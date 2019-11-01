@@ -78,12 +78,12 @@ SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHostsWithMax
 }
 
 void RemoteCommandTargeterMock::markHostNotMaster(const HostAndPort& host, const Status& status) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     _hostsMarkedDown.insert(host);
 }
 
 void RemoteCommandTargeterMock::markHostUnreachable(const HostAndPort& host, const Status& status) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     _hostsMarkedDown.insert(host);
 }
 
@@ -105,7 +105,7 @@ void RemoteCommandTargeterMock::setFindHostsReturnValue(
 }
 
 std::set<HostAndPort> RemoteCommandTargeterMock::getAndClearMarkedDownHosts() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     auto hostsMarkedDown = _hostsMarkedDown;
     _hostsMarkedDown.clear();
     return hostsMarkedDown;

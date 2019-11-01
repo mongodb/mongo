@@ -147,7 +147,7 @@ private:
     std::unique_ptr<transport::TransportLayer> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::_mutex");
     ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::shared_ptr<ConnectionPool> _pool;
@@ -165,7 +165,7 @@ private:
     AtomicWord<State> _state;
     stdx::thread _ioThread;
 
-    stdx::mutex _inProgressMutex;
+    Mutex _inProgressMutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::_inProgressMutex");
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandState>> _inProgress;
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<AlarmState>>
         _inProgressAlarms;

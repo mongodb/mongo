@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "mongo/db/service_context_fwd.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/periodic_runner.h"
@@ -88,7 +88,7 @@ private:
 
         // The mutex is protecting _execStatus, the variable that can be accessed from other
         // threads.
-        stdx::mutex _mutex;
+        Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
 
         // The current execution status of the job.
         ExecutionStatus _execStatus{ExecutionStatus::kNotScheduled};
@@ -102,7 +102,7 @@ private:
     std::vector<std::shared_ptr<PeriodicJobImpl>> _jobs;
     std::vector<std::shared_ptr<PeriodicJobImpl>> _Pausedjobs;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("PeriodicRunnerEmbedded::_mutex");
 };
 
 }  // namespace mongo

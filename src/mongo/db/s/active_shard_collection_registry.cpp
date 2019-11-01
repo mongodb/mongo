@@ -91,7 +91,7 @@ ActiveShardCollectionRegistry& ActiveShardCollectionRegistry::get(OperationConte
 
 StatusWith<ScopedShardCollection> ActiveShardCollectionRegistry::registerShardCollection(
     const ShardsvrShardCollection& request) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     std::string nss = request.get_shardsvrShardCollection().get().ns();
 
     auto iter = _activeShardCollectionMap.find(nss);
@@ -114,7 +114,7 @@ StatusWith<ScopedShardCollection> ActiveShardCollectionRegistry::registerShardCo
 }
 
 void ActiveShardCollectionRegistry::_clearShardCollection(std::string nss) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto iter = _activeShardCollectionMap.find(nss);
     invariant(iter != _activeShardCollectionMap.end());
     _activeShardCollectionMap.erase(nss);
@@ -122,7 +122,7 @@ void ActiveShardCollectionRegistry::_clearShardCollection(std::string nss) {
 
 void ActiveShardCollectionRegistry::_setUUIDOrError(std::string nss,
                                                     StatusWith<boost::optional<UUID>> swUUID) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto iter = _activeShardCollectionMap.find(nss);
     invariant(iter != _activeShardCollectionMap.end());
     auto activeShardCollectionState = iter->second;

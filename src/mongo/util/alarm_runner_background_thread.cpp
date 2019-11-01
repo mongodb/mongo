@@ -34,13 +34,13 @@
 namespace mongo {
 
 void AlarmRunnerBackgroundThread::start() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _running = true;
     _thread = stdx::thread(&AlarmRunnerBackgroundThread::_threadRoutine, this);
 }
 
 void AlarmRunnerBackgroundThread::shutdown() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _running = false;
     lk.unlock();
     _condVar.notify_one();
@@ -56,7 +56,7 @@ AlarmRunnerBackgroundThread::_initializeSchedulers(std::vector<AlarmSchedulerHan
     invariant(!schedulers.empty());
 
     const auto registerHook = [this](Date_t next, const std::shared_ptr<AlarmScheduler>& which) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         if (next >= _nextAlarm) {
             return;
         }
@@ -81,7 +81,7 @@ AlarmRunnerBackgroundThread::_initializeSchedulers(std::vector<AlarmSchedulerHan
 }
 
 void AlarmRunnerBackgroundThread::_threadRoutine() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     while (_running) {
         const auto clockSource = _schedulers.front()->clockSource();
         const auto now = clockSource->now();

@@ -38,8 +38,8 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -92,7 +92,7 @@ Milliseconds AbstractOplogFetcher::_getGetMoreMaxTime() const {
 }
 
 std::string AbstractOplogFetcher::toString() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     str::stream msg;
     msg << _getComponentName() << " -"
         << " last optime fetched: " << _lastFetched.toString();
@@ -117,7 +117,7 @@ void AbstractOplogFetcher::_makeAndScheduleFetcherCallback(
 
     Status scheduleStatus = Status::OK();
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _fetcher = _makeFetcher(findCommandObj, metadataObj, _getInitialFindMaxTime());
         scheduleStatus = _scheduleFetcher_inlock();
     }
@@ -143,7 +143,7 @@ void AbstractOplogFetcher::_doShutdown_inlock() noexcept {
     }
 }
 
-stdx::mutex* AbstractOplogFetcher::_getMutex() noexcept {
+Mutex* AbstractOplogFetcher::_getMutex() noexcept {
     return &_mutex;
 }
 
@@ -157,12 +157,12 @@ OpTime AbstractOplogFetcher::getLastOpTimeFetched_forTest() const {
 }
 
 OpTime AbstractOplogFetcher::_getLastOpTimeFetched() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _lastFetched;
 }
 
 BSONObj AbstractOplogFetcher::getCommandObject_forTest() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _fetcher->getCommandObject();
 }
 
@@ -197,7 +197,7 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
             _makeFindCommandObject(_nss, _getLastOpTimeFetched(), _getRetriedFindMaxTime());
         BSONObj metadataObj = _makeMetadataObject();
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             if (_fetcherRestarts == _maxFetcherRestarts) {
                 log() << "Error returned from oplog query (no more query restarts left): "
                       << redact(responseStatus);
@@ -229,7 +229,7 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
 
     // Reset fetcher restart counter on successful response.
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_isActive_inlock());
         _fetcherRestarts = 0;
     }
@@ -274,7 +274,7 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         LOG(3) << _getComponentName()
                << " setting last fetched optime ahead after batch: " << lastDoc;
 
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _lastFetched = lastDoc;
     }
 
@@ -295,7 +295,7 @@ void AbstractOplogFetcher::_finishCallback(Status status) {
     _onShutdownCallbackFn(status);
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _transitionToComplete_inlock();
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.

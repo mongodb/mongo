@@ -43,9 +43,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
@@ -62,7 +62,7 @@ public:
 
     void setInterval(Seconds interval) {
         {
-            stdx::lock_guard<stdx::mutex> twiddle(_mutex);
+            stdx::lock_guard<Latch> twiddle(_mutex);
             MONGO_LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
             _interval = interval;
         }
@@ -70,12 +70,12 @@ public:
     }
 
     void start() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         _last = Date_t::now();
     }
 
     void abort() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         _inShutdown = true;
         _condition.notify_all();
     }
@@ -86,7 +86,7 @@ public:
      * interval has elapsed.
      */
     bool wait() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         while (true) {
             if (_inShutdown) {
                 return false;
@@ -110,7 +110,7 @@ public:
 
 private:
     Seconds _interval;
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ThreadSleepInterval::_mutex");
     stdx::condition_variable _condition;
     bool _inShutdown = false;
     Date_t _last;

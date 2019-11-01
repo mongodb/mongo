@@ -78,7 +78,7 @@ public:
         auto pf = makePromiseFuture<ReturnType>();
         auto taskCompletionPromise = std::make_shared<Promise<ReturnType>>(std::move(pf.promise));
         try {
-            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            stdx::unique_lock<Latch> ul(_mutex);
             uassertStatusOK(_shutdownStatus);
 
             auto scheduledWorkHandle = uassertStatusOK(_executor->scheduleWorkAt(
@@ -119,7 +119,7 @@ public:
 
             return std::move(pf.future).tapAll(
                 [this, it = std::move(it)](StatusOrStatusWith<ReturnType> s) {
-                    stdx::lock_guard<stdx::mutex> lg(_mutex);
+                    stdx::lock_guard<Latch> lg(_mutex);
                     _activeHandles.erase(it);
                     _notifyAllTasksComplete(lg);
                 });
@@ -210,7 +210,7 @@ private:
     ChildIteratorsList::iterator _itToRemove;
 
     // Mutex to protect the shared state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("AsyncWorkScheduler::_mutex");
 
     // If shutdown() is called, this contains the first status that was passed to it and is an
     // indication that no more operations can be scheduled
@@ -294,7 +294,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
          * The first few fields have fixed values.           *
          ******************************************************/
         // Protects all state in the SharedBlock.
-        stdx::mutex mutex;
+        Mutex mutex = MONGO_MAKE_LATCH("SharedBlock::mutex");
 
         // If any response returns an error prior to a response setting shouldStopIteration to
         // ShouldStopIteration::kYes, the promise will be set with that error rather than the global
@@ -332,7 +332,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
     for (auto&& localFut : futures) {
         std::move(localFut)
             .then([sharedBlock](IndividualResult res) {
-                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
+                stdx::unique_lock<Latch> lk(sharedBlock->mutex);
                 if (sharedBlock->shouldStopIteration == ShouldStopIteration::kNo &&
                     sharedBlock->status.isOK()) {
                     sharedBlock->shouldStopIteration =
@@ -340,14 +340,14 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
                 }
             })
             .onError([sharedBlock](Status s) {
-                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
+                stdx::unique_lock<Latch> lk(sharedBlock->mutex);
                 if (sharedBlock->shouldStopIteration == ShouldStopIteration::kNo &&
                     sharedBlock->status.isOK()) {
                     sharedBlock->status = s;
                 }
             })
             .getAsync([sharedBlock](Status s) {
-                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
+                stdx::unique_lock<Latch> lk(sharedBlock->mutex);
                 sharedBlock->numOutstandingResponses--;
                 if (sharedBlock->numOutstandingResponses == 0) {
                     // Unlock before emplacing the result in case any continuations do expensive

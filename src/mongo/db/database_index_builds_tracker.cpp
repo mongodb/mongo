@@ -71,7 +71,7 @@ int DatabaseIndexBuildsTracker::getNumberOfIndexBuilds(WithLock) const {
     return _allIndexBuilds.size();
 }
 
-void DatabaseIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_lock<stdx::mutex>& lk) {
+void DatabaseIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_lock<Latch>& lk) {
     _noIndexBuildsRemainCondVar.wait(lk, [&] { return _allIndexBuilds.empty(); });
 }
 

@@ -48,17 +48,17 @@ bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) 
 }
 
 bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _collectionsAlwaysNeedingSizeAdjustment.count(ident) > 0;
 }
 
 void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.insert(ident);
 }
 
 void SizeRecoveryState::clearStateBeforeRecovery() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.clear();
 }
 }  // namespace mongo

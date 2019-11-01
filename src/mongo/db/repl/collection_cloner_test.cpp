@@ -66,7 +66,7 @@ public:
         : MockDBClientConnection(remote), _net(net) {}
 
     virtual ~FailableMockDBClientConnection() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _paused = false;
         _cond.notify_all();
         _cond.wait(lk, [this] { return !_resuming; });
@@ -87,13 +87,13 @@ public:
                              int batchSize) override {
         ON_BLOCK_EXIT([this]() {
             {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                stdx::lock_guard<Latch> lk(_mutex);
                 _queryCount++;
             }
             _cond.notify_all();
         });
         {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_mutex);
             _waiting = _paused;
             _cond.notify_all();
             while (_paused) {
@@ -119,14 +119,14 @@ public:
 
     void pause() {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             _paused = true;
         }
         _cond.notify_all();
     }
     void resume() {
         {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_mutex);
             _resuming = true;
             _resume(&lk);
             _resuming = false;
@@ -136,13 +136,13 @@ public:
 
     // Waits for the next query after pause() is called to start.
     void waitForPausedQuery() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _cond.wait(lk, [this] { return _waiting; });
     }
 
     // Resumes, then waits for the next query to run after resume() is called to complete.
     void resumeAndWaitForResumedQuery() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _resuming = true;
         _resume(&lk);
         _cond.notify_all();  // This is to wake up the paused thread.
@@ -153,7 +153,7 @@ public:
 
 private:
     executor::NetworkInterfaceMock* _net;
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("FailableMockDBClientConnection::_mutex");
     stdx::condition_variable _cond;
     bool _paused = false;
     bool _waiting = false;
@@ -163,7 +163,7 @@ private:
     Status _failureForConnect = Status::OK();
     Status _failureForQuery = Status::OK();
 
-    void _resume(stdx::unique_lock<stdx::mutex>* lk) {
+    void _resume(stdx::unique_lock<Latch>* lk) {
         invariant(lk->owns_lock());
         _paused = false;
         _resumedQueryCount = _queryCount;

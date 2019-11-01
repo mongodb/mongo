@@ -34,7 +34,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 /**
  * Caches the set of collections containing a TTL index.
@@ -51,7 +51,7 @@ public:
     std::vector<std::string> getCollections();
 
 private:
-    std::vector<std::string> _ttlCollections;
-    stdx::mutex _ttlCollectionsLock;
+    Mutex _ttlCollectionsLock = MONGO_MAKE_LATCH("TTLCollectionCache::_ttlCollectionsLock");
+    std::vector<std::string> _ttlCollections;  // <CollectionUUID, IndexName>
 };
 }  // namespace mongo

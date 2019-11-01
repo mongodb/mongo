@@ -51,14 +51,14 @@ void TransactionCoordinatorCatalog::exitStepUp(Status status) {
                   << causedBy(status);
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_stepUpCompletionStatus);
     _stepUpCompletionStatus = std::move(status);
     _stepUpCompleteCV.notify_all();
 }
 
 void TransactionCoordinatorCatalog::onStepDown() {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
 
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
     for (auto&& [sessionId, coordinatorsForSession] : _coordinatorsBySession) {
@@ -82,7 +82,7 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     LOG(3) << "Inserting coordinator " << lsid.getId() << ':' << txnNumber
            << " into in-memory catalog";
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     if (!forStepUp) {
         _waitForStepUpToComplete(ul, opCtx);
     }
@@ -110,7 +110,7 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
 
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
     OperationContext* opCtx, const LogicalSessionId& lsid, TxnNumber txnNumber) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     _waitForStepUpToComplete(ul, opCtx);
 
     std::shared_ptr<TransactionCoordinator> coordinatorToReturn;
@@ -130,7 +130,7 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
 boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
 TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
                                                   const LogicalSessionId& lsid) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     _waitForStepUpToComplete(ul, opCtx);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
@@ -153,7 +153,7 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
     LOG(3) << "Removing coordinator " << lsid.getId() << ':' << txnNumber
            << " from in-memory catalog";
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -178,7 +178,7 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
 }
 
 void TransactionCoordinatorCatalog::join() {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
 
     while (!_noActiveCoordinatorsCV.wait_for(
         ul, stdx::chrono::seconds{5}, [this] { return _coordinatorsBySession.empty(); })) {
@@ -189,11 +189,11 @@ void TransactionCoordinatorCatalog::join() {
 }
 
 std::string TransactionCoordinatorCatalog::toString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _toString(lk);
 }
 
-void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk,
+void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<Latch>& lk,
                                                              OperationContext* opCtx) {
     invariant(lk.owns_lock());
     opCtx->waitForConditionOrInterrupt(
@@ -216,7 +216,7 @@ std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {
 }
 
 void TransactionCoordinatorCatalog::filter(FilterPredicate predicate, FilterVisitor visitor) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     for (auto sessionIt = _coordinatorsBySession.begin(); sessionIt != _coordinatorsBySession.end();
          ++sessionIt) {
         auto& lsid = sessionIt->first;

@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/diagnostic_info.h"
 
 namespace mongo {
 

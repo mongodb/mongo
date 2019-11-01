@@ -166,7 +166,7 @@ private:
     std::unique_ptr<txn::AsyncWorkScheduler> _sendPrepareScheduler;
 
     // Protects the state below
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("TransactionCoordinator::_mutex");
 
     // Tracks which step of the 2PC coordination is currently (or was most recently) executing
     Step _step{Step::kInactive};

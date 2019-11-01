@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -46,7 +46,7 @@ public:
     /**
      * Take lock on construction to guard value.
      */
-    explicit update_guard(T& value, stdx::mutex& mtx) : _lock(mtx), _value(value) {}
+    explicit update_guard(T& value, Mutex& mtx) : _lock(mtx), _value(value) {}
     ~update_guard() = default;
 
     // Only move construction is permitted so that synchronized_value may return update_guard
@@ -81,7 +81,7 @@ public:
 
 private:
     // Held lock from synchronized_value
-    stdx::unique_lock<stdx::mutex> _lock;
+    stdx::unique_lock<Latch> _lock;
 
     // Reference to the value from synchronized_value
     T& _value;
@@ -96,7 +96,7 @@ public:
     /**
      * Take lock on construction to guard value.
      */
-    explicit const_update_guard(const T& value, stdx::mutex& mtx) : _lock(mtx), _value(value) {}
+    explicit const_update_guard(const T& value, Mutex& mtx) : _lock(mtx), _value(value) {}
     ~const_update_guard() = default;
 
     // Only move construction is permitted so that synchronized_value may return const_update_guard
@@ -121,7 +121,7 @@ public:
 
 private:
     // Held lock from synchronized_value
-    stdx::unique_lock<stdx::mutex> _lock;
+    stdx::unique_lock<Latch> _lock;
 
     // Reference to the value from synchronized_value
     const T& _value;
@@ -156,7 +156,7 @@ public:
     // Support assigning from the contained value
     synchronized_value& operator=(const T& value) {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             _value = value;
         }
         return *this;
@@ -164,7 +164,7 @@ public:
 
     synchronized_value& operator=(T&& value) {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             _value = std::move(value);
         }
         return *this;
@@ -174,7 +174,7 @@ public:
      * Return a copy of the protected object.
      */
     T get() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         return _value;
     }
 
@@ -204,26 +204,26 @@ public:
     bool operator==(synchronized_value const& rhs) const {
         // TODO: C++17 - move from std::lock to std::scoped_lock
         std::lock(_mutex, rhs._mutex);
-        stdx::lock_guard<stdx::mutex> lk1(_mutex, stdx::adopt_lock);
-        stdx::lock_guard<stdx::mutex> lk2(rhs._mutex, stdx::adopt_lock);
+        stdx::lock_guard<Latch> lk1(_mutex, stdx::adopt_lock);
+        stdx::lock_guard<Latch> lk2(rhs._mutex, stdx::adopt_lock);
         return _value == rhs._value;
     }
 
     bool operator!=(synchronized_value const& rhs) const {
         // TODO: C++17 - move from std::lock to std::scoped_lock
         std::lock(_mutex, rhs._mutex);
-        stdx::lock_guard<stdx::mutex> lk1(_mutex, stdx::adopt_lock);
-        stdx::lock_guard<stdx::mutex> lk2(rhs._mutex, stdx::adopt_lock);
+        stdx::lock_guard<Latch> lk1(_mutex, stdx::adopt_lock);
+        stdx::lock_guard<Latch> lk2(rhs._mutex, stdx::adopt_lock);
         return _value != rhs._value;
     }
 
     bool operator==(T const& rhs) const {
-        stdx::lock_guard<stdx::mutex> lock1(_mutex);
+        stdx::lock_guard<Latch> lock1(_mutex);
         return _value == rhs;
     }
 
     bool operator!=(T const& rhs) const {
-        stdx::lock_guard<stdx::mutex> lock1(_mutex);
+        stdx::lock_guard<Latch> lock1(_mutex);
         return _value != rhs;
     }
 
@@ -250,12 +250,12 @@ private:
     T _value;
 
     // Mutex to guard value
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("synchronized_value::_mutex");
 };
 
 template <class T>
 bool operator==(const synchronized_value<T>& lhs, const T& rhs) {
-    stdx::lock_guard<stdx::mutex> lock(lhs._mutex);
+    stdx::lock_guard<Latch> lock(lhs._mutex);
 
     return lhs._value == rhs;
 }
@@ -267,7 +267,7 @@ bool operator!=(const synchronized_value<T>& lhs, const T& rhs) {
 
 template <class T>
 bool operator==(const T& lhs, const synchronized_value<T>& rhs) {
-    stdx::lock_guard<stdx::mutex> lock(rhs._mutex);
+    stdx::lock_guard<Latch> lock(rhs._mutex);
 
     return lhs == rhs._value;
 }
@@ -281,8 +281,8 @@ template <class T>
 bool operator==(const synchronized_value<T>& lhs, const synchronized_value<T>& rhs) {
     // TODO: C++17 - move from std::lock to std::scoped_lock
     std::lock(lhs._mutex, rhs._mutex);
-    stdx::lock_guard<stdx::mutex> lk1(lhs._mutex, stdx::adopt_lock);
-    stdx::lock_guard<stdx::mutex> lk2(rhs._mutex, stdx::adopt_lock);
+    stdx::lock_guard<Latch> lk1(lhs._mutex, stdx::adopt_lock);
+    stdx::lock_guard<Latch> lk2(rhs._mutex, stdx::adopt_lock);
 
     return lhs._value == rhs._value;
 }

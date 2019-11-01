@@ -202,7 +202,7 @@ private:
          * same task object on which it was called because it might have been deleted during the
          * unlocked period.
          */
-        void waitForActiveTaskCompletion(stdx::unique_lock<stdx::mutex>& lg);
+        void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
 
         /**
          * Checks whether 'term' matches the term of the latest task in the task list. This is
@@ -312,7 +312,7 @@ private:
          * same task object on which it was called because it might have been deleted during the
          * unlocked period.
          */
-        void waitForActiveTaskCompletion(stdx::unique_lock<stdx::mutex>& lg);
+        void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
 
         /**
          * Checks whether 'term' matches the term of the latest task in the task list. This is
@@ -482,7 +482,7 @@ private:
     NamespaceMetadataChangeNotifications _namespaceNotifications;
 
     // Protects the class state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ShardServerCatalogCacheLoader::_mutex");
 
     // This value is bumped every time the set of currently scheduled tasks should no longer be
     // running. This includes, replica set state transitions and shutdown.

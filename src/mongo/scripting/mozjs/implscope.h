@@ -414,7 +414,7 @@ private:
     std::vector<JS::PersistentRootedValue> _funcs;
     InternedStringTable _internedStrings;
     Status _killStatus;
-    mutable std::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MozJSImplScope::_mutex");
     stdx::condition_variable _sleepCondition;
     std::string _error;
     unsigned int _opId;        // op id for this scope

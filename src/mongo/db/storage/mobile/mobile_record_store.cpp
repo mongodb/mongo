@@ -233,7 +233,7 @@ void MobileRecordStore::_initDataSizeIfNeeded_inlock(OperationContext* opCtx) co
 }
 
 long long MobileRecordStore::dataSize(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lock(_dataSizeMutex);
+    stdx::lock_guard<Latch> lock(_dataSizeMutex);
     _initDataSizeIfNeeded_inlock(opCtx);
     return _dataSize;
 }
@@ -255,7 +255,7 @@ void MobileRecordStore::_initNumRecsIfNeeded_inlock(OperationContext* opCtx) con
 }
 
 long long MobileRecordStore::numRecords(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lock(_numRecsMutex);
+    stdx::lock_guard<Latch> lock(_numRecsMutex);
     _initNumRecsIfNeeded_inlock(opCtx);
     return _numRecs;
 }
@@ -451,7 +451,7 @@ public:
     void commit(boost::optional<Timestamp>) override {}
 
     void rollback() override {
-        stdx::lock_guard<stdx::mutex> lock(_rs->_numRecsMutex);
+        stdx::lock_guard<Latch> lock(_rs->_numRecsMutex);
         _rs->_numRecs -= _diff;
     }
 
@@ -461,7 +461,7 @@ private:
 };
 
 void MobileRecordStore::_changeNumRecs(OperationContext* opCtx, int64_t diff) {
-    stdx::lock_guard<stdx::mutex> lock(_numRecsMutex);
+    stdx::lock_guard<Latch> lock(_numRecsMutex);
     opCtx->recoveryUnit()->registerChange(new NumRecsChange(this, diff));
     _initNumRecsIfNeeded_inlock(opCtx);
     _numRecs += diff;
@@ -472,7 +472,7 @@ bool MobileRecordStore::_resetNumRecsIfNeeded(OperationContext* opCtx, int64_t n
     int64_t currNumRecs = numRecords(opCtx);
     if (currNumRecs != newNumRecs) {
         wasReset = true;
-        stdx::lock_guard<stdx::mutex> lock(_numRecsMutex);
+        stdx::lock_guard<Latch> lock(_numRecsMutex);
         _numRecs = newNumRecs;
     }
     return wasReset;
@@ -488,7 +488,7 @@ public:
     void commit(boost::optional<Timestamp>) override {}
 
     void rollback() override {
-        stdx::lock_guard<stdx::mutex> lock(_rs->_dataSizeMutex);
+        stdx::lock_guard<Latch> lock(_rs->_dataSizeMutex);
         _rs->_dataSize -= _diff;
     }
 
@@ -498,7 +498,7 @@ private:
 };
 
 void MobileRecordStore::_changeDataSize(OperationContext* opCtx, int64_t diff) {
-    stdx::lock_guard<stdx::mutex> lock(_dataSizeMutex);
+    stdx::lock_guard<Latch> lock(_dataSizeMutex);
     opCtx->recoveryUnit()->registerChange(new DataSizeChange(this, diff));
     _initDataSizeIfNeeded_inlock(opCtx);
     _dataSize += diff;
@@ -510,7 +510,7 @@ bool MobileRecordStore::_resetDataSizeIfNeeded(OperationContext* opCtx, int64_t 
 
     if (currDataSize != _dataSize) {
         wasReset = true;
-        stdx::lock_guard<stdx::mutex> lock(_dataSizeMutex);
+        stdx::lock_guard<Latch> lock(_dataSizeMutex);
         _dataSize = newDataSize;
     }
     return wasReset;

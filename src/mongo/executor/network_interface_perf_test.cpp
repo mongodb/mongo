@@ -66,7 +66,7 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
     auto server = fixture.getServers()[0];
 
     std::atomic<int> remainingOps(operations);  // NOLINT
-    stdx::mutex mtx;
+    auto mtx = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     Timer t;
 
@@ -81,7 +81,7 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
         if (--remainingOps) {
             return func();
         }
-        stdx::unique_lock<stdx::mutex> lk(mtx);
+        stdx::unique_lock<Latch> lk(mtx);
         cv.notify_one();
     };
 
@@ -93,7 +93,7 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
 
     func();
 
-    stdx::unique_lock<stdx::mutex> lk(mtx);
+    stdx::unique_lock<Latch> lk(mtx);
     cv.wait(lk, [&] { return remainingOps.load() == 0; });
 
     return t.millis();

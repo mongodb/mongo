@@ -133,7 +133,7 @@ void BackgroundSync::startup(OperationContext* opCtx) {
 }
 
 void BackgroundSync::shutdown(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     _state = ProducerState::Stopped;
 
@@ -157,7 +157,7 @@ void BackgroundSync::join(OperationContext* opCtx) {
 }
 
 bool BackgroundSync::inShutdown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _inShutdown_inlock();
 }
 
@@ -236,7 +236,7 @@ void BackgroundSync::_produce() {
     HostAndPort source;
     SyncSourceResolverResponse syncSourceResp;
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         if (_lastOpTimeFetched.isNull()) {
             // then we're initial syncing and we're still waiting for this to be set
             lock.unlock();
@@ -259,7 +259,7 @@ void BackgroundSync::_produce() {
             auto opCtx = cc().makeOperationContext();
             minValidSaved = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
         }
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
         }
@@ -289,7 +289,7 @@ void BackgroundSync::_produce() {
     fassert(40349, status);
     _syncSourceResolver->join();
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _syncSourceResolver.reset();
     }
 
@@ -338,7 +338,7 @@ void BackgroundSync::_produce() {
         return;
     } else if (syncSourceResp.isOK() && !syncSourceResp.getSyncSource().empty()) {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             _syncSourceHost = syncSourceResp.getSyncSource();
             source = _syncSourceHost;
         }
@@ -380,7 +380,7 @@ void BackgroundSync::_produce() {
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
         }
@@ -428,7 +428,7 @@ void BackgroundSync::_produce() {
             },
             onOplogFetcherShutdownCallbackFn,
             bgSyncOplogFetcherBatchSize);
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
         }
@@ -504,7 +504,7 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
         // are done to prevent going into shutdown. This avoids a race where shutdown() clears the
         // buffer between the time we check _inShutdown and the point where we finish writing to the
         // buffer.
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return Status::OK();
         }
@@ -556,7 +556,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     OpTime lastOpTimeFetched;
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         lastOpTimeFetched = _lastOpTimeFetched;
     }
 
@@ -633,7 +633,7 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
                                      rollbackRemoteOplogQueryBatchSize.load());
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
         }
@@ -670,18 +670,18 @@ void BackgroundSync::_fallBackOnRollbackViaRefetch(
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     return _syncSourceHost;
 }
 
 void BackgroundSync::clearSyncTarget() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     log() << "Resetting sync source to empty, which was " << _syncSourceHost;
     _syncSourceHost = HostAndPort();
 }
 
 void BackgroundSync::stop(bool resetLastFetchedOptime) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     _state = ProducerState::Stopped;
     log() << "Stopping replication producer";
@@ -711,7 +711,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
 
     do {
         lastAppliedOpTime = _readLastAppliedOpTime(opCtx);
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         // Double check the state after acquiring the mutex.
         if (_state != ProducerState::Starting) {
             return;
@@ -781,12 +781,12 @@ bool BackgroundSync::shouldStopFetching() const {
 }
 
 BackgroundSync::ProducerState BackgroundSync::getState() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _state;
 }
 
 void BackgroundSync::startProducerIfStopped() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     // Let producer run if it's already running.
     if (_state == ProducerState::Stopped) {
         _state = ProducerState::Starting;

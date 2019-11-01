@@ -221,7 +221,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
                                                   /*commitQuorum=*/boost::none);
 
         Status status = [&]() {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_mutex);
             return _registerIndexBuild(lk, replIndexBuildState);
         }();
         if (!status.isOK()) {
@@ -257,7 +257,7 @@ Future<void> IndexBuildsCoordinator::joinIndexBuilds(const NamespaceString& nss,
 }
 
 void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // All index builds should have been signaled to stop via the ServiceContext.
 
@@ -272,7 +272,7 @@ void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown() {
 
 void IndexBuildsCoordinator::abortCollectionIndexBuilds(const UUID& collectionUUID,
                                                         const std::string& reason) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // Ensure the caller correctly stopped any new index builds on the collection.
     auto it = _disallowedCollections.find(collectionUUID);
@@ -292,7 +292,7 @@ void IndexBuildsCoordinator::abortCollectionIndexBuilds(const UUID& collectionUU
 }
 
 void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::string& reason) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // Ensure the caller correctly stopped any new index builds on the database.
     auto it = _disallowedDbs.find(db);
@@ -333,7 +333,7 @@ void IndexBuildsCoordinator::recoverIndexBuilds() {
 }
 
 int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
     if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
@@ -343,7 +343,7 @@ int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
 }
 
 void IndexBuildsCoordinator::dump(std::ostream& ss) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     if (_collectionIndexBuilds.size()) {
         ss << "\n<b>Background Jobs in Progress</b>\n";
@@ -360,17 +360,17 @@ void IndexBuildsCoordinator::dump(std::ostream& ss) const {
 }
 
 bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _collectionIndexBuilds.find(collectionUUID) != _collectionIndexBuilds.end();
 }
 
 bool IndexBuildsCoordinator::inProgForDb(StringData db) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _databaseIndexBuilds.find(db) != _databaseIndexBuilds.end();
 }
 
 void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
             str::stream() << "cannot perform operation: there are currently "
                           << _allIndexBuilds.size() << " index builds running.",
@@ -394,7 +394,7 @@ void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
 
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
     const UUID& collectionUUID) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
     if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
@@ -408,7 +408,7 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
 }
 
 void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
     if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
@@ -426,7 +426,7 @@ void IndexBuildsCoordinator::onReplicaSetReconfig() {
 }
 
 void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _sleepForTest = sleep;
 }
 
@@ -578,7 +578,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     // Lock from when we ascertain what indexes to build through to when the build is registered
     // on the Coordinator and persistedly set up in the catalog. This serializes setting up an
     // index build so that no attempts are made to register the same build twice.
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     std::vector<BSONObj> filteredSpecs;
     try {
@@ -693,7 +693,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
 void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
                                             const UUID& buildUUID) noexcept {
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         while (_sleepForTest) {
             lk.unlock();
             sleepmillis(100);
@@ -702,7 +702,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     }
 
     auto replState = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         auto it = _allIndexBuilds.find(buildUUID);
         invariant(it != _allIndexBuilds.end());
         return it->second;
@@ -720,7 +720,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     // Ensure the index build is unregistered from the Coordinator and the Promise is set with
     // the build's result so that callers are notified of the outcome.
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     _unregisterIndexBuild(lk, replState);
 
@@ -961,7 +961,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     invariant(opCtx->lockState()->isW());
 
     auto replState = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         auto it = _allIndexBuilds.find(buildUUID);
         invariant(it != _allIndexBuilds.end());
         return it->second;
@@ -1023,7 +1023,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     invariant(indexCatalogStats.numIndexesBefore == indexCatalogStats.numIndexesAfter);
 
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _unregisterIndexBuild(lk, replState);
     }
 
@@ -1034,7 +1034,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 }
 
 void IndexBuildsCoordinator::_stopIndexBuildsOnDatabase(StringData dbName) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto it = _disallowedDbs.find(dbName);
     if (it != _disallowedDbs.end()) {
@@ -1045,7 +1045,7 @@ void IndexBuildsCoordinator::_stopIndexBuildsOnDatabase(StringData dbName) {
 }
 
 void IndexBuildsCoordinator::_stopIndexBuildsOnCollection(const UUID& collectionUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto it = _disallowedCollections.find(collectionUUID);
     if (it != _disallowedCollections.end()) {
@@ -1056,7 +1056,7 @@ void IndexBuildsCoordinator::_stopIndexBuildsOnCollection(const UUID& collection
 }
 
 void IndexBuildsCoordinator::_allowIndexBuildsOnDatabase(StringData dbName) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto it = _disallowedDbs.find(dbName);
     invariant(it != _disallowedDbs.end());
@@ -1067,7 +1067,7 @@ void IndexBuildsCoordinator::_allowIndexBuildsOnDatabase(StringData dbName) {
 }
 
 void IndexBuildsCoordinator::_allowIndexBuildsOnCollection(const UUID& collectionUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto it = _disallowedCollections.find(collectionUUID);
     invariant(it != _disallowedCollections.end());

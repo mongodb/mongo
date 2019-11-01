@@ -79,7 +79,7 @@ private:
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     const ConnectionPool::Options _connPoolOptions;
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("TLTypeFactory::_mutex");
     AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };

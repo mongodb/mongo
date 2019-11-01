@@ -60,7 +60,7 @@ MultiApplier::~MultiApplier() {
 }
 
 bool MultiApplier::isActive() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _isActive_inlock();
 }
 
@@ -69,7 +69,7 @@ bool MultiApplier::_isActive_inlock() const {
 }
 
 Status MultiApplier::startup() noexcept {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     switch (_state) {
         case State::kPreStart:
@@ -96,7 +96,7 @@ Status MultiApplier::startup() noexcept {
 }
 
 void MultiApplier::shutdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     switch (_state) {
         case State::kPreStart:
             // Transition directly from PreStart to Complete if not started yet.
@@ -117,12 +117,12 @@ void MultiApplier::shutdown() {
 }
 
 void MultiApplier::join() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _condition.wait(lk, [this]() { return !_isActive_inlock(); });
 }
 
 MultiApplier::State MultiApplier::getState_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _state;
 }
 
@@ -153,14 +153,14 @@ void MultiApplier::_finishCallback(const Status& result) {
     // destroyed outside the lock.
     decltype(_onCompletion) onCompletion;
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_onCompletion);
         std::swap(_onCompletion, onCompletion);
     }
 
     onCompletion(result);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(State::kComplete != _state);
     _state = State::kComplete;
     _condition.notify_all();

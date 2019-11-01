@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>
@@ -56,7 +56,7 @@ namespace mongo {
  *
  * A call to such a function looks like this:
  *
- *     stdx::lock_guard<stdx::mutex> lk(_mutex);
+ *     stdx::lock_guard<Latch> lk(_mutex);
  *     _clobber(lk, opCtx);  // instead of _clobber_inlock(opCtx)
  *
  * Note that the formal argument need not (and should not) be named unless it is needed to pass
@@ -68,11 +68,11 @@ namespace mongo {
  *
  */
 struct WithLock {
-    template <typename Mutex>
-    WithLock(stdx::lock_guard<Mutex> const&) noexcept {}
+    template <typename LatchT>
+    WithLock(stdx::lock_guard<LatchT> const&) noexcept {}
 
-    template <typename Mutex>
-    WithLock(stdx::unique_lock<Mutex> const& lock) noexcept {
+    template <typename LatchT>
+    WithLock(stdx::unique_lock<LatchT> const& lock) noexcept {
         invariant(lock.owns_lock());
     }
 
@@ -88,9 +88,9 @@ struct WithLock {
 
     // No moving a lock_guard<> or unique_lock<> in.
     template <typename Mutex>
-    WithLock(stdx::lock_guard<Mutex>&&) = delete;
+    WithLock(stdx::lock_guard<Latch>&&) = delete;
     template <typename Mutex>
-    WithLock(stdx::unique_lock<Mutex>&&) = delete;
+    WithLock(stdx::unique_lock<Latch>&&) = delete;
 
     /*
      * Produces a WithLock without benefit of any actual lock, for use in cases where a lock is not

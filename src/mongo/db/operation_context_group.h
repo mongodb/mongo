@@ -32,7 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -96,7 +96,7 @@ public:
 private:
     friend class Context;
 
-    stdx::mutex _lock;
+    Mutex _lock = MONGO_MAKE_LATCH("OperationContextGroup::_lock");
     std::vector<UniqueOperationContext> _contexts;
 
 };  // class OperationContextGroup

@@ -32,7 +32,7 @@
 #include <memory>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -185,9 +185,9 @@ private:
     using AlarmMap = std::multimap<Date_t, AlarmData>;
     using AlarmMapIt = AlarmMap::iterator;
 
-    void _clearAllAlarmsImpl(stdx::unique_lock<stdx::mutex>& lk);
+    void _clearAllAlarmsImpl(stdx::unique_lock<Latch>& lk);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("AlarmSchedulerPrecise::_mutex");
     bool _shutdown = false;
     AlarmMap _alarms;
 };

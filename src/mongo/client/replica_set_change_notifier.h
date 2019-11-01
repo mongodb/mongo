@@ -35,7 +35,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
 
@@ -102,7 +102,7 @@ private:
     void _addListener(Listener* listener);
     void _removeListener(Listener* listener);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetChangeNotifier::_mutex");
     std::vector<Listener*> _listeners;
     stdx::unordered_map<Key, State> _replicaSetStates;
 };

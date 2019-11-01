@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -190,7 +190,7 @@ public:
 
 private:
     // Protects all the member variables.
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("DistLockCatalogMock::_mutex");
 
     GrabLockFunc _grabLockChecker;
     StatusWith<LocksType> _grabLockReturnValue;

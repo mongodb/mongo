@@ -35,7 +35,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -194,7 +194,7 @@ private:
 
     ReplicaSetChangeListenerHandle _listener;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ShardingTaskExecutorPoolController::_mutex");
 
     // Entires to _poolDatas are added by addHost() and removed by removeHost()
     stdx::unordered_map<PoolId, PoolData> _poolDatas;

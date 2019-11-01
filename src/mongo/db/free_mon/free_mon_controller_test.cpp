@@ -86,7 +86,7 @@ public:
         builder.append("mock", "some data");
 
         {
-            stdx::lock_guard<stdx::mutex> lck(_mutex);
+            stdx::lock_guard<Latch> lck(_mutex);
 
             ++_counter;
 
@@ -105,12 +105,12 @@ public:
     }
 
     std::uint32_t count() {
-        stdx::lock_guard<stdx::mutex> lck(_mutex);
+        stdx::lock_guard<Latch> lck(_mutex);
         return _counter;
     }
 
     void wait() {
-        stdx::unique_lock<stdx::mutex> lck(_mutex);
+        stdx::unique_lock<Latch> lck(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lck);
         }
@@ -130,7 +130,7 @@ private:
 
     std::uint32_t _counter{0};
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("FreeMonMetricsCollectorMock::_mutex");
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -158,7 +158,7 @@ public:
      * Set the count of events to wait for.
      */
     void reset(uint32_t count) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         ASSERT_EQ(_count, 0UL);
         ASSERT_GT(count, 0UL);
 
@@ -170,7 +170,7 @@ public:
      * Set the payload and signal waiter.
      */
     void set(T payload) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         if (_count > 0) {
             --_count;
@@ -187,7 +187,7 @@ public:
      * Returns boost::none on timeout.
      */
     boost::optional<T> wait_for(Milliseconds duration) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
 
         if (!_condvar.wait_for(
                 lock, duration.toSystemDuration(), [this]() { return _count == 0; })) {
@@ -202,7 +202,7 @@ private:
     stdx::condition_variable _condvar;
 
     // Lock for condition variable and to protect state
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("CountdownLatchResult::_mutex");
 
     // Count to wait fore
     uint32_t _count;
@@ -309,7 +309,7 @@ public:
         auto cdr = req.getMetrics();
 
         {
-            stdx::lock_guard<stdx::mutex> lock(_metricsLock);
+            stdx::lock_guard<Latch> lock(_metricsLock);
             auto metrics = decompressMetrics(cdr);
             _lastMetrics = metrics;
             _countdownMetrics.set(metrics);
@@ -354,7 +354,7 @@ public:
     }
 
     BSONArray getLastMetrics() {
-        stdx::lock_guard<stdx::mutex> lock(_metricsLock);
+        stdx::lock_guard<Latch> lock(_metricsLock);
         return _lastMetrics;
     }
 
@@ -365,7 +365,7 @@ private:
 
     executor::ThreadPoolTaskExecutor* _threadPool;
 
-    stdx::mutex _metricsLock;
+    Mutex _metricsLock = MONGO_MAKE_LATCH("FreeMonNetworkInterfaceMock::_metricsLock");
     BSONArray _lastMetrics;
 
     Options _options;

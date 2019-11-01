@@ -41,9 +41,9 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -84,7 +84,7 @@ public:
     /**
      * Type of a fetcher callback function.
      */
-    typedef stdx::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
+    typedef std::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
         CallbackFn;
 
     /**
@@ -239,7 +239,7 @@ private:
     CallbackFn _work;
 
     // Protects member data of this Fetcher.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("Fetcher::_mutex");
 
     mutable stdx::condition_variable _condition;
 

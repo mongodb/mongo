@@ -43,12 +43,12 @@ MockServiceLiaisonImpl::MockServiceLiaisonImpl() {
 }
 
 LogicalSessionIdSet MockServiceLiaisonImpl::getActiveOpSessions() const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _activeSessions;
 }
 
 LogicalSessionIdSet MockServiceLiaisonImpl::getOpenCursorSessions(OperationContext* opCtx) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _cursorSessions;
 }
 
@@ -65,32 +65,32 @@ void MockServiceLiaisonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
 
 
 void MockServiceLiaisonImpl::addCursorSession(LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _cursorSessions.insert(std::move(lsid));
 }
 
 void MockServiceLiaisonImpl::removeCursorSession(LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _cursorSessions.erase(lsid);
 }
 
 void MockServiceLiaisonImpl::clearCursorSession() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _cursorSessions.clear();
 }
 
 void MockServiceLiaisonImpl::add(LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _cursorSessions.insert(std::move(lsid));
 }
 
 void MockServiceLiaisonImpl::remove(LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _activeSessions.erase(lsid);
 }
 
 void MockServiceLiaisonImpl::clear() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _activeSessions.clear();
 }
 

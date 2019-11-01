@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/executor/async_timer_interface.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -84,7 +84,7 @@ public:
 private:
     void _callAllHandlers(std::error_code ec);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("AsyncTimerMockImpl::_mutex");
     Milliseconds _timeLeft;
     std::vector<AsyncTimerInterface::Handler> _handlers;
 };

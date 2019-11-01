@@ -69,7 +69,7 @@ private:
     using Alarm = std::pair<Date_t, unique_function<void()>>;
     void _processAlarms(stdx::unique_lock<stdx::mutex> lk);
 
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
     Date_t _now{Date_t::fromMillisSinceEpoch(1)};
     std::vector<Alarm> _alarms;
 };

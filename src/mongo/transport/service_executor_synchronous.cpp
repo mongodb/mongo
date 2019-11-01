@@ -67,7 +67,7 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
 
     _stillRunning.store(false);
 
-    stdx::unique_lock<stdx::mutex> lock(_shutdownMutex);
+    stdx::unique_lock<Latch> lock(_shutdownMutex);
     bool result = _shutdownCondition.wait_for(lock, timeout.toSystemDuration(), [this]() {
         return _numRunningWorkerThreads.load() == 0;
     });

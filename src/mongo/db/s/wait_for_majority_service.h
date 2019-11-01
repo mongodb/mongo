@@ -36,7 +36,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 
@@ -74,7 +74,7 @@ private:
      */
     void _periodicallyWaitForMajority(ServiceContext* service);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("WaitForMaorityService::_mutex");
 
     // Contains an ordered list of opTimes to wait to be majority comitted.
     OpTimeWaitingMap _queuedOpTimes;

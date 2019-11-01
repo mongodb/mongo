@@ -31,7 +31,7 @@
 
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -57,7 +57,7 @@ public:
 
 private:
     // protects _maxOperationTime
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OperationTimeTracker::_mutex");
     LogicalTime _maxOperationTime;
 };
 

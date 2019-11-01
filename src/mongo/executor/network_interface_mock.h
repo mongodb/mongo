@@ -35,10 +35,10 @@
 #include <vector>
 
 #include "mongo/executor/network_interface.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
@@ -361,7 +361,7 @@ private:
     // Mutex that synchronizes access to mutable data in this class and its subclasses.
     // Fields guarded by the mutex are labled (M), below, and those that are read-only
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
 
     // Condition signaled to indicate that the network processing thread should wake up.
     stdx::condition_variable _shouldWakeNetworkCondition;  // (M)

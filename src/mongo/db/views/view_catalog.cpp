@@ -87,7 +87,7 @@ Status ViewCatalog::reload(OperationContext* opCtx, ViewCatalogLookupBehavior lo
         opCtx,
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _reload(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
 }
 
@@ -147,7 +147,7 @@ Status ViewCatalog::_reload(WithLock,
 }
 
 void ViewCatalog::clear() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     _viewMap.clear();
     _viewGraph.clear();
@@ -172,7 +172,7 @@ void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback
         opCtx,
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _requireValidCatalog(lk);
     for (auto&& view : _viewMap) {
         callback(*view.second);
@@ -389,7 +389,7 @@ Status ViewCatalog::createView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
@@ -422,7 +422,7 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                                const BSONArray& pipeline) {
     invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_X));
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
@@ -461,7 +461,7 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _requireValidCatalog(lk);
 
     ON_BLOCK_EXIT([this] { _ignoreExternalChange = false; });
@@ -515,7 +515,7 @@ std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, Str
         opCtx,
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (!_valid && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
         if (!NamespaceString::validCollectionName(ns)) {
@@ -537,7 +537,7 @@ std::shared_ptr<ViewDefinition> ViewCatalog::lookupWithoutValidatingDurableViews
         opCtx,
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _lookup(lk, opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
 }
 
@@ -547,7 +547,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
         opCtx,
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
 
     _requireValidCatalog(lock);
 

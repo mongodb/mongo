@@ -145,7 +145,7 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateMock::loadLocalLastVoteD
 Status ReplicationCoordinatorExternalStateMock::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     {
-        stdx::unique_lock<stdx::mutex> lock(_shouldHangLastVoteMutex);
+        stdx::unique_lock<Latch> lock(_shouldHangLastVoteMutex);
         while (_storeLocalLastVoteDocumentShouldHang) {
             _shouldHangLastVoteCondVar.wait(lock);
         }
@@ -210,7 +210,7 @@ void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentStatu
 }
 
 void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentToHang(bool hang) {
-    stdx::unique_lock<stdx::mutex> lock(_shouldHangLastVoteMutex);
+    stdx::unique_lock<Latch> lock(_shouldHangLastVoteMutex);
     _storeLocalLastVoteDocumentShouldHang = hang;
     if (!hang) {
         _shouldHangLastVoteCondVar.notify_all();

@@ -31,11 +31,10 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace repl {
-
-class Mutex;
 
 /**
  * The RollbackChecker maintains a sync source and its baseline rollback ID (rbid). It
@@ -119,7 +118,7 @@ private:
     executor::TaskExecutor* const _executor;
 
     // Protects member data of this RollbackChecker.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackChecker::_mutex");
 
     // The sync source to check for rollbacks against.
     HostAndPort _syncSource;

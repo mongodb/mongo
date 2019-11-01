@@ -107,7 +107,7 @@ public:
     }
 
     void wait() {
-        stdx::unique_lock<stdx::mutex> lck(_mutex);
+        stdx::unique_lock<Latch> lck(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lck);
         }
@@ -133,7 +133,7 @@ private:
 
     std::vector<BSONObj> _docs;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("FTDCMetricsCollectorMockTee::_mutex");
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };

@@ -96,7 +96,7 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
         return {ErrorCodes::ShardingStateNotInitialized, "sharding state is not yet initialized"};
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     {
         auto res = _shardCollectionIfNeeded(opCtx);
         if (!res.isOK()) {

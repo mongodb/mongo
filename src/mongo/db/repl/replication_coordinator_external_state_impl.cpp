@@ -205,7 +205,7 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
-    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    stdx::lock_guard<Latch> lk(_threadMutex);
 
     // We've shut down the external state, don't start again.
     if (_inShutdown)
@@ -256,12 +256,12 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_threadMutex);
+    stdx::unique_lock<Latch> lk(_threadMutex);
     _stopDataReplication_inlock(opCtx, lk);
 }
 
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
-    OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock) {
+    OperationContext* opCtx, stdx::unique_lock<Latch>& lock) {
     // Make sue no other _stopDataReplication calls are in progress.
     _dataReplicationStopped.wait(lock, [this]() { return !_stoppingDataReplication; });
     _stoppingDataReplication = true;
@@ -316,7 +316,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
 
 
 void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
-    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    stdx::lock_guard<Latch> lk(_threadMutex);
     if (_startedThreads) {
         return;
     }
@@ -339,7 +339,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
 }
 
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_threadMutex);
+    stdx::unique_lock<Latch> lk(_threadMutex);
     _inShutdown = true;
     if (!_startedThreads) {
         return;
@@ -826,21 +826,21 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
-    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    stdx::lock_guard<Latch> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->clearSyncTarget();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopProducer() {
-    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    stdx::lock_guard<Latch> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->stop(false);
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
-    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    stdx::lock_guard<Latch> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->startProducerIfStopped();
     }

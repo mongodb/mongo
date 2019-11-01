@@ -56,8 +56,8 @@ namespace {
 
 using Request = executor::RemoteCommandRequest;
 using Response = executor::RemoteCommandResponse;
-using LockGuard = stdx::lock_guard<stdx::mutex>;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using LockGuard = stdx::lock_guard<Latch>;
+using UniqueLock = stdx::unique_lock<Latch>;
 
 }  // namespace
 

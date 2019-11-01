@@ -430,13 +430,13 @@ TEST_F(TimestampKVEngineTest, TimestampListeners) {
 }
 
 TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
-    stdx::mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
 
     bool changes[4] = {false, false, false, false};
 
     TimestampListener first(checkpoint, [&](Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        stdx::lock_guard<Latch> lock(mutex);
         if (!changes[0]) {
             changes[0] = true;
             cv.notify_all();
@@ -444,7 +444,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener second(oldest, [&](Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        stdx::lock_guard<Latch> lock(mutex);
         if (!changes[1]) {
             changes[1] = true;
             cv.notify_all();
@@ -452,7 +452,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener third(stable, [&](Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        stdx::lock_guard<Latch> lock(mutex);
         if (!changes[2]) {
             changes[2] = true;
             cv.notify_all();
@@ -460,7 +460,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener fourth(stable, [&](Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        stdx::lock_guard<Latch> lock(mutex);
         if (!changes[3]) {
             changes[3] = true;
             cv.notify_all();
@@ -473,7 +473,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     _storageEngine->getTimestampMonitor()->addListener(&fourth);
 
     // Wait until all 4 listeners get notified at least once.
-    stdx::unique_lock<stdx::mutex> lk(mutex);
+    stdx::unique_lock<Latch> lk(mutex);
     cv.wait(lk, [&] {
         for (auto const& change : changes) {
             if (!change) {

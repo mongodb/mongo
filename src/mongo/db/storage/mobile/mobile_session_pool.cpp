@@ -43,7 +43,7 @@
 #include "mongo/db/storage/mobile/mobile_session_pool.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -105,7 +105,7 @@ MobileSessionPool::~MobileSessionPool() {
 }
 
 std::unique_ptr<MobileSession> MobileSessionPool::getSession(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // We should never be able to get here after _shuttingDown is set, because no new operations
     // should be allowed to start.
@@ -141,13 +141,13 @@ void MobileSessionPool::releaseSession(MobileSession* session) {
     if (!failedDropsQueue.isEmpty())
         failedDropsQueue.execAndDequeueOp(session);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _sessions.push_back(session->getSession());
     _releasedSessionNotifier.notify_one();
 }
 
 void MobileSessionPool::shutDown() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _shuttingDown = true;
 
     // Retrieve the operation context from the thread's client if the client exists.

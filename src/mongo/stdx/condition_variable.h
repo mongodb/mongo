@@ -206,7 +206,7 @@ private:
 
     AtomicWord<unsigned long long> _notifyableCount;
 
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
     std::list<Notifyable*> _notifyables;
 };
 

@@ -36,7 +36,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -73,7 +73,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
 
     // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
     // see _shuttingDown as true and quit prematurely.
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
     _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
                                        this,
                                        WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
@@ -85,7 +85,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
 
 void WiredTigerOplogManager::halt() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+        stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
         invariant(_isRunning);
         _shuttingDown = true;
         _isRunning = false;
@@ -119,7 +119,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // Close transaction before we wait.
     opCtx->recoveryUnit()->abandonSnapshot();
 
-    stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
 
     // Prevent any scheduled journal flushes from being delayed and blocking this wait excessively.
     _opsWaitingForVisibility++;
@@ -147,7 +147,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
 }
 
 void WiredTigerOplogManager::triggerJournalFlush() {
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
     if (!_opsWaitingForJournal) {
         _opsWaitingForJournal = true;
         _opsWaitingForJournalCV.notify_one();
@@ -162,7 +162,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
     // forward cursors.  The timestamp is used to hide oplog entries that might be committed but
     // have uncommitted entries ahead of them.
     while (true) {
-        stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
+        stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
         {
             MONGO_IDLE_THREAD_BLOCK;
             _opsWaitingForJournalCV.wait(lk,
@@ -239,7 +239,7 @@ std::uint64_t WiredTigerOplogManager::getOplogReadTimestamp() const {
 }
 
 void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
     _setOplogReadTimestamp(lk, ts.asULL());
 }
 

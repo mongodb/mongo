@@ -40,12 +40,12 @@ const Client::Decoration<std::shared_ptr<ClusterLastErrorInfo>> ClusterLastError
     Client::declareDecoration<std::shared_ptr<ClusterLastErrorInfo>>();
 
 void ClusterLastErrorInfo::addShardHost(const std::string& shardHost) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _cur->shardHostsWritten.insert(shardHost);
 }
 
 void ClusterLastErrorInfo::addHostOpTime(ConnectionString connStr, HostOpTime stat) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _cur->hostOpTimes[connStr] = stat;
 }
 
@@ -56,13 +56,13 @@ void ClusterLastErrorInfo::addHostOpTimes(const HostOpTimeMap& hostOpTimes) {
 }
 
 void ClusterLastErrorInfo::newRequest() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     std::swap(_cur, _prev);
     _cur->clear();
 }
 
 void ClusterLastErrorInfo::disableForCommand() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     RequestInfo* temp = _cur;
     _cur = _prev;
     _prev = temp;

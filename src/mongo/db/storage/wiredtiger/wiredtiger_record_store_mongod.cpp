@@ -56,7 +56,7 @@ namespace mongo {
 namespace {
 
 std::set<NamespaceString> _backgroundThreadNamespaces;
-stdx::mutex _backgroundThreadMutex;
+Mutex _backgroundThreadMutex;
 
 class OplogTruncaterThread : public BackgroundJob {
 public:
@@ -153,7 +153,7 @@ bool initRsOplogBackgroundThread(StringData ns) {
         return false;
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_backgroundThreadMutex);
+    stdx::lock_guard<Latch> lock(_backgroundThreadMutex);
     NamespaceString nss(ns);
     if (_backgroundThreadNamespaces.count(nss)) {
         log() << "OplogTruncaterThread " << ns << " already started";

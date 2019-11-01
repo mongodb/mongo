@@ -39,7 +39,7 @@
 
 #include <boost/align/aligned_allocator.hpp>
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/with_alignment.h"
 

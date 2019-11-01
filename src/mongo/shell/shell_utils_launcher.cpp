@@ -137,7 +137,7 @@ void safeClose(int fd) {
     }
 }
 
-stdx::mutex _createProcessMtx;
+Mutex _createProcessMtx;
 }  // namespace
 
 ProgramOutputMultiplexer programOutputLogger;
@@ -242,7 +242,7 @@ void ProgramOutputMultiplexer::appendLine(int port,
                                           ProcessId pid,
                                           const std::string& name,
                                           const std::string& line) {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
+    stdx::lock_guard<Latch> lk(mongoProgramOutputMutex);
     boost::iostreams::tee_device<std::ostream, std::stringstream> teeDevice(cout, _buffer);
     boost::iostreams::stream<decltype(teeDevice)> teeStream(teeDevice);
     if (port > 0) {
@@ -253,12 +253,12 @@ void ProgramOutputMultiplexer::appendLine(int port,
 }
 
 string ProgramOutputMultiplexer::str() const {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
+    stdx::lock_guard<Latch> lk(mongoProgramOutputMutex);
     return _buffer.str();
 }
 
 void ProgramOutputMultiplexer::clear() {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
+    stdx::lock_guard<Latch> lk(mongoProgramOutputMutex);
     _buffer.str("");
 }
 
@@ -407,7 +407,7 @@ void ProgramRunner::start() {
         //
         // Holding the lock for the duration of those events prevents the leaks and thus the
         // associated deadlocks.
-        stdx::lock_guard<stdx::mutex> lk(_createProcessMtx);
+        stdx::lock_guard<Latch> lk(_createProcessMtx);
         int status = pipe(pipeEnds);
         if (status != 0) {
             const auto ewd = errnoWithDescription();

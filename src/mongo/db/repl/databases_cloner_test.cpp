@@ -43,7 +43,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -57,9 +57,9 @@ using namespace mongo::repl;
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using LockGuard = stdx::lock_guard<stdx::mutex>;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-using mutex = stdx::mutex;
+using LockGuard = stdx::lock_guard<Latch>;
+using UniqueLock = stdx::unique_lock<Latch>;
+using mutex = Mutex;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
 using namespace unittest;
 using Responses = std::vector<std::pair<std::string, BSONObj>>;
@@ -288,7 +288,7 @@ protected:
     void runCompleteClone(Responses responses) {
         Status result{Status::OK()};
         bool done = false;
-        stdx::mutex mutex;
+        auto mutex = MONGO_MAKE_LATCH();
         stdx::condition_variable cvDone;
         DatabasesCloner cloner{&getStorage(),
                                &getExecutor(),

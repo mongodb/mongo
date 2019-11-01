@@ -31,7 +31,7 @@
 
 namespace mongo {
 int64_t KVPrefix::_nextValue = 0;
-stdx::mutex KVPrefix::_nextValueMutex;
+Mutex KVPrefix::_nextValueMutex = MONGO_MAKE_LATCH();
 const KVPrefix KVPrefix::kNotPrefixed = KVPrefix(-1);
 
 std::string KVPrefix::toString() const {
@@ -54,7 +54,7 @@ std::string KVPrefix::toString() const {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_nextValueMutex);
+    stdx::lock_guard<Latch> lk(_nextValueMutex);
     _nextValue = largestPrefix._value + 1;
 }
 
@@ -67,7 +67,7 @@ std::string KVPrefix::toString() const {
 }
 
 /* static */ KVPrefix KVPrefix::generateNextPrefix() {
-    stdx::lock_guard<stdx::mutex> lk(_nextValueMutex);
+    stdx::lock_guard<Latch> lk(_nextValueMutex);
     return KVPrefix(_nextValue++);
 }
 }  // namespace mongo

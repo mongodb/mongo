@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/sessions_collection.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

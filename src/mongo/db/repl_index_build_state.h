@@ -106,7 +106,7 @@ struct ReplIndexBuildState {
     IndexBuildProtocol protocol;
 
     // Protects the state below.
-    mutable stdx::mutex mutex;
+    mutable Mutex mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::mutex");
 
     // Secondaries do not set this information, so it is only set on primaries or on
     // transition to primary.

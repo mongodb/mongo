@@ -3473,7 +3473,6 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     ASSERT_NOT_OK(environment.validate());
-    ;
 
     environment = moe::Environment();
     argv.clear();
@@ -3482,7 +3481,6 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     ASSERT_OK(environment.validate());
-    ;
     ASSERT_OK(environment.get(moe::Key("option1"), &value));
 
     environment = moe::Environment();
@@ -3492,7 +3490,6 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     ASSERT_OK(environment.validate());
-    ;
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
 }
 
@@ -3517,7 +3514,6 @@ TEST(Constraints, RequiresOtherConstraint) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     ASSERT_NOT_OK(environment.validate());
-    ;
 
     environment = moe::Environment();
     argv.clear();
@@ -3527,7 +3523,6 @@ TEST(Constraints, RequiresOtherConstraint) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     ASSERT_OK(environment.validate());
-    ;
     ASSERT_OK(environment.get(moe::Key("option1"), &value));
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
 
@@ -3538,7 +3533,6 @@ TEST(Constraints, RequiresOtherConstraint) {
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     ASSERT_OK(environment.validate());
-    ;
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
 }
 

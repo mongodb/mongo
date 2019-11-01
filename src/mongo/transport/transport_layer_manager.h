@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/time_support.h"
@@ -91,7 +91,7 @@ public:
     static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 
     BatonHandle makeBaton(OperationContext* opCtx) const override {
-        stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
+        stdx::lock_guard<Latch> lk(_tlsMutex);
         // TODO: figure out what to do about managers with more than one transport layer.
         invariant(_tls.size() == 1);
         return _tls[0]->makeBaton(opCtx);
@@ -101,7 +101,7 @@ private:
     template <typename Callable>
     void _foreach(Callable&& cb) const;
 
-    mutable stdx::mutex _tlsMutex;
+    mutable Mutex _tlsMutex = MONGO_MAKE_LATCH("TransportLayerManager::_tlsMutex");
     std::vector<std::unique_ptr<TransportLayer>> _tls;
 };
 

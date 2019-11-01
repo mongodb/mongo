@@ -87,7 +87,7 @@ public:
     /**
      * Returns when no index builds remain on this database.
      */
-    void waitUntilNoIndexBuildsRemain(stdx::unique_lock<stdx::mutex>& lk);
+    void waitUntilNoIndexBuildsRemain(stdx::unique_lock<Latch>& lk);
 
 private:
     // Map of index build states on the database, by build UUID.

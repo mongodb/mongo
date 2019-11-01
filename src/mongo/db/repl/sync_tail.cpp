@@ -158,7 +158,7 @@ private:
     void _run();
 
     // Protects _cond, _shutdownSignaled, and _latestOpTime.
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ApplyBatchFinalizerForJournal::_mutex");
     // Used to alert our thread of a new OpTime.
     stdx::condition_variable _cond;
     // The next OpTime to set as the ReplicationCoordinator's lastOpTime after flushing.
@@ -170,7 +170,7 @@ private:
 };
 
 ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     _shutdownSignaled = true;
     _cond.notify_all();
     lock.unlock();
@@ -182,7 +182,7 @@ void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAnd
                                            ReplicationCoordinator::DataConsistency consistency) {
     _recordApplied(newOpTimeAndWallTime, consistency);
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     _latestOpTimeAndWallTime = newOpTimeAndWallTime;
     _cond.notify_all();
 }
@@ -194,7 +194,7 @@ void ApplyBatchFinalizerForJournal::_run() {
         OpTimeAndWallTime latestOpTimeAndWallTime = {OpTime(), Date_t()};
 
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            stdx::unique_lock<Latch> lock(_mutex);
             while (_latestOpTimeAndWallTime.opTime.isNull() && !_shutdownSignaled) {
                 _cond.wait(lock);
             }
@@ -601,7 +601,7 @@ public:
     }
 
     OpQueue getNextBatch(Seconds maxWaitTime) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         // _ops can indicate the following cases:
         // 1. A new batch is ready to consume.
         // 2. Shutdown.
@@ -713,7 +713,7 @@ private:
                 }
             }
 
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_mutex);
             // Block until the previous batch has been taken.
             _cv.wait(lk, [&] { return _ops.empty() && !_ops.termWhenExhausted(); });
             _ops = std::move(ops);
@@ -730,7 +730,7 @@ private:
     OplogBuffer* const _oplogBuffer;
     OplogApplier::GetNextApplierBatchFn const _getNextApplierBatchFn;
 
-    stdx::mutex _mutex;  // Guards _ops.
+    Mutex _mutex = MONGO_MAKE_LATCH("OpQueueBatcher::_mutex");  // Guards _ops.
     stdx::condition_variable _cv;
     OpQueue _ops;
 
@@ -881,12 +881,12 @@ void SyncTail::shutdown() {
         fassertFailedNoTrace(40304);
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _inShutdown = true;
 }
 
 bool SyncTail::inShutdown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _inShutdown;
 }
 

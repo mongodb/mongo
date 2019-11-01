@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -89,7 +89,7 @@ private:
     /**
      * Protects _splitState when starting a split.
      */
-    stdx::mutex _mtx;
+    Mutex _mtx = MONGO_MAKE_LATCH("ChunkWritesTracker::_mtx");
 
     /**
      * Whether or not a current split is in progress for this chunk.

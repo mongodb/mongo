@@ -46,19 +46,19 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 }
 
 void TTLCollectionCache::registerCollection(const NamespaceString& collectionNS) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
+    stdx::lock_guard<Latch> lock(_ttlCollectionsLock);
     _ttlCollections.push_back(collectionNS.ns());
 }
 
 void TTLCollectionCache::unregisterCollection(const NamespaceString& collectionNS) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
+    stdx::lock_guard<Latch> lock(_ttlCollectionsLock);
     auto collIter = std::find(_ttlCollections.begin(), _ttlCollections.end(), collectionNS.ns());
     fassert(40220, collIter != _ttlCollections.end());
     _ttlCollections.erase(collIter);
 }
 
 std::vector<std::string> TTLCollectionCache::getCollections() {
-    stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
+    stdx::lock_guard<Latch> lock(_ttlCollectionsLock);
     return _ttlCollections;
 }
 };  // namespace mongo

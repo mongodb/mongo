@@ -160,7 +160,7 @@ Status ServiceExecutorAdaptive::shutdown(Milliseconds timeout) {
     _scheduleCondition.notify_one();
     _controllerThread.join();
 
-    stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
+    stdx::unique_lock<Latch> lk(_threadsMutex);
     _reactorHandle->stop();
     bool result =
         _deathCondition.wait_for(lk, timeout.toSystemDuration(), [&] { return _threads.empty(); });
@@ -285,7 +285,7 @@ bool ServiceExecutorAdaptive::_isStarved() const {
  *   by schedule().
  */
 void ServiceExecutorAdaptive::_controllerThreadRoutine() {
-    stdx::mutex noopLock;
+    auto noopLock = MONGO_MAKE_LATCH();
     setThreadName("worker-controller"_sd);
 
     // Setup the timers/timeout values for stuck thread detection.
@@ -294,7 +294,7 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
 
     // Get the initial values for our utilization percentage calculations
     auto getTimerTotals = [this]() {
-        stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
+        stdx::unique_lock<Latch> lk(_threadsMutex);
         auto first = _getThreadTimerTotal(ThreadTimer::kExecuting, lk);
         auto second = _getThreadTimerTotal(ThreadTimer::kRunning, lk);
         return std::make_pair(first, second);
@@ -428,7 +428,7 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
 }
 
 void ServiceExecutorAdaptive::_startWorkerThread(ThreadCreationReason reason) {
-    stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
+    stdx::unique_lock<Latch> lk(_threadsMutex);
     auto it = _threads.emplace(_threads.begin(), _tickSource);
     auto num = _threads.size();
 
@@ -452,7 +452,7 @@ void ServiceExecutorAdaptive::_startWorkerThread(ThreadCreationReason reason) {
 }
 
 Milliseconds ServiceExecutorAdaptive::_getThreadJitter() const {
-    static stdx::mutex jitterMutex;
+    static auto jitterMutex = MONGO_MAKE_LATCH();
     static std::default_random_engine randomEngine = [] {
         std::random_device seed;
         return std::default_random_engine(seed());
@@ -464,7 +464,7 @@ Milliseconds ServiceExecutorAdaptive::_getThreadJitter() const {
 
     std::uniform_int_distribution<> jitterDist(-jitterParam, jitterParam);
 
-    stdx::lock_guard<stdx::mutex> lk(jitterMutex);
+    stdx::lock_guard<Latch> lk(jitterMutex);
     auto jitter = jitterDist(randomEngine);
     if (jitter > _config->workerThreadRunTime().count())
         jitter = 0;
@@ -485,8 +485,8 @@ void ServiceExecutorAdaptive::_accumulateTaskMetrics(MetricsArray* outArray,
     }
 }
 
-void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(
-    MetricsArray* outputMetricsArray, const stdx::unique_lock<stdx::mutex>& lk) const {
+void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(MetricsArray* outputMetricsArray,
+                                                        const stdx::unique_lock<Latch>& lk) const {
     _accumulateTaskMetrics(outputMetricsArray, _accumulatedMetrics);
     for (auto& thread : _threads) {
         _accumulateTaskMetrics(outputMetricsArray, thread.threadMetrics);
@@ -494,7 +494,7 @@ void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(
 }
 
 TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(
-    ThreadTimer which, const stdx::unique_lock<stdx::mutex>& lk) const {
+    ThreadTimer which, const stdx::unique_lock<Latch>& lk) const {
     TickSource::Tick accumulator;
     switch (which) {
         case ThreadTimer::kRunning:
@@ -539,7 +539,7 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
 
         _accumulateTaskMetrics(&_accumulatedMetrics, state->threadMetrics);
         {
-            stdx::lock_guard<stdx::mutex> lk(_threadsMutex);
+            stdx::lock_guard<Latch> lk(_threadsMutex);
             _threads.erase(state);
         }
         _deathCondition.notify_one();
@@ -631,7 +631,7 @@ StringData ServiceExecutorAdaptive::_threadStartedByToString(
 }
 
 void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
-    stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
+    stdx::unique_lock<Latch> lk(_threadsMutex);
     *bob << kExecutorLabel << kExecutorName                                                //
          << kTotalQueued << _totalQueued.load()                                            //
          << kTotalExecuted << _totalExecuted.load()                                        //

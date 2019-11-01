@@ -331,9 +331,9 @@ public:
      * Sleeps until "deadline"; throws an exception if the interruptible is interrupted before then.
      */
     void sleepUntil(Date_t deadline) {
-        stdx::mutex m;
+        auto m = MONGO_MAKE_LATCH();
         stdx::condition_variable cv;
-        stdx::unique_lock<stdx::mutex> lk(m);
+        stdx::unique_lock<Latch> lk(m);
         invariant(!waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }));
     }
 
@@ -342,9 +342,9 @@ public:
      * then.
      */
     void sleepFor(Milliseconds duration) {
-        stdx::mutex m;
+        auto m = MONGO_MAKE_LATCH();
         stdx::condition_variable cv;
-        stdx::unique_lock<stdx::mutex> lk(m);
+        stdx::unique_lock<Latch> lk(m);
         invariant(!waitForConditionOrInterruptFor(cv, lk, duration, [] { return false; }));
     }
 

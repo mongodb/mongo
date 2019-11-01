@@ -34,13 +34,13 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/s/config/namespace_serializer.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -506,7 +506,7 @@ private:
     // (S) Self-synchronizing; access in any way from any context.
     //
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ShardingCatalogManager::_mutex");
 
     // True if shutDown() has been called. False, otherwise.
     bool _inShutdown{false};  // (M)

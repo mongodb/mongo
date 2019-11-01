@@ -333,7 +333,7 @@ private:
     class ThreadIDManager {
     public:
         unsigned long reserveID() {
-            stdx::unique_lock<stdx::mutex> lock(_idMutex);
+            stdx::unique_lock<Latch> lock(_idMutex);
             if (!_idLast.empty()) {
                 unsigned long ret = _idLast.top();
                 _idLast.pop();
@@ -343,13 +343,14 @@ private:
         }
 
         void releaseID(unsigned long id) {
-            stdx::unique_lock<stdx::mutex> lock(_idMutex);
+            stdx::unique_lock<Latch> lock(_idMutex);
             _idLast.push(id);
         }
 
     private:
         // Machinery for producing IDs that are unique for the life of a thread.
-        stdx::mutex _idMutex;       // Protects _idNext and _idLast.
+        Mutex _idMutex =
+            MONGO_MAKE_LATCH("ThreadIDManager::_idMutex");  // Protects _idNext and _idLast.
         unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
         std::stack<unsigned long, std::vector<unsigned long>>
             _idLast;  // Stores old thread IDs, for reuse.
@@ -463,7 +464,7 @@ private:
 
         /** Either returns a cached password, or prompts the user to enter one. */
         StatusWith<StringData> fetchPassword() {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             if (_password->size()) {
                 return StringData(_password->c_str());
             }
@@ -488,7 +489,7 @@ private:
         }
 
     private:
-        stdx::mutex _mutex;
+        Mutex _mutex = MONGO_MAKE_LATCH("PasswordFetcher::_mutex");
         SecureString _password;  // Protected by _mutex
 
         std::string _prompt;

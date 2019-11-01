@@ -77,7 +77,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
         }
         startPromise.emplaceValue();
 
-        stdx::unique_lock lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         while (_execStatus != ExecutionStatus::CANCELED) {
             // Wait until it's unpaused or canceled
             _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
@@ -120,14 +120,14 @@ void PeriodicRunnerImpl::PeriodicJobImpl::start() {
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING);
     _execStatus = PeriodicJobImpl::ExecutionStatus::PAUSED;
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::PAUSED);
         _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
     }
@@ -136,7 +136,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
 
 void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
     auto lastExecStatus = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         return std::exchange(_execStatus, ExecutionStatus::CANCELED);
     }();
@@ -158,12 +158,12 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
 }
 
 Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _job.interval;
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::setPeriod(Milliseconds ms) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _job.interval = ms;
 
     if (_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING) {

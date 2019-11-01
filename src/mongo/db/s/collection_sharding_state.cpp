@@ -54,7 +54,7 @@ public:
         : _factory(std::move(factory)) {}
 
     CollectionShardingState& getOrCreate(const NamespaceString& nss) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
 
         auto it = _collections.find(nss.ns());
         if (it == _collections.end()) {
@@ -70,7 +70,7 @@ public:
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
         {
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            stdx::lock_guard<Latch> lg(_mutex);
 
             for (auto& coll : _collections) {
                 const auto optMetadata = coll.second->getCurrentMetadataIfKnown();
@@ -89,7 +89,7 @@ private:
 
     std::unique_ptr<CollectionShardingStateFactory> _factory;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateMap::_mutex");
     CollectionsMap _collections;
 };
 

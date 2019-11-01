@@ -37,7 +37,7 @@
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -125,7 +125,7 @@ private:
     // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
     AtomicWord<std::int64_t> _isLaggedTimeMicros{0};
 
-    mutable stdx::mutex _sampledOpsMutex;
+    mutable Mutex _sampledOpsMutex = MONGO_MAKE_LATCH("FlowControl::_sampledOpsMutex");
     std::deque<Sample> _sampledOpsApplied;
 
     // These values are used in the sampling process.

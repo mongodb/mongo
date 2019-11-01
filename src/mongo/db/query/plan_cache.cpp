@@ -553,7 +553,7 @@ Status PlanCache::set(const CanonicalQuery& query,
 
     const auto key = computeKey(query);
     const size_t newWorks = why->stats[0]->common.works;
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     bool isNewEntryActive = false;
     uint32_t queryHash;
     uint32_t planCacheKey;
@@ -608,7 +608,7 @@ void PlanCache::deactivate(const CanonicalQuery& query) {
     }
 
     PlanCacheKey key = computeKey(query);
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     PlanCacheEntry* entry = nullptr;
     Status cacheStatus = _cache.get(key, &entry);
     if (!cacheStatus.isOK()) {
@@ -625,7 +625,7 @@ PlanCache::GetResult PlanCache::get(const CanonicalQuery& query) const {
 }
 
 PlanCache::GetResult PlanCache::get(const PlanCacheKey& key) const {
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     PlanCacheEntry* entry = nullptr;
     Status cacheStatus = _cache.get(key, &entry);
     if (!cacheStatus.isOK()) {
@@ -642,7 +642,7 @@ PlanCache::GetResult PlanCache::get(const PlanCacheKey& key) const {
 Status PlanCache::feedback(const CanonicalQuery& cq, double score) {
     PlanCacheKey ck = computeKey(cq);
 
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     PlanCacheEntry* entry;
     Status cacheStatus = _cache.get(ck, &entry);
     if (!cacheStatus.isOK()) {
@@ -659,12 +659,12 @@ Status PlanCache::feedback(const CanonicalQuery& cq, double score) {
 }
 
 Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     return _cache.remove(computeKey(canonicalQuery));
 }
 
 void PlanCache::clear() {
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     _cache.clear();
 }
 
@@ -679,7 +679,7 @@ PlanCacheKey PlanCache::computeKey(const CanonicalQuery& cq) const {
 StatusWith<std::unique_ptr<PlanCacheEntry>> PlanCache::getEntry(const CanonicalQuery& query) const {
     PlanCacheKey key = computeKey(query);
 
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     PlanCacheEntry* entry;
     Status cacheStatus = _cache.get(key, &entry);
     if (!cacheStatus.isOK()) {
@@ -691,7 +691,7 @@ StatusWith<std::unique_ptr<PlanCacheEntry>> PlanCache::getEntry(const CanonicalQ
 }
 
 std::vector<std::unique_ptr<PlanCacheEntry>> PlanCache::getAllEntries() const {
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     std::vector<std::unique_ptr<PlanCacheEntry>> entries;
 
     for (auto&& cacheEntry : _cache) {
@@ -703,7 +703,7 @@ std::vector<std::unique_ptr<PlanCacheEntry>> PlanCache::getAllEntries() const {
 }
 
 size_t PlanCache::size() const {
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     return _cache.size();
 }
 
@@ -715,7 +715,7 @@ std::vector<BSONObj> PlanCache::getMatchingStats(
     const std::function<BSONObj(const PlanCacheEntry&)>& serializationFunc,
     const std::function<bool(const BSONObj&)>& filterFunc) const {
     std::vector<BSONObj> results;
-    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
 
     for (auto&& cacheEntry : _cache) {
         const auto entry = cacheEntry.second;

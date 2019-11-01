@@ -44,9 +44,9 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -286,7 +286,7 @@ public:
         MonitoredTimestamps _currentTimestamps;
 
         // Protects access to _listeners below.
-        stdx::mutex _monitorMutex;
+        Mutex _monitorMutex = MONGO_MAKE_LATCH("TimestampMonitor::_monitorMutex");
         std::vector<TimestampListener*> _listeners;
 
         // Periodic runner that the timestamp monitor schedules its job on.

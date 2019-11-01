@@ -53,7 +53,7 @@ TransportLayerManager::TransportLayerManager() = default;
 template <typename Callable>
 void TransportLayerManager::_foreach(Callable&& cb) const {
     {
-        stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
+        stdx::lock_guard<Latch> lk(_tlsMutex);
         for (auto&& tl : _tls) {
             cb(tl.get());
         }
@@ -111,7 +111,7 @@ Status TransportLayerManager::setup() {
 Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl) {
     auto ptr = tl.get();
     {
-        stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
+        stdx::lock_guard<Latch> lk(_tlsMutex);
         _tls.emplace_back(std::move(tl));
     }
     return ptr->start();

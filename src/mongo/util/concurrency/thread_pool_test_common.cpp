@@ -33,9 +33,9 @@
 
 #include "mongo/util/concurrency/thread_pool_test_common.h"
 
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -202,10 +202,10 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     auto& pool = getThreadPool();
     stdx::function<void()> func;
     std::size_t n = 0;
-    stdx::mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH();
     stdx::condition_variable condvar;
     func = [&pool, &n, &func, &condvar, &mutex, depth]() {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         if (n < depth) {
             n++;
             lk.unlock();
@@ -222,7 +222,7 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     pool.startup();
     pool.join();
 
-    stdx::unique_lock<stdx::mutex> lk(mutex);
+    stdx::unique_lock<Latch> lk(mutex);
     condvar.wait(lk, [&n, depth] { return n == depth; });
 }
 

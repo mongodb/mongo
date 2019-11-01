@@ -46,7 +46,7 @@ KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(e
 void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestamp,
                                                    const NamespaceString& nss,
                                                    StringData ident) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     const auto equalRange = _dropPendingIdents.equal_range(dropTimestamp);
     const auto& lowerBound = equalRange.first;
     const auto& upperBound = equalRange.second;
@@ -65,7 +65,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
 }
 
 boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     auto it = _dropPendingIdents.cbegin();
     if (it == _dropPendingIdents.cend()) {
         return boost::none;
@@ -74,7 +74,7 @@ boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() 
 }
 
 std::set<std::string> KVDropPendingIdentReaper::getAllIdents() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     std::set<std::string> idents;
     for (const auto& entry : _dropPendingIdents) {
         const auto& identInfo = entry.second;
@@ -87,7 +87,7 @@ std::set<std::string> KVDropPendingIdentReaper::getAllIdents() const {
 void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
     DropPendingIdents toDrop;
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         for (auto it = _dropPendingIdents.cbegin();
              it != _dropPendingIdents.cend() && it->first < ts;
              ++it) {
@@ -125,7 +125,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     {
         // Entries must be removed AFTER drops are completed, so that getEarliestDropTimestamp()
         // returns appropriate results.
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         for (const auto& timestampAndIdentInfo : toDrop) {
             const auto& dropTimestamp = timestampAndIdentInfo.first;
             // This may return zero if _dropPendingIdents was cleared using clearDropPendingState().
@@ -135,7 +135,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 }
 
 void KVDropPendingIdentReaper::clearDropPendingState() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _dropPendingIdents.clear();
 }
 

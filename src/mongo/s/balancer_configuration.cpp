@@ -96,7 +96,7 @@ BalancerConfiguration::BalancerConfiguration()
 BalancerConfiguration::~BalancerConfiguration() = default;
 
 BalancerSettingsType::BalancerMode BalancerConfiguration::getBalancerMode() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     return _balancerSettings.getMode();
 }
 
@@ -148,7 +148,7 @@ Status BalancerConfiguration::enableAutoSplit(OperationContext* opCtx, bool enab
 }
 
 bool BalancerConfiguration::shouldBalance() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() == BalancerSettingsType::kOff ||
         _balancerSettings.getMode() == BalancerSettingsType::kAutoSplitOnly) {
         return false;
@@ -158,7 +158,7 @@ bool BalancerConfiguration::shouldBalance() const {
 }
 
 bool BalancerConfiguration::shouldBalanceForAutoSplit() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() == BalancerSettingsType::kOff) {
         return false;
     }
@@ -167,12 +167,12 @@ bool BalancerConfiguration::shouldBalanceForAutoSplit() const {
 }
 
 MigrationSecondaryThrottleOptions BalancerConfiguration::getSecondaryThrottle() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     return _balancerSettings.getSecondaryThrottle();
 }
 
 bool BalancerConfiguration::waitForDelete() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     return _balancerSettings.waitForDelete();
 }
 
@@ -214,7 +214,7 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* opCtx) 
         return settingsObjStatus.getStatus();
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     _balancerSettings = std::move(settings);
 
     return Status::OK();

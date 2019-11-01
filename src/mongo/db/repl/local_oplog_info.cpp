@@ -95,7 +95,7 @@ void LocalOplogInfo::resetCollection() {
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
-    stdx::lock_guard<stdx::mutex> lk(_newOpMutex);
+    stdx::lock_guard<Latch> lk(_newOpMutex);
     LogicalClock::get(service)->setClusterTimeFromTrustedSource(LogicalTime(newTime));
 }
 
@@ -120,7 +120,7 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
 
     // Allow the storage engine to start the transaction outside the critical section.
     opCtx->recoveryUnit()->preallocateSnapshot();
-    stdx::lock_guard<stdx::mutex> lk(_newOpMutex);
+    stdx::lock_guard<Latch> lk(_newOpMutex);
 
     ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
     const bool orderedCommit = false;

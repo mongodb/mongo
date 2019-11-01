@@ -38,7 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -55,7 +55,7 @@ namespace SnapshotWindowUtil {
 // another, since they act on and modify the same storage parameters. Further guards the static
 // variables "_snapshotWindowLastDecreasedAt" and "_snapshotWindowLastIncreasedAt" used in
 // increaseTargetSnapshotWindowSize() and decreaseSnapshowWindow().
-stdx::mutex snapshotWindowMutex;
+Mutex snapshotWindowMutex;
 
 namespace {
 
@@ -92,7 +92,7 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
         return;
     }
 
-    stdx::unique_lock<stdx::mutex> lock(snapshotWindowMutex);
+    stdx::unique_lock<Latch> lock(snapshotWindowMutex);
 
     // Tracks the last time that the snapshot window was increased so that it does not go up so fast
     // that the storage engine does not have time to improve snapshot availability.
@@ -150,7 +150,7 @@ void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
         return;
     }
 
-    stdx::unique_lock<stdx::mutex> lock(snapshotWindowMutex);
+    stdx::unique_lock<Latch> lock(snapshotWindowMutex);
 
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     if (engine && engine->isCacheUnderPressure(opCtx)) {

@@ -45,20 +45,20 @@ class TaskGroup {
 public:
     TaskGroup() : _c(), _killCount(0), _targetKillCount(0) {}
     void noteKill() {
-        stdx::lock_guard<stdx::mutex> lk(_m);
+        stdx::lock_guard<Latch> lk(_m);
         ++_killCount;
         if (_killCount >= _targetKillCount)
             _c.notify_one();
     }
     void waitForKillCount(uint64_t target) {
-        stdx::unique_lock<stdx::mutex> lk(_m);
+        stdx::unique_lock<Latch> lk(_m);
         _targetKillCount = target;
         while (_killCount < _targetKillCount)
             _c.wait(lk);
     }
 
 private:
-    stdx::mutex _m;
+    Mutex _m = MONGO_MAKE_LATCH("TaskGroup::_m");
     stdx::condition_variable _c;
     uint64_t _killCount;
     uint64_t _targetKillCount;

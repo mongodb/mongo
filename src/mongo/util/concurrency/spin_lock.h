@@ -37,7 +37,7 @@
 
 #include "mongo/config.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -86,7 +86,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
 };
 
 #else

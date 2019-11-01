@@ -44,9 +44,9 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -216,7 +216,8 @@ public:
     ReplicaSetChangeNotifier* const notifier;
     executor::TaskExecutor* const executor;
 
-    stdx::mutex mutex;  // You must hold this to access any member below.
+    // You must hold this to access any member below.
+    mutable Mutex mutex = MONGO_MAKE_LATCH("SetState::mutex");
 
     // For starting scans
     std::set<HostAndPort> seedNodes;  // updated whenever a master reports set membership changes

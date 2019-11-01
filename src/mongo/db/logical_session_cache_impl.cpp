@@ -116,7 +116,7 @@ Status LogicalSessionCacheImpl::reapNow(Client* client) {
 }
 
 size_t LogicalSessionCacheImpl::size() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _activeSessions.size();
 }
 
@@ -140,7 +140,7 @@ void LogicalSessionCacheImpl::_periodicReap(Client* client) {
 Status LogicalSessionCacheImpl::_reap(Client* client) {
     // Take the lock to update some stats.
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         // Clear the last set of stats for our new run.
         _stats.setLastTransactionReaperJobDurationMillis(0);
@@ -187,7 +187,7 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
                                                  Minutes(gTransactionRecordMinimumLifetimeMinutes));
     } catch (const DBException& ex) {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             auto millis = _service->now() - _stats.getLastTransactionReaperJobTimestamp();
             _stats.setLastTransactionReaperJobDurationMillis(millis.count());
         }
@@ -196,7 +196,7 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         auto millis = _service->now() - _stats.getLastTransactionReaperJobTimestamp();
         _stats.setLastTransactionReaperJobDurationMillis(millis.count());
         _stats.setLastTransactionReaperJobEntriesCleanedUp(numReaped);
@@ -208,7 +208,7 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 void LogicalSessionCacheImpl::_refresh(Client* client) {
     // Stats for serverStatus:
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         // Clear the refresh-related stats with the beginning of our run.
         _stats.setLastSessionsCollectionJobDurationMillis(0);
@@ -223,7 +223,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     // This will finish timing _refresh for our stats no matter when we return.
     const auto timeRefreshJob = makeGuard([this] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         auto millis = _service->now() - _stats.getLastSessionsCollectionJobTimestamp();
         _stats.setLastSessionsCollectionJobDurationMillis(millis.count());
     });
@@ -255,7 +255,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     {
         using std::swap;
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         swap(explicitlyEndingSessions, _endingSessions);
         swap(activeSessions, _activeSessions);
     }
@@ -264,7 +264,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     // swapped out of LogicalSessionCache, and merges in any records that had been added since we
     // swapped them out.
     auto backSwap = [this](auto& member, auto& temp) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         using std::swap;
         swap(member, temp);
         for (const auto& it : temp) {
@@ -300,7 +300,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     uassertStatusOK(_sessionsColl->refreshSessions(opCtx, activeSessionRecords));
     activeSessionsBackSwapper.dismiss();
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _stats.setLastSessionsCollectionJobEntriesRefreshed(activeSessionRecords.size());
     }
 
@@ -308,7 +308,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     uassertStatusOK(_sessionsColl->removeRecords(opCtx, explicitlyEndingSessions));
     explicitlyEndingBackSwaper.dismiss();
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _stats.setLastSessionsCollectionJobEntriesEnded(explicitlyEndingSessions.size());
     }
 
@@ -321,7 +321,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     // Exclude sessions added to _activeSessions from the openCursorSession to avoid race between
     // killing cursors on the removed sessions and creating sessions.
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         for (const auto& it : _activeSessions) {
             auto newSessionIt = openCursorSessions.find(it.first);
@@ -351,18 +351,18 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     SessionKiller::Matcher matcher(std::move(patterns));
     auto killRes = _service->killCursorsWithMatchingSessions(opCtx, std::move(matcher));
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _stats.setLastSessionsCollectionJobCursorsClosed(killRes.second);
     }
 }
 
 void LogicalSessionCacheImpl::endSessions(const LogicalSessionIdSet& sessions) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _endingSessions.insert(begin(sessions), end(sessions));
 }
 
 LogicalSessionCacheStats LogicalSessionCacheImpl::getStats() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _stats.setActiveSessionsCount(_activeSessions.size());
     return _stats;
 }
@@ -380,7 +380,7 @@ Status LogicalSessionCacheImpl::_addToCache(WithLock, LogicalSessionRecord recor
 }
 
 std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     std::vector<LogicalSessionId> ret;
     ret.reserve(_activeSessions.size());
     for (const auto& id : _activeSessions) {
@@ -391,7 +391,7 @@ std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds() const {
 
 std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds(
     const std::vector<SHA256Block>& userDigests) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     std::vector<LogicalSessionId> ret;
     for (const auto& it : _activeSessions) {
         if (std::find(userDigests.cbegin(), userDigests.cend(), it.first.getUid()) !=
@@ -404,7 +404,7 @@ std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds(
 
 boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::peekCached(
     const LogicalSessionId& id) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     const auto it = _activeSessions.find(id);
     if (it == _activeSessions.end()) {
         return boost::none;

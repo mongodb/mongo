@@ -36,7 +36,7 @@
 #include "mongo/db/baton.h"
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -81,7 +81,7 @@ public:
         }
 
         _baton->schedule([this, anchor = shared_from_this()](Status status) {
-            _runJobs(stdx::unique_lock(_mutex), status);
+            _runJobs(stdx::unique_lock<Latch>(_mutex), status);
         });
     }
 
@@ -114,14 +114,14 @@ public:
     }
 
     void detachImpl() noexcept override {
-        stdx::unique_lock lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _isDead = true;
 
         _runJobs(std::move(lk), kDetached);
     }
 
 private:
-    void _runJobs(stdx::unique_lock<stdx::mutex> lk, Status status) {
+    void _runJobs(stdx::unique_lock<Latch> lk, Status status) {
         if (status.isOK() && _isDead) {
             status = kDetached;
         }
@@ -140,7 +140,7 @@ private:
 
     BatonHandle _baton;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("SubBaton::_mutex");
     bool _isDead = false;
     std::vector<Task> _scheduled;
 };

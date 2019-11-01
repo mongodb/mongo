@@ -34,7 +34,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace logger {
@@ -118,7 +118,7 @@ public:
         Status _openFileStream(bool append);
 
         RotatableFileWriter* _writer;
-        stdx::unique_lock<stdx::mutex> _lock;
+        stdx::unique_lock<Latch> _lock;
     };
 
     /**
@@ -128,7 +128,7 @@ public:
 
 private:
     friend class RotatableFileWriter::Use;
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("RotatableFileWriter::_mutex");
     std::string _fileName;
     std::unique_ptr<std::ostream> _stream;
 };

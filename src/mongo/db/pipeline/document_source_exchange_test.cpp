@@ -492,7 +492,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
     // thread holds this while it calls getNext(). This is to simulate the case where a thread may
     // hold some "real" resources which need to be yielded while waiting, such as the Session, or
     // the locks held in a transaction.
-    stdx::mutex artificalGlobalMutex;
+    auto artificalGlobalMutex = MONGO_MAKE_LATCH();
 
     boost::intrusive_ptr<Exchange> ex =
         new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
@@ -503,7 +503,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
      */
     class MutexYielder : public ResourceYielder {
     public:
-        MutexYielder(stdx::mutex* mutex) : _lock(*mutex, stdx::defer_lock) {}
+        MutexYielder(Latch* mutex) : _lock(*mutex, stdx::defer_lock) {}
 
         void yield(OperationContext* opCtx) override {
             _lock.unlock();
@@ -513,12 +513,12 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
             _lock.lock();
         }
 
-        stdx::unique_lock<stdx::mutex>& getLock() {
+        stdx::unique_lock<Latch>& getLock() {
             return _lock;
         }
 
     private:
-        stdx::unique_lock<stdx::mutex> _lock;
+        stdx::unique_lock<Latch> _lock;
     };
 
     /**

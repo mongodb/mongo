@@ -96,7 +96,7 @@ public:
     /**
      * Returns when no index builds remain on this collection.
      */
-    void waitUntilNoIndexBuildsRemain(stdx::unique_lock<stdx::mutex>& lk);
+    void waitUntilNoIndexBuildsRemain(stdx::unique_lock<Latch>& lk);
 
 private:
     // Maps of index build states on the collection, by build UUID and index name.

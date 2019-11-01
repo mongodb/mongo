@@ -42,9 +42,9 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -186,13 +186,13 @@ Future<void> authenticateClient(const BSONObj& params,
 
 AuthMongoCRHandler authMongoCR = authMongoCRImpl;
 
-static stdx::mutex internalAuthKeysMutex;
+static auto internalAuthKeysMutex = MONGO_MAKE_LATCH();
 static bool internalAuthSet = false;
 static std::vector<std::string> internalAuthKeys;
 static BSONObj internalAuthParams;
 
 void setInternalAuthKeys(const std::vector<std::string>& keys) {
-    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
+    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
 
     internalAuthKeys = keys;
     fassert(50996, internalAuthKeys.size() > 0);
@@ -200,24 +200,24 @@ void setInternalAuthKeys(const std::vector<std::string>& keys) {
 }
 
 void setInternalUserAuthParams(BSONObj obj) {
-    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
+    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
     internalAuthParams = obj.getOwned();
     internalAuthKeys.clear();
     internalAuthSet = true;
 }
 
 bool hasMultipleInternalAuthKeys() {
-    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
+    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
     return internalAuthSet && internalAuthKeys.size() > 1;
 }
 
 bool isInternalAuthSet() {
-    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
+    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
     return internalAuthSet;
 }
 
 BSONObj getInternalAuthParams(size_t idx, const std::string& mechanism) {
-    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
+    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
     if (!internalAuthSet) {
         return BSONObj();
     }

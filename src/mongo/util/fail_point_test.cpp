@@ -171,7 +171,7 @@ public:
 
     void stopTest() {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<mongo::Latch> lk(_mutex);
             _inShutdown = true;
         }
         for (auto& t : _tasks) {
@@ -195,7 +195,7 @@ private:
                 }
             }
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<mongo::Latch> lk(_mutex);
             if (_inShutdown)
                 break;
         }
@@ -218,7 +218,7 @@ private:
             } catch (const std::logic_error&) {
             }
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<mongo::Latch> lk(_mutex);
             if (_inShutdown)
                 break;
         }
@@ -227,7 +227,7 @@ private:
     void simpleTask() {
         while (true) {
             static_cast<void>(MONGO_FAIL_POINT(_fp));
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<mongo::Latch> lk(_mutex);
             if (_inShutdown)
                 break;
         }
@@ -241,7 +241,7 @@ private:
                 _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
             }
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<mongo::Latch> lk(_mutex);
             if (_inShutdown)
                 break;
         }
@@ -249,7 +249,8 @@ private:
 
     FailPoint _fp;
     std::vector<stdx::thread> _tasks;
-    stdx::mutex _mutex;
+
+    mongo::Mutex _mutex = MONGO_MAKE_LATCH();
     bool _inShutdown = false;
 };
 

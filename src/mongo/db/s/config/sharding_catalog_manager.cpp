@@ -100,7 +100,7 @@ ShardingCatalogManager::~ShardingCatalogManager() {
 }
 
 void ShardingCatalogManager::startup() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_started) {
         return;
     }
@@ -114,7 +114,7 @@ void ShardingCatalogManager::startup() {
 
 void ShardingCatalogManager::shutDown() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _inShutdown = true;
     }
 
@@ -126,7 +126,7 @@ void ShardingCatalogManager::shutDown() {
 
 Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext* opCtx) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         if (_configInitialized) {
             return {ErrorCodes::AlreadyInitialized,
                     "Config database was previously loaded into memory"};
@@ -146,14 +146,14 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
         return status;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _configInitialized = true;
 
     return Status::OK();
 }
 
 void ShardingCatalogManager::discardCachedConfigDatabaseInitializationState() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _configInitialized = false;
 }
 

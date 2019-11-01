@@ -170,7 +170,7 @@ Status RamLogAppender::append(const logger::MessageEventEphemeral& event) {
 RamLog* RamLog::get(const std::string& name) {
     if (!_namedLock) {
         // Guaranteed to happen before multi-threaded operation.
-        _namedLock = new stdx::mutex();
+        _namedLock = new stdx::mutex();  // NOLINT
     }
 
     stdx::lock_guard<stdx::mutex> lk(*_namedLock);
@@ -215,7 +215,7 @@ MONGO_INITIALIZER(RamLogCatalog)(InitializerContext*) {
             return Status(ErrorCodes::InternalError,
                           "Inconsistent intiailization of RamLogCatalog.");
         }
-        _namedLock = new stdx::mutex();
+        _namedLock = new stdx::mutex();  // NOLINT
         _named = new RM();
     }
 

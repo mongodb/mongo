@@ -61,7 +61,7 @@ FreeMonNetworkInterface::~FreeMonNetworkInterface() = default;
 void FreeMonController::addRegistrationCollector(
     std::unique_ptr<FreeMonCollectorInterface> collector) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_state == State::kNotStarted);
 
         _registrationCollectors.add(std::move(collector));
@@ -70,7 +70,7 @@ void FreeMonController::addRegistrationCollector(
 
 void FreeMonController::addMetricsCollector(std::unique_ptr<FreeMonCollectorInterface> collector) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_state == State::kNotStarted);
 
         _metricCollectors.add(std::move(collector));
@@ -128,7 +128,7 @@ void FreeMonController::notifyOnRollback() {
 
 void FreeMonController::_enqueue(std::shared_ptr<FreeMonMessage> msg) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_state == State::kStarted);
     }
 
@@ -139,7 +139,7 @@ void FreeMonController::start(RegistrationType registrationType,
                               std::vector<std::string>& tags,
                               Seconds gatherMetricsInterval) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         invariant(_state == State::kNotStarted);
     }
@@ -154,7 +154,7 @@ void FreeMonController::start(RegistrationType registrationType,
     _thread = stdx::thread([this] { _processor->run(); });
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -170,7 +170,7 @@ void FreeMonController::stop() {
     log() << "Shutting down free monitoring";
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         bool started = (_state == State::kStarted);
 
@@ -194,7 +194,7 @@ void FreeMonController::stop() {
 
 void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_state == State::kStarted);
     }
 
@@ -205,7 +205,7 @@ void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
 
 void FreeMonController::getStatus(OperationContext* opCtx, BSONObjBuilder* status) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         if (_state != State::kStarted) {
             status->append("state", "disabled");
@@ -218,7 +218,7 @@ void FreeMonController::getStatus(OperationContext* opCtx, BSONObjBuilder* statu
 
 void FreeMonController::getServerStatus(OperationContext* opCtx, BSONObjBuilder* status) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         if (_state != State::kStarted) {
             status->append("state", "disabled");

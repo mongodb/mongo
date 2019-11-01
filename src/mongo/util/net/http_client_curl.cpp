@@ -44,7 +44,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
@@ -131,17 +131,17 @@ private:
     }
 
     static void _lockShare(CURL*, curl_lock_data, curl_lock_access, void* ctx) {
-        reinterpret_cast<stdx::mutex*>(ctx)->lock();
+        reinterpret_cast<Mutex*>(ctx)->lock();
     }
 
     static void _unlockShare(CURL*, curl_lock_data, void* ctx) {
-        reinterpret_cast<stdx::mutex*>(ctx)->unlock();
+        reinterpret_cast<Mutex*>(ctx)->unlock();
     }
 
 private:
     bool _initialized = false;
     CURLSH* _share = nullptr;
-    stdx::mutex _shareMutex;
+    Mutex _shareMutex = MONGO_MAKE_LATCH("CurlLibraryManager::_shareMutex");
 } curlLibraryManager;
 
 /**

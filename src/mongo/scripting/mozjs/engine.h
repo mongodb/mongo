@@ -31,9 +31,9 @@
 
 #include <jsapi.h>
 
+#include "mongo/platform/mutex.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 
@@ -91,7 +91,7 @@ private:
     /**
      * This mutex protects _opToScopeMap
      */
-    stdx::mutex _globalInterruptLock;
+    Mutex _globalInterruptLock = MONGO_MAKE_LATCH("MozJSScriptEngine::_globalInterruptLock");
 
     using OpIdToScopeMap = stdx::unordered_map<unsigned, MozJSImplScope*>;
     OpIdToScopeMap _opToScopeMap;  // map of mongo op ids to scopes (protected by

@@ -114,7 +114,7 @@ private:
     MockConnHook _mockConnStrHook;
 
     // protects _registry
-    stdx::mutex _registryMutex;
+    Mutex _registryMutex = MONGO_MAKE_LATCH("MockConnRegistry::_registryMutex");
     stdx::unordered_map<std::string, MockRemoteDBServer*> _registry;
 };
 }  // namespace mongo

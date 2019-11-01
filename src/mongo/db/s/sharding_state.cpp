@@ -57,7 +57,7 @@ ShardingState* ShardingState::get(OperationContext* operationContext) {
 }
 
 void ShardingState::setInitialized(ShardId shardId, OID clusterId) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     invariant(_getInitializationState() == InitializationState::kNew);
 
     _shardId = std::move(shardId);
@@ -71,7 +71,7 @@ void ShardingState::setInitialized(Status failedStatus) {
     invariant(!failedStatus.isOK());
     log() << "Failed to initialize sharding components" << causedBy(failedStatus);
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     invariant(_getInitializationState() == InitializationState::kNew);
 
     _initializationStatus = std::move(failedStatus);
@@ -79,7 +79,7 @@ void ShardingState::setInitialized(Status failedStatus) {
 }
 
 boost::optional<Status> ShardingState::initializationStatus() {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     if (_getInitializationState() == InitializationState::kNew)
         return boost::none;
 
@@ -105,13 +105,13 @@ Status ShardingState::canAcceptShardedCommands() const {
 
 ShardId ShardingState::shardId() {
     invariant(enabled());
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _shardId;
 }
 
 OID ShardingState::clusterId() {
     invariant(enabled());
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _clusterId;
 }
 

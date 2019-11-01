@@ -191,7 +191,7 @@ private:
     State _state{State::kNotStarted};
 
     // Mutext to protect internal state
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("FreeMonController::_mutex");
 
     // Set of registration collectors
     FreeMonCollectorCollection _registrationCollectors;

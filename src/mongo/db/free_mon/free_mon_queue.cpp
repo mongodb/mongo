@@ -74,7 +74,7 @@ FreeMonMessage::~FreeMonMessage() {}
 
 void FreeMonMessageQueue::enqueue(std::shared_ptr<FreeMonMessage> msg) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         // If we were stopped, drop messages
         if (_stop) {
@@ -98,7 +98,7 @@ void FreeMonMessageQueue::enqueue(std::shared_ptr<FreeMonMessage> msg) {
 boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
     ClockSource* clockSource) {
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         if (_stop) {
             return {};
         }
@@ -188,7 +188,7 @@ boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
 
 void FreeMonMessageQueue::stop() {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         // We can be stopped twice in some situations:
         // 1. Stop on unexpected error
@@ -204,7 +204,7 @@ void FreeMonMessageQueue::turnCrankForTest(size_t countMessagesToIgnore) {
     invariant(_useCrank);
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         _waitable = std::make_unique<WaitableResult>();
 

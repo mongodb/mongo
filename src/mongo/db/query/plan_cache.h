@@ -40,7 +40,7 @@
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
@@ -612,7 +612,7 @@ private:
     LRUKeyValue<PlanCacheKey, PlanCacheEntry, PlanCacheKeyHasher> _cache;
 
     // Protects _cache.
-    mutable stdx::mutex _cacheMutex;
+    mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("PlanCache::_cacheMutex");
 
     // Full namespace of collection.
     std::string _ns;

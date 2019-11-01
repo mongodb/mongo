@@ -59,22 +59,22 @@ Status MockSessionsCollectionImpl::removeRecords(const LogicalSessionIdSet& sess
 }
 
 void MockSessionsCollectionImpl::add(LogicalSessionRecord record) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _sessions.insert({record.getId(), std::move(record)});
 }
 
 void MockSessionsCollectionImpl::remove(LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _sessions.erase(lsid);
 }
 
 bool MockSessionsCollectionImpl::has(LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _sessions.find(lsid) != _sessions.end();
 }
 
 void MockSessionsCollectionImpl::clearSessions() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _sessions.clear();
 }
 
@@ -92,7 +92,7 @@ Status MockSessionsCollectionImpl::_refreshSessions(const LogicalSessionRecordSe
 }
 
 Status MockSessionsCollectionImpl::_removeRecords(const LogicalSessionIdSet& sessions) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     for (auto& lsid : sessions) {
         _sessions.erase(lsid);
     }
@@ -103,7 +103,7 @@ Status MockSessionsCollectionImpl::_removeRecords(const LogicalSessionIdSet& ses
 StatusWith<LogicalSessionIdSet> MockSessionsCollectionImpl::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     LogicalSessionIdSet lsids;
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     for (auto& lsid : sessions) {
         if (_sessions.find(lsid) == _sessions.end()) {
             lsids.emplace(lsid);

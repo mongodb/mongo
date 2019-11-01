@@ -44,7 +44,7 @@ namespace mongo {
 
 RecoveryUnit* EphemeralForTestEngine::newRecoveryUnit() {
     return new EphemeralForTestRecoveryUnit([this]() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         JournalListener::Token token = _journalListener->getToken();
         _journalListener->onDurable(token);
     });
@@ -56,14 +56,14 @@ Status EphemeralForTestEngine::createRecordStore(OperationContext* opCtx,
                                                  const CollectionOptions& options) {
     // Register the ident in the `_dataMap` (for `getAllIdents`). Remainder of work done in
     // `getRecordStore`.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _dataMap[ident] = {};
     return Status::OK();
 }
 
 std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
     OperationContext* opCtx, StringData ns, StringData ident, const CollectionOptions& options) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (options.capped) {
         return stdx::make_unique<EphemeralForTestRecordStore>(
             ns,
@@ -78,7 +78,7 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
 
 std::unique_ptr<RecordStore> EphemeralForTestEngine::makeTemporaryRecordStore(
     OperationContext* opCtx, StringData ident) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _dataMap[ident] = {};
     return stdx::make_unique<EphemeralForTestRecordStore>(ident, &_dataMap[ident]);
 }
@@ -89,7 +89,7 @@ Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx
                                                          const IndexDescriptor* desc) {
     // Register the ident in `_dataMap` (for `getAllIdents`). Remainder of work done in
     // `getSortedDataInterface`.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _dataMap[ident] = {};
     return Status::OK();
 }
@@ -97,7 +97,7 @@ Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx
 SortedDataInterface* EphemeralForTestEngine::getSortedDataInterface(OperationContext* opCtx,
                                                                     StringData ident,
                                                                     const IndexDescriptor* desc) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return getEphemeralForTestBtreeImpl(Ordering::make(desc->keyPattern()),
                                         desc->unique(),
                                         desc->parentNS(),
@@ -107,7 +107,7 @@ SortedDataInterface* EphemeralForTestEngine::getSortedDataInterface(OperationCon
 }
 
 Status EphemeralForTestEngine::dropIdent(OperationContext* opCtx, StringData ident) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _dataMap.erase(ident);
     return Status::OK();
 }
@@ -119,7 +119,7 @@ int64_t EphemeralForTestEngine::getIdentSize(OperationContext* opCtx, StringData
 std::vector<std::string> EphemeralForTestEngine::getAllIdents(OperationContext* opCtx) const {
     std::vector<std::string> all;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         for (DataMap::const_iterator it = _dataMap.begin(); it != _dataMap.end(); ++it) {
             all.push_back(it->first);
         }

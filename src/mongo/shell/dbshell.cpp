@@ -158,7 +158,7 @@ private:
 
     // This needs to use a mutex rather than an atomic bool because we need to ensure that no more
     // logging will happen once we return from disable().
-    static inline stdx::mutex mx;
+    static inline Mutex mx = MONGO_MAKE_LATCH("ShellConsoleAppender::mx");
     static inline bool loggingEnabled = true;
 };
 
