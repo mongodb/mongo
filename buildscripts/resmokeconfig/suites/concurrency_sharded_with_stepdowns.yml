@@ -12,6 +12,7 @@ selector:
   # SERVER-17397 Drops of sharded namespaces may not fully succeed
   - jstests/concurrency/fsm_workloads/create_database.js
   - jstests/concurrency/fsm_workloads/drop_database.js
+  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
   # Disabled due to SERVER-33753, '.count() without a predicate can be wrong on sharded
   # collections'. This bug is problematic for these workloads because they assert on count()
@@ -23,7 +24,6 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
 
   # Disabled pending investigation in SERVER-43251.
-  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   - jstests/concurrency/fsm_workloads/map_reduce_inline.js
   - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
   - jstests/concurrency/fsm_workloads/map_reduce_merge.js
