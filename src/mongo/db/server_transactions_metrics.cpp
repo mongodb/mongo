@@ -149,6 +149,18 @@ void ServerTransactionsMetrics::decrementCurrentPrepared() {
     _currentPrepared.fetchAndSubtract(1);
 }
 
+void ServerTransactionsMetrics::updateLastTransaction(size_t operationCount,
+                                                      size_t oplogOperationBytes,
+                                                      BSONObj writeConcern) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_lastCommittedTransaction) {
+        _lastCommittedTransaction = LastCommittedTransaction();
+    }
+    _lastCommittedTransaction->setOperationCount(operationCount);
+    _lastCommittedTransaction->setOplogOperationBytes(oplogOperationBytes);
+    _lastCommittedTransaction->setWriteConcern(std::move(writeConcern));
+}
+
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setCurrentActive(_currentActive.load());
     stats->setCurrentInactive(_currentInactive.load());
@@ -160,6 +172,11 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
     stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
     stats->setCurrentPrepared(_currentPrepared.load());
+
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (_lastCommittedTransaction) {
+        stats->setLastCommittedTransaction(*_lastCommittedTransaction);
+    }
 }
 
 namespace {

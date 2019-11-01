@@ -718,6 +718,20 @@ var {
             return endTransaction("abortTransaction", driverSession);
         };
 
+        this.getTxnWriteConcern = function getTxnWriteConcern(driverSession) {
+            // If a writeConcern is not specified from the default transaction options, it will be
+            // inherited from the session.
+            let writeConcern = undefined;
+            const sessionAwareClient = driverSession._getSessionAwareClient();
+            if (sessionAwareClient.getWriteConcern(driverSession) !== undefined) {
+                writeConcern = sessionAwareClient.getWriteConcern(driverSession);
+            }
+            if (_txnOptions.getTxnWriteConcern() !== undefined) {
+                writeConcern = _txnOptions.getTxnWriteConcern();
+            }
+            return writeConcern;
+        };
+
         const endTransaction = (commandName, driverSession) => {
             // If commitTransaction or abortTransaction is the first statement in a
             // transaction, it should not send a command to the server and should mark the
@@ -732,22 +746,18 @@ var {
             }
 
             let cmd = {[commandName]: 1, txnNumber: this.handle.getTxnNumber()};
-            // writeConcern should only be specified on commit or abort. If a writeConcern is
-            // not specified from the default transaction options, it will be inherited from
-            // the session.
-            const sessionAwareClient = driverSession._getSessionAwareClient();
-            if (sessionAwareClient.getWriteConcern(driverSession) !== undefined) {
-                cmd.writeConcern = sessionAwareClient.getWriteConcern(driverSession);
-            }
-            if (_txnOptions.getTxnWriteConcern() !== undefined) {
-                cmd.writeConcern = _txnOptions.getTxnWriteConcern();
+            // writeConcern should only be specified on commit or abort.
+            const writeConcern = driverSession._serverSession.getTxnWriteConcern(driverSession);
+            if (writeConcern !== undefined) {
+                cmd.writeConcern = writeConcern;
             }
 
             // If commit or abort raises an error, the transaction's state should still change.
             let res;
             try {
                 // run command against the admin database.
-                res = sessionAwareClient.runCommand(driverSession, "admin", cmd, 0);
+                res = driverSession._getSessionAwareClient().runCommand(
+                    driverSession, "admin", cmd, 0);
             } finally {
                 if (commandName === "commitTransaction") {
                     setTxnState("committed");
@@ -872,6 +882,10 @@ var {
 
             this.getTxnNumber_forTesting = function getTxnNumber_forTesting() {
                 return this._serverSession.getTxnNumber();
+            };
+
+            this.getTxnWriteConcern_forTesting = function getTxnWriteConcern_forTesting() {
+                return this._serverSession.getTxnWriteConcern(this);
             };
 
             this.setTxnNumber_forTesting = function setTxnNumber_forTesting(newTxnNumber) {

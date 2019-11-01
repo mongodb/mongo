@@ -34,8 +34,13 @@ const PrepareHelpers = (function() {
     function commitTransaction(session, commitTimestamp) {
         assert(session);
 
-        const res = session.getDatabase('admin').adminCommand(
-            {commitTransaction: 1, commitTimestamp: commitTimestamp});
+        let cmd = {commitTransaction: 1, commitTimestamp: commitTimestamp};
+        const writeConcern = session.getTxnWriteConcern_forTesting();
+        if (writeConcern !== undefined) {
+            cmd.writeConcern = writeConcern;
+        }
+
+        const res = session.getDatabase('admin').adminCommand(cmd);
 
         // End the transaction on the shell session.
         if (res.ok) {
