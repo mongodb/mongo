@@ -47,7 +47,6 @@
 #include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
@@ -583,15 +582,9 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
 
     // MapReduce should filter existing indexes in the temporary collection, such as
     // the _id index.
-    ASSERT_EQUALS(2U, _opObserver->indexesCreated.size())
+    ASSERT_EQUALS(1U, _opObserver->indexesCreated.size())
         << BSON("indexesCreated" << _opObserver->indexesCreated);
-    if (IndexDescriptor::isIdIndexPattern(_opObserver->indexesCreated[0]["key"].Obj())) {
-        ASSERT_BSONOBJ_EQ(indexSpec, _opObserver->indexesCreated[1]);
-    } else {
-        ASSERT(IndexDescriptor::isIdIndexPattern(_opObserver->indexesCreated[1]["key"].Obj()))
-            << BSON("indexesCreated" << _opObserver->indexesCreated);
-        ASSERT_BSONOBJ_EQ(indexSpec, _opObserver->indexesCreated[0]);
-    }
+    ASSERT_BSONOBJ_EQ(indexSpec, _opObserver->indexesCreated[0]);
 
     ASSERT_NOT_EQUALS(*options.uuid,
                       *CollectionCatalog::get(_opCtx.get()).lookupUUIDByNSS(outputNss))

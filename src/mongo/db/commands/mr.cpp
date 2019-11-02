@@ -616,7 +616,13 @@ void State::prepTempCollection() {
         auto const tempColl =
             db->createCollection(_opCtx, _config.tempNamespace, options, buildIdIndex);
 
-        if (!indexesToInsert.empty()) {
+        // Secondary index builds do not filter existing indexes so we have to do this on the
+        // primary.
+        auto removeIndexBuildsToo = false;
+        auto filteredIndexes = tempColl->getIndexCatalog()->removeExistingIndexes(
+            _opCtx, indexesToInsert, removeIndexBuildsToo);
+
+        if (!filteredIndexes.empty()) {
             // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the
             // current FCV.
             auto opObserver = _opCtx->getServiceContext()->getOpObserver();
@@ -630,16 +636,12 @@ void State::prepTempCollection() {
 
             if (buildUUID) {
                 opObserver->onStartIndexBuild(
-                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, indexesToInsert, fromMigrate);
+                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, filteredIndexes, fromMigrate);
             }
 
-            for (const auto& indexToInsert : indexesToInsert) {
-                try {
-                    uassertStatusOK(tempColl->getIndexCatalog()->createIndexOnEmptyCollection(
-                        _opCtx, indexToInsert));
-                } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
-                    continue;
-                }
+            for (const auto& indexToInsert : filteredIndexes) {
+                uassertStatusOK(tempColl->getIndexCatalog()->createIndexOnEmptyCollection(
+                    _opCtx, indexToInsert));
 
                 // If two phase index builds is enabled, index build will be coordinated using
                 // startIndexBuild and commitIndexBuild oplog entries.
@@ -652,7 +654,7 @@ void State::prepTempCollection() {
 
             if (buildUUID) {
                 opObserver->onCommitIndexBuild(
-                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, indexesToInsert, fromMigrate);
+                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, filteredIndexes, fromMigrate);
             }
         }
 
