@@ -149,7 +149,7 @@ public:
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
         wuow.commit();
 
-        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(_lastSetOldestTimestamp);
+        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(Timestamp(1, 1));
 
         // Start with a fresh oplog.
         deleteAll(cllNS());
@@ -244,8 +244,6 @@ protected:
                     if (auto tsElem = ops.front()["ts"]) {
                         _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
                             tsElem.timestamp());
-                        _lastSetOldestTimestamp =
-                            std::max(_lastSetOldestTimestamp, tsElem.timestamp());
                     }
                 }
             }
@@ -289,12 +287,23 @@ protected:
             coll = db->createCollection(&_opCtx, nss());
         }
 
+        auto lastApplied = repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                               ->getMyLastAppliedOpTime()
+                               .getTimestamp();
+        // The oplog collection may already have some oplog entries for writes prior to this insert.
+        // And the oplog visibility timestamp may already reflect those entries (e.g. no holes exist
+        // before lastApplied). Thus, it is invalid to do any timestamped writes using a timestamp
+        // less than or equal to the WT "all_durable" timestamp. Therefore, we use the next
+        // timestamp of the lastApplied to be safe. In the case where there is no oplog entries in
+        // the oplog collection, we will use a non-zero timestamp (Timestamp(1, 1)) for the insert.
+        auto nextTimestamp =
+            std::max(Timestamp(lastApplied.getSecs(), lastApplied.getInc() + 1), Timestamp(1, 1));
         OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
             coll->insertDocument(&_opCtx, InsertStatement(o), nullOpDebug, true)
                 .transitional_ignore();
-            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(_lastSetOldestTimestamp));
+            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
             wunit.commit();
             return;
         }
@@ -307,7 +316,7 @@ protected:
         repl::UnreplicatedWritesBlock uwb(&_opCtx);
         coll->insertDocument(&_opCtx, InsertStatement(b.obj()), nullOpDebug, true)
             .transitional_ignore();
-        ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(_lastSetOldestTimestamp));
+        ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
         wunit.commit();
     }
     static BSONObj wid(const char* json) {
@@ -318,8 +327,6 @@ protected:
         b.appendElements(fromjson(json));
         return b.obj();
     }
-
-    Timestamp _lastSetOldestTimestamp = Timestamp(1, 1);
 };
 
 
@@ -1297,15 +1304,6 @@ public:
 
 class DeleteOpIsIdBased : public Base {
 public:
-    DeleteOpIsIdBased() : _oldSeverity(globalLogDomain()->getMinimumLogSeverity()) {
-        // TODO (SERVER-43399): This is temporary to help diagnose a rare failure.
-        globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(2));
-    }
-
-    ~DeleteOpIsIdBased() {
-        globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, _oldSeverity);
-    }
-
     void run() {
         // Replication is not supported by mobile SE.
         if (mongo::storageGlobalParams.engine == "mobile") {
@@ -1328,9 +1326,6 @@ public:
         ASSERT(!one(BSON("_id" << 1)).isEmpty());
         ASSERT(!one(BSON("_id" << 2)).isEmpty());
     }
-
-private:
-    LogSeverity _oldSeverity;
 };
 
 class All : public OldStyleSuiteSpecification {
