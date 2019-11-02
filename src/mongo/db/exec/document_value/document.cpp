@@ -461,6 +461,14 @@ BSONObj Document::toBson() const {
     return bb.obj();
 }
 
+boost::optional<BSONObj> Document::toBsonIfTriviallyConvertible() const {
+    if (!storage().isModified() && !storage().stripMetadata()) {
+        return storage().bsonObj();
+    } else {
+        return boost::none;
+    }
+}
+
 constexpr StringData Document::metaFieldTextScore;
 constexpr StringData Document::metaFieldRandVal;
 constexpr StringData Document::metaFieldSortKey;

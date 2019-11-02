@@ -260,9 +260,15 @@ StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc,
 
 BSONObj SortKeyGenerator::extractKeyWithArray(const Document& doc,
                                               const DocumentMetadataFields& metadata) const {
-    // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
-    // Then run the result through the SortKeyGenerator to obtain the final sort key.
-    auto bsonDoc = _sortPattern.documentToBsonWithSortPaths(doc);
+    // Sort key generation requires the Document to be in BSON format. First, we attempt the
+    // "trivial" conversion, which returns the Document's BSON storage.
+    auto optionalBsonDoc = doc.toBsonIfTriviallyConvertible();
+
+    // If the trivial conversion is not possible, we perform a conversion that only converts the
+    // paths we need to generate the sort key.
+    auto bsonDoc = optionalBsonDoc ? std::move(*optionalBsonDoc)
+                                   : _sortPattern.documentToBsonWithSortPaths(doc);
+
     return computeSortKeyFromDocument(bsonDoc, metadata);
 }
 

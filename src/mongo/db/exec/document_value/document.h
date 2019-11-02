@@ -230,6 +230,15 @@ public:
     BSONObj toBson() const;
 
     /**
+     * Serializes this document iff the conversion is "trivial," meaning that the underlying storage
+     * is already in BSON format and there are no damages. No conversion is necessary; this function
+     * just returns the already existing BSON.
+     *
+     * When the trivial conversion is not possible, this function returns boost::none.
+     */
+    boost::optional<BSONObj> toBsonIfTriviallyConvertible() const;
+
+    /**
      * Like the 'toBson()' method, but includes metadata at the top-level. When
      * 'use42ChangeStreamSortKeys' is true, we assume that any Value in the "sortKey" metadata
      * represents the resume token, which gets assigned directly to the "$sortKey" field. Otherwise,
