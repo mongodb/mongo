@@ -325,8 +325,14 @@ void _logOpsInner(OperationContext* opCtx,
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (nss.size() && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
-        uasserted(ErrorCodes::NotMaster,
-                  str::stream() << "logOp() but can't accept write to collection " << nss.ns());
+        str::stream ss;
+        ss << "logOp() but can't accept write to collection " << nss;
+        ss << ": entries: " << records->size() << ": [ ";
+        for (const auto& record : *records) {
+            ss << "(" << record.id << ", " << redact(record.data.toBson()) << ") ";
+        }
+        ss << "]";
+        uasserted(ErrorCodes::NotMaster, ss);
     }
 
     Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
