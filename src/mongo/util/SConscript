@@ -539,6 +539,7 @@ icuEnv.CppUnitTest(
         'future_test_promise_int.cpp',
         'future_test_promise_void.cpp',
         'future_test_shared_future.cpp',
+        'hierarchical_acquisition_test.cpp',
         'icu_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
