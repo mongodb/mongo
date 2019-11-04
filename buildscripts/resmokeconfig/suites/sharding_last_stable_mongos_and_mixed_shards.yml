@@ -26,6 +26,7 @@ selector:
   - jstests/sharding/explain_cmd.js
   # Enable when 4.4 becomes last stable
   - jstests/sharding/agg_explain_fmt.js
+  - jstests/sharding/array_shard_key.js
   - jstests/sharding/banned_txn_databases_sharded.js
   - jstests/sharding/mongos_precache_routing_info.js
   - jstests/sharding/bulk_insert.js

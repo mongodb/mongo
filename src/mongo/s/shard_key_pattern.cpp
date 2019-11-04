@@ -128,8 +128,10 @@ bool isValidShardKeyElementForStorage(const BSONElement& element) {
 BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable, StringData pathStr) {
     ElementPath path;
     path.init(pathStr);
+    // Set both leaf and nonleaf array behavior such that any arrays found get immediately
+    // returned. We are equipped up the call stack to specifically deal with array values.
     path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
-    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
+    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kMatchSubpath);
 
     MatchableDocument::IteratorHolder matchIt(&matchable, &path);
     if (!matchIt->more())

@@ -385,6 +385,13 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
 
     if (_routingInfo->cm()) {
         shardKey = _routingInfo->cm()->getShardKeyPattern().extractShardKeyFromDoc(doc);
+        // The shard key would only be empty after extraction if we encountered an error case,
+        // such as the shard key possessing an array value or array descendants. If the shard key
+        // presented to the targeter was empty, we would emplace the missing fields, and the
+        // extracted key here would *not* be empty.
+        uassert(ErrorCodes::ShardKeyNotFound,
+                "Shard key cannot contain array values or array descendants.",
+                !shardKey.isEmpty());
     }
 
     // Target the shard key or database primary

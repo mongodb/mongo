@@ -132,6 +132,10 @@ void assertPathsNotArray(const mb::Document& document, const FieldRefSet& requir
     for (const auto& path : requiredPaths) {
         auto elem = document.root();
         for (size_t i = 0; i < (*path).numParts(); ++i) {
+            elem = elem[(*path).getPart(i)];
+            if (!elem.ok()) {
+                break;
+            }
             uassert(ErrorCodes::NotSingleValueField,
                     str::stream() << "After applying the update to the document, the field '"
                                   << (*path).dottedField()
