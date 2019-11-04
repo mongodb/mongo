@@ -6160,6 +6160,17 @@ tasks:
       resmoke_args: --suites=change_streams --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: change_streams_multiversion_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: change_streams
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
+
+- <<: *task_template
   name: change_streams_mongos_sessions_passthrough
   tags: ["change_streams"]
   depends_on:
@@ -6202,6 +6213,19 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_sharded_collections_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: change_streams_sharded_collections_multiversion_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  depends_on:
+  - name: change_streams_multiversion_gen
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: change_streams_sharded_collections_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough

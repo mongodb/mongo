@@ -76,7 +76,7 @@ def update_suite_config_for_multiversion_sharded(suite_config):
 
     if base_num_shards is not default_shards or base_num_rs_nodes_per_shard is not default_num_nodes:
         num_shard_num_nodes_pair = "{}-{}".format(base_num_shards, base_num_rs_nodes_per_shard)
-        assert num_shard_num_nodes_pair in {"default_shards-2"}, \
+        assert num_shard_num_nodes_pair in {"default_shards-2", "2-default_nodes"}, \
                "The multiversion suite runs sharded clusters with 2 shards and 2 nodes per shard. "\
                " acceptable, please add '{}' to this assert.".format(num_shard_num_nodes_pair)
 
