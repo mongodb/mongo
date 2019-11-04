@@ -849,7 +849,7 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                 MongoURI targetURI;
 
                 if (_set->setUri.isValid()) {
-                    targetURI = _set->setUri.cloneURIForServer(ns.host);
+                    targetURI = _set->setUri.cloneURIForServer(ns.host, "");
                     targetURI.setUser("");
                     targetURI.setPassword("");
                 } else {
