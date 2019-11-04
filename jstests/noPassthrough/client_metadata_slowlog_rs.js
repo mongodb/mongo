@@ -1,6 +1,7 @@
 /**
  * Test that verifies client metadata is logged as part of slow query logging in MongoD in a replica
  * set.
+ * @tags: [requires_replication]
  */
 (function() {
 'use strict';
