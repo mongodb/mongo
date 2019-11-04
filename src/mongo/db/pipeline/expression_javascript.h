@@ -44,6 +44,8 @@ namespace mongo {
  */
 class ExpressionInternalJsEmit final : public Expression {
 public:
+    static constexpr auto kExpressionName = "$_internalJsEmit"_sd;
+
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
@@ -74,8 +76,9 @@ private:
     const boost::intrusive_ptr<Expression>& _thisRef;
     std::string _funcSource;
 
-    static constexpr auto kExpressionName = "$_internalJsEmit"_sd;
-
+    // For a given invocation of the user-defined function, this vector holds the results of each
+    // call to emit(). Mark as mutable since it needs to be cleared for each call to evaluate().
+    mutable std::vector<BSONObj> _emittedObjects;
     size_t _byteLimit;
 };
 

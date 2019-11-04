@@ -119,32 +119,34 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     auto expCtx = getExpressionContext();
     auto jsExec = expCtx->getJsExecWithScope();
 
+    // Inject the native "emit" function to be called from the user-defined map function. This
+    // particular Expression/ExpressionContext may be reattached to a new OperationContext (and thus
+    // a new JS Scope) when used across getMore operations, so this method will handle that case for
+    // us by only injecting if we haven't already.
+    jsExec->injectEmitIfNecessary(emitFromJS, &_emittedObjects);
+
     // Although inefficient to "create" a new function every time we evaluate, this will usually end
     // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
     // on a new thread if the expression is evaluated across getMores.
     auto func = jsExec->getScope()->createFunction(_funcSource.c_str());
     uassert(31226, "The map function failed to parse in the javascript engine", func);
 
-    // For a given invocation of the user-defined function, this vector holds the results of each
-    // call to emit().
-    std::vector<BSONObj> emittedObjects;
-    jsExec->getScope()->injectNative("emit", emitFromJS, &emittedObjects);
-
     BSONObj thisBSON = thisVal.getDocument().toBson();
     BSONObj params;
     jsExec->callFunctionWithoutReturn(func, params, thisBSON);
 
     std::vector<Value> output;
-
     size_t bytesUsed = 0;
-    for (const auto& obj : emittedObjects) {
+    for (auto&& obj : _emittedObjects) {
         bytesUsed += obj.objsize();
         uassert(31292,
                 str::stream() << "Size of emitted values exceeds the set size limit of "
                               << _byteLimit << " bytes",
                 bytesUsed < _byteLimit);
-        output.push_back(Value(obj));
+        output.push_back(Value(std::move(obj)));
     }
+
+    _emittedObjects.clear();
 
     return Value{std::move(output)};
 }

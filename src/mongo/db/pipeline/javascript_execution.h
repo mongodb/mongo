@@ -60,6 +60,11 @@ public:
         : _scope(getGlobalScriptEngine()->newScopeForCurrentThread()) {
         _scopeVars = scopeVars.getOwned();
         _scope->init(&_scopeVars);
+        _scope->registerOperation(Client::getCurrent()->getOperationContext());
+    }
+
+    ~JsExecution() {
+        _scope->unregisterOperation();
     }
 
     /**
@@ -71,9 +76,6 @@ public:
     void callFunctionWithoutReturn(ScriptingFunction func,
                                    const BSONObj& params,
                                    const BSONObj& thisObj) {
-        _scope->registerOperation(Client::getCurrent()->getOperationContext());
-        const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
-
         _scope->invoke(func, &params, &thisObj, 0, true);
     }
 
@@ -84,13 +86,21 @@ public:
      * Returns the value returned by the function.
      */
     Value callFunction(ScriptingFunction func, const BSONObj& params, const BSONObj& thisObj) {
-        _scope->registerOperation(Client::getCurrent()->getOperationContext());
-        const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
-
         _scope->invoke(func, &params, &thisObj, 0, false);
         BSONObjBuilder returnValue;
         _scope->append(returnValue, "", "__returnValue");
         return Value(returnValue.done().firstElement());
+    }
+
+    /**
+     * Injects the given function 'emitFn' as a native JS function named 'emit', callable from
+     * user-defined functions.
+     */
+    void injectEmitIfNecessary(NativeFunction emitFn, void* data) {
+        if (!_emitCreated) {
+            _scope->injectNative("emit", emitFn, data);
+            _emitCreated = true;
+        }
     }
 
     Scope* getScope() {
@@ -100,5 +110,6 @@ public:
 private:
     BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
+    bool _emitCreated = false;
 };
 }  // namespace mongo
