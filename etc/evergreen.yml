@@ -196,18 +196,6 @@ variables:
   - benchrun_embedded_update
   - generate_benchrun_embedded_files
 
-- &unittests
-  name: unittests!
-  execution_tasks:
-  - compile_unittests
-  - unittests
-
-- &dbtest
-  name: dbtest!
-  execution_tasks:
-  - compile_dbtest
-  - dbtest
-
 - &compile_task_group_template
   name: compile_task_group_template
   max_hosts: 1
@@ -280,9 +268,6 @@ variables:
   - windows-64-vs2017-test
   modules:
   - enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   expansions: &enterprise-windows-64-2k8-nopush-expansions-template
     platform_decompress: unzip
     exe: ".exe"
@@ -3677,18 +3662,14 @@ tasks:
         display_name: Library Dependency Graph (library_dependency_graph.json)
         build_variants: [enterprise-rhel-70-64-bit-kitchen-sink] # This must be the Dagger variant
 
-## compile_unittests - build unittests ##
-- name: compile_unittests
+## unittests - run unittests ##
+- name: unittests
   commands:
     - func: "scons compile"
       vars:
         targets: unittests
         task_compile_flags: >-
           --detect-odr-violations
-
-## unittests - run unittests ##
-- name: unittests
-  commands:
     - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
@@ -3696,15 +3677,14 @@ tasks:
       vars:
         resmoke_args: --suites=unittests
 
-## compile_dbtest ##
-- name: compile_dbtest
+## dbtest ##
+- name: dbtest
   commands:
     - func: "scons compile"
       vars:
         targets: dbtest
         task_compile_flags: >-
           --detect-odr-violations
-
     # Tar unstripped dbtest, to be archived in case of failure
     - command: archive.targz_pack
       params:
@@ -3712,10 +3692,6 @@ tasks:
         source_dir: "src"
         include:
           - "./dbtest*"
-
-## dbtest ##
-- name: dbtest
-  commands:
     - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
@@ -8180,15 +8156,12 @@ task_groups:
 - <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
-  - compile_dbtest
   - dbtest
 - <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
   tasks:
   - compile
-  - compile_unittests
   - unittests
-  - compile_dbtest
   - dbtest
   - compile_all
 - name: embedded_sdk_build_and_test
@@ -8272,9 +8245,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8310,9 +8280,6 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
     target_resmoke_time: 15
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.encrypt
@@ -8358,9 +8325,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8419,9 +8383,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8476,9 +8437,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8524,9 +8482,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8594,9 +8549,6 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggfuzzer .common
@@ -8645,9 +8597,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -8694,9 +8643,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
     multiversion_edition: targeted
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: free_monitoring
@@ -8731,9 +8677,6 @@ buildvariants:
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
     use_default_timeouts: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8789,9 +8732,6 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: s390x
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8847,9 +8787,6 @@ buildvariants:
     repo_edition: org
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8886,9 +8823,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_architecture: s390x
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8944,9 +8878,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8999,9 +8930,6 @@ buildvariants:
     tooltags: "ssl"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9059,9 +8987,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9117,9 +9042,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9193,8 +9115,6 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     large_distro_name: windows-64-vs2017-compile
-  display_tasks:
-    - *dbtest
   tasks:
     - name: compile_TG
       requires:
@@ -9228,9 +9148,6 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9289,8 +9206,6 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: win32
     push_arch: x86_64-enterprise-windows-64
-  display_tasks:
-  - *dbtest
   tasks:
   - name: compile_TG
     requires:
@@ -9340,9 +9255,6 @@ buildvariants:
   display_name: "* Enterprise Windows 2008R2 compile_all"
   run_on:
   - windows-64-vs2017-test
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9408,9 +9320,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9462,9 +9371,6 @@ buildvariants:
     tooltags: "ssl"
     build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9551,9 +9457,6 @@ buildvariants:
     resmoke_jobs_max: 4
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.auth !.encrypt !.unwind
@@ -9597,9 +9500,6 @@ buildvariants:
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -9635,9 +9535,6 @@ buildvariants:
     resmoke_jobs_max: 4
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: audit
@@ -10114,9 +10011,6 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     large_distro_name: rhel62-large
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10323,9 +10217,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel62-large
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10405,8 +10296,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel62-large
-  display_tasks:
-  - *dbtest
   tasks:
   - name: compile_TG
     distros:
@@ -10509,9 +10398,6 @@ buildvariants:
     use_scons_cache: false
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-    - *dbtest
-    - *unittests
   tasks:
     - name: compile_all_run_unittests_TG
     - name: .aggregation !.unwind
@@ -10573,9 +10459,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10633,9 +10516,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10749,9 +10629,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10802,9 +10679,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10857,9 +10731,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10933,9 +10804,6 @@ buildvariants:
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10994,9 +10862,6 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11050,9 +10915,6 @@ buildvariants:
     repo_edition: enterprise
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11103,9 +10965,6 @@ buildvariants:
     repo_edition: org
     build_mongoreplay: true
     tooltags: "ssl"
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11135,9 +10994,6 @@ buildvariants:
     repo_edition: org
     build_mongoreplay: true
     tooltags: "ssl"
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11175,9 +11031,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11218,9 +11071,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11238,9 +11088,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11272,9 +11119,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11321,9 +11165,6 @@ buildvariants:
     multiversion_platform: suse12
     multiversion_architecture: s390x
     multiversion_edition: enterprise
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11378,9 +11219,6 @@ buildvariants:
     multiversion_platform: suse12
     multiversion_architecture: s390x
     multiversion_edition: targeted
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11414,9 +11252,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11465,9 +11300,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11508,9 +11340,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11566,9 +11395,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     scons_cache_scope: shared
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11664,9 +11490,6 @@ buildvariants:
     tooltags: "ssl"
     scons_cache_scope: shared
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11769,9 +11592,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11794,9 +11614,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel62-large
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11852,8 +11669,6 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-62-64-bit-inmem-expansions
     burn_in_tests_build_variant: enterprise-rhel-62-64-bit-inmem
-  display_tasks:
-  - *dbtest
   tasks:
   # This build variant exists specifically to test that newly added or modified JavaScript tests
   # properly tag non-persistent storage tests using "requires_persistence", "requires_journaling" or
@@ -11901,8 +11716,6 @@ buildvariants:
     additional_targets: mongoebench mongoed
   display_tasks:
   - *benchrun_embedded
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11953,9 +11766,6 @@ buildvariants:
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -12025,9 +11835,6 @@ buildvariants:
     resmoke_jobs_max: 4
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -12059,9 +11866,6 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12114,9 +11918,6 @@ buildvariants:
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12159,9 +11960,6 @@ buildvariants:
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12220,9 +12018,6 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation
@@ -12281,9 +12076,6 @@ buildvariants:
     scons_cache_scope: shared
     target_resmoke_time: 15
     test_flags: --excludeWithAnyTags=requires_fast_memory
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggfuzzer .common
@@ -12310,9 +12102,6 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     scons_cache_scope: shared
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation
@@ -12370,9 +12159,6 @@ buildvariants:
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: jsCore
@@ -12401,9 +12187,6 @@ buildvariants:
         --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
         --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
     scons_cache_scope: shared
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.no_async
@@ -12443,9 +12226,6 @@ buildvariants:
     scons_cache_mode: all
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
