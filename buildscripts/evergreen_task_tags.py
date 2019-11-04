@@ -149,7 +149,7 @@ def main():
         list_all_tasks(evg_config, options.list_tasks)
 
     if options.tasks_for_tag:
-        list_tasks_with_tag(evg_config, options.tasks_for_tag, options.tasks_for_tag_filter)
+        list_tasks_with_tag(evg_config, options.tasks_for_tag, options.remove_tasks_for_tag_filter)
 
 
 if __name__ == "__main__":
