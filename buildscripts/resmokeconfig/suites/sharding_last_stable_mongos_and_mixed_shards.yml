@@ -22,6 +22,8 @@ selector:
   - jstests/sharding/mongos_wait_csrs_initiate.js
   # Enable after SERVER-40258 gets backported and available in the official 4.2 binaries.
   - jstests/sharding/prepared_txn_metadata_refresh.js
+  # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.
+  - jstests/sharding/explain_cmd.js
   # Enable when 4.4 becomes last stable
   - jstests/sharding/agg_explain_fmt.js
   - jstests/sharding/banned_txn_databases_sharded.js

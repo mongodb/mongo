@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
@@ -208,6 +209,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     auto targeter = std::move(targetingStatus.getValue());
+    if (request.getExplain()) {
+        explain_common::generateServerInfo(result);
+    }
+
     switch (targeter.policy) {
         case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
             // A pipeline with $changeStream should never be allowed to passthrough.
@@ -222,8 +227,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
 
         case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kMongosRequired: {
-            auto expCtx = targeter.pipeline->getContext();
             // If this is an explain write the explain output and return.
+            auto expCtx = targeter.pipeline->getContext();
             if (expCtx->explain) {
                 *result << "splitPipeline" << BSONNULL << "mongos"
                         << Document{

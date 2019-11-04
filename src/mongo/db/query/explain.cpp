@@ -47,6 +47,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -757,17 +758,6 @@ void Explain::generateSinglePlanExecutionInfo(const PlanStageStats* stats,
     stagesBob.doneFast();
 }
 
-// static
-void Explain::generateServerInfo(BSONObjBuilder* out) {
-    BSONObjBuilder serverBob(out->subobjStart("serverInfo"));
-    out->append("host", getHostNameCached());
-    out->appendNumber("port", serverGlobalParams.port);
-    auto&& vii = VersionInfoInterface::instance();
-    out->append("version", vii.version());
-    out->append("gitVersion", vii.gitVersion());
-    serverBob.doneFast();
-}
-
 std::unique_ptr<PlanStageStats> Explain::getWinningPlanTrialStats(PlanExecutor* exec) {
     // Inspect the tree to see if there is a MultiPlanStage. Plan selection has already happened at
     // this point, since we have a PlanExecutor.
@@ -877,6 +867,8 @@ void Explain::explainPipelineExecutor(PlanExecutor* exec,
     }
 
     *out << "stages" << Value(pps->writeExplainOps(verbosity));
+
+    explain_common::generateServerInfo(out);
 }
 
 // static
@@ -909,7 +901,7 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   out);
 
-    generateServerInfo(out);
+    explain_common::generateServerInfo(out);
 }
 
 // static
