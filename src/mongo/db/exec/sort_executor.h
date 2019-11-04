@@ -43,9 +43,27 @@ namespace mongo {
  * caller should provide input documents by repeated calls to the add() function, and then
  * complete the loading process with a single call to loadingDone(). Finally, getNext() should be
  * called to return the documents one by one in sorted order.
+ *
+ * The template parameter is the type of data being sorted. In DocumentSource execution, we sort
+ * Document objects directly, but in the PlanStage layer we may sort WorkingSetMembers. The type of
+ * the sort key, on the other hand, is always Value.
  */
+template <typename T>
 class SortExecutor {
 public:
+    using DocumentSorter = Sorter<Value, T>;
+    class Comparator {
+    public:
+        Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
+        int operator()(const typename DocumentSorter::Data& lhs,
+                       const typename DocumentSorter::Data& rhs) const {
+            return _sortKeyComparator(lhs.first, rhs.first);
+        }
+
+    private:
+        SortKeyComparator _sortKeyComparator;
+    };
+
     /**
      * If the passed in limit is 0, this is treated as no limit.
      */
@@ -53,11 +71,15 @@ public:
                  uint64_t limit,
                  uint64_t maxMemoryUsageBytes,
                  std::string tempDir,
-                 bool allowDiskUse);
-
-    boost::optional<Document> getNextDoc();
-
-    boost::optional<WorkingSetMember> getNextWsm();
+                 bool allowDiskUse)
+        : _sortPattern(std::move(sortPattern)),
+          _tempDir(std::move(tempDir)),
+          _diskUseAllowed(allowDiskUse) {
+        _stats.sortPattern =
+            _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
+        _stats.limit = limit;
+        _stats.maxMemoryUsageBytes = maxMemoryUsageBytes;
+    }
 
     const SortPattern& sortPattern() const {
         return _sortPattern;
@@ -85,21 +107,6 @@ public:
     }
 
     /**
-     * Signals to the sort executor that there will be no more input documents.
-     */
-    void loadingDone();
-
-    /**
-     * Add a Document with sort key specified by Value to the DocumentSorter.
-     */
-    void add(Value, Document);
-
-    /**
-     * Add a WorkingSetMember with sort key specified by Value to the DocumentSorter.
-     */
-    void add(Value, WorkingSetMember);
-
-    /**
      * Returns true if the loading phase has been explicitly completed, and then the stream of
      * documents has subsequently been exhausted by "get next" calls.
      */
@@ -111,29 +118,76 @@ public:
         return _stats;
     }
 
-    std::unique_ptr<SortStats> cloneStats() const;
+    std::unique_ptr<SortStats> cloneStats() const {
+        return std::unique_ptr<SortStats>{static_cast<SortStats*>(_stats.clone())};
+    }
 
-private:
-    using DocumentSorter = Sorter<Value, WorkingSetMember>;
-    class Comparator {
-    public:
-        Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
-        int operator()(const DocumentSorter::Data& lhs, const DocumentSorter::Data& rhs) const {
-            return _sortKeyComparator(lhs.first, rhs.first);
+    /**
+     * Add data item to be sorted of type T with sort key specified by Value to the sort executor.
+     * Should only be called before 'loadingDone()' is called.
+     */
+    void add(Value sortKey, T data) {
+        if (!_sorter) {
+            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
+        }
+        _sorter->add(std::move(sortKey), std::move(data));
+
+        _stats.totalDataSizeBytes += data.memUsageForSorter();
+    }
+
+    /**
+     * Signals to the sort executor that there will be no more input documents.
+     */
+    void loadingDone() {
+        // This conditional should only pass if no documents were added to the sorter.
+        if (!_sorter) {
+            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
+        }
+        _output.reset(_sorter->done());
+        _stats.wasDiskUsed = _stats.wasDiskUsed || _sorter->usedDisk();
+        _sorter.reset();
+    }
+
+    /**
+     * Returns the next data item in the sorted stream, or boost::none for end-of-stream. Should
+     * only be called after 'loadingDone()' is called.
+     */
+    boost::optional<T> getNext() {
+        if (_isEOF) {
+            return boost::none;
         }
 
-    private:
-        SortKeyComparator _sortKeyComparator;
-    };
+        if (!_output->more()) {
+            _output.reset();
+            _isEOF = true;
+            return boost::none;
+        }
 
-    SortOptions makeSortOptions() const;
+        return _output->next().second;
+    }
+
+private:
+    SortOptions makeSortOptions() const {
+        SortOptions opts;
+        if (_stats.limit) {
+            opts.limit = _stats.limit;
+        }
+
+        opts.maxMemoryUsageBytes = _stats.maxMemoryUsageBytes;
+        if (_diskUseAllowed) {
+            opts.extSortAllowed = true;
+            opts.tempDir = _tempDir;
+        }
+
+        return opts;
+    }
 
     const SortPattern _sortPattern;
     const std::string _tempDir;
     const bool _diskUseAllowed;
 
     std::unique_ptr<DocumentSorter> _sorter;
-    std::unique_ptr<DocumentSorter::Iterator> _output;
+    std::unique_ptr<typename DocumentSorter::Iterator> _output;
 
     SortStats _stats;
 

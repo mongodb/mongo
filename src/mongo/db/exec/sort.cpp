@@ -98,7 +98,7 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
         return code;
     }
 
-    auto nextWsm = _sortExecutor.getNextWsm();
+    auto nextWsm = _sortExecutor.getNext();
     if (!nextWsm) {
         return PlanStage::IS_EOF;
     }

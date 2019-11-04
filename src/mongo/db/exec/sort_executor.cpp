@@ -48,107 +48,14 @@ std::string nextFileName() {
     return "extsort-sort-executor." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
 }
 }  // namespace
-
-SortExecutor::SortExecutor(SortPattern sortPattern,
-                           uint64_t limit,
-                           uint64_t maxMemoryUsageBytes,
-                           std::string tempDir,
-                           bool allowDiskUse)
-    : _sortPattern(std::move(sortPattern)),
-      _tempDir(std::move(tempDir)),
-      _diskUseAllowed(allowDiskUse) {
-    _stats.sortPattern =
-        _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
-    _stats.limit = limit;
-    _stats.maxMemoryUsageBytes = maxMemoryUsageBytes;
-}
-
-boost::optional<Document> SortExecutor::getNextDoc() {
-    auto wsm = getNextWsm();
-    if (!wsm) {
-        return boost::none;
-    }
-
-    // Ensure that this WorkingSetMember only houses a Document. This guarantees that we are not
-    // discarding data inside the working set member (e.g. the RecordId) when returning the Document
-    // to the caller.
-    invariant(wsm->hasOwnedObj());
-
-    // Transfer metadata from the WorkingSetMember to the Document.
-    MutableDocument mutableDoc{std::move(wsm->doc.value())};
-    mutableDoc.setMetadata(wsm->releaseMetadata());
-
-    return mutableDoc.freeze();
-}
-
-boost::optional<WorkingSetMember> SortExecutor::getNextWsm() {
-    if (_isEOF) {
-        return boost::none;
-    }
-
-    if (!_output->more()) {
-        _output.reset();
-        _isEOF = true;
-        return boost::none;
-    }
-
-    return _output->next().second;
-}
-
-void SortExecutor::add(Value sortKey, Document data) {
-    invariant(data.isOwned());
-    WorkingSetMember wsm;
-
-    // Transfer metadata from the Document to the WorkingSetMember.
-    MutableDocument mutableDoc{std::move(data)};
-    wsm.setMetadata(mutableDoc.releaseMetadata());
-
-    wsm.doc.setValue(mutableDoc.freeze());
-    wsm.transitionToOwnedObj();
-    this->add(std::move(sortKey), std::move(wsm));
-}
-
-void SortExecutor::add(Value sortKey, WorkingSetMember data) {
-    // Metadata should be attached directly to the WSM rather than inside the Document.
-    invariant(!data.doc.value().metadata());
-
-    if (!_sorter) {
-        _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
-    }
-    _sorter->add(std::move(sortKey), std::move(data));
-
-    _stats.totalDataSizeBytes += data.getMemUsage();
-}
-
-void SortExecutor::loadingDone() {
-    // This conditional should only pass if no documents were added to the sorter.
-    if (!_sorter) {
-        _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
-    }
-    _output.reset(_sorter->done());
-    _stats.wasDiskUsed = _stats.wasDiskUsed || _sorter->usedDisk();
-    _sorter.reset();
-}
-
-SortOptions SortExecutor::makeSortOptions() const {
-    SortOptions opts;
-    if (_stats.limit) {
-        opts.limit = _stats.limit;
-    }
-
-    opts.maxMemoryUsageBytes = _stats.maxMemoryUsageBytes;
-    if (_diskUseAllowed) {
-        opts.extSortAllowed = true;
-        opts.tempDir = _tempDir;
-    }
-
-    return opts;
-}
-
-std::unique_ptr<SortStats> SortExecutor::cloneStats() const {
-    return std::unique_ptr<SortStats>{static_cast<SortStats*>(_stats.clone())};
-}
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
-// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.
+
+// Instantiate Sorter templates for sorting both Document and WorkingSetMember.
+MONGO_CREATE_SORTER(mongo::Value,
+                    mongo::Document,
+                    mongo::SortExecutor<mongo::Document>::Comparator);
+MONGO_CREATE_SORTER(mongo::Value,
+                    mongo::WorkingSetMember,
+                    mongo::SortExecutor<mongo::WorkingSetMember>::Comparator);

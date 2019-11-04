@@ -80,7 +80,7 @@ private:
     // Not owned by us.
     WorkingSet* _ws;
 
-    SortExecutor _sortExecutor;
+    SortExecutor<WorkingSetMember> _sortExecutor;
 
     // Whether or not we have finished loading data into '_sortExecutor'.
     bool _populated = false;

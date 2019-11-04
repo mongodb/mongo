@@ -86,7 +86,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
         invariant(populationResult.isEOF());
     }
 
-    auto result = _sortExecutor->getNextDoc();
+    auto result = _sortExecutor->getNext();
     if (!result)
         return GetNextResult::makeEOF();
     return GetNextResult(std::move(*result));

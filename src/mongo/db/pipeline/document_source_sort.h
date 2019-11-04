@@ -183,7 +183,7 @@ private:
 
     bool _populated = false;
 
-    boost::optional<SortExecutor> _sortExecutor;
+    boost::optional<SortExecutor<Document>> _sortExecutor;
 
     boost::optional<SortKeyGenerator> _sortKeyGen;
 };
