@@ -176,5 +176,76 @@ TEST(MapReduceParseTest, parseAllOptionalFields) {
                           << "db"));
 }
 
+TEST(MapReduceParseTest, deprecatedOptions) {
+    auto ctx = IDLParserErrorContext("mapReduce");
+    // jsMode can be true or false
+    MapReduce::parse(ctx,
+                     BSON("mapReduce"
+                          << "theSource"
+                          << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                          << BSON("inline" << 1) << "$db"
+                          << "db"
+                          << "jsMode" << true));
+    MapReduce::parse(ctx,
+                     BSON("mapReduce"
+                          << "theSource"
+                          << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                          << BSON("inline" << 1) << "$db"
+                          << "db"
+                          << "jsMode" << false));
+    // nonAtomic can be true but not false
+    MapReduce::parse(ctx,
+                     BSON("mapReduce"
+                          << "theSource"
+                          << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                          << BSON("reduce"
+                                  << "theSink"
+                                  << "db"
+                                  << "myDb"
+                                  << "nonAtomic" << true)
+                          << "$db"
+                          << "db"));
+    ASSERT_THROWS(
+        MapReduce::parse(ctx,
+                         BSON("mapReduce"
+                              << "theSource"
+                              << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                              << BSON("reduce"
+                                      << "theSink"
+                                      << "db"
+                                      << "myDb"
+                                      << "nonAtomic" << false)
+                              << "$db"
+                              << "db")),
+        DBException);
+    ASSERT_THROWS(
+        MapReduce::parse(ctx,
+                         BSON("mapReduce"
+                              << "theSource"
+                              << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                              << BSON("reduce"
+                                      << "theSink"
+                                      << "db"
+                                      << "myDb"
+                                      << "nonAtomic" << false)
+                              << "$db"
+                              << "db")),
+        DBException);
+    // out.sharded cannot be false
+    ASSERT_THROWS(
+        MapReduce::parse(ctx,
+                         BSON("mapReduce"
+                              << "theSource"
+                              << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                              << BSON("reduce"
+                                      << "theSink"
+                                      << "db"
+                                      << "myDb"
+                                      << "sharded" << false)
+                              << "$db"
+                              << "db")),
+        DBException);
+}
+
 }  // namespace
 }  // namespace mongo

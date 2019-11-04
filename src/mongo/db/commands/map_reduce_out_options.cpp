@@ -52,14 +52,16 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
             return MapReduceOutOptions(boost::none, "", OutputType::InMemory, false);
         }
 
-        int allowedNFields = 3;
+        int allowedNFields = 4;
 
         const auto sharded = [&]() {
             if (const auto sharded = obj["sharded"]) {
                 uassert(ErrorCodes::BadValue,
                         "sharded field value must be boolean",
                         sharded.type() == Bool);
-                return sharded.boolean();
+                uassert(
+                    ErrorCodes::BadValue, "sharded field value must be true", sharded.boolean());
+                return true;
             } else {
                 --allowedNFields;
                 return false;
@@ -99,6 +101,16 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
                 return boost::none;
             }
         }();
+
+        if (const auto nonAtomic = obj["nonAtomic"]) {
+            uassert(ErrorCodes::BadValue,
+                    "nonAtomic field value must be boolean",
+                    nonAtomic.type() == Bool);
+            uassert(
+                ErrorCodes::BadValue, "nonAtomic field value must be true", nonAtomic.boolean());
+        } else {
+            --allowedNFields;
+        }
 
         uassert(ErrorCodes::BadValue,
                 "'out' supports only output type with collection name, optional 'sharded' and "

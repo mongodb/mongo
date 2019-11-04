@@ -113,3 +113,7 @@ commands:
                     collection's document validation."
                 type: bool
                 optional: true
+            jsMode:
+                description: "Deprecated non-functional option which is ignored."
+                type: bool
+                optional: true
