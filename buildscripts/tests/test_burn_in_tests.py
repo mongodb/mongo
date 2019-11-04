@@ -17,9 +17,10 @@ import requests
 from shrub.config import Configuration
 
 import buildscripts.burn_in_tests as under_test
+from buildscripts.ciconfig.evergreen import parse_evergreen_file
 import buildscripts.util.teststats as teststats_utils
 import buildscripts.resmokelib.parser as _parser
-from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key_and_value
+import buildscripts.resmokelib.config as _config
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
 _parser.set_options()
 
@@ -36,19 +37,15 @@ def create_tests_by_task_mock(n_tasks, n_tests):
     }
 
 
+MV_MOCK_SUITES = [
+    "replica_sets_jscore_passthrough", "sharded_causally_consistent_jscore_passthrough"
+]
+
+
 def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
-    multiversion_suites = get_named_suites_with_root_level_key_and_value(
-        under_test.MULTIVERSION_CONFIG_KEY, True)
-    mock_suites = [
-        "replica_sets_jscore_passthrough", "sharded_causally_consistent_jscore_passthrough"
-    ]
-    assert n_tasks <= len(mock_suites)
-    for suite in mock_suites:
-        # We have to hardcode mock_suites because 'create_multiversion_generate_tasks_config'
-        # is only meant to generate the tests in multiversion_suites.
-        assert suite in multiversion_suites
+    assert n_tasks <= len(MV_MOCK_SUITES)
     return {
-        f"{mock_suites[i % len(mock_suites)]}": {
+        f"{MV_MOCK_SUITES[i % len(MV_MOCK_SUITES)]}": {
             "resmoke_args": f"--suites=suite_{i}",
             "tests": [f"jstests/tests_{j}" for j in range(n_tests)]
         }
@@ -67,6 +64,100 @@ NS = "buildscripts.burn_in_tests"
 def ns(relative_name):  # pylint: disable=invalid-name
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
+
+
+def mock_a_file(filename):
+    change = MagicMock(a_path=filename)
+    return change
+
+
+def mock_git_diff(change_list):
+    diff = MagicMock()
+    diff.iter_change_type.return_value = change_list
+    return diff
+
+
+def mock_changed_git_files(add_files):
+    repo = MagicMock()
+    repo.index.diff.return_value = mock_git_diff([mock_a_file(f) for f in add_files])
+    return repo
+
+
+def get_evergreen_config(config_file_path):
+    evergreen_home = os.path.expanduser(os.path.join("~", "evergreen"))
+    if os.path.exists(evergreen_home):
+        return parse_evergreen_file(config_file_path, evergreen_home)
+    return parse_evergreen_file(config_file_path)
+
+
+class TestAcceptance(unittest.TestCase):
+    def tearDown(self):
+        _parser.set_options()
+
+    @patch(ns("_write_json_file"))
+    def test_no_tests_run_if_none_changed(self, write_json_mock):
+        """
+        Given a git repository with no changes,
+        When burn_in_tests is run,
+        Then no tests are discovered to run.
+        """
+        variant = "build_variant"
+        repo = mock_changed_git_files([])
+        repeat_config = under_test.RepeatConfig()
+        gen_config = under_test.GenerateConfig(
+            variant,
+            "project",
+            use_multiversion=False
+        )  # yapf: disable
+
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repo, None)
+
+        write_json_mock.assert_called_once()
+        written_config = write_json_mock.call_args[0][0]
+        display_task = written_config["buildvariants"][0]["display_tasks"][0]
+        self.assertEqual(1, len(display_task["execution_tasks"]))
+        self.assertEqual(under_test.BURN_IN_TESTS_GEN_TASK, display_task["execution_tasks"][0])
+
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
+    @patch(ns("_write_json_file"))
+    def test_tests_generated_if_a_file_changed(self, write_json_mock):
+        """
+        Given a git repository with no changes,
+        When burn_in_tests is run,
+        Then no tests are discovered to run.
+        """
+        # Note: this test is using actual tests and suites. So changes to those suites could
+        # introduce failures and require this test to be updated.
+        # You can see the test file it is using below. This test is used in the 'auth' and
+        # 'auth_audit' test suites. It needs to be in at least one of those for the test to pass.
+        _config.NAMED_SUITES = None
+        variant = "enterprise-rhel-62-64-bit"
+        repo = mock_changed_git_files(["jstests/auth/auth1.js"])
+        repeat_config = under_test.RepeatConfig()
+        gen_config = under_test.GenerateConfig(
+            variant,
+            "project",
+            use_multiversion=False
+        )  # yapf: disable
+        evg_config = get_evergreen_config("etc/evergreen.yml")
+
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repo,
+                           None)
+
+        write_json_mock.assert_called_once()
+        written_config = write_json_mock.call_args[0][0]
+        n_tasks = len(written_config["tasks"])
+        # Ensure we are generating at least one task for the test.
+        self.assertGreaterEqual(n_tasks, 1)
+
+        written_build_variant = written_config["buildvariants"][0]
+        self.assertEqual(variant, written_build_variant["name"])
+        self.assertEqual(n_tasks, len(written_build_variant["tasks"]))
+
+        display_task = written_build_variant["display_tasks"][0]
+        # The display task should contain all the generated tasks as well as 1 extra task for
+        # the burn_in_test_gen task.
+        self.assertEqual(n_tasks + 1, len(display_task["execution_tasks"]))
 
 
 class TestRepeatConfig(unittest.TestCase):
@@ -202,11 +293,10 @@ class TestGenerateConfig(unittest.TestCase):
     def test_validate_use_multiversion_with_local_mode_true(self):
         evg_conf_mock = MagicMock()
 
-        gen_config = under_test.GenerateConfig("build_variant", "project")
-        use_multiversion = True
+        gen_config = under_test.GenerateConfig("build_variant", "project", use_multiversion=True)
         local_mode = True
         with self.assertRaises(ValueError):
-            gen_config.validate(evg_conf_mock, use_multiversion, local_mode)
+            gen_config.validate(evg_conf_mock, local_mode)
 
     def test_validate_use_multiversion(self):
         evg_conf_mock = MagicMock()
@@ -593,7 +683,7 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
     @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
     def test_gen_tasks_configuration_is_returned(self, gen_tasks_config_mock):
         evg_api = MagicMock()
-        gen_config = MagicMock()
+        gen_config = MagicMock(use_multiversion=False)
         repeat_config = MagicMock()
         tests_by_task = MagicMock()
 
@@ -614,9 +704,9 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
     @patch(ns("create_generate_tasks_config"))
     def test_gen_tasks_multiversion_configuration_is_returned(self, gen_tasks_config_mock):  # pylint: disable=invalid-name
         evg_api = MagicMock()
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
+        gen_config = MagicMock(run_build_variant="variant", project="project",
+                               build_variant="build_variant", task_id="task_id",
+                               use_multiversion=True)
         repeat_config = MagicMock()
         tests_by_task = MagicMock()
 
@@ -640,14 +730,14 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         gen_tasks_config_mock.return_value = evg_config
 
         config = under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config,
-                                                       evg_api, use_multiversion=True)
+                                                       evg_api)
         self.assertEqual(config, evg_config.to_map.return_value)
 
     @patch("buildscripts.burn_in_tests.sys.exit")
     @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
     def test_cap_on_task_generate(self, gen_tasks_config_mock, exit_mock):
         evg_api = MagicMock()
-        gen_config = MagicMock()
+        gen_config = MagicMock(use_multiversion=False)
         repeat_config = MagicMock()
         tests_by_task = MagicMock()
 
