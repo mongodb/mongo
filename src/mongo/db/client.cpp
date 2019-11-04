@@ -41,6 +41,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -143,6 +144,12 @@ std::string Client::clientAddress(bool includePort) const {
 
 Client* Client::getCurrent() {
     return currentClient.get();
+}
+
+std::unique_ptr<Locker> Client::swapLockState(std::unique_ptr<Locker> locker) {
+    scoped_spinlock scopedLock(_lock);
+    invariant(_opCtx);
+    return _opCtx->swapLockState(std::move(locker), scopedLock);
 }
 
 Client& cc() {

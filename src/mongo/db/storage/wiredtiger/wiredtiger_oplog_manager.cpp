@@ -172,7 +172,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         //
         // TODO (SERVER-41392): the Replicate Before Journaling project will be removing the
         // waitUntilDurable() call requiring an opCtx parameter.
-        opCtx->swapLockState(std::make_unique<LockerImpl>());
+        cc().swapLockState(std::make_unique<LockerImpl>());
 
         stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
         {

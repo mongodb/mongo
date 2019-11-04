@@ -55,7 +55,7 @@ public:
             auto client = getGlobalServiceContext()->makeClient(str::stream()
                                                                 << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
-            opCtx->swapLockState(std::make_unique<LockerImpl>());
+            client->swapLockState(std::make_unique<LockerImpl>());
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
     }

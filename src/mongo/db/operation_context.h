@@ -44,6 +44,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
@@ -133,9 +134,10 @@ public:
     void setLockState(std::unique_ptr<Locker> locker);
 
     /**
-     * Swaps the locker, releasing the old locker to the caller.
+     * Swaps the locker, releasing the old locker to the caller.  The Client lock is required to
+     * call this function.
      */
-    std::unique_ptr<Locker> swapLockState(std::unique_ptr<Locker> locker);
+    std::unique_ptr<Locker> swapLockState(std::unique_ptr<Locker> locker, WithLock);
 
     /**
      * Returns Status::OK() unless this operation is in a killed state.

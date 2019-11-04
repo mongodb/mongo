@@ -382,7 +382,7 @@ void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
     _locker = std::move(locker);
 }
 
-std::unique_ptr<Locker> OperationContext::swapLockState(std::unique_ptr<Locker> locker) {
+std::unique_ptr<Locker> OperationContext::swapLockState(std::unique_ptr<Locker> locker, WithLock) {
     invariant(_locker);
     invariant(locker);
     _locker.swap(locker);

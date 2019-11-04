@@ -1924,7 +1924,7 @@ TEST_F(StepDownTest,
     // locker to test this, or otherwise stepDown will be granted the lock automatically.
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
     ASSERT_TRUE(opCtx->lockState()->isRSTLExclusive());
-    auto locker = opCtx.get()->swapLockState(std::make_unique<LockerImpl>());
+    auto locker = getClient()->swapLockState(std::make_unique<LockerImpl>());
 
     ASSERT_THROWS_CODE(
         getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
@@ -1935,7 +1935,7 @@ TEST_F(StepDownTest,
     ASSERT_TRUE(locker->isRSTLExclusive());
     ASSERT_FALSE(opCtx->lockState()->isRSTLLocked());
 
-    opCtx.get()->swapLockState(std::move(locker));
+    getClient()->swapLockState(std::move(locker));
 }
 
 /* Step Down Test for a 5-node replica set */
