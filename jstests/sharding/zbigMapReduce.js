@@ -21,6 +21,15 @@ function setupTest() {
 
     // Reduce chunk size to split
     var config = s.getDB("config");
+    // Double the balancer interval to produce fewer migrations per unit time so that the test does
+    // not run out of stale shard version retries.
+    s._configServers.forEach((conn) => {
+        conn.adminCommand({
+            configureFailPoint: 'overrideBalanceRoundInterval',
+            mode: 'alwaysOn',
+            data: {intervalMs: 2000}
+        });
+    });
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', s.shard0.shardName);
