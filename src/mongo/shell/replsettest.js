@@ -75,6 +75,8 @@
 var ReplSetTest = function(opts) {
     'use strict';
 
+    load("jstests/libs/parallelTester.js");  // For Thread.
+
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
     }
@@ -2665,9 +2667,11 @@ var ReplSetTest = function(opts) {
      * @param {Object} [extraOptions={}]
      * @param {boolean} [extraOptions.forRestart=false] indicates whether stop() is being called
      * with the intent to call start() with restart=true for the same node(s) n.
+     * @param {boolean} [extraOptions.waitPid=true] if true, we will wait for the process to
+     * terminate after stopping it.
      */
     this.stop = _nodeParamToSingleNode(_nodeParamToConn(function(
-        n, signal, opts, {forRestart: forRestart = false} = {}) {
+        n, signal, opts, {forRestart: forRestart = false, waitpid: waitPid = true} = {}) {
         // Can specify wait as second parameter, if using default signal
         if (signal == true || signal == false) {
             signal = undefined;
@@ -2676,11 +2680,15 @@ var ReplSetTest = function(opts) {
         n = this.getNodeId(n);
 
         var conn = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
-        print('ReplSetTest stop *** Shutting down mongod in port ' + conn.port + ' ***');
-        var ret = MongoRunner.stopMongod(conn, signal, opts);
+        print('ReplSetTest stop *** Shutting down mongod in port ' + conn.port +
+              ', wait for process termination: ' + waitPid + ' ***');
+        var ret = MongoRunner.stopMongod(conn, signal, opts, waitPid);
 
-        print('ReplSetTest stop *** Mongod in port ' + conn.port + ' shutdown with code (' + ret +
-              ') ***');
+        // We only expect the process to have terminated if we actually called 'waitpid'.
+        if (waitPid) {
+            print('ReplSetTest stop *** Mongod in port ' + conn.port + ' shutdown with code (' +
+                  ret + ') ***');
+        }
 
         if (_useBridge && !forRestart) {
             // We leave the mongobridge process running when the mongod process is being restarted.
@@ -2693,6 +2701,25 @@ var ReplSetTest = function(opts) {
 
         return ret;
     }));
+
+    /**
+     * Performs collection validation on all nodes in the given 'ports' array in parallel.
+     *
+     * @param {int[]} ports the array of mongo ports to run validation on
+     */
+    this.validateNodes = function(ports) {
+        // Perform collection validation on each node in parallel.
+        let validators = [];
+        for (let i = 0; i < ports.length; i++) {
+            let validator = new Thread(MongoRunner.validateCollectionsCallback, this.ports[i]);
+            validators.push(validator);
+            validators[i].start();
+        }
+        // Wait for all validators to finish.
+        for (let i = 0; i < ports.length; i++) {
+            validators[i].join();
+        }
+    };
 
     /**
      * Kill all members of this replica set.
@@ -2750,11 +2777,33 @@ var ReplSetTest = function(opts) {
             });
         }
 
-        print("ReplSetTest stopSet stopping all replica set nodes.");
         let startTime = new Date();  // Measure the execution time of shutting down nodes.
-        for (var i = 0; i < this.ports.length; i++) {
-            this.stop(i, signal, opts);
+
+        // Optionally validate collections on all nodes.
+        if (opts && opts.skipValidation) {
+            print("ReplSetTest stopSet skipping validation before stopping nodes.");
+        } else {
+            print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
+            this.validateNodes(this.ports);
         }
+
+        // Stop all nodes without waiting for them to terminate. We also skip validation since we
+        // have already done it above.
+        opts = Object.merge(opts, {skipValidation: true});
+        for (let i = 0; i < this.ports.length; i++) {
+            this.stop(i, signal, opts, {waitpid: false});
+        }
+
+        // Wait for all processes to terminate.
+        for (let i = 0; i < this.ports.length; i++) {
+            let conn = _useBridge ? _unbridgedNodes[i] : this.nodes[i];
+            let port = parseInt(conn.port);
+            print("ReplSetTest stopSet waiting for mongo program on port " + port + " to stop.");
+            let exitCode = waitMongoProgram(port);
+            print("ReplSetTest stopSet mongo program on port " + port + " shut down with code " +
+                  exitCode);
+        }
+
         print("ReplSetTest stopSet stopped all replica set nodes, took " +
               (new Date() - startTime) + "ms for " + this.ports.length + " nodes.");
 

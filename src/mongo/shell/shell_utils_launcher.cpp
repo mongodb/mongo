@@ -781,6 +781,23 @@ BSONObj WaitProgram(const BSONObj& a, void* data) {
     return BSON(string("") << exit_code);
 }
 
+// Calls waitpid on a mongo process specified by a port. If there is no pid registered for the given
+// port, this function returns an exit code of 0 without doing anything. Otherwise, it calls waitpid
+// for the pid associated with the given port and returns its exit code.
+BSONObj WaitMongoProgram(const BSONObj& a, void* data) {
+    int port = singleArg(a).numberInt();
+    ProcessId pid;
+    int exit_code = -123456;  // sentinel value
+    invariant(port >= 0);
+    if (!registry.isPortRegistered(port)) {
+        log() << "No db started on port: " << port;
+        return BSON(string("") << 0);
+    }
+    pid = registry.pidForPort(port);
+    wait_for_pid(pid, true, &exit_code);
+    return BSON(string("") << exit_code);
+}
+
 // This function starts a program. In its input array it accepts either all commandline tokens
 // which will be executed, or a single Object which must have a field named "args" which contains
 // an array with all commandline tokens. The Object may have a field named "env" which contains an
@@ -978,7 +995,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
 #endif
 }
 
-int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
+int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt, bool waitPid = true) {
     ProcessId pid;
     if (port > 0) {
         if (!registry.isPortRegistered(port)) {
@@ -992,8 +1009,15 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
 
     kill_wrapper(pid, signal, port, opt);
 
+    // If we are not waiting for the process to end, then return immediately.
+    if (!waitPid) {
+        log() << "skip waiting for pid " << pid << " to terminate";
+        return 0;
+    }
+
     int exitCode = EXIT_FAILURE;
     try {
+        log() << "waiting for process " << pid << " to terminate.";
         wait_for_pid(pid, true, &exitCode);
     } catch (...) {
         warning() << "process " << pid << " failed to terminate.";
@@ -1039,13 +1063,30 @@ BSONObj getStopMongodOpts(const BSONObj& a) {
     return BSONObj();
 }
 
+bool getWaitPid(const BSONObj& a) {
+    if (a.nFields() == 4) {
+        BSONObjIterator i(a);
+        i.next();
+        i.next();
+        i.next();
+        BSONElement e = i.next();
+        if (e.isBoolean()) {
+            return e.boolean();
+        }
+    }
+    // Default to wait for pid.
+    return true;
+}
+
 /** stopMongoProgram(port[, signal]) */
 BSONObj StopMongoProgram(const BSONObj& a, void* data) {
     int nFields = a.nFields();
-    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 3);
+    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 4);
     uassert(ErrorCodes::BadValue, "stopMongoProgram needs a number", a.firstElement().isNumber());
     int port = int(a.firstElement().number());
-    int code = killDb(port, ProcessId::fromNative(0), getSignal(a), getStopMongodOpts(a));
+    log() << "shell: stopping mongo program, waitpid=" << getWaitPid(a);
+    int code =
+        killDb(port, ProcessId::fromNative(0), getSignal(a), getStopMongodOpts(a), getWaitPid(a));
     log() << "shell: stopped mongo program on port " << port;
     return BSON("" << (double)code);
 }
@@ -1128,6 +1169,7 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("rawMongoProgramOutput", RawMongoProgramOutput);
     scope.injectNative("clearRawMongoProgramOutput", ClearRawMongoProgramOutput);
     scope.injectNative("waitProgram", WaitProgram);
+    scope.injectNative("waitMongoProgram", WaitMongoProgram);
     scope.injectNative("checkProgram", CheckProgram);
     scope.injectNative("resetDbpath", ResetDbpath);
     scope.injectNative("pathExists", PathExists);

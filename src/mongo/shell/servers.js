@@ -918,11 +918,12 @@ MongoRunner.validateCollectionsCallback = function(port) {};
  *      skipValidation: <bool>,
  *      allowedExitCode: <int>
  *    }
+ * @param {boolean} waitpid should we wait for the process to terminate after stopping it.
  *
  * Note: The auth option is required in a authenticated mongod running in Windows since
  *  it uses the shutdown command, which requires admin credentials.
  */
-MongoRunner.stopMongod = function(conn, signal, opts) {
+MongoRunner.stopMongod = function(conn, signal, opts, waitpid) {
     if (!conn.pid) {
         throw new Error("first arg must have a `pid` property; " +
                         "it is usually the object returned from MongoRunner.runMongod/s");
@@ -935,6 +936,7 @@ MongoRunner.stopMongod = function(conn, signal, opts) {
 
     signal = parseInt(signal) || 15;
     opts = opts || {};
+    waitpid = (waitpid === undefined) ? true : waitpid;
 
     var allowedExitCode = MongoRunner.EXIT_CLEAN;
 
@@ -965,7 +967,12 @@ MongoRunner.stopMongod = function(conn, signal, opts) {
             MongoRunner.validateCollectionsCallback(port);
         }
 
-        returnCode = _stopMongoProgram(port, signal, opts);
+        returnCode = _stopMongoProgram(port, signal, opts, waitpid);
+    }
+
+    // If we are not waiting for shutdown, then there is no exit code to check.
+    if (!waitpid) {
+        return 0;
     }
     if (allowedExitCode !== returnCode) {
         throw new MongoRunner.StopError(returnCode);

@@ -9,6 +9,12 @@
 load("jstests/libs/command_sequence_with_retries.js");  // for CommandSequenceWithRetries
 
 MongoRunner.validateCollectionsCallback = function(port) {
+    // This function may be executed in a new Thread context, so ensure the proper definitions
+    // are loaded.
+    if (typeof CommandSequenceWithRetries === "undefined") {
+        load("jstests/libs/command_sequence_with_retries.js");
+    }
+
     if (jsTest.options().skipCollectionAndIndexValidation) {
         print("Skipping collection validation during mongod shutdown");
         return;
