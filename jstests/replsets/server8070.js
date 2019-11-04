@@ -102,8 +102,9 @@ replSet.stop(0);
 // which would check for 30 seconds that node 3 didn't try to sync from 2
 sleep(30 * 1000);
 jsTest.log("3 should not attempt to sync from 2, as it cannot clear its buffer");
-var syncingTo = member3.adminCommand({replSetGetStatus: 1}).syncingTo;
-assert(syncingTo !== getHostName() + ":" + replSet.ports[1], "node 3 is syncing from node 2 :(");
+var syncSourceHost = member3.adminCommand({replSetGetStatus: 1}).syncSourceHost;
+assert(syncSourceHost !== getHostName() + ":" + replSet.ports[1],
+       "node 3 is syncing from node 2 :(");
 
 jsTest.log("Pause 3's bgsync thread");
 stopServerReplication(member3.getMongo());

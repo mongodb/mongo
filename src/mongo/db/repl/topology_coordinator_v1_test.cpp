@@ -4161,15 +4161,12 @@ TEST_F(TopoCoordTest,
 
         // These fields should all be empty, since this node has not received heartbeats and has
         // no sync source yet.
-        ASSERT_EQUALS("", rsStatus["syncingTo"].String());
         ASSERT_EQUALS("", rsStatus["syncSourceHost"].String());
         ASSERT_EQUALS(-1, rsStatus["syncSourceId"].numberInt());
-        ASSERT_EQUALS("", member0Status["syncingTo"].String());
         ASSERT_EQUALS("", member0Status["syncSourceHost"].String());
         ASSERT_EQUALS(-1, member0Status["syncSourceId"].numberInt());
         ASSERT_EQUALS("", member0Status["lastHeartbeatMessage"].String());
         ASSERT_EQUALS("", member0Status["infoMessage"].String());
-        ASSERT_EQUALS("", member1Status["syncingTo"].String());
         ASSERT_EQUALS("", member1Status["syncSourceHost"].String());
         ASSERT_EQUALS(-1, member1Status["syncSourceId"].numberInt());
         ASSERT_EQUALS("", member1Status["lastHeartbeatMessage"].String());
@@ -4232,15 +4229,12 @@ TEST_F(TopoCoordTest,
         BSONObj member1Status = rsStatus["members"].Array()[1].Obj();
 
         // Node 0 (self) has received heartbeats and has a sync source.
-        ASSERT_EQUALS("host1:27017", rsStatus["syncingTo"].String());
         ASSERT_EQUALS("host1:27017", rsStatus["syncSourceHost"].String());
         ASSERT_EQUALS(1, rsStatus["syncSourceId"].numberInt());
-        ASSERT_EQUALS("host1:27017", member0Status["syncingTo"].String());
         ASSERT_EQUALS("host1:27017", member0Status["syncSourceHost"].String());
         ASSERT_EQUALS(1, member0Status["syncSourceId"].numberInt());
         ASSERT_EQUALS("syncing from: host1:27017", member0Status["infoMessage"].String());
         ASSERT_EQUALS("", member0Status["lastHeartbeatMessage"].String());
-        ASSERT_EQUALS("", member1Status["syncingTo"].String());
         ASSERT_EQUALS("", member1Status["syncSourceHost"].String());
         ASSERT_EQUALS(-1, member1Status["syncSourceId"].numberInt());
         ASSERT_EQUALS("", member1Status["infoMessage"].String());
@@ -4319,13 +4313,11 @@ TEST_F(TopoCoordTest, replSetGetStatusForThreeMemberedReplicaSet) {
     BSONObj member1Status = rsStatus["members"].Array()[1].Obj();
     BSONObj member2Status = rsStatus["members"].Array()[2].Obj();
 
-    ASSERT_EQUALS("hprimary:27017", rsStatus["syncingTo"].String());
     ASSERT_EQUALS("hprimary:27017", rsStatus["syncSourceHost"].String());
     ASSERT_EQUALS(20, rsStatus["syncSourceId"].numberInt());
 
     // h1
     ASSERT_EQUALS(10, member0Status["_id"].numberInt());
-    ASSERT_EQUALS("hprimary:27017", member0Status["syncingTo"].String());
     ASSERT_EQUALS("hprimary:27017", member0Status["syncSourceHost"].String());
     ASSERT_EQUALS(20, member0Status["syncSourceId"].numberInt());
     ASSERT_EQUALS("", member0Status["infoMessage"].String());
@@ -4333,7 +4325,6 @@ TEST_F(TopoCoordTest, replSetGetStatusForThreeMemberedReplicaSet) {
 
     // hprimary
     ASSERT_EQUALS(20, member1Status["_id"].numberInt());
-    ASSERT_EQUALS("", member1Status["syncingTo"].String());
     ASSERT_EQUALS("", member1Status["syncSourceHost"].String());
     ASSERT_EQUALS(-1, member1Status["syncSourceId"].numberInt());
     ASSERT_EQUALS("", member1Status["infoMessage"].String());
@@ -4341,7 +4332,6 @@ TEST_F(TopoCoordTest, replSetGetStatusForThreeMemberedReplicaSet) {
 
     // hself
     ASSERT_EQUALS(30, member2Status["_id"].numberInt());
-    ASSERT_EQUALS("hprimary:27017", member2Status["syncingTo"].String());
     ASSERT_EQUALS("hprimary:27017", member2Status["syncSourceHost"].String());
     ASSERT_EQUALS(20, member2Status["syncSourceId"].numberInt());
     ASSERT_EQUALS("syncing from primary: hprimary:27017", member2Status["infoMessage"].String());
@@ -4382,7 +4372,6 @@ TEST_F(TopoCoordTest, StatusResponseAlwaysIncludesStringStatusFieldsForNonMember
 
     // These fields should all be empty, since this node is not a member of a replica set.
     ASSERT_EQUALS("", rsStatus["lastHeartbeatMessage"].String());
-    ASSERT_EQUALS("", rsStatus["syncingTo"].String());
     ASSERT_EQUALS("", rsStatus["syncSourceHost"].String());
     ASSERT_EQUALS(-1, rsStatus["syncSourceId"].numberInt());
     ASSERT_EQUALS("", rsStatus["infoMessage"].String());

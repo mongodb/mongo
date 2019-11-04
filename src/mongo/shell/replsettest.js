@@ -661,7 +661,7 @@ var ReplSetTest = function(opts) {
                 status = node.getDB("admin").runCommand({replSetGetStatus: 1});
                 for (var j = 0; j < status.members.length; j++) {
                     if (status.members[j].self) {
-                        return status.members[j].syncingTo === upstreamNode.host;
+                        return status.members[j].syncSourceHost === upstreamNode.host;
                     }
                 }
                 return false;

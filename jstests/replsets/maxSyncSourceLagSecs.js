@@ -42,7 +42,7 @@ assert.commandWorked(slaves[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
 assert.soon(function() {
     master.getDB("foo").bar.insert({a: 2});
     var res = slaves[1].getDB("admin").runCommand({"replSetGetStatus": 1});
-    return res.syncingTo === master.name;
+    return res.syncSourceHost === master.name;
 }, "sync target not changed back to primary", 100 * 1000, 2 * 1000);
 printjson(replTest.status());
 
