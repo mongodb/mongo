@@ -177,8 +177,12 @@ Future<void> BaseCloner::runOnExecutor(TaskExecutor* executor) {
     _promise = std::move(pf.promise);
     auto callback = [this](const TaskExecutor::CallbackArgs& args) mutable {
         if (!args.status.isOK()) {
-            stdx::lock_guard<Latch> lk(_mutex);
-            _startedAsync = false;
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                _startedAsync = false;
+            }
+            // The _promise can run the error callback on this thread, so we must not hold the lock
+            // when we set it.
             _promise.setError(args.status);
             return;
         }
