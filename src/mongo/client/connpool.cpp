@@ -391,7 +391,7 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
 DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
     auto connect = [&] {
         string errmsg;
-        std::unique_ptr<DBClientBase> c(uri.connect(StringData(), errmsg, socketTimeout));
+        std::unique_ptr<DBClientBase> c(uri.connect(uri.getAppName().get(), errmsg, socketTimeout));
         uassert(40356, _name + ": connect failed " + uri.toString() + " : " + errmsg, c);
         return c.release();
     };
