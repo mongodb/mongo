@@ -345,4 +345,84 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     ASSERT_EQUALS(numObj(), count);
 }
 
+// Verify that successfully seeking to the resumeAfterRecordId returns PlanStage::NEED_TIME and
+// that we can complete the collection scan afterwards.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuccess) {
+    AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+    auto collection = ctx.getCollection();
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
+
+    // We will resume the collection scan this many results in.
+    auto offset = 10;
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+
+    // Pick a recordId that is known to be in the collection.
+    params.resumeAfterRecordId = recordIds[offset - 1];
+
+    // Create plan stage.
+    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    unique_ptr<PlanStage> ps =
+        std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
+
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Check that the resume succeeds in making the cursor.
+    ASSERT_EQUALS(PlanStage::NEED_TIME, ps->work(&id));
+
+    // Run the rest of the scan and verify the results.
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+    ASSERT_OK(statusWithPlanExecutor.getStatus());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
+
+    int count = 0;
+    PlanExecutor::ExecState state;
+    for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
+        // Make sure we get the objects in the order we want.
+        ASSERT_EQUALS(count + offset, obj["foo"].numberInt());
+        ++count;
+    }
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
+    ASSERT_EQUALS(numObj() - offset, count);
+}
+
+// Verify that if we fail to seek to the resumeAfterRecordId, the plan stage fails.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFailure) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    auto coll = ctx.getCollection();
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+
+    // We will resume the collection scan this many results in.
+    auto offset = 10;
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+
+    // Pick a recordId that is known to be in the collection and then delete it, so that we can
+    // guarantee it does not exist.
+    auto recordId = recordIds[offset - 1];
+    remove(coll->docFor(&_opCtx, recordId).value());
+    params.resumeAfterRecordId = recordId;
+
+    // Create plan stage.
+    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    unique_ptr<PlanStage> ps =
+        std::make_unique<CollectionScan>(&_opCtx, coll, params, ws.get(), nullptr);
+
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Check that failed seek causes the entire resume to fail.
+    ASSERT_EQUALS(PlanStage::FAILURE, ps->work(&id));
+}
+
 }  // namespace query_stage_collection_scan

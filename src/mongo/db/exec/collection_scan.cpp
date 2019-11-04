@@ -75,8 +75,15 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
         // applies only to forwards scans of the oplog.
         invariant(params.direction == CollectionScanParams::FORWARD);
         invariant(collection->ns().isOplog());
+        invariant(!params.resumeAfterRecordId);
     }
     invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
+
+    if (params.resumeAfterRecordId) {
+        // The 'resumeAfterRecordId' parameter is used for resumable collection scans, which we
+        // only support in the forward direction.
+        invariant(params.direction == CollectionScanParams::FORWARD);
+    }
 
     // Set early stop condition.
     if (params.maxTs) {
@@ -122,13 +129,35 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // want to signal an error rather than silently dropping data from the stream.
                 //
                 // Note that we want to return the record *after* this one since we have already
-                // returned this one. This is only possible in the tailing case because that is the
-                // only time we'd need to create a cursor after already getting a record out of it.
+                // returned this one. This is possible in the tailing case. Notably, tailing is the
+                // only time we'd need to create a cursor after already getting a record out of it
+                // and updating our _lastSeenId.
                 if (!_cursor->seekExact(_lastSeenId)) {
                     Status status(ErrorCodes::CappedPositionLost,
                                   str::stream() << "CollectionScan died due to failure to restore "
                                                 << "tailable cursor position. "
                                                 << "Last seen record id: " << _lastSeenId);
+                    *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
+                    return PlanStage::FAILURE;
+                }
+            }
+
+            if (_params.resumeAfterRecordId) {
+                invariant(!_params.tailable);
+                invariant(_lastSeenId.isNull());
+                // Seek to where we are trying to resume the scan from. Signal a KeyNotFound error
+                // if the record no longer exists.
+                //
+                // Note that we want to return the record *after* this one since we have already
+                // returned this one prior to the resume.
+                auto recordIdToSeek = *_params.resumeAfterRecordId;
+                if (!_cursor->seekExact(recordIdToSeek)) {
+                    Status status(
+                        ErrorCodes::KeyNotFound,
+                        str::stream()
+                            << "Failed to resume collection scan: the recordId from which we are "
+                            << "attempting to resume no longer exists in the collection. "
+                            << "recordId: " << recordIdToSeek);
                     *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                     return PlanStage::FAILURE;
                 }

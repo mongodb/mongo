@@ -73,6 +73,10 @@ public:
         return _latestOplogEntryTimestamp;
     }
 
+    RecordId getLastSeenRecordId() const {
+        return _lastSeenId;
+    }
+
     std::unique_ptr<PlanStageStats> getStats() final;
 
     const SpecificStats* getSpecificStats() const final;
