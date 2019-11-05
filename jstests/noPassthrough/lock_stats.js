@@ -6,18 +6,15 @@
 'use strict';
 
 function testBlockTime(blockTimeMillis) {
-    assert.commandWorked(db.getSiblingDB('t1').createCollection('test'));
-
     // Lock the database, and in parallel start an operation that needs the lock, so it blocks.
     assert.commandWorked(db.fsyncLock());
     var startStats = db.serverStatus().locks.Global;
     var startTime = new Date();
     var minBlockedMillis = blockTimeMillis;
 
-    // This is just some command that requires a MODE_X global lock that conflicts.
-    let awaitRename = startParallelShell(() => {
+    let awaitSleepCmd = startParallelShell(() => {
         assert.commandWorked(
-            db.adminCommand({renameCollection: 't1.test', to: 't2.test', dropTarget: true}));
+            db.adminCommand({sleep: 1, millis: 100, lock: "w", $comment: "Lock sleep"}));
     }, conn.port);
 
     // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
@@ -36,8 +33,7 @@ function testBlockTime(blockTimeMillis) {
     sleep(minBlockedMillis);
     db.fsyncUnlock();
 
-    // Wait for the parallel shell to finish, so its stats will have been recorded.
-    awaitRename();
+    awaitSleepCmd();
 
     // The fsync command from the shell cannot have possibly been blocked longer than this.
     var maxBlockedMillis = new Date() - startTime;
