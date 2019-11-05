@@ -5,8 +5,9 @@
 // against a sharded collection is wrapped in a "shards" object with keys for each shard.
 //
 // This test makes assumptions about how the explain output will be formatted, so cannot be
-// transformed to be put inside a $facet stage.
-// @tags: [do_not_wrap_aggregations_in_facets,assumes_unsharded_collection]
+// transformed to be put inside a $facet stage or when pipeline optimization is disabled.
+// @tags: [do_not_wrap_aggregations_in_facets,assumes_unsharded_collection,
+//         requires_pipeline_optimization]
 (function() {
 "use strict";
 

@@ -10,53 +10,37 @@ const specials = [{val: NaN, path: "$nan"}, {val: Infinity, path: "$inf"}];
 
 assert.commandWorked(coll.insert({inf: Infinity, nan: NaN}));
 
-try {
-    ["alwaysOn", "off"].forEach((mode) => {
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: 'disablePipelineOptimization', mode: mode}));
-
-        ["$multiply", "$add", "$sum"].forEach((op) => {
-            (function testCommutativityWithConstArguments() {
-                specials.forEach((special) => {
-                    numbers.forEach((num) => {
-                        const expected = [{
-                            a: (num instanceof NumberDecimal ? NumberDecimal(special.val)
-                                                             : special.val)
-                        }];
-                        assert.eq(
-                            expected,
-                            coll.aggregate([{$project: {a: {[op]: [special.val, num]}, _id: 0}}])
-                                .toArray());
-                        assert.eq(
-                            expected,
-                            coll.aggregate([{$project: {a: {[op]: [num, special.val]}, _id: 0}}])
-                                .toArray());
-                    });
-                });
-            })();
-
-            (function testCommutativityWithNonConstArgument() {
-                specials.forEach((special) => {
-                    numbers.forEach((num) => {
-                        const expected = [{
-                            a: (num instanceof NumberDecimal ? NumberDecimal(special.val)
-                                                             : special.val)
-                        }];
-                        assert.eq(
-                            expected,
-                            coll.aggregate([{$project: {a: {[op]: [special.path, num]}, _id: 0}}])
-                                .toArray());
-                        assert.eq(
-                            expected,
-                            coll.aggregate([{$project: {a: {[op]: [num, special.path]}, _id: 0}}])
-                                .toArray());
-                    });
-                });
-            })();
+["$multiply", "$add", "$sum"].forEach((op) => {
+    (function testCommutativityWithConstArguments() {
+        specials.forEach((special) => {
+            numbers.forEach((num) => {
+                const expected = [
+                    {a: (num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val)}
+                ];
+                assert.eq(expected,
+                          coll.aggregate([{$project: {a: {[op]: [special.val, num]}, _id: 0}}])
+                              .toArray());
+                assert.eq(expected,
+                          coll.aggregate([{$project: {a: {[op]: [num, special.val]}, _id: 0}}])
+                              .toArray());
+            });
         });
-    });
-} finally {
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: 'disablePipelineOptimization', mode: 'off'}));
-}
+    })();
+
+    (function testCommutativityWithNonConstArgument() {
+        specials.forEach((special) => {
+            numbers.forEach((num) => {
+                const expected = [
+                    {a: (num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val)}
+                ];
+                assert.eq(expected,
+                          coll.aggregate([{$project: {a: {[op]: [special.path, num]}, _id: 0}}])
+                              .toArray());
+                assert.eq(expected,
+                          coll.aggregate([{$project: {a: {[op]: [num, special.path]}, _id: 0}}])
+                              .toArray());
+            });
+        });
+    })();
+});
 })();

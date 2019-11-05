@@ -1,6 +1,6 @@
 // Tests that the aggregation pipeline correctly coalesces a $project stage at the front of the
 // pipeline that can be covered by a normal query.
-// @tags: [do_not_wrap_aggregations_in_facets]
+// @tags: [do_not_wrap_aggregations_in_facets, requires_pipeline_optimization]
 (function() {
 "use strict";
 

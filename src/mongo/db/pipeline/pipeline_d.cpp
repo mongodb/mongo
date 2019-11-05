@@ -454,10 +454,6 @@ boost::optional<long long> extractLimitForPushdown(Pipeline* pipeline) {
     auto limit = DocumentSourceSort::extractLimitForPushdown(sources.begin(), &sources);
     if (limit) {
         // Removing $limit stages may have produced the opportunity for additional optimizations.
-        //
-        // In addition, since a stage was removed from the middle of the pipeline, we need to
-        // re-stitch the pipeline in order to ensure that each stage has a valid pointer to the
-        // previous document source. 'optimizePipeline()' will take care of re-stitching for us.
         pipeline->optimizePipeline();
     }
     return limit;

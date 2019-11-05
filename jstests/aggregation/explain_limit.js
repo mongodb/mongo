@@ -1,5 +1,8 @@
 // Tests the behavior of explain() when used with the aggregation pipeline and limits.
-// @tags: [do_not_wrap_aggregations_in_facets]
+//
+// This test makes assumptions about how the explain output will be formatted, so cannot be
+// transformed to be put inside a $facet stage, or when pipeline optimization is disabled.
+// @tags: [do_not_wrap_aggregations_in_facets,requires_pipeline_optimization]
 (function() {
 "use strict";
 

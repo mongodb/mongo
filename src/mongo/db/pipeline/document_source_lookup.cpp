@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
@@ -297,9 +298,16 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     // Add the cache stage at the end and optimize. During the optimization process, the cache will
     // either move itself to the correct position in the pipeline, or will abandon itself if no
-    // suitable cache position exists.
-    pipeline->addFinalSource(
-        DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
+    // suitable cache position exists. Do it only if pipeline optimization is enabled, otherwise
+    // Pipeline::optimizePipeline() will exit early and correct placement of the cache will not
+    // occur.
+    if (auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
+        fp && fp->shouldFail()) {
+        _cache->abandon();
+    } else {
+        pipeline->addFinalSource(
+            DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
+    }
 
     pipeline->optimizePipeline();
 

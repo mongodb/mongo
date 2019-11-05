@@ -6,7 +6,10 @@
 // Relies on the pipeline stages to be collapsed into a single $cursor stage, so pipelines cannot be
 // wrapped into a facet stage to not prevent this optimization. Also, this test is not prepared to
 // handle explain output for sharded collections.
-// @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection]
+// This test makes assumptions about how the explain output will be formatted, so cannot be run when
+// pipeline optimization is disabled.
+// @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection,
+//         requires_pipeline_optimization]
 (function() {
 "use strict";
 

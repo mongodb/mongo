@@ -143,6 +143,11 @@ boost::optional<long long> DocumentSourceSort::extractLimitForPushdown(
             }
 
             itr = container->erase(itr);
+            // If the removed stage wasn't the last in the pipeline, make sure that the stage
+            // followed the erased stage has a valid pointer to the previous document source.
+            if (itr != container->end()) {
+                (*itr)->setSource(itr != container->begin() ? std::prev(itr)->get() : nullptr);
+            }
         } else if (!nextStage->constraints().canSwapWithLimitAndSample) {
             break;
         } else {

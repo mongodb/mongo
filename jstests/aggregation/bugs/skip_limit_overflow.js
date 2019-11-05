@@ -4,8 +4,10 @@
  * requirements.
  *
  * This test makes assumptions about how the explain output will be formatted, so cannot be
- * transformed to be put inside a $facet stage or in a sharded explain output.
- * @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection]
+ * transformed to be put inside a $facet stage, in a sharded explain output or when pipeline
+ * optimization is disabled.
+ * @tags: [do_not_wrap_aggregations_in_facets,assumes_unsharded_collection,
+ *         requires_pipeline_optimization]
  */
 (function() {
 "use strict";
