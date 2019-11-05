@@ -1049,8 +1049,8 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
  * Returns true if indices contains an index that can be used with DistinctNode (the "fast distinct
  * hack" node, which can be used only if there is an empty query predicate).  Sets indexOut to the
  * array index of PlannerParams::indices.  Look for the index for the fewest fields.  Criteria for
- * suitable index is that the index cannot be special (geo, hashed, text, ...), and the index cannot
- * be a partial index.
+ * suitable index is that the index should be of type BTREE or HASHED and the index cannot be a
+ * partial index.
  *
  * Multikey indices are not suitable for DistinctNode when the projection is on an array element.
  * Arrays are flattened in a multikey index which makes it impossible for the distinct scan stage
@@ -1071,18 +1071,34 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
         if (!CollatorInterface::collatorsMatch(indices[i].collator, collator)) {
             continue;
         }
-        // Skip special indices.
-        if (!IndexNames::findPluginName(indices[i].keyPattern).empty()) {
-            continue;
-        }
         // Skip partial indices.
         if (indices[i].filterExpr) {
             continue;
         }
-        // Skip indices where the first key is not field.
-        if (indices[i].keyPattern.firstElement().fieldNameStringData() != StringData(field)) {
+        // Skip indices where the first key is not 'field'.
+        auto firstIndexField = indices[i].keyPattern.firstElement();
+        if (firstIndexField.fieldNameStringData() != StringData(field)) {
             continue;
         }
+        // Skip the index if the first key is a "plugin" such as "hashed", "2dsphere", and so on.
+        if (!firstIndexField.isNumber()) {
+            continue;
+        }
+        // Compound hashed indexes can use distinct scan if the first field is 1 or -1. For the
+        // other special indexes, the 1 or -1 index fields may be stored as a function of the data
+        // rather than the raw data itself. Storing f(d) instead of 'd' precludes the distinct_scan
+        // due to the possibility that f(d1) == f(d2).  Therefore, after fetching the base data,
+        // either d1 or d2 would be incorrectly missing from the result set.
+        auto indexPluginName = IndexNames::findPluginName(indices[i].keyPattern);
+        switch (IndexNames::nameToType(indexPluginName)) {
+            case IndexType::INDEX_BTREE:
+            case IndexType::INDEX_HASHED:
+                break;
+            default:
+                // All other index types are not eligible.
+                continue;
+        }
+
         int nFields = indices[i].keyPattern.nFields();
         // Pick the index with the lowest number of fields.
         if (nFields < minFields) {
