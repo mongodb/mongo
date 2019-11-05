@@ -345,7 +345,7 @@ assert = (function() {
                         "with {runHangAnalyzer: false} as the fifth argument " +
                         "(you can fill unused arguments with `undefined`).";
                     print(msg + " Running hang analyzer from assert.soon.");
-                    MongoRunner.runHangAnalyzer(msg);
+                    MongoRunner.runHangAnalyzer();
                 }
                 doassert(msg);
             } else {
@@ -385,14 +385,14 @@ assert = (function() {
             }
         }
         // Used up all attempts
-        msg = _buildAssertionMessage(msg, msgPrefix);
+        msg = _buildAssertionMessage(msg);
         if (runHangAnalyzer) {
             msg = msg + "The hang analyzer is automatically called in assert.retry functions. " +
                 "If you are *expecting* assert.soon to possibly fail, call assert.retry " +
                 "with {runHangAnalyzer: false} as the fifth argument " +
                 "(you can fill unused arguments with `undefined`).";
             print(msg + " Running hang analyzer from assert.retry.");
-            MongoRunner.runHangAnalyzer(msg);
+            MongoRunner.runHangAnalyzer();
         }
         doassert(msg);
     };
@@ -454,7 +454,7 @@ assert = (function() {
                     "with {runHangAnalyzer: false} as the fourth argument " +
                     "(you can fill unused arguments with `undefined`).";
                 print(msg + " Running hang analyzer from assert.time.");
-                MongoRunner.runHangAnalyzer(msg);
+                MongoRunner.runHangAnalyzer();
             }
             doassert(msg);
         }

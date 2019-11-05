@@ -392,7 +392,9 @@ jsTest.authenticate = function(conn) {
                 pwd: jsTestOptions().authPassword,
             });
             return conn.authenticated;
-        }, "Authenticating connection: " + conn, 5000, 1000);
+            // Dont' run the hang analyzer because we expect that this might fail in the normal
+            // course of events.
+        }, "Authenticating connection: " + conn, 5000, 1000, {runHangAnalyzer: false});
     } catch (e) {
         print("Caught exception while authenticating connection: " + tojson(e));
         conn.authenticated = false;

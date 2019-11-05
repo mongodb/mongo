@@ -720,6 +720,32 @@
                            compareBinaryEqual);
     });
 
+    tests.push(function assertCallsHangAnalyzer() {
+        function runAssertTest(f) {
+            const oldMongoRunner = MongoRunner;
+            let runs = 0;
+            try {
+                MongoRunner.runHangAnalyzer = function() {
+                    ++runs;
+                };
+                f();
+                assert(false);
+            } catch (e) {
+                assert.eq(runs, 1);
+            } finally {
+                MongoRunner = oldMongoRunner;
+            }
+        }
+        runAssertTest(() => assert.soon(
+                          () => false, 'assert message', kSmallTimeoutMS, kSmallRetryIntervalMS));
+        runAssertTest(
+            () => assert.retry(
+                () => false, 'assert message', kDefaultRetryAttempts, kSmallRetryIntervalMS));
+        runAssertTest(() => assert.time(() => sleep(5),
+                                        'assert message',
+                                        1 /* we certainly take less than this */));
+    });
+
     /* main */
 
     tests.forEach((test) => {
