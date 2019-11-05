@@ -145,7 +145,7 @@ public:
         return false;
     }
     void setCachePressureForTest(int pressure) final {}
-    void replicationBatchIsComplete() const final {}
+    void triggerJournalFlush() const final {}
     StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
         OperationContext* opCtx) final {
         return std::vector<CollectionIndexNamePair>();

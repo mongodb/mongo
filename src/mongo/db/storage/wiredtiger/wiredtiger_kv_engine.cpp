@@ -244,32 +244,71 @@ public:
         ThreadClient tc(name(), getGlobalServiceContext());
         LOG(1) << "starting " << name() << " thread";
 
-        while (!_shuttingDown.load()) {
+        while (true) {
             auto opCtx = tc->makeOperationContext();
             try {
-                const bool forceCheckpoint = false;
-                const bool stableCheckpoint = false;
-                _sessionCache->waitUntilDurable(opCtx.get(), forceCheckpoint, stableCheckpoint);
+                _sessionCache->waitUntilDurable(
+                    opCtx.get(), /*forceCheckpoint*/ false, /*stableCheckpoint*/ false);
             } catch (const AssertionException& e) {
                 invariant(e.code() == ErrorCodes::ShutdownInProgress);
             }
 
-            int ms = storageGlobalParams.journalCommitIntervalMs.load();
+            // Wait until either journalCommitIntervalMs passes or an immediate journal flush is
+            // requested (or shutdown).
+
+            auto deadline =
+                Date_t::now() + Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
+            stdx::unique_lock<Latch> lk(_stateMutex);
 
             MONGO_IDLE_THREAD_BLOCK;
-            sleepmillis(ms);
+            _flushJournalNowCV.wait_until(lk, deadline.toSystemTimePoint(), [&] {
+                return _flushJournalNow || _shuttingDown;
+            });
+
+            _flushJournalNow = false;
+
+            if (_shuttingDown) {
+                LOG(1) << "stopping " << name() << " thread";
+                return;
+            }
         }
-        LOG(1) << "stopping " << name() << " thread";
     }
 
+    /**
+     * Signals the thread to quit and then waits until it does.
+     */
     void shutdown() {
-        _shuttingDown.store(true);
+        {
+            stdx::lock_guard<Latch> lk(_stateMutex);
+            _shuttingDown = true;
+            _flushJournalNowCV.notify_one();
+        }
         wait();
+    }
+
+    /**
+     * Signals an immediate journal flush.
+     */
+    void triggerJournalFlush() {
+        stdx::lock_guard<Latch> lk(_stateMutex);
+        if (!_flushJournalNow) {
+            _flushJournalNow = true;
+            _flushJournalNowCV.notify_one();
+        }
     }
 
 private:
     WiredTigerSessionCache* _sessionCache;
-    AtomicWord<bool> _shuttingDown{false};
+
+    // Protects the state below.
+    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("WiredTigerJournalFlusherStateMutex");
+
+    // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
+    // _flushJournalNow or _shuttingDown is set.
+    mutable stdx::condition_variable _flushJournalNowCV;
+
+    bool _flushJournalNow = false;
+    bool _shuttingDown = false;
 };
 
 namespace {
@@ -2027,8 +2066,10 @@ void WiredTigerKVEngine::haltOplogManager() {
     }
 }
 
-void WiredTigerKVEngine::replicationBatchIsComplete() const {
-    _oplogManager->triggerJournalFlush();
+void WiredTigerKVEngine::triggerJournalFlush() const {
+    if (_journalFlusher) {
+        _journalFlusher->triggerJournalFlush();
+    }
 }
 
 bool WiredTigerKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {

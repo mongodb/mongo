@@ -107,7 +107,8 @@ public:
     /**
      * wait for completion.
      *
-     * @param msTimeOut maximum amount of time to wait in milliseconds
+     * @param msTimeOut maximum amount of time to wait in milliseconds. Default wait of 0
+     * ms will wait without deadline.
      * @return true if did not time out. false otherwise.
      *
      * @note you can call wait() more than once if the first call times out.

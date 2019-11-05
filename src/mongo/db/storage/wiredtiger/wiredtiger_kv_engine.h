@@ -249,11 +249,7 @@ public:
 
     bool supportsOplogStones() const final override;
 
-    /*
-     * This function is called when replication has completed a batch.  In this function, we
-     * refresh our oplog visiblity read-at-timestamp value.
-     */
-    void replicationBatchIsComplete() const override;
+    void triggerJournalFlush() const override;
 
     bool isCacheUnderPressure(OperationContext* opCtx) const override;
 

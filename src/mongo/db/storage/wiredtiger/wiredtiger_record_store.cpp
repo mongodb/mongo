@@ -1861,15 +1861,22 @@ Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* opCtx,
                                                    const Timestamp& ts,
                                                    bool orderedCommit) {
     opCtx->recoveryUnit()->setOrderedCommit(orderedCommit);
+
     if (!orderedCommit) {
         // This labels the current transaction with a timestamp.
         // This is required for oplog visibility to work correctly, as WiredTiger uses the
         // transaction list to determine where there are holes in the oplog.
         return opCtx->recoveryUnit()->setTimestamp(ts);
     }
+
     // This handles non-primary (secondary) state behavior; we simply set the oplog visiblity read
     // timestamp here, as there cannot be visible holes prior to the opTime passed in.
     _kvEngine->getOplogManager()->setOplogReadTimestamp(ts);
+
+    // Inserts and updates usually notify waiters on commit, but the oplog collection has special
+    // visibility rules and waiters must be notified whenever the oplog read timestamp is forwarded.
+    notifyCappedWaitersIfNeeded();
+
     return Status::OK();
 }
 

@@ -159,7 +159,7 @@ public:
 
     void clearDropPendingState() final;
 
-    virtual void replicationBatchIsComplete() const override;
+    void triggerJournalFlush() const final;
 
     SnapshotManager* getSnapshotManager() const final;
 

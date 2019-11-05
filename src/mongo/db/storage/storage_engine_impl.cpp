@@ -825,8 +825,8 @@ void StorageEngineImpl::clearDropPendingState() {
     _dropPendingIdentReaper.clearDropPendingState();
 }
 
-void StorageEngineImpl::replicationBatchIsComplete() const {
-    return _engine->replicationBatchIsComplete();
+void StorageEngineImpl::triggerJournalFlush() const {
+    return _engine->triggerJournalFlush();
 }
 
 Timestamp StorageEngineImpl::getAllDurableTimestamp() const {

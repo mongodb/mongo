@@ -448,9 +448,9 @@ public:
     }
 
     /**
-     * See `StorageEngine::replicationBatchIsComplete()`
+     * See `StorageEngine::triggerJournalFlush()`
      */
-    virtual void replicationBatchIsComplete() const {};
+    virtual void triggerJournalFlush() const {};
 
     /**
      * Methods to access the storage engine's timestamps.
