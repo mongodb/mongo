@@ -45,8 +45,7 @@ def make_process(*args, **kwargs):
     if config.SPAWN_USING == "jasper":
         process_cls = jasper_process.Process
     # Add the current working directory and /data/multiversion to the PATH.
-    process_kwargs = kwargs.get("process_kwargs", {}).copy()
-    env_vars = process_kwargs.get("env_vars", {}).copy()
+    env_vars = kwargs.get("env_vars", {}).copy()
     path = [env_vars.get("PATH", os.environ.get("PATH", ""))]
     path = [os.getcwd(), config.DEFAULT_MULTIVERSION_DIR] + path
     env_vars["PATH"] = os.pathsep.join(path)
