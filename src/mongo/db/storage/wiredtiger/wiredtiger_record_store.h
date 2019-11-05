@@ -117,6 +117,8 @@ public:
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
 
+    void getOplogTruncateStats(BSONObjBuilder& builder) const;
+
     virtual ~WiredTigerRecordStore();
 
     virtual void postConstructorInit(OperationContext* opCtx);
@@ -382,6 +384,9 @@ private:
 
     // Non-null if this record store is underlying the active oplog.
     std::shared_ptr<OplogStones> _oplogStones;
+
+    AtomicInt64 _totalTimeTruncating;  // Cumulative amount of time spent truncating the oplog.
+    AtomicInt64 _truncateCount;        // Cumulative number of truncates of the oplog.
 };
 
 

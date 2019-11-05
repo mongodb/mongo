@@ -69,5 +69,11 @@
     assert.eq(0,
               secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
               "Oplog buffer was not dropped after initial sync");
+    if (jsTest.options().storageEngine == 'wiredTiger') {
+        const res = primary.getDB('test').runCommand({serverStatus: 1});
+        assert.commandWorked(res);
+        assert.eq(res.oplogTruncation.truncateCount, 1, tojson(res.oplogTruncation));
+        assert.gt(res.oplogTruncation.totalTimeTruncatingMicros, 0, tojson(res.oplogTruncation));
+    }
     replSet.stopSet();
 })();

@@ -302,6 +302,12 @@ void WiredTigerRecordStore::OplogStones::setMinBytesPerStone(int64_t size) {
 
 void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCtx,
                                                           size_t numStonesToKeep) {
+    const std::uint64_t startWaitTime = curTimeMicros64();
+    ON_BLOCK_EXIT([&] {
+        auto waitTime = curTimeMicros64() - startWaitTime;
+        log() << "WiredTiger record store oplog processing took " << waitTime / 1000 << "ms";
+        _totalTimeProcessing.fetchAndAdd(waitTime);
+    });
     long long numRecords = _rs->numRecords(opCtx);
     long long dataSize = _rs->dataSize(opCtx);
 
@@ -331,6 +337,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCt
 }
 
 void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationContext* opCtx) {
+    _processBySampling.store(false);  // process by scanning
     log() << "Scanning the oplog to determine where to place markers for truncation";
 
     long long numRecords = 0;
@@ -358,6 +365,8 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationCon
 void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationContext* opCtx,
                                                                     int64_t estRecordsPerStone,
                                                                     int64_t estBytesPerStone) {
+    log() << "Sampling the oplog to determine where to place markers for truncation";
+    _processBySampling.store(true);  // process by sampling
     Timestamp earliestOpTime;
     Timestamp latestOpTime;
 
@@ -738,6 +747,14 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
         invariant(_kvEngine);
         _kvEngine->startOplogManager(opCtx, _uri, this);
     }
+}
+
+void WiredTigerRecordStore::getOplogTruncateStats(BSONObjBuilder& builder) const {
+    if (_oplogStones) {
+        _oplogStones->getOplogStonesStats(builder);
+    }
+    builder.append("totalTimeTruncatingMicros", _totalTimeTruncating.load());
+    builder.append("truncateCount", _truncateCount.load());
 }
 
 const char* WiredTigerRecordStore::name() const {
@@ -1176,7 +1193,11 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp pers
     LOG(1) << "Finished truncating the oplog, it now contains approximately "
            << _sizeInfo->numRecords.load() << " records totaling to " << _sizeInfo->dataSize.load()
            << " bytes";
-    log() << "WiredTiger record store oplog truncation finished in: " << timer.millis() << "ms";
+    auto elapsedMicros = timer.micros();
+    auto elapsedMillis = elapsedMicros / 1000;
+    _totalTimeTruncating.fetchAndAdd(elapsedMicros);
+    _truncateCount.fetchAndAdd(1);
+    log() << "WiredTiger record store oplog truncation finished in: " << elapsedMillis << "ms";
 }
 
 Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,
