@@ -623,39 +623,9 @@ void State::prepTempCollection() {
             _opCtx, indexesToInsert, removeIndexBuildsToo);
 
         if (!filteredIndexes.empty()) {
-            // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the
-            // current FCV.
-            auto opObserver = _opCtx->getServiceContext()->getOpObserver();
-            const auto& tmpName = _config.tempNamespace;
             auto fromMigrate = false;
-            auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                    serverGlobalParams.featureCompatibility.getVersion() ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
-                ? boost::make_optional(UUID::gen())
-                : boost::none;
-
-            if (buildUUID) {
-                opObserver->onStartIndexBuild(
-                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, filteredIndexes, fromMigrate);
-            }
-
-            for (const auto& indexToInsert : filteredIndexes) {
-                uassertStatusOK(tempColl->getIndexCatalog()->createIndexOnEmptyCollection(
-                    _opCtx, indexToInsert));
-
-                // If two phase index builds is enabled, index build will be coordinated using
-                // startIndexBuild and commitIndexBuild oplog entries.
-                if (!IndexBuildsCoordinator::get(_opCtx)->supportsTwoPhaseIndexBuild()) {
-                    // Log the createIndex operation.
-                    opObserver->onCreateIndex(
-                        _opCtx, tmpName, tempColl->uuid(), indexToInsert, fromMigrate);
-                }
-            }
-
-            if (buildUUID) {
-                opObserver->onCommitIndexBuild(
-                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, filteredIndexes, fromMigrate);
-            }
+            IndexBuildsCoordinator::get(_opCtx)->createIndexesOnEmptyCollection(
+                _opCtx, tempColl->uuid(), filteredIndexes, fromMigrate);
         }
 
         wuow.commit();
