@@ -1164,6 +1164,91 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughRollbackCheckerCallbackError
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughDefaultBeginFetchingOpTimeScheduleError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    // We reject the 'find' command on the oplog and save the request for inspection at the end of
+    // this test case.
+    executor::RemoteCommandRequest request;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequestOnAny& requestToSend) {
+            request = {requestToSend, 0};
+            auto elem = requestToSend.cmdObj.firstElement();
+            return (("find" == elem.fieldNameStringData()) &&
+                    ("oplog.rs" == elem.valueStringData()));
+        };
+
+    HostAndPort syncSource("localhost", 12345);
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+
+    ASSERT_EQUALS(syncSource, request.target);
+    ASSERT_EQUALS(NamespaceString::kLocalDb, request.dbname);
+    assertRemoteCommandNameEquals("find", request);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughDefaultBeginFetchingOpTimeCallbackError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        assertRemoteCommandNameEquals(
+            "find",
+            net->scheduleErrorResponse(
+                Status(ErrorCodes::OperationFailed, "find command failed at sync source")));
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerCancelsDefaultBeginFetchingOpTimeFetcherOnShutdown) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
+}
+
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeScheduleError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -1191,6 +1276,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeSchedu
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
         net->runReadyNetworkOperations();
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
     }
 
     initialSyncer->join();
@@ -1215,6 +1303,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeCallba
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
         net->runReadyNetworkOperations();
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         assertRemoteCommandNameEquals(
             "find",
@@ -1241,8 +1332,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBeginFetchingOpTimeFetcherOnShutdo
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
     }
@@ -1261,13 +1355,6 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
     // We reject the 'find' command on the oplog and save the request for inspection at the end of
     // this test case.
     executor::RemoteCommandRequest request;
-    _executorProxy->shouldFailScheduleRemoteCommandRequest =
-        [&request](const executor::RemoteCommandRequestOnAny& requestToSend) {
-            request = {requestToSend, 0};
-            auto elem = requestToSend.cmdObj.firstElement();
-            return (("find" == elem.fieldNameStringData()) &&
-                    ("oplog.rs" == elem.valueStringData()));
-        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1280,8 +1367,19 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        _executorProxy->shouldFailScheduleRemoteCommandRequest =
+            [&request](const executor::RemoteCommandRequestOnAny& requestToSend) {
+                request = {requestToSend, 0};
+                auto elem = requestToSend.cmdObj.firstElement();
+                return (("find" == elem.fieldNameStringData()) &&
+                        ("oplog.rs" == elem.valueStringData()));
+            };
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
@@ -1312,8 +1410,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherCallbac
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
@@ -1344,8 +1445,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastOplogEntryFetcherOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
@@ -1376,14 +1480,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({});
     }
 
@@ -1405,8 +1512,11 @@ TEST_F(InitialSyncerTest,
     // Base rollback ID.
     net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+    // Oplog entry associated with the defaultBeginFetchingTimestamp.
+    processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
     // Send an empty optime as the response to the beginFetchingOptime find request, which will
-    // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+    // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
     auto request = net->scheduleSuccessfulResponse(
         makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
     assertRemoteCommandNameEquals("find", request);
@@ -1439,14 +1549,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({BSONObj()});
     }
 
@@ -1474,13 +1587,16 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -1516,13 +1632,16 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
     }
 
@@ -1547,13 +1666,16 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         request = assertRemoteCommandNameEquals(
@@ -1582,13 +1704,16 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         ASSERT_TRUE(net->hasReadyRequests());
@@ -1614,14 +1739,17 @@ TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetr
     // Base rollback ID.
     net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+    // Oplog entry associated with the defaultBeginFetchingTimestamp.
+    processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
     // Send an empty optime as the response to the beginFetchingOptime find request, which will
-    // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+    // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
     auto request = net->scheduleSuccessfulResponse(
         makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
     assertRemoteCommandNameEquals("find", request);
     net->runReadyNetworkOperations();
 
-    // Last oplog entry.
+    // Oplog entry associated with the beginApplyingTimestamp.
     processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
     // FCV first attempt - retriable error.
@@ -1651,14 +1779,17 @@ void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> do
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         processSuccessfulFCVFetcherResponse(docs);
@@ -1718,14 +1849,17 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
@@ -1776,14 +1910,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
         net->runReadyNetworkOperations();
 
@@ -1826,14 +1963,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
         net->runReadyNetworkOperations();
@@ -1872,14 +2012,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         request =
             assertRemoteCommandNameEquals("find",
                                           net->scheduleSuccessfulResponse(makeCursorResponse(
@@ -1899,7 +2042,7 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->runReadyNetworkOperations();
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Last rollback checker replSetGetRBID command.
@@ -1936,14 +2079,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -1961,7 +2107,7 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->runReadyNetworkOperations();
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
 
         // Last rollback checker replSetGetRBID command.
@@ -1993,14 +2139,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         {
@@ -2027,7 +2176,7 @@ TEST_F(
             net->runReadyNetworkOperations();
         }
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         // Return an oplog entry with an optime that is more recent than what the completed
         // OplogFetcher has read from the sync source.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(4)});
@@ -2056,14 +2205,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -2112,14 +2264,17 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndAllDatabaseClon
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -2138,18 +2293,18 @@ TEST_F(InitialSyncerTest,
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
-    // Make the second last oplog entry fetcher command fail. Allow all other requests to be
+    // Make the third last oplog entry fetcher command fail. Allow all other requests to be
     // scheduled.
     executor::RemoteCommandRequest request;
-    bool first = true;
+    int count = 0;
     _executorProxy->shouldFailScheduleRemoteCommandRequest =
-        [&first, &request](const executor::RemoteCommandRequestOnAny& requestToSend) {
+        [&count, &request](const executor::RemoteCommandRequestOnAny& requestToSend) {
             auto elem = requestToSend.cmdObj.firstElement();
             if (("find" == elem.fieldNameStringData()) && (requestToSend.cmdObj.hasField("sort")) &&
                 (1 == requestToSend.cmdObj.getIntField("limit")) &&
                 (NamespaceString::kRsOplogNamespace.coll().toString() == elem.valueStringData())) {
-                if (first) {
-                    first = false;
+                if (count < 2) {
+                    count++;
                     return false;
                 }
                 request = {requestToSend, 0};
@@ -2168,14 +2323,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -2216,14 +2374,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -2236,11 +2397,12 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         request = assertRemoteCommandNameEquals(
             "find",
             net->scheduleErrorResponse(
-                Status(ErrorCodes::OperationFailed, "second last oplog entry fetcher failed")));
+                Status(ErrorCodes::OperationFailed,
+                       "Oplog entry fetcher associated with the stopTimestamp failed")));
         ASSERT_TRUE(request.cmdObj.hasField("sort"));
         ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
         net->runReadyNetworkOperations();
@@ -2271,14 +2433,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -2291,7 +2456,7 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         noi = net->getNextReadyRequest();
         request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.hasField("sort"));
@@ -2321,14 +2486,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -2341,7 +2509,7 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         auto oplogFetcherNetworkOperationIterator = noi;
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         // Blackhole this request which will be canceled when oplog fetcher fails.
         noi = net->getNextReadyRequest();
         request = assertRemoteCommandNameEquals("find", noi->getRequest());
@@ -2382,14 +2550,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2403,7 +2574,7 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({BSON("ts"
                                                              << "not a timestamp"
                                                              << "t" << 1)});
@@ -2434,14 +2605,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // Feature Compatibility Version.
@@ -2454,7 +2628,7 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
@@ -2500,14 +2674,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2520,7 +2697,7 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
@@ -2569,14 +2746,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2589,7 +2769,7 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
@@ -2638,14 +2818,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2658,7 +2841,7 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
@@ -2689,14 +2872,17 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2709,7 +2895,7 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Last rollback checker replSetGetRBID command.
@@ -2745,14 +2931,17 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2765,7 +2954,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Last rollback checker replSetGetRBID command.
@@ -2802,14 +2991,17 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2822,7 +3014,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         auto oplogFetcherNetworkOperationIterator = noi;
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Last rollback checker replSetGetRBID command.
@@ -2864,14 +3056,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Feature Compatibility Version.
@@ -2885,7 +3080,7 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         // Last rollback checker replSetGetRBID command.
@@ -2922,14 +3117,17 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
 
         // Instead of fast forwarding to AllDatabaseCloner completion by returning an empty list of
@@ -2980,7 +3178,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
 
         // Last rollback checker replSetGetRBID command.
@@ -3017,14 +3215,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -3038,8 +3239,8 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // The cloners start right after the FCV is received.  The second last oplog entry fetcher
-        // will not start until the cloners are done, so wait for them.
+        // The cloners start right after the FCV is received. The oplog entry fetcher associated
+        // with the stopTimestamp will not start until the cloners are done, so wait for them.
         getInitialSyncer().waitForCloner_forTest();
 
         // Before processing scheduled last oplog entry fetcher response, set flag in
@@ -3047,7 +3248,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // _getNextApplierBatchCallback().
         _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
@@ -3078,14 +3279,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -3104,7 +3308,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // _getNextApplierBatchCallback() at (now + options.getApplierBatchCallbackRetryWait).
         _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
@@ -3135,14 +3339,17 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -3156,7 +3363,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // Since we black holed OplogFetcher's find request, _getNextApplierBatch_inlock() will
@@ -3194,15 +3401,18 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
         {
             // Ensure second lastOplogFetch doesn't happen until we're ready for it.
@@ -3231,7 +3441,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
             net->runReadyNetworkOperations();
         }
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // _getNextApplierBatchCallback() will shut down the OplogFetcher after setting the
@@ -3276,15 +3486,18 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
         {
             // Ensure second lastOplogFetch doesn't happen until we're ready for it.
             FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
@@ -3311,7 +3524,7 @@ TEST_F(
             net->runReadyNetworkOperations();
         }
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // Since the 'rsSyncApplyStop' fail point is enabled, InitialSyncer will get an empty
@@ -3348,14 +3561,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -3368,7 +3584,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         auto oplogFetcherNoi = noi;
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // _getNextApplierBatchCallback() should have rescheduled itself.
@@ -3422,14 +3638,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         {
@@ -3458,7 +3677,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
             net->blackHole(noi);
         }
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // _multiApplierCallback() will shut down the OplogFetcher after setting the completion
@@ -3487,14 +3706,17 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -3507,7 +3729,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         auto oplogFetcherNoi = noi;
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // Send error to _oplogFetcherCallback().
@@ -3542,14 +3764,17 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         {
@@ -3577,7 +3802,7 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
             net->blackHole(noi);
         }
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({lastOp.toBSON()});
 
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
@@ -3641,14 +3866,17 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Instead of fast forwarding to AllDatabaseCloner completion by returning an empty list of
@@ -3707,7 +3935,7 @@ TEST_F(InitialSyncerTest,
         assertRemoteCommandNameEquals("getMore", request);
         net->blackHole(noi);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({lastOp.toBSON()});
 
         // Last rollback ID.
@@ -3766,14 +3994,17 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Feature Compatibility Version.
@@ -3836,14 +4067,17 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
             // Base rollback ID.
             net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+            // Oplog entry associated with the defaultBeginFetchingTimestamp.
+            processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
             // Send an empty optime as the response to the beginFetchingOptime find request, which
-            // will cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+            // will cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
             auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
                 0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
             assertRemoteCommandNameEquals("find", request);
             net->runReadyNetworkOperations();
 
-            // Last oplog entry.
+            // Oplog entry associated with the beginApplyingTimestamp.
             processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
             // Feature Compatibility Version.
@@ -3896,14 +4130,17 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                 net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
             assertRemoteCommandNameEquals("replSetGetRBID", rbidRequest);
 
+            // Oplog entry associated with the defaultBeginFetchingTimestamp.
+            processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
             // Send an empty optime as the response to the beginFetchingOptime find request, which
-            // will cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+            // will cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
             auto findRequest = net->scheduleSuccessfulResponse(makeCursorResponse(
                 0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
             assertRemoteCommandNameEquals("find", findRequest);
             net->runReadyNetworkOperations();
 
-            // Last oplog entry.
+            // Oplog entry associated with the beginApplyingTimestamp.
             processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
             // Feature Compatibility Version.
@@ -4007,7 +4244,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
-        // Second last oplog entry fetcher.
+        // Oplog entry associated with the stopTimestamp.
         // Send oplog entry with timestamp 7. InitialSyncer will update this end timestamp after
         // applying the first batch.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(7)});
@@ -4130,14 +4367,17 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
         auto request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
-        // Last oplog entry.
+        // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         // Set up the cloner data.  This must be done before providing the FCV to avoid races.

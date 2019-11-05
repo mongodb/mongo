@@ -799,15 +799,20 @@ Before the data clone phase begins, the node will do the following:
 3. Drop all of its data except for the local database and recreate the oplog.
 4. Get the Rollback ID (RBID) from the sync source to ensure at the end that no rollbacks occurred
    during initial sync.
-5. Query its sync source's transactions table for the oldest starting OpTime of all active
-   transactions. This will be the `beginFetchingTimestamp` or the timestamp that it begins fetching
-   oplog entries from, so that the node will have the oplog entries for all active transactions in
-   its oplog.
-6. Query its sync source's oplog for its lastest OpTime. This will be the `beginApplyingTimestamp`,
+5. Query its sync source's oplog for its latest OpTime and save it as the
+   `defaultBeginFetchingOpTime`. If there are no open transactions on the sync source, this will be
+   used as the `beginFetchingTimestamp` or the timestamp that it begins fetching oplog entries from.
+6. Query its sync source's transactions table for the oldest starting OpTime of all active
+   transactions. If this timestamp exists (meaning there is an open transaction on the sync source)
+   this will be used as the `beginFetchingTimestamp`. If this timestamp doesn't exist, the node will
+   use the `defaultBeginFetchingOpTime` instead. This will ensure that even if a transaction was
+   started on the sync source after it was queried for the oldest active transaction timestamp, the
+   syncing node will have all the oplog entries associated with an active transaction in its oplog.
+7. Query its sync source's oplog for its lastest OpTime. This will be the `beginApplyingTimestamp`,
    or the timestamp that it begins applying oplog entries at once it has completed the data clone
    phase. If there was no active transaction on the sync source, the `beginFetchingTimestamp` will
    be the same as the `beginApplyingTimestamp`.
-7. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
+8. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
    to be applied later. Operations are buffered to a collection so that they are not limited by the
    amount of memory available.
 
