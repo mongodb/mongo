@@ -695,8 +695,8 @@ def create_tests_by_task(build_variant: str, repo: Repo, evg_conf: EvergreenProj
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
+    buildscripts.resmokelib.parser.set_options()
     if changed_tests:
-        buildscripts.resmokelib.parser.set_options()
         return create_task_list_for_tests(changed_tests, build_variant, evg_conf, exclude_suites,
                                           exclude_tasks)
 
