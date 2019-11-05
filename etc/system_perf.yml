@@ -329,47 +329,6 @@ functions:
           TAG="4.0.2-Baseline"
           OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
-<<<<<<< HEAD
-=======
-          # detect outliers needs to run, so defer the post_run_check exit status to later
-          echo $? > post_run_check.status
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          ../src/dsi/dsi/run-dsi detect-outliers --evergreen-api-config .evergreen.yml
-    - command: shell.exec
-      type: setup
-      params:
-        working_dir: work
-        script: |
-          set -o verbose
-          filename=rejects.json
-          if [ -s "$filename" ]; then
-            echo "Rejecting task due to the following outliers:"
-            cat "$filename"
-            exit ${detected_outlier_exit_code|0}
-          fi
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: work
-        script: |
-          set -o verbose
-          exit $(cat post_run_check.status)
-
-  "upload pip requirements":
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: pip-requirements.txt
-      remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
-      bucket: mciuploads
-      permissions: public-read
-      content_type: atext-plain
-      display_name: Pip Requirements
->>>>>>> e9061ddf06... SERVER-44312: Setup evergreen authentication for performance tests
 
 #######################################
 #               Tasks                 #
