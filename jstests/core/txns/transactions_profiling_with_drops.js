@@ -4,6 +4,7 @@
 "use strict";
 
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+load("jstests/libs/wait_for_command.js");
 
 const dbName = "test";
 const collName = "transactions_profiling_with_drops";
@@ -40,25 +41,12 @@ let lockShell = startParallelShell(function() {
     }));
 });
 
-const waitForCommand = function(opFilter) {
-    let opId = -1;
-    assert.soon(function() {
-        const curopRes = testDB.currentOp();
-        assert.commandWorked(curopRes);
-        const foundOp = curopRes["inprog"].filter(opFilter);
-
-        if (foundOp.length == 1) {
-            opId = foundOp[0]["opid"];
-        }
-        return (foundOp.length == 1);
-    });
-    return opId;
-};
-
 // Wait for sleep to appear in currentOp
 let opId = waitForCommand(
+    "sleepCmd",
     op => (op["ns"] == "admin.$cmd" &&
-           op["command"]["$comment"] == "transaction_profiling_with_drops lock sleep"));
+           op["command"]["$comment"] == "transaction_profiling_with_drops lock sleep"),
+    testDB);
 
 jsTest.log("Run a slow read. Profiling in the transaction should fail.");
 assert.sameMembers(
@@ -90,8 +78,9 @@ lockShell = startParallelShell(function() {
 });
 
 // Wait for sleep to appear in currentOp
-opId =
-    waitForCommand(op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "lock sleep"));
+opId = waitForCommand("sleepCmd",
+                      op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "lock sleep"),
+                      testDB);
 
 jsTest.log("Run a slow write. Profiling in the transaction should still succeed " +
            "since the transaction already has an IX DB lock.");

@@ -3,27 +3,12 @@
  * @tags: [requires_replication, uses_transactions]
  */
 (function() {
+load("jstests/libs/wait_for_command.js");
 const rst = ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
 const dropDB = rst.getPrimary().getDB("drop");
-
-const waitForCommand = function(waitingFor, opFilter) {
-    let opId = -1;
-    assert.soon(function() {
-        print(`Checking for ${waitingFor}`);
-        const curopRes = dropDB.getSiblingDB("admin").currentOp();
-        assert.commandWorked(curopRes);
-        const foundOp = curopRes["inprog"].filter(opFilter);
-
-        if (foundOp.length == 1) {
-            opId = foundOp[0]["opid"];
-        }
-        return (foundOp.length == 1);
-    });
-    return opId;
-};
 
 (function assertCollectionDropCanBeInterrupted() {
     assert.commandWorked(dropDB.bar.insert({}));
@@ -76,7 +61,9 @@ const waitForCommand = function(waitingFor, opFilter) {
 
     // Interrupt the sleep command.
     const sleepID = waitForCommand(
-        "sleepCmd", op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep"));
+        "sleepCmd",
+        op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep"),
+        dropDB.getSiblingDB("admin"));
     assert.commandWorked(dropDB.getSiblingDB("admin").killOp(sleepID));
 
     sleepCommand();

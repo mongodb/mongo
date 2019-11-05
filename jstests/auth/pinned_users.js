@@ -9,6 +9,7 @@
  */
 (function() {
 'use strict';
+load("jstests/libs/wait_for_command.js");
 jsTest.setOption("enableTestCommands", true);
 // Start a mongod with the user cache size set to zero, so we know that users who have
 // logged out always get fetched cleanly from disk.
@@ -52,22 +53,6 @@ assert.soon(function() {
     return cacheContents.some((doc) => friendlyEqual(admin2Doc, sortDoc(doc)));
 });
 
-const waitForCommand = function(waitingFor, opFilter) {
-    let opId = -1;
-    assert.soon(function() {
-        print(`Checking for ${waitingFor}`);
-        const curopRes = admin.currentOp();
-        assert.commandWorked(curopRes);
-        const foundOp = curopRes["inprog"].filter(opFilter);
-
-        if (foundOp.length == 1) {
-            opId = foundOp[0]["opid"];
-        }
-        return (foundOp.length == 1);
-    });
-    return opId;
-};
-
 // The deadlock happens in two phases. First we run a command that acquires a read lock and
 // holds it for forever.
 let readLockShell = startParallelShell(function() {
@@ -78,7 +63,9 @@ let readLockShell = startParallelShell(function() {
 
 // Wait for that command to appear in currentOp
 const readID = waitForCommand(
-    "readlock", op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Read lock sleep"));
+    "readlock",
+    op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Read lock sleep"),
+    admin);
 
 // Then we run a command that tries to acquire a write lock, which will wait for forever
 // because we're already holding a read lock, but will also prevent any new read locks from
@@ -92,7 +79,8 @@ let writeLockShell = startParallelShell(function() {
 // Wait for that to appear in currentOp
 const writeID = waitForCommand(
     "writeLock",
-    op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Write lock sleep"));
+    op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Write lock sleep"),
+    admin);
 
 print("killing ops and moving on!");
 

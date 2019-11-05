@@ -79,17 +79,31 @@ public:
         if (ns.empty()) {
             Lock::GlobalLock lk(opCtx, mode, Date_t::max(), Lock::InterruptBehavior::kThrow);
             opCtx->sleepFor(Milliseconds(millis));
-        } else if (nsIsDbOnly(ns)) {
-            uassert(50961, "lockTarget is not a valid namespace", NamespaceString::validDBName(ns));
-            Lock::DBLock lk(opCtx, ns, mode, Date_t::max());
-            opCtx->sleepFor(Milliseconds(millis));
-        } else {
-            uassert(50962,
-                    "lockTarget is not a valid namespace",
-                    NamespaceString::validCollectionComponent(ns));
-            Lock::CollectionLock lk(opCtx, NamespaceString(ns), mode, Date_t::max());
-            opCtx->sleepFor(Milliseconds(millis));
+            return;
         }
+        auto nss = NamespaceString(ns);
+        uassert(
+            50961, "lockTarget is not a valid namespace", NamespaceString::validDBName(nss.db()));
+
+        auto dbMode = mode;
+        if (!nsIsDbOnly(ns)) {
+            // Only acquire minimum dbLock mode required for collection lock acquisition.
+            dbMode = isSharedLockMode(mode) ? MODE_IS : MODE_IX;
+        }
+
+        Lock::DBLock dbLock(opCtx, nss.db(), dbMode, Date_t::max());
+
+        if (nsIsDbOnly(ns)) {
+            opCtx->sleepFor(Milliseconds(millis));
+            return;
+        }
+
+        // Need to acquire DBLock before attempting to acquire a collection lock.
+        uassert(50962,
+                "lockTarget is not a valid namespace",
+                NamespaceString::validCollectionComponent(ns));
+        Lock::CollectionLock collLock(opCtx, nss, mode, Date_t::max());
+        opCtx->sleepFor(Milliseconds(millis));
     }
 
     void _sleepInPBWM(mongo::OperationContext* opCtx, long long millis) {
