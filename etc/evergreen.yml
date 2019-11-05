@@ -6994,6 +6994,17 @@ tasks:
       resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: sharded_collections_jscore_multiversion_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: sharded_collections_jscore_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
+
+- <<: *task_template
   name: sharding_jscore_passthrough
   tags: ["sharding", "jscore", "common"]
   depends_on:
@@ -7003,6 +7014,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_jscore_multiversion_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: sharding_jscore_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
 
 - <<: *task_template
   name: sharding_jscore_op_query_passthrough
@@ -7752,17 +7774,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
-
-- <<: *multiversion_template
-  name: sharded_causally_consistent_jscore_multiversion_passthrough_gen
-  tags: ["multiversion_passthrough"]
-  commands:
-  - func: "generate multiversion tasks"
-    vars:
-      suite: sharded_causally_consistent_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
-      task_path_suffix: /data/multiversion
-      fallback_num_sub_suites: 4
 
 - name: retryable_writes_jscore_passthrough_gen
   tags: ["retry"]

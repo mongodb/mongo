@@ -68,10 +68,11 @@ def update_suite_config_for_multiversion_sharded(suite_config):
     fixture_config = suite_config["executor"]["fixture"]
     default_shards = "default_shards"
     default_num_nodes = "default_nodes"
-    base_num_shards = (default_shards
-                       if "num_shards" not in fixture_config else fixture_config["num_shards"])
+    base_num_shards = (default_shards if "num_shards" not in fixture_config
+                       or not fixture_config["num_shards"] else fixture_config["num_shards"])
     base_num_rs_nodes_per_shard = (default_num_nodes
-                                   if "num_rs_nodes_per_shard" not in fixture_config else
+                                   if "num_rs_nodes_per_shard" not in fixture_config
+                                   or not fixture_config["num_rs_nodes_per_shard"] else
                                    fixture_config["num_rs_nodes_per_shard"])
 
     if base_num_shards is not default_shards or base_num_rs_nodes_per_shard is not default_num_nodes:

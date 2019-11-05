@@ -37,9 +37,7 @@ def create_tests_by_task_mock(n_tasks, n_tests):
     }
 
 
-MV_MOCK_SUITES = [
-    "replica_sets_jscore_passthrough", "sharded_causally_consistent_jscore_passthrough"
-]
+MV_MOCK_SUITES = ["replica_sets_jscore_passthrough", "sharding_jscore_passthrough"]
 
 
 def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
