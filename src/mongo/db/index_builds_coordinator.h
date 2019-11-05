@@ -297,6 +297,37 @@ public:
      */
     void onReplicaSetReconfig();
 
+    //
+    // Helper functions for creating indexes that do not have to be managed by the
+    // IndexBuildsCoordinator.
+    //
+
+    /**
+     * Creates indexes in collection.
+     * Assumes callers has necessary locks.
+     * For two phase index builds, writes both startIndexBuild and commitIndexBuild oplog entries
+     * on success. No two phase index build oplog entries, including abortIndexBuild, will be
+     * written on failure.
+     * Throws exception on error.
+     */
+    void createIndexes(OperationContext* opCtx,
+                       UUID collectionUUID,
+                       const std::vector<BSONObj>& specs,
+                       bool fromMigrate);
+
+    /**
+     * Creates indexes on an empty collection.
+     * Assumes we are enclosed in a WriteUnitOfWork and caller has necessary locks.
+     * For two phase index builds, writes both startIndexBuild and commitIndexBuild oplog entries
+     * on success. No two phase index build oplog entries, including abortIndexBuild, will be
+     * written on failure.
+     * Throws exception on error.
+     */
+    void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                        UUID collectionUUID,
+                                        const std::vector<BSONObj>& specs,
+                                        bool fromMigrate);
+
     void sleepIndexBuilds_forTestOnly(bool sleep);
 
     void verifyNoIndexBuilds_forTestOnly();

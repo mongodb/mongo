@@ -641,6 +641,107 @@ void IndexBuildsCoordinator::onReplicaSetReconfig() {
     // TODO: not yet implemented.
 }
 
+void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
+                                           UUID collectionUUID,
+                                           const std::vector<BSONObj>& specs,
+                                           bool fromMigrate) {
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+    invariant(collection,
+              str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
+    auto nss = collection->ns();
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
+              str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
+
+    auto buildUUID = UUID::gen();
+
+    // Rest of this function can throw, so ensure the build cleanup occurs.
+    ON_BLOCK_EXIT([&] {
+        opCtx->recoveryUnit()->abandonSnapshot();
+        _indexBuildsManager.tearDownIndexBuild(
+            opCtx, collection, buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+    });
+
+    auto onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
+    IndexBuildsManager::SetupOptions options;
+    options.indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+    uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
+        opCtx, collection, specs, buildUUID, onInitFn, options));
+
+    uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection, buildUUID));
+
+    uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(opCtx, buildUUID));
+
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto onCreateEachFn = [&](const BSONObj& spec) {
+        // If two phase index builds is enabled, index build will be coordinated using
+        // startIndexBuild and commitIndexBuild oplog entries.
+        if (supportsTwoPhaseIndexBuild()) {
+            return;
+        }
+        opObserver->onCreateIndex(opCtx, collection->ns(), collectionUUID, spec, fromMigrate);
+    };
+    auto onCommitFn = [&] {
+        // Index build completion will be timestamped using the createIndexes oplog entry.
+        if (!supportsTwoPhaseIndexBuild()) {
+            return;
+        }
+        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
+        opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
+    };
+    uassertStatusOK(_indexBuildsManager.commitIndexBuild(
+        opCtx, collection, nss, buildUUID, onCreateEachFn, onCommitFn));
+}
+
+void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                                            UUID collectionUUID,
+                                                            const std::vector<BSONObj>& specs,
+                                                            bool fromMigrate) {
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+    invariant(collection, str::stream() << collectionUUID);
+    invariant(0U == collection->numRecords(opCtx), str::stream() << collectionUUID);
+
+    auto nss = collection->ns();
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
+              str::stream() << collectionUUID);
+
+
+    // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
+        ? boost::make_optional(UUID::gen())
+        : boost::none;
+
+    if (buildUUID) {
+        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, *buildUUID, specs, fromMigrate);
+    }
+
+    // If two phase index builds are enabled, the index build will be coordinated using
+    // startIndexBuild and commitIndexBuild oplog entries.
+    auto indexCatalog = collection->getIndexCatalog();
+    if (supportsTwoPhaseIndexBuild()) {
+        invariant(buildUUID, str::stream() << collectionUUID << ": " << nss);
+
+        // All indexes will be added to the mdb catalog using the commitIndexBuild timestamp.
+        opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, *buildUUID, specs, fromMigrate);
+        for (const auto& spec : specs) {
+            uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
+        }
+    } else {
+        for (const auto& spec : specs) {
+            // Each index will be added to the mdb catalog using the preceding createIndexes
+            // timestamp.
+            opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
+            uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
+        }
+        if (buildUUID) {
+            opObserver->onCommitIndexBuild(
+                opCtx, nss, collectionUUID, *buildUUID, specs, fromMigrate);
+        }
+    }
+}
+
 void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
     stdx::unique_lock<Latch> lk(_mutex);
     _sleepForTest = sleep;
