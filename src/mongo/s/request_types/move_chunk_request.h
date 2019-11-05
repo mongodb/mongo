@@ -48,6 +48,21 @@ class StatusWith;
  */
 class MoveChunkRequest {
 public:
+    // This enum represents whether or not a migraiton should attempt to move a large chunk
+    enum class ForceJumbo : int {
+        kDoNotForce = 0,  // do not attempt to migrate a large chunk
+        kForceManual,     // manual moveChunk command specified 'forceJumbo : true'
+        kForceBalancer,   // balancer specified 'forceJumbo : true'
+    };
+
+    static constexpr StringData kDoNotForce = "doNotForceJumbo"_sd;
+    static constexpr StringData kForceManual = "forceJumboManualMoveChunk"_sd;
+    static constexpr StringData kForceBalancer = "forceJumboBalancerMigration"_sd;
+
+    static std::string forceJumboToString(ForceJumbo forceJumboVal);
+
+    static ForceJumbo parseForceJumbo(std::string forceJumbo);
+
     /**
      * Parses the input command and produces a request corresponding to its arguments. The parsing
      * ignores arguments, which are processed at the command level, in particular shardVersion and
@@ -73,7 +88,8 @@ public:
                                 const ChunkRange& range,
                                 int64_t maxChunkSizeBytes,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                bool waitForDelete);
+                                bool waitForDelete,
+                                ForceJumbo forceJumbo);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -109,6 +125,10 @@ public:
 
     bool getWaitForDelete() const {
         return _waitForDelete;
+    }
+
+    ForceJumbo getForceJumbo() const {
+        return parseForceJumbo(_forceJumbo);
     }
 
     /**
@@ -153,6 +173,8 @@ private:
     // Whether to block and wait for the range deleter to cleanup the orphaned documents at the end
     // of move.
     bool _waitForDelete;
+
+    std::string _forceJumbo;
 };
 
 }  // namespace mongo

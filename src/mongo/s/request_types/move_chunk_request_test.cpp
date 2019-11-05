@@ -64,7 +64,8 @@ TEST(MoveChunkRequest, Roundtrip) {
         ChunkRange(kMin, kMax),
         kMaxChunkSizeBytes,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        kWaitForDelete);
+        kWaitForDelete,
+        MoveChunkRequest::ForceJumbo::kDoNotForce);
 
     BSONObj cmdObj = builder.obj();
 
@@ -98,7 +99,8 @@ TEST(MoveChunkRequest, EqualityOperatorSameValue) {
         ChunkRange(kMin, kMax),
         kMaxChunkSizeBytes,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        kWaitForDelete);
+        kWaitForDelete,
+        MoveChunkRequest::ForceJumbo::kDoNotForce);
 
     BSONObj obj = builder.obj();
 
@@ -123,7 +125,8 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
         ChunkRange(kMin, kMax),
         kMaxChunkSizeBytes,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        kWaitForDelete);
+        kWaitForDelete,
+        MoveChunkRequest::ForceJumbo::kDoNotForce);
 
     auto value1 = assertGet(MoveChunkRequest::createFromCommand(kNs, builder1.obj()));
 
@@ -138,7 +141,8 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
         ChunkRange(BSON("Key" << 100), BSON("Key" << 200)),  // Different key ranges
         kMaxChunkSizeBytes,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        kWaitForDelete);
+        kWaitForDelete,
+        MoveChunkRequest::ForceJumbo::kDoNotForce);
     auto value2 = assertGet(MoveChunkRequest::createFromCommand(kNs, builder2.obj()));
 
     ASSERT_FALSE(value1 == value2);

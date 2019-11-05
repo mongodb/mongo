@@ -124,6 +124,8 @@ public:
         }
 
         const auto to = toStatus.getValue();
+        const auto forceJumboElt = cmdObj["forceJumbo"];
+        const auto forceJumbo = forceJumboElt && forceJumboElt.Bool();
 
         // so far, chunk size serves test purposes; it may or may not become a supported parameter
         long long maxChunkSizeBytes = cmdObj["maxChunkSizeBytes"].numberLong();
@@ -192,7 +194,8 @@ public:
                                                     maxChunkSizeBytes,
                                                     secondaryThrottle,
                                                     cmdObj["_waitForDelete"].trueValue() ||
-                                                        cmdObj["waitForDelete"].trueValue()));
+                                                        cmdObj["waitForDelete"].trueValue(),
+                                                    forceJumbo));
 
         Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(routingInfo));
 

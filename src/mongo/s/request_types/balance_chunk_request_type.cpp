@@ -45,6 +45,7 @@ const char kToShardId[] = "toShard";
 const char kSecondaryThrottle[] = "secondaryThrottle";
 const char kWaitForDelete[] = "waitForDelete";
 const char kWaitForDeleteDeprecated[] = "_waitForDelete";
+const char kForceJumbo[] = "forceJumbo";
 
 const WriteConcernOptions kMajorityWriteConcernNoTimeout(WriteConcernOptions::kMajority,
                                                          WriteConcernOptions::SyncMode::UNSET,
@@ -130,6 +131,14 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
         }
     }
 
+    {
+        Status status =
+            bsonExtractBooleanFieldWithDefault(obj, kForceJumbo, 0, &request._forceJumbo);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     return request;
 }
 
@@ -138,7 +147,8 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     const ShardId& newShardId,
     int64_t maxChunkSizeBytes,
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
-    bool waitForDelete) {
+    bool waitForDelete,
+    bool forceJumbo) {
     invariant(chunk.validate());
 
     BSONObjBuilder cmdBuilder;
@@ -152,6 +162,7 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
         secondaryThrottleBuilder.doneFast();
     }
     cmdBuilder.append(kWaitForDelete, waitForDelete);
+    cmdBuilder.append(kForceJumbo, forceJumbo);
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

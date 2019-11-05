@@ -136,7 +136,8 @@ public:
                            const ShardId& newShardId,
                            uint64_t maxChunkSizeBytes,
                            const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                           bool waitForDelete);
+                           bool waitForDelete,
+                           bool forceJumbo);
 
     /**
      * Appends the runtime state of the balancer instance to the specified builder.

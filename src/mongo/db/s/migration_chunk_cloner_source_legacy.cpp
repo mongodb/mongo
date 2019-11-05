@@ -40,7 +40,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -69,6 +68,9 @@ const char kRecvChunkCommit[] = "_recvChunkCommit";
 const char kRecvChunkAbort[] = "_recvChunkAbort";
 
 const int kMaxObjectPerChunk{250000};
+const Hours kMaxWaitToCommitCloneForJumboChunk(6);
+
+MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
 
 bool isInRange(const BSONObj& obj,
                const BSONObj& min,
@@ -227,7 +229,8 @@ MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequ
       _sessionId(MigrationSessionId::generate(_args.getFromShardId().toString(),
                                               _args.getToShardId().toString())),
       _donorConnStr(std::move(donorConnStr)),
-      _recipientHost(std::move(recipientHost)) {}
+      _recipientHost(std::move(recipientHost)),
+      _forceJumbo(_args.getForceJumbo() != MoveChunkRequest::ForceJumbo::kDoNotForce) {}
 
 MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(_state == kDone);
@@ -263,7 +266,10 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
             PrepareConflictBehavior::kIgnoreConflicts);
 
         auto storeCurrentLocsStatus = _storeCurrentLocs(opCtx);
-        if (!storeCurrentLocsStatus.isOK()) {
+        if (storeCurrentLocsStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
+            stdx::lock_guard<Latch> sl(_mutex);
+            _jumboChunkCloneState.emplace();
+        } else if (!storeCurrentLocsStatus.isOK()) {
             return storeCurrentLocsStatus;
         }
     }
@@ -302,89 +308,30 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
     OperationContext* opCtx, Milliseconds maxTimeToWait) {
     invariant(_state == kCloning);
     invariant(!opCtx->lockState()->isLocked());
-
-    const auto startTime = Date_t::now();
-
-    int iteration = 0;
-    while ((Date_t::now() - startTime) < maxTimeToWait) {
-        auto responseStatus = _callRecipient(
-            createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId, true));
-        if (!responseStatus.isOK()) {
-            return responseStatus.getStatus().withContext(
-                "Failed to contact recipient shard to monitor data transfer");
-        }
-
-        const BSONObj& res = responseStatus.getValue();
-
-        if (!res["waited"].boolean()) {
-            sleepmillis(1LL << std::min(iteration, 10));
-        }
-        iteration++;
-
-        stdx::lock_guard<Latch> sl(_mutex);
-
-        const std::size_t cloneLocsRemaining = _cloneLocs.size();
-
-        log() << "moveChunk data transfer progress: " << redact(res) << " mem used: " << _memoryUsed
-              << " documents remaining to clone: " << cloneLocsRemaining;
-
-        if (res["state"].String() == "steady") {
-            if (cloneLocsRemaining != 0) {
-                return {ErrorCodes::OperationIncomplete,
-                        str::stream() << "Unable to enter critical section because the recipient "
-                                         "shard thinks all data is cloned while there are still "
-                                      << cloneLocsRemaining << " documents remaining"};
-            }
-
-            return Status::OK();
-        }
-
-        if (res["state"].String() == "fail") {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Data transfer error: " << res["errmsg"].str()};
-        }
-
-        auto migrationSessionIdStatus = MigrationSessionId::extractFromBSON(res);
-        if (!migrationSessionIdStatus.isOK()) {
-            return {ErrorCodes::OperationIncomplete,
-                    str::stream() << "Unable to retrieve the id of the migration session due to "
-                                  << migrationSessionIdStatus.getStatus().toString()};
-        }
-
-        if (res["ns"].str() != _args.getNss().ns() ||
-            (res.hasField("fromShardId")
-                 ? (res["fromShardId"].str() != _args.getFromShardId().toString())
-                 : (res["from"].str() != _donorConnStr.toString())) ||
-            !res["min"].isABSONObj() || res["min"].Obj().woCompare(_args.getMinKey()) != 0 ||
-            !res["max"].isABSONObj() || res["max"].Obj().woCompare(_args.getMaxKey()) != 0 ||
-            !_sessionId.matches(migrationSessionIdStatus.getValue())) {
-            // This can happen when the destination aborted the migration and received another
-            // recvChunk before this thread sees the transition to the abort state. This is
-            // currently possible only if multiple migrations are happening at once. This is an
-            // unfortunate consequence of the shards not being able to keep track of multiple
-            // incoming and outgoing migrations.
-            return {ErrorCodes::OperationIncomplete,
-                    "Destination shard aborted migration because a new one is running"};
-        }
-
-        if (_memoryUsed > 500 * 1024 * 1024) {
-            // This is too much memory for us to use so we're going to abort the migration
-            return {ErrorCodes::ExceededMemoryLimit,
-                    "Aborting migration because of high memory usage"};
-        }
-
-        Status interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (!interruptStatus.isOK()) {
-            return interruptStatus;
-        }
+    // If this migration is manual migration that specified "force", enter the critical section
+    // immediately. This means the entire cloning phase will be done under the critical section.
+    if (_jumboChunkCloneState &&
+        _args.getForceJumbo() == MoveChunkRequest::ForceJumbo::kForceManual) {
+        return Status::OK();
     }
 
-    return {ErrorCodes::ExceededTimeLimit, "Timed out waiting for the cloner to catch up"};
+    return _checkRecipientCloningStatus(opCtx, maxTimeToWait);
 }
 
 StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationContext* opCtx) {
     invariant(_state == kCloning);
     invariant(!opCtx->lockState()->isLocked());
+    if (_jumboChunkCloneState && _forceJumbo) {
+        if (_args.getForceJumbo() == MoveChunkRequest::ForceJumbo::kForceManual) {
+            auto status = _checkRecipientCloningStatus(opCtx, kMaxWaitToCommitCloneForJumboChunk);
+            if (!status.isOK()) {
+                return status;
+            }
+        } else {
+            invariant(PlanExecutor::IS_EOF == _jumboChunkCloneState->clonerState);
+            invariant(_cloneLocs.empty());
+        }
+    }
 
     if (_sessionCatalogSource) {
         _sessionCatalogSource->onCommitCloneStarted();
@@ -605,18 +552,78 @@ void MigrationChunkClonerSourceLegacy::_decrementOutstandingOperationTrackReques
     }
 }
 
-uint64_t MigrationChunkClonerSourceLegacy::getCloneBatchBufferAllocationSize() {
-    stdx::lock_guard<Latch> sl(_mutex);
+void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationContext* opCtx,
+                                                                    Collection* collection,
+                                                                    BSONArrayBuilder* arrBuilder) {
+    ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
+                           internalQueryExecYieldIterations.load(),
+                           Milliseconds(internalQueryExecYieldPeriodMS.load()));
 
-    return std::min(static_cast<uint64_t>(BSONObjMaxUserSize),
-                    _averageObjectSizeForCloneLocs * _cloneLocs.size());
+    if (!_jumboChunkCloneState->clonerExec) {
+        auto exec = uassertStatusOK(_getIndexScanExecutor(opCtx, collection));
+        _jumboChunkCloneState->clonerExec = std::move(exec);
+    } else {
+        _jumboChunkCloneState->clonerExec->reattachToOperationContext(opCtx);
+        _jumboChunkCloneState->clonerExec->restoreState();
+    }
+
+    BSONObj obj;
+    RecordId recordId;
+    PlanExecutor::ExecState execState;
+
+    while (PlanExecutor::ADVANCED ==
+           (execState = _jumboChunkCloneState->clonerExec->getNext(
+                &obj, _jumboChunkCloneState->stashedRecordId ? nullptr : &recordId))) {
+
+        stdx::unique_lock<Latch> lk(_mutex);
+        _jumboChunkCloneState->clonerState = execState;
+        lk.unlock();
+
+        opCtx->checkForInterrupt();
+
+        // Use the builder size instead of accumulating the document sizes directly so
+        // that we take into consideration the overhead of BSONArray indices.
+        if (arrBuilder->arrSize() &&
+            (arrBuilder->len() + obj.objsize() + 1024) > BSONObjMaxUserSize) {
+            _jumboChunkCloneState->clonerExec->enqueue(obj);
+
+            // Stash the recordId we just read to add to the next batch.
+            if (!recordId.isNull()) {
+                invariant(!_jumboChunkCloneState->stashedRecordId);
+                _jumboChunkCloneState->stashedRecordId = std::move(recordId);
+            }
+
+            break;
+        }
+
+        Snapshotted<BSONObj> doc;
+        invariant(collection->findDoc(
+            opCtx, _jumboChunkCloneState->stashedRecordId.value_or(recordId), &doc));
+        arrBuilder->append(doc.value());
+        _jumboChunkCloneState->stashedRecordId = boost::none;
+
+        lk.lock();
+        _jumboChunkCloneState->docsCloned++;
+        lk.unlock();
+
+        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
+    }
+
+    stdx::unique_lock<Latch> lk(_mutex);
+    _jumboChunkCloneState->clonerState = execState;
+    lk.unlock();
+
+    _jumboChunkCloneState->clonerExec->saveState();
+    _jumboChunkCloneState->clonerExec->detachFromOperationContext();
+
+    if (PlanExecutor::FAILURE == execState)
+        uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+            "Executor error while scanning for documents belonging to chunk"));
 }
 
-Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
-                                                        Collection* collection,
-                                                        BSONArrayBuilder* arrBuilder) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss(), MODE_IS));
-
+void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationContext* opCtx,
+                                                                    Collection* collection,
+                                                                    BSONArrayBuilder* arrBuilder) {
     ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
@@ -625,8 +632,8 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
     auto iter = _cloneLocs.begin();
 
     for (; iter != _cloneLocs.end(); ++iter) {
-        // We must always make progress in this method by at least one document because empty return
-        // indicates there is no more initial clone data.
+        // We must always make progress in this method by at least one document because empty
+        // return indicates there is no more initial clone data.
         if (arrBuilder->arrSize() && tracker.intervalHasElapsed()) {
             break;
         }
@@ -641,6 +648,7 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
             // that we take into consideration the overhead of BSONArray indices.
             if (arrBuilder->arrSize() &&
                 (arrBuilder->len() + doc.value().objsize() + 1024) > BSONObjMaxUserSize) {
+
                 break;
             }
 
@@ -652,7 +660,34 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
     }
 
     _cloneLocs.erase(_cloneLocs.begin(), iter);
+}
 
+uint64_t MigrationChunkClonerSourceLegacy::getCloneBatchBufferAllocationSize() {
+    stdx::lock_guard<Latch> sl(_mutex);
+    if (_jumboChunkCloneState && _forceJumbo)
+        return static_cast<uint64_t>(BSONObjMaxUserSize);
+
+    return std::min(static_cast<uint64_t>(BSONObjMaxUserSize),
+                    _averageObjectSizeForCloneLocs * _cloneLocs.size());
+}
+
+Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
+                                                        Collection* collection,
+                                                        BSONArrayBuilder* arrBuilder) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss(), MODE_IS));
+
+    // If this chunk is too large to store records in _cloneLocs and the command args specify to
+    // attempt to move it, scan the collection directly.
+    if (_jumboChunkCloneState && _forceJumbo) {
+        try {
+            _nextCloneBatchFromIndexScan(opCtx, collection, arrBuilder);
+            return Status::OK();
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }
+
+    _nextCloneBatchFromCloneLocs(opCtx, collection, arrBuilder);
     return Status::OK();
 }
 
@@ -732,15 +767,9 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
     return responseStatus.data.getOwned();
 }
 
-Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
-
-    Collection* const collection = autoColl.getCollection();
-    if (!collection) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection " << _args.getNss().ns() << " does not exist."};
-    }
-
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
+                                                        Collection* const collection) {
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
     const IndexDescriptor* idx =
@@ -761,13 +790,29 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
 
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.
-    auto exec = InternalPlanner::indexScan(opCtx,
-                                           collection,
-                                           idx,
-                                           min,
-                                           max,
-                                           BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::YIELD_AUTO);
+    return InternalPlanner::indexScan(opCtx,
+                                      collection,
+                                      idx,
+                                      min,
+                                      max,
+                                      BoundInclusion::kIncludeStartKeyOnly,
+                                      PlanExecutor::YIELD_AUTO);
+}
+
+Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
+    AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
+
+    Collection* const collection = autoColl.getCollection();
+    if (!collection) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection " << _args.getNss().ns() << " does not exist."};
+    }
+
+    auto swExec = _getIndexScanExecutor(opCtx, collection);
+    if (!swExec.isOK()) {
+        return swExec.getStatus();
+    }
+    auto exec = std::move(swExec.getValue());
 
     // Use the average object size to estimate how many objects a full chunk would carry do that
     // while traversing the chunk's range using the sharding index, below there's a fair amount of
@@ -812,8 +857,11 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
 
         if (++recCount > maxRecsWhenFull) {
             isLargeChunk = true;
-            // Continue on despite knowing that it will fail, just to get the correct value for
-            // recCount
+
+            if (_forceJumbo) {
+                _cloneLocs.clear();
+                break;
+            }
         }
     }
 
@@ -896,6 +944,96 @@ long long MigrationChunkClonerSourceLegacy::_xferUpdates(OperationContext* opCtx
 
     arr.done();
     return totalSize;
+}
+
+Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationContext* opCtx,
+                                                                      Milliseconds maxTimeToWait) {
+    const auto startTime = Date_t::now();
+    int iteration = 0;
+    while ((Date_t::now() - startTime) < maxTimeToWait) {
+        auto responseStatus = _callRecipient(
+            createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId, true));
+        if (!responseStatus.isOK()) {
+            return responseStatus.getStatus().withContext(
+                "Failed to contact recipient shard to monitor data transfer");
+        }
+
+        const BSONObj& res = responseStatus.getValue();
+        if (!res["waited"].boolean()) {
+            sleepmillis(1LL << std::min(iteration, 10));
+        }
+        iteration++;
+
+        stdx::lock_guard<Latch> sl(_mutex);
+
+        const std::size_t cloneLocsRemaining = _cloneLocs.size();
+
+        if (_forceJumbo && _jumboChunkCloneState) {
+            log() << "moveChunk data transfer progress: " << redact(res)
+                  << " mem used: " << _memoryUsed
+                  << " documents cloned so far: " << _jumboChunkCloneState->docsCloned;
+        } else {
+            log() << "moveChunk data transfer progress: " << redact(res)
+                  << " mem used: " << _memoryUsed
+                  << " documents remaining to clone: " << cloneLocsRemaining;
+        }
+
+        if (res["state"].String() == "steady") {
+            if (cloneLocsRemaining != 0 ||
+                (_jumboChunkCloneState && _forceJumbo &&
+                 PlanExecutor::IS_EOF != _jumboChunkCloneState->clonerState)) {
+                return {ErrorCodes::OperationIncomplete,
+                        str::stream() << "Unable to enter critical section because the recipient "
+                                         "shard thinks all data is cloned while there are still "
+                                         "documents remaining"};
+            }
+
+            return Status::OK();
+        }
+
+        if (res["state"].String() == "fail") {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Data transfer error: " << res["errmsg"].str()};
+        }
+
+        auto migrationSessionIdStatus = MigrationSessionId::extractFromBSON(res);
+        if (!migrationSessionIdStatus.isOK()) {
+            return {ErrorCodes::OperationIncomplete,
+                    str::stream() << "Unable to retrieve the id of the migration session due to "
+                                  << migrationSessionIdStatus.getStatus().toString()};
+        }
+
+        if (res["ns"].str() != _args.getNss().ns() ||
+            (res.hasField("fromShardId")
+                 ? (res["fromShardId"].str() != _args.getFromShardId().toString())
+                 : (res["from"].str() != _donorConnStr.toString())) ||
+            !res["min"].isABSONObj() || res["min"].Obj().woCompare(_args.getMinKey()) != 0 ||
+            !res["max"].isABSONObj() || res["max"].Obj().woCompare(_args.getMaxKey()) != 0 ||
+            !_sessionId.matches(migrationSessionIdStatus.getValue())) {
+            // This can happen when the destination aborted the migration and received another
+            // recvChunk before this thread sees the transition to the abort state. This is
+            // currently possible only if multiple migrations are happening at once. This is an
+            // unfortunate consequence of the shards not being able to keep track of multiple
+            // incoming and outgoing migrations.
+            return {ErrorCodes::OperationIncomplete,
+                    "Destination shard aborted migration because a new one is running"};
+        }
+
+        if (_args.getForceJumbo() != MoveChunkRequest::ForceJumbo::kForceManual &&
+            (_memoryUsed > 500 * 1024 * 1024 ||
+             (_jumboChunkCloneState && MONGO_unlikely(failTooMuchMemoryUsed.shouldFail())))) {
+            // This is too much memory for us to use so we're going to abort the migration
+            return {ErrorCodes::ExceededMemoryLimit,
+                    "Aborting migration because of high memory usage"};
+        }
+
+        Status interruptStatus = opCtx->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+    }
+
+    return {ErrorCodes::ExceededTimeLimit, "Timed out waiting for the cloner to catch up"};
 }
 
 boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(

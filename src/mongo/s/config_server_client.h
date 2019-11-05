@@ -52,7 +52,8 @@ Status moveChunk(OperationContext* opCtx,
                  const ShardId& newShardId,
                  int64_t maxChunkSizeBytes,
                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                 bool waitForDelete);
+                 bool waitForDelete,
+                 bool forceJumbo);
 
 /**
  * Requests the balancer to move the specified chunk off of its current shard to a shard, considered

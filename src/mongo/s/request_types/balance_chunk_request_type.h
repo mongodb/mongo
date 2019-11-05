@@ -63,7 +63,8 @@ public:
         const ShardId& newShardId,
         int64_t maxChunkSizeBytes,
         const MigrationSecondaryThrottleOptions& secondaryThrottle,
-        bool waitForDelete);
+        bool waitForDelete,
+        bool forceJumbo);
 
     /**
      * Produces a BSON object for the variant of the command, which requests the balancer to pick a
@@ -95,6 +96,10 @@ public:
         return _waitForDelete;
     }
 
+    bool getForceJumbo() const {
+        return _forceJumbo;
+    }
+
 private:
     BalanceChunkRequest(ChunkType chunk, MigrationSecondaryThrottleOptions secondaryThrottle);
 
@@ -114,6 +119,8 @@ private:
     // Whether to block and wait for the range deleter to cleanup the orphaned documents at the end
     // of move.
     bool _waitForDelete;
+
+    bool _forceJumbo;
 };
 
 }  // namespace mongo

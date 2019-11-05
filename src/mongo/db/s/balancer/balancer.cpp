@@ -273,14 +273,22 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
                                  const ShardId& newShardId,
                                  uint64_t maxChunkSizeBytes,
                                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                 bool waitForDelete) {
+                                 bool waitForDelete,
+                                 bool forceJumbo) {
     auto moveAllowedStatus = _chunkSelectionPolicy->checkMoveAllowed(opCtx, chunk, newShardId);
     if (!moveAllowedStatus.isOK()) {
         return moveAllowedStatus;
     }
 
     return _migrationManager.executeManualMigration(
-        opCtx, MigrateInfo(newShardId, chunk), maxChunkSizeBytes, secondaryThrottle, waitForDelete);
+        opCtx,
+        MigrateInfo(newShardId,
+                    chunk,
+                    forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
+                               : MoveChunkRequest::ForceJumbo::kDoNotForce),
+        maxChunkSizeBytes,
+        secondaryThrottle,
+        waitForDelete);
 }
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
@@ -603,7 +611,13 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                                             });
         invariant(requestIt != candidateChunks.end());
 
-        if (status == ErrorCodes::ChunkTooBig) {
+        // ChunkTooBig is returned by the source shard during the cloning phase if the migration
+        // manager finds that the chunk is larger than some calculated size, the source shard is
+        // *not* in draining mode, and the 'forceJumbo' balancer setting is 'kDoNotForce'.
+        // ExceededMemoryLimit is returned when the transfer mods queue surpasses 500MB regardless
+        // of whether the source shard is in draining mode or the value if the 'froceJumbo' balancer
+        // setting.
+        if (status == ErrorCodes::ChunkTooBig || status == ErrorCodes::ExceededMemoryLimit) {
             numChunksProcessed++;
 
             log() << "Performing a split because migration " << redact(requestIt->toString())

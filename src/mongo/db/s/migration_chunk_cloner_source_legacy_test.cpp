@@ -154,7 +154,8 @@ protected:
             chunkRange,
             1024 * 1024,
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault),
-            false);
+            false,
+            MoveChunkRequest::ForceJumbo::kDoNotForce);
 
         return assertGet(MoveChunkRequest::createFromCommand(kNss, cmdBuilder.obj()));
     }

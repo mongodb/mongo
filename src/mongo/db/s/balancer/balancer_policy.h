@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -52,7 +53,9 @@ struct ZoneRange {
 };
 
 struct MigrateInfo {
-    MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk);
+    MigrateInfo(const ShardId& a_to,
+                const ChunkType& a_chunk,
+                MoveChunkRequest::ForceJumbo a_forceJumbo);
 
     std::string getName() const;
 
@@ -66,6 +69,7 @@ struct MigrateInfo {
     BSONObj minKey;
     BSONObj maxKey;
     ChunkVersion version;
+    MoveChunkRequest::ForceJumbo forceJumbo;
 };
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
@@ -190,7 +194,8 @@ public:
      */
     static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            std::set<ShardId>* usedShards);
+                                            std::set<ShardId>* usedShards,
+                                            bool forceJumbo);
 
     /**
      * Using the specified distribution information, returns a suggested better location for the
@@ -236,7 +241,8 @@ private:
                                    const std::string& tag,
                                    size_t idealNumberOfChunksPerShardForTag,
                                    std::vector<MigrateInfo>* migrations,
-                                   std::set<ShardId>* usedShards);
+                                   std::set<ShardId>* usedShards,
+                                   MoveChunkRequest::ForceJumbo forceJumbo);
 };
 
 }  // namespace mongo

@@ -61,7 +61,8 @@ MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true);
+        true,
+        MoveChunkRequest::ForceJumbo::kDoNotForce);
     return assertGet(MoveChunkRequest::createFromCommand(nss, builder.obj()));
 }
 

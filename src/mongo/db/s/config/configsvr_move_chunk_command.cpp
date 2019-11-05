@@ -100,7 +100,8 @@ public:
                                                                   request.getToShardId(),
                                                                   request.getMaxChunkSizeBytes(),
                                                                   request.getSecondaryThrottle(),
-                                                                  request.getWaitForDelete()));
+                                                                  request.getWaitForDelete(),
+                                                                  request.getForceJumbo()));
         } else {
             uassertStatusOK(Balancer::get(opCtx)->rebalanceSingleChunk(opCtx, request.getChunk()));
         }

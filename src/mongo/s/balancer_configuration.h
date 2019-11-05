@@ -107,6 +107,15 @@ public:
         return _waitForDelete;
     }
 
+    /**
+     * Returns whether the balancer should schedule migrations of chunks that are 'large' rather
+     * than marking these chunks as 'jumbo' (meaning they will not be scheduled for split or
+     * migration).
+     */
+    bool attemptToBalanceJumboChunks() const {
+        return _attemptToBalanceJumboChunks;
+    }
+
 private:
     BalancerSettingsType();
 
@@ -118,6 +127,8 @@ private:
     MigrationSecondaryThrottleOptions _secondaryThrottle;
 
     bool _waitForDelete{false};
+
+    bool _attemptToBalanceJumboChunks{false};
 };
 
 /**
@@ -234,6 +245,13 @@ public:
      * each migration.
      */
     bool waitForDelete() const;
+
+    /**
+     * Returns whether the balancer should attempt to schedule migrations of 'large' chunks. If
+     * false, the balancer will instead mark these chunks as 'jumbo', meaning they will not be
+     * scheduled for any split or move in the future.
+     */
+    bool attemptToBalanceJumboChunks() const;
 
     /**
      * Returns the max chunk size after which a chunk would be considered jumbo.

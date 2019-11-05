@@ -61,7 +61,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));
     ASSERT_OK(chunkType.validate());
 
-    MigrateInfo migrateInfo(kToShard, chunkType);
+    MigrateInfo migrateInfo(kToShard, chunkType, MoveChunkRequest::ForceJumbo::kDoNotForce);
     MigrationType migrationType(migrateInfo, kWaitForDelete);
 
     BSONObjBuilder builder;
@@ -72,6 +72,8 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     builder.append(MigrationType::toShard(), kToShard.toString());
     version.appendWithField(&builder, "chunkVersion");
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
+    builder.append(MigrationType::forceJumbo(),
+                   MoveChunkRequest::forceJumboToString(MoveChunkRequest::ForceJumbo::kDoNotForce));
 
     BSONObj obj = builder.obj();
 
@@ -89,6 +91,8 @@ TEST(MigrationTypeTest, FromAndToBSON) {
     builder.append(MigrationType::toShard(), kToShard.toString());
     version.appendWithField(&builder, "chunkVersion");
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
+    builder.append(MigrationType::forceJumbo(),
+                   MoveChunkRequest::forceJumboToString(MoveChunkRequest::ForceJumbo::kDoNotForce));
 
     BSONObj obj = builder.obj();
 

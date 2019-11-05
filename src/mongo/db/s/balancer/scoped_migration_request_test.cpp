@@ -113,7 +113,7 @@ MigrateInfo makeMigrateInfo() {
     ChunkType chunkType = assertGet(ChunkType::parseFromConfigBSONCommand(chunkBuilder.obj()));
     ASSERT_OK(chunkType.validate());
 
-    return MigrateInfo(kToShard, chunkType);
+    return MigrateInfo(kToShard, chunkType, MoveChunkRequest::ForceJumbo::kDoNotForce);
 }
 
 TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequest) {

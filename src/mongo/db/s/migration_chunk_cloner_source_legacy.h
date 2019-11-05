@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_session_id.h"
@@ -220,6 +221,17 @@ private:
      */
     StatusWith<BSONObj> _callRecipient(const BSONObj& cmdObj);
 
+    StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getIndexScanExecutor(
+        OperationContext* opCtx, Collection* const collection);
+
+    void _nextCloneBatchFromIndexScan(OperationContext* opCtx,
+                                      Collection* collection,
+                                      BSONArrayBuilder* arrBuilder);
+
+    void _nextCloneBatchFromCloneLocs(OperationContext* opCtx,
+                                      Collection* collection,
+                                      BSONArrayBuilder* arrBuilder);
+
     /**
      * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid
      * seeking disk later).
@@ -307,6 +319,12 @@ private:
                            std::list<BSONObj>* updateList,
                            long long initialSize);
 
+    /**
+     * Sends _recvChunkStatus to the recipient shard until it receives 'steady' from the recipient,
+     * an error has occurred, or a timeout is hit.
+     */
+    Status _checkRecipientCloningStatus(OperationContext* opCtx, Milliseconds maxTimeToWait);
+
     // The original move chunk request
     const MoveChunkRequest _args;
 
@@ -356,6 +374,27 @@ private:
 
     // Total bytes in _reload + _deleted (xfer mods)
     uint64_t _memoryUsed{0};
+
+    // False if the move chunk request specified ForceJumbo::kDoNotForce, true otherwise.
+    const bool _forceJumbo;
+
+    struct JumboChunkCloneState {
+        // Plan executor for collection scan used to clone docs.
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> clonerExec;
+
+        // The current state of 'clonerExec'.
+        PlanExecutor::ExecState clonerState;
+
+        // RecordId of the last doc read in by 'clonerExec' if collection scan yields during
+        // cloning.
+        boost::optional<RecordId> stashedRecordId;
+
+        // Number docs in jumbo chunk cloned so far
+        int docsCloned = 0;
+    };
+
+    // Set only once its discovered a chunk is jumbo
+    boost::optional<JumboChunkCloneState> _jumboChunkCloneState;
 };
 
 }  // namespace mongo

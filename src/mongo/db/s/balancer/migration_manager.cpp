@@ -170,7 +170,6 @@ Status MigrationManager::executeManualMigration(
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
     bool waitForDelete) {
     _waitForRecovery();
-
     // Write a document to the config.migrations collection, in case this migration must be
     // recovered by the Balancer. Fail if the chunk is already moving.
     auto statusWithScopedMigrationRequest =
@@ -455,7 +454,8 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
         ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),
         maxChunkSizeBytes,
         secondaryThrottle,
-        waitForDelete);
+        waitForDelete,
+        migrateInfo.forceJumbo);
 
     stdx::lock_guard<Latch> lock(_mutex);
 

@@ -49,7 +49,8 @@ Status moveChunk(OperationContext* opCtx,
                  const ShardId& newShardId,
                  int64_t maxChunkSizeBytes,
                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                 bool waitForDelete) {
+                 bool waitForDelete,
+                 bool forceJumbo) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
     auto cmdResponseStatus = shard->runCommand(
@@ -57,7 +58,7 @@ Status moveChunk(OperationContext* opCtx,
         kPrimaryOnlyReadPreference,
         "admin",
         BalanceChunkRequest::serializeToMoveCommandForConfig(
-            chunk, newShardId, maxChunkSizeBytes, secondaryThrottle, waitForDelete),
+            chunk, newShardId, maxChunkSizeBytes, secondaryThrottle, waitForDelete, forceJumbo),
         Shard::RetryPolicy::kIdempotent);
     if (!cmdResponseStatus.isOK()) {
         return cmdResponseStatus.getStatus();

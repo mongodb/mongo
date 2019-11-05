@@ -75,6 +75,7 @@ const char kStopped[] = "stopped";
 const char kMode[] = "mode";
 const char kActiveWindow[] = "activeWindow";
 const char kWaitForDelete[] = "_waitForDelete";
+const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
 
 const NamespaceString kSettingsNamespace("config", "settings");
 
@@ -174,6 +175,11 @@ MigrationSecondaryThrottleOptions BalancerConfiguration::getSecondaryThrottle() 
 bool BalancerConfiguration::waitForDelete() const {
     stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     return _balancerSettings.waitForDelete();
+}
+
+bool BalancerConfiguration::attemptToBalanceJumboChunks() const {
+    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
+    return _balancerSettings.attemptToBalanceJumboChunks();
 }
 
 Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
@@ -364,6 +370,16 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
             return status;
 
         settings._waitForDelete = waitForDelete;
+    }
+
+    {
+        bool attemptToBalanceJumboChunks;
+        Status status = bsonExtractBooleanFieldWithDefault(
+            obj, kAttemptToBalanceJumboChunks, false, &attemptToBalanceJumboChunks);
+        if (!status.isOK())
+            return status;
+
+        settings._attemptToBalanceJumboChunks = attemptToBalanceJumboChunks;
     }
 
     return settings;

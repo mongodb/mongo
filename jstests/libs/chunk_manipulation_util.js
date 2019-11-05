@@ -19,12 +19,19 @@ load('./jstests/libs/test_background_ops.js');
 // Returns a join function; call it to wait for moveChunk to complete.
 //
 
-function moveChunkParallel(
-    staticMongod, mongosURL, findCriteria, bounds, ns, toShardId, expectSuccess = true) {
+function moveChunkParallel(staticMongod,
+                           mongosURL,
+                           findCriteria,
+                           bounds,
+                           ns,
+                           toShardId,
+                           expectSuccess = true,
+                           forceJumbo = false) {
     assert((findCriteria || bounds) && !(findCriteria && bounds),
            'Specify either findCriteria or bounds, but not both.');
 
-    function runMoveChunk(mongosURL, findCriteria, bounds, ns, toShardId, expectSuccess) {
+    function runMoveChunk(
+        mongosURL, findCriteria, bounds, ns, toShardId, expectSuccess, forceJumbo) {
         assert(mongosURL && ns && toShardId, 'Missing arguments.');
         assert((findCriteria || bounds) && !(findCriteria && bounds),
                'Specify either findCriteria or bounds, but not both.');
@@ -39,6 +46,7 @@ function moveChunkParallel(
 
         cmd.to = toShardId;
         cmd._waitForDelete = true;
+        cmd.forceJumbo = forceJumbo;
 
         printjson(cmd);
         var result = admin.runCommand(cmd);
@@ -51,9 +59,10 @@ function moveChunkParallel(
     }
 
     // Return the join function.
-    return startParallelOps(staticMongod,
-                            runMoveChunk,
-                            [mongosURL, findCriteria, bounds, ns, toShardId, expectSuccess]);
+    return startParallelOps(
+        staticMongod,
+        runMoveChunk,
+        [mongosURL, findCriteria, bounds, ns, toShardId, expectSuccess, forceJumbo]);
 }
 
 // moveChunk starts at step 0 and proceeds to 1 (it has *finished* parsing

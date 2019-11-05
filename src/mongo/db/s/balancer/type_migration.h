@@ -54,6 +54,7 @@ public:
     static const BSONField<std::string> fromShard;
     static const BSONField<std::string> toShard;
     static const BSONField<bool> waitForDelete;
+    static const BSONField<std::string> forceJumbo;
 
     /**
      * The Balancer encapsulates migration information in MigrateInfo objects, so this facilitates
@@ -85,6 +86,10 @@ public:
         return _waitForDelete;
     }
 
+    MoveChunkRequest::ForceJumbo getForceJumbo() const {
+        return MoveChunkRequest::parseForceJumbo(_forceJumbo);
+    }
+
 private:
     MigrationType();
 
@@ -96,6 +101,7 @@ private:
     ShardId _toShard;
     ChunkVersion _chunkVersion;
     bool _waitForDelete{false};
+    std::string _forceJumbo{0};
 };
 
 }  // namespace mongo

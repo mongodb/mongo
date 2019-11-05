@@ -50,6 +50,7 @@ const BSONField<BSONObj> MigrationType::max("max");
 const BSONField<std::string> MigrationType::fromShard("fromShard");
 const BSONField<std::string> MigrationType::toShard("toShard");
 const BSONField<bool> MigrationType::waitForDelete("waitForDelete");
+const BSONField<std::string> MigrationType::forceJumbo("forceJumbo");
 
 MigrationType::MigrationType() = default;
 
@@ -60,7 +61,8 @@ MigrationType::MigrationType(MigrateInfo info, bool waitForDelete)
       _fromShard(info.from),
       _toShard(info.to),
       _chunkVersion(info.version),
-      _waitForDelete(waitForDelete) {}
+      _waitForDelete(waitForDelete),
+      _forceJumbo(MoveChunkRequest::forceJumboToString(info.forceJumbo)) {}
 
 StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     MigrationType migrationType;
@@ -115,6 +117,21 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         migrationType._waitForDelete = waitForDeleteVal;
     }
 
+    {
+        std::string forceJumboVal;
+        Status status = bsonExtractStringField(source, forceJumbo.name(), &forceJumboVal);
+        if (!status.isOK())
+            return status;
+
+        auto forceJumbo = MoveChunkRequest::parseForceJumbo(forceJumboVal);
+        if (forceJumbo != MoveChunkRequest::ForceJumbo::kDoNotForce &&
+            forceJumbo != MoveChunkRequest::ForceJumbo::kForceManual &&
+            forceJumbo != MoveChunkRequest::ForceJumbo::kForceBalancer) {
+            return Status{ErrorCodes::BadValue, "Unknown value for forceJumbo"};
+        }
+        migrationType._forceJumbo = std::move(forceJumboVal);
+    }
+
     return migrationType;
 }
 
@@ -132,6 +149,7 @@ BSONObj MigrationType::toBSON() const {
     _chunkVersion.appendWithField(&builder, kChunkVersion);
 
     builder.append(waitForDelete.name(), _waitForDelete);
+    builder.append(forceJumbo.name(), _forceJumbo);
     return builder.obj();
 }
 
@@ -143,7 +161,7 @@ MigrateInfo MigrationType::toMigrateInfo() const {
     chunk.setMax(_max);
     chunk.setVersion(_chunkVersion);
 
-    return MigrateInfo(_toShard, chunk);
+    return MigrateInfo(_toShard, chunk, MoveChunkRequest::parseForceJumbo(_forceJumbo));
 }
 
 }  // namespace mongo
