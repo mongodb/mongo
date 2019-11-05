@@ -41,19 +41,12 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/future.h"
 #include "mongo/util/log.h"
 
 using namespace std::chrono_literals;
@@ -95,11 +88,10 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     return Status::OK();
 }
 
-SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForExistingCollection(
-    OperationContext* opCtx,
-    UUID collectionUUID,
-    const NamespaceString& ns,
-    const IndexSpec& spec) {
+void generateSystemIndexForExistingCollection(OperationContext* opCtx,
+                                              UUID collectionUUID,
+                                              const NamespaceString& ns,
+                                              const IndexSpec& spec) {
     // Do not try to generate any system indexes on a secondary.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(ErrorCodes::NotMaster,
@@ -117,18 +109,9 @@ SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForE
         log() << "No authorization index detected on " << ns
               << " collection. Attempting to recover by creating an index with spec: " << indexSpec;
 
-        UUID buildUUID = UUID::gen();
-        IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {CommitQuorumOptions(1)};
-        auto indexBuildFuture =
-            uassertStatusOK(indexBuildsCoord->startIndexBuild(opCtx,
-                                                              ns.db(),
-                                                              collectionUUID,
-                                                              {indexSpec},
-                                                              buildUUID,
-                                                              IndexBuildProtocol::kSinglePhase,
-                                                              indexBuildOptions));
-        return indexBuildFuture;
+        auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+        auto fromMigrate = false;
+        indexBuildsCoord->createIndexes(opCtx, collectionUUID, {indexSpec}, fromMigrate);
     } catch (const DBException& e) {
         severe() << "Failed to regenerate index for " << ns << ". Exception: " << e.what();
         throw;
@@ -146,9 +129,6 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 
     const NamespaceString& systemUsers = AuthorizationManager::usersCollectionNamespace;
     const NamespaceString& systemRoles = AuthorizationManager::rolesCollectionNamespace;
-
-    boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> systemUsersFuture;
-    boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> systemRolesFuture;
 
     // Create indexes for collections on the admin db
     {
@@ -179,7 +159,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemUsersKeyPattern, false, &indexes);
             if (indexes.empty()) {
                 try {
-                    systemUsersFuture = generateSystemIndexForExistingCollection(
+                    generateSystemIndexForExistingCollection(
                         opCtx, collection->uuid(), systemUsers, v3SystemUsersIndexSpec);
                 } catch (...) {
                     return exceptionToStatus();
@@ -197,32 +177,13 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemRolesKeyPattern, false, &indexes);
             if (indexes.empty()) {
                 try {
-                    systemRolesFuture = generateSystemIndexForExistingCollection(
+                    generateSystemIndexForExistingCollection(
                         opCtx, collection->uuid(), systemRoles, v3SystemRolesIndexSpec);
                 } catch (...) {
                     return exceptionToStatus();
                 }
             }
         }
-    }
-
-    Status systemUsersStatus = Status::OK();
-    Status systemRolesStatus = Status::OK();
-
-    if (systemUsersFuture) {
-        systemUsersStatus = systemUsersFuture->waitNoThrow(opCtx);
-    }
-
-    if (systemRolesFuture) {
-        systemRolesStatus = systemRolesFuture->waitNoThrow(opCtx);
-    }
-
-    if (!systemUsersStatus.isOK()) {
-        return systemUsersStatus;
-    }
-
-    if (!systemRolesStatus.isOK()) {
-        return systemRolesStatus;
     }
 
     return Status::OK();
@@ -245,34 +206,12 @@ void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
                 opCtx, v3SystemRolesIndexSpec.toBSON(), serverGlobalParams.featureCompatibility));
     }
     if (!indexSpec.isEmpty()) {
-        // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
-        auto opObserver = opCtx->getServiceContext()->getOpObserver();
         auto fromMigrate = false;
-        auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
-            ? boost::make_optional(UUID::gen())
-            : boost::none;
-
-        if (buildUUID) {
-            opObserver->onStartIndexBuild(
-                opCtx, ns, collection->uuid(), *buildUUID, {indexSpec}, fromMigrate);
-        }
-
-        // If two phase index builds are enabled, the index build will be coordinated using
-        // startIndexBuild and commitIndexBuild oplog entries.
-        if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
-            opObserver->onCreateIndex(opCtx, ns, collection->uuid(), indexSpec, fromMigrate);
-        }
-
-        // Note that the opObserver is called prior to creating the index.  This ensures the index
-        // write gets the same storage timestamp as the oplog entry.
-        fassert(40456,
-                collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
-
-        if (buildUUID) {
-            opObserver->onCommitIndexBuild(
-                opCtx, ns, collection->uuid(), *buildUUID, {indexSpec}, fromMigrate);
+        try {
+            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                opCtx, collection->uuid(), {indexSpec}, fromMigrate);
+        } catch (DBException& ex) {
+            fassertFailedWithStatus(40456, ex.toStatus());
         }
     }
 }
