@@ -516,7 +516,6 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
 
-    auto const serviceContext = opCtx->getServiceContext();
     DisableDocumentValidation validationDisabler(opCtx);
 
     std::vector<BSONObj> donorIndexSpecs;
@@ -670,47 +669,9 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(collection);
         if (!indexSpecs.empty()) {
             WriteUnitOfWork wunit(opCtx);
-
-            // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the
-            // current FCV.
-            auto opObserver = serviceContext->getOpObserver();
             auto fromMigrate = true;
-            auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                    serverGlobalParams.featureCompatibility.getVersion() ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
-                ? boost::make_optional(UUID::gen())
-                : boost::none;
-
-            if (buildUUID) {
-                opObserver->onStartIndexBuild(
-                    opCtx, nss, collection->uuid(), *buildUUID, indexSpecs, fromMigrate);
-            }
-
-            for (const auto& spec : indexSpecs) {
-                // Make sure to create index on secondaries as well. Oplog entry must be written
-                // before the index is added to the index catalog for correct rollback operation.
-                // See SERVER-35780 and SERVER-35070.
-
-                // If two phase index builds is enabled, index build will be coordinated using
-                // startIndexBuild and commitIndexBuild oplog entries.
-                if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
-                    opObserver->onCreateIndex(opCtx, nss, collection->uuid(), spec, fromMigrate);
-                }
-
-                // Since the collection is empty, we can add and commit the index catalog entry
-                // within a single WUOW.
-                auto indexCatalog = collection->getIndexCatalog();
-                uassertStatusOKWithContext(indexCatalog->createIndexOnEmptyCollection(opCtx, spec),
-                                           str::stream()
-                                               << "failed to create index before migrating data: "
-                                               << redact(spec));
-            }
-
-            if (buildUUID) {
-                opObserver->onCommitIndexBuild(
-                    opCtx, nss, collection->uuid(), *buildUUID, indexSpecs, fromMigrate);
-            }
-
+            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                opCtx, collection->uuid(), indexSpecs, fromMigrate);
             wunit.commit();
         }
     }
