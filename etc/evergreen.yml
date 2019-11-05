@@ -5494,7 +5494,7 @@ tasks:
 ## Standalone generational fuzzer for multiversion aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
-  tags: ["aggfuzzer", "common"]
+  tags: ["aggfuzzer", "common", "multiversion"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -7638,7 +7638,7 @@ tasks:
       fallback_num_sub_suites: 31
 
 - name: sharding_last_stable_mongos_and_mixed_shards_gen
-  tags: ["sharding", "common", "mixed_version"]
+  tags: ["sharding", "common", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -9488,7 +9488,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version !.jscore
+  - name: .sharding .common !.multiversion !.jscore
   - name: .sharding .txns
   - name: snmp
   - name: .stitch
@@ -9579,7 +9579,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version
+  - name: .sharding .common !.multiversion
   - name: .sharding .txns
   - name: snmp
   - name: .publish
@@ -11616,7 +11616,7 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version
+  - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
   - name: .publish
@@ -11674,7 +11674,7 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version
+  - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
   - name: .publish
@@ -11726,7 +11726,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version
+  - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
@@ -11998,7 +11998,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version
+  - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
@@ -12113,7 +12113,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
@@ -12153,7 +12153,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -12171,7 +12171,7 @@ buildvariants:
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
   - name: .publish
@@ -12468,7 +12468,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version !.csrs
+  - name: .sharding .common !.multiversion !.csrs
   - name: snmp
   - name: .ssl
   - name: .updatefuzzer
@@ -12675,7 +12675,7 @@ buildvariants:
   - name: replica_sets
   - name: .replica_sets .common
   - name: rollback_fuzzer_gen
-  - name: .sharding .common !.mixed_version !.csrs
+  - name: .sharding .common !.multiversion !.csrs
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .updatefuzzer
 
@@ -12718,7 +12718,7 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version !.csrs
+  - name: .sharding .common !.multiversion !.csrs
   - name: snmp
   - name: .ssl
 
@@ -12763,7 +12763,7 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.mixed_version !.csrs
+  - name: .sharding .common !.multiversion !.csrs
   - name: snmp
   - name: .ssl
 
