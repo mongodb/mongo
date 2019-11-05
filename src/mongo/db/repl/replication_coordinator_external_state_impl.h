@@ -93,6 +93,7 @@ public:
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual void closeConnections();
     virtual void shardingOnStepDownHook();
+    virtual void clearOplogVisibilityStateForStepDown() override;
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();

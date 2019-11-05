@@ -144,6 +144,14 @@ public:
     // -------- Oplog Truncate After Point ----------
 
     /**
+     * Ensures that the fast-count counter for the oplogTruncateAfterPoint collection is properly
+     * set. An unclean shutdown can result in a miscount, if the persisted size store is not updated
+     * before the crash. Rollback usually handles this for user collections, but local, unreplicated
+     * collections are not adjusted.
+     */
+    virtual void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) = 0;
+
+    /**
      * The oplog truncate after point is set to the beginning of a batch of oplog entries before
      * the oplog entries are written into the oplog, and reset before we begin applying the batch.
      * On startup all oplog entries with a value >= the oplog truncate after point should be

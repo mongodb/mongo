@@ -218,6 +218,12 @@ public:
     virtual void shardingOnStepDownHook() = 0;
 
     /**
+     * Clears oplog visibility state. All of the oplog is safely visible because there are no oplog
+     * writes during stepdown.
+     */
+    virtual void clearOplogVisibilityStateForStepDown() = 0;
+
+    /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
      */
     virtual void signalApplierToChooseNewSyncSource() = 0;

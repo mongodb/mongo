@@ -417,6 +417,10 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // initial sync has completed, it also sees these collections.
     fassert(50708, _replicationProcess->getConsistencyMarkers()->createInternalCollections(opCtx));
 
+    // Ensure (update if needed) the in-memory count for the oplogTruncateAfterPoint collection
+    // matches the collection contents.
+    _replicationProcess->getConsistencyMarkers()->ensureFastCountOnOplogTruncateAfterPoint(opCtx);
+
     _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx);
 
     fassert(51240, _externalState->createLocalLastVoteCollection(opCtx));
@@ -2992,8 +2996,10 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _externalState->closeConnections();
         /* FALLTHROUGH */
         case kActionSteppedDown:
+            // This code must be safe to run on node rollback and node removal!
             _externalState->shardingOnStepDownHook();
             _externalState->stopNoopWriter();
+            _externalState->clearOplogVisibilityStateForStepDown();
             break;
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of

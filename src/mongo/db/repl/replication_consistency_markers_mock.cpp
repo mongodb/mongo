@@ -80,6 +80,9 @@ void ReplicationConsistencyMarkersMock::setMinValidToAtLeast(OperationContext* o
     _minValid = std::max(_minValid, minValid);
 }
 
+void ReplicationConsistencyMarkersMock::ensureFastCountOnOplogTruncateAfterPoint(
+    OperationContext* opCtx) {}
+
 void ReplicationConsistencyMarkersMock::setOplogTruncateAfterPoint(OperationContext* opCtx,
                                                                    const Timestamp& timestamp) {
     stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);

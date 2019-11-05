@@ -308,6 +308,40 @@ ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
     return oplogTruncateAfterPoint;
 }
 
+void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint(
+    OperationContext* opCtx) {
+    LOG(3) << "Updating cached fast-count on collection " << _oplogTruncateAfterPointNss
+           << " in case an unclean shutdown caused it to become incorrect.";
+
+    auto result = _storageInterface->findSingleton(opCtx, _oplogTruncateAfterPointNss);
+
+    if (result.getStatus() == ErrorCodes::NamespaceNotFound) {
+        return;
+    }
+
+    if (result.getStatus() == ErrorCodes::CollectionIsEmpty) {
+        // The count is updated before successful commit of a write, so unclean shutdown can leave
+        // the value incorrectly set to one.
+        invariant(
+            _storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 0).isOK());
+        return;
+    }
+
+    if (result.getStatus() == ErrorCodes::TooManyMatchingDocuments) {
+        fassert(51265,
+                {result.getStatus().code(),
+                 str::stream() << "More than one document was found in the '"
+                               << kDefaultOplogTruncateAfterPointNamespace
+                               << "' collection. Users should not write to this collection. Please "
+                                  "delete the excess documents"});
+    }
+    fassert(51266, result.getStatus());
+
+    // We can safely set a count of one. We know that we only ever write one document, and the
+    // success of findSingleton above confirms only one document exists in the collection.
+    invariant(_storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 1).isOK());
+}
+
 void ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
     OperationContext* opCtx, const BSONObj& updateSpec) {
     fassert(40512,

@@ -698,6 +698,26 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     }
 }
 
+void ReplicationCoordinatorExternalStateImpl::clearOplogVisibilityStateForStepDown() {
+    auto opCtx = cc().getOperationContext();
+    // Temporarily turn off flow control ticketing. Getting a ticket can stall on a ticket being
+    // available, which may have to wait for the ticket refresher to run, which in turn blocks on
+    // the repl _mutex to check whether we are primary or not: this is a deadlock because stepdown
+    // already holds the repl _mutex!
+    auto originalFlowControlSetting = opCtx->shouldParticipateInFlowControl();
+    ON_BLOCK_EXIT([&] { opCtx->setShouldParticipateInFlowControl(originalFlowControlSetting); });
+    opCtx->setShouldParticipateInFlowControl(false);
+
+    // We can clear the oplogTruncateAfterPoint because we know there are no concurrent user writes
+    // during stepdown and therefore presently no oplog holes.
+    //
+    // This value is updated periodically while in PRIMARY mode to protect against oplog holes on
+    // unclean shutdown. The value must then be cleared on stepdown because stepup expects the value
+    // to be unset. Batch application, in mode SECONDARY, also uses the value to protect against
+    // unclean shutdown, and will handle both setting AND unsetting the value.
+    _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp());
+}
+
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
     OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
