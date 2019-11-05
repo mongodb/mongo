@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import uuid
+import argparse
 import xml.etree.ElementTree as ET
 
 VCXPROJ_FOOTER = r"""
@@ -49,6 +50,23 @@ VCXPROJ_FIELDS_TO_PRESERVE = [
     "NMakeCleanCommandLine",
     "NMakeReBuildCommandLine",
 ]
+
+VCXPROJ_TOOLSVERSION = {
+    "14.1": "15.0",
+    "14.2": "16.0",
+}
+
+VCXPROJ_PLATFORM_TOOLSET = {
+    "14.1": "v141",
+    "14.2": "v142",
+}
+
+VCXPROJ_WINDOWS_TARGET_SDK = {
+    "14.1": "10.0.17763.0",
+    "14.2": "10.0.18362.0",
+}
+
+VCXPROJ_MSVC_DEFAULT_VERSION = "14.1"  # Visual Studio 2017
 
 
 def get_defines(args):
@@ -126,7 +144,7 @@ def _replace_vcxproj(file_name, restore_elements):
 class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
     """Generate a .vcxproj and .vcxprof.filters file."""
 
-    def __init__(self, target):
+    def __init__(self, target, vs_version):
         """Initialize ProjFileGenerator."""
         # we handle DEBUG in the vcxproj header:
         self.common_defines = set()
@@ -142,6 +160,9 @@ class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
         self.filters = None
         self.all_defines = set(self.common_defines)
         self.vcxproj_file_name = self.target + ".vcxproj"
+        self.tools_version = VCXPROJ_TOOLSVERSION[vs_version]
+        self.platform_toolset = VCXPROJ_PLATFORM_TOOLSET[vs_version]
+        self.windows_target_sdk = VCXPROJ_WINDOWS_TARGET_SDK[vs_version]
 
         self.existing_build_commands = _read_vcxproj(self.vcxproj_file_name)
 
@@ -157,6 +178,10 @@ class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
         with open('buildscripts/vcxproj.header', 'r') as header_file:
             header_str = header_file.read()
             header_str = header_str.replace("%_TARGET_%", self.target)
+            header_str = header_str.replace("%ToolsVersion%", self.tools_version)
+            header_str = header_str.replace("%PlatformToolset%", self.platform_toolset)
+            header_str = header_str.replace("%WindowsTargetPlatformVersion%",
+                                            self.windows_target_sdk)
             header_str = header_str.replace("%AdditionalIncludeDirectories%", ';'.join(
                 sorted(self.includes)))
             self.vcxproj.write(header_str)
@@ -336,11 +361,14 @@ class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
 
 def main():
     """Execute Main program."""
-    if len(sys.argv) != 2:
-        print(r"Usage: python buildscripts\make_vcxproj.py FILE_NAME")
-        return
+    parser = argparse.ArgumentParser(description='VS Project File Generator.')
+    parser.add_argument('--version', type=str, nargs='?', help="MSVC Toolchain version",
+                        default=VCXPROJ_MSVC_DEFAULT_VERSION)
+    parser.add_argument('target', type=str, help="File to generate")
 
-    with ProjFileGenerator(sys.argv[1]) as projfile:
+    args = parser.parse_args()
+
+    with ProjFileGenerator(args.target, args.version) as projfile:
         with open("compile_commands.json", "rb") as sjh:
             contents = sjh.read().decode('utf-8')
             commands = json.loads(contents)

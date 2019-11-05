@@ -4135,11 +4135,16 @@ env.AddMethod(injectModule, 'InjectModule')
 compileCommands = env.CompilationDatabase('compile_commands.json')
 compileDb = env.Alias("compiledb", compileCommands)
 
+
+msvc_version = ""
+if 'MSVC_VERSION' in env and env['MSVC_VERSION']:
+    msvc_version = "--version " + env['MSVC_VERSION'] + " "
+
 # Microsoft Visual Studio Project generation for code browsing
 vcxprojFile = env.Command(
     "mongodb.vcxproj",
     compileCommands,
-    r"$PYTHON buildscripts\make_vcxproj.py mongodb")
+    r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb")
 vcxproj = env.Alias("vcxproj", vcxprojFile)
 
 distSrc = env.DistSrc("mongodb-src-${MONGO_VERSION}.tar")
