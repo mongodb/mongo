@@ -427,7 +427,11 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     std::move(root));
             } else {
                 root = std::make_unique<ProjectionStageSimple>(
-                    opCtx, canonicalQuery->getQueryRequest().getProj(), ws, std::move(root));
+                    canonicalQuery->getExpCtx(),
+                    canonicalQuery->getQueryRequest().getProj(),
+                    canonicalQuery->getProj(),
+                    ws,
+                    std::move(root));
             }
         }
 
@@ -686,7 +690,11 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
 //
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
-    OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedDelete* parsedDelete) {
+    OperationContext* opCtx,
+    OpDebug* opDebug,
+    Collection* collection,
+    ParsedDelete* parsedDelete,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     const DeleteRequest* request = parsedDelete->getRequest();
 
     const NamespaceString& nss(request->getNamespaceString());
@@ -772,6 +780,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     // This is the regular path for when we have a CanonicalQuery.
     unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
+    // Transfer the explain verbosity level into the expression context.
+    cq->getExpCtx()->explain = verbosity;
+
     const size_t defaultPlannerOptions = 0;
     StatusWith<PrepareExecutionResult> executionResult =
         prepareExecution(opCtx, collection, ws.get(), std::move(cq), defaultPlannerOptions);
@@ -816,7 +827,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
 //
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
-    OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedUpdate* parsedUpdate) {
+    OperationContext* opCtx,
+    OpDebug* opDebug,
+    Collection* collection,
+    ParsedUpdate* parsedUpdate,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     const UpdateRequest* request = parsedUpdate->getRequest();
     UpdateDriver* driver = parsedUpdate->getDriver();
 
@@ -912,6 +927,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
 
     // This is the regular path for when we have a CanonicalQuery.
     unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
+
+    // Transfer the explain verbosity level into the expression context.
+    cq->getExpCtx()->explain = verbosity;
 
     const size_t defaultPlannerOptions = 0;
     StatusWith<PrepareExecutionResult> executionResult =

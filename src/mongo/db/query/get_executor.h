@@ -218,6 +218,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  *
  * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
  *
+ * If the delete operation is executed in explain mode, the 'verbosity' parameter should be
+ * set to the requested verbosity level, or boost::none otherwise.
+ *
  * The returned PlanExecutor will used the YieldPolicy returned by parsedDelete->yieldPolicy().
  *
  * Does not take ownership of its arguments.
@@ -228,7 +231,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  * If the query cannot be executed, returns a Status indicating why.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
-    OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedDelete* parsedDelete);
+    OperationContext* opCtx,
+    OpDebug* opDebug,
+    Collection* collection,
+    ParsedDelete* parsedDelete,
+    boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
@@ -237,6 +244,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  * PlanExecutor is deleted.
  *
  * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
+ *
+ * If the delete operation is executed in explain mode, the 'verbosity' parameter should be
+ * set to the requested verbosity level, or boost::none otherwise.
  *
  * The returned PlanExecutor will used the YieldPolicy returned by parsedUpdate->yieldPolicy().
  *
@@ -248,5 +258,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  * If the query cannot be executed, returns a Status indicating why.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
-    OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedUpdate* parsedUpdate);
+    OperationContext* opCtx,
+    OpDebug* opDebug,
+    Collection* collection,
+    ParsedUpdate* parsedUpdate,
+    boost::optional<ExplainOptions::Verbosity> verbosity);
 }  // namespace mongo

@@ -97,7 +97,8 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;
-    auto exec = uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
+    auto exec = uassertStatusOK(getExecutorUpdate(
+        opCtx, nullOpDebug, collection, &parsedUpdate, boost::none /* verbosity */));
 
     uassertStatusOK(exec->executePlan());
 

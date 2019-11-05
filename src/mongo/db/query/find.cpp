@@ -591,7 +591,8 @@ std::string runQuery(OperationContext* opCtx,
     beginQueryOp(opCtx, nss, upconvertedQuery, q.ntoreturn, q.ntoskip);
 
     // Parse the qm into a CanonicalQuery.
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    const boost::intrusive_ptr<ExpressionContext> expCtx =
+        make_intrusive<ExpressionContext>(opCtx, nullptr /* collator */);
     auto cq = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
                                      q,
@@ -607,10 +608,9 @@ std::string runQuery(OperationContext* opCtx,
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
     AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden);
     Collection* const collection = ctx.getCollection();
+    const QueryRequest& qr = cq->getQueryRequest();
 
     {
-        const QueryRequest& qr = cq->getQueryRequest();
-
         // Allow the query to run on secondaries if the read preference permits it. If no read
         // preference was specified, allow the query to run iff slaveOk has been set.
         const bool slaveOK = qr.hasReadPref()
@@ -622,9 +622,9 @@ std::string runQuery(OperationContext* opCtx,
     }
 
     // Get the execution plan for the query.
+    constexpr auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
+    expCtx->explain = qr.isExplain() ? boost::make_optional(verbosity) : boost::none;
     auto exec = uassertStatusOK(getExecutorLegacyFind(opCtx, collection, std::move(cq)));
-
-    const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
 
     // If it's actually an explain, do the explain and return rather than falling through
     // to the normal query execution loop.
@@ -633,11 +633,7 @@ std::string runQuery(OperationContext* opCtx,
         bb.skip(sizeof(QueryResult::Value));
 
         BSONObjBuilder explainBob;
-        Explain::explainStages(exec.get(),
-                               collection,
-                               ExplainOptions::Verbosity::kExecAllPlans,
-                               BSONObj(),
-                               &explainBob);
+        Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &explainBob);
 
         // Add the resulting object to the return buffer.
         BSONObj explainObj = explainBob.obj();

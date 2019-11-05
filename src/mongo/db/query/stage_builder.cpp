@@ -154,8 +154,9 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         case STAGE_PROJECTION_COVERED: {
             auto pn = static_cast<const ProjectionNodeCovered*>(root);
             auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageCovered>(opCtx,
+            return std::make_unique<ProjectionStageCovered>(cq.getExpCtx(),
                                                             cq.getQueryRequest().getProj(),
+                                                            cq.getProj(),
                                                             ws,
                                                             std::move(childStage),
                                                             pn->coveredKeyObj);
@@ -163,8 +164,11 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         case STAGE_PROJECTION_SIMPLE: {
             auto pn = static_cast<const ProjectionNodeSimple*>(root);
             auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageSimple>(
-                opCtx, cq.getQueryRequest().getProj(), ws, std::move(childStage));
+            return std::make_unique<ProjectionStageSimple>(cq.getExpCtx(),
+                                                           cq.getQueryRequest().getProj(),
+                                                           cq.getProj(),
+                                                           ws,
+                                                           std::move(childStage));
         }
         case STAGE_LIMIT: {
             const LimitNode* ln = static_cast<const LimitNode*>(root);

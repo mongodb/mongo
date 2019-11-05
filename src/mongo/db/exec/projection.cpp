@@ -45,9 +45,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-static const char* kIdField = "_id";
-
 namespace {
 
 void transitionMemberToOwnedObj(Document&& doc, WorkingSetMember* member) {
@@ -115,36 +112,14 @@ auto rehydrateIndexKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) 
 }
 }  // namespace
 
-ProjectionStage::ProjectionStage(OperationContext* opCtx,
+ProjectionStage::ProjectionStage(boost::intrusive_ptr<ExpressionContext> expCtx,
                                  const BSONObj& projObj,
                                  WorkingSet* ws,
                                  std::unique_ptr<PlanStage> child,
                                  const char* stageType)
-    : PlanStage(opCtx, std::move(child), stageType), _projObj(projObj), _ws(*ws) {}
-
-// static
-void ProjectionStage::getSimpleInclusionFields(const BSONObj& projObj, FieldSet* includedFields) {
-    // The _id is included by default.
-    bool includeId = true;
-
-    // Figure out what fields are in the projection. We could eventually do this using the
-    // Projection AST.
-    BSONObjIterator projObjIt(projObj);
-    while (projObjIt.more()) {
-        BSONElement elt = projObjIt.next();
-        // Must deal with the _id case separately as there is an implicit _id: 1 in the
-        // projection.
-        if ((elt.fieldNameStringData() == kIdField) && !elt.trueValue()) {
-            includeId = false;
-            continue;
-        }
-        (*includedFields)[elt.fieldNameStringData()] = true;
-    }
-
-    if (includeId) {
-        (*includedFields)[kIdField] = true;
-    }
-}
+    : PlanStage{expCtx->opCtx, std::move(child), stageType},
+      _projObj{expCtx->explain ? boost::make_optional(projObj.getOwned()) : boost::none},
+      _ws{*ws} {}
 
 bool ProjectionStage::isEOF() {
     return child()->isEOF();
@@ -184,7 +159,7 @@ std::unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     auto ret = std::make_unique<PlanStageStats>(_commonStats, stageType());
 
     auto projStats = std::make_unique<ProjectionStats>(_specificStats);
-    projStats->projObj = _projObj;
+    projStats->projObj = _projObj.value_or(BSONObj{});
     ret->specific = std::move(projStats);
 
     ret->children.emplace_back(child()->getStats());
@@ -196,7 +171,7 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
                                                const projection_ast::Projection* projection,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child)
-    : ProjectionStage{expCtx->opCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
+    : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
       _wantRecordId{projection->metadataDeps()[DocumentMetadataFields::kRecordId]},
       _projectType{projection->type()},
       _executor{projection_executor::buildProjectionExecutor(expCtx, projection, {})} {}
@@ -241,16 +216,15 @@ Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     return Status::OK();
 }
 
-ProjectionStageCovered::ProjectionStageCovered(OperationContext* opCtx,
+ProjectionStageCovered::ProjectionStageCovered(boost::intrusive_ptr<ExpressionContext> expCtx,
                                                const BSONObj& projObj,
+                                               const projection_ast::Projection* projection,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child,
                                                const BSONObj& coveredKeyObj)
-    : ProjectionStage(opCtx, projObj, ws, std::move(child), "PROJECTION_COVERED"),
-      _coveredKeyObj(coveredKeyObj) {
-    invariant(projObjHasOwnedData());
-    // Figure out what fields are in the projection.
-    getSimpleInclusionFields(_projObj, &_includedFields);
+    : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_COVERED"},
+      _coveredKeyObj{coveredKeyObj} {
+    invariant(projection->isSimple());
 
     // If we're pulling data out of one index we can pre-compute the indices of the fields
     // in the key that we pull data from and avoid looking up the field name each time.
@@ -258,6 +232,8 @@ ProjectionStageCovered::ProjectionStageCovered(OperationContext* opCtx,
     // Sanity-check.
     invariant(_coveredKeyObj.isOwned());
 
+    _includedFields = {projection->getRequiredFields().begin(),
+                       projection->getRequiredFields().end()};
     BSONObjIterator kpIt(_coveredKeyObj);
     while (kpIt.more()) {
         BSONElement elt = kpIt.next();
@@ -269,7 +245,7 @@ ProjectionStageCovered::ProjectionStageCovered(OperationContext* opCtx,
             _includeKey.push_back(false);
         } else {
             // If we are including this key field store its field name.
-            _keyFieldNames.push_back(fieldIt->first);
+            _keyFieldNames.push_back(*fieldIt);
             _includeKey.push_back(true);
         }
     }
@@ -297,14 +273,15 @@ Status ProjectionStageCovered::transform(WorkingSetMember* member) const {
     return Status::OK();
 }
 
-ProjectionStageSimple::ProjectionStageSimple(OperationContext* opCtx,
+ProjectionStageSimple::ProjectionStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
                                              const BSONObj& projObj,
+                                             const projection_ast::Projection* projection,
                                              WorkingSet* ws,
                                              std::unique_ptr<PlanStage> child)
-    : ProjectionStage(opCtx, projObj, ws, std::move(child), "PROJECTION_SIMPLE") {
-    invariant(projObjHasOwnedData());
-    // Figure out what fields are in the projection.
-    getSimpleInclusionFields(_projObj, &_includedFields);
+    : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_SIMPLE"} {
+    invariant(projection->isSimple());
+    _includedFields = {projection->getRequiredFields().begin(),
+                       projection->getRequiredFields().end()};
 }
 
 Status ProjectionStageSimple::transform(WorkingSetMember* member) const {
@@ -317,8 +294,8 @@ Status ProjectionStageSimple::transform(WorkingSetMember* member) const {
     // Look at every field in the source document and see if we're including it.
     auto objToProject = member->doc.value().toBson();
     for (auto&& elt : objToProject) {
-        auto fieldIt = _includedFields.find(elt.fieldNameStringData());
-        if (_includedFields.end() != fieldIt) {
+        if (auto fieldIt = _includedFields.find(elt.fieldNameStringData());
+            _includedFields.end() != fieldIt) {
             bob.append(elt);
         }
     }

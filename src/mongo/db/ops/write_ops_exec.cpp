@@ -636,8 +636,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, ns, collection->getCollection());
 
-    auto exec = uassertStatusOK(
-        getExecutorUpdate(opCtx, &curOp.debug(), collection->getCollection(), &parsedUpdate));
+    auto exec = uassertStatusOK(getExecutorUpdate(opCtx,
+                                                  &curOp.debug(),
+                                                  collection->getCollection(),
+                                                  &parsedUpdate,
+                                                  boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -865,8 +868,11 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
-    auto exec = uassertStatusOK(
-        getExecutorDelete(opCtx, &curOp.debug(), collection.getCollection(), &parsedDelete));
+    auto exec = uassertStatusOK(getExecutorDelete(opCtx,
+                                                  &curOp.debug(),
+                                                  collection.getCollection(),
+                                                  &parsedDelete,
+                                                  boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());

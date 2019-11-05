@@ -43,7 +43,7 @@ namespace mongo {
  */
 class ProjectionStage : public PlanStage {
 protected:
-    ProjectionStage(OperationContext* opCtx,
+    ProjectionStage(boost::intrusive_ptr<ExpressionContext> expCtx,
                     const BSONObj& projObj,
                     WorkingSet* ws,
                     std::unique_ptr<PlanStage> child,
@@ -60,22 +60,11 @@ public:
     }
 
 protected:
-    using FieldSet = StringMap<bool>;  // Value is unused.
+    using FieldSet = StringSet;
 
-    /**
-     * Given the projection spec for a simple inclusion projection,
-     * 'projObj', populates 'includedFields' with the set of field
-     * names to be included.
-     */
-    static void getSimpleInclusionFields(const BSONObj& projObj, FieldSet* includedFields);
-
-    bool projObjHasOwnedData() {
-        return _projObj.isOwned() && !_projObj.isEmpty();
-    }
-
-    // The projection object used by all projection implementations. We lack a ProjectionExpression
-    // or similar so we use a BSONObj.
-    BSONObj _projObj;
+    // The raw BSON projection used to populate projection stats. Optional, since it is required
+    // only in explain mode.
+    boost::optional<BSONObj> _projObj;
 
 private:
     /**
@@ -128,8 +117,9 @@ public:
     /**
      * ProjectionNodeCovered should obtain a fast-path object through this constructor.
      */
-    ProjectionStageCovered(OperationContext* opCtx,
+    ProjectionStageCovered(boost::intrusive_ptr<ExpressionContext> expCtx,
                            const BSONObj& projObj,
+                           const projection_ast::Projection* projection,
                            WorkingSet* ws,
                            std::unique_ptr<PlanStage> child,
                            const BSONObj& coveredKeyObj);
@@ -141,7 +131,7 @@ public:
 private:
     Status transform(WorkingSetMember* member) const final;
 
-    // Has the field names present in the simple projection.
+    // Field names present in the simple projection.
     FieldSet _includedFields;
 
     // This is the key pattern we're extracting covered data from. It is maintained here since
@@ -166,8 +156,9 @@ public:
     /**
      * ProjectionNodeSimple should obtain a fast-path object through this constructor.
      */
-    ProjectionStageSimple(OperationContext* opCtx,
+    ProjectionStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
                           const BSONObj& projObj,
+                          const projection_ast::Projection* projection,
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child);
 

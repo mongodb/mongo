@@ -76,8 +76,10 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
     return qr;
 }
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
-                                                              const QueryRequest& queryRequest) {
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
+    OperationContext* opCtx,
+    const QueryRequest& queryRequest,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     std::unique_ptr<CollatorInterface> collator;
     if (!queryRequest.getCollation().isEmpty()) {
         collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
@@ -100,9 +102,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
     // sense to start initializing these fields for find operations as well.
     auto expCtx =
         make_intrusive<ExpressionContext>(opCtx,
-                                          boost::none,  // explain
-                                          false,        // fromMongos
-                                          false,        // needsMerge
+                                          verbosity,
+                                          false,  // fromMongos
+                                          false,  // needsMerge
                                           queryRequest.allowDiskUse(),
                                           false,  // bypassDocumentValidation
                                           queryRequest.nss(),
@@ -227,7 +229,7 @@ public:
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *qr);
+            auto expCtx = makeExpressionContext(opCtx, *qr, verbosity);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(qr),
@@ -425,7 +427,7 @@ public:
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *qr);
+            auto expCtx = makeExpressionContext(opCtx, *qr, boost::none /* verbosity */);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(qr),
