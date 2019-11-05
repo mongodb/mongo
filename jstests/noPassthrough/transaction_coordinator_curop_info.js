@@ -6,7 +6,7 @@
 
 (function() {
 'use strict';
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load('jstests/libs/fail_point_util.js');
 
 function commitTxn(st, lsid, txnNumber, expectedError = null) {
     let cmd = "db.adminCommand({" +
@@ -24,21 +24,19 @@ function commitTxn(st, lsid, txnNumber, expectedError = null) {
     return startParallelShell(cmd, st.s.port);
 }
 
-function curOpAfterFailpoint(fpName, filter, fpCount = 1) {
-    const expectedLog = "Hit " + fpName + " failpoint";
-    jsTest.log(`waiting for failpoint '${fpName}' to appear in the log ${fpCount} time(s).`);
-    waitForFailpoint(expectedLog, fpCount);
+function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
+    jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to appear in the log ${
+        timesEntered} time(s).`);
+    failPoint.wait(timesEntered);
 
-    jsTest.log(`Running curOp operation after '${fpName}' failpoint.`);
+    jsTest.log(`Running curOp operation after '${failPoint.failPointName}' failpoint.`);
     let result = adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
 
-    jsTest.log(`${result.length} matching curOp entries after '${fpName}':\n${tojson(result)}`);
+    jsTest.log(`${result.length} matching curOp entries after '${failPoint.failPointName}':\n${
+        tojson(result)}`);
 
-    jsTest.log(`disable '${fpName}' failpoint.`);
-    assert.commandWorked(coordinator.adminCommand({
-        configureFailPoint: fpName,
-        mode: "off",
-    }));
+    jsTest.log(`disable '${failPoint.failPointName}' failpoint.`);
+    failPoint.off();
 
     return result;
 }
@@ -53,14 +51,15 @@ function makeWorkerFilterWithAction(session, action, txnNumber) {
     };
 }
 
-function enableFailPoints(shard, failPoints) {
-    jsTest.log(`enabling the following failpoints: ${tojson(failPoints)}`);
-    failPoints.forEach(function(fpName) {
-        assert.commandWorked(shard.adminCommand({
-            configureFailPoint: fpName,
-            mode: "alwaysOn",
-        }));
+function enableFailPoints(shard, failPointNames) {
+    let failPoints = {};
+
+    jsTest.log(`enabling the following failpoints: ${tojson(failPointNames)}`);
+    failPointNames.forEach(function(failPointName) {
+        failPoints[failPointName] = configureFailPoint(shard, failPointName);
     });
+
+    return failPoints;
 }
 
 function startTransaction(session, collectionName, insertValue) {
@@ -81,7 +80,7 @@ const ns = dbName + "." + collectionName;
 const adminDB = st.s.getDB('admin');
 const coordinator = st.shard0;
 const participant = st.shard1;
-const failPoints = [
+const failPointNames = [
     'hangAfterStartingCoordinateCommit',
     'hangBeforeWritingParticipantList',
     'hangBeforeSendingPrepare',
@@ -99,7 +98,7 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: parti
 assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 assert.commandWorked(participant.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 
-enableFailPoints(coordinator, failPoints);
+let failPoints = enableFailPoints(coordinator, failPointNames);
 
 jsTest.log("Testing that coordinator threads show up in currentOp for a commit decision");
 {
@@ -117,33 +116,35 @@ jsTest.log("Testing that coordinator threads show up in currentOp for a commit d
         'command.coordinator': true,
         'command.autocommit': false
     };
-    let createCoordinateCommitTxnOp =
-        curOpAfterFailpoint("hangAfterStartingCoordinateCommit", coordinateCommitFilter);
+    let createCoordinateCommitTxnOp = curOpAfterFailpoint(
+        failPoints["hangAfterStartingCoordinateCommit"], coordinateCommitFilter);
     assert.eq(1, createCoordinateCommitTxnOp.length);
 
     const writeParticipantFilter =
         makeWorkerFilterWithAction(session, "writingParticipantList", txnNumber);
     let writeParticipantOp =
-        curOpAfterFailpoint('hangBeforeWritingParticipantList', writeParticipantFilter);
+        curOpAfterFailpoint(failPoints['hangBeforeWritingParticipantList'], writeParticipantFilter);
     assert.eq(1, writeParticipantOp.length);
 
     const sendPrepareFilter = makeWorkerFilterWithAction(session, "sendingPrepare", txnNumber);
     let sendPrepareOp =
-        curOpAfterFailpoint('hangBeforeSendingPrepare', sendPrepareFilter, numShards);
+        curOpAfterFailpoint(failPoints['hangBeforeSendingPrepare'], sendPrepareFilter, numShards);
     assert.eq(numShards, sendPrepareOp.length);
 
     const writingDecisionFilter = makeWorkerFilterWithAction(session, "writingDecision", txnNumber);
-    let writeDecisionOp = curOpAfterFailpoint('hangBeforeWritingDecision', writingDecisionFilter);
+    let writeDecisionOp =
+        curOpAfterFailpoint(failPoints['hangBeforeWritingDecision'], writingDecisionFilter);
     assert.eq(1, writeDecisionOp.length);
 
     const sendCommitFilter = makeWorkerFilterWithAction(session, "sendingCommit", txnNumber);
-    let sendCommitOp = curOpAfterFailpoint('hangBeforeSendingCommit', sendCommitFilter, numShards);
+    let sendCommitOp =
+        curOpAfterFailpoint(failPoints['hangBeforeSendingCommit'], sendCommitFilter, numShards);
     assert.eq(numShards, sendCommitOp.length);
 
     const deletingCoordinatorFilter =
         makeWorkerFilterWithAction(session, "deletingCoordinatorDoc", txnNumber);
-    let deletingCoordinatorDocOp =
-        curOpAfterFailpoint('hangBeforeDeletingCoordinatorDoc', deletingCoordinatorFilter);
+    let deletingCoordinatorDocOp = curOpAfterFailpoint(
+        failPoints['hangBeforeDeletingCoordinatorDoc'], deletingCoordinatorFilter);
     assert.eq(1, deletingCoordinatorDocOp.length);
 
     commitJoin();
@@ -167,7 +168,8 @@ jsTest.log("Testing that coordinator threads show up in currentOp for an abort d
     let commitJoin = commitTxn(st, lsid, txnNumber, ErrorCodes.NoSuchTransaction);
 
     const sendAbortFilter = makeWorkerFilterWithAction(session, "sendingAbort", txnNumber);
-    let sendingAbortOp = curOpAfterFailpoint('hangBeforeSendingAbort', sendAbortFilter, numShards);
+    let sendingAbortOp =
+        curOpAfterFailpoint(failPoints['hangBeforeSendingAbort'], sendAbortFilter, numShards);
     assert.eq(numShards, sendingAbortOp.length);
 
     commitJoin();

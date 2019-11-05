@@ -6,33 +6,32 @@
 
 (function() {
 'use strict';
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load('jstests/libs/fail_point_util.js');
 
-function curOpAfterFailpoint(fpName, filter, fpCount, curOpParams) {
-    const expectedLog = "Hit " + fpName + " failpoint";
-    jsTest.log(`waiting for failpoint '${fpName}' to appear in the log ${fpCount} time(s).`);
-    waitForFailpoint(expectedLog, fpCount);
+function curOpAfterFailpoint(failPoint, filter, timesEntered, curOpParams) {
+    jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to appear in the log ${
+        timesEntered} time(s).`);
+    failPoint.wait(timesEntered);
 
-    jsTest.log(`Running curOp operation after '${fpName}' failpoint.`);
-    let result = adminDB.aggregate([{$currentOp: curOpParams}, {$match: filter}]).toArray();
+    jsTest.log(`Running curOp operation after '${failPoint.failPointName}' failpoint.`);
+    let result = adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
 
-    jsTest.log(`${result.length} matching curOp entries after '${fpName}':\n${tojson(result)}`);
+    jsTest.log(`${result.length} matching curOp entries after '${failPoint.failPointName}':\n${
+        tojson(result)}`);
 
-    assert.commandWorked(coordinator.adminCommand({
-        configureFailPoint: fpName,
-        mode: "off",
-    }));
+    failPoint.off();
 
     return result;
 }
 
-function enableFailPoints(shard, failPoints) {
-    failPoints.forEach(function(fpName) {
-        assert.commandWorked(shard.adminCommand({
-            configureFailPoint: fpName,
-            mode: "alwaysOn",
-        }));
+function enableFailPoints(shard, failPointNames) {
+    let failPoints = {};
+
+    failPointNames.forEach(function(failPointName) {
+        failPoints[failPointName] = configureFailPoint(shard, failPointName);
     });
+
+    return failPoints;
 }
 
 function startTransaction(session, collectionName, insertValue) {
@@ -252,26 +251,27 @@ let failPointStates = {
 };
 
 // Not using 'Object.keys(failPointStates)' since lexical order is not guaranteed
-let failPoints = [
+let failPointNames = [
     'hangBeforeWritingParticipantList',
     'hangBeforeSendingPrepare',
     'hangBeforeWaitingForDecisionWriteConcern',
     'hangBeforeSendingCommit',
     'hangBeforeDeletingCoordinatorDoc'
 ];
-enableFailPoints(coordinator, failPoints);
+let failPoints = enableFailPoints(coordinator, failPointNames);
 
 let commitJoin = commitTxn(st, lsid, txnNumber);
 
-failPoints.forEach(function(failPoint) {
-    let expectNumFailPoints = failPointStates[failPoint].expectNumFailPoints;
-    let expectedState = failPointStates[failPoint].expectedState;
-    let expectedStepDurations = failPointStates[failPoint].expectedStepDurations;
-    let expectedCommitDecision = failPointStates[failPoint].commitDecision;
-    let expectedNumParticipants = failPointStates[failPoint].expectedNumParticipants;
+failPointNames.forEach(function(failPointName) {
+    let expectNumFailPoints = failPointStates[failPointName].expectNumFailPoints;
+    let expectedState = failPointStates[failPointName].expectedState;
+    let expectedStepDurations = failPointStates[failPointName].expectedStepDurations;
+    let expectedCommitDecision = failPointStates[failPointName].commitDecision;
+    let expectedNumParticipants = failPointStates[failPointName].expectedNumParticipants;
 
     let filter = coordinatorCuropFilter(session, txnNumber, expectedState);
-    let results = curOpAfterFailpoint(failPoint, filter, expectNumFailPoints, {idleSessions: true});
+    let results = curOpAfterFailpoint(
+        failPoints[failPointName], filter, expectNumFailPoints, {idleSessions: true});
 
     assert.eq(1, results.length);
     assertCuropFields(coordinator,

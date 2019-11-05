@@ -12,7 +12,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/sharded_transactions_helpers.js');  // for waitForFailpoint
+load("jstests/libs/fail_point_util.js");
 load('jstests/libs/write_concern_util.js');  // for stopping/restarting replication
 
 const dbName = "test";
@@ -87,12 +87,9 @@ let coordPrimary = coordinatorReplSetTest.getPrimary();
 let coordSecondary = coordinatorReplSetTest.getSecondary();
 
 // Make the commit coordination hang before writing the decision, and send commitTransaction.
-assert.commandWorked(coordPrimary.adminCommand({
-    configureFailPoint: "hangBeforeWritingDecision",
-    mode: "alwaysOn",
-}));
+let failPoint = configureFailPoint(coordPrimary, "hangBeforeWritingDecision");
 let awaitResult = runCommitThroughMongosInParallelShellExpectTimeOut();
-waitForFailpoint("Hit hangBeforeWritingDecision failpoint", 1);
+failPoint.wait();
 
 // Stop replication on all nodes in the coordinator replica set so that the write done on stepup
 // cannot become majority committed, regardless of which node steps up.
@@ -104,10 +101,7 @@ stopServerReplication([coordPrimary, coordSecondary]);
 const stepDownSecs = 1;
 assert.commandWorked(coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
 
-assert.commandWorked(coordPrimary.adminCommand({
-    configureFailPoint: "hangBeforeWritingDecision",
-    mode: "off",
-}));
+failPoint.off();
 
 // The router should retry commitTransaction against the new primary and time out waiting to
 // access the coordinator catalog.
