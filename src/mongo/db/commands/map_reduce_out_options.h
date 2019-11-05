@@ -94,7 +94,7 @@ public:
         return _databaseName;
     }
 
-    const bool isSharded() const {
+    bool isSharded() const {
         return _sharded;
     }
 
