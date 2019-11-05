@@ -15,7 +15,18 @@ class KeyVault {
             {unique: true, partialFilterExpression: {keyAltNames: {$exists: true}}});
     }
 
-    createKey(kmsProvider, customerMasterKey, keyAltNames = undefined) {
+    createKey(kmsProvider, param2 = undefined, param3 = undefined) {
+        if (Array.isArray(param2) && param3 === undefined) {
+            if (kmsProvider !== "local") {
+                return "ValueError: customerMasterKey must be defined if kmsProvider is not local.";
+            }
+            return this._createKey(kmsProvider, '', param2);
+        }
+
+        return this._createKey(kmsProvider, param2, param3);
+    }
+
+    _createKey(kmsProvider, customerMasterKey, keyAltNames) {
         if (typeof kmsProvider !== "string") {
             return "TypeError: kmsProvider must be of String type.";
         }
