@@ -63,7 +63,7 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
                conn,
                "Failed to connect to host '" + host + "' for background collection validation");
 
-    if (!conn.adminCommand("serverStatus").storageEngine.supportsCheckpoints) {
+    if (!conn.adminCommand("serverStatus").storageEngine.supportsCheckpointCursors) {
         print("Skipping background validation against test node: " + host +
               " because its storage engine does not support background validation (checkpoints).");
         return {ok: 1};
