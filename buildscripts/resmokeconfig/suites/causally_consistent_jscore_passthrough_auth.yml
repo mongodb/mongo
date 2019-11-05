@@ -63,8 +63,6 @@ selector:
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
   # Tests that fail for Causal Consistency as they have statements that do not support
   # non-local read concern.
-  - jstests/core/geo_mapreduce.js
-  - jstests/core/geo_mapreduce2.js
   - jstests/core/geo_big_polygon3.js
   - jstests/core/mr*.js
   - jstests/core/collation.js

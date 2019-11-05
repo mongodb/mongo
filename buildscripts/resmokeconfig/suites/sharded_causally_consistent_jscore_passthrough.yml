@@ -65,7 +65,6 @@ selector:
   - jstests/core/mr_correctness.js
   - jstests/core/mr_fail_invalid_js.js
   - jstests/core/mr_scope.js
-  - jstests/core/mr_undef.js
   # TODO: SERVER-30052
   - jstests/core/queryoptimizer3.js
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
@@ -75,8 +74,6 @@ selector:
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
   # Tests that fail for Causal Consistency as they have statements that do not support
   # non-local read concern.
-  - jstests/core/geo_mapreduce.js
-  - jstests/core/geo_mapreduce2.js
   - jstests/core/geo_big_polygon3.js
   - jstests/core/mr*.js
   - jstests/core/collation.js

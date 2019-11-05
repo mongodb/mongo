@@ -7,11 +7,13 @@
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions
-var collection = db.mrMutableReceiver;
+(function() {
+"use strict";
+const collection = db.mrMutableReceiver;
 collection.drop();
 collection.insert({a: 1});
 
-var map = function() {
+const map = function() {
     // set property on receiver
     this.feed = {beef: 1};
 
@@ -21,7 +23,7 @@ var map = function() {
     emit(this._id, this.a);
 };
 
-var reduce = function(key, values) {
+const reduce = function(key, values) {
     // set property on receiver
     this.feed = {beat: 1};
 
@@ -39,7 +41,7 @@ var reduce = function(key, values) {
     return {food: values};
 };
 
-var finalize = function(key, values) {
+const finalize = function(key, values) {
     // set property on receiver
     this.feed = {ice: 1};
 
@@ -58,7 +60,7 @@ var finalize = function(key, values) {
     return values;
 };
 
-var mr = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
+const mr = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
 printjson(mr);
 
 // verify mutated properties exist (order dictated by emit sequence and properties added)
@@ -71,3 +73,4 @@ assert.eq(mr.results[0].value.food[5].cream, 1);
 mr.results[0].value.food.forEach(function(val) {
     assert.eq(val.mod, 1);
 });
+}());
