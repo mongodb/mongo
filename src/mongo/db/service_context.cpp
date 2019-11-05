@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/service_context.h"
@@ -41,6 +43,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"
@@ -93,7 +96,11 @@ bool supportsDocLocking() {
 bool isMMAPV1() {
     StorageEngine* globalStorageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
-    invariant(globalStorageEngine);
+    if (!globalStorageEngine) {
+        warning()
+            << "Attempted to check if storage engine is MMAPv1 without an existing storage engine.";
+        return false;
+    }
     return globalStorageEngine->isMmapV1();
 }
 
