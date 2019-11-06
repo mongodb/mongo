@@ -65,6 +65,44 @@ Rarely nonAtomicDeprecationSampler;  // Used to occasionally log deprecation mes
 
 using namespace std::string_literals;
 
+Status interpretTranslationError(DBException* ex, const MapReduce& parsedMr) {
+    auto status = ex->toStatus();
+    auto outOptions = parsedMr.getOutOptions();
+    auto outNss = NamespaceString{outOptions.getDatabaseName() ? *outOptions.getDatabaseName()
+                                                               : parsedMr.getNamespace().db(),
+                                  outOptions.getCollectionName()};
+    std::string error;
+    switch (static_cast<int>(ex->code())) {
+        case ErrorCodes::InvalidNamespace:
+            error = "Invalid output namespace {} for MapReduce"_format(outNss.ns());
+            break;
+        case 15976:
+            error = "The mapReduce sort option must have at least one sort key";
+            break;
+        case 15958:
+            error = "The limit specified to mapReduce must be positive";
+            break;
+        case 17017:
+            error =
+                "Cannot run mapReduce against an existing *sharded* output collection when using "
+                "the replace action";
+            break;
+        case 17385:
+        case 31319:
+            error = "Can't output mapReduce results to special collection {}"_format(outNss.coll());
+            break;
+        case 31320:
+        case 31321:
+            error = "Can't output mapReduce results to internal DB {}"_format(outNss.db());
+            break;
+        default:
+            // Prepend MapReduce context in the event of an unknown exception.
+            ex->addContext("MapReduce internal error");
+            throw;
+    }
+    return status.withReason(std::move(error));
+}
+
 auto translateSort(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& sort) {
     return DocumentSourceSort::create(expCtx, sort);
 }
@@ -339,29 +377,32 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 !expCtx->inMongos);
     }
 
-    // TODO: It would be good to figure out what kind of errors this would produce in the Status.
-    // It would be better not to produce something incomprehensible out of an internal translation.
-    auto pipeline = uassertStatusOK(Pipeline::create(
-        makeFlattenedList<boost::intrusive_ptr<DocumentSource>>(
-            parsedMr.getQuery().map(
-                [&](auto&& query) { return DocumentSourceMatch::create(query, expCtx); }),
-            parsedMr.getSort().map([&](auto&& sort) { return translateSort(expCtx, sort); }),
-            parsedMr.getLimit().map(
-                [&](auto&& limit) { return DocumentSourceLimit::create(expCtx, limit); }),
-            translateMap(expCtx, parsedMr.getMap().getCode()),
-            DocumentSourceUnwind::create(expCtx, "emits", false, boost::none),
-            translateReduce(expCtx, parsedMr.getReduce().getCode()),
-            parsedMr.getFinalize().map([&](auto&& finalize) {
-                return translateFinalize(expCtx, parsedMr.getFinalize()->getCode());
-            }),
-            translateOut(expCtx,
-                         outType,
-                         parsedMr.getNamespace().db(),
-                         std::move(outNss),
-                         parsedMr.getReduce().getCode())),
-        expCtx));
-    pipeline->optimizePipeline();
-    return pipeline;
+    try {
+        auto pipeline = uassertStatusOK(Pipeline::create(
+            makeFlattenedList<boost::intrusive_ptr<DocumentSource>>(
+                parsedMr.getQuery().map(
+                    [&](auto&& query) { return DocumentSourceMatch::create(query, expCtx); }),
+                parsedMr.getSort().map([&](auto&& sort) { return translateSort(expCtx, sort); }),
+                parsedMr.getLimit().map(
+                    [&](auto&& limit) { return DocumentSourceLimit::create(expCtx, limit); }),
+                translateMap(expCtx, parsedMr.getMap().getCode()),
+                DocumentSourceUnwind::create(expCtx, "emits", false, boost::none),
+                translateReduce(expCtx, parsedMr.getReduce().getCode()),
+                parsedMr.getFinalize().map([&](auto&& finalize) {
+                    return translateFinalize(expCtx, parsedMr.getFinalize()->getCode());
+                }),
+                translateOut(expCtx,
+                             outType,
+                             parsedMr.getNamespace().db(),
+                             std::move(outNss),
+                             parsedMr.getReduce().getCode())),
+            expCtx));
+        pipeline->optimizePipeline();
+        return pipeline;
+    } catch (DBException& ex) {
+        uassertStatusOK(interpretTranslationError(&ex, parsedMr));
+    }
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo::map_reduce_common

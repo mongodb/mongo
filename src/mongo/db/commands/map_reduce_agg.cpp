@@ -138,40 +138,48 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(std::move(planSummaryStr));
     }
 
-    auto resultArray = exhaustPipelineIntoBSONArray(runnablePipeline);
+    try {
+        auto resultArray = exhaustPipelineIntoBSONArray(runnablePipeline);
 
-    PlanSummaryStats planSummaryStats;
-    PipelineD::getPlanSummaryStats(runnablePipeline.get(), &planSummaryStats);
-    CurOp::get(opCtx)->debug().setPlanSummaryMetrics(planSummaryStats);
+        PlanSummaryStats planSummaryStats;
+        PipelineD::getPlanSummaryStats(runnablePipeline.get(), &planSummaryStats);
+        CurOp::get(opCtx)->debug().setPlanSummaryMetrics(planSummaryStats);
 
-    MapReduceStats mapReduceStats(extractStats(*runnablePipeline),
-                                  MapReduceStats::ResponseType::kUnsharded,
-                                  boost::get_optional_value_or(parsedMr.getVerbose(), false),
-                                  cmdTimer.millis());
 
-    if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
-        map_reduce_output_format::appendInlineResponse(
-            std::move(resultArray), mapReduceStats, &result);
-    } else {
-        // For output to collection, pipeline execution should not return any results.
-        invariant(resultArray.isEmpty());
+        MapReduceStats mapReduceStats(extractStats(*runnablePipeline),
+                                      MapReduceStats::ResponseType::kUnsharded,
+                                      boost::get_optional_value_or(parsedMr.getVerbose(), false),
+                                      cmdTimer.millis());
 
-        map_reduce_output_format::appendOutResponse(parsedMr.getOutOptions().getDatabaseName(),
-                                                    parsedMr.getOutOptions().getCollectionName(),
-                                                    mapReduceStats,
-                                                    &result);
+        if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
+            map_reduce_output_format::appendInlineResponse(
+                std::move(resultArray), mapReduceStats, &result);
+        } else {
+            // For output to collection, pipeline execution should not return any results.
+            invariant(resultArray.isEmpty());
+
+            map_reduce_output_format::appendOutResponse(
+                parsedMr.getOutOptions().getDatabaseName(),
+                parsedMr.getOutOptions().getCollectionName(),
+                mapReduceStats,
+                &result);
+        }
+
+        // The aggregation pipeline may change the namespace of the curop and we need to set it back
+        // to the original namespace to correctly report command stats. One example when the
+        // namespace can be changed is when the pipeline contains an $out stage, which executes an
+        // internal command to create a temp collection, changing the curop namespace to the name of
+        // this temp collection.
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setNS_inlock(parsedMr.getNamespace().ns());
+        }
+
+        return true;
+    } catch (DBException& e) {
+        e.addContext("MapReduce internal error");
+        throw;
     }
-
-    // The aggregation pipeline may change the namespace of the curop and we need to set it back to
-    // the original namespace to correctly report command stats. One example when the namespace can
-    // be changed is when the pipeline contains an $out stage, which executes an internal command to
-    // create a temp collection, changing the curop namespace to the name of this temp collection.
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setNS_inlock(parsedMr.getNamespace().ns());
-    }
-
-    return true;
 }
 
 }  // namespace mongo::map_reduce_agg

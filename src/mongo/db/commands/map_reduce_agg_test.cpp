@@ -279,6 +279,7 @@ TEST(MapReduceAggTest, testShardedTrueWithReplaceActionFailsOnMongos) {
     ASSERT_THROWS_CODE(map_reduce_common::translateFromMR(mr, expCtx), DBException, 31327);
 }
 
+
 TEST(MapReduceAggTest, testShardedTrueWithReplaceActionDoesNotFailOnMongod) {
     auto nss = NamespaceString{"db", "coll"};
     auto mr = MapReduce{
@@ -289,6 +290,24 @@ TEST(MapReduceAggTest, testShardedTrueWithReplaceActionDoesNotFailOnMongod) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
 }
+
+TEST(MapReduceAggTest, testErrorMessagesTranslated) {
+    // Verifies that agg specific error messages are translated to be mapReduce specific.
+    auto nss = NamespaceString{"db", "coll1"};
+
+    auto mr = MapReduce{
+        nss,
+        MapReduceJavascriptCode{mapJavascript.toString()},
+        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Merge, false}};
+    mr.setLimit(-23);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    ASSERT_THROWS_CODE_AND_WHAT(map_reduce_common::translateFromMR(mr, expCtx),
+                                DBException,
+                                15958,
+                                "The limit specified to mapReduce must be positive");
+}
+
 
 }  // namespace
 }  // namespace mongo
