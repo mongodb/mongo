@@ -54,6 +54,18 @@ protected:
     DurableCatalog() = default;
 
 public:
+    /**
+     * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
+     */
+    struct Entry {
+        Entry() {}
+        Entry(RecordId catalogId, std::string ident, NamespaceString nss)
+            : catalogId(catalogId), ident(std::move(ident)), nss(std::move(nss)) {}
+        RecordId catalogId;
+        std::string ident;
+        NamespaceString nss;
+    };
+
     virtual ~DurableCatalog() {}
 
     static DurableCatalog* get(OperationContext* opCtx) {
@@ -62,16 +74,16 @@ public:
 
     virtual void init(OperationContext* opCtx) = 0;
 
-    virtual std::vector<NamespaceString> getAllCollections() const = 0;
+    virtual std::vector<Entry> getAllCatalogEntries(OperationContext* opCtx) const = 0;
 
-    virtual std::string getCollectionIdent(const NamespaceString& nss) const = 0;
+    virtual Entry getEntry(RecordId catalogId) const = 0;
 
     virtual std::string getIndexIdent(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      StringData idName) const = 0;
+                                      RecordId id,
+                                      StringData idxName) const = 0;
 
     virtual BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
-                                                             const NamespaceString& nss) const = 0;
+                                                             RecordId id) const = 0;
 
     /**
      * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
@@ -79,10 +91,9 @@ public:
      * adds it to the catalog entry.
      */
     virtual void putMetaData(OperationContext* opCtx,
-                             const NamespaceString& nss,
+                             RecordId id,
                              BSONCollectionCatalogEntry::MetaData& md) = 0;
 
-    virtual std::vector<std::string> getAllIdentsForDB(StringData db) const = 0;
     virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const = 0;
 
     virtual bool isUserDataIdent(StringData ident) const = 0;
@@ -109,23 +120,27 @@ public:
      */
     virtual std::string newInternalIdent() = 0;
 
-    virtual StatusWith<std::unique_ptr<RecordStore>> createCollection(
+    /**
+     * On success, returns the RecordId which identifies the new record store in the durable catalog
+     * in addition to ownership of the new RecordStore.
+     */
+    virtual StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const CollectionOptions& options,
         bool allocateDefaultSpace) = 0;
 
     virtual Status renameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromNss,
+                                    RecordId catalogId,
                                     const NamespaceString& toNss,
                                     bool stayTemp) = 0;
 
-    virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
+    virtual Status dropCollection(OperationContext* opCtx, RecordId catalogId) = 0;
 
     /**
      * Updates size of a capped Collection.
      */
-    virtual void updateCappedSize(OperationContext* opCtx, NamespaceString ns, long long size) = 0;
+    virtual void updateCappedSize(OperationContext* opCtx, RecordId catalogId, long long size) = 0;
 
     /*
      * Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
@@ -133,7 +148,7 @@ public:
      * that field and newExpireSecs must both be numeric.
      */
     virtual void updateTTLSetting(OperationContext* opCtx,
-                                  NamespaceString ns,
+                                  RecordId catalogId,
                                   StringData idxName,
                                   long long newExpireSeconds) = 0;
 
@@ -141,16 +156,16 @@ public:
      * equal, false otherwise.
      */
     virtual bool isEqualToMetadataUUID(OperationContext* opCtx,
-                                       NamespaceString ns,
+                                       RecordId catalogId,
                                        OptionalCollectionUUID uuid) = 0;
 
     /**
      * Updates the 'temp' setting for this collection.
      */
-    virtual void setIsTemp(OperationContext* opCtx, NamespaceString ns, bool isTemp) = 0;
+    virtual void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp) = 0;
 
     virtual boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
-                                                            NamespaceString ns,
+                                                            RecordId catalogId,
                                                             StringData indexName) const = 0;
 
     /**
@@ -159,13 +174,13 @@ public:
      * An empty validator removes all validation.
      */
     virtual void updateValidator(OperationContext* opCtx,
-                                 NamespaceString ns,
+                                 RecordId catalogId,
                                  const BSONObj& validator,
                                  StringData validationLevel,
                                  StringData validationAction) = 0;
 
     virtual Status removeIndex(OperationContext* opCtx,
-                               NamespaceString ns,
+                               RecordId catalogId,
                                StringData indexName) = 0;
 
     /**
@@ -173,7 +188,7 @@ public:
      * disk.
      */
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
-                                        NamespaceString ns,
+                                        RecordId catalogId,
                                         const IndexDescriptor* spec,
                                         IndexBuildProtocol indexBuildProtocol,
                                         bool isBackgroundSecondaryBuild) = 0;
@@ -182,7 +197,7 @@ public:
      * Returns whether or not the index is being built with the two-phase index build procedure.
      */
     virtual bool isTwoPhaseIndexBuild(OperationContext* opCtx,
-                                      NamespaceString ns,
+                                      RecordId catalogId,
                                       StringData indexName) const = 0;
 
     /**
@@ -192,7 +207,7 @@ public:
      * It is only valid to call this when the index is using the kTwoPhase IndexBuildProtocol.
      */
     virtual void setIndexBuildScanning(OperationContext* opCtx,
-                                       NamespaceString ns,
+                                       RecordId catalogId,
                                        StringData indexName,
                                        std::string sideWritesIdent,
                                        boost::optional<std::string> constraintViolationsIdent) = 0;
@@ -202,7 +217,7 @@ public:
      * Returns whether or not this index is building in the "scanning" phase.
      */
     virtual bool isIndexBuildScanning(OperationContext* opCtx,
-                                      NamespaceString ns,
+                                      RecordId catalogId,
                                       StringData indexName) const = 0;
 
     /**
@@ -211,21 +226,21 @@ public:
      * It is only valid to call this when the index is using the kTwoPhase IndexBuildProtocol.
      */
     virtual void setIndexBuildDraining(OperationContext* opCtx,
-                                       NamespaceString ns,
+                                       RecordId catalogId,
                                        StringData indexName) = 0;
 
     /**
      * Returns whether or not this index is building in the "draining" phase.
      */
     virtual bool isIndexBuildDraining(OperationContext* opCtx,
-                                      NamespaceString ns,
+                                      RecordId catalogId,
                                       StringData indexName) const = 0;
 
     /**
      * Indicate that an index build is completed and the index is ready to use.
      */
     virtual void indexBuildSuccess(OperationContext* opCtx,
-                                   NamespaceString ns,
+                                   RecordId catalogId,
                                    StringData indexName) = 0;
 
     /**
@@ -240,7 +255,7 @@ public:
      * number of elements in the index key pattern of empty sets.
      */
     virtual bool isIndexMultikey(OperationContext* opCtx,
-                                 NamespaceString ns,
+                                 RecordId catalogId,
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const = 0;
 
@@ -254,49 +269,49 @@ public:
      * This function returns true if the index metadata has changed, and returns false otherwise.
      */
     virtual bool setIndexIsMultikey(OperationContext* opCtx,
-                                    NamespaceString ns,
+                                    RecordId catalogId,
                                     StringData indexName,
                                     const MultikeyPaths& multikeyPaths) = 0;
 
     virtual boost::optional<std::string> getConstraintViolationsIdent(
-        OperationContext* opCtx, NamespaceString ns, StringData indexName) const = 0;
+        OperationContext* opCtx, RecordId catalogId, StringData indexName) const = 0;
 
     /**
      * Returns the server-compatibility version of the index build procedure.
      */
     virtual long getIndexBuildVersion(OperationContext* opCtx,
-                                      NamespaceString ns,
+                                      RecordId catalogId,
                                       StringData indexName) const = 0;
 
     virtual CollectionOptions getCollectionOptions(OperationContext* opCtx,
-                                                   NamespaceString ns) const = 0;
+                                                   RecordId catalogId) const = 0;
 
-    virtual int getTotalIndexCount(OperationContext* opCtx, NamespaceString ns) const = 0;
+    virtual int getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const = 0;
 
-    virtual int getCompletedIndexCount(OperationContext* opCtx, NamespaceString ns) const = 0;
+    virtual int getCompletedIndexCount(OperationContext* opCtx, RecordId catalogId) const = 0;
 
     virtual BSONObj getIndexSpec(OperationContext* opCtx,
-                                 NamespaceString ns,
+                                 RecordId catalogId,
                                  StringData indexName) const = 0;
 
     virtual void getAllIndexes(OperationContext* opCtx,
-                               NamespaceString ns,
+                               RecordId catalogId,
                                std::vector<std::string>* names) const = 0;
 
     virtual void getReadyIndexes(OperationContext* opCtx,
-                                 NamespaceString ns,
+                                 RecordId catalogId,
                                  std::vector<std::string>* names) const = 0;
 
     virtual bool isIndexPresent(OperationContext* opCtx,
-                                NamespaceString ns,
+                                RecordId catalogId,
                                 StringData indexName) const = 0;
 
     virtual bool isIndexReady(OperationContext* opCtx,
-                              NamespaceString ns,
+                              RecordId catalogId,
                               StringData indexName) const = 0;
 
     virtual KVPrefix getIndexPrefix(OperationContext* opCtx,
-                                    NamespaceString ns,
+                                    RecordId catalogId,
                                     StringData indexName) const = 0;
 };
 }  // namespace mongo

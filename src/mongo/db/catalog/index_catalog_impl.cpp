@@ -93,12 +93,13 @@ IndexCatalogImpl::IndexCatalogImpl(Collection* collection) : _collection(collect
 Status IndexCatalogImpl::init(OperationContext* opCtx) {
     vector<string> indexNames;
     auto durableCatalog = DurableCatalog::get(opCtx);
-    durableCatalog->getAllIndexes(opCtx, _collection->ns(), &indexNames);
+    durableCatalog->getAllIndexes(opCtx, _collection->getCatalogId(), &indexNames);
 
     for (size_t i = 0; i < indexNames.size(); i++) {
         const string& indexName = indexNames[i];
-        BSONObj spec = durableCatalog->getIndexSpec(opCtx, _collection->ns(), indexName).getOwned();
-        invariant(durableCatalog->isIndexReady(opCtx, _collection->ns(), indexName));
+        BSONObj spec =
+            durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), indexName).getOwned();
+        invariant(durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName));
 
         BSONObj keyPattern = spec.getObjectField("key");
         auto descriptor =
@@ -236,25 +237,26 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
     std::vector<std::string> readyIndexes;
 
     auto durableCatalog = DurableCatalog::get(opCtx);
-    durableCatalog->getAllIndexes(opCtx, _collection->ns(), &allIndexes);
-    durableCatalog->getReadyIndexes(opCtx, _collection->ns(), &readyIndexes);
+    durableCatalog->getAllIndexes(opCtx, _collection->getCatalogId(), &allIndexes);
+    durableCatalog->getReadyIndexes(opCtx, _collection->getCatalogId(), &readyIndexes);
 
     error() << "All indexes:";
     for (const auto& index : allIndexes) {
         error() << "Index '" << index << "' with specification: "
-                << redact(durableCatalog->getIndexSpec(opCtx, _collection->ns(), index));
+                << redact(durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), index));
     }
 
     error() << "Ready indexes:";
     for (const auto& index : readyIndexes) {
         error() << "Index '" << index << "' with specification: "
-                << redact(durableCatalog->getIndexSpec(opCtx, _collection->ns(), index));
+                << redact(durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), index));
     }
 
     error() << "Index names to drop:";
     for (const auto& indexNameToDrop : indexNamesToDrop) {
         error() << "Index '" << indexNameToDrop << "' with specification: "
-                << redact(durableCatalog->getIndexSpec(opCtx, _collection->ns(), indexNameToDrop));
+                << redact(durableCatalog->getIndexSpec(
+                       opCtx, _collection->getCatalogId(), indexNameToDrop));
     }
 }
 
@@ -349,8 +351,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     auto engine = opCtx->getServiceContext()->getStorageEngine();
-    std::string ident =
-        engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), descriptor->indexName());
+    std::string ident = engine->getCatalog()->getIndexIdent(
+        opCtx, _collection->getCatalogId(), descriptor->indexName());
 
     auto* const descriptorPtr = descriptor.get();
     auto entry = std::make_shared<IndexCatalogEntryImpl>(
@@ -423,7 +425,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
 
     // sanity check
     invariant(DurableCatalog::get(opCtx)->isIndexReady(
-        opCtx, _collection->ns(), descriptor->indexName()));
+        opCtx, _collection->getCatalogId(), descriptor->indexName()));
 
     return spec;
 }
@@ -826,7 +828,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
     // verify state is sane post cleaning
 
     long long numIndexesInCollectionCatalogEntry =
-        DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, _collection->ns());
+        DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, _collection->getCatalogId());
 
     if (haveIdIndex) {
         fassert(17324, numIndexesTotal(opCtx) == 1);
@@ -934,7 +936,8 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
 void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string& indexName) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
-    Status status = DurableCatalog::get(opCtx)->removeIndex(opCtx, _collection->ns(), indexName);
+    Status status =
+        DurableCatalog::get(opCtx)->removeIndex(opCtx, _collection->getCatalogId(), indexName);
     if (status.code() == ErrorCodes::NamespaceNotFound) {
         /*
          * This is ok, as we may be partially through index creation.
@@ -988,8 +991,8 @@ int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
             // This can throw a WriteConflictException when retries on write conflicts are disabled
             // during testing. The DurableCatalog fetches the metadata off of the disk using a
             // findRecord() call.
-            dassert(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, _collection->ns()) ==
-                    count);
+            dassert(DurableCatalog::get(opCtx)->getTotalIndexCount(
+                        opCtx, _collection->getCatalogId()) == count);
         } catch (const WriteConflictException& ex) {
             log() << " Skipping dassert check due to: " << ex;
         }
@@ -1007,7 +1010,7 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
     }
     if (kDebugBuild) {
         std::vector<std::string> completedIndexes;
-        durableCatalog->getReadyIndexes(opCtx, _collection->ns(), &completedIndexes);
+        durableCatalog->getReadyIndexes(opCtx, _collection->getCatalogId(), &completedIndexes);
 
         // There is a potential inconistency where the index information in the collection catalog
         // entry and the index catalog differ. Log as much information as possible here.
@@ -1159,7 +1162,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     const std::string indexName = oldDesc->indexName();
     auto durableCatalog = DurableCatalog::get(opCtx);
-    invariant(durableCatalog->isIndexReady(opCtx, _collection->ns(), indexName));
+    invariant(durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName));
 
     // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
     // invalid and should not be dereferenced. Also, invalidate the index from the
@@ -1171,7 +1174,8 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     CollectionQueryInfo::get(_collection).droppedIndex(opCtx, indexName);
 
     // Ask the CollectionCatalogEntry for the new index spec.
-    BSONObj spec = durableCatalog->getIndexSpec(opCtx, _collection->ns(), indexName).getOwned();
+    BSONObj spec =
+        durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), indexName).getOwned();
     BSONObj keyPattern = spec.getObjectField("key");
 
     // Re-register this index in the index catalog with the new spec. Also, add the new index

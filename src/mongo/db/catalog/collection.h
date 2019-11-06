@@ -178,6 +178,7 @@ public:
          */
         virtual std::unique_ptr<Collection> make(OperationContext* opCtx,
                                                  const NamespaceString& nss,
+                                                 RecordId catalogId,
                                                  CollectionUUID uuid,
                                                  std::unique_ptr<RecordStore> rs) const = 0;
     };
@@ -189,6 +190,8 @@ public:
 
     Collection() = default;
     virtual ~Collection() = default;
+
+    virtual RecordId getCatalogId() const = 0;
 
     virtual const NamespaceString& ns() const = 0;
 

@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -39,13 +40,24 @@ namespace mongo {
  */
 class CollectionMock : public Collection {
 public:
-    CollectionMock(const NamespaceString& ns) : CollectionMock(ns, {}) {}
+    CollectionMock(const NamespaceString& ns)
+        : CollectionMock(ns, std::unique_ptr<IndexCatalog>()) {}
     CollectionMock(const NamespaceString& ns, std::unique_ptr<IndexCatalog> indexCatalog)
         : _ns(ns), _indexCatalog(std::move(indexCatalog)) {}
+    CollectionMock(const NamespaceString& ns, RecordId catalogId)
+        : _ns(ns), _catalogId(catalogId) {}
     ~CollectionMock() = default;
 
     void init(OperationContext* opCtx) {
         std::abort();
+    }
+
+    RecordId getCatalogId() const {
+        return _catalogId;
+    }
+
+    void setCatalogId(RecordId catalogId) {
+        _catalogId = catalogId;
     }
 
     const NamespaceString& ns() const {
@@ -263,6 +275,7 @@ public:
 private:
     UUID _uuid = UUID::gen();
     NamespaceString _ns;
+    RecordId _catalogId{0};
     std::unique_ptr<IndexCatalog> _indexCatalog;
 };
 

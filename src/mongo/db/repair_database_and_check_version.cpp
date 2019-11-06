@@ -140,11 +140,11 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  * Returns true if the collection associated with the given CollectionCatalogEntry has an index on
  * the _id field
  */
-bool checkIdIndexExists(OperationContext* opCtx, const NamespaceString& nss) {
+bool checkIdIndexExists(OperationContext* opCtx, RecordId catalogId) {
     auto durableCatalog = DurableCatalog::get(opCtx);
-    auto indexCount = durableCatalog->getTotalIndexCount(opCtx, nss);
+    auto indexCount = durableCatalog->getTotalIndexCount(opCtx, catalogId);
     auto indexNames = std::vector<std::string>(indexCount);
-    durableCatalog->getAllIndexes(opCtx, nss, &indexNames);
+    durableCatalog->getAllIndexes(opCtx, catalogId, &indexNames);
 
     for (auto name : indexNames) {
         if (name == "_id_") {
@@ -213,13 +213,15 @@ Status ensureCollectionProperties(OperationContext* opCtx,
 
             // All user-created replicated collections created since MongoDB 4.0 have _id indexes.
             auto requiresIndex = coll->requiresIdIndex() && coll->ns().isReplicated();
-            auto collOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->ns());
+            auto collOptions =
+                DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->getCatalogId());
             auto hasAutoIndexIdField = collOptions.autoIndexId == CollectionOptions::YES;
 
             // Even if the autoIndexId field is not YES, the collection may still have an _id index
             // that was created manually by the user. Check the list of indexes to confirm index
             // does not exist before attempting to build it or returning an error.
-            if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll->ns())) {
+            if (requiresIndex && !hasAutoIndexIdField &&
+                !checkIdIndexExists(opCtx, coll->getCatalogId())) {
                 log() << "collection " << coll->ns() << " is missing an _id index; building it now";
                 auto status = buildMissingIdIndex(opCtx, coll);
                 if (!status.isOK()) {
@@ -262,7 +264,7 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 }
 
 void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
-    std::vector<StorageEngine::CollectionIndexNamePair> indexesToRebuild =
+    std::vector<StorageEngine::IndexIdentifier> indexesToRebuild =
         fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
 
     if (!indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
@@ -278,11 +280,13 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;
-    for (auto&& indexNamespace : indexesToRebuild) {
-        NamespaceString collNss(indexNamespace.first);
-        const std::string& indexName = indexNamespace.second;
-        auto swIndexSpecs = getIndexNameObjs(
-            opCtx, collNss, [&indexName](const std::string& name) { return name == indexName; });
+    for (auto&& idxIdentifier : indexesToRebuild) {
+        NamespaceString collNss = idxIdentifier.nss;
+        const std::string& indexName = idxIdentifier.indexName;
+        auto swIndexSpecs =
+            getIndexNameObjs(opCtx, idxIdentifier.catalogId, [&indexName](const std::string& name) {
+                return name == indexName;
+            });
         if (!swIndexSpecs.isOK() || swIndexSpecs.getValue().first.empty()) {
             fassert(40590,
                     {ErrorCodes::InternalError,

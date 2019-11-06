@@ -190,9 +190,11 @@ StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData n
 
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const NamespaceString& nss,
+                               RecordId catalogId,
                                UUID uuid,
                                std::unique_ptr<RecordStore> recordStore)
     : _ns(nss),
+      _catalogId(catalogId),
       _uuid(uuid),
       _recordStore(std::move(recordStore)),
       _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
@@ -219,13 +221,15 @@ CollectionImpl::~CollectionImpl() {
 std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    RecordId catalogId,
     CollectionUUID uuid,
     std::unique_ptr<RecordStore> rs) const {
-    return std::make_unique<CollectionImpl>(opCtx, nss, uuid, std::move(rs));
+    return std::make_unique<CollectionImpl>(opCtx, nss, catalogId, uuid, std::move(rs));
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
-    auto collectionOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, _ns);
+    auto collectionOptions =
+        DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, getCatalogId());
     _collator = parseCollation(opCtx, _ns, collectionOptions.collation);
     _validatorDoc = collectionOptions.validator.getOwned();
     _validator = uassertStatusOK(
@@ -728,7 +732,7 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
 }
 
 bool CollectionImpl::isTemporary(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, _ns).temp;
+    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, getCatalogId()).temp;
 }
 
 bool CollectionImpl::isCapped() const {
@@ -840,7 +844,7 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
         return statusWithMatcher.getStatus();
 
     DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, ns(), validatorDoc, getValidationLevel(), getValidationAction());
+        opCtx, getCatalogId(), validatorDoc, getValidationLevel(), getValidationAction());
 
     opCtx->recoveryUnit()->onRollback([this,
                                        oldValidator = std::move(_validator),
@@ -887,7 +891,7 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
     _validationLevel = levelSW.getValue();
 
     DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
+        opCtx, getCatalogId(), _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
         [this, oldValidationLevel]() { this->_validationLevel = oldValidationLevel; });
 
@@ -907,7 +911,7 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
 
 
     DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
+        opCtx, getCatalogId(), _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
         [this, oldValidationAction]() { this->_validationAction = oldValidationAction; });
 
@@ -931,7 +935,8 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
         this->_validationAction = oldValidationAction;
     });
 
-    DurableCatalog::get(opCtx)->updateValidator(opCtx, ns(), newValidator, newLevel, newAction);
+    DurableCatalog::get(opCtx)->updateValidator(
+        opCtx, getCatalogId(), newValidator, newLevel, newAction);
     _validatorDoc = std::move(newValidator);
 
     auto validatorSW =
@@ -1020,7 +1025,8 @@ void CollectionImpl::setNs(NamespaceString nss) {
 }
 
 void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
-    DurableCatalog::get(opCtx)->indexBuildSuccess(opCtx, ns(), index->descriptor()->indexName());
+    DurableCatalog::get(opCtx)->indexBuildSuccess(
+        opCtx, getCatalogId(), index->descriptor()->indexName());
     _indexCatalog->indexBuildSuccess(opCtx, index);
 }
 

@@ -61,7 +61,7 @@
 namespace mongo {
 
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           const NamespaceString& nss,
+                                           RecordId catalogId,
                                            std::function<bool(const std::string&)> filter) {
     IndexNameObjs ret;
     std::vector<std::string>& indexNames = ret.first;
@@ -69,7 +69,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
     auto durableCatalog = DurableCatalog::get(opCtx);
     {
         // Fetch all indexes
-        durableCatalog->getAllIndexes(opCtx, nss, &indexNames);
+        durableCatalog->getAllIndexes(opCtx, catalogId, &indexNames);
         auto newEnd =
             std::remove_if(indexNames.begin(),
                            indexNames.end(),
@@ -80,7 +80,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 
 
         for (const auto& name : indexNames) {
-            BSONObj spec = durableCatalog->getIndexSpec(opCtx, nss, name);
+            BSONObj spec = durableCatalog->getIndexSpec(opCtx, catalogId, name);
             using IndexVersion = IndexDescriptor::IndexVersion;
             IndexVersion indexVersion = IndexVersion::kV1;
             if (auto indexVersionElem = spec[IndexDescriptor::kIndexVersionFieldName]) {
@@ -147,7 +147,8 @@ Status repairCollections(OperationContext* opCtx,
 
         log() << "Repairing collection " << nss;
 
-        Status status = engine->repairRecordStore(opCtx, nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
         if (!status.isOK())
             return status;
     }
@@ -155,7 +156,7 @@ Status repairCollections(OperationContext* opCtx,
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
         auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
-        auto swIndexNameObjs = getIndexNameObjs(opCtx, nss);
+        auto swIndexNameObjs = getIndexNameObjs(opCtx, collection->getCatalogId());
         if (!swIndexNameObjs.isOK())
             return swIndexNameObjs.getStatus();
 

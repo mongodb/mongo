@@ -151,7 +151,8 @@ public:
             vector<string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", toReIndexNss.ns(), [&] {
                 indexNames.clear();
-                DurableCatalog::get(opCtx)->getAllIndexes(opCtx, collection->ns(), &indexNames);
+                DurableCatalog::get(opCtx)->getAllIndexes(
+                    opCtx, collection->getCatalogId(), &indexNames);
             });
 
             all.reserve(indexNames.size());
@@ -159,7 +160,8 @@ public:
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const string& name = indexNames[i];
                 BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss.ns(), [&] {
-                    return DurableCatalog::get(opCtx)->getIndexSpec(opCtx, collection->ns(), name);
+                    return DurableCatalog::get(opCtx)->getIndexSpec(
+                        opCtx, collection->getCatalogId(), name);
                 });
 
                 {

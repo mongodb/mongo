@@ -430,7 +430,7 @@ CollectionOptions _getCollectionOptions(OperationContext* opCtx, const Namespace
     auto collection = autoColl.getCollection();
     ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
                             << " because collection does not exist.";
-    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
+    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
 }
 
 /**

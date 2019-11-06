@@ -1278,7 +1278,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             WriteUnitOfWork wuow(opCtx);
 
             // Set collection to whatever temp status is on the sync source.
-            DurableCatalog::get(opCtx)->setIsTemp(opCtx, *nss, options.temp);
+            DurableCatalog::get(opCtx)->setIsTemp(opCtx, collection->getCatalogId(), options.temp);
 
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync
@@ -1296,8 +1296,9 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             LOG(1) << "Resynced collection metadata for collection: " << *nss << ", UUID: " << uuid
                    << ", with: " << redact(info) << ", to: "
-                   << redact(
-                          DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, *nss).toBSON());
+                   << redact(DurableCatalog::get(opCtx)
+                                 ->getCollectionOptions(opCtx, collection->getCatalogId())
+                                 .toBSON());
         }
 
         // Since we read from the sync source to retrieve the metadata of the

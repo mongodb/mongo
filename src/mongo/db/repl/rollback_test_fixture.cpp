@@ -320,7 +320,8 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
     // Make sure the collection options are correct.
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString(nss.toString()));
     auto collAfterRollbackOptions =
-        DurableCatalog::get(_opCtx.get())->getCollectionOptions(_opCtx.get(), nss);
+        DurableCatalog::get(_opCtx.get())
+            ->getCollectionOptions(_opCtx.get(), autoColl.getCollection()->getCatalogId());
 
     BSONObjBuilder expectedOptionsBob;
     if (localCollOptions.uuid) {

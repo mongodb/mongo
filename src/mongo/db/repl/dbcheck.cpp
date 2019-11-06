@@ -359,11 +359,11 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* co
 
     // List the indices,
     auto durableCatalog = DurableCatalog::get(opCtx);
-    durableCatalog->getAllIndexes(opCtx, collection->ns(), &names);
+    durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &names);
 
     // and get the info for each one.
     for (const auto& name : names) {
-        result.push_back(durableCatalog->getIndexSpec(opCtx, collection->ns(), name));
+        result.push_back(durableCatalog->getIndexSpec(opCtx, collection->getCatalogId(), name));
     }
 
     auto comp = std::make_unique<SimpleBSONObjComparator>();
@@ -374,7 +374,9 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* co
 }
 
 BSONObj collectionOptions(OperationContext* opCtx, Collection* collection) {
-    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->ns()).toBSON();
+    return DurableCatalog::get(opCtx)
+        ->getCollectionOptions(opCtx, collection->getCatalogId())
+        .toBSON();
 }
 
 AutoGetDbForDbCheck::AutoGetDbForDbCheck(OperationContext* opCtx, const NamespaceString& nss)

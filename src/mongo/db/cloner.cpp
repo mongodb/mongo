@@ -600,8 +600,8 @@ Status Cloner::createCollectionsForDb(
                 // exists on the target, we check if the existing collection's UUID matches
                 // that of the one we're trying to create. If it does, we treat the create
                 // as a no-op; if it doesn't match, we return an error.
-                auto existingOpts =
-                    DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->ns());
+                auto existingOpts = DurableCatalog::get(opCtx)->getCollectionOptions(
+                    opCtx, collection->getCatalogId());
                 const UUID clonedUUID =
                     uassertStatusOK(UUID::parse(params.collectionInfo["info"]["uuid"]));
 

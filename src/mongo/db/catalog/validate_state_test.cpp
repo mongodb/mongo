@@ -54,11 +54,11 @@ public:
     /**
      * Create collection 'nss' and insert some documents. It will possess a default _id index.
      */
-    void createCollectionAndPopulateIt(OperationContext* opCtx, const NamespaceString& nss);
+    Collection* createCollectionAndPopulateIt(OperationContext* opCtx, const NamespaceString& nss);
 };
 
-void ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
-                                                      const NamespaceString& nss) {
+Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
+                                                             const NamespaceString& nss) {
     // Create collection.
     CollectionOptions defaultCollectionOptions;
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, defaultCollectionOptions));
@@ -75,6 +75,8 @@ void ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
             collection->insertDocument(opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug));
         wuow.commit();
     }
+
+    return collection;
 }
 
 /**
@@ -199,7 +201,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnCheckpointedIndexes) {
 // Only open cursors against indexes that are consistent with the rest of the checkpoint'ed data.
 TEST_F(ValidateStateTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
     auto opCtx = operationContext();
-    createCollectionAndPopulateIt(opCtx, kNss);
+    Collection* coll = createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
     FailPointEnableBlock failPoint("pauseCheckpointThread");
@@ -220,10 +222,10 @@ TEST_F(ValidateStateTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
             opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(opCtx);
         auto indexIdentA =
             opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                opCtx, kNss, "a_1");
+                opCtx, coll->getCatalogId(), "a_1");
         auto indexIdentB =
             opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                opCtx, kNss, "b_1");
+                opCtx, coll->getCatalogId(), "b_1");
         opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndexToList(
             indexIdentA);
         opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndexToList(

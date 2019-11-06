@@ -105,7 +105,7 @@ public:
             WriteUnitOfWork wunit(opCtx);
             Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
             uassertStatusOK(status);
-            DurableCatalog::get(opCtx)->updateCappedSize(opCtx, coll->ns(), size);
+            DurableCatalog::get(opCtx)->updateCappedSize(opCtx, coll->getCatalogId(), size);
             wunit.commit();
             LOG(0) << "replSetResizeOplog success, currentSize:" << size;
             return true;

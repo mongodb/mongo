@@ -316,10 +316,10 @@ public:
     }
 
     BSONCollectionCatalogEntry::MetaData getMetaDataAtTime(DurableCatalog* durableCatalog,
-                                                           NamespaceString ns,
+                                                           RecordId catalogId,
                                                            const Timestamp& ts) {
         OneOffRead oor(_opCtx, ts);
-        return durableCatalog->getMetaData(_opCtx, ns);
+        return durableCatalog->getMetaData(_opCtx, catalogId);
     }
 
     StatusWith<BSONObj> doAtomicApplyOps(const std::string& dbName,
@@ -479,7 +479,8 @@ public:
         // getAllIdents() actually looks in the RecordStore for a list of all idents, and is thus
         // versioned by timestamp. We can expect a namespace to have a consistent ident across
         // timestamps, provided the collection does not get renamed.
-        auto expectedIdent = durableCatalog->getCollectionIdent(nss);
+        auto expectedIdent =
+            durableCatalog->getEntry(autoColl.getCollection()->getCatalogId()).ident;
         auto idents = durableCatalog->getAllIdents(_opCtx);
         auto found = std::find(idents.begin(), idents.end(), expectedIdent);
 
@@ -669,11 +670,11 @@ public:
         MultikeyPaths actualMultikeyPaths;
         if (!shouldBeMultikey) {
             ASSERT_FALSE(durableCatalog->isIndexMultikey(
-                opCtx, collection->ns(), indexName, &actualMultikeyPaths))
+                opCtx, collection->getCatalogId(), indexName, &actualMultikeyPaths))
                 << "index " << indexName << " should not be multikey at timestamp " << ts;
         } else {
             ASSERT(durableCatalog->isIndexMultikey(
-                opCtx, collection->ns(), indexName, &actualMultikeyPaths))
+                opCtx, collection->getCatalogId(), indexName, &actualMultikeyPaths))
                 << "index " << indexName << " should be multikey at timestamp " << ts;
         }
 
@@ -1848,6 +1849,7 @@ public:
         reset(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        RecordId catalogId = autoColl.getCollection()->getCatalogId();
 
         const LogicalTime insertTimestamp = _clock->reserveTicks(1);
         {
@@ -1937,15 +1939,16 @@ public:
         {
             ASSERT_FALSE(
                 getIndexMetaData(
-                    getMetaDataAtTime(durableCatalog, nss, afterIndexInit.asTimestamp()), "a_1")
+                    getMetaDataAtTime(durableCatalog, catalogId, afterIndexInit.asTimestamp()),
+                    "a_1")
                     .ready);
         }
 
         // After the build completes, assert that the index is `ready: true` and multikey.
         assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, afterIndexBuild);
         {
-            auto indexMetaData =
-                getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, afterIndexBuild), "a_1");
+            auto indexMetaData = getIndexMetaData(
+                getMetaDataAtTime(durableCatalog, catalogId, afterIndexBuild), "a_1");
             ASSERT(indexMetaData.ready);
             ASSERT(indexMetaData.multikey);
 
@@ -2180,35 +2183,38 @@ public:
         const auto indexBComplete = commitIndexBuildTs;
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_S);
+        RecordId catalogId = autoColl.getCollection()->getCatalogId();
 
-        // The idents are created and persisted with the "ready: false" write. There should be two
-        // new index idents visible at this time.
+        // The idents are created and persisted with the "ready: false" write.
+        // There should be two new index idents visible at this time.
         const std::vector<std::string> indexes =
             getNewIndexIdentsAtTime(durableCatalog, origIdents, indexCreateInitTs);
         ASSERT_EQ(static_cast<std::size_t>(2), indexes.size()) << " Num idents: " << indexes.size();
 
         ASSERT_FALSE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexCreateInitTs), "a_1")
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, indexCreateInitTs), "a_1")
                 .ready);
         ASSERT_FALSE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexCreateInitTs), "b_1")
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, indexCreateInitTs), "b_1")
                 .ready);
 
         // Assert the `a_1` index becomes ready at the next oplog entry time.
         if (!indexAComplete.isNull()) {
-            ASSERT_TRUE(
-                getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexAComplete), "a_1")
-                    .ready);
-            ASSERT_FALSE(
-                getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexAComplete), "b_1")
-                    .ready);
+            ASSERT_TRUE(getIndexMetaData(
+                            getMetaDataAtTime(durableCatalog, catalogId, indexAComplete), "a_1")
+                            .ready);
+            ASSERT_FALSE(getIndexMetaData(
+                             getMetaDataAtTime(durableCatalog, catalogId, indexAComplete), "b_1")
+                             .ready);
         }
 
         // Assert the `b_1` index becomes ready at the last oplog entry time.
         ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexBComplete), "a_1").ready);
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, indexBComplete), "a_1")
+                .ready);
         ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexBComplete), "b_1").ready);
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, indexBComplete), "b_1")
+                .ready);
     }
 };
 
@@ -2300,12 +2306,14 @@ public:
             durableCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexCommitTs);
 
         // Assert the 'a_1' and `b_1` indexes becomes ready at the last oplog entry time.
-        ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexCommitTs), "a_1")
-                .ready);
-        ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexCommitTs), "b_1")
-                .ready);
+        RecordId renamedCatalogId =
+            CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(renamedNss)->getCatalogId();
+        ASSERT_TRUE(getIndexMetaData(
+                        getMetaDataAtTime(durableCatalog, renamedCatalogId, indexCommitTs), "a_1")
+                        .ready);
+        ASSERT_TRUE(getIndexMetaData(
+                        getMetaDataAtTime(durableCatalog, renamedCatalogId, indexCommitTs), "b_1")
+                        .ready);
     }
 };
 
@@ -2379,17 +2387,20 @@ public:
         // Check index state in catalog at oplog entry times for both startIndexBuild and
         // abortIndexBuild.
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        RecordId catalogId = autoColl.getCollection()->getCatalogId();
 
         // We expect one new one new index ident during this index build.
         assertRenamedCollectionIdentsAtTimestamp(
             durableCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexStartTs);
         ASSERT_FALSE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexStartTs), "a_1").ready);
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, indexStartTs), "a_1")
+                .ready);
 
         // We expect all new idents to be removed after the index build has aborted.
         assertRenamedCollectionIdentsAtTimestamp(
             durableCatalog, origIdents, /*expectedNewIndexIdents*/ 0, indexAbortTs);
-        assertIndexMetaDataMissing(getMetaDataAtTime(durableCatalog, nss, indexAbortTs), "a_1");
+        assertIndexMetaDataMissing(getMetaDataAtTime(durableCatalog, catalogId, indexAbortTs),
+                                   "a_1");
     }
 };
 
@@ -2684,6 +2695,7 @@ public:
             ASSERT_OK(doAtomicApplyOps(nss.db().toString(), {createIndexOp}));
 
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+            RecordId catalogId = autoColl.getCollection()->getCatalogId();
             const std::string indexIdent =
                 getNewIndexIdentAtTime(durableCatalog, origIdents, Timestamp::min());
             assertIdentsMissingAtTimestamp(
@@ -2692,9 +2704,9 @@ public:
 
             // On a primary, the index build should start and finish at `startBuildTs` because it is
             // built in the foreground.
-            ASSERT_TRUE(
-                getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, startBuildTs), "field_1")
-                    .ready);
+            ASSERT_TRUE(getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, startBuildTs),
+                                         "field_1")
+                            .ready);
         }
     }
 };
@@ -2730,16 +2742,18 @@ public:
 
         {
             Lock::GlobalRead read(_opCtx);
+            AutoGetCollection autoColl(_opCtx, systemViewsNss, LockMode::MODE_IS);
+            RecordId catalogId = autoColl.getCollection()->getCatalogId();
+
             auto systemViewsMd = getMetaDataAtTime(
-                durableCatalog, systemViewsNss, Timestamp(systemViewsCreateTs.asULL() - 1));
+                durableCatalog, catalogId, Timestamp(systemViewsCreateTs.asULL() - 1));
             ASSERT_EQ("", systemViewsMd.ns)
                 << systemViewsNss
                 << " incorrectly exists before creation. CreateTs: " << systemViewsCreateTs;
 
-            systemViewsMd = getMetaDataAtTime(durableCatalog, systemViewsNss, systemViewsCreateTs);
+            systemViewsMd = getMetaDataAtTime(durableCatalog, catalogId, systemViewsCreateTs);
             ASSERT_EQ(systemViewsNss.ns(), systemViewsMd.ns);
 
-            AutoGetCollection autoColl(_opCtx, systemViewsNss, LockMode::MODE_IS);
             assertDocumentAtTimestamp(autoColl.getCollection(), systemViewsCreateTs, BSONObj());
             assertDocumentAtTimestamp(autoColl.getCollection(),
                                       viewCreateTs,
@@ -2765,7 +2779,12 @@ public:
 
         ASSERT_OK(createCollection(_opCtx, nss.db().toString(), BSON("create" << nss.coll())));
 
-        { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+        RecordId catalogId;
+        {
+            AutoGetCollectionForReadCommand coll(_opCtx, nss);
+            ASSERT(coll.getCollection());
+            catalogId = coll.getCollection()->getCatalogId();
+        }
 
         BSONObj result = queryOplog(BSON("op"
                                          << "c"
@@ -2817,7 +2836,7 @@ public:
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
-        auto indexIdent = durableCatalog->getIndexIdent(_opCtx, nss, "user_1_db_1");
+        auto indexIdent = durableCatalog->getIndexIdent(_opCtx, catalogId, "user_1_db_1");
         assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, pastTs);
         assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, presentTs);
         assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, futureTs);

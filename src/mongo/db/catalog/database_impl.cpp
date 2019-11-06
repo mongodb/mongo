@@ -183,7 +183,9 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     };
 
     CollectionCatalog::CollectionInfoFn predicate = [&](const Collection* collection) {
-        return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->ns()).temp;
+        return DurableCatalog::get(opCtx)
+            ->getCollectionOptions(opCtx, collection->getCatalogId())
+            .temp;
     };
 
     catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
@@ -448,7 +450,8 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
     LOG(1) << "dropCollection: " << nss << " - dropAllIndexes start";
     collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-    invariant(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, nss) == 0);
+    invariant(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, collection->getCatalogId()) ==
+              0);
     LOG(1) << "dropCollection: " << nss << " - dropAllIndexes done";
 }
 
@@ -458,7 +461,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     UUID uuid = collection->uuid();
     log() << "Finishing collection drop for " << nss << " (" << uuid << ").";
 
-    auto status = DurableCatalog::get(opCtx)->dropCollection(opCtx, nss);
+    auto status = DurableCatalog::get(opCtx)->dropCollection(opCtx, collection->getCatalogId());
     if (!status.isOK())
         return status;
 
@@ -509,7 +512,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fromNss);
 
-    Status status = DurableCatalog::get(opCtx)->renameCollection(opCtx, fromNss, toNss, stayTemp);
+    Status status = DurableCatalog::get(opCtx)->renameCollection(
+        opCtx, collToRename->getCatalogId(), toNss, stayTemp);
 
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
     // because
@@ -631,12 +635,16 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     // Create Collection object
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto statusWithRecordStore = storageEngine->getCatalog()->createCollection(
-        opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/);
-    massertStatusOK(statusWithRecordStore.getStatus());
-    std::unique_ptr<RecordStore> rs = std::move(statusWithRecordStore.getValue());
-    std::unique_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-        opCtx, nss, optionsWithUUID.uuid.get(), std::move(rs));
+    std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
+        uassertStatusOK(storageEngine->getCatalog()->createCollection(
+            opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
+    auto catalogId = catalogIdRecordStorePair.first;
+    std::unique_ptr<Collection> ownedCollection =
+        Collection::Factory::get(opCtx)->make(opCtx,
+                                              nss,
+                                              catalogId,
+                                              optionsWithUUID.uuid.get(),
+                                              std::move(catalogIdRecordStorePair.second));
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
 

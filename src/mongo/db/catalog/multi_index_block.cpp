@@ -841,7 +841,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                 opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(opCtx);
             auto indexIdent =
                 opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                    opCtx, collection->ns(), _indexes[i].block->getIndexName());
+                    opCtx, collection->getCatalogId(), _indexes[i].block->getIndexName());
             opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndexToList(
                 indexIdent);
         }

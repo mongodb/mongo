@@ -206,7 +206,7 @@ public:
         {
             WriteUnitOfWork wuow(&opCtx);
             opCtx.getServiceContext()->getStorageEngine()->getCatalog()->updateTTLSetting(
-                &opCtx, _nss, "x_1", 10);
+                &opCtx, _coll->getCatalogId(), "x_1", 10);
             wuow.commit();
         }
 

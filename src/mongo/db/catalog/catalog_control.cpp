@@ -116,16 +116,17 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;
-    for (auto indexNamespace : indexesToRebuild.getValue()) {
-        NamespaceString collNss(indexNamespace.first);
-        auto indexName = indexNamespace.second;
-        auto indexSpecs = getIndexNameObjs(
-            opCtx, collNss, [&indexName](const std::string& name) { return name == indexName; });
+    for (StorageEngine::IndexIdentifier indexIdentifier : indexesToRebuild.getValue()) {
+        auto indexName = indexIdentifier.indexName;
+        auto indexSpecs =
+            getIndexNameObjs(opCtx,
+                             indexIdentifier.catalogId,
+                             [&indexName](const std::string& name) { return name == indexName; });
         if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
             fassert(40689,
                     {ErrorCodes::InternalError,
                      str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection " << collNss.toString()});
+                                   << " in collection " << indexIdentifier.nss});
         }
         auto indexesToRebuild = indexSpecs.getValue();
         invariant(
@@ -137,7 +138,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
             str::stream() << "expected to find a list containing exactly 1 index spec, but found "
                           << indexesToRebuild.second.size());
 
-        auto& ino = nsToIndexNameObjMap[collNss.ns()];
+        auto& ino = nsToIndexNameObjMap[indexIdentifier.nss.ns()];
         ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }

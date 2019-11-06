@@ -44,6 +44,7 @@ public:
 
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
+                            RecordId catalogId,
                             UUID uuid,
                             std::unique_ptr<RecordStore> recordStore);
 
@@ -53,6 +54,7 @@ public:
     public:
         std::unique_ptr<Collection> make(OperationContext* opCtx,
                                          const NamespaceString& nss,
+                                         RecordId catalogId,
                                          CollectionUUID uuid,
                                          std::unique_ptr<RecordStore> rs) const final;
     };
@@ -62,6 +64,10 @@ public:
     }
 
     void setNs(NamespaceString nss) final;
+
+    RecordId getCatalogId() const {
+        return _catalogId;
+    }
 
     UUID uuid() const {
         return _uuid;
@@ -357,6 +363,7 @@ private:
                             OpDebug* opDebug);
 
     NamespaceString _ns;
+    RecordId _catalogId;
     UUID _uuid;
 
     // The RecordStore may be null during a repair operation.

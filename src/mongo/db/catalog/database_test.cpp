@@ -369,7 +369,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         ASSERT_TRUE(toCollection);
 
         auto toCollectionOptions =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, toCollection->ns());
+            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, toCollection->getCatalogId());
 
         auto toUuid = toCollectionOptions.uuid;
         ASSERT_TRUE(toUuid);

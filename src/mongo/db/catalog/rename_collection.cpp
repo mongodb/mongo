@@ -548,7 +548,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     Collection* tmpColl = nullptr;
     {
         auto collectionOptions =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, sourceColl->ns());
+            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, sourceColl->getCatalogId());
 
         // Renaming across databases will result in a new UUID.
         collectionOptions.uuid = UUID::gen();

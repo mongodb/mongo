@@ -95,7 +95,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     // Setup on-disk structures.
     const auto protocol = IndexBuildProtocol::kSinglePhase;
     Status status = DurableCatalog::get(opCtx)->prepareForIndexBuild(
-        opCtx, _nss, descriptor.get(), protocol, isBackgroundSecondaryBuild);
+        opCtx, collection->getCatalogId(), descriptor.get(), protocol, isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 
@@ -118,7 +118,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
 
             DurableCatalog::get(opCtx)->setIndexBuildScanning(
                 opCtx,
-                _nss,
+                collection->getCatalogId(),
                 _indexCatalogEntry->descriptor()->indexName(),
                 sideWritesIdent,
                 constraintsIdent);

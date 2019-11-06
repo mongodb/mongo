@@ -179,7 +179,8 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
 
     std::vector<std::string> readyDurableIndexes;
     try {
-        DurableCatalog::get(opCtx)->getReadyIndexes(opCtx, _nss, &readyDurableIndexes);
+        DurableCatalog::get(opCtx)->getReadyIndexes(
+            opCtx, _collection->getCatalogId(), &readyDurableIndexes);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         invariant(_background);
         log() << "Skipping background validation on collection '" << _nss
@@ -213,7 +214,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         // because its in-memory representation is gone).
         auto diskIndexIdent =
             opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                opCtx, _nss, desc->indexName());
+                opCtx, _collection->getCatalogId(), desc->indexName());
         if (entry->getIdent() != diskIndexIdent) {
             log() << "Skipping validation on index '" << desc->indexName() << "' in collection '"
                   << _nss << "' because the index was recreated and is not yet in a checkpoint.";

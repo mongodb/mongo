@@ -164,7 +164,7 @@ public:
             vector<string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
                 indexNames.clear();
-                durableCatalog->getAllIndexes(opCtx, nss, &indexNames);
+                durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &indexNames);
             });
 
             auto ws = std::make_unique<WorkingSet>();
@@ -173,17 +173,20 @@ public:
             for (size_t i = 0; i < indexNames.size(); i++) {
                 auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
                     if (includeBuildUUIDs &&
-                        !durableCatalog->isIndexReady(opCtx, nss, indexNames[i])) {
+                        !durableCatalog->isIndexReady(
+                            opCtx, collection->getCatalogId(), indexNames[i])) {
                         BSONObjBuilder builder;
                         builder.append("spec"_sd,
-                                       durableCatalog->getIndexSpec(opCtx, nss, indexNames[i]));
+                                       durableCatalog->getIndexSpec(
+                                           opCtx, collection->getCatalogId(), indexNames[i]));
 
                         // TODO(SERVER-37980): Replace with index build UUID.
                         auto indexBuildUUID = UUID::gen();
                         indexBuildUUID.appendToBuilder(&builder, "buildUUID"_sd);
                         return builder.obj();
                     }
-                    return durableCatalog->getIndexSpec(opCtx, nss, indexNames[i]);
+                    return durableCatalog->getIndexSpec(
+                        opCtx, collection->getCatalogId(), indexNames[i]);
                 });
 
                 WorkingSetID id = ws->allocate();

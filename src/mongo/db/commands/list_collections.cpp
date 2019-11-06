@@ -186,7 +186,8 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
         return b.obj();
     }
 
-    CollectionOptions options = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
+    CollectionOptions options =
+        DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
     // unsettable read-only property, so put it in the 'info' section.

@@ -157,19 +157,21 @@ private:
             if (!coll || coll->uuid() != uuid)
                 continue;
 
-            if (!DurableCatalog::get(opCtxPtr.get())->isIndexPresent(&opCtx, *nss, indexName)) {
+            if (!DurableCatalog::get(opCtxPtr.get())
+                     ->isIndexPresent(&opCtx, coll->getCatalogId(), indexName)) {
                 ttlCollectionCache.deregisterTTLInfo(ttlInfo);
                 continue;
             }
 
-            BSONObj spec =
-                DurableCatalog::get(opCtxPtr.get())->getIndexSpec(&opCtx, *nss, indexName);
+            BSONObj spec = DurableCatalog::get(opCtxPtr.get())
+                               ->getIndexSpec(&opCtx, coll->getCatalogId(), indexName);
             if (!spec.hasField(secondsExpireField)) {
                 ttlCollectionCache.deregisterTTLInfo(ttlInfo);
                 continue;
             }
 
-            if (!DurableCatalog::get(opCtxPtr.get())->isIndexReady(&opCtx, *nss, indexName))
+            if (!DurableCatalog::get(opCtxPtr.get())
+                     ->isIndexReady(&opCtx, coll->getCatalogId(), indexName))
                 continue;
 
             ttlIndexes.push_back(std::make_pair(*nss, spec.getOwned()));

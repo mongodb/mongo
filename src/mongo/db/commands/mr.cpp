@@ -560,8 +560,8 @@ void State::prepTempCollection() {
 
         auto const finalColl = autoGetFinalColl.getCollection();
         if (finalColl) {
-            finalOptions =
-                DurableCatalog::get(_opCtx)->getCollectionOptions(_opCtx, finalColl->ns());
+            finalOptions = DurableCatalog::get(_opCtx)->getCollectionOptions(
+                _opCtx, finalColl->getCatalogId());
 
             std::unique_ptr<IndexCatalog::IndexIterator> ii =
                 finalColl->getIndexCatalog()->getIndexIterator(_opCtx, true);

@@ -1061,7 +1061,7 @@ TEST_F(RSRollbackTest, RollbackRenameCollectionInSameDatabaseCommand) {
         // Remote collection options should have been empty.
         auto collAfterRollbackOptions =
             DurableCatalog::get(_opCtx.get())
-                ->getCollectionOptions(_opCtx.get(), oldCollName.getCollection()->ns());
+                ->getCollectionOptions(_opCtx.get(), oldCollName.getCollection()->getCatalogId());
         ASSERT_BSONOBJ_EQ(BSON("uuid" << *options.uuid), collAfterRollbackOptions.toBSON());
     }
 }
@@ -1117,7 +1117,8 @@ TEST_F(RSRollbackTest,
 
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString(renameFromNss));
     auto collAfterRollbackOptions =
-        DurableCatalog::get(_opCtx.get())->getCollectionOptions(_opCtx.get(), renameFromNss);
+        DurableCatalog::get(_opCtx.get())
+            ->getCollectionOptions(_opCtx.get(), autoColl.getCollection()->getCatalogId());
     ASSERT_TRUE(collAfterRollbackOptions.temp);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << *options.uuid << "temp" << true),
                       collAfterRollbackOptions.toBSON());
@@ -1712,7 +1713,7 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString("test.t"));
     auto collAfterRollbackOptions =
         DurableCatalog::get(_opCtx.get())
-            ->getCollectionOptions(_opCtx.get(), NamespaceString("test.t"));
+            ->getCollectionOptions(_opCtx.get(), autoColl.getCollection()->getCatalogId());
     ASSERT_BSONOBJ_EQ(BSON("uuid" << *options.uuid), collAfterRollbackOptions.toBSON());
 }
 

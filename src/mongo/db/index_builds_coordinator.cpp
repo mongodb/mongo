@@ -353,8 +353,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
                 auto descriptor = indexCatalog->findIndexByName(opCtx, indexNames[i], false);
                 if (!descriptor) {
                     // If it's unfinished index, drop it directly via removeIndex.
-                    Status status =
-                        DurableCatalog::get(opCtx)->removeIndex(opCtx, nss, indexNames[i]);
+                    Status status = DurableCatalog::get(opCtx)->removeIndex(
+                        opCtx, collection->getCatalogId(), indexNames[i]);
                     continue;
                 }
                 Status s = indexCatalog->dropIndex(opCtx, descriptor);

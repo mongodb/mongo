@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/durable_catalog_test_fixture.h"
+#include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
@@ -44,6 +44,34 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+class DurableCatalogImplTest : public unittest::Test {
+protected:
+    RecordId newCollection(OperationContext* opCtx,
+                           const NamespaceString& ns,
+                           const CollectionOptions& options,
+                           KVPrefix prefix,
+                           DurableCatalogImpl* catalog) {
+        auto swEntry = catalog->_addEntry(opCtx, ns, options, prefix);
+        ASSERT_OK(swEntry.getStatus());
+        return swEntry.getValue().catalogId;
+    }
+
+    Status renameCollection(OperationContext* opCtx,
+                            RecordId catalogId,
+                            StringData toNS,
+                            bool stayTemp,
+                            DurableCatalogImpl* catalog) {
+        return catalog->_replaceEntry(opCtx, catalogId, NamespaceString(toNS), stayTemp);
+    }
+
+    Status dropCollection(OperationContext* opCtx,
+                          RecordId catalogId,
+                          DurableCatalogImpl* catalog) {
+        return catalog->_removeEntry(opCtx, catalogId);
+    }
+};
+
 namespace {
 
 std::function<std::unique_ptr<KVHarnessHelper>()> basicFactory =
@@ -161,7 +189,8 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        collection = std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), std::move(rs));
+        collection =
+            std::make_unique<CollectionImpl>(&opCtx, ns, RecordId(0), UUID::gen(), std::move(rs));
         uow.commit();
     }
 
@@ -318,19 +347,20 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         uow.commit();
     }
 
+    RecordId catalogId;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(newCollection(&opCtx,
-                                NamespaceString("a.b"),
-                                CollectionOptions(),
-                                KVPrefix::kNotPrefixed,
-                                catalog.get()));
-        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent(NamespaceString("a.b")));
+        catalogId = newCollection(&opCtx,
+                                  NamespaceString("a.b"),
+                                  CollectionOptions(),
+                                  KVPrefix::kNotPrefixed,
+                                  catalog.get());
+        ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
         uow.commit();
     }
 
-    std::string ident = catalog->getCollectionIdent(NamespaceString("a.b"));
+    std::string ident = catalog->getEntry(catalogId).ident;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
@@ -338,21 +368,21 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         catalog->init(&opCtx);
         uow.commit();
     }
-    ASSERT_EQUALS(ident, catalog->getCollectionIdent(NamespaceString("a.b")));
+    ASSERT_EQUALS(ident, catalog->getEntry(catalogId).ident);
 
+    RecordId newCatalogId;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        dropCollection(&opCtx, "a.b", catalog.get()).transitional_ignore();
-        newCollection(&opCtx,
-                      NamespaceString("a.b"),
-                      CollectionOptions(),
-                      KVPrefix::kNotPrefixed,
-                      catalog.get())
-            .transitional_ignore();
+        dropCollection(&opCtx, catalogId, catalog.get()).transitional_ignore();
+        newCatalogId = newCollection(&opCtx,
+                                     NamespaceString("a.b"),
+                                     CollectionOptions(),
+                                     KVPrefix::kNotPrefixed,
+                                     catalog.get());
         uow.commit();
     }
-    ASSERT_NOT_EQUALS(ident, catalog->getCollectionIdent(NamespaceString("a.b")));
+    ASSERT_NOT_EQUALS(ident, catalog->getEntry(newCatalogId).ident);
 }
 
 TEST_F(DurableCatalogImplTest, Idx1) {
@@ -370,16 +400,17 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         uow.commit();
     }
 
+    RecordId catalogId;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(newCollection(&opCtx,
-                                NamespaceString("a.b"),
-                                CollectionOptions(),
-                                KVPrefix::kNotPrefixed,
-                                catalog.get()));
-        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent(NamespaceString("a.b")));
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
+        catalogId = newCollection(&opCtx,
+                                  NamespaceString("a.b"),
+                                  CollectionOptions(),
+                                  KVPrefix::kNotPrefixed,
+                                  catalog.get());
+        ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -398,21 +429,20 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
+        catalog->putMetaData(&opCtx, catalogId, md);
         uow.commit();
     }
 
     std::string idxIndent;
     {
         MyOperationContext opCtx(engine);
-        idxIndent = catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo");
+        idxIndent = catalog->getIndexIdent(&opCtx, catalogId, "foo");
     }
 
     {
         MyOperationContext opCtx(engine);
-        ASSERT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"));
-        ASSERT_TRUE(catalog->isUserDataIdent(
-            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
+        ASSERT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, catalogId, "foo"));
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, catalogId, "foo")));
     }
 
     {
@@ -421,7 +451,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);  // remove index
+        catalog->putMetaData(&opCtx, catalogId, md);  // remove index
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -431,13 +461,13 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
+        catalog->putMetaData(&opCtx, catalogId, md);
         uow.commit();
     }
 
     {
         MyOperationContext opCtx(engine);
-        ASSERT_NOT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"));
+        ASSERT_NOT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, catalogId, "foo"));
     }
 }
 
@@ -456,16 +486,17 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         uow.commit();
     }
 
+    RecordId catalogId;
     {  // collection
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(newCollection(&opCtx,
-                                NamespaceString("a.b"),
-                                CollectionOptions(),
-                                KVPrefix::kNotPrefixed,
-                                catalog.get()));
-        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent(NamespaceString("a.b")), "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
+        catalogId = newCollection(&opCtx,
+                                  NamespaceString("a.b"),
+                                  CollectionOptions(),
+                                  KVPrefix::kNotPrefixed,
+                                  catalog.get());
+        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -484,10 +515,9 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"), "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(
-            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
+        catalog->putMetaData(&opCtx, catalogId, md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, catalogId, "foo"), "a/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, catalogId, "foo")));
         uow.commit();
     }
 }
@@ -507,16 +537,17 @@ TEST_F(DurableCatalogImplTest, Split1) {
         uow.commit();
     }
 
+    RecordId catalogId;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(newCollection(&opCtx,
-                                NamespaceString("a.b"),
-                                CollectionOptions(),
-                                KVPrefix::kNotPrefixed,
-                                catalog.get()));
-        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent(NamespaceString("a.b")), "collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
+        catalogId = newCollection(&opCtx,
+                                  NamespaceString("a.b"),
+                                  CollectionOptions(),
+                                  KVPrefix::kNotPrefixed,
+                                  catalog.get());
+        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -535,11 +566,9 @@ TEST_F(DurableCatalogImplTest, Split1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"),
-                               "index/");
-        ASSERT_TRUE(catalog->isUserDataIdent(
-            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
+        catalog->putMetaData(&opCtx, catalogId, md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, catalogId, "foo"), "index/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, catalogId, "foo")));
         uow.commit();
     }
 }
@@ -559,17 +588,17 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         uow.commit();
     }
 
+    RecordId catalogId;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(newCollection(&opCtx,
-                                NamespaceString("a.b"),
-                                CollectionOptions(),
-                                KVPrefix::kNotPrefixed,
-                                catalog.get()));
-        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent(NamespaceString("a.b")),
-                               "a/collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
+        catalogId = newCollection(&opCtx,
+                                  NamespaceString("a.b"),
+                                  CollectionOptions(),
+                                  KVPrefix::kNotPrefixed,
+                                  catalog.get());
+        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -588,82 +617,10 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo"),
-                               "a/index/");
-        ASSERT_TRUE(catalog->isUserDataIdent(
-            catalog->getIndexIdent(&opCtx, NamespaceString("a.b"), "foo")));
+        catalog->putMetaData(&opCtx, catalogId, md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, catalogId, "foo"), "a/index/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, catalogId, "foo")));
         uow.commit();
-    }
-}
-
-TEST_F(DurableCatalogImplTest, RestartForPrefixes) {
-    storageGlobalParams.groupCollections = true;
-    ON_BLOCK_EXIT([&] { storageGlobalParams.groupCollections = false; });
-
-    KVPrefix abCollPrefix = KVPrefix::getNextPrefix(NamespaceString("a.b"));
-    KVPrefix fooIndexPrefix = KVPrefix::getNextPrefix(NamespaceString("a.b"));
-
-    std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
-    KVEngine* engine = helper->getEngine();
-    {
-        std::unique_ptr<RecordStore> rs;
-        std::unique_ptr<DurableCatalogImpl> catalog;
-        {
-            MyOperationContext opCtx(engine);
-            WriteUnitOfWork uow(&opCtx);
-            ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
-            rs = engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
-            catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx(engine);
-            WriteUnitOfWork uow(&opCtx);
-            ASSERT_OK(newCollection(
-                &opCtx, NamespaceString("a.b"), CollectionOptions(), abCollPrefix, catalog.get()));
-            ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent(NamespaceString("a.b")));
-            ASSERT_TRUE(
-                catalog->isUserDataIdent(catalog->getCollectionIdent(NamespaceString("a.b"))));
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx(engine);
-            WriteUnitOfWork uow(&opCtx);
-
-            BSONCollectionCatalogEntry::MetaData md;
-            md.ns = "a.b";
-
-            BSONCollectionCatalogEntry::IndexMetaData imd;
-            imd.spec = BSON("name"
-                            << "foo");
-            imd.ready = false;
-            imd.multikey = false;
-            imd.prefix = fooIndexPrefix;
-            imd.isBackgroundSecondaryBuild = false;
-            md.indexes.push_back(imd);
-            md.prefix = abCollPrefix;
-            catalog->putMetaData(&opCtx, NamespaceString("a.b"), md);
-            uow.commit();
-        }
-    }
-
-    engine = helper->restartEngine();
-    {
-        MyOperationContext opCtx(engine);
-        WriteUnitOfWork uow(&opCtx);
-        std::unique_ptr<RecordStore> rs =
-            engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
-        auto catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
-        catalog->init(&opCtx);
-
-        const BSONCollectionCatalogEntry::MetaData md =
-            catalog->getMetaData(&opCtx, NamespaceString("a.b"));
-        ASSERT_EQ("a.b", md.ns);
-        ASSERT_EQ(abCollPrefix, md.prefix);
-        ASSERT_EQ(fooIndexPrefix, md.indexes[md.findIndexOffset("foo")].prefix);
     }
 }
 
@@ -701,7 +658,8 @@ DEATH_TEST_F(DurableCatalogImplTest, TerminateOnNonNumericIndexVersion, "Fatal A
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        collection = std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), std::move(rs));
+        collection =
+            std::make_unique<CollectionImpl>(&opCtx, ns, RecordId(0), UUID::gen(), std::move(rs));
         uow.commit();
     }
 

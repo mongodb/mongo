@@ -65,21 +65,22 @@ public:
 
     void init(OperationContext* opCtx);
 
-    std::vector<NamespaceString> getAllCollections() const;
+    std::vector<Entry> getAllCatalogEntries(OperationContext* opCtx) const;
 
-    std::string getCollectionIdent(const NamespaceString& nss) const;
+    Entry getEntry(RecordId catalogId) const;
+
+    std::string getCollectionIdent(RecordId catalogId) const;
 
     std::string getIndexIdent(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              StringData idName) const;
+                              RecordId catalogId,
+                              StringData idxName) const;
 
     BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
-                                                     const NamespaceString& nss) const;
+                                                     RecordId catalogId) const;
     void putMetaData(OperationContext* opCtx,
-                     const NamespaceString& nss,
+                     RecordId catalogId,
                      BSONCollectionCatalogEntry::MetaData& md);
 
-    std::vector<std::string> getAllIdentsForDB(StringData db) const;
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
 
     bool isUserDataIdent(StringData ident) const;
@@ -103,112 +104,113 @@ public:
 
     std::string newInternalIdent();
 
-    StatusWith<std::unique_ptr<RecordStore>> createCollection(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const CollectionOptions& options,
-                                                              bool allocateDefaultSpace);
+    StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const CollectionOptions& options,
+        bool allocateDefaultSpace);
 
     Status renameCollection(OperationContext* opCtx,
-                            const NamespaceString& fromNss,
+                            RecordId catalogId,
                             const NamespaceString& toNss,
                             bool stayTemp);
 
-    Status dropCollection(OperationContext* opCtx, const NamespaceString& nss);
+    Status dropCollection(OperationContext* opCtx, RecordId catalogId);
 
-    void updateCappedSize(OperationContext* opCtx, NamespaceString ns, long long size);
+    void updateCappedSize(OperationContext* opCtx, RecordId catalogId, long long size);
 
     void updateTTLSetting(OperationContext* opCtx,
-                          NamespaceString ns,
+                          RecordId catalogId,
                           StringData idxName,
                           long long newExpireSeconds);
 
     bool isEqualToMetadataUUID(OperationContext* opCtx,
-                               NamespaceString ns,
+                               RecordId catalogId,
                                OptionalCollectionUUID uuid);
 
-    void setIsTemp(OperationContext* opCtx, NamespaceString ns, bool isTemp);
+    void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp);
 
     boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
-                                                    NamespaceString ns,
+                                                    RecordId catalogId,
                                                     StringData indexName) const;
 
     void updateValidator(OperationContext* opCtx,
-                         NamespaceString ns,
+                         RecordId catalogId,
                          const BSONObj& validator,
                          StringData validationLevel,
                          StringData validationAction);
 
-    Status removeIndex(OperationContext* opCtx, NamespaceString ns, StringData indexName);
+    Status removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 
     Status prepareForIndexBuild(OperationContext* opCtx,
-                                NamespaceString ns,
+                                RecordId catalogId,
                                 const IndexDescriptor* spec,
                                 IndexBuildProtocol indexBuildProtocol,
                                 bool isBackgroundSecondaryBuild);
 
     bool isTwoPhaseIndexBuild(OperationContext* opCtx,
-                              NamespaceString ns,
+                              RecordId catalogId,
                               StringData indexName) const;
 
     void setIndexBuildScanning(OperationContext* opCtx,
-                               NamespaceString ns,
+                               RecordId catalogId,
                                StringData indexName,
                                std::string sideWritesIdent,
                                boost::optional<std::string> constraintViolationsIdent);
 
 
     bool isIndexBuildScanning(OperationContext* opCtx,
-                              NamespaceString ns,
+                              RecordId catalogId,
                               StringData indexName) const;
 
-    void setIndexBuildDraining(OperationContext* opCtx, NamespaceString ns, StringData indexName);
+    void setIndexBuildDraining(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 
     bool isIndexBuildDraining(OperationContext* opCtx,
-                              NamespaceString ns,
+                              RecordId catalogId,
                               StringData indexName) const;
 
-    void indexBuildSuccess(OperationContext* opCtx, NamespaceString ns, StringData indexName);
+    void indexBuildSuccess(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 
     bool isIndexMultikey(OperationContext* opCtx,
-                         NamespaceString ns,
+                         RecordId catalogId,
                          StringData indexName,
                          MultikeyPaths* multikeyPaths) const;
 
     bool setIndexIsMultikey(OperationContext* opCtx,
-                            NamespaceString ns,
+                            RecordId catalogId,
                             StringData indexName,
                             const MultikeyPaths& multikeyPaths);
 
     boost::optional<std::string> getConstraintViolationsIdent(OperationContext* opCtx,
-                                                              NamespaceString ns,
+                                                              RecordId catalogId,
                                                               StringData indexName) const;
 
     long getIndexBuildVersion(OperationContext* opCtx,
-                              NamespaceString ns,
+                              RecordId catalogId,
                               StringData indexName) const;
 
-    CollectionOptions getCollectionOptions(OperationContext* opCtx, NamespaceString ns) const;
+    CollectionOptions getCollectionOptions(OperationContext* opCtx, RecordId catalogId) const;
 
-    int getTotalIndexCount(OperationContext* opCtx, NamespaceString ns) const;
+    int getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const;
 
-    int getCompletedIndexCount(OperationContext* opCtx, NamespaceString ns) const;
+    int getCompletedIndexCount(OperationContext* opCtx, RecordId catalogId) const;
 
-    BSONObj getIndexSpec(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
+    BSONObj getIndexSpec(OperationContext* opCtx, RecordId catalogId, StringData indexName) const;
 
     void getAllIndexes(OperationContext* opCtx,
-                       NamespaceString ns,
+                       RecordId catalogId,
                        std::vector<std::string>* names) const;
 
     void getReadyIndexes(OperationContext* opCtx,
-                         NamespaceString ns,
+                         RecordId catalogId,
                          std::vector<std::string>* names) const;
 
-    bool isIndexPresent(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
+    bool isIndexPresent(OperationContext* opCtx, RecordId catalogId, StringData indexName) const;
 
-    bool isIndexReady(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
+    bool isIndexReady(OperationContext* opCtx, RecordId catalogId, StringData indexName) const;
 
     KVPrefix getIndexPrefix(OperationContext* opCtx,
-                            NamespaceString ns,
+                            RecordId catalogId,
                             StringData indexName) const;
 
 private:
@@ -221,25 +223,23 @@ private:
     friend class DurableCatalogImplTest;
     friend class StorageEngineTest;
 
-    BSONObj _findEntry(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       RecordId* out = nullptr) const;
-    Status _addEntry(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     const CollectionOptions& options,
-                     KVPrefix prefix);
+    BSONObj _findEntry(OperationContext* opCtx, RecordId catalogId) const;
+    StatusWith<Entry> _addEntry(OperationContext* opCtx,
+                                NamespaceString nss,
+                                const CollectionOptions& options,
+                                KVPrefix prefix);
     Status _replaceEntry(OperationContext* opCtx,
-                         const NamespaceString& fromNss,
+                         RecordId catalogId,
                          const NamespaceString& toNss,
                          bool stayTemp);
-    Status _removeEntry(OperationContext* opCtx, const NamespaceString& nss);
+    Status _removeEntry(OperationContext* opCtx, RecordId catalogId);
 
     /**
      * Generates a new unique identifier for a new "thing".
      * @param nss - the containing namespace
      * @param kind - what this "thing" is, likely collection or index
      */
-    std::string _newUniqueIdent(const NamespaceString& nss, const char* kind);
+    std::string _newUniqueIdent(NamespaceString nss, const char* kind);
 
     // Helpers only used by constructor and init(). Don't call from elsewhere.
     static std::string _newRand();
@@ -253,15 +253,9 @@ private:
     std::string _rand;  // effectively const after init() returns
     AtomicWord<unsigned long long> _next;
 
-    struct Entry {
-        Entry() {}
-        Entry(std::string i, RecordId l) : ident(i), storedLoc(l) {}
-        std::string ident;
-        RecordId storedLoc;
-    };
-    typedef std::map<std::string, Entry> NSToIdentMap;
-    NSToIdentMap _idents;
-    mutable Mutex _identsLock = MONGO_MAKE_LATCH("DurableCatalogImpl::_identsLock");
+    std::map<RecordId, Entry> _catalogIdToEntryMap;
+    mutable Mutex _catalogIdToEntryMapLock =
+        MONGO_MAKE_LATCH("DurableCatalogImpl::_catalogIdToEntryMap");
 
     // Manages the feature document that may be present in the DurableCatalogImpl. '_featureTracker'
     // is guaranteed to be non-null after DurableCatalogImpl::init() is called.

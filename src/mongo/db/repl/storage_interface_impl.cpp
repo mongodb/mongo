@@ -426,7 +426,8 @@ StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx
         return collectionResult.getStatus();
     }
 
-    const auto options = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
+    const auto options = DurableCatalog::get(opCtx)->getCollectionOptions(
+        opCtx, collectionResult.getValue()->getCatalogId());
     if (!options.capped)
         return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
 

@@ -350,7 +350,7 @@ Status _collModInternal(OperationContext* opCtx,
         // options so we save the relevant TTL index data in a separate object.
 
         CollectionOptions oldCollOptions =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
+            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->getCatalogId());
 
         boost::optional<TTLCollModInfo> ttlInfo;
 
@@ -363,8 +363,10 @@ Status _collModInternal(OperationContext* opCtx,
 
             if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
                 // Change the value of "expireAfterSeconds" on disk.
-                DurableCatalog::get(opCtx)->updateTTLSetting(
-                    opCtx, coll->ns(), cmrOld.idx->indexName(), newExpireSecs.safeNumberLong());
+                DurableCatalog::get(opCtx)->updateTTLSetting(opCtx,
+                                                             coll->getCatalogId(),
+                                                             cmrOld.idx->indexName(),
+                                                             newExpireSecs.safeNumberLong());
 
                 // Notify the index catalog that the definition of this index changed. This will
                 // invalidate the idx pointer in cmrOld. On rollback of this WUOW, the idx pointer

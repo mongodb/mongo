@@ -791,7 +791,9 @@ TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempFalseMakesItNotTemp
 
     AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
     ASSERT_TRUE(autoColl2.getCollection());
-    ASSERT_FALSE(DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, toNss).temp);
+    ASSERT_FALSE(DurableCatalog::get(opCtx)
+                     ->getCollectionOptions(opCtx, autoColl2.getCollection()->getCatalogId())
+                     .temp);
 }
 
 TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempTrueMakesItTemp) {
@@ -810,7 +812,9 @@ TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempTrueMakesItTemp) {
 
     AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
     ASSERT_TRUE(autoColl2.getCollection());
-    ASSERT_TRUE(DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, toNss).temp);
+    ASSERT_TRUE(DurableCatalog::get(opCtx)
+                    ->getCollectionOptions(opCtx, autoColl2.getCollection()->getCatalogId())
+                    .temp);
 }
 
 TEST_F(StorageInterfaceImplTest, RenameCollectionFailsBetweenDatabases) {

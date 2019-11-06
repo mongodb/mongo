@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 class Collection;
@@ -52,7 +53,7 @@ typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
  *               should be included in the result.
  */
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           const NamespaceString& nss,
+                                           RecordId catalogId,
                                            std::function<bool(const std::string&)> filter =
                                                [](const std::string& indexName) { return true; });
 

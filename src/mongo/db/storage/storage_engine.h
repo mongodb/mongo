@@ -313,7 +313,9 @@ public:
      * Generally, this method should not be called directly except by the repairDatabase()
      * free function.
      */
-    virtual Status repairRecordStore(OperationContext* opCtx, const NamespaceString& nss) = 0;
+    virtual Status repairRecordStore(OperationContext* opCtx,
+                                     RecordId catalogId,
+                                     const NamespaceString& nss) = 0;
 
     /**
      * Creates a temporary RecordStore on the storage engine. This record store will drop itself
@@ -488,14 +490,17 @@ public:
      */
     virtual void triggerJournalFlush() const = 0;
 
-    // (CollectionName, IndexName)
-    typedef std::pair<std::string, std::string> CollectionIndexNamePair;
+    struct IndexIdentifier {
+        const RecordId catalogId;
+        const NamespaceString nss;
+        const std::string indexName;
+    };
 
     /**
      * Drop abandoned idents. In the successful case, returns a list of collection, index name
      * pairs to rebuild.
      */
-    virtual StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
+    virtual StatusWith<std::vector<IndexIdentifier>> reconcileCatalogAndIdents(
         OperationContext* opCtx) = 0;
 
     /**

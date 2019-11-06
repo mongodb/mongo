@@ -96,7 +96,9 @@ public:
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine does not support a concurrent mode.");
     }
-    Status repairRecordStore(OperationContext* opCtx, const NamespaceString& ns) final {
+    Status repairRecordStore(OperationContext* opCtx,
+                             RecordId catalogId,
+                             const NamespaceString& ns) final {
         return Status::OK();
     }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx) final {
@@ -146,9 +148,9 @@ public:
     }
     void setCachePressureForTest(int pressure) final {}
     void triggerJournalFlush() const final {}
-    StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
+    StatusWith<std::vector<IndexIdentifier>> reconcileCatalogAndIdents(
         OperationContext* opCtx) final {
-        return std::vector<CollectionIndexNamePair>();
+        return std::vector<IndexIdentifier>();
     }
     Timestamp getAllDurableTimestamp() const final {
         return {};

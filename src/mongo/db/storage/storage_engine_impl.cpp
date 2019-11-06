@@ -137,8 +137,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
         std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
     }
 
-    auto collectionsKnownToCatalog = _catalog->getAllCollections();
-
+    std::vector<DurableCatalog::Entry> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
     if (_options.forRepair) {
         // It's possible that there are collection files on disk that are unknown to the catalog. In
         // a repair context, if we can't find an ident in the catalog, we generate a catalog entry
@@ -146,12 +145,10 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
         // will be dropped in reconcileCatalogAndIdents().
         for (const auto& ident : identsKnownToStorageEngine) {
             if (_catalog->isCollectionIdent(ident)) {
-                bool isOrphan = !std::any_of(collectionsKnownToCatalog.begin(),
-                                             collectionsKnownToCatalog.end(),
-                                             [this, &ident](const auto& coll) {
-                                                 return _catalog->getCollectionIdent(
-                                                            NamespaceString(coll)) == ident;
-                                             });
+                bool isOrphan = !std::any_of(
+                    catalogEntries.begin(),
+                    catalogEntries.end(),
+                    [this, &ident](DurableCatalog::Entry entry) { return entry.ident == ident; });
                 if (isOrphan) {
                     // If the catalog does not have information about this
                     // collection, we create an new entry for it.
@@ -185,15 +182,13 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
     }
 
     KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
-    for (const auto& nss : collectionsKnownToCatalog) {
-        std::string dbName = nss.db().toString();
-
+    for (DurableCatalog::Entry entry : catalogEntries) {
         if (loadingFromUncleanShutdownOrRepair) {
             // If we are loading the catalog after an unclean shutdown or during repair, it's
             // possible that there are collections in the catalog that are unknown to the storage
             // engine. If we can't find a table in the list of storage engine idents, either
             // attempt to recover the ident or drop it.
-            const auto collectionIdent = _catalog->getCollectionIdent(nss);
+            const auto collectionIdent = entry.ident;
             bool orphan = !std::binary_search(identsKnownToStorageEngine.begin(),
                                               identsKnownToStorageEngine.end(),
                                               collectionIdent);
@@ -201,17 +196,18 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
             // store, drop it from the catalog and skip initializing it by continuing past the
             // following logic.
             if (orphan) {
-                auto status = _recoverOrphanedCollection(opCtx, nss, collectionIdent);
+                auto status =
+                    _recoverOrphanedCollection(opCtx, entry.catalogId, entry.nss, collectionIdent);
                 if (!status.isOK()) {
-                    warning() << "Failed to recover orphaned data file for collection '" << nss
-                              << "': " << status;
+                    warning() << "Failed to recover orphaned data file for collection '"
+                              << entry.nss << "': " << status;
                     WriteUnitOfWork wuow(opCtx);
-                    fassert(50716, _catalog->_removeEntry(opCtx, nss));
+                    fassert(50716, _catalog->_removeEntry(opCtx, entry.catalogId));
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
                             ->invalidatingModification(str::stream()
-                                                       << "Collection " << nss
+                                                       << "Collection " << entry.nss
                                                        << " dropped: " << status.reason());
                     }
                     wuow.commit();
@@ -220,12 +216,12 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
             }
         }
 
-        _initCollection(opCtx, nss, _options.forRepair);
-        auto maxPrefixForCollection = _catalog->getMetaData(opCtx, nss).getMaxPrefix();
+        _initCollection(opCtx, entry.catalogId, entry.nss, _options.forRepair);
+        auto maxPrefixForCollection = _catalog->getMetaData(opCtx, entry.catalogId).getMaxPrefix();
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
 
-        if (nss.isOrphanCollection()) {
-            log() << "Orphaned collection found: " << nss;
+        if (entry.nss.isOrphanCollection()) {
+            log() << "Orphaned collection found: " << entry.nss;
         }
     }
 
@@ -238,14 +234,15 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 }
 
 void StorageEngineImpl::_initCollection(OperationContext* opCtx,
+                                        RecordId catalogId,
                                         const NamespaceString& nss,
                                         bool forRepair) {
-    BSONCollectionCatalogEntry::MetaData md = _catalog->getMetaData(opCtx, nss);
+    BSONCollectionCatalogEntry::MetaData md = _catalog->getMetaData(opCtx, catalogId);
     uassert(ErrorCodes::MustDowngrade,
             str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << nss,
             md.options.uuid);
 
-    auto ident = _catalog->getCollectionIdent(nss);
+    auto ident = _catalog->getEntry(catalogId).ident;
 
     std::unique_ptr<RecordStore> rs;
     if (forRepair) {
@@ -257,10 +254,10 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
         invariant(rs);
     }
 
-    auto uuid = _catalog->getCollectionOptions(opCtx, nss).uuid.get();
+    auto uuid = _catalog->getCollectionOptions(opCtx, catalogId).uuid.get();
 
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
-    auto collection = collectionFactory->make(opCtx, nss, uuid, std::move(rs));
+    auto collection = collectionFactory->make(opCtx, nss, catalogId, uuid, std::move(rs));
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
     collectionCatalog.registerCollection(uuid, std::move(collection));
@@ -279,6 +276,7 @@ void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
 }
 
 Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
+                                                     RecordId catalogId,
                                                      const NamespaceString& collectionName,
                                                      StringData collectionIdent) {
     if (!_options.forRepair) {
@@ -289,10 +287,9 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
           << collectionIdent;
 
     WriteUnitOfWork wuow(opCtx);
-    const auto metadata = _catalog->getMetaData(opCtx, collectionName);
-    auto status =
+    const auto metadata = _catalog->getMetaData(opCtx, catalogId);
+    Status status =
         _engine->recoverOrphanedIdent(opCtx, collectionName, collectionIdent, metadata.options);
-
 
     bool dataModified = status.code() == ErrorCodes::DataModifiedByRepair;
     if (!status.isOK() && !dataModified) {
@@ -320,7 +317,7 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
  * Third, a DurableCatalog may have an index ident that the KVEngine does not. This method will
  * rebuild the index.
  */
-StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>>
+StatusWith<std::vector<StorageEngine::IndexIdentifier>>
 StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
     // Gather all tables known to the storage engine and drop those that aren't cross-referenced
     // in the _mdb_catalog. This can happen for two reasons.
@@ -392,14 +389,13 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
     // engine. An omission here is fatal. A missing ident could mean a collection drop was rolled
     // back. Note that startup already attempts to open tables; this should only catch errors in
     // other contexts such as `recoverToStableTimestamp`.
-    auto collections = _catalog->getAllCollections();
+    std::vector<DurableCatalog::Entry> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
     if (!_options.forRepair) {
-        for (const auto& coll : collections) {
-            const auto& identForColl = _catalog->getCollectionIdent(coll);
-            if (engineIdents.find(identForColl) == engineIdents.end()) {
+        for (DurableCatalog::Entry entry : catalogEntries) {
+            if (engineIdents.find(entry.ident) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
-                        str::stream() << "Expected collection does not exist. Collection: " << coll
-                                      << " Ident: " << identForColl};
+                        str::stream() << "Expected collection does not exist. Collection: "
+                                      << entry.nss << " Ident: " << entry.ident};
             }
         }
     }
@@ -409,15 +405,17 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
     //
     // Also, remove unfinished builds except those that were background index builds started on a
     // secondary.
-    std::vector<CollectionIndexNamePair> ret;
-    for (const auto& coll : collections) {
-        BSONCollectionCatalogEntry::MetaData metaData = _catalog->getMetaData(opCtx, coll);
+    std::vector<StorageEngine::IndexIdentifier> ret;
+    for (DurableCatalog::Entry entry : catalogEntries) {
+        BSONCollectionCatalogEntry::MetaData metaData =
+            _catalog->getMetaData(opCtx, entry.catalogId);
+        NamespaceString coll(metaData.ns);
 
         // Batch up the indexes to remove them from `metaData` outside of the iterator.
         std::vector<std::string> indexesToDrop;
         for (const auto& indexMetaData : metaData.indexes) {
             const std::string& indexName = indexMetaData.name();
-            std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
+            std::string indexIdent = _catalog->getIndexIdent(opCtx, entry.catalogId, indexName);
 
             // Warn in case of incorrect "multikeyPath" information in catalog documents. This is
             // the result of a concurrency bug which has since been fixed, but may persist in
@@ -442,7 +440,7 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
             if (indexMetaData.ready && !foundIdent) {
                 log() << "Expected index data is missing, rebuilding. Collection: " << coll
                       << " Index: " << indexName;
-                ret.emplace_back(coll.ns(), indexName);
+                ret.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
 
@@ -488,7 +486,7 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
                 log() << "Expected background index build did not complete, rebuilding. "
                          "Collection: "
                       << coll << " Index: " << indexName;
-                ret.emplace_back(coll.ns(), indexName);
+                ret.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
 
@@ -515,7 +513,7 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
-            _catalog->putMetaData(opCtx, coll, metaData);
+            _catalog->putMetaData(opCtx, entry.catalogId, metaData);
             wuow.commit();
         }
     }
@@ -629,17 +627,17 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     for (auto& nss : toDrop) {
         invariant(getCatalog());
-        auto uuid = CollectionCatalog::get(opCtx).lookupUUIDByNSS(nss).get();
-        Status result = getCatalog()->dropCollection(opCtx, nss);
+        auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        Status result = getCatalog()->dropCollection(opCtx, coll->getCatalogId());
 
         if (!result.isOK() && firstError.isOK()) {
             firstError = result;
         }
 
-        auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(uuid);
+        auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(coll->uuid());
         opCtx->recoveryUnit()->registerChange(
             CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(std::move(removedColl),
-                                                                         uuid));
+                                                                         coll->uuid()));
     }
 
     untimestampedDropWuow.commit();
@@ -697,11 +695,13 @@ SnapshotManager* StorageEngineImpl::getSnapshotManager() const {
     return _engine->getSnapshotManager();
 }
 
-Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx, const NamespaceString& nss) {
+Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
+                                            RecordId catalogId,
+                                            const NamespaceString& nss) {
     auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
     invariant(repairObserver->isIncomplete());
 
-    Status status = _engine->repairIdent(opCtx, _catalog->getCollectionIdent(nss));
+    Status status = _engine->repairIdent(opCtx, _catalog->getEntry(catalogId).ident);
     bool dataModified = status.code() == ErrorCodes::DataModifiedByRepair;
     if (!status.isOK() && !dataModified) {
         return status;
@@ -716,7 +716,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx, const Names
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
     auto uuid = collectionCatalog.lookupUUIDByNSS(nss).get();
     collectionCatalog.deregisterCollection(uuid);
-    _initCollection(opCtx, nss, false);
+    _initCollection(opCtx, catalogId, nss, false);
     return Status::OK();
 }
 
@@ -1012,10 +1012,11 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
         size += collection->getRecordStore()->storageSize(opCtx);
 
         std::vector<std::string> indexNames;
-        _catalog->getAllIndexes(opCtx, collection->ns(), &indexNames);
+        _catalog->getAllIndexes(opCtx, collection->getCatalogId(), &indexNames);
 
         for (size_t i = 0; i < indexNames.size(); i++) {
-            std::string ident = _catalog->getIndexIdent(opCtx, collection->ns(), indexNames[i]);
+            std::string ident =
+                _catalog->getIndexIdent(opCtx, collection->getCatalogId(), indexNames[i]);
             size += _engine->getIdentSize(opCtx, ident);
         }
 

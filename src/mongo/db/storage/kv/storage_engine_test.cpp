@@ -62,8 +62,8 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
 
     // Add a collection, `db.coll1` to both the DurableCatalog and KVEngine. The returned value is
     // the `ident` name given to the collection.
-    auto swIdentName = createCollection(opCtx.get(), NamespaceString("db.coll1"));
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), NamespaceString("db.coll1"));
+    ASSERT_OK(swCollInfo.getStatus());
     // Create a table in the KVEngine not reflected in the DurableCatalog. This should be dropped
     // when reconciling.
     ASSERT_OK(createCollTable(opCtx.get(), NamespaceString("db.coll2")));
@@ -72,7 +72,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto idents = std::set<std::string>(identsVec.begin(), identsVec.end());
     // There are two idents. `_mdb_catalog` and the ident for `db.coll1`.
     ASSERT_EQUALS(static_cast<const unsigned long>(2), idents.size());
-    ASSERT_TRUE(idents.find(swIdentName.getValue()) != idents.end());
+    ASSERT_TRUE(idents.find(swCollInfo.getValue().ident) != idents.end());
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
     // Create a catalog entry for the `_id` index. Drop the created the table.
@@ -83,12 +83,12 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto reconcileStatus = reconcile(opCtx.get());
     ASSERT_OK(reconcileStatus.getStatus());
     ASSERT_EQUALS(static_cast<const unsigned long>(1), reconcileStatus.getValue().size());
-    StorageEngine::CollectionIndexNamePair& toRebuild = reconcileStatus.getValue()[0];
-    ASSERT_EQUALS("db.coll1", toRebuild.first);
-    ASSERT_EQUALS("_id", toRebuild.second);
+    StorageEngine::IndexIdentifier& toRebuild = reconcileStatus.getValue()[0];
+    ASSERT_EQUALS("db.coll1", toRebuild.nss.ns());
+    ASSERT_EQUALS("_id", toRebuild.indexName);
 
     // Now drop the `db.coll1` table, while leaving the DurableCatalog entry.
-    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT_OK(dropIdent(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
     // Reconciling this should result in an error.
@@ -101,10 +101,10 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
-    auto swIdentName = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT_OK(dropIdent(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the collection has been dropped because the
@@ -116,7 +116,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
         _storageEngine->loadCatalog(opCtx.get());
     }
 
-    ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(!collectionExists(opCtx.get(), collNs));
 }
 
@@ -167,8 +167,8 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
     const NamespaceString ns("db.coll1");
     const std::string indexName("a_1");
 
-    auto swIdentName = createCollection(opCtx.get(), ns);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), ns);
+    ASSERT_OK(swCollInfo.getStatus());
 
     const bool isBackgroundSecondaryBuild = false;
     ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild));
@@ -176,7 +176,8 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
     auto sideWrites = makeTemporary(opCtx.get());
     auto constraintViolations = makeTemporary(opCtx.get());
 
-    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns, indexName);
+    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(
+        opCtx.get(), swCollInfo.getValue().catalogId, indexName);
 
     indexBuildScan(opCtx.get(),
                    ns,
@@ -208,8 +209,8 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSeco
     const NamespaceString ns("db.coll1");
     const std::string indexName("a_1");
 
-    auto swIdentName = createCollection(opCtx.get(), ns);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), ns);
+    ASSERT_OK(swCollInfo.getStatus());
 
     const bool isBackgroundSecondaryBuild = true;
     ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild));
@@ -217,7 +218,8 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSeco
     auto sideWrites = makeTemporary(opCtx.get());
     auto constraintViolations = makeTemporary(opCtx.get());
 
-    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns, indexName);
+    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(
+        opCtx.get(), swCollInfo.getValue().catalogId, indexName);
 
     indexBuildScan(opCtx.get(),
                    ns,
@@ -233,9 +235,9 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSeco
     // Because this backgroundSecondary index is unfinished, reconcile will identify that it should
     // be rebuilt.
     ASSERT_EQUALS(1UL, reconcileStatus.getValue().size());
-    StorageEngine::CollectionIndexNamePair& toRebuild = reconcileStatus.getValue()[0];
-    ASSERT_EQUALS(ns.toString(), toRebuild.first);
-    ASSERT_EQUALS(indexName, toRebuild.second);
+    StorageEngine::IndexIdentifier& toRebuild = reconcileStatus.getValue()[0];
+    ASSERT_EQUALS(ns, toRebuild.nss);
+    ASSERT_EQUALS(indexName, toRebuild.indexName);
 
     // Because these temporary idents were associated with an in-progress index build, they are not
     // dropped.
@@ -250,10 +252,10 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
-    auto swIdentName = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT_OK(dropIdent(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the ident has been recovered because the
@@ -264,7 +266,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
         _storageEngine->loadCatalog(opCtx.get());
     }
 
-    ASSERT(identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
@@ -274,17 +276,17 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
-    auto swIdentName = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT_OK(dropIdent(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // Reconcile would normally return an error if a collection existed with a missing ident in the
     // storage engine. When in a repair context, that should not be the case.
     ASSERT_OK(reconcile(opCtx.get()).getStatus());
 
-    ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
     ASSERT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
@@ -294,8 +296,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
-    auto swIdentName = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     AutoGetDb db(opCtx.get(), collNs.db(), LockMode::MODE_X);
@@ -307,11 +309,11 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 
     // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadCatalog(opCtx.get());
-    auto identNs = swIdentName.getValue();
+    auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
 
-    ASSERT(identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), orphanNs));
 
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
@@ -322,8 +324,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
-    auto swIdentName = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swIdentName);
+    auto swCollInfo = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     AutoGetDb db(opCtx.get(), collNs.db(), LockMode::MODE_X);
@@ -339,8 +341,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     // reconcileCatalogAndIdents() drops orphaned idents.
     ASSERT_OK(reconcile(opCtx.get()).getStatus());
 
-    ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
-    auto identNs = swIdentName.getValue();
+    ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
+    auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
     ASSERT(!collectionExists(opCtx.get(), orphanNs));
