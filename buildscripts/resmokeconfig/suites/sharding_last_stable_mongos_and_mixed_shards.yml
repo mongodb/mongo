@@ -67,7 +67,8 @@ selector:
     # Enable if SERVER-42273 is backported or 4.4 becomes last-stable
   - jstests/sharding/move_jumbo_chunk.js
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
-
+  # Enable after SERVER-31083 is backported and available on 4.2 and 4.0 binaries
+  - jstests/sharding/enable_sharding_with_primary.js
 executor:
   config:
     shell_options:

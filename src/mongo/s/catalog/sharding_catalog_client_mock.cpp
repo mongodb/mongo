@@ -188,7 +188,8 @@ Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* opCtx,
 }
 
 Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
-                                                 const std::string& dbName) {
+                                                 StringData dbName,
+                                                 ShardId primaryShard) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

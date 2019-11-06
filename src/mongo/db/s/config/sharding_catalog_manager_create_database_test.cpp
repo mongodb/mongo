@@ -61,11 +61,12 @@ namespace {
 
 using executor::RemoteCommandRequest;
 using std::vector;
+using unittest::assertGet;
 
 using CreateDatabaseTest = ConfigServerTestFixture;
 
-TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
-    const std::string dbname = "db1";
+TEST_F(CreateDatabaseTest, createDatabaseSuccessWithoutCustomPrimary) {
+    auto dbname = StringData("db1");
 
     ShardType s0;
     s0.setName("shard0000");
@@ -101,7 +102,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     auto future = launchAsync([this, dbname] {
         ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
-        ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname);
+        ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname, ShardId());
     });
 
     // Return size information about first shard
@@ -159,6 +160,66 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     future.default_timed_get();
 }
 
+TEST_F(CreateDatabaseTest, createDatabaseSuccessWithCustomPrimary) {
+    const std::string primaryShardName = "shard0002";
+    auto dbname = StringData("dbWithCustomPrimary1");
+
+    ShardType s0;
+    s0.setName("shard0000");
+    s0.setHost("ShardHost0:27017");
+    setupShards(vector<ShardType>{s0});
+
+    ShardType s1;
+    s1.setName("shard0001");
+    s1.setHost("ShardHost1:27017");
+    setupShards(vector<ShardType>{s1});
+
+    ShardType s2;
+    s2.setName(primaryShardName);
+    s2.setHost("ShardHost2:27017");
+    setupShards(vector<ShardType>{s2});
+
+    // Prime the shard registry with information about the existing shards
+    shardRegistry()->reload(operationContext());
+
+    // Set up all the target mocks return values.
+    RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s0.getName()))->getTargeter())
+        ->setFindHostReturnValue(HostAndPort(s0.getHost()));
+    RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s1.getName()))->getTargeter())
+        ->setFindHostReturnValue(HostAndPort(s1.getHost()));
+    RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s2.getName()))->getTargeter())
+        ->setFindHostReturnValue(HostAndPort(s2.getHost()));
+
+    // Now actually start the createDatabase work.
+
+    auto future = launchAsync([this, dbname, primaryShardName] {
+        ThreadClient tc("Test", getGlobalServiceContext());
+        auto opCtx = cc().makeOperationContext();
+        ShardingCatalogManager::get(opCtx.get())
+            ->createDatabase(opCtx.get(), dbname, ShardId(primaryShardName));
+    });
+
+    // Return OK for _flushDatabaseCacheUpdates
+    onCommand([&](const RemoteCommandRequest& request) {
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("_flushDatabaseCacheUpdates", cmdName);
+
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+
+    auto databaseDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), DatabaseType::ConfigNS, BSON("_id" << dbname)));
+
+    DatabaseType foundDatabase = assertGet(DatabaseType::fromBSON(databaseDoc));
+
+    ASSERT_EQUALS(primaryShardName, foundDatabase.getPrimary());
+}
+
 TEST_F(CreateDatabaseTest,
        createDatabaseShardReturnsNamespaceNotFoundForFlushDatabaseCacheUpdates) {
     const std::string dbname = "db1";
@@ -197,7 +258,7 @@ TEST_F(CreateDatabaseTest,
     auto future = launchAsync([this, dbname] {
         ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
-        ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname);
+        ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname, ShardId());
     });
 
     // Return size information about first shard
@@ -267,7 +328,8 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
 
     setupDatabase(dbname, shard.getName(), false);
 
-    ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);
+    ShardingCatalogManager::get(operationContext())
+        ->createDatabase(operationContext(), dbname, ShardId());
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
@@ -282,18 +344,18 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
 
     setupDatabase(dbnameDiffCase, shard.getName(), false);
 
-    ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname),
-        AssertionException,
-        ErrorCodes::DatabaseDifferCase);
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), dbname, ShardId()),
+                       AssertionException,
+                       ErrorCodes::DatabaseDifferCase);
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseNoShards) {
     const std::string dbname = "db5";
-    ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname),
-        AssertionException,
-        ErrorCodes::ShardNotFound);
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), dbname, ShardId()),
+                       AssertionException,
+                       ErrorCodes::ShardNotFound);
 }
 
 }  // namespace

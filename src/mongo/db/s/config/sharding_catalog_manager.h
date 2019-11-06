@@ -232,7 +232,7 @@ public:
      *
      * Throws DatabaseDifferCase if the database already exists with a different case.
      */
-    DatabaseType createDatabase(OperationContext* opCtx, const std::string& dbName);
+    DatabaseType createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
 
     /**
      * Creates a ScopedLock on the database name in _namespaceSerializer. This is to prevent
@@ -248,7 +248,7 @@ public:
      *
      * Throws DatabaseDifferCase if the database already exists with a different case.
      */
-    void enableSharding(OperationContext* opCtx, const std::string& dbName);
+    void enableSharding(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
 
     /**
      * Retrieves all databases for a shard.
