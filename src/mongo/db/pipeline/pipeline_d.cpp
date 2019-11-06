@@ -360,8 +360,6 @@ PipelineD::buildInnerQueryExecutor(Collection* collection,
                 // Pipeline) and an exception is thrown, an invariant will trigger in the
                 // DocumentSourceCursor. This is a design flaw in DocumentSourceCursor.
 
-                // TODO SERVER-37453 this should no longer be necessary when we no don't need locks
-                // to destroy a PlanExecutor.
                 auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
                 const bool shouldProduceEmptyDocs = deps.hasNoRequirements();
                 auto attachExecutorCallback =
