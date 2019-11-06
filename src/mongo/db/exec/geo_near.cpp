@@ -420,8 +420,8 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
 
         // Estimator finished its work, we need to finish initialization too.
         if (SPHERE == _nearParams.nearQuery->centroid->crs) {
-            // Estimated distance is in degrees, convert it to meters.
-            _boundsIncrement = deg2rad(estimatedDistance) * kRadiusOfEarthInMeters * 3;
+            // Estimated distance is in degrees, convert it to meters multiplied by 3.
+            _boundsIncrement = (estimatedDistance * kRadiusOfEarthInMeters * 3) * (M_PI / 180);
             // Limit boundsIncrement to ~20KM, so that the first circle won't be too aggressive.
             _boundsIncrement = std::min(_boundsIncrement, kMaxEarthDistanceInMeters / 1000.0);
         } else {
