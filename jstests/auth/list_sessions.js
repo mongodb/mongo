@@ -62,10 +62,6 @@ function runListSessionsTest(mongod) {
     // Ensure users can't view either other's sessions.
     assertErrorCode(config.system.sessions, user1Pipeline, ErrorCodes.Unauthorized);
 
-    if (true) {
-        // TODO SERVER-29141: Support forcing pipelines to run on mongos
-        return;
-    }
     function listLocalSessions() {
         return config.aggregate([{'$listLocalSessions': {}}]);
     }
