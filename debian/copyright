@@ -17,7 +17,7 @@ Copyright:
 
 License:
 
-    AGPL
+    SSPL
 
 The Debian packaging is (C) 2009, Kristina Chodorow <kristina@10gen.com> and
-is licensed under the AGPL, see `http://www.fsf.org/licensing/licenses/agpl-3.0.html'.
+is licensed under the SSPL, see `https://www.mongodb.com/licensing/server-side-public-license'.
