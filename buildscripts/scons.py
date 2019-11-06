@@ -25,7 +25,7 @@ sys.path = [scons_dir] + sys.path
 try:
     import SCons.Script
 except ImportError:
-    print("Could not find SCons in '%s'" % (scons_dir))
+    print("Could not import SCons from '%s'" % (scons_dir))
     sys.exit(1)
 
 SCons.Script.main()
