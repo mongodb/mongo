@@ -604,43 +604,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
     if (!indexesToCopy.empty()) {
         Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            auto tmpIndexCatalog = tmpColl->getIndexCatalog();
-            auto opObserver = opCtx->getServiceContext()->getOpObserver();
             auto fromMigrate = false;
-
-            // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the
-            // current FCV.
-            auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                    serverGlobalParams.featureCompatibility.getVersion() ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
-                ? boost::make_optional(UUID::gen())
-                : boost::none;
-
-            if (buildUUID) {
-                opObserver->onStartIndexBuild(
-                    opCtx, tmpName, tmpColl->uuid(), *buildUUID, indexesToCopy, fromMigrate);
+            try {
+                IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                    opCtx, tmpColl->uuid(), indexesToCopy, fromMigrate);
+            } catch (DBException& ex) {
+                return ex.toStatus();
             }
-
-            for (const auto& indexToCopy : indexesToCopy) {
-                // If two phase index builds is enabled, index build will be coordinated using
-                // startIndexBuild and commitIndexBuild oplog entries.
-                if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
-                    opObserver->onCreateIndex(
-                        opCtx, tmpName, tmpColl->uuid(), indexToCopy, fromMigrate);
-                }
-
-                auto indexResult =
-                    tmpIndexCatalog->createIndexOnEmptyCollection(opCtx, indexToCopy);
-                if (!indexResult.isOK()) {
-                    return indexResult.getStatus();
-                }
-            };
-
-            if (buildUUID) {
-                opObserver->onCommitIndexBuild(
-                    opCtx, tmpName, tmpColl->uuid(), *buildUUID, indexesToCopy, fromMigrate);
-            }
-
             wunit.commit();
             return Status::OK();
         });
