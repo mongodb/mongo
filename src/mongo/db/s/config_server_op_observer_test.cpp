@@ -39,10 +39,7 @@ namespace {
 class ConfigServerOpObserverTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
-        ConfigServerTestFixture::setUp();
-
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
+        setUpAndInitializeConfigDb();
 
         auto clusterIdLoader = ClusterIdentityLoader::get(operationContext());
         ASSERT_OK(clusterIdLoader->loadClusterId(operationContext(),

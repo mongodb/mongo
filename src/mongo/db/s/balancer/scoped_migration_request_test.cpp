@@ -70,9 +70,7 @@ private:
 };
 
 void ScopedMigrationRequestTest::setUp() {
-    ConfigServerTestFixture::setUp();
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+    setUpAndInitializeConfigDb();
 }
 
 void ScopedMigrationRequestTest::checkMigrationsCollectionForDocument(

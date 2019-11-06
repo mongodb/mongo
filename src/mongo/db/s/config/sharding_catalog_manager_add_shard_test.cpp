@@ -76,11 +76,7 @@ protected:
      * the client name.
      */
     void setUp() override {
-        ConfigServerTestFixture::setUp();
-
-        // Make sure clusterID is written to the config.version collection.
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
+        setUpAndInitializeConfigDb();
 
         auto clusterIdLoader = ClusterIdentityLoader::get(operationContext());
         ASSERT_OK(clusterIdLoader->loadClusterId(operationContext(),

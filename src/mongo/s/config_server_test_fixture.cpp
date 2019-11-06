@@ -41,6 +41,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/write_ops.h"
@@ -102,6 +103,33 @@ ConfigServerTestFixture::ConfigServerTestFixture() = default;
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
 void ConfigServerTestFixture::setUp() {
+    _setUp([] {});
+}
+
+std::unique_ptr<AutoGetDb> ConfigServerTestFixture::setUpAndLockConfigDb() {
+    std::unique_ptr<AutoGetDb> autoDb;
+    auto lockConfigDb = [&] {
+        autoDb =
+            std::make_unique<AutoGetDb>(operationContext(), NamespaceString::kConfigDb, MODE_X);
+    };
+    _setUp(lockConfigDb);
+    return autoDb;
+}
+
+void ConfigServerTestFixture::setUpAndInitializeConfigDb() {
+    // Prevent DistLockManager from writing to lockpings collection before we create the indexes.
+    auto autoDb = setUpAndLockConfigDb();
+
+    // Locking the RSTL makes the index build run synchronously in the IndexBuildsCoordinator. This
+    // is also how the config db is initialized in a replica set node on stepup.
+    repl::ReplicationStateTransitionLockGuard rstlGuard(operationContext(), MODE_X);
+
+    // Initialize the config database while we have exclusive access.
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+}
+
+void ConfigServerTestFixture::_setUp(std::function<void()> onPreInitGlobalStateFn) {
     ShardingMongodTestFixture::setUp();
 
     // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
@@ -127,6 +155,8 @@ void ConfigServerTestFixture::setUp() {
 
     CatalogCacheLoader::set(getServiceContext(),
                             std::make_unique<ConfigServerCatalogCacheLoader>());
+
+    onPreInitGlobalStateFn();
 
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 }

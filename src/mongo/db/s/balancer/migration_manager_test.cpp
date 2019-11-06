@@ -161,9 +161,7 @@ private:
 };
 
 void MigrationManagerTest::setUp() {
-    ConfigServerTestFixture::setUp();
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+    setUpAndInitializeConfigDb();
     _migrationManager = std::make_unique<MigrationManager>(getServiceContext());
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
