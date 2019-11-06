@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include <boost/none_t.hpp>
 
 #include "mongo/platform/basic.h"
@@ -38,14 +36,16 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/unique_message.h"
-#include "mongo/util/log.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -138,11 +138,45 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
     invariant(ns.db() == "config" || ns.db() == "admin");
 
     try {
-        DBDirectClient client(opCtx);
+        AutoGetOrCreateDb autoDb(opCtx, ns.db(), MODE_IX);
+        AutoGetCollection autoColl(opCtx, ns, MODE_X);
+        auto collection = autoColl.getCollection();
+        if (!collection) {
+            CollectionOptions options;
+            options.uuid = UUID::gen();
+            writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                auto db = autoDb.getDb();
+                collection = db->createCollection(opCtx, ns, options);
+                invariant(collection,
+                          str::stream() << "Failed to create collection " << ns.ns()
+                                        << " in config database for indexes: " << keys);
+                wunit.commit();
+            });
+        }
+        auto indexCatalog = collection->getIndexCatalog();
         IndexSpec index;
         index.addKeys(keys);
         index.unique(unique);
-        client.createIndex(ns.toString(), index);
+        index.version(int(IndexDescriptor::kLatestIndexVersion));
+        auto removeIndexBuildsToo = false;
+        auto indexSpecs = indexCatalog->removeExistingIndexes(
+            opCtx,
+            uassertStatusOK(
+                collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, {index.toBSON()})),
+            removeIndexBuildsToo);
+
+        if (indexSpecs.empty()) {
+            return Status::OK();
+        }
+
+        writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
+            WriteUnitOfWork wunit(opCtx);
+            auto fromMigrate = true;
+            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                opCtx, collection->uuid(), indexSpecs, fromMigrate);
+            wunit.commit();
+        });
     } catch (const DBException& e) {
         return e.toStatus();
     }
