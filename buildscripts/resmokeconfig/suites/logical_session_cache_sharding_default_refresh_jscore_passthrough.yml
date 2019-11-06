@@ -72,7 +72,7 @@ selector:
   - jstests/core/list_all_sessions.js
   - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
-  # TODO: Remove after fixing SERVER-32555. executionStats.nReturned is incorrect for sharded
+  # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
   # queries with a limit or for distinct commands.
   - jstests/core/distinct_index1.js
   - jstests/core/explain1.js
