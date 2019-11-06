@@ -1,5 +1,5 @@
 /* Tests the "failCommand" failpoint.
- * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged]
+ * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged, uses_testing_only_commands]
  */
 (function() {
 "use strict";

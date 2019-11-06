@@ -8,6 +8,7 @@
 //   # Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
 //   # startSession may cause this test to fail to find the returned sessionId.
 //   does_not_support_stepdowns,
+//   assumes_superuser_permissions
 // ]
 
 (function() {

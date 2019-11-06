@@ -6,7 +6,7 @@
  * - Confirm that writes can progress after fsyncUnlock
  * - Confirm that the command can be run repeatedly without breaking things
  *
- * @tags: [requires_fastcount, requires_fsync]
+ * @tags: [requires_fastcount, requires_fsync, assumes_superuser_permissions]
  */
 (function() {
 "use strict";

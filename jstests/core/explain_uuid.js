@@ -1,6 +1,7 @@
 /**
  * Test that running explain() providing a collection UUID rather than collection name will fail
  * cleanly.
+ * @tags: [expects_auth_parameters] 
  */
 (function() {
 "use strict";
