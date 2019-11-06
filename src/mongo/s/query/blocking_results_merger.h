@@ -68,6 +68,10 @@ public:
         return _arm.remotesExhausted();
     }
 
+    bool partialResultsReturned() const {
+        return _arm.partialResultsReturned();
+    }
+
     std::size_t getNumRemotes() const {
         return _arm.getNumRemotes();
     }

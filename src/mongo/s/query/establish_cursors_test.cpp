@@ -275,9 +275,13 @@ TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrorsAllowPartialResu
                                         true);  // allowPartialResults
 
         // Failure to establish a cursor due to maxing out retriable errors on one remote (in this
-        // case, the only remote) was ignored, since allowPartialResults is true, and one less
-        // cursor was established.
-        ASSERT_EQUALS(remotes.size() - 1, cursors.size());
+        // case, the only remote) was ignored, since allowPartialResults is true. The cursor entry
+        // is marked as 'partialResultReturned:true', with a CursorId of 0 and no HostAndPort.
+        ASSERT_EQ(cursors.size(), 1);
+        ASSERT(cursors.front().getHostAndPort().empty());
+        ASSERT_EQ(cursors.front().getShardId(), kTestShardIds[0]);
+        ASSERT(cursors.front().getCursorResponse().getPartialResultsReturned());
+        ASSERT_EQ(cursors.front().getCursorResponse().getCursorId(), CursorId{0});
     });
 
     // Remote repeatedly responds with retriable errors.
@@ -571,8 +575,16 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrorsAllo
                                         remotes,
                                         true);  // allowPartialResults
         // Failure to establish a cursor due to maxing out retriable errors on one remote was
-        // ignored, since allowPartialResults is true, and one less cursor was established.
-        ASSERT_EQUALS(remotes.size() - 1, cursors.size());
+        // ignored, since allowPartialResults is true. The cursor entry for that shard is marked
+        // 'partialResultReturned:true', with a CursorId of 0 and no HostAndPort.
+        ASSERT_EQ(remotes.size(), cursors.size());
+        for (auto&& cursor : cursors) {
+            const bool isMaxedOutShard = (cursor.getShardId() == kTestShardIds[1]);
+            ASSERT_EQ(cursor.getHostAndPort().empty(), isMaxedOutShard);
+            ASSERT_EQ(cursor.getCursorResponse().getPartialResultsReturned(), isMaxedOutShard);
+            ASSERT(isMaxedOutShard ? cursor.getCursorResponse().getCursorId() == CursorId{0}
+                                   : cursor.getCursorResponse().getCursorId() > CursorId{0});
+        }
     });
 
     // First remote responds with success.

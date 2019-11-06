@@ -64,7 +64,8 @@ public:
     static CursorId runQuery(OperationContext* opCtx,
                              const CanonicalQuery& query,
                              const ReadPreferenceSetting& readPref,
-                             std::vector<BSONObj>* results);
+                             std::vector<BSONObj>* results,
+                             bool* partialResultsReturned = nullptr);
 
     /**
      * Executes the getMore request 'request', and on success returns a CursorResponse.

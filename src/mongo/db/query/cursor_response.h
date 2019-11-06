@@ -49,7 +49,7 @@ class CursorResponseBuilder {
 
 public:
     /**
-     * Structure used to confiugre the CursorResponseBuilder.
+     * Structure used to configure the CursorResponseBuilder.
      */
     struct Options {
         bool isInitialResponse = false;
@@ -91,6 +91,10 @@ public:
         _postBatchResumeToken = token.getOwned();
     }
 
+    void setPartialResultsReturned(bool partialResults) {
+        _partialResultsReturned = partialResults;
+    }
+
     long long numDocs() const {
         return _numDocs;
     }
@@ -120,6 +124,7 @@ private:
     bool _active = true;
     long long _numDocs = 0;
     BSONObj _postBatchResumeToken;
+    bool _partialResultsReturned = false;
 };
 
 /**
@@ -188,7 +193,8 @@ public:
                    std::vector<BSONObj> batch,
                    boost::optional<long long> numReturnedSoFar = boost::none,
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
-                   boost::optional<BSONObj> writeConcernError = boost::none);
+                   boost::optional<BSONObj> writeConcernError = boost::none,
+                   bool partialResultsReturned = false);
 
     CursorResponse(CursorResponse&& other) = default;
     CursorResponse& operator=(CursorResponse&& other) = default;
@@ -225,6 +231,10 @@ public:
         return _writeConcernError;
     }
 
+    bool getPartialResultsReturned() const {
+        return _partialResultsReturned;
+    }
+
     /**
      * Converts this response to its raw BSON representation.
      */
@@ -241,6 +251,7 @@ private:
     boost::optional<long long> _numReturnedSoFar;
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
+    bool _partialResultsReturned = false;
 };
 
 }  // namespace mongo

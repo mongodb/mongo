@@ -210,9 +210,16 @@ public:
      */
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors);
 
-    std::size_t getNumRemotes() const {
-        return _remotes.size();
-    }
+    /**
+     * Returns true if the cursor was opened with 'allowPartialResults:true' and results are not
+     * available from one or more shards.
+     */
+    bool partialResultsReturned() const;
+
+    /**
+     * Returns the number of remotes involved in this operation.
+     */
+    std::size_t getNumRemotes() const;
 
     /**
      * For sorted tailable cursors, returns the most recent available sort key. This guarantees that
@@ -250,7 +257,8 @@ private:
     struct RemoteCursorData {
         RemoteCursorData(HostAndPort hostAndPort,
                          NamespaceString cursorNss,
-                         CursorId establishedCursorId);
+                         CursorId establishedCursorId,
+                         bool partialResultsReturned);
 
         /**
          * Returns the resolved host and port on which the remote cursor resides.
@@ -283,11 +291,16 @@ private:
         // the operation if there is a view.
         NamespaceString cursorNss;
 
-        // The exact host in the shard on which the cursor resides.
+        // The exact host in the shard on which the cursor resides. Can be empty if this merger has
+        // 'allowPartialResults' set to true and initial cursor establishment failed on this shard.
         HostAndPort shardHostAndPort;
 
         // The identity of the shard which the cursor belongs to.
         ShardId shardId;
+
+        // This flag is set if the connection to the remote shard was lost, or never established in
+        // the first place. Only applicable if the 'allowPartialResults' option is enabled.
+        bool partialResultsReturned = false;
 
         // The buffer of results that have been retrieved but not yet returned to the caller.
         std::queue<ClusterQueryResult> docBuffer;

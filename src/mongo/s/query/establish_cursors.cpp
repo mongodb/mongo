@@ -70,8 +70,8 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
     try {
         // Get the responses
         while (!ars.done()) {
+            auto response = ars.next();
             try {
-                auto response = ars.next();
                 // Note the shardHostAndPort may not be populated if there was an error, so be sure
                 // to do this after parsing the cursor response to ensure the response was ok.
                 // Additionally, be careful not to push into 'remoteCursors' until we are sure we
@@ -95,21 +95,20 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                     uassertStatusOK(cursor.getStatus());
                 }
 
-            } catch (const ExceptionForCat<ErrorCategory::RetriableError>&) {
-                // Retriable errors are swallowed if 'allowPartialResults' is true.
-                if (allowPartialResults) {
-                    continue;
+            } catch (const AssertionException& ex) {
+                // Retriable errors are swallowed if 'allowPartialResults' is true. Targeting shard
+                // replica sets can also throw FailedToSatisfyReadPreference, so we swallow it too.
+                bool isEligibleException = (ex.isA<ErrorCategory::RetriableError>() ||
+                                            ex.code() == ErrorCodes::FailedToSatisfyReadPreference);
+                // Fail if the exception is something other than a retriable or read preference
+                // error, or if the 'allowPartialResults' query parameter was not enabled.
+                if (!allowPartialResults || !isEligibleException) {
+                    throw;
                 }
-                throw;  // Fail this loop.
-            } catch (const ExceptionFor<ErrorCodes::FailedToSatisfyReadPreference>&) {
-                // The errors marked as retriable errors are meant to correspond to the driver's
-                // spec (see SERVER-42908), but targeting a replica set shard can fail with
-                // FailedToSatisfyReadPreference, which is not a retriable error in the driver's
-                // spec, so we swallow it separately here if allowPartialResults is true.
-                if (allowPartialResults) {
-                    continue;
-                }
-                throw;  // Fail this loop.
+                // This exception is eligible to be swallowed. Add an entry with a cursorID of 0, an
+                // empty HostAndPort, and which has the 'partialResultsReturned' flag set to true.
+                remoteCursors.push_back(
+                    {response.shardId.toString(), {}, {nss, CursorId{0}, {}, {}, {}, {}, true}});
             }
         }
         return remoteCursors;

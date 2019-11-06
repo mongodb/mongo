@@ -102,7 +102,11 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
     for (const auto& remote : _params.getRemotes()) {
         _remotes.emplace_back(remote.getHostAndPort(),
                               remote.getCursorResponse().getNSS(),
-                              remote.getCursorResponse().getCursorId());
+                              remote.getCursorResponse().getCursorId(),
+                              remote.getCursorResponse().getPartialResultsReturned());
+
+        // A remote cannot be flagged as 'partialResultsReturned' if 'allowPartialResults' is false.
+        invariant(!(_remotes.back().partialResultsReturned && !_params.getAllowPartialResults()));
 
         // We don't check the return value of _addBatchToBuffer here; if there was an error,
         // it will be stored in the remote and the first call to ready() will return true.
@@ -183,9 +187,31 @@ void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCurso
         const auto newIndex = _remotes.size();
         _remotes.emplace_back(remote.getHostAndPort(),
                               remote.getCursorResponse().getNSS(),
-                              remote.getCursorResponse().getCursorId());
+                              remote.getCursorResponse().getCursorId(),
+                              remote.getCursorResponse().getPartialResultsReturned());
         _addBatchToBuffer(lk, newIndex, remote.getCursorResponse());
     }
+}
+
+bool AsyncResultsMerger::partialResultsReturned() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return std::any_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
+        return remote.partialResultsReturned;
+    });
+}
+
+std::size_t AsyncResultsMerger::getNumRemotes() const {
+    // Take the lock to guard against shard additions or disconnections.
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    // If 'allowPartialResults' is false, the number of participating remotes is constant.
+    if (!_params.getAllowPartialResults()) {
+        return _remotes.size();
+    }
+    // Otherwise, discount remotes which failed to connect or disconnected prematurely.
+    return std::count_if(_remotes.begin(), _remotes.end(), [](const auto& remote) {
+        return !remote.partialResultsReturned;
+    });
 }
 
 BSONObj AsyncResultsMerger::getHighWaterMark() {
@@ -579,14 +605,14 @@ void AsyncResultsMerger::_cleanUpFailedBatch(WithLock lk, Status status, size_t 
     //
     // The ExchangePassthrough error code is an internal-only error code used specifically to
     // communicate that an error has occurred, but some other thread is responsible for returning
-    // the error to the user. In order to avoid polluting the user's error message, we ingore such
+    // the error to the user. In order to avoid polluting the user's error message, we ignore such
     // errors with the expectation that all outstanding cursors will be closed promptly.
     if (_params.getAllowPartialResults() || remote.status == ErrorCodes::ExchangePassthrough) {
-        remote.status = Status::OK();
-
-        // Clear the results buffer and cursor id.
+        // Clear the results buffer and cursor id, and set 'partialResultsReturned' if appropriate.
+        remote.partialResultsReturned = (remote.status != ErrorCodes::ExchangePassthrough);
         std::queue<ClusterQueryResult> emptyBuffer;
         std::swap(remote.docBuffer, emptyBuffer);
+        remote.status = Status::OK();
         remote.cursorId = 0;
     }
 }
@@ -758,10 +784,15 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* o
 
 AsyncResultsMerger::RemoteCursorData::RemoteCursorData(HostAndPort hostAndPort,
                                                        NamespaceString cursorNss,
-                                                       CursorId establishedCursorId)
+                                                       CursorId establishedCursorId,
+                                                       bool partialResultsReturned)
     : cursorId(establishedCursorId),
       cursorNss(std::move(cursorNss)),
-      shardHostAndPort(std::move(hostAndPort)) {}
+      shardHostAndPort(std::move(hostAndPort)),
+      partialResultsReturned(partialResultsReturned) {
+    // If the 'partialResultsReturned' flag is set, the cursorId must be zero (closed).
+    invariant(!(partialResultsReturned && cursorId != 0));
+}
 
 const HostAndPort& AsyncResultsMerger::RemoteCursorData::getTargetHost() const {
     return shardHostAndPort;

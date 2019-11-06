@@ -145,6 +145,10 @@ const PrivilegeVector& ClusterClientCursorImpl::getOriginatingPrivileges() const
     return _params.originatingPrivileges;
 }
 
+bool ClusterClientCursorImpl::partialResultsReturned() const {
+    return _root->partialResultsReturned();
+}
+
 std::size_t ClusterClientCursorImpl::getNumRemotes() const {
     return _root->getNumRemotes();
 }

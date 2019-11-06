@@ -213,9 +213,10 @@ public:
             try {
                 // Do the work to generate the first batch of results. This blocks waiting to get
                 // responses from the shard(s).
+                bool partialResultsReturned = false;
                 std::vector<BSONObj> batch;
-                auto cursorId =
-                    ClusterFind::runQuery(opCtx, *cq, ReadPreferenceSetting::get(opCtx), &batch);
+                auto cursorId = ClusterFind::runQuery(
+                    opCtx, *cq, ReadPreferenceSetting::get(opCtx), &batch, &partialResultsReturned);
 
                 // Build the response document.
                 CursorResponseBuilder::Options options;
@@ -224,6 +225,7 @@ public:
                 for (const auto& obj : batch) {
                     firstBatch.append(obj);
                 }
+                firstBatch.setPartialResultsReturned(partialResultsReturned);
                 firstBatch.done(cursorId, cq->ns());
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 result->reset();

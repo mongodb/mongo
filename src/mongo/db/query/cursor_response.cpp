@@ -49,6 +49,7 @@ const char kBatchFieldInitial[] = "firstBatch";
 const char kBatchDocSequenceField[] = "cursor.nextBatch";
 const char kBatchDocSequenceFieldInitial[] = "cursor.firstBatch";
 const char kPostBatchResumeTokenField[] = "postBatchResumeToken";
+const char kPartialResultsReturnedField[] = "partialResultsReturned";
 
 }  // namespace
 
@@ -77,6 +78,9 @@ void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) 
     }
     if (!_postBatchResumeToken.isEmpty()) {
         _cursorObject->append(kPostBatchResumeTokenField, _postBatchResumeToken);
+    }
+    if (_partialResultsReturned) {
+        _cursorObject->append(kPartialResultsReturnedField, true);
     }
     _cursorObject->append(kIdField, cursorId);
     _cursorObject->append(kNsField, cursorNamespace);
@@ -123,13 +127,15 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                std::vector<BSONObj> batch,
                                boost::optional<long long> numReturnedSoFar,
                                boost::optional<BSONObj> postBatchResumeToken,
-                               boost::optional<BSONObj> writeConcernError)
+                               boost::optional<BSONObj> writeConcernError,
+                               bool partialResultsReturned)
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
       _numReturnedSoFar(numReturnedSoFar),
       _postBatchResumeToken(std::move(postBatchResumeToken)),
-      _writeConcernError(std::move(writeConcernError)) {}
+      _writeConcernError(std::move(writeConcernError)),
+      _partialResultsReturned(partialResultsReturned) {}
 
 std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
     const BSONObj& cmdResponse) {
@@ -225,6 +231,17 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                               << postBatchResumeTokenElem.type()};
     }
 
+    auto partialResultsReturned = cursorObj[kPartialResultsReturnedField];
+
+    if (partialResultsReturned) {
+        if (partialResultsReturned.type() != BSONType::Bool) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << kPartialResultsReturnedField
+                                  << " format is invalid; expected Bool, but found: "
+                                  << partialResultsReturned.type()};
+        }
+    }
+
     auto writeConcernError = cmdResponse["writeConcernError"];
 
     if (writeConcernError && writeConcernError.type() != BSONType::Object) {
@@ -239,7 +256,8 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
              boost::none,
              postBatchResumeTokenElem ? postBatchResumeTokenElem.Obj().getOwned()
                                       : boost::optional<BSONObj>{},
-             writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{}}};
+             writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{},
+             partialResultsReturned.trueValue()}};
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
@@ -259,6 +277,10 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
 
     if (_postBatchResumeToken && !_postBatchResumeToken->isEmpty()) {
         cursorBuilder.append(kPostBatchResumeTokenField, *_postBatchResumeToken);
+    }
+
+    if (_partialResultsReturned) {
+        cursorBuilder.append(kPartialResultsReturnedField, true);
     }
 
     cursorBuilder.doneFast();

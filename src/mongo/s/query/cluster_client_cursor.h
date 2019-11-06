@@ -119,7 +119,13 @@ public:
     void getOriginatingPrivileges() && = delete;
 
     /**
-     * Returns a reference to the vector of remote hosts involved in this operation.
+     * Returns true if the cursor was opened with 'allowPartialResults:true' and results are not
+     * available from one or more shards.
+     */
+    virtual bool partialResultsReturned() const = 0;
+
+    /**
+     * Returns the number of remote hosts involved in this operation.
      */
     virtual std::size_t getNumRemotes() const = 0;
 

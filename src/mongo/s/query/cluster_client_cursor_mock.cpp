@@ -74,6 +74,10 @@ const PrivilegeVector& ClusterClientCursorMock::getOriginatingPrivileges() const
     return _originatingPrivileges;
 }
 
+bool ClusterClientCursorMock::partialResultsReturned() const {
+    MONGO_UNREACHABLE;
+}
+
 std::size_t ClusterClientCursorMock::getNumRemotes() const {
     MONGO_UNREACHABLE;
 }

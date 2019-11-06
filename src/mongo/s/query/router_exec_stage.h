@@ -90,6 +90,14 @@ public:
     }
 
     /**
+     * Returns true if only a subset of the all relevant results are being returned by this cursor.
+     * Only applicable if the 'allowPartialResults' option was enabled in the query request.
+     */
+    virtual bool partialResultsReturned() const {
+        return _child ? _child->partialResultsReturned() : false;
+    }
+
+    /**
      * Returns the number of remote hosts involved in this execution plan.
      */
     virtual std::size_t getNumRemotes() const {

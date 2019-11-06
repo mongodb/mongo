@@ -238,7 +238,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
                                  const CachedCollectionRoutingInfo& routingInfo,
-                                 std::vector<BSONObj>* results) {
+                                 std::vector<BSONObj>* results,
+                                 bool* partialResultsReturned) {
     // Get the set of shards on which we will run the query.
     auto shardIds = getTargetedShardsForQuery(opCtx,
                                               routingInfo,
@@ -299,7 +300,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection);
 
     // Establish the cursors with a consistent shardVersion across shards.
-
     params.remotes = establishCursors(opCtx,
                                       Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                       query.nss(),
@@ -366,6 +366,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Fill out query exec properties.
     CurOp::get(opCtx)->debug().nShards = ccc->getNumRemotes();
     CurOp::get(opCtx)->debug().nreturned = results->size();
+
+    // If the caller wants to know whether the cursor returned partial results, set it here.
+    if (partialResultsReturned) {
+        *partialResultsReturned = ccc->partialResultsReturned();
+    }
 
     // If the cursor is exhausted, then there are no more results to return and we don't need to
     // allocate a cursor id.
@@ -435,7 +440,14 @@ const size_t ClusterFind::kMaxRetries = 10;
 CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const CanonicalQuery& query,
                                const ReadPreferenceSetting& readPref,
-                               std::vector<BSONObj>* results) {
+                               std::vector<BSONObj>* results,
+                               bool* partialResultsReturned) {
+    // If the user supplied a 'partialResultsReturned' out-parameter, default it to false here.
+    if (partialResultsReturned) {
+        *partialResultsReturned = false;
+    }
+
+    // We must always have a BSONObj vector into which to output our results.
     invariant(results);
 
     // Projection on the reserved sort key field is illegal in mongos.
@@ -461,7 +473,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         auto routingInfo = uassertStatusOK(routingInfoStatus);
 
         try {
-            return runQueryWithoutRetrying(opCtx, query, readPref, routingInfo, results);
+            return runQueryWithoutRetrying(
+                opCtx, query, readPref, routingInfo, results, partialResultsReturned);
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be
@@ -731,6 +744,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         postBatchResumeToken = pinnedCursor.getValue()->getPostBatchResumeToken();
     }
 
+    const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
     pinnedCursor.getValue()->incNBatches();
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
@@ -748,8 +762,13 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
     }
 
-    return CursorResponse(
-        request.nss, idToReturn, std::move(batch), startingFrom, postBatchResumeToken);
+    return CursorResponse(request.nss,
+                          idToReturn,
+                          std::move(batch),
+                          startingFrom,
+                          postBatchResumeToken,
+                          boost::none,
+                          partialResultsReturned);
 }
 
 }  // namespace mongo

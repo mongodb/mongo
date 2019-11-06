@@ -183,6 +183,82 @@ TEST(CursorResponseTest, parseFromBSONOkFieldMissing) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(CursorResponseTest, parseFromBSONPartialResultsReturnedField) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2))
+                              << "partialResultsReturned" << true)
+                 << "ok" << 1));
+    ASSERT_OK(result.getStatus());
+
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_EQ(response.getPartialResultsReturned(), true);
+}
+
+TEST(CursorResponseTest, parseFromBSONPartialResultsReturnedFieldWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2))
+                              << "partialResultsReturned" << 1)
+                 << "ok" << 1));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResultsReturned) {
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    rpc::OpMsgReplyBuilder builder;
+    BSONObj okStatus = BSON("ok" << 1);
+    BSONObj testDoc = BSON("_id" << 1);
+    BSONObj expectedBody =
+        BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "partialResultsReturned"
+                                           << true << "id" << CursorId(123) << "ns"
+                                           << "db.coll"));
+
+    // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
+    CursorResponseBuilder crb(&builder, options);
+    crb.append(testDoc);
+    crb.setPartialResultsReturned(true);
+    crb.done(CursorId(123), "db.coll");
+
+    // Confirm that the resulting BSONObj response matches the expected body.
+    auto msg = builder.done();
+    auto opMsg = OpMsg::parse(msg);
+    ASSERT_BSONOBJ_EQ(expectedBody, opMsg.body);
+
+    // Append {"ok": 1} to the opMsg body so that it can be parsed by CursorResponse.
+    auto swCursorResponse = CursorResponse::parseFromBSON(opMsg.body.addField(okStatus["ok"]));
+    ASSERT_OK(swCursorResponse.getStatus());
+
+    // Confirm the CursorReponse parsed from CursorResponseBuilder output has the correct content.
+    CursorResponse response = std::move(swCursorResponse.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 1U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
+    ASSERT_EQ(response.getPartialResultsReturned(), true);
+
+    // Re-serialize a BSONObj response from the CursorResponse.
+    auto cursorResBSON = response.toBSONAsInitialResponse();
+
+    // Confirm that the BSON serialized by the CursorResponse is the same as that serialized by the
+    // CursorResponseBuilder. Field ordering differs between the two, so compare per-element.
+    BSONObjIteratorSorted cursorResIt(cursorResBSON["cursor"].Obj());
+    BSONObjIteratorSorted cursorBuilderIt(opMsg.body["cursor"].Obj());
+    while (cursorResIt.more()) {
+        ASSERT(cursorBuilderIt.more());
+        ASSERT_EQ(cursorResIt.next().woCompare(cursorBuilderIt.next()), 0);
+    }
+    ASSERT(!cursorBuilderIt.more());
+}
+
 TEST(CursorResponseTest, parseFromBSONHandleErrorResponse) {
     StatusWith<CursorResponse> result =
         CursorResponse::parseFromBSON(BSON("ok" << 0 << "code" << 123 << "errmsg"
@@ -212,6 +288,25 @@ TEST(CursorResponseTest, toBSONSubsequentResponse) {
         "cursor" << BSON("id" << CursorId(123) << "ns"
                               << "testdb.testcoll"
                               << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "ok" << 1.0);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
+}
+
+TEST(CursorResponseTest, toBSONPartialResultsReturned) {
+    std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
+    CursorResponse response(NamespaceString("testdb.testcoll"),
+                            CursorId(123),
+                            batch,
+                            boost::none,
+                            boost::none,
+                            boost::none,
+                            true);
+    BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::InitialResponse);
+    BSONObj expectedResponse = BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "testdb.testcoll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2))
+                              << "partialResultsReturned" << true)
                  << "ok" << 1.0);
     ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }

@@ -63,6 +63,10 @@ public:
         return _resultsMerger.remotesExhausted();
     }
 
+    bool partialResultsReturned() const final {
+        return _resultsMerger.partialResultsReturned();
+    }
+
     std::size_t getNumRemotes() const final {
         return _resultsMerger.getNumRemotes();
     }
