@@ -49,7 +49,7 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/handle_request_response.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
@@ -706,17 +706,22 @@ bool runCommandImpl(OperationContext* opCtx,
     }();
     behaviors.attachCurOpErrInfo(opCtx, replyBuilder->getBodyBuilder().asTempObj());
 
-    if (!ok) {
+    {
+        boost::optional<ErrorCodes::Error> wcCode;
+        boost::optional<ErrorCodes::Error> code;
         auto response = replyBuilder->getBodyBuilder().asTempObj();
         auto codeField = response["code"];
-        const auto hasWriteConcern = response.hasField("writeConcernError");
-        if (codeField.isNumber()) {
-            auto code = ErrorCodes::Error(codeField.numberInt());
-            // Append the error labels for transient transaction errors.
-            auto errorLabels =
-                getErrorLabels(sessionOptions, command->getName(), code, hasWriteConcern);
-            replyBuilder->getBodyBuilder().appendElements(errorLabels);
+        if (!ok && codeField.isNumber()) {
+            code = ErrorCodes::Error(codeField.numberInt());
         }
+        if (response.hasField("writeConcernError")) {
+            wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
+        }
+        auto isInternalClient = opCtx->getClient()->session() &&
+            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+        auto errorLabels =
+            getErrorLabels(sessionOptions, command->getName(), code, wcCode, isInternalClient);
+        replyBuilder->getBodyBuilder().appendElements(errorLabels);
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
@@ -1013,9 +1018,14 @@ void execCommandDatabase(OperationContext* opCtx,
 
         // Append the error labels for transient transaction errors.
         auto response = extraFieldsBuilder.asTempObj();
-        auto hasWriteConcern = response.hasField("writeConcernError");
+        boost::optional<ErrorCodes::Error> wcCode;
+        if (response.hasField("writeConcernError")) {
+            wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
+        }
+        auto isInternalClient = opCtx->getClient()->session() &&
+            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         auto errorLabels =
-            getErrorLabels(sessionOptions, command->getName(), e.code(), hasWriteConcern);
+            getErrorLabels(sessionOptions, command->getName(), e.code(), wcCode, isInternalClient);
         extraFieldsBuilder.appendElements(errorLabels);
 
         BSONObjBuilder metadataBob;

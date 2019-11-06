@@ -1330,12 +1330,22 @@ env.Library(
 )
 
 env.Library(
+    target='error_labels',
+    source=[
+        'error_labels.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_id',
+    ],
+)
+
+env.Library(
     target='shared_request_handling',
     source=[
-        'handle_request_response.cpp',
         'transaction_validation.cpp',
     ],
     LIBDEPS=[
+        'error_labels',
         'logical_session_cache_impl',
     ],
 )
@@ -1794,6 +1804,7 @@ envWithAsio.CppUnitTest(
         'transaction_participant_test.cpp',
         'update_index_data_test.cpp',
         'write_concern_options_test.cpp',
+        'error_labels_test.cpp',
         env.Idlc('commands_test_example.idl')[0],
     ],
     LIBDEPS=[

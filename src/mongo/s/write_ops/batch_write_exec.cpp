@@ -36,10 +36,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/base/status.h"
-#include "mongo/base/transaction_error.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -97,7 +97,7 @@ bool hasTransientTransactionError(const BatchedCommandResponse& response) {
 
     const auto& errorLabels = response.getErrorLabels();
     auto iter = std::find_if(errorLabels.begin(), errorLabels.end(), [](const std::string& label) {
-        return label == txn::TransientTxnErrorFieldName;
+        return label == ErrorLabel::kTransientTransaction;
     });
     return iter != errorLabels.end();
 }

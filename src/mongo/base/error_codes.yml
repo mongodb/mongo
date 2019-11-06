@@ -85,7 +85,7 @@ error_codes:
     - {code: 61,name: ShardKeyNotFound}
     - {code: 62,name: OplogOperationUnsupported}
     - {code: 63,name: StaleShardVersion,categories: [StaleShardVersionError,NeedRetargettingError]}
-    - {code: 64,name: WriteConcernFailed,categories: [WriteConcernError,RetriableError]}
+    - {code: 64,name: WriteConcernFailed,categories: [WriteConcernError]}
     - {code: 65,name: MultipleErrorsOccurred}
     - {code: 66,name: ImmutableField}
     - {code: 67,name: CannotCreateIndex}
@@ -214,7 +214,7 @@ error_codes:
     - {code: 191,name: OBSOLETE_BalancerLostDistributedLock}
     - {code: 192,name: FailPointEnabled}
     - {code: 193,name: NoShardingEnabled}
-    - {code: 194,name: BalancerInterrupted,categories: [RetriableError]}
+    - {code: 194,name: BalancerInterrupted}
     - {code: 195,name: ViewPipelineMaxSizeExceeded}
     - {code: 197,name: InvalidIndexSpecificationOption}
     - {code: 198,name: OBSOLETE_ReceivedOpReplyMessage}

@@ -169,7 +169,7 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
 // https://github.com/mongodb/specifications/blob/master/source/transactions/transactions.rst#unknowntransactioncommitresult.
 bool isCommitResultUnknown(const Status& commitStatus, const Status& commitWCStatus) {
     if (!commitStatus.isOK()) {
-        return ErrorCodes::isRetriableError(commitStatus) ||
+        return isMongosRetriableError(commitStatus.code()) ||
             ErrorCodes::isExceededTimeLimitError(commitStatus) ||
             commitStatus.code() == ErrorCodes::TransactionTooOld;
     }

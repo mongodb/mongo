@@ -31,7 +31,7 @@ const writeConcernMajority = {
 
 assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
-jsTest.log("Write concern errors should not have error labels");
+jsTest.log("Write concern timeout should not have error labels");
 // Start a new session on the primary.
 let session = primary.startSession(sessionOptions);
 let sessionDb = session.getDatabase(dbName);

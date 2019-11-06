@@ -44,14 +44,14 @@ let res = secondarySessionDb.runCommand({
 assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-jsTest.log("Insert outside a transaction on secondary should fail but not return error labels");
+jsTest.log("Insert as a retryable write on secondary should fail with retryable error labels");
 txnNumber++;
 // Insert as a retryable write.
 res = secondarySessionDb.runCommand(
     {insert: collName, documents: [{_id: "insert-1"}], txnNumber: NumberLong(txnNumber)});
 
 assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
-assert(!res.hasOwnProperty("errorLabels"));
+assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 secondarySession.endSession();
 
 jsTest.log("failCommand should be able to return errors with TransientTransactionError");
@@ -89,7 +89,8 @@ assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-jsTest.log("NotMaster returned by commitTransaction command is not TransientTransactionError");
+jsTest.log("NotMaster returned by commitTransaction command is not TransientTransactionError but" +
+           " RetryableWriteError");
 // commitTransaction will attempt to perform a noop write in response to a NoSuchTransaction
 // error and non-empty writeConcern. This will throw NotMaster.
 res = secondarySessionDb.adminCommand({
@@ -99,10 +100,11 @@ res = secondarySessionDb.adminCommand({
     writeConcern: {w: "majority"}
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
-assert(!res.hasOwnProperty("errorLabels"));
+assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 
 jsTest.log(
-    "NotMaster returned by coordinateCommitTransaction command is not TransientTransactionError");
+    "NotMaster returned by coordinateCommitTransaction command is not TransientTransactionError" +
+    " but RetryableWriteError");
 // coordinateCommitTransaction will attempt to perform a noop write in response to a
 // NoSuchTransaction error and non-empty writeConcern. This will throw NotMaster.
 res = secondarySessionDb.adminCommand({
@@ -113,7 +115,7 @@ res = secondarySessionDb.adminCommand({
     writeConcern: {w: "majority"}
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
-assert(!res.hasOwnProperty("errorLabels"));
+assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 
 jsTest.log("ShutdownInProgress returned by write commands is TransientTransactionError");
 session.startTransaction();
@@ -130,7 +132,8 @@ assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mod
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 jsTest.log(
-    "ShutdownInProgress returned by commitTransaction command is not TransientTransactionError");
+    "ShutdownInProgress returned by commitTransaction command is not TransientTransactionError" +
+    " but RetryableWriteError");
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "commitTransaction-fail-point"}));
 assert.commandWorked(testDB.adminCommand({
@@ -140,11 +143,11 @@ assert.commandWorked(testDB.adminCommand({
 }));
 res = session.commitTransaction_forTesting();
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
-assert(!res.hasOwnProperty("errorLabels"));
+assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-jsTest.log(
-    "ShutdownInProgress returned by coordinateCommitTransaction command is not TransientTransactionError");
+jsTest.log("ShutdownInProgress returned by coordinateCommitTransaction command is not" +
+           " TransientTransactionError but RetryableWriteError");
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "coordinateCommitTransaction-fail-point"}));
 assert.commandWorked(testDB.adminCommand({
@@ -159,7 +162,7 @@ res = sessionDb.adminCommand({
     autocommit: false
 });
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
-assert(!res.hasOwnProperty("errorLabels"));
+assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 assert.commandWorked(session.abortTransaction_forTesting());
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
@@ -216,7 +219,7 @@ assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-jsTest.log("Network errors for commit should not be transient");
+jsTest.log("Network errors for commit should not be transient but RetryableWriteError");
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "commitTransaction-network-error"}));
 assert.commandWorked(testDB.adminCommand({
@@ -230,7 +233,7 @@ res = sessionDb.adminCommand({
     autocommit: false
 });
 assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
-assert(!res.hasOwnProperty("errorLabels"), tojson(res));
+assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 assert.commandWorked(session.abortTransaction_forTesting());
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 

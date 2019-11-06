@@ -112,7 +112,7 @@ bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
         } break;
 
         case RetryPolicy::kIdempotent: {
-            return ErrorCodes::isRetriableError(code);
+            return isMongosRetriableError(code);
         } break;
 
         case RetryPolicy::kNotIdempotent: {

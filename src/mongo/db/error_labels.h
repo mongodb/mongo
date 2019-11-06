@@ -33,12 +33,55 @@
 
 namespace mongo {
 
+namespace ErrorLabel {
+// PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
+static constexpr StringData kTransientTransaction = "TransientTransactionError"_sd;
+static constexpr StringData kRetryableWrite = "RetryableWriteError"_sd;
+static constexpr StringData kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
+}  // namespace ErrorLabel
+
+class ErrorLabelBuilder {
+public:
+    ErrorLabelBuilder(const OperationSessionInfoFromClient& sessionOptions,
+                      const std::string& commandName,
+                      boost::optional<ErrorCodes::Error> code,
+                      boost::optional<ErrorCodes::Error> wcCode,
+                      bool isInternalClient)
+        : _sessionOptions(sessionOptions),
+          _commandName(commandName),
+          _code(code),
+          _wcCode(wcCode),
+          _isInternalClient(isInternalClient) {}
+
+    void build(BSONArrayBuilder& labels) const;
+
+    bool isTransientTransactionError() const;
+    bool isRetryableWriteError() const;
+    bool isNonResumableChangeStreamError() const;
+
+private:
+    bool _isCommitOrAbort() const;
+    const OperationSessionInfoFromClient& _sessionOptions;
+    const std::string& _commandName;
+    boost::optional<ErrorCodes::Error> _code;
+    boost::optional<ErrorCodes::Error> _wcCode;
+    bool _isInternalClient;
+};
+
 /**
  * Returns the error labels for the given error.
  */
 BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
-                       ErrorCodes::Error code,
-                       bool hasWriteConcernError);
+                       boost::optional<ErrorCodes::Error> code,
+                       boost::optional<ErrorCodes::Error> wcCode,
+                       bool isInternalClient);
+
+/**
+ * Whether a write error in a transaction should be labelled with "TransientTransactionError".
+ */
+bool isTransientTransactionError(ErrorCodes::Error code,
+                                 bool hasWriteConcernError,
+                                 bool isCommitOrAbort);
 
 }  // namespace mongo
