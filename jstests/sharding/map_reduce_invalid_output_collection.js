@@ -54,6 +54,13 @@ const usingAgg = st.getDB(dbName)
                      .internalQueryUseAggMapReduce;
 const expectedError = usingAgg ? 31313 : 31311;
 
+// TODO SERVER-44461: Allow running this test when using non-agg MR.
+if (!usingAgg) {
+    jsTestLog("Skipping test case. See SERVER-44461.");
+    st.stop();
+    return;
+}
+
 // Through the same mongos, verify that mapReduce fails since the output collection is not sharded
 // by _id.
 assert.commandFailedWithCode(

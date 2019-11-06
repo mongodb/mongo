@@ -47,7 +47,8 @@ st.shardColl(coll, {c: 1}, {c: 0}, {c: 1}, coll.getDB(), true);
 assert.commandWorked(staleCollA.update({c: "c"}, {c: "c"}, true));
 
 // Make sure we unsuccessfully upsert with old info
-assert.writeError(staleCollB.update({b: "b"}, {b: "b"}, true));
+assert.commandFailedWithCode(staleCollB.update({b: "b"}, {b: "b"}, true),
+                             ErrorCodes.ShardKeyNotFound);
 
 // Change the collection sharding state
 coll.drop();
@@ -61,7 +62,8 @@ assert.commandWorked(staleCollA.update({d: "d"}, {$set: {x: "x"}}, false, false)
 assert.eq(staleCollA.findOne().x, "x");
 
 // Make sure we unsuccessfully update with old info
-assert.writeError(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false));
+assert.commandFailedWithCode(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false),
+                             ErrorCodes.InvalidOptions);
 assert.eq(staleCollB.findOne().x, "x");
 
 // Change the collection sharding state
@@ -78,7 +80,7 @@ assert.commandWorked(staleCollA.remove({e: "e"}, true));
 assert.eq(null, staleCollA.findOne());
 
 // Make sure we unsuccessfully remove with old info
-assert.writeError(staleCollB.remove({d: "d"}, true));
+assert.commandFailedWithCode(staleCollB.remove({d: "d"}, true), ErrorCodes.ShardKeyNotFound);
 
 st.stop();
 })();

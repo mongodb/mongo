@@ -62,6 +62,8 @@ selector:
   - jstests/sharding/track_unsharded_collections_rename_collection.js
   - jstests/sharding/update_compound_shard_key.js
   - jstests/sharding/update_replace_id.js
+  - jstests/sharding/update_sharded.js
+  - jstests/sharding/upsert_sharded.js
   # Enable if SERVER-41813 is backported or 4.4 becomes last-stable
   - jstests/sharding/invalid_system_views_sharded_collection.js
     # Enable if SERVER-42273 is backported or 4.4 becomes last-stable

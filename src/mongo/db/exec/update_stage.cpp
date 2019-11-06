@@ -128,6 +128,9 @@ void assertRequiredPathsPresent(const mb::Document& document, const FieldRefSet&
     }
 }
 
+/**
+ * Uasserts if any of the paths in 'requiredPaths' are arrays or array descendants.
+ */
 void assertPathsNotArray(const mb::Document& document, const FieldRefSet& requiredPaths) {
     for (const auto& path : requiredPaths) {
         auto elem = document.root();
@@ -475,14 +478,19 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
         if (enforceOkForStorage) {
             storage_validation::storageValid(*doc);
         }
-        FieldRefSet requiredPaths;
+
+        // _id must be present and cannot be an array.
+        FieldRefSet idFieldSet;
+        idFieldSet.keepShortest(&idFieldRef);
+        assertRequiredPathsPresent(*doc, idFieldSet);
+
         if (metadata->isSharded()) {
-            const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
+            // The shard key path cannot contain an array.
+            FieldRefSet requiredPaths;
             requiredPaths.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
+                transitional_tools_do_not_use::unspool_vector(metadata->getKeyPatternFields()));
+            assertPathsNotArray(*doc, requiredPaths);
         }
-        requiredPaths.keepShortest(&idFieldRef);
-        assertRequiredPathsPresent(*doc, requiredPaths);
     }
 
     BSONObj newObj = doc->getObject();

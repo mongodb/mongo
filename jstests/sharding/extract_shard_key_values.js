@@ -172,5 +172,13 @@ assert.writeErrorWithCode(
     mongos.getCollection(kNsName).update({b: 1}, {$set: {c: 2}}, {upsert: true}),
     ErrorCodes.ShardKeyNotFound);
 
+// Find and modify will not treat missing shard key values as null and require the full shard key to
+// be specified.
+assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
+assert.commandFailedWithCode(
+    sessionDB.runCommand(
+        {findAndModify: kCollName, query: {a: 1}, update: {$set: {updated: true}}}),
+    ErrorCodes.ShardKeyNotFound);
+
 st.stop();
 })();

@@ -38,10 +38,6 @@ var getDirectShardedConn = function(st, collName) {
 
 var shard0Coll = getDirectShardedConn(st, coll.getFullName()).getCollection(coll.getFullName());
 
-// No shard key
-shard0Coll.remove({});
-assert.writeError(shard0Coll.save({_id: 3}));
-
 // Full shard key in save
 assert.commandWorked(shard0Coll.save({_id: 1, a: 1}));
 
@@ -64,20 +60,6 @@ assert.commandFailedWithCode(shard0Coll.update({_id: 1, a: 1}, {_id: 1, a: 2}),
                              ErrorCodes.IllegalOperation);
 assert.commandFailedWithCode(shard0Coll.update({_id: 1, a: 1}, {"$set": {a: 2}}),
                              ErrorCodes.IllegalOperation);
-
-// Error when unsetting shard key.
-assert.writeError(shard0Coll.update({_id: 1}, {b: 3}));
-
-// Error when unsetting shard key ($set).
-assert.writeError(shard0Coll.update({_id: 1}, {$unset: {a: 1}}));
-
-// Error due to removing all the embedded fields.
-shard0Coll.remove({});
-
-assert.commandWorked(shard0Coll.save({_id: 2, a: {c: 1, b: 1}}));
-
-assert.writeError(shard0Coll.update({}, {$unset: {"a.c": 1}}));
-assert.writeError(shard0Coll.update({}, {$unset: {"a.b": 1, "a.c": 1}}));
 
 st.stop();
 })();
