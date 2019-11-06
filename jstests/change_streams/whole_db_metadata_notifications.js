@@ -1,7 +1,7 @@
 // Tests of metadata notifications for a $changeStream on a whole database.
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
-// @tags: [do_not_run_in_whole_cluster_passthrough]
+// @tags: [do_not_run_in_whole_cluster_passthrough, assumes_superuser_permissions]
 (function() {
 "use strict";
 

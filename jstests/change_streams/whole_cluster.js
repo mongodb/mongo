@@ -1,4 +1,5 @@
 // Basic tests for $changeStream against all databases in the cluster.
+// @tags: [assumes_superuser_permissions]
 (function() {
 "use strict";
 

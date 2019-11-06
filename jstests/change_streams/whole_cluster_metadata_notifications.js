@@ -2,7 +2,7 @@
 // When run in sharded+transaction passthrough suites, it is possible that the two unsharded
 // collections will live on different shards. Majority read concern cannot be off with multi-shard
 // transactions, which is why this test needs the tag below.
-// @tags: [requires_majority_read_concern]
+// @tags: [requires_majority_read_concern, assumes_superuser_permissions]
 (function() {
 "use strict";
 
