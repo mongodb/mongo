@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/s/persistent_task_store.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/s/catalog/type_chunk.h"
+
 namespace mongo {
 
 class BSONObj;
@@ -55,6 +59,16 @@ BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const bool& isDonorShard,
                                     const BSONObj& min,
                                     const BSONObj& max);
+
+// Creates a query object that can used to find overlapping ranges in the pending range deletions
+// collection.
+Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid);
+
+// Checks the pending range deletions collection to see if there are any pending ranges that
+// conflict with the passed in range.
+bool checkForConflictingDeletions(OperationContext* opCtx,
+                                  const ChunkRange& range,
+                                  const UUID& uuid);
 
 }  // namespace migrationutil
 

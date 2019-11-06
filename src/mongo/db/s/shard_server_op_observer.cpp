@@ -341,8 +341,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
 
             if (!autoColl.getCollection() ||
-                autoColl.getCollection()->uuid() !=
-                    UUID::parse(deletionTask.getCollectionUuid().toString())) {
+                autoColl.getCollection()->uuid() != deletionTask.getCollectionUuid()) {
                 LOG(0) << "Collection UUID doesn't match the one marked for deletion: "
                        << autoColl.getCollection()->uuid()
                        << " != " << deletionTask.getCollectionUuid();

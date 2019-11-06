@@ -62,6 +62,23 @@ BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
     return builder.obj();
 }
 
+Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid) {
+    return QUERY(RangeDeletionTask::kCollectionUuidFieldName
+                 << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << LT
+                 << range.getMax() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+                 << GT << range.getMin());
+}
+
+bool checkForConflictingDeletions(OperationContext* opCtx,
+                                  const ChunkRange& range,
+                                  const UUID& uuid) {
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+
+    auto results = store.query(opCtx, overlappingRangeQuery(range, uuid));
+
+    return !results.empty();
+}
+
 }  // namespace migrationutil
 
 }  // namespace mongo

@@ -52,6 +52,9 @@ class StatusWith;
  */
 class ChunkRange {
 public:
+    static constexpr char kMinKey[] = "min";
+    static constexpr char kMaxKey[] = "max";
+
     ChunkRange(BSONObj minKey, BSONObj maxKey);
 
     /**

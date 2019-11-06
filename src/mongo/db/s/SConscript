@@ -385,6 +385,7 @@ env.CppUnitTest(
         'implicit_create_collection_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',
+        'migration_util_test.cpp',
         'namespace_metadata_change_notifications_test.cpp',
         'session_catalog_migration_destination_test.cpp',
         'session_catalog_migration_source_test.cpp',
@@ -417,6 +418,7 @@ env.CppUnitTest(
         'collection_range_deleter_test.cpp',
         'collection_sharding_state_test.cpp',
         'metadata_manager_test.cpp',
+        'persistent_task_store_test.cpp',
         'persistent_task_queue_test.cpp'
     ],
     LIBDEPS=[

@@ -65,7 +65,7 @@ let testColl = testDB.foo;
 
     let deletionTask = {
         nss: ns,
-        collectionUuid: extractUUIDFromObject(collectionUuid),
+        collectionUuid: collectionUuid,
         pending: "true",
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now"
@@ -113,7 +113,7 @@ let testColl = testDB.foo;
 
     let deletionTask = {
         nss: ns,
-        collectionUuid: "0",
+        collectionUuid: UUID(),
         pending: "true",
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now"

@@ -60,9 +60,6 @@ const BSONField<BSONObj> ChunkType::history("history");
 
 namespace {
 
-const char kMinKey[] = "min";
-const char kMaxKey[] = "max";
-
 /**
  * Extracts an Object value from 'obj's field 'fieldName'. Sets the result to 'bsonElement'.
  */

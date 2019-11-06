@@ -52,6 +52,8 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/s/persistent_task_store.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
@@ -734,12 +736,28 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard));
 
+    const UUID collectionUuid = [&] {
+        AutoGetCollection autoGetCollection(opCtx, _nss, MODE_IS);
+        return autoGetCollection.getCollection()->uuid();
+    }();
+
     {
+        const ChunkRange range(_min, _max);
+
+        if (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUuid)) {
+            _setStateFail(str::stream() << "Migration aborted because range overlaps with a "
+                                           "range that is scheduled for deletion: collection: "
+                                        << _nss.ns() << " range: " << redact(range.toString()));
+            return;
+        }
+
+        // TODO(SERVER-44163): Delete this block after the MigrationCoordinator has been integrated
+        // into the source. It will be replaced by the checkForOverlapping call.
+
         // 2. Synchronously delete any data which might have been left orphaned in the range
         // being moved, and wait for completion
 
-        const ChunkRange footprint(_min, _max);
-        auto notification = _notePending(opCtx, footprint);
+        auto notification = _notePending(opCtx, range);
         // Wait for the range deletion to report back
         if (!notification.waitStatus(opCtx).isOK()) {
             _setStateFail(redact(notification.waitStatus(opCtx).reason()));
@@ -747,7 +765,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         }
 
         // Wait for any other, overlapping queued deletions to drain
-        auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, footprint);
+        auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
         if (!status.isOK()) {
             _setStateFail(redact(status.reason()));
             return;

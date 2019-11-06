@@ -46,12 +46,12 @@ types:
         deserializer: "mongo::ChunkRange::fromBSONThrowing"
 
 enums:
-  CleanWhen:
-    description: "When to cleanup ranges."
-    type: string
-    values:
-      kNow: "now"
-      kDelayed: "delayed"
+    CleanWhen:
+        description: "When to cleanup ranges."
+        type: string
+        values:
+            kNow: "now"
+            kDelayed: "delayed"
 
 structs:
     rangeDeletionTask:
@@ -62,7 +62,7 @@ structs:
                 type: namespacestring
                 description: "The namespace of the collection that the chunk belongs to."
             collectionUuid:
-                type: namespacestring
+                type: uuid
                 description: "The UUID of the collection that the chunk belongs to."
             range:
                 type: chunkRangeType
