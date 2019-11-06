@@ -62,7 +62,7 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
     AutoGetCollectionForReadCommand ctx(
         opCtx, parsedMr.getNamespace(), AutoGetCollection::ViewMode::kViewsPermitted);
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            "mapReduce on a view is not yet supported",
+            "mapReduce on a view is not supported",
             !ctx.getView());
 
     auto resolvedCollator = PipelineD::resolveCollator(
@@ -177,6 +177,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
         return true;
     } catch (DBException& e) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                "mapReduce on a view is not supported",
+                e.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+
         e.addContext("MapReduce internal error");
         throw;
     }
