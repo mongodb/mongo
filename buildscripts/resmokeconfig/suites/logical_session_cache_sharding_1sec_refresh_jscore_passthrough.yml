@@ -95,8 +95,6 @@ selector:
   - jstests/core/mr_preserve_indexes.js
   - jstests/core/mr_scope.js
   - jstests/core/mr_use_this_object.js
-  # TODO: SERVER-36966
-  - jstests/core/autocomplete.js
 
   # The tests below use applyOps, SERVER-1439.
   - jstests/core/list_collections1.js
