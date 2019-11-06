@@ -480,6 +480,15 @@ functions:
       bucket: mciuploads
       extract_to: src
 
+  "fetch packages": &fetch_packages
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+      bucket: mciuploads
+      extract_to: src
+
   "fetch binaries": &fetch_binaries
     command: s3.get
     params:
@@ -1731,6 +1740,9 @@ functions:
           extra_args="$extra_args --cache-debug=scons_cache.log"
         fi
 
+        # Enable performance debugging
+        extra_args="$extra_args --debug=time"
+
         # If we are doing a patch build or we are building a non-push
         # build on the waterfall, then we don't need the --release
         # flag. Otherwise, this is potentially a build that "leaves
@@ -2407,7 +2419,7 @@ functions:
       script: |
         set -o errexit
 
-        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz"
+        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
@@ -3666,14 +3678,14 @@ tasks:
     - func: "build new tools"
     - func: "scons compile"
       vars:
-        targets: core tools ${mh_target|}
-        task_compile_flags: >-
-          --use-new-tools
-          --build-mongoreplay="${build_mongoreplay}"
-          --detect-odr-violations
-    - func: "scons compile"
-      vars:
-        targets: archive-dist archive-dist-debug distsrc-${ext|tgz} ${msi_target|}
+        targets: >-
+          archive-dist
+          archive-dist-debug
+          install-core
+          install-tools
+          distsrc-${ext|tgz}
+          ${msi_target|}
+          ${mh_target|}
         additional_targets: ""
         task_compile_flags: >-
           --use-new-tools
@@ -3697,7 +3709,8 @@ tasks:
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
-          mv mh-*.${ext|tgz} mh-binaries.${ext|tgz} || true
+          mv mh-*-debugsymbols.${ext|tgz} mh-debugsymbols.${ext|tgz} || true
+          mv mh-mongodb*.${ext|tgz} mh-binaries.${ext|tgz} || true
 
     # Tar unstripped dbtest, to be archived in case of failure
     - command: archive.targz_pack
@@ -3706,26 +3719,6 @@ tasks:
         source_dir: "src"
         include:
           - "./dbtest*"
-
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
-            exit 0
-          fi
-
-          # If strip is on the path (everywhere except windows) then we should strip the test binaries
-          # before tarring them up
-          if [ -x ${strip_path|/usr/bin/strip} ]; then
-            ${strip_command|/usr/bin/strip} mongobridge
-            ${strip_command|/usr/bin/strip} wt
-          fi
-
 
     - command: shell.exec
       params:
@@ -3767,6 +3760,13 @@ tasks:
 
     - command: archive.targz_pack
       params:
+        target: "packages.tgz"
+        source_dir: "src"
+        include:
+          - "repo/**"
+
+    - command: archive.targz_pack
+      params:
         target: "artifacts.tgz"
         source_dir: "src"
         include:
@@ -3793,7 +3793,6 @@ tasks:
           - "./etc/*san.suppressions"
           - "./etc/repo_config.yaml"
           - "./build/**.gcno"
-          - "repo/**"
           - "src/mongo/util/options_parser/test_config_files/**"
           - "library_dependency_graph.json"
           - "src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
@@ -3802,6 +3801,7 @@ tasks:
           - "artifacts.json"
         exclude_files:
           - "*_test.pdb"
+
     - func: "upload debugsymbols"
     - command: s3.put
       params:
@@ -3835,7 +3835,18 @@ tasks:
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
-        display_name: MH
+        display_name: MH Binaries
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mh-debugsymbols.${ext|tgz}
+        remote_file: ${mh_archive}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: MH Debuginfo
     - command: s3.put
       params:
         optional: true
@@ -3857,6 +3868,17 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: Artifacts
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: packages.tgz
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: Packages
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -3897,15 +3919,7 @@ tasks:
     - func: "build new tools"
     - func: "scons compile"
       vars:
-        targets: core tools ${mh_target|}
-        compiling_for_test: true
-        task_compile_flags: >-
-          --use-new-tools
-          --build-mongoreplay="${build_mongoreplay}"
-          --detect-odr-violations
-    - func: "scons compile"
-      vars:
-        targets: archive-dist
+        targets: install-core install-tools archive-dist ${mh_target|}
         compiling_for_test: true
         additional_targets: ""
         task_compile_flags: >-
@@ -8213,6 +8227,7 @@ tasks:
   - name: replica_sets_jscore_passthrough
   commands:
     - func: "fetch artifacts"
+    - func: "fetch packages"
     - func: "apply compile expansions"
     - func: "set up remote credentials"
       vars:
@@ -8243,6 +8258,7 @@ tasks:
   stepback: false
   commands:
     - func: "fetch artifacts"
+    - func: "fetch packages"
     - func: "fetch binaries"
     # Fetch the shell
     - command: s3.get
@@ -9160,7 +9176,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -9844,7 +9860,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
@@ -10291,7 +10307,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: x86_64-enterprise
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
@@ -10758,7 +10774,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
@@ -11198,7 +11214,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel70
     multiversion_edition: enterprise
@@ -11258,7 +11274,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel80
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -11820,7 +11836,7 @@ buildvariants:
     push_name: linux
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
@@ -12203,7 +12219,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian92
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: debian92
     multiversion_edition: enterprise
@@ -12307,7 +12323,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian10
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: debian10
     multiversion_edition: enterprise
@@ -13081,7 +13097,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    mh_target: dist-mh
+    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise

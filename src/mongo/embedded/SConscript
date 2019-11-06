@@ -163,6 +163,7 @@ if get_option('link-model') != 'dynamic-sdk':
     env.Alias('all', mongoed) # This ensures it compiles and links, but doesn't copy it anywhere.
 
     hygienic = get_option('install-mode') == 'hygienic'
-
-    if not hygienic:
-        env.Install('#/', mongoed)
+    install_mongoed = env.Install('#/', mongoed)
+    if hygienic:
+        # TODO: remove when archive.tgz is built by hygienic
+        env.Alias("install-embedded-test", install_mongoed)

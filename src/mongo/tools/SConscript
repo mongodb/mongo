@@ -56,9 +56,9 @@ mongoebench = yamlEnv.Program(
     ],
 )
 
-hygienic = get_option('install-mode') == 'hygienic'
-if not hygienic:
-    env.Install("#/", mongobridge)
-    env.Install("#/", mongoebench)
+# TODO: remove this when hygienic is driving all tarball creation
+install_mongobridge = env.Install("#/", mongobridge)
+install_mongoebench = env.Install("#/", mongoebench)
+env.Alias("install-tools", [install_mongoebench, install_mongobridge])
 
 env.Alias('all', mongoebench)  # This ensures it compiles and links, but doesn't copy it anywhere.

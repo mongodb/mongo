@@ -36,7 +36,6 @@ COMPONENTS = "AIB_COMPONENTS_EXTRA"
 INSTALL_ACTIONS = "AIB_INSTALL_ACTIONS"
 META_ROLE = "AIB_META_ROLE"
 PACKAGE_ALIAS_MAP = "AIB_PACKAGE_ALIAS_MAP"
-PACKAGE_PREFIX = "AIB_PACKAGE_PREFIX"
 PRIMARY_COMPONENT = "AIB_COMPONENT"
 PRIMARY_ROLE = "AIB_ROLE"
 ROLES = "AIB_ROLES"
@@ -55,7 +54,7 @@ FILES should be absolute paths or relative to ROOT_DIRECTORY.
 
 ARCHIVE_TYPE is one of zip or tar.
 '''
-            
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print(sys.argv[0], "takes at minimum four arguments.")
@@ -252,7 +251,8 @@ def get_package_name(env, component, role):
         (component, role),
         "{component}-{role}".format(component=component, role=role)
     )
-    return "${{{prefix}}}{basename}".format(basename=basename, prefix=PACKAGE_PREFIX)
+
+    return basename
 
 
 def get_dependent_actions(
@@ -660,7 +660,7 @@ def dest_dir_generator(initial_value=None):
         if initial_value is None:
             dest_dir = env.Dir("#install")
         elif isinstance(initial_value, str):
-            dest_dir = env.Dir(initial_value) 
+            dest_dir = env.Dir(initial_value)
         elif isinstance(initial_value, SCons.Node.FS.Dir):
             dest_dir = initial_value
         else:
@@ -670,7 +670,7 @@ def dest_dir_generator(initial_value=None):
         return dd[1]
 
     return generator
-    
+
 
 def _aib_debugdir(source, target, env, for_signature):
     for s in source:
@@ -722,7 +722,6 @@ def generate(env):  # pylint: disable=too-many-statements
     env["PREFIX_DOCDIR"] = env.get("PREFIX_DOCDIR", "$PREFIX_SHAREDIR/doc")
     env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$DESTDIR/include")
     env["PREFIX_DEBUGDIR"] = env.get("PREFIX_DEBUGDIR", _aib_debugdir)
-    env[PACKAGE_PREFIX] = env.get(PACKAGE_PREFIX, "")
     env[SUFFIX_MAP] = {}
     env[PACKAGE_ALIAS_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)
