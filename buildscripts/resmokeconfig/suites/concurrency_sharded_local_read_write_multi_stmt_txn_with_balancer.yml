@@ -133,11 +133,6 @@ selector:
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
 
-  # TODO SERVER-38387: Incorrectly sends a shardCollection command that will fail with
-  # InvalidOptions, which is normally ignored but this error is re-thrown with transactions enabled,
-  # failing the workload.
-  - jstests/concurrency/fsm_workloads/agg_out.js
-
   exclude_with_any_tags:
   - assumes_balancer_off
   - does_not_support_causal_consistency
