@@ -1,16 +1,19 @@
-t = db.array1;
-t.drop();
+(function() {
+"use strict";
 
-x = {
+const coll = db.array1;
+coll.drop();
+
+const x = {
     a: [1, 2]
 };
 
-t.save({a: [[1, 2]]});
-assert.eq(1, t.find(x).count(), "A");
+assert.commandWorked(coll.insert({a: [[1, 2]]}));
+assert.eq(1, coll.find(x).count());
 
-t.save(x);
-delete x._id;
-assert.eq(2, t.find(x).count(), "B");
+assert.commandWorked(coll.insert(x));
+assert.eq(2, coll.find(x).count());
 
-t.ensureIndex({a: 1});
-assert.eq(2, t.find(x).count(), "C");  // TODO SERVER-146
+assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.eq(2, coll.find(x).count());
+}());

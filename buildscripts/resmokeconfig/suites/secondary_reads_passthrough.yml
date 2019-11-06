@@ -12,27 +12,6 @@ selector:
   - jstests/core/read_after_optime.js
   - jstests/core/capped_update.js
 
-  # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
-  # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
-  # written when no sort is specified; however, the order of documents within a collection can
-  # be different across a primary and secondary."
-  - jstests/core/coveredIndex1.js
-  - jstests/core/distinct1.js
-  - jstests/core/elemMatchProjection.js
-  - jstests/core/find4.js
-  - jstests/core/find5.js
-  - jstests/core/fts1.js
-  - jstests/core/find_dedup.js
-  - jstests/core/fts_spanish.js
-  - jstests/core/geo_distinct.js
-  - jstests/core/geo_s2ordering.js
-  - jstests/core/nan.js
-  - jstests/core/not2.js
-  - jstests/core/sorta.js
-  - jstests/core/sortc.js
-  - jstests/core/sort3.js
-  - jstests/core/sort4.js
-  - jstests/core/ord.js
   # Parallel shell is not causally consistent
   - jstests/core/benchrun_pipeline_updates.js
   - jstests/core/crud_ops_do_not_throw_locktimeout.js

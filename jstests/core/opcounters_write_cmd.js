@@ -135,7 +135,12 @@ t.find().batchSize(2).toArray();  // 3 documents, batchSize=2 => 1 query + 1 get
 assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 assert.eq(opCounters.getmore + 1, newdb.serverStatus().opcounters.getmore);
 
-// Getmore, with error (TODO implement when SERVER-5813 is resolved).
+// Getmore, with error.
+opCounters = newdb.serverStatus().opcounters;
+assert.commandFailedWithCode(
+    t.getDB().runCommand({getMore: NumberLong(123), collection: t.getName()}),
+    ErrorCodes.CursorNotFound);
+assert.eq(opCounters.getmore + 1, newdb.serverStatus().opcounters.getmore);
 
 //
 // 6. Command.

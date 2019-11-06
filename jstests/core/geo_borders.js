@@ -136,22 +136,6 @@ cornerPt = t.findOne(
     {loc: {$within: {$center: [onBoundsNeg, Math.sqrt(2 * epsilon * epsilon) + (step / 2)]}}});
 assert.eq(cornerPt.loc.y, overallMin);
 
-// Make sure we can't get corner point when center is over bounds
-// TODO: SERVER-5800 clean up wrapping rules for different CRS queries - not sure this is an error
-/*
-assert.throws(function(){
-    t.findOne( { loc : { $within : { $center : [ offBounds, Math.sqrt( 8 * epsilon * epsilon ) + (
-step / 2 ) ] } } } );
-});
-*/
-
-// Make sure we can't get corner point when center is on max bounds
-// Broken - see SERVER-13581
-// assert.throws(function(){
-//    t.findOne( { loc : { $within : { $center : [ onBounds, Math.sqrt( 8 * epsilon * epsilon ) + (
-//    step / 2 ) ] } } } );
-//});
-
 // ***********
 // Near tests
 // ***********
@@ -161,14 +145,6 @@ assert.eq(overallMax, t.find({loc: {$near: offCenter}}).next().loc.y);
 
 // Make sure we can get all nearby points to point on boundary
 assert.eq(overallMin, t.find({loc: {$near: onBoundsNeg}}).next().loc.y);
-
-// Make sure we can't get all nearby points to point over boundary
-// TODO: SERVER-9986 clean up wrapping rules for different CRS queries - not sure this is an error
-/*
-assert.throws(function(){
-    t.findOne( { loc : { $near : offBounds } } );
-});
-*/
 
 // Make sure we can't get all nearby points to point on max boundary
 // Broken - see SERVER-13581

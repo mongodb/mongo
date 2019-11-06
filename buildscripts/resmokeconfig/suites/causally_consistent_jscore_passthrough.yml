@@ -43,8 +43,6 @@ selector:
   - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
-  - jstests/core/views/views_coll_stats.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
   # Tests that need triaging & remediation | blacklist decision
   # Comments list possible problem point under review.

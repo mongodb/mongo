@@ -1011,8 +1011,8 @@ public:
         ASSERT(
             _client.query(NamespaceString(ns), Query("{a:{$in:[1,[1,2,3]]}}").hint(BSON("a" << 1)))
                 ->more());
-        ASSERT(_client.query(NamespaceString(ns), Query("{a:[1,2,3]}").hint(BSON("a" << 1)))
-                   ->more());  // SERVER-146
+        ASSERT(
+            _client.query(NamespaceString(ns), Query("{a:[1,2,3]}").hint(BSON("a" << 1)))->more());
     }
 };
 
@@ -1026,7 +1026,7 @@ public:
         _client.insert(ns, fromjson("{a:[[1],2]}"));
         check("$natural");
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
-        check("a");  // SERVER-146
+        check("a");
     }
 
 private:

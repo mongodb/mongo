@@ -72,7 +72,7 @@ pipeline = [{$collStats: {queryExecStats: {}}}];
 assertErrorCode(coll, pipeline, 31142);
 
 // Test that we error when the database does not exist.
-// TODO SERVER-33039 When running against a mongos, a non-existent database will cause all
+// TODO SERVER-35479 When running against a mongos, a non-existent database will cause all
 // aggregations to return an empty result set.
 assert.commandWorked(testDB.dropDatabase());
 if (FixtureHelpers.isMongos(testDB)) {
