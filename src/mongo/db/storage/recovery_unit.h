@@ -349,6 +349,29 @@ public:
     }
 
     /**
+     * Sets catalog conflicting timestamp.
+     * This cannot be called after WiredTigerRecoveryUnit::_txnOpen.
+     *
+     * This value must be set when both of the following conditions are true:
+     * - A storage engine snapshot is opened without a read timestamp
+     * (RecoveryUnit::ReadSource::kNoTimestamp).
+     * - The transaction may touch collections it does not yet have locks for.
+     * In this circumstance, the catalog conflicting timestamp serves as a substitute for a read
+     * timestamp. This value must be set to a valid (i.e: no-holes) read timestamp prior to
+     * acquiring a storage engine snapshot. This timestamp will be used to determine if any changes
+     * had happened to the in-memory catalog after a storage engine snapshot got opened for that
+     * transaction.
+     */
+    virtual void setCatalogConflictingTimestamp(Timestamp timestamp) {}
+
+    /**
+     * Returns the catalog conflicting timestamp.
+     */
+    virtual Timestamp getCatalogConflictingTimestamp() const {
+        return {};
+    }
+
+    /**
      * Fetches the storage level statistics.
      */
     virtual std::shared_ptr<StorageStats> getOperationStatistics() const {
