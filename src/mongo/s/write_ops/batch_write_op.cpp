@@ -542,6 +542,9 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
             // writeErrors
             request.setWriteConcern(upgradeWriteConcern(_clientRequest.getWriteConcern()));
         }
+    } else if (!TransactionRouter::get(_opCtx)) {
+        // Apply the WC from the opCtx (except if in a transaction).
+        request.setWriteConcern(_opCtx->getWriteConcern().toBSON());
     }
 
     request.setAllowImplicitCreate(_clientRequest.isImplicitCreateAllowed());

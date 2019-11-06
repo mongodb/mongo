@@ -99,7 +99,8 @@ public:
             nss.db(),
             nss,
             routingInfo,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
             query,

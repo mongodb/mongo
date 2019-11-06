@@ -190,14 +190,14 @@ boost::optional<WouldChangeOwningShardInfo> getWouldChangeOwningShardErrorInfo(
  * inserts the new one. Returns whether or not we actually complete the delete and insert.
  */
 bool handleWouldChangeOwningShardError(OperationContext* opCtx,
-                                       const BatchedCommandRequest& request,
+                                       BatchedCommandRequest* request,
                                        BatchedCommandResponse* response,
                                        BatchWriteExecStats stats) {
     auto txnRouter = TransactionRouter::get(opCtx);
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
     auto wouldChangeOwningShardErrorInfo =
-        getWouldChangeOwningShardErrorInfo(opCtx, request, response, !isRetryableWrite);
+        getWouldChangeOwningShardErrorInfo(opCtx, *request, response, !isRetryableWrite);
     if (!wouldChangeOwningShardErrorInfo)
         return false;
 
@@ -214,12 +214,17 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
+            // Ensure the retried operation does not include WC inside the transaction.  The
+            // transaction commit will still use the WC, because it uses the WC from the opCtx
+            // (which has been set previously in Strategy).
+            request->unsetWriteConcern();
+
             documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
             // Clear the error details from the response object before sending the write again
             response->unsetErrDetails();
-            ClusterWriter::write(opCtx, request, &stats, response);
+            ClusterWriter::write(opCtx, *request, &stats, response);
             wouldChangeOwningShardErrorInfo =
-                getWouldChangeOwningShardErrorInfo(opCtx, request, response, !isRetryableWrite);
+                getWouldChangeOwningShardErrorInfo(opCtx, *request, response, !isRetryableWrite);
             if (!wouldChangeOwningShardErrorInfo)
                 uassertStatusOK(response->toStatus());
 
@@ -228,7 +233,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             // new one.
             updatedShardKey = wouldChangeOwningShardErrorInfo &&
                 documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                                  opCtx, request.getNS(), wouldChangeOwningShardErrorInfo.get());
+                                  opCtx, request->getNS(), wouldChangeOwningShardErrorInfo.get());
 
             // If the operation was an upsert, record the _id of the new document.
             if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -272,7 +277,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         try {
             // Delete the original document and insert the new one
             updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                opCtx, request.getNS(), wouldChangeOwningShardErrorInfo.get());
+                opCtx, request->getNS(), wouldChangeOwningShardErrorInfo.get());
 
             // If the operation was an upsert, record the _id of the new document.
             if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -441,7 +446,7 @@ private:
         bool updatedShardKey = false;
         if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
             updatedShardKey =
-                handleWouldChangeOwningShardError(opCtx, batchedRequest, &response, stats);
+                handleWouldChangeOwningShardError(opCtx, &batchedRequest, &response, stats);
         }
 
         // Populate the lastError object based on the write response

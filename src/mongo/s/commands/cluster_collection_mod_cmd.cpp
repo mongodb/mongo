@@ -73,7 +73,8 @@ public:
         auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
             opCtx,
             nss,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kNoRetry);
         return appendRawResponses(

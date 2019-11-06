@@ -267,6 +267,57 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow) {
     return newCmdBuilder.obj();
 }
 
+BSONObj applyReadWriteConcern(OperationContext* opCtx, bool appendWC, const BSONObj& cmdObj) {
+    // Never apply write concern to ordinary operations inside transactions.  Applying writeConcern
+    // to terminal operations such as abortTransaction and commitTransaction is done directly by the
+    // TransactionRouter.
+    if (TransactionRouter::get(opCtx)) {
+        return cmdObj;
+    }
+
+    // Append all original fields except the readConcern/writeConcern field to the new command.
+    BSONObjBuilder output;
+    bool seenWriteConcern = false;
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (appendWC && name == WriteConcernOptions::kWriteConcernField) {
+            seenWriteConcern = true;
+        }
+        if (!output.hasField(name)) {
+            output.append(elem);
+        }
+    }
+
+    // Finally, add the new read/write concern.
+    if (appendWC && !seenWriteConcern) {
+        output.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+    }
+
+    return output.obj();
+}
+
+BSONObj applyReadWriteConcern(OperationContext* opCtx,
+                              CommandInvocation* invocation,
+                              const BSONObj& cmdObj) {
+    return applyReadWriteConcern(opCtx, invocation->supportsWriteConcern(), cmdObj);
+}
+
+BSONObj applyReadWriteConcern(OperationContext* opCtx, BasicCommand* cmd, const BSONObj& cmdObj) {
+    return applyReadWriteConcern(opCtx, cmd->supportsWriteConcern(cmdObj), cmdObj);
+}
+
+BSONObj stripWriteConcern(const BSONObj& cmdObj) {
+    BSONObjBuilder output;
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (name == WriteConcernOptions::kWriteConcernField) {
+            continue;
+        }
+        output.append(elem);
+    }
+    return output.obj();
+}
+
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
     StringData dbName,

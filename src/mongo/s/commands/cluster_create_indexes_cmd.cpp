@@ -73,8 +73,8 @@ public:
 
         createShardDatabase(opCtx, dbName);
 
-        auto shardResponses =
-            dispatchCommandAssertCollectionExistsOnAtLeastOneShard(opCtx, nss, cmdObj);
+        auto shardResponses = dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
+            opCtx, nss, applyReadWriteConcern(opCtx, this, cmdObj));
 
         return appendRawResponses(opCtx,
                                   &errmsg,

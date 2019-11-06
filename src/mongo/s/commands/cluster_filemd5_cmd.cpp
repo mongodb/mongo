@@ -118,8 +118,10 @@ public:
             SimpleBSONObjComparator::kInstance.evaluate(
                 routingInfo.cm()->getShardKeyPattern().toBSON() == BSON("files_id" << 1))) {
             CommandHelpers::filterCommandReplyForPassthrough(
-                callShardFn(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                            BSON("files_id" << cmdObj.firstElement())),
+                callShardFn(
+                    applyReadWriteConcern(
+                        opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                    BSON("files_id" << cmdObj.firstElement())),
                 &result);
             return true;
         }
@@ -149,7 +151,8 @@ public:
         while (true) {
             const auto res = callShardFn(
                 [&] {
-                    BSONObjBuilder bb(CommandHelpers::filterCommandRequestForPassthrough(cmdObj));
+                    BSONObjBuilder bb(applyReadWriteConcern(
+                        opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
                     bb.append("partialOk", true);
                     bb.append("startAt", numGridFSChunksProcessed);
                     if (!lastResult.isEmpty()) {

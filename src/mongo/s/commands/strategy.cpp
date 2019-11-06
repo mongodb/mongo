@@ -57,6 +57,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/views/resolved_view.h"
@@ -243,23 +244,6 @@ void execCommandClient(OperationContext* opCtx,
         globalOpCounters.gotCommand();
     }
 
-    auto wcResult = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body));
-
-    bool supportsWriteConcern = invocation->supportsWriteConcern();
-    if (!supportsWriteConcern && !wcResult.usedDefault) {
-        // This command doesn't do writes so it should not be passed a writeConcern.
-        // If we did not use the default writeConcern, one was provided when it shouldn't have
-        // been by the user.
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(
-            body, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
-        return;
-    }
-
-    if (TransactionRouter::get(opCtx)) {
-        validateWriteConcernForTransaction(wcResult, c->getName());
-    }
-
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         uassert(ErrorCodes::InvalidOptions,
@@ -280,24 +264,13 @@ void execCommandClient(OperationContext* opCtx,
     }
 
     auto txnRouter = TransactionRouter::get(opCtx);
-    if (!supportsWriteConcern) {
-        if (txnRouter) {
-            invokeInTransactionRouter(opCtx, invocation, result);
-        } else {
-            invocation->run(opCtx, result);
-        }
+    if (txnRouter) {
+        invokeInTransactionRouter(opCtx, invocation, result);
     } else {
-        // Change the write concern while running the command.
-        const auto oldWC = opCtx->getWriteConcern();
-        ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
-        opCtx->setWriteConcern(wcResult);
+        invocation->run(opCtx, result);
+    }
 
-        if (txnRouter) {
-            invokeInTransactionRouter(opCtx, invocation, result);
-        } else {
-            invocation->run(opCtx, result);
-        }
-
+    if (invocation->supportsWriteConcern()) {
         failCommand.executeIf(
             [&](const BSONObj& data) {
                 result->getBodyBuilder().append(data["writeConcernError"]);
@@ -393,6 +366,8 @@ void runCommand(OperationContext* opCtx,
     auto allowTransactionsOnConfigDatabase = false;
     validateSessionOptions(osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
 
+    auto wc = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body));
+
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = [&]() {
         // We must obtain the client lock to set the ReadConcernArgs on the operation
@@ -438,6 +413,39 @@ void runCommand(OperationContext* opCtx,
             })();
 
             txnRouter.beginOrContinueTxn(opCtx, *txnNumber, transactionAction);
+        }
+
+        bool supportsWriteConcern = invocation->supportsWriteConcern();
+        if (!supportsWriteConcern && !wc.usedDefault) {
+            // This command doesn't do writes so it should not be passed a writeConcern.
+            // If we did not use the default writeConcern, one was provided when it shouldn't have
+            // been by the user.
+            auto responseBuilder = replyBuilder->getBodyBuilder();
+            CommandHelpers::appendCommandStatusNoThrow(
+                responseBuilder,
+                Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
+            return;
+        }
+
+        if (supportsWriteConcern && wc.usedDefault &&
+            (!TransactionRouter::get(opCtx) ||
+             commandSupportsWriteConcernInTransaction(commandName))) {
+            // This command supports WC, but wasn't given one - so apply the default, if there is
+            // one.
+            if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                           .getDefaultWriteConcern()) {
+                wc = *wcDefault;
+                LOG(2) << "Applying default writeConcern on " << request.getCommandName() << " of "
+                       << wcDefault->toBSON();
+            }
+        }
+
+        if (TransactionRouter::get(opCtx)) {
+            validateWriteConcernForTransaction(wc, commandName);
+        }
+
+        if (supportsWriteConcern) {
+            opCtx->setWriteConcern(wc);
         }
 
         for (int tries = 0;; ++tries) {

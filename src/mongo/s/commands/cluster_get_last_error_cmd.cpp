@@ -39,6 +39,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
@@ -251,12 +252,13 @@ public:
         const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc())->getPrevHostOpTimes());
 
         std::vector<LegacyWCResponse> wcResponses;
-        auto status =
-            enforceLegacyWriteConcern(opCtx,
-                                      dbname,
-                                      CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                                      hostOpTimes,
-                                      &wcResponses);
+        auto status = enforceLegacyWriteConcern(
+            opCtx,
+            dbname,
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+            hostOpTimes,
+            &wcResponses);
 
         // Don't forget about our last hosts, reset the client info
         ClusterLastErrorInfo::get(cc())->disableForCommand();

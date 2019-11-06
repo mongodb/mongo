@@ -79,7 +79,8 @@ public:
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
             db,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
 

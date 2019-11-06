@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/async_requests_sender.h"
@@ -89,6 +90,26 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
  * Returns a copy of 'cmdObj' with 'allowImplicitCollectionCreation' appended.
  */
 BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
+
+/**
+ * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the
+ * cmdObj explicitly specifies read/writeConcern.
+ */
+BSONObj applyReadWriteConcern(OperationContext* opCtx, bool appendWC, const BSONObj& cmdObj);
+
+/**
+ * Convenience versions of applyReadWriteConcern() for calling from within
+ * CommandInvocation or BasicCommand.
+ */
+BSONObj applyReadWriteConcern(OperationContext* opCtx,
+                              CommandInvocation* invocation,
+                              const BSONObj& cmdObj);
+BSONObj applyReadWriteConcern(OperationContext* opCtx, BasicCommand* cmd, const BSONObj& cmdObj);
+
+/**
+ * Returns a copy of 'cmdObj' with the writeConcern removed.
+ */
+BSONObj stripWriteConcern(const BSONObj& cmdObj);
 
 /**
  * Utility for dispatching unversioned commands to all shards in a cluster.

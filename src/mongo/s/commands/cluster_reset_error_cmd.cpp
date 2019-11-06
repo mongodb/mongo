@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
 
 namespace mongo {
@@ -77,7 +78,10 @@ public:
 
             // Don't care about result from shards.
             conn->runCommand(
-                dbname, CommandHelpers::filterCommandRequestForPassthrough(cmdObj), res);
+                dbname,
+                applyReadWriteConcern(
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                res);
             conn.done();
         }
 

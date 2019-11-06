@@ -90,7 +90,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
     }
 
@@ -134,7 +135,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -183,7 +185,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -223,7 +226,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -270,7 +274,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -317,7 +322,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -354,7 +360,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, dbname, CommandHelpers::filterCommandRequestForPassthrough(cmdObj), &result);
+            opCtx,
+            dbname,
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+            &result);
     }
 
 } cmdUsersInfo;
@@ -389,7 +399,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
     }
 
@@ -425,7 +436,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -466,7 +478,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -506,7 +519,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -546,7 +560,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -586,7 +601,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -629,7 +645,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -674,7 +691,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
 
         const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -711,7 +729,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, dbname, CommandHelpers::filterCommandRequestForPassthrough(cmdObj), &result);
+            opCtx,
+            dbname,
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+            &result);
     }
 
 } cmdRolesInfo;
@@ -798,7 +820,8 @@ public:
             opCtx,
             getName(),
             dbname,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             &result);
     }
 

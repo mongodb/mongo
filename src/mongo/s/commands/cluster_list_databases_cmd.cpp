@@ -40,6 +40,7 @@
 #include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 
@@ -118,7 +119,8 @@ public:
         shardIds.emplace_back(ShardRegistry::kConfigServerShardId);
 
         // { filter: matchExpression }.
-        auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+        auto filteredCmd = applyReadWriteConcern(
+            opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj));
 
         for (const ShardId& shardId : shardIds) {
             const auto shardStatus = shardRegistry->getShard(opCtx, shardId);

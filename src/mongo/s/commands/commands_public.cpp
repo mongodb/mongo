@@ -144,7 +144,8 @@ protected:
 
         // Here, we first filter the command before appending an UNSHARDED shardVersion, because
         // "shardVersion" is one of the fields that gets filtered out.
-        BSONObj filteredCmdObj(CommandHelpers::filterCommandRequestForPassthrough(cmdObj));
+        BSONObj filteredCmdObj(applyReadWriteConcern(
+            opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
         BSONObj filteredCmdObjWithVersion(
             appendShardVersion(filteredCmdObj, ChunkVersion::UNSHARDED()));
 
@@ -235,8 +236,8 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 "admin",
-                configsvrRenameCollectionRequest.toBSON(
-                    CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                configsvrRenameCollectionRequest.toBSON(applyReadWriteConcern(
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj))),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);
@@ -260,8 +261,10 @@ public:
             NamespaceString::kAdminDb,
             fromNss,
             fromRoutingInfo,
-            appendAllowImplicitCreate(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                                      true),
+            appendAllowImplicitCreate(
+                applyReadWriteConcern(
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                true),
             Shard::RetryPolicy::kNoRetry,
             &result);
     }
@@ -310,7 +313,8 @@ public:
             dbName,
             nss,
             routingInfo,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             Shard::RetryPolicy::kIdempotent,
             &result);
     }
@@ -494,7 +498,7 @@ public:
             opCtx,
             dbName,
             dbInfoStatus.getValue(),
-            newCmd,
+            applyReadWriteConcern(opCtx, this, newCmd),
             nss,
             &result,
             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
@@ -554,7 +558,7 @@ public:
             opCtx,
             nss.db(),
             routingInfo.db(),
-            cmdObj,
+            applyReadWriteConcern(opCtx, this, cmdObj),
             nss,
             &result,
             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)});

@@ -57,12 +57,15 @@ bool isRetryableWriteCommand(StringData cmdName) {
 
 }  // namespace
 
+bool commandSupportsWriteConcernInTransaction(StringData cmdName) {
+    return cmdName == "commitTransaction" || cmdName == "coordinateCommitTransaction" ||
+        cmdName == "abortTransaction" || cmdName == "prepareTransaction";
+}
+
 void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName) {
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
-            wcResult.usedDefault || cmdName == "commitTransaction" ||
-                cmdName == "coordinateCommitTransaction" || cmdName == "abortTransaction" ||
-                cmdName == "prepareTransaction");
+            wcResult.usedDefault || commandSupportsWriteConcernInTransaction(cmdName));
 }
 
 bool shouldCommandSkipSessionCheckout(StringData cmdName) {

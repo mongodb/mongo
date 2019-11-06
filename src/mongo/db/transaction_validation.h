@@ -35,6 +35,11 @@
 namespace mongo {
 
 /**
+ * Returns true if the given cmd name is allowed to specify write concern in a transaction.
+ */
+bool commandSupportsWriteConcernInTransaction(StringData cmdName);
+
+/**
  * Throws if the given write concern is not allowed in a transaction.
  */
 void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName);

@@ -124,7 +124,8 @@ public:
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
             dbName,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
         if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
