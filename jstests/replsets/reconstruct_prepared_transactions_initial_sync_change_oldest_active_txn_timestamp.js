@@ -17,6 +17,7 @@
 "use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/libs/fail_point_util.js");
 
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
@@ -58,8 +59,11 @@ secondary = replTest.start(secondary,
 
 // Wait for failpoint to be reached so we know that the node is paused. At this point, the
 // the beginFetchingTimestamp is Timestamp(0, 0) because there were no open transactions.
-assert.commandWorked(secondary.adminCommand(
-    {waitForFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp", timesEntered: 1}));
+assert.commandWorked(secondary.adminCommand({
+    waitForFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp",
+    timesEntered: 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
 
 jsTestLog("Preparing a transaction after the initial syncing node fetched the beginFetchingOptime");
 
