@@ -7179,6 +7179,17 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: concurrency_replication_multiversion_gen
+  tags: [multiversion_passthrough]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: concurrency_replication
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
+
+- <<: *task_template
   name: concurrency_replication_causal_consistency
   tags: ["concurrency", "repl", "large"]
   commands:
@@ -7258,6 +7269,17 @@ tasks:
     vars:
       resmoke_args: --suites=concurrency_sharded_replication --storageEngine=wiredTiger
       resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_sharded_replication_multiversion_gen
+  tags: [multiversion_passthrough]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: concurrency_sharded_replication
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
 
 - <<: *task_template
   name: concurrency_sharded_replication_with_balancer

@@ -1,4 +1,5 @@
 test_kind: fsm_workload_test
+use_in_multiversion_burn_in_tests: true
 
 selector:
   roots:
