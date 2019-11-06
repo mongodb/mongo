@@ -4,7 +4,7 @@
  * Test a snapshot read spanning a find and getmore that runs concurrently with
  * killOp and txnNumber change.
 
- * TODO: SERVER-35567 - Delete this workload.
+ * TODO: SERVER-39939 - Delete this workload.
 
  * @tags: [uses_transactions, state_functions_share_transaction]
  */

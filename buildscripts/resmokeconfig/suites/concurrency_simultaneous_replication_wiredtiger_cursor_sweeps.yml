@@ -23,7 +23,7 @@ selector:
   - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
 
   # This workload kills random cursors which takes a collection lock.
-  # TODO: SERVER-35567.
+  # TODO: SERVER-39939.
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
 
   # This workload kills random sessions and a different FSM workload wouldn't be able to handle
