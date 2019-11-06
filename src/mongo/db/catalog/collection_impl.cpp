@@ -430,7 +430,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
 
 Status CollectionImpl::insertDocument(OperationContext* opCtx,
                                       const BSONObj& doc,
-                                      const std::vector<MultiIndexBlock*>& indexBlocks,
+                                      const OnRecordInsertedFn& onRecordInserted,
                                       bool enforceQuota) {
 
     MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
@@ -462,11 +462,9 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     if (!loc.isOK())
         return loc.getStatus();
 
-    for (auto&& indexBlock : indexBlocks) {
-        Status status = indexBlock->insert(doc, loc.getValue());
-        if (!status.isOK()) {
-            return status;
-        }
+    auto status = onRecordInserted(loc.getValue());
+    if (!status.isOK()) {
+        return status;
     }
 
     vector<InsertStatement> inserts;

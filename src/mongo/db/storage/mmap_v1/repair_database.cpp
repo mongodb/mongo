@@ -420,9 +420,17 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
             auto cursor = originalCollection->getCursor(opCtx);
             while (auto record = cursor->next()) {
                 BSONObj doc = record->data.releaseToBson();
-
+                auto onRecordInserted = [&](const RecordId& loc) {
+                    for (auto&& indexBlock : indexers) {
+                        Status status = indexBlock->insert(doc, loc);
+                        if (!status.isOK()) {
+                            return status;
+                        }
+                    }
+                    return Status::OK();
+                };
                 WriteUnitOfWork wunit(opCtx);
-                Status status = tempCollection->insertDocument(opCtx, doc, indexers, false);
+                Status status = tempCollection->insertDocument(opCtx, doc, onRecordInserted, false);
                 if (!status.isOK())
                     return status;
 

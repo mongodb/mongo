@@ -108,11 +108,11 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
 
 Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
-    int count = 0;
     return _runTaskReleaseResourcesOnFailure([&]() -> Status {
         UnreplicatedWritesBlock uwb(_opCtx.get());
 
         for (auto iter = begin; iter != end; ++iter) {
+            RecordId location;
             std::vector<MultiIndexBlock*> indexers;
             if (_idIndexBlock) {
                 indexers.push_back(_idIndexBlock.get());
@@ -125,10 +125,15 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                 _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns(), [&] {
                     WriteUnitOfWork wunit(_opCtx.get());
                     if (!indexers.empty()) {
+                        auto onRecordInserted = [&](const RecordId& loc) {
+                            location = loc;
+                            return Status::OK();
+                        };
+
                         // This flavor of insertDocument will not update any pre-existing indexes,
                         // only the indexers passed in.
                         const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), *iter, indexers, false);
+                            _opCtx.get(), *iter, onRecordInserted, false);
                         if (!status.isOK()) {
                             return status;
                         }
@@ -151,7 +156,12 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                 return status;
             }
 
-            ++count;
+            for (auto&& indexBlock : indexers) {
+                status = indexBlock->insert(*iter, location);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
         }
         return Status::OK();
     });

@@ -116,10 +116,10 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAbo
     {
         AutoGetCollection autoColl(
             operationContext(), NamespaceString("admin.system.version"), MODE_IX);
-
+        auto onRecordInserted = [&](const RecordId& loc) { return Status::OK(); };
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(autoColl.getCollection()->insertDocument(
-            operationContext(), shardIdentity.toShardIdentityDocument(), {}, false));
+            operationContext(), shardIdentity.toShardIdentityDocument(), onRecordInserted, false));
         ASSERT_EQ(0, getInitCallCount());
     }
 

@@ -228,6 +228,11 @@ public:
                                     bool noWarn,
                                     StoreDeletedDoc storeDeletedDoc) = 0;
 
+        /**
+         * Callback function for callers of insertDocumentForBulkLoader().
+         */
+        using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
+
         virtual Status insertDocuments(OperationContext* opCtx,
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
@@ -248,7 +253,7 @@ public:
 
         virtual Status insertDocument(OperationContext* opCtx,
                                       const BSONObj& doc,
-                                      const std::vector<MultiIndexBlock*>& indexBlocks,
+                                      const OnRecordInsertedFn& onRecordInserted,
                                       bool enforceQuota) = 0;
 
         virtual RecordId updateDocument(OperationContext* opCtx,
@@ -508,15 +513,20 @@ public:
     }
 
     /**
+     * Callback function for callers of insertDocumentForBulkLoader().
+     */
+    using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
+
+    /**
      * Inserts a document into the record store and adds it to the MultiIndexBlocks passed in.
      *
      * NOTE: It is up to caller to commit the indexes.
      */
     inline Status insertDocument(OperationContext* const opCtx,
                                  const BSONObj& doc,
-                                 const std::vector<MultiIndexBlock*>& indexBlocks,
+                                 const OnRecordInsertedFn& onRecordInserted,
                                  const bool enforceQuota) {
-        return this->_impl().insertDocument(opCtx, doc, indexBlocks, enforceQuota);
+        return this->_impl().insertDocument(opCtx, doc, onRecordInserted, enforceQuota);
     }
 
     /**

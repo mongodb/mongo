@@ -199,7 +199,7 @@ public:
      */
     Status insertDocument(OperationContext* opCtx,
                           const BSONObj& doc,
-                          const std::vector<MultiIndexBlock*>& indexBlocks,
+                          const OnRecordInsertedFn& onRecordInserted,
                           bool enforceQuota) final;
 
     /**
