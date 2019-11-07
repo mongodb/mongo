@@ -1,4 +1,6 @@
 // Test $text with $textScore projection.
+(function() {
+"use strict";
 
 load("jstests/libs/analyze_plan.js");
 
@@ -119,3 +121,13 @@ assert(results[0].score,
        "invalid text score for " + tojson(results[0], '', true) + " when $text is in $or");
 assert(results[1].score,
        "invalid text score for " + tojson(results[0], '', true) + " when $text is in $or");
+
+// Project a text score when the query has no $text component. The behavior of $meta expression is
+// to evaluate to "missing" when the metadata is absent, so there should be no "score" field in the
+// output documents.
+results = t.find({}, {score: {$meta: "textScore"}}).toArray();
+assert.eq(results.length, 3);
+for (let res of results) {
+    assert(!res.hasOwnProperty("score"));
+}
+})();
