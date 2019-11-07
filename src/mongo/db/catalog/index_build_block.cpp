@@ -54,11 +54,13 @@ class IndexCatalog;
 IndexBuildBlock::IndexBuildBlock(IndexCatalog* indexCatalog,
                                  const NamespaceString& nss,
                                  const BSONObj& spec,
-                                 IndexBuildMethod method)
+                                 IndexBuildMethod method,
+                                 boost::optional<UUID> indexBuildUUID)
     : _indexCatalog(indexCatalog),
       _nss(nss),
       _spec(spec.getOwned()),
       _method(method),
+      _buildUUID(indexBuildUUID),
       _indexCatalogEntry(nullptr) {}
 
 void IndexBuildBlock::deleteTemporaryTables(OperationContext* opCtx) {
@@ -93,9 +95,11 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     }
 
     // Setup on-disk structures.
-    const auto protocol = IndexBuildProtocol::kSinglePhase;
-    Status status = DurableCatalog::get(opCtx)->prepareForIndexBuild(
-        opCtx, collection->getCatalogId(), descriptor.get(), protocol, isBackgroundSecondaryBuild);
+    Status status = DurableCatalog::get(opCtx)->prepareForIndexBuild(opCtx,
+                                                                     collection->getCatalogId(),
+                                                                     descriptor.get(),
+                                                                     _buildUUID,
+                                                                     isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 
@@ -107,22 +111,6 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     if (_method == IndexBuildMethod::kHybrid) {
         _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, _indexCatalogEntry);
         _indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
-
-        if (IndexBuildProtocol::kTwoPhase == protocol) {
-            const auto sideWritesIdent = _indexBuildInterceptor->getSideWritesTableIdent();
-            // Only unique indexes have a constraint violations table.
-            const auto constraintsIdent = (_indexCatalogEntry->descriptor()->unique())
-                ? boost::optional<std::string>(
-                      _indexBuildInterceptor->getConstraintViolationsTableIdent())
-                : boost::none;
-
-            DurableCatalog::get(opCtx)->setIndexBuildScanning(
-                opCtx,
-                collection->getCatalogId(),
-                _indexCatalogEntry->descriptor()->indexName(),
-                sideWritesIdent,
-                constraintsIdent);
-        }
     }
 
     if (isBackgroundIndex) {

@@ -36,6 +36,7 @@
 
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl_index_build_state.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -67,6 +68,7 @@ public:
     struct SetupOptions {
         SetupOptions();
         IndexConstraints indexConstraints = IndexConstraints::kEnforce;
+        IndexBuildProtocol protocol = IndexBuildProtocol::kSinglePhase;
         bool forRecovery = false;
     };
 

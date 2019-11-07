@@ -34,7 +34,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -186,11 +185,13 @@ public:
     /**
      * Updates the persisted catalog entry for 'ns' with the new index and creates the index on
      * disk.
+     *
+     * A passed 'buildUUID' implies that the index is part of a two-phase index build.
      */
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
                                         RecordId catalogId,
                                         const IndexDescriptor* spec,
-                                        IndexBuildProtocol indexBuildProtocol,
+                                        boost::optional<UUID> buildUUID,
                                         bool isBackgroundSecondaryBuild) = 0;
 
     /**
@@ -212,6 +213,10 @@ public:
                                        std::string sideWritesIdent,
                                        boost::optional<std::string> constraintViolationsIdent) = 0;
 
+
+    virtual boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
+                                                    RecordId catalogId,
+                                                    StringData indexName) const = 0;
 
     /**
      * Returns whether or not this index is building in the "scanning" phase.

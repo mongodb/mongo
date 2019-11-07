@@ -140,11 +140,10 @@ public:
         auto descriptor =
             std::make_unique<IndexDescriptor>(collection, IndexNames::findPluginName(spec), spec);
 
-        const auto protocol = IndexBuildProtocol::kTwoPhase;
         auto ret = DurableCatalog::get(opCtx)->prepareForIndexBuild(opCtx,
                                                                     collection->getCatalogId(),
                                                                     descriptor.get(),
-                                                                    protocol,
+                                                                    UUID::gen(),
                                                                     isBackgroundSecondaryBuild);
         return ret;
     }

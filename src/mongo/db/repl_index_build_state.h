@@ -55,7 +55,7 @@ enum class IndexBuildProtocol {
     kSinglePhase,
     /**
      * Refers to the two-phase index build protocol for building indexes in replica sets. Indexes
-     * are built simultaneously on all nodes and are resumable during the draining phase.
+     * are built simultaneously on all nodes.
      */
     kTwoPhase
 };

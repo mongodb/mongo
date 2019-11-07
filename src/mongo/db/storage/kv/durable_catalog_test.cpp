@@ -109,7 +109,7 @@ public:
 
     std::string createIndex(BSONObj keyPattern,
                             std::string indexType = IndexNames::BTREE,
-                            IndexBuildProtocol protocol = IndexBuildProtocol::kSinglePhase) {
+                            bool twoPhase = false) {
         auto opCtx = newOperationContext();
         std::string indexName = "idx" + std::to_string(numIndexesCreated);
 
@@ -121,8 +121,9 @@ public:
         {
             WriteUnitOfWork wuow(opCtx.get());
             const bool isSecondaryBackgroundIndexBuild = false;
+            boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
             ASSERT_OK(_storageEngine.getCatalog()->prepareForIndexBuild(
-                opCtx.get(), _catalogId, &desc, protocol, isSecondaryBackgroundIndexBuild));
+                opCtx.get(), _catalogId, &desc, buildUUID, isSecondaryBackgroundIndexBuild));
             wuow.commit();
         }
 
@@ -377,8 +378,8 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
 }
 
 TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
-    std::string indexName =
-        createIndex(BSON("a" << 1), IndexNames::BTREE, IndexBuildProtocol::kTwoPhase);
+    bool twoPhase = true;
+    std::string indexName = createIndex(BSON("a" << 1), IndexNames::BTREE, twoPhase);
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
 
@@ -386,6 +387,7 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
               catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
     ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_TRUE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
@@ -429,6 +431,7 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
 }

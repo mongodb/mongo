@@ -145,12 +145,16 @@ public:
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 RecordId catalogId,
                                 const IndexDescriptor* spec,
-                                IndexBuildProtocol indexBuildProtocol,
+                                boost::optional<UUID> buildUUID,
                                 bool isBackgroundSecondaryBuild);
 
     bool isTwoPhaseIndexBuild(OperationContext* opCtx,
                               RecordId catalogId,
                               StringData indexName) const;
+
+    boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
+                                            RecordId catalogId,
+                                            StringData indexName) const;
 
     void setIndexBuildScanning(OperationContext* opCtx,
                                RecordId catalogId,

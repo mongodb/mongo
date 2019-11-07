@@ -73,6 +73,7 @@ public:
         bool multikey = false;
         KVPrefix prefix = KVPrefix::kNotPrefixed;
         bool isBackgroundSecondaryBuild = false;
+        boost::optional<UUID> buildUUID;
 
         long versionOfBuild = kIndexBuildVersion;
         // If true, a two-phase index build is in progress, false otherwise.

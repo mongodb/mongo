@@ -304,7 +304,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                                      << "a_1");
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
-            indexCatalog, collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid);
+            indexCatalog, collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid, UUID::gen());
         {
             WriteUnitOfWork wuow(opCtx);
             ASSERT_OK(indexBuildBlock->init(opCtx, collection));

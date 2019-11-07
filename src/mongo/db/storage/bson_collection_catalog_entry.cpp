@@ -181,6 +181,9 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             if (indexes[i].buildPhase) {
                 sub.append("buildPhase", *indexes[i].buildPhase);
             }
+            if (indexes[i].buildUUID) {
+                indexes[i].buildUUID->appendToBuilder(&sub, "buildUUID");
+            }
             if (indexes[i].constraintViolationsIdent) {
                 sub.append("constraintViolationsIdent", *indexes[i].constraintViolationsIdent);
             }
@@ -228,6 +231,9 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             }
             if (idx["buildPhase"]) {
                 imd.buildPhase = idx["buildPhase"].str();
+            }
+            if (idx["buildUUID"]) {
+                imd.buildUUID = fassert(31353, UUID::parse(idx["buildUUID"]));
             }
             if (idx["constraintViolationsIdent"]) {
                 imd.constraintViolationsIdent = idx["constraintViolationsIdent"].str();

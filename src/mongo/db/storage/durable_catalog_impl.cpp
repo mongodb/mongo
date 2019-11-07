@@ -595,6 +595,9 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
             const auto index = md.indexes[i];
             string name = index.name();
 
+            // All indexes with buildUUIDs must be ready:false.
+            invariant(!(index.buildUUID && index.ready), str::stream() << md.toBSON());
+
             // fix ident map
             BSONElement e = oldIdentMap[name];
             if (e.type() == String) {
@@ -942,7 +945,7 @@ Status DurableCatalogImpl::removeIndex(OperationContext* opCtx,
 Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
                                                 RecordId catalogId,
                                                 const IndexDescriptor* spec,
-                                                IndexBuildProtocol indexBuildProtocol,
+                                                boost::optional<UUID> buildUUID,
                                                 bool isBackgroundSecondaryBuild) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
@@ -953,7 +956,8 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
     imd.multikey = false;
     imd.prefix = prefix;
     imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
-    imd.runTwoPhaseBuild = indexBuildProtocol == IndexBuildProtocol::kTwoPhase;
+    imd.runTwoPhaseBuild = buildUUID.is_initialized();
+    imd.buildUUID = buildUUID;
 
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
         const auto feature = FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
@@ -994,6 +998,15 @@ bool DurableCatalogImpl::isTwoPhaseIndexBuild(OperationContext* opCtx,
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].runTwoPhaseBuild;
+}
+
+boost::optional<UUID> DurableCatalogImpl::getIndexBuildUUID(OperationContext* opCtx,
+                                                            RecordId catalogId,
+                                                            StringData indexName) const {
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].buildUUID;
 }
 
 void DurableCatalogImpl::setIndexBuildScanning(
@@ -1059,6 +1072,7 @@ void DurableCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
     md.indexes[offset].ready = true;
     md.indexes[offset].runTwoPhaseBuild = false;
     md.indexes[offset].buildPhase = boost::none;
+    md.indexes[offset].buildUUID = boost::none;
     md.indexes[offset].sideWritesIdent = boost::none;
     md.indexes[offset].constraintViolationsIdent = boost::none;
     putMetaData(opCtx, catalogId, md);
@@ -1142,6 +1156,7 @@ boost::optional<std::string> DurableCatalogImpl::getConstraintViolationsIdent(
     invariant(offset >= 0);
     return md.indexes[offset].constraintViolationsIdent;
 }
+
 
 long DurableCatalogImpl::getIndexBuildVersion(OperationContext* opCtx,
                                               RecordId catalogId,

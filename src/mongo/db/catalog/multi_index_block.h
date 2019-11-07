@@ -111,6 +111,14 @@ public:
     void ignoreUniqueConstraint();
 
     /**
+     * Sets an index build UUID associated with the indexes for this builder. This call is required
+     * for two-phase index builds.
+     */
+    void setTwoPhaseBuildUUID(UUID indexBuildUUID) {
+        _buildUUID = indexBuildUUID;
+    }
+
+    /**
      * Prepares the index(es) for building and returns the canonicalized form of the requested index
      * specifications.
      *
@@ -354,6 +362,8 @@ private:
 
     // Duplicate key constraints should be checked at least once in the MultiIndexBlock.
     bool _constraintsChecked = false;
+
+    boost::optional<UUID> _buildUUID;
 
     // Protects member variables of this class declared below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiIndexBlock::_mutex");

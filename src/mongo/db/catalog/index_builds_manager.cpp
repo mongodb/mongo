@@ -89,6 +89,9 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                             << nss.ns() << " is not locked in exclusive mode.");
 
     auto builder = _getBuilder(buildUUID);
+    if (options.protocol == IndexBuildProtocol::kTwoPhase) {
+        builder->setTwoPhaseBuildUUID(buildUUID);
+    }
 
     // Ignore uniqueness constraint violations when relaxed (on secondaries). Secondaries can
     // complete index builds in the middle of batches, which creates the potential for finding

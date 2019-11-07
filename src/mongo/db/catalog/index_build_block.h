@@ -44,7 +44,9 @@ public:
     IndexBuildBlock(IndexCatalog* indexCatalog,
                     const NamespaceString& nss,
                     const BSONObj& spec,
-                    IndexBuildMethod method);
+                    IndexBuildMethod method,
+                    // The index build UUID is only required for persisting to the catalog.
+                    boost::optional<UUID> indexBuildUUID);
 
     ~IndexBuildBlock();
 
@@ -109,6 +111,7 @@ private:
 
     BSONObj _spec;
     IndexBuildMethod _method;
+    boost::optional<UUID> _buildUUID;
 
     std::string _indexName;
     std::string _indexNamespace;

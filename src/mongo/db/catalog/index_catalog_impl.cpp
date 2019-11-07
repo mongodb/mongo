@@ -406,7 +406,9 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     spec = statusWithSpec.getValue();
 
     // now going to touch disk
-    IndexBuildBlock indexBuildBlock(this, _collection->ns(), spec, IndexBuildMethod::kForeground);
+    boost::optional<UUID> buildUUID = boost::none;
+    IndexBuildBlock indexBuildBlock(
+        this, _collection->ns(), spec, IndexBuildMethod::kForeground, buildUUID);
     status = indexBuildBlock.init(opCtx, _collection);
     if (!status.isOK())
         return status;

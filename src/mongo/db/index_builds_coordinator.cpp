@@ -979,6 +979,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
         repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, nss)
         ? IndexBuildsManager::IndexConstraints::kRelax
         : IndexBuildsManager::IndexConstraints::kEnforce;
+    options.protocol = protocol;
     status = _indexBuildsManager.setUpIndexBuild(
         opCtx, collection, filteredSpecs, replIndexBuildState->buildUUID, onInitFn, options);
 
