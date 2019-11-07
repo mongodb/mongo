@@ -40,6 +40,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -56,6 +57,8 @@ using std::set;
 using std::string;
 
 namespace {
+
+static constexpr StringData kShardNameField = "primaryShard"_sd;
 
 /**
  * Internal sharding command run on config servers to enable sharding on a database.
@@ -112,6 +115,14 @@ public:
 
         const std::string dbname = parseNs("", cmdObj);
 
+        auto shardElem = cmdObj[kShardNameField];
+        ShardId shardId = shardElem.ok() ? ShardId(shardElem.String()) : ShardId();
+
+        // If assigned, check that the shardId is valid
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "invalid shard name: " << shardId,
+                !shardElem.ok() || shardId.isValid());
+
         uassert(
             ErrorCodes::InvalidNamespace,
             str::stream() << "invalid db name specified: " << dbname,
@@ -134,13 +145,12 @@ public:
             uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
                 opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
 
-        ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname);
+        ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname, shardId);
         audit::logEnableSharding(Client::getCurrent(), dbname);
 
         return true;
     }
 
 } configsvrEnableShardingCmd;
-
 }  // namespace
 }  // namespace mongo

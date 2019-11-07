@@ -97,7 +97,7 @@ public:
                 uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
                     opCtx, dbname, "createDatabase", DistLockManager::kDefaultLockTimeout));
 
-            ShardingCatalogManager::get(opCtx)->createDatabase(opCtx, dbname.toString());
+            ShardingCatalogManager::get(opCtx)->createDatabase(opCtx, dbname, ShardId());
         }
 
     private:

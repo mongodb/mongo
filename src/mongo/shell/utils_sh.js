@@ -64,7 +64,8 @@ sh.help = function() {
           "assigns the specified range of the given collection to a zone");
     print("\tsh.disableBalancing(coll)                 disable balancing on one collection");
     print("\tsh.enableBalancing(coll)                  re-enable balancing on one collection");
-    print("\tsh.enableSharding(dbname)                 enables sharding on the database dbname");
+    print(
+        "\tsh.enableSharding(dbname, shardName)      enables sharding on the database dbname, optionally use shardName as primary");
     print("\tsh.getBalancerState()                     returns whether the balancer is enabled");
     print(
         "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
@@ -97,9 +98,13 @@ sh.addShard = function(url) {
     return sh._adminCommand({addShard: url}, true);
 };
 
-sh.enableSharding = function(dbname) {
+sh.enableSharding = function(dbname, shardName) {
     assert(dbname, "need a valid dbname");
-    return sh._adminCommand({enableSharding: dbname});
+    var command = {enableSharding: dbname};
+    if (shardName) {
+        command.primaryShard = shardName;
+    }
+    return sh._adminCommand(command);
 };
 
 sh.shardCollection = function(fullName, key, unique, options) {

@@ -145,7 +145,7 @@ public:
                                  const BSONObj& query,
                                  const WriteConcernOptions& writeConcern) override;
 
-    Status createDatabase(OperationContext* opCtx, const std::string& dbName);
+    Status createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
 
     DistLockManager* getDistLockManager() override;
 

@@ -45,6 +45,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -59,7 +60,8 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 }  // namespace
 
 DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
-                                                    const std::string& dbName) {
+                                                    StringData dbName,
+                                                    ShardId primaryShard) {
     invariant(nsIsDbOnly(dbName));
 
     // The admin and config databases should never be explicitly created. They "just exist",
@@ -68,13 +70,20 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
         uasserted(ErrorCodes::InvalidOptions,
                   str::stream() << "cannot manually create database '" << dbName << "'");
     }
+    const auto shardPtr = !primaryShard.isValid()
+        ? nullptr
+        : uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShard));
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Invalid shard name: " << primaryShard.toString(),
+            (primaryShard.isValid() && shardPtr != nullptr) ||
+                (!primaryShard.isValid() && shardPtr == nullptr));
 
     // Check if a database already exists with the same name (case sensitive), and if so, return the
     // existing entry.
 
     BSONObjBuilder queryBuilder;
     queryBuilder.appendRegex(
-        DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
+        DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$", "i");
 
     auto docs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->_exhaustiveFindOnConfig(
                                     opCtx,
@@ -87,16 +96,20 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                     .value;
 
     if (!docs.empty()) {
-        BSONObj dbObj = docs.front();
-        std::string actualDbName = dbObj[DatabaseType::name()].String();
+        auto actualDb = uassertStatusOK(DatabaseType::fromBSON(docs.front()));
 
         uassert(ErrorCodes::DatabaseDifferCase,
                 str::stream() << "can't have 2 databases that just differ on case "
                               << " have: "
-                              << actualDbName
+                              << actualDb.getName()
                               << " want to add: "
-                              << dbName,
-                actualDbName == dbName);
+                              << dbName.toString(),
+                actualDb.getName() == dbName.toString());
+
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "database already created on a primary which is different from: "
+                              << primaryShard,
+                !primaryShard.isValid() || actualDb.getPrimary() == primaryShard);
 
         // We did a local read of the database entry above and found that the database already
         // exists. However, the data may not be majority committed (a previous createDatabase
@@ -104,14 +117,15 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
         // Since the current Client doesn't know the opTime of the last write to the database entry,
         // make it wait for the last opTime in the system when we wait for writeConcern.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return uassertStatusOK(DatabaseType::fromBSON(dbObj));
+        return actualDb;
     }
 
     // The database does not exist. Insert an entry for the new database into the sharding catalog.
 
     // Pick a primary shard for the new database.
-    const auto primaryShardId =
-        uassertStatusOK(_selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry()));
+    const ShardId primaryShardId = shardPtr == nullptr
+        ? uassertStatusOK(_selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry()))
+        : shardPtr->getId();
 
     // Hold the Global IX lock across checking the FCV and writing the new database entry.
     // Because of the Global S lock barrier in setFCV, this ensures either the setFCV schema
@@ -129,7 +143,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     }
 
     // Insert an entry for the new database into the sharding catalog.
-    DatabaseType db(dbName, std::move(primaryShardId), false, std::move(dbVersion));
+    DatabaseType db(dbName.toString(), std::move(primaryShardId), false, std::move(dbVersion));
 
     log() << "Registering new database " << db << " in sharding catalog";
 
@@ -139,7 +153,9 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     return db;
 }
 
-void ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std::string& dbName) {
+void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
+                                            StringData dbName,
+                                            ShardId primaryShard) {
     invariant(nsIsDbOnly(dbName));
 
     uassert(ErrorCodes::IllegalOperation,
@@ -153,7 +169,7 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std::
 
     // Creates the database if it doesn't exist and returns the new database entry, else returns the
     // existing database entry.
-    auto dbType = createDatabase(opCtx, dbName);
+    auto dbType = createDatabase(opCtx, dbName, primaryShard);
     dbType.setSharded(true);
 
     // We must wait for the database entry to be majority committed, because it's possible that
@@ -172,7 +188,7 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std::
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
         DatabaseType::ConfigNS,
-        BSON(DatabaseType::name(dbName)),
+        BSON(DatabaseType::name(dbName.toString())),
         BSON("$set" << BSON(DatabaseType::sharded(true))),
         false,
         ShardingCatalogClient::kLocalWriteConcern));

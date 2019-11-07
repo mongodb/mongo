@@ -224,6 +224,7 @@ selector:
   - jstests/sharding/findandmodify1.js
   - jstests/sharding/move_chunk_missing_idx.js
   - jstests/sharding/enable_sharding_basic.js
+  - jstests/sharding/enable_sharding_with_primary.js
   - jstests/sharding/inserts_consistent.js
   - jstests/sharding/shard4.js
   - jstests/sharding/migration_with_source_ops.js
