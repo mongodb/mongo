@@ -35,6 +35,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -59,11 +60,13 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+    static constexpr StringData kShardNameField = "primaryShard"_sd;
 
     std::string help() const override {
-        return "Enable sharding for a database. "
+        return "Enable sharding for a database. Optionally allows the caller to specify the shard "
+               "to be used as primary."
                "(Use 'shardcollection' command afterwards.)\n"
-               "  { enablesharding : \"<dbname>\" }\n";
+               "  { enableSharding : \"<dbname>\", primaryShard:  \"<shard>\"}\n";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -87,19 +90,31 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
+
         const std::string db = parseNs("", cmdObj);
+
+        auto shardElem = cmdObj[kShardNameField];
+        std::string shardId = shardElem.ok() ? shardElem.String() : "";
 
         // Invalidate the routing table cache entry for this database so that we reload the
         // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
-        ON_BLOCK_EXIT([opCtx, db] { Grid::get(opCtx)->catalogCache()->purgeDatabase(db); });
+        auto guard =
+            makeGuard([opCtx, db] { Grid::get(opCtx)->catalogCache()->purgeDatabase(db); });
+
+
+        BSONObjBuilder remoteCmdObj;
+        remoteCmdObj.append("_configsvrEnableSharding", db);
+        if (shardElem.ok()) {
+            remoteCmdObj.append(kShardNameField, shardId);
+        }
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                cmdObj, BSON("_configsvrEnableSharding" << db))),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(cmdObj, remoteCmdObj.obj())),
             Shard::RetryPolicy::kIdempotent));
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
