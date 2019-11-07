@@ -550,6 +550,18 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',
         'replication_auth',
+        'tla_plus_trace_repl',
+    ],
+)
+
+env.Library(
+    target='tla_plus_trace_repl',
+    source=[
+        'tla_plus_trace_repl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 
@@ -938,7 +950,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/net/network',
-    ],        
+    ],
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
         'replication_auth',
