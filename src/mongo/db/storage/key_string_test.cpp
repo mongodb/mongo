@@ -132,6 +132,42 @@ void checkSizeWhileAppendingTypeBits(int numOfBitsUsedForType, T&& appendBitsFun
     }
 }
 
+// This test is derived from a fuzzer suite and triggers interesting code paths and recursion
+// patterns, so including it here specifically.
+TEST(InvalidKeyStringTest, FuzzedCodeWithScopeNesting) {
+    BufBuilder keyData;
+    fromHexString(
+        "aa00aa4200aafa00aa0200aa0a01aa02aa00aa4200aafa00aa0200aa0a01aa0200aa00aa4200aafa00aa0200aa"
+        "0a01aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa0200aa3900aafa00aa0200aa00aa004200aafa00"
+        "aaaafa00aa0200aa0a01aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa0200aa00aafa00aa0200aa00"
+        "aa004200aafa00aa0200aa000200aafcfeaa0200aaaa00aa00aafa00aa0200aa00aaaa00aa00aa4200aafa00aa"
+        "0200aa6001fa00aa0200aa0a01aa0200aa00aaaa0a01aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa"
+        "0200aa004200aafa00aa0200aa000200aa0a0200aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa0200"
+        "aa3900aafa00aa0200aa00aa004200aafa00aaaafa00aa0200aa0a01aa0200aa4200aafa00aa0200aa00aaaa00"
+        "aa00aafa00aa0200aa00aafa00aa0200aa00aa004200aafa00aa0200aa000200aafcfeaa0200aaaa00aa00aafa"
+        "00aa0200aa00aaaa00aa00aa4200aafa00aa0200aa6001fa00aa0200aa0a01aa0200aa00aaaa0a01aa0200aa42"
+        "00aafa00aa0200aa00aaaa00aa00aafa00aa0200aa00aaaa00aa0200aa0200aa4200aafa00aa0200aa00aaaa00"
+        "aa00aafa00aa0200aa3900aafa00aa0200aa00aa004200aafa00aaaafa00aa0200aa0a01aa0200aa4200aafa00"
+        "aa0200aa00aaaa00aa00aafa00aa0200aa00aafa00aa0200aa00aa004200aafa00aa0200aa000200aafcfeaa02"
+        "00aaaa00aa00aafa00aa0200aa00aaaa00aa00aa4200aafa00aa0200aa6001fa00aa0200aa0a01aa0200aa00aa"
+        "aa0a01aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa0200aa00aaaa00aa00aafa00aa0201aa0200aa"
+        "aa00aa00aafa00aa0200aa00aaaa00000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000004200aafa00aa0200aa000200aa0a0200aa00aaaa002c00aafa00aa0200aa0200"
+        "aa00aaaa002c00aafa00aa0200aa004200aafa00aa0200aa000200aa0a01aa0200aaaa00aa00aafa00aa0201aa"
+        "0200aaaa00aa00aafa00aa0200aa00aaaa00000000000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000000000aaaa00aa00aafa00aa0200aa00aaaa00000000000000000000000000"
+        "00000000000000000000000000000000000000000000000000aafa00aa0200aa00aaaa00000000000000000400"
+        "00000000000000000000000000000000"_sd,
+        &keyData);
+    char typeBitsData[] = {0, 16, 0, 0, -127, 1};
+    BufReader typeBitsReader(typeBitsData, sizeof(typeBitsData));
+    KeyString::TypeBits typeBits =
+        KeyString::TypeBits::fromBuffer(KeyString::Version::kLatestVersion, &typeBitsReader);
+    ASSERT_THROWS_CODE(KeyString::toBsonSafe(keyData.buf(), keyData.len(), ALL_ASCENDING, typeBits),
+                       AssertionException,
+                       ErrorCodes::Overflow);
+}
+
 TEST(TypeBitsTest, AppendSymbol) {
     checkSizeWhileAppendingTypeBits(
         1, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendSymbol(); });

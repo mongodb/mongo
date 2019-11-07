@@ -1375,10 +1375,11 @@ void toBsonValue(uint8_t ctype,
             } else {
                 code = readCStringWithNuls(reader, &scratch);
             }
-            // Not going to optimize CodeWScope.
-            BSONObjBuilder scope;
-            toBson(reader, typeBits, inverted, version, &scope, depth + 1);
-            *stream << BSONCodeWScope(code, scope.done());
+            // Not going to optimize CodeWScope, but limit stack space usage due to recursion.
+            auto scope = std::make_unique<BSONObjBuilder>();
+            // BSON validation counts a CodeWithScope as two nesting levels, so match that.
+            toBson(reader, typeBits, inverted, version, scope.get(), depth + 2);
+            *stream << BSONCodeWScope(code, scope->done());
             break;
         }
 
