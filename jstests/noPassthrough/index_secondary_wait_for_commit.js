@@ -32,10 +32,7 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 
-const enableTwoPhaseIndexBuild =
-    assert.commandWorked(primary.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
-        .enableTwoPhaseIndexBuild;
-if (!enableTwoPhaseIndexBuild) {
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     jsTestLog('Two phase index builds not enabled, skipping test.');
     rst.stopSet();
     return;

@@ -6,6 +6,7 @@
 "use strict";
 
 load("jstests/libs/get_index_helpers.js");
+load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -15,12 +16,6 @@ const primary = rst.getPrimary();
 
 const testDB = primary.getDB("test");
 const oplogColl = primary.getDB("local").oplog.rs;
-
-// If two phase index builds are enabled, index creation will show up in the oplog as a pair of
-// startIndexBuild and commitIndexBuild oplog entries rather than a single createIndexes entry.
-const enableTwoPhaseIndexBuild =
-    assert.commandWorked(testDB.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
-        .enableTwoPhaseIndexBuild;
 
 function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
@@ -32,8 +27,9 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
         indexSpec,
         "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
 
-    // Find the createIndexes command entries.
-    const indexCreationOplogQuery = enableTwoPhaseIndexBuild
+    // If two phase index builds are enabled, index creation will show up in the oplog as a pair of
+    // startIndexBuild and commitIndexBuild oplog entries rather than a single createIndexes entry.
+    const indexCreationOplogQuery = IndexBuildTest.supportsTwoPhaseIndexBuild(primary)
         ? {op: "c", ns: testDB.getName() + ".$cmd", "o.startIndexBuild": coll.getName()}
         : {op: "c", ns: testDB.getName() + ".$cmd", "o.createIndexes": coll.getName()};
 

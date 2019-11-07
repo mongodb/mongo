@@ -4,6 +4,9 @@
  */
 (function() {
 "use strict";
+
+load('jstests/noPassthrough/libs/index_build.js');
+
 let ensureIndexExists = function(testDB, collName, indexName, expectedNumIndexes) {
     let cmd = {listIndexes: collName};
     let res = testDB.runCommand(cmd);
@@ -35,10 +38,7 @@ let ensureOplogEntryExists = function(localDB, indexName) {
 
     // If two phase index builds are enabled, index creation will show up in the oplog as a pair of
     // startIndexBuild and commitIndexBuild oplog entries rather than a single createIndexes entry.
-    const enableTwoPhaseIndexBuild =
-        assert.commandWorked(localDB.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
-            .enableTwoPhaseIndexBuild;
-    if (enableTwoPhaseIndexBuild) {
+    if (IndexBuildTest.supportsTwoPhaseIndexBuild(localDB.getMongo())) {
         let query = {
             $and: [{"o.startIndexBuild": {$exists: true}}, {"o.indexes.0.name": indexName}]
         };

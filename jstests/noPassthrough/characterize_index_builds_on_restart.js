@@ -12,6 +12,7 @@
 'use strict';
 
 load("jstests/libs/check_log.js");
+load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 
 const dbName = "testDb";
@@ -88,11 +89,8 @@ function startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, writeConcern, s
         // createIndexes for each index spec. When two phase index builds are in effect, all four
         // index specs are built using the same builder, so we should expect to see only one fail
         // point log message instead of four.
-        const enableTwoPhaseIndexBuild = assert
-                                             .commandWorked(primaryDB.adminCommand(
-                                                 {getParameter: 1, enableTwoPhaseIndexBuild: 1}))
-                                             .enableTwoPhaseIndexBuild;
-        const expectedFailPointMessageCount = enableTwoPhaseIndexBuild ? 1 : 4;
+        const expectedFailPointMessageCount =
+            IndexBuildTest.supportsTwoPhaseIndexBuild(primaryDB.getMongo()) ? 1 : 4;
 
         // Wait till all index builds hang.
         checkLog.containsWithCount(

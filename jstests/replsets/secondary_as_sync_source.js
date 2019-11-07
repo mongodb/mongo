@@ -46,14 +46,10 @@ let secondaryDB = secondary.getDB(dbName);
 
 addTestDocuments(primaryDB);
 
-const enableTwoPhaseIndexBuild =
-    assert.commandWorked(primary.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
-        .enableTwoPhaseIndexBuild;
-
 // Used to wait for two-phase builds to complete.
 let awaitIndex;
 
-if (!enableTwoPhaseIndexBuild) {
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     jsTest.log("Hanging index build on the secondary node");
     IndexBuildTest.pauseIndexBuilds(secondary);
 
@@ -87,7 +83,7 @@ replSet.reInitiate();
 waitForState(newNode, ReplSetTest.State.SECONDARY);
 
 jsTest.log("Removing index build hang to allow it to finish");
-if (!enableTwoPhaseIndexBuild) {
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     // Let the 'secondary' finish its index build.
     IndexBuildTest.resumeIndexBuilds(secondary);
 } else {

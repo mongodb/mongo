@@ -178,4 +178,13 @@ class IndexBuildTest {
         assert.commandWorked(
             conn.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
     }
+
+    /**
+     * Returns true if two phase index builds are supported.
+     */
+    static supportsTwoPhaseIndexBuild(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+            .enableTwoPhaseIndexBuild;
+    }
 }
