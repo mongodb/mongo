@@ -3683,9 +3683,9 @@ tasks:
           install-core
           install-tools
           distsrc-${ext|tgz}
+          ${additional_targets|}
           ${msi_target|}
           ${mh_target|}
-        additional_targets: ""
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
@@ -12482,7 +12482,7 @@ buildvariants:
       MONGO_DISTMOD=rhel62
     scons_cache_scope: shared
     build_mongoreplay: true
-    additional_targets: mongoebench mongoed
+    additional_targets: install-embedded-test
   display_tasks:
   - *benchrun_embedded
   tasks:
@@ -12533,7 +12533,7 @@ buildvariants:
         MONGO_DISTMOD=ubuntu1604
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     build_mongoreplay: true
-    additional_targets: mongoebench mongoed
+    additional_targets: install-embedded-test
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -12597,7 +12597,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 4
     build_mongoreplay: true
-    additional_targets: mongoebench mongoed
+    additional_targets: install-embedded-test
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
