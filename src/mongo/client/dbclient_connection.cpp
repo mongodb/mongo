@@ -220,6 +220,9 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
         return connectStatus;
     }
 
+    // Clear the auto-detected protocols from any previous connection.
+    _setServerRPCProtocols(rpc::supports::kOpQueryOnly);
+
     // NOTE: If the 'applicationName' parameter is a view of the '_applicationName' member, as
     // happens, for instance, in the call to DBClientConnection::connect from
     // DBClientConnection::_checkConnection then the following line will invalidate the
