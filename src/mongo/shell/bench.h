@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/shim.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
@@ -159,8 +158,7 @@ public:
      */
     static BenchRunConfig* createFromBson(const BSONObj& args);
 
-    static MONGO_DECLARE_SHIM((const BenchRunConfig&)->std::unique_ptr<DBClientBase>)
-        createConnectionImpl;
+    static std::unique_ptr<DBClientBase> createConnectionImpl(const BenchRunConfig&);
 
     BenchRunConfig();
 

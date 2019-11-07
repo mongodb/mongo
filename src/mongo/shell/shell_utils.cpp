@@ -126,18 +126,19 @@ extern const JSFile bridge;
 extern const JSFile feature_compatibility_version;
 }  // namespace JSFiles
 
-MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
-(const BenchRunConfig& config)->std::unique_ptr<DBClientBase> {
-    const ConnectionString connectionString = uassertStatusOK(ConnectionString::parse(config.host));
+namespace {
 
+std::unique_ptr<DBClientBase> benchRunConfigCreateConnectionImplProvider(
+    const BenchRunConfig& config) {
+    const ConnectionString connectionString = uassertStatusOK(ConnectionString::parse(config.host));
     std::string errorMessage;
     std::unique_ptr<DBClientBase> connection(connectionString.connect("BenchRun", errorMessage));
     uassert(16158, errorMessage, connection);
-
     return connection;
 }
 
-namespace {
+auto benchRunConfigCreateConnectionImplRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    BenchRunConfig::createConnectionImpl, benchRunConfigCreateConnectionImplProvider);
 
 // helper functions for isBalanced
 bool isUseCmd(std::string code) {

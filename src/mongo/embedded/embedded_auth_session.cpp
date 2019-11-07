@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/util/assert_util.h"
@@ -277,9 +278,16 @@ private:
 }  // namespace
 }  // namespace embedded
 
-MONGO_REGISTER_SHIM(AuthorizationSession::create)
-(AuthorizationManager* const authzManager)->std::unique_ptr<AuthorizationSession> {
+namespace {
+
+std::unique_ptr<AuthorizationSession> authorizationSessionCreateImpl(
+    AuthorizationManager* authzManager) {
     return std::make_unique<embedded::AuthorizationSession>(authzManager);
 }
+
+auto authorizationSessionCreateRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationSession::create, authorizationSessionCreateImpl);
+
+}  // namespace
 
 }  // namespace mongo

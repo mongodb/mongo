@@ -29,10 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 
 namespace mongo {
 
-MONGO_DEFINE_SHIM(createTransactionCoordinator);
+void createTransactionCoordinator(OperationContext* opCtx, TxnNumber clientTxnNumber) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(createTransactionCoordinator);
+    w(opCtx, clientTxnNumber);
+}
 
 }  // namespace mongo

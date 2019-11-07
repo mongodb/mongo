@@ -31,8 +31,14 @@
 
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 
+#include "mongo/base/shim.h"
+
 namespace mongo {
 
-MONGO_DEFINE_SHIM(getTransactionCoordinatorWorkerCurOpRepository);
+std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+getTransactionCoordinatorWorkerCurOpRepository() {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(getTransactionCoordinatorWorkerCurOpRepository);
+    return w();
+}
 
 }  // namespace mongo

@@ -72,8 +72,7 @@ class AuthorizationSession {
     AuthorizationSession& operator=(const AuthorizationSession&) = delete;
 
 public:
-    static MONGO_DECLARE_SHIM(
-        (AuthorizationManager * authzManager)->std::unique_ptr<AuthorizationSession>) create;
+    static std::unique_ptr<AuthorizationSession> create(AuthorizationManager*);
 
     AuthorizationSession() = default;
 

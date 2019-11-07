@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
@@ -59,7 +58,7 @@ class AuthzManagerExternalState {
     AuthzManagerExternalState& operator=(const AuthzManagerExternalState&) = delete;
 
 public:
-    static MONGO_DECLARE_SHIM(()->std::unique_ptr<AuthzManagerExternalState>) create;
+    static std::unique_ptr<AuthzManagerExternalState> create();
 
     virtual ~AuthzManagerExternalState();
 

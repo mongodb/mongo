@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/shim.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -98,8 +97,7 @@ public:
      * Factory function to create MongoProcessInterface of the right type. The implementation will
      * be installed by a lib higher up in the link graph depending on the application type.
      */
-    static MONGO_DECLARE_SHIM(
-        (OperationContext * opCtx)->std::shared_ptr<MongoProcessInterface>) create;
+    static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
 
     struct MakePipelineOptions {
         MakePipelineOptions(){};

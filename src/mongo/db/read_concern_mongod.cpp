@@ -29,6 +29,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -232,13 +233,9 @@ bool canIgnorePrepareConflicts(OperationContext* opCtx,
     return true;
 }
 
-}  // namespace
-
-MONGO_REGISTER_SHIM(setPrepareConflictBehaviorForReadConcern)
-(OperationContext* opCtx,
- const repl::ReadConcernArgs& readConcernArgs,
- PrepareConflictBehavior prepareConflictBehavior)
-    ->void {
+void setPrepareConflictBehaviorForReadConcernImpl(OperationContext* opCtx,
+                                                  const repl::ReadConcernArgs& readConcernArgs,
+                                                  PrepareConflictBehavior prepareConflictBehavior) {
     // DBDirectClient should inherit whether or not to ignore prepare conflicts from its parent.
     if (opCtx->getClient()->isInDirectClient()) {
         return;
@@ -253,9 +250,9 @@ MONGO_REGISTER_SHIM(setPrepareConflictBehaviorForReadConcern)
     opCtx->recoveryUnit()->setPrepareConflictBehavior(prepareConflictBehavior);
 }
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
-(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs, bool allowAfterClusterTime)
-    ->Status {
+Status waitForReadConcernImpl(OperationContext* opCtx,
+                              const repl::ReadConcernArgs& readConcernArgs,
+                              bool allowAfterClusterTime) {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
     // waiting for read concern. We don't want to ignore prepare conflicts because reads in
@@ -387,8 +384,7 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     return Status::OK();
 }
 
-MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
-(OperationContext* opCtx, const int readConcernTimeout)->Status {
+Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, const int readConcernTimeout) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeLinearizableReadConcern, opCtx, "hangBeforeLinearizableReadConcern", [opCtx]() {
             log() << "batch update - hangBeforeLinearizableReadConcern fail point enabled. "
@@ -443,8 +439,8 @@ MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
     return awaitReplResult.status;
 }
 
-MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
-(OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo)->Status {
+Status waitForSpeculativeMajorityReadConcernImpl(
+    OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo) {
     invariant(speculativeReadInfo.isSpeculativeRead());
 
     // Select the timestamp to wait on. A command may have selected a specific timestamp to wait on.
@@ -486,5 +482,14 @@ MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
     return waitStatus;
 }
 
+auto setPrepareConflictBehaviorForReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    setPrepareConflictBehaviorForReadConcern, setPrepareConflictBehaviorForReadConcernImpl);
+auto waitForReadConcernRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(waitForReadConcern, waitForReadConcernImpl);
+auto waitForLinearizableReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    waitForLinearizableReadConcern, waitForLinearizableReadConcernImpl);
+auto waitForSpeculativeMajorityReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    waitForSpeculativeMajorityReadConcern, waitForSpeculativeMajorityReadConcernImpl);
+}  // namespace
 
 }  // namespace mongo

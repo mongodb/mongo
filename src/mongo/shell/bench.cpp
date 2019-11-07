@@ -35,6 +35,7 @@
 
 #include <pcrecpp.h>
 
+#include "mongo/base/shim.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
@@ -743,7 +744,11 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     }
 }
 
-MONGO_DEFINE_SHIM(BenchRunConfig::createConnectionImpl);
+std::unique_ptr<DBClientBase> BenchRunConfig::createConnectionImpl(
+    const BenchRunConfig& benchRunConfig) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(BenchRunConfig::createConnectionImpl);
+    return w(benchRunConfig);
+}
 
 std::unique_ptr<DBClientBase> BenchRunConfig::createConnection() const {
     return BenchRunConfig::createConnectionImpl(*this);

@@ -27,21 +27,22 @@
  *    it in the license file.
  */
 
+#include "mongo/base/shim.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 
 namespace mongo {
+namespace {
 
-MONGO_REGISTER_SHIM(setPrepareConflictBehaviorForReadConcern)
-(OperationContext* opCtx,
- const repl::ReadConcernArgs& readConcernArgs,
- PrepareConflictBehavior requestedPrepareConflictBehavior)
-    ->void {}
+void setPrepareConflictBehaviorForReadConcernImpl(
+    OperationContext* opCtx,
+    const repl::ReadConcernArgs& readConcernArgs,
+    PrepareConflictBehavior requestedPrepareConflictBehavior) {}
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
-(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs, bool allowAfterClusterTime)
-    ->Status {
+Status waitForReadConcernImpl(OperationContext* opCtx,
+                              const repl::ReadConcernArgs& readConcernArgs,
+                              bool allowAfterClusterTime) {
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         return {ErrorCodes::NotImplemented, "linearizable read concern not supported on embedded"};
     } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
@@ -56,14 +57,24 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
 
     return Status::OK();
 }
-MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
-(OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo)->Status {
+
+Status waitForSpeculativeMajorityReadConcernImpl(
+    OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo) {
     return Status::OK();
 }
 
-MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
-(OperationContext* opCtx, const int readConcernTimeout)->Status {
+Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, int readConcernTimeout) {
     return Status::OK();
 }
 
+auto setPrepareConflictBehaviorForReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    setPrepareConflictBehaviorForReadConcern, setPrepareConflictBehaviorForReadConcernImpl);
+auto waitForReadConcernRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(waitForReadConcern, waitForReadConcernImpl);
+auto waitForSpeculativeMajorityReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    waitForSpeculativeMajorityReadConcern, waitForSpeculativeMajorityReadConcernImpl);
+auto waitForLinearizableReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    waitForLinearizableReadConcern, waitForLinearizableReadConcernImpl);
+
+}  // namespace
 }  // namespace mongo

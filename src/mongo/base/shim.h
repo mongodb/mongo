@@ -30,287 +30,165 @@
 #pragma once
 
 #include <functional>
+#include <map>
+#include <memory>
+#include <string>
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
+#include "mongo/util/assert_util.h"
 
 /**
- * The `SHIM` mechanism allows for the creation of "weak-symbol-like" functions which can have their
- * actual implementation injected in the final binary without creating a link dependency upon any
- * actual implementation.  One uses it like this:
+ * The `WeakFunction` mechanism allows for the creation of "weak-symbol-like" functions
+ * which can have implementations injected into a link target without creating a link
+ * dependency. This is used for injecting factory functions and mocks.
  *
- * In a header:
- * ```
- * class MyClass {
- *   public:
- *     static MONGO_DECLARE_SHIM((int)->std::string) helloWorldFunction;
- * };
- * ```
- *
- * In the corresponding C++ file (which is a link dependency):
- * ```
- * MONGO_DEFINE_SHIM(MyClass::helloWorldFunction);
- * ```
- *
- * And in any number of implementation files:
- * ```
- * MONGO_REGISTER_SHIM(MyClass::helloWorldFunction)(int value)->std::string {
- *     if (value == 42) {
- *         return "Hello World";
- *     } else {
- *         return "No way!";
- *     }
- * }
- * ```
- *
- * This can be useful for making auto-registering and auto-constructing mock and release class
- * factories, among other useful things
+ * DEPRECATION WARNING:
+ * This library was created as a one-time expediency to resolve technical debt in the
+ * link dependency graph. It should not be used in new designs, and existing uses will
+ * continue to be phased out over time.
  */
-
 namespace mongo {
-template <typename T>
-struct PrivateCall;
-
-/**
- * When declaring shim functions that should be private, they really need to be public; however,
- * this type can be used as a parameter to permit the function to only be called by the type
- * specified in the template parameter.
- */
-template <typename T>
-struct PrivateTo {
-private:
-    friend PrivateCall<T>;
-
-    PrivateTo() = default;
-};
-
-/**
- * When calling shim functions that should be private, you pass an immediately created instance of
- * the type `PrivateCall< T >`, where `T` is the type that `PrivateTo` requires as a template
- * parameter.
- */
-template <typename T>
-struct PrivateCall {
-private:
-    friend T;
-    PrivateCall() {}
-
+class WeakFunctionRegistry {
 public:
-    operator PrivateTo<T>() {
-        return {};
-    }
-};
-}  // namespace mongo
+    class BasicSlot {
+    public:
+        virtual ~BasicSlot();
+        int priority = 0;
+    };
 
-namespace shim_detail {
-/**
- * This type, `storage`, is used as a workaround for needing C++17 `inline` variables.  The template
- * static member is effectively `inline` already.
- */
-template <typename T, typename tag = void>
-struct storage {
-    static T data;
-};
+    template <typename F>
+    class Slot : public BasicSlot {
+    public:
+        Slot() : Slot(nullptr) {}
+        explicit Slot(F* f) : f(f) {}
+        F* f;
+    };
 
-template <typename T, typename tag>
-T storage<T, tag>::data = {};
-}  // namespace shim_detail
-
-#define MONGO_SHIM_DEPENDENTS ("ShimHooks")
-
-namespace mongo {
-#ifdef MONGO_CONFIG_CHECK_SHIM_DEPENDENCIES
-const bool checkShimsViaTUHook = true;
-#define MONGO_SHIM_TU_HOOK(name) \
-    name {}
-#else
-const bool checkShimsViaTUHook = false;
-#define MONGO_SHIM_TU_HOOK(name)
-#endif
-}  // namespace mongo
-
-/**
- * Declare a shimmable function with signature `SHIM_SIGNATURE`.  Declare such constructs in a C++
- * header as static members of a class.
- */
-#define MONGO_DECLARE_SHIM(/*SHIM_SIGNATURE*/...) MONGO_DECLARE_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_DECLARE_SHIM_1(LN, ...) MONGO_DECLARE_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_DECLARE_SHIM_2(LN, ...)                                                             \
-    const struct ShimBasis_##LN {                                                                 \
-        ShimBasis_##LN() = default;                                                               \
-        struct MongoShimImplGuts {                                                                \
-            template <bool required = mongo::checkShimsViaTUHook>                                 \
-            struct AbiCheckType {                                                                 \
-                AbiCheckType() = default;                                                         \
-            };                                                                                    \
-            using AbiCheck = AbiCheckType<>;                                                      \
-            struct LibTUHookTypeBase {                                                            \
-                LibTUHookTypeBase();                                                              \
-            };                                                                                    \
-            template <bool required = true>                                                       \
-            struct LibTUHookType : LibTUHookTypeBase {};                                          \
-            using LibTUHook = LibTUHookType<>;                                                    \
-            struct ImplTUHookTypeBase {                                                           \
-                ImplTUHookTypeBase();                                                             \
-            };                                                                                    \
-            template <bool required = mongo::checkShimsViaTUHook>                                 \
-            struct ImplTUHookType : ImplTUHookTypeBase {};                                        \
-            using ImplTUHook = ImplTUHookType<>;                                                  \
-                                                                                                  \
-            static auto functionTypeHelper __VA_ARGS__;                                           \
-            /* Workaround for Microsoft -- by taking the address of this function pointer, we     \
-             * avoid the problems that their compiler has with default * arguments in deduced     \
-             * typedefs. */                                                                       \
-            using function_type_pointer = decltype(&MongoShimImplGuts::functionTypeHelper);       \
-            using function_type = std::remove_pointer_t<function_type_pointer>;                   \
-            MongoShimImplGuts* abi(const AbiCheck* const) {                                       \
-                return this;                                                                      \
-            }                                                                                     \
-            MongoShimImplGuts* lib(const LibTUHook* const) {                                      \
-                LibTUHook{};                                                                      \
-                return this;                                                                      \
-            }                                                                                     \
-            MongoShimImplGuts* impl(const ImplTUHook* const) {                                    \
-                MONGO_SHIM_TU_HOOK(ImplTUHook);                                                   \
-                return this;                                                                      \
-            }                                                                                     \
-            virtual auto implementation __VA_ARGS__ = 0;                                          \
-                                                                                                  \
-            using tag =                                                                           \
-                std::tuple<MongoShimImplGuts::function_type, AbiCheck, LibTUHook, ImplTUHook>;    \
-        };                                                                                        \
-                                                                                                  \
-        using storage = shim_detail::storage<MongoShimImplGuts*, MongoShimImplGuts::tag>;         \
-                                                                                                  \
-        /* TODO: When the dependency graph is fixed, add the `impl()->` call to the call chain */ \
-        template <typename... Args>                                                               \
-        auto operator()(Args&&... args) const                                                     \
-            noexcept(noexcept(storage::data->abi(nullptr)->lib(nullptr)->implementation(          \
-                std::forward<Args>(args)...)))                                                    \
-                -> decltype(storage::data->abi(nullptr)->lib(nullptr)->implementation(            \
-                    std::forward<Args>(args)...)) {                                               \
-            return storage::data->abi(nullptr)->lib(nullptr)->implementation(                     \
-                std::forward<Args>(args)...);                                                     \
-        }                                                                                         \
+    /**
+     * Get the function slot for `key`. Creating a new empty slot if necessary.
+     * The slot thus created is permanently associated with function type `F`.
+     * Throws if `key` is not associated with the requested function type `F`.
+     */
+    template <typename F>
+    Slot<F>* getSlot(const std::string& key) {
+        auto [iter, ok] = _slots.try_emplace(key, nullptr);
+        if (ok) {
+            iter->second = std::make_unique<Slot<F>>();
+        }
+        Slot<F>* slot = dynamic_cast<Slot<F>*>(iter->second.get());
+        if (!slot) {
+            uasserted(31335, std::string("key ") + key + " mapped to wrong function type");
+        }
+        return slot;
     }
 
+    /**
+     * Make `f` the implementation of function `key`. Subsequent `getSlot<F>(key)` calls
+     * will return a slot mapped to a function object that invokes `f` when called.
+     *
+     * Throws if a previous call with the same `key` and `priority` was made. If keys
+     * collide, but at differing priorities, the function that was installed with the
+     * greater priority gets the slot.
+     */
+    template <typename F>
+    void inject(const std::string& key, F* impl, int priority) {
+        Slot<F>* slot = getSlot<F>(key);
+        if (slot->priority > priority)
+            return;
+        if (slot->priority == priority && slot->f)
+            uasserted(31336, std::string("key collision: ") + key);
+        slot->priority = priority;
+        slot->f = impl;
+    }
+
+private:
+    std::map<std::string, std::unique_ptr<BasicSlot>> _slots;
+};
+
+WeakFunctionRegistry& globalWeakFunctionRegistry();
+
+template <typename F>
+class WeakFunction {
+public:
+    explicit WeakFunction(std::string key)
+        : _key(std::move(key)), _slot(globalWeakFunctionRegistry().getSlot<F>(_key)) {}
+
+    template <typename... A>
+    decltype(auto) operator()(A&&... a) const {
+        return std::invoke(_slot->f, std::forward<A>(a)...);
+    }
+
+private:
+    std::string _key;
+    const WeakFunctionRegistry::Slot<F>* _slot;
+};
 
 /**
- * Evaluates to a string which represents the `MONGO_INITIALIZER` step name in which this specific
- * shim is registered.  This can be useful to make sure that some initializers depend upon a shim's
- * execution and presence in a binary.
+ * Associates an implementation function with a name in the global WeakFunction registry.
+ * A registration object, useful only for its constructor's side effects.
+ *
+ * Example:
+ *
+ *   // Inject an implementation of the WeakFunction "badSqrt".
+ *   static double badSqrtImpl(double x) {
+ *     return std::sqrt(x) + 1;
+ *   }
+ *   static auto sqrtRegistration = WeakFunctionRegistration("badSqrt", badSqrtImpl);
+ *
+ *   // Elsewhere...
+ *   double badSqrt(double x) {
+ *     // Use a WeakFunction to allow injected implementations of badSqrt.
+ *     static auto weak = WeakFunction<double(double)>("badSqrt");
+ *     return weak(x);
+ *   }
+ *
+ * The macros below help with the syntax a bit. The example can be updated to use the
+ * MONGO_WEAK_FUNCTION_ macros.
+ *
+ *   static double badSqrtImpl(double x) {
+ *     return std::sqrt(x) + 1;
+ *   }
+ *   static auto sqrtRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(badSqrt, badSqrtImpl);
+ *
+ *   // Elsewhere...
+ *   double badSqrt(double x) {
+ *     // Use a WeakFunction to allow injected implementations of badSqrt.
+ *     // Notice that the function type of `double(double)` is implicitly determined.
+ *     static auto weak = MONGO_WEAK_FUNCTION_DEFINITION(badSqrt);
+ *     return weak(x);
+ *   }
  */
-#define MONGO_SHIM_DEPENDENCY(...) MONGO_SHIM_EVIL_STRINGIFY_(__VA_ARGS__)
-#define MONGO_SHIM_EVIL_STRINGIFY_(args) #args
+template <typename F>
+struct WeakFunctionRegistration {
+    /**
+     * Injects `f` as the implementation for the WeakFunction name `key` in the global
+     * registry. A priority can optionally be specified as an int parameter. Default
+     * priority is 0.
+     */
+    WeakFunctionRegistration(std::string key, F* impl, int priority = 0) {
+        globalWeakFunctionRegistry().inject<F>(key, impl, priority);
+    }
+};
 
 /**
- * Define a shimmable function with name `SHIM_NAME`, returning a value of type `RETURN_TYPE`, with
- * any arguments.  This shim definition macro should go in the associated C++ file to the header
- * where a SHIM was defined.  This macro does not emit a function definition, only the customization
- * point's machinery.
+ * Wrapper for the WeakFunctionRegistration constructor call.
+ * Declares a registration object that registers the function `impl` as the implementation
+ * of any WeakFunction objects mapped to the key `func`.
+ * See WeakFunctionRegistration documentation for an example.
  */
-#define MONGO_DEFINE_SHIM(/*SHIM_NAME*/...) MONGO_DEFINE_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_DEFINE_SHIM_1(LN, ...) MONGO_DEFINE_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_DEFINE_SHIM_2(LN, ...)                                                          \
-    namespace {                                                                               \
-    namespace shim_namespace##LN {                                                            \
-        using ShimType = decltype(__VA_ARGS__);                                               \
-        ::mongo::Status initializerGroupStartup(::mongo::InitializerContext*) {               \
-            return Status::OK();                                                              \
-        }                                                                                     \
-        ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer(                     \
-            std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__)),                                  \
-            mongo::InitializerFunction(initializerGroupStartup),                              \
-            mongo::DeinitializerFunction(nullptr),                                            \
-            {},                                                                               \
-            {MONGO_SHIM_DEPENDENTS});                                                         \
-    } /*namespace shim_namespace*/                                                            \
-    } /*namespace*/                                                                           \
-    shim_namespace##LN::ShimType::MongoShimImplGuts::LibTUHookTypeBase::LibTUHookTypeBase() = \
-        default;                                                                              \
-    shim_namespace##LN::ShimType __VA_ARGS__{};
+#define MONGO_WEAK_FUNCTION_REGISTRATION_WITH_PRIORITY(func, impl, priority) \
+    ::mongo::WeakFunctionRegistration(#func, impl, priority)
+
+/** Usually we don't specify a priority, so this uses default priority 0. */
+#define MONGO_WEAK_FUNCTION_REGISTRATION(func, impl) \
+    MONGO_WEAK_FUNCTION_REGISTRATION_WITH_PRIORITY(func, impl, 0)
 
 /**
- * Define an implementation of a shimmable function with name `SHIM_NAME`.  The compiler will check
- * supplied parameters for correctness.  This shim registration macro should go in the associated
- * C++ implementation file to the header where a SHIM was defined.   Such a file would be a mock
- * implementation or a real implementation, for example.
+ * Wrapper for the WeakFunction constructor call to create a WeakFunction that agrees with the
+ * type signature of the declared function `func`, and uses func's name as a key.
+ * See WeakFunctionRegistration documentation for an example.
  */
-#define MONGO_REGISTER_SHIM(/*SHIM_NAME*/...) MONGO_REGISTER_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_REGISTER_SHIM_1(LN, ...) MONGO_REGISTER_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_REGISTER_SHIM_2(LN, ...)                                                          \
-    namespace {                                                                                 \
-    namespace shim_namespace##LN {                                                              \
-        using ShimType = decltype(__VA_ARGS__);                                                 \
-                                                                                                \
-        class Implementation final : public ShimType::MongoShimImplGuts {                       \
-            /* Some compilers don't work well with the trailing `override` in this kind of      \
-             * function declaration. */                                                         \
-            ShimType::MongoShimImplGuts::function_type implementation; /* override */           \
-        };                                                                                      \
-                                                                                                \
-        ::mongo::Status createInitializerRegistration(::mongo::InitializerContext* const) {     \
-            static Implementation impl;                                                         \
-            ShimType::storage::data = &impl;                                                    \
-            return Status::OK();                                                                \
-        }                                                                                       \
-                                                                                                \
-        const ::mongo::GlobalInitializerRegisterer registrationHook{                            \
-            std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__) "_registration"),                    \
-            mongo::InitializerFunction(createInitializerRegistration),                          \
-            mongo::DeinitializerFunction(nullptr),                                              \
-            {},                                                                                 \
-            {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), MONGO_SHIM_DEPENDENTS}};                       \
-    } /*namespace shim_namespace*/                                                              \
-    } /*namespace*/                                                                             \
-                                                                                                \
-    shim_namespace##LN::ShimType::MongoShimImplGuts::ImplTUHookTypeBase::ImplTUHookTypeBase() = \
-        default;                                                                                \
-                                                                                                \
-    auto shim_namespace##LN::Implementation::implementation /* After this point someone just    \
-                                                               writes the signature's arguments \
-                                                               and return value (using arrow    \
-                                                               notation).  Then they write the  \
-                                                               body. */
+#define MONGO_WEAK_FUNCTION_DEFINITION(func) ::mongo::WeakFunction<decltype(func)>(#func)
 
-/**
- * Define an overriding implementation of a shimmable function with `SHIM_NAME`.  The compiler will
- * check the supplied parameters for correctness.  This shim override macro should go in the
- * associated C++ implementation file to the header where a SHIM was defined.  Such a file
- * specifying an override would be a C++ implementation used by a mongodb extension module.
- * This creates a runtime dependency upon the original registration being linked in.
- */
-#define MONGO_OVERRIDE_SHIM(/*SHIM_NAME*/...) MONGO_OVERRIDE_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_OVERRIDE_SHIM_1(LN, ...) MONGO_OVERRIDE_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_OVERRIDE_SHIM_2(LN, ...)                                                           \
-    namespace {                                                                                  \
-    namespace shim_namespace##LN {                                                               \
-        using ShimType = decltype(__VA_ARGS__);                                                  \
-                                                                                                 \
-        class OverrideImplementation final : public ShimType::MongoShimImplGuts {                \
-            /* Some compilers don't work well with the trailing `override` in this kind of       \
-             * function declaration. */                                                          \
-            ShimType::MongoShimImplGuts::function_type implementation; /* override */            \
-        };                                                                                       \
-                                                                                                 \
-        ::mongo::Status createInitializerOverride(::mongo::InitializerContext* const) {          \
-            static OverrideImplementation overrideImpl;                                          \
-            ShimType::storage::data = &overrideImpl;                                             \
-            return Status::OK();                                                                 \
-        }                                                                                        \
-                                                                                                 \
-        const ::mongo::GlobalInitializerRegisterer overrideHook{                                 \
-            std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__) "_override"),                         \
-            mongo::InitializerFunction(createInitializerOverride),                               \
-            mongo::DeinitializerFunction(nullptr),                                               \
-            {MONGO_SHIM_DEPENDENCY(                                                              \
-                __VA_ARGS__) "_registration"},   /* Override happens after first registration */ \
-            {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), /* Provides impl for this shim */               \
-             MONGO_SHIM_DEPENDENTS}              /* Still a shim registration */                 \
-        };                                                                                       \
-    } /*namespace shim_namespace*/                                                               \
-    } /*namespace*/                                                                              \
-                                                                                                 \
-    auto shim_namespace##LN::OverrideImplementation::                                            \
-        implementation /* After this point someone just writes the signature's arguments and     \
-                          return value (using arrow notation).  Then they write the body. */
+}  // namespace mongo

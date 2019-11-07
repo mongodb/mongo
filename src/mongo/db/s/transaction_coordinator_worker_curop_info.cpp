@@ -33,6 +33,10 @@
 
 namespace mongo {
 
-MONGO_DEFINE_SHIM(getTransactionCoordinatorWorkerCurOpRepository);
+std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+getTransactionCoordinatorWorkerCurOpRepository() {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(getTransactionCoordinatorWorkerCurOpRepository);
+    return w();
+}
 
 }  // namespace mongo

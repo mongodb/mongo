@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -222,9 +223,16 @@ Status AuthorizationManagerPinnedUsersServerParameter::setFromString(const std::
     return authorizationManagerPinnedUsers.setFromString(str);
 }
 
-MONGO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<AuthorizationManager> {
+namespace {
+
+std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl() {
     return std::make_unique<AuthorizationManagerImpl>();
 }
+
+auto authorizationManagerCreateRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationManager::create, authorizationManagerCreateImpl);
+
+}  // namespace
 
 /**
  * Guard object for synchronizing accesses to data cached in AuthorizationManager instances.

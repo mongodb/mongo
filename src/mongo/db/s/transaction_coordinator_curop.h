@@ -31,6 +31,9 @@
 #include "mongo/db/pipeline/mongos_process_interface.h"
 
 namespace mongo {
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx, bool includeIdle, std::vector<BSONObj>* ops)
-                              ->void) reportCurrentOpsForTransactionCoordinators;
+
+void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                bool includeIdle,
+                                                std::vector<BSONObj>* ops);
+
 }  // namespace mongo

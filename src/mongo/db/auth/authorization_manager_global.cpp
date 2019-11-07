@@ -60,9 +60,7 @@ Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
 
 ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
-    {"OIDGeneration",
-     "EndStartupOptionStorage",
-     MONGO_SHIM_DEPENDENCY(AuthorizationManager::create)},
+    {"OIDGeneration", "EndStartupOptionStorage"},
     [](ServiceContext* service) {
         auto authzManager = AuthorizationManager::create();
         authzManager->setAuthEnabled(serverGlobalParams.authState ==

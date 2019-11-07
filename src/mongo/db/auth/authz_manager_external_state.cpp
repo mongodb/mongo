@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
@@ -38,7 +39,10 @@
 
 namespace mongo {
 
-MONGO_DEFINE_SHIM(AuthzManagerExternalState::create);
+std::unique_ptr<AuthzManagerExternalState> AuthzManagerExternalState::create() {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthzManagerExternalState::create);
+    return w();
+}
 
 AuthzManagerExternalState::AuthzManagerExternalState() = default;
 AuthzManagerExternalState::~AuthzManagerExternalState() = default;

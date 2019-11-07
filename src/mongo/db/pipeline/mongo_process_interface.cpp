@@ -31,8 +31,13 @@
 
 #include "mongo_process_interface.h"
 
+#include "mongo/base/shim.h"
+
 namespace mongo {
 
-MONGO_DEFINE_SHIM(MongoProcessInterface::create);
+std::shared_ptr<MongoProcessInterface> MongoProcessInterface::create(OperationContext* opCtx) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(MongoProcessInterface::create);
+    return w(opCtx);
+}
 
 }  // namespace mongo

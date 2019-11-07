@@ -30,7 +30,6 @@
 
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 
-#include "mongo/base/shim.h"
 #include "mongo/db/curop.h"
 
 namespace mongo {

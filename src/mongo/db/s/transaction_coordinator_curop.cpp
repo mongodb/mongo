@@ -27,7 +27,15 @@
  *    it in the license file.
  */
 #include "mongo/db/s/transaction_coordinator_curop.h"
+#include "mongo/base/shim.h"
 
 namespace mongo {
-MONGO_DEFINE_SHIM(reportCurrentOpsForTransactionCoordinators);
+
+void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                bool includeIdle,
+                                                std::vector<BSONObj>* ops) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(reportCurrentOpsForTransactionCoordinators);
+    w(opCtx, includeIdle, ops);
+}
+
 }  // namespace mongo

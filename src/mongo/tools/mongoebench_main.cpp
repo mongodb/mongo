@@ -34,6 +34,7 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/base/shim.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
@@ -144,12 +145,13 @@ int mongoeBenchMain(int argc, char* argv[], char** envp) {
     shutdown(EXIT_CLEAN);
 }
 
-}  // namespace
-
-MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
-(const BenchRunConfig& config)->std::unique_ptr<DBClientBase> {
+std::unique_ptr<DBClientBase> benchRunConfigCreateConnectionImplProvider(const BenchRunConfig&) {
     return std::unique_ptr<DBClientBase>(new DBDirectClientWithOwnOpCtx());
 }
+
+auto benchRunConfigCreateConnectionImplRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    BenchRunConfig::createConnectionImpl, benchRunConfigCreateConnectionImplProvider);
+}  // namespace
 
 }  // namespace mongo
 

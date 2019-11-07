@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authz_session_external_state_d.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
@@ -66,9 +67,17 @@ bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
 }
 
-MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
-(AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
+namespace {
+
+std::unique_ptr<AuthzSessionExternalState> authzSessionExternalStateImpl(
+    AuthorizationManager* authzManager) {
     return std::make_unique<AuthzSessionExternalStateMongod>(authzManager);
 }
+
+auto authzSessionExternalStateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzSessionExternalState::create, authzSessionExternalStateImpl);
+
+}  // namespace
+
 
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authz_session_external_state.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 
@@ -44,6 +45,10 @@ AuthorizationManager& AuthzSessionExternalState::getAuthorizationManager() {
     return *_authzManager;
 }
 
-MONGO_DEFINE_SHIM(AuthzSessionExternalState::create);
+std::unique_ptr<AuthzSessionExternalState> AuthzSessionExternalState::create(
+    AuthorizationManager* authzManager) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthzSessionExternalState::create);
+    return w(authzManager);
+}
 
 }  // namespace mongo

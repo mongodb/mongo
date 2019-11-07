@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -66,5 +67,10 @@ void AuthorizationSession::ScopedImpersonate::swap() {
     swap(*std::get<1>(impersonations), _roles);
 }
 
-MONGO_DEFINE_SHIM(AuthorizationSession::create);
+std::unique_ptr<AuthorizationSession> AuthorizationSession::create(
+    AuthorizationManager* authzManager) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthorizationSession::create);
+    return w(authzManager);
+}
+
 }  // namespace mongo

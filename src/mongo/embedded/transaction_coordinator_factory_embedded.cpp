@@ -29,9 +29,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(createTransactionCoordinator)
-(OperationContext* opCtx, TxnNumber clientTxnNumber)->void {}
+namespace {
+
+void createTransactionCoordinatorImpl(OperationContext*, TxnNumber) {}
+
+auto createTransactionCoordinatorRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    createTransactionCoordinator, createTransactionCoordinatorImpl);
+
+}  // namespace
 }  // namespace mongo

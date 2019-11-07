@@ -31,6 +31,8 @@
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 
 namespace mongo {
+namespace {
+
 class NoOpTransactionCoordinatorWorkerCurOpRepository final
     : public TransactionCoordinatorWorkerCurOpRepository {
 public:
@@ -47,8 +49,14 @@ public:
 const auto _transactionCoordinatorWorkerCurOpRepository =
     std::make_shared<NoOpTransactionCoordinatorWorkerCurOpRepository>();
 
-MONGO_REGISTER_SHIM(getTransactionCoordinatorWorkerCurOpRepository)
-()->std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository> {
+std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+getTransactionCoordinatorWorkerCurOpRepositoryImpl() {
     return _transactionCoordinatorWorkerCurOpRepository;
 }
+
+auto getTransactionCoordinatorWorkerCurOpRepositoryRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(getTransactionCoordinatorWorkerCurOpRepository,
+                                     getTransactionCoordinatorWorkerCurOpRepositoryImpl);
+
+}  // namespace
 }  // namespace mongo

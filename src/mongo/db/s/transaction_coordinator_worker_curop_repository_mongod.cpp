@@ -34,6 +34,8 @@ namespace mongo {
 const auto getTransactionCoordinatorWorkerCurOpInfo =
     OperationContext::declareDecoration<boost::optional<TransactionCoordinatorWorkerCurOpInfo>>();
 
+namespace {
+
 class MongoDTransactionCoordinatorWorkerCurOpRepository final
     : public TransactionCoordinatorWorkerCurOpRepository {
 public:
@@ -62,10 +64,16 @@ public:
 const auto _transactionCoordinatorWorkerCurOpRepository =
     std::make_shared<MongoDTransactionCoordinatorWorkerCurOpRepository>();
 
-MONGO_REGISTER_SHIM(getTransactionCoordinatorWorkerCurOpRepository)
-()->std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository> {
+std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+getTransactionCoordinatorWorkerCurOpRepositoryImpl() {
     return _transactionCoordinatorWorkerCurOpRepository;
 }
+
+auto getTransactionCoordinatorWorkerCurOpRepositoryRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(getTransactionCoordinatorWorkerCurOpRepository,
+                                     getTransactionCoordinatorWorkerCurOpRepositoryImpl);
+
+}  // namespace
 
 TransactionCoordinatorWorkerCurOpInfo::TransactionCoordinatorWorkerCurOpInfo(
     LogicalSessionId lsid, TxnNumber txnNumber, Date_t startTime, CoordinatorAction action)

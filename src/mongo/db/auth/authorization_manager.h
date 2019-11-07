@@ -36,7 +36,6 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/oid.h"
@@ -96,7 +95,7 @@ public:
 
     AuthorizationManager() = default;
 
-    static MONGO_DECLARE_SHIM(()->std::unique_ptr<AuthorizationManager>) create;
+    static std::unique_ptr<AuthorizationManager> create();
 
     static constexpr StringData USERID_FIELD_NAME = "userId"_sd;
     static constexpr StringData USER_NAME_FIELD_NAME = "user"_sd;

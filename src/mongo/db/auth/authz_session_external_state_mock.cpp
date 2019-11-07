@@ -28,10 +28,18 @@
  */
 
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/base/shim.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
-(AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
+namespace {
+
+std::unique_ptr<AuthzSessionExternalState> authzSessionExternalStateCreateImpl(
+    AuthorizationManager* authzManager) {
     return std::make_unique<AuthzSessionExternalStateMock>(authzManager);
 }
+
+auto authzSessionExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzSessionExternalState::create, authzSessionExternalStateCreateImpl);
+
+}  // namespace
 }  // namespace mongo

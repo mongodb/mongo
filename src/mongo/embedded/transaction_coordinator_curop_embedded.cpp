@@ -26,9 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(reportCurrentOpsForTransactionCoordinators)
-(OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops)->void {}
+namespace {
+
+void reportCurrentOpsForTransactionCoordinatorsImpl(OperationContext* opCtx,
+                                                    bool includeIdle,
+                                                    std::vector<BSONObj>* ops) {}
+
+auto reportCurrentOpsForTransactionCoordinatorsRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    reportCurrentOpsForTransactionCoordinators, reportCurrentOpsForTransactionCoordinatorsImpl);
+
+
+}  // namespace
 }  // namespace mongo

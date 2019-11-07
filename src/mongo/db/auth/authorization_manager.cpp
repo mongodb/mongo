@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -100,6 +101,10 @@ const int AuthorizationManager::schemaVersion26Upgrade;
 const int AuthorizationManager::schemaVersion26Final;
 const int AuthorizationManager::schemaVersion28SCRAM;
 
-MONGO_DEFINE_SHIM(AuthorizationManager::create);
+
+std::unique_ptr<AuthorizationManager> AuthorizationManager::create() {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthorizationManager::create);
+    return w();
+}
 
 }  // namespace mongo

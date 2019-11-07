@@ -30,9 +30,19 @@
 
 #include "mongo/db/s/transaction_coordinator_service.h"
 
+#include "mongo/base/shim.h"
+
 namespace mongo {
-MONGO_REGISTER_SHIM(reportCurrentOpsForTransactionCoordinators)
-(OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops)->void {
+namespace {
+
+void reportCurrentOpsForTransactionCoordinatorsImpl(OperationContext* opCtx,
+                                                    bool includeIdle,
+                                                    std::vector<BSONObj>* ops) {
     TransactionCoordinatorService::get(opCtx)->reportCoordinators(opCtx, includeIdle, ops);
 }
+
+auto reportCurrentOpsForTransactionCoordinatorsRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    reportCurrentOpsForTransactionCoordinators, reportCurrentOpsForTransactionCoordinatorsImpl);
+
+}  // namespace
 }  // namespace mongo

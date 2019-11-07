@@ -29,13 +29,18 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/pipeline/process_interface_standalone.h"
 
 namespace mongo {
+namespace {
 
-MONGO_REGISTER_SHIM(MongoProcessInterface::create)
-(OperationContext* opCtx)->std::shared_ptr<MongoProcessInterface> {
+std::shared_ptr<MongoProcessInterface> mongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
     return std::make_shared<MongoInterfaceStandalone>(opCtx);
 }
 
+auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    MongoProcessInterface::create, mongoProcessInterfaceCreateImpl);
+
+}  // namespace
 }  // namespace mongo

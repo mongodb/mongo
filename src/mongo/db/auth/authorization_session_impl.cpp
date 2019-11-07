@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -61,14 +62,18 @@ namespace mongo {
 namespace dps = ::mongo::dotted_path_support;
 using std::vector;
 
-MONGO_REGISTER_SHIM(AuthorizationSession::create)
-(AuthorizationManager* authzManager)->std::unique_ptr<AuthorizationSession> {
+namespace {
+
+std::unique_ptr<AuthorizationSession> authorizationSessionCreateImpl(
+    AuthorizationManager* authzManager) {
     return std::make_unique<AuthorizationSessionImpl>(
         AuthzSessionExternalState::create(authzManager),
         AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
 }
 
-namespace {
+auto authorizationSessionCreateRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationSession::create, authorizationSessionCreateImpl);
+
 constexpr StringData ADMIN_DBNAME = "admin"_sd;
 
 // Checks if this connection has the privileges necessary to create or modify the view 'viewNs'

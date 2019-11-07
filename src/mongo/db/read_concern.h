@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/shim.h"
-
 namespace mongo {
 
 class BSONObj;
@@ -51,10 +49,9 @@ class SpeculativeMajorityReadInfo;
  * are used to verify if the command is safe to ignore prepare conflicts, and if not, we
  * enforce prepare conflicts.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
-                           const repl::ReadConcernArgs& readConcernArgs,
-                           PrepareConflictBehavior prepareConflictBehavior)
-                              ->void) setPrepareConflictBehaviorForReadConcern;
+void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
+                                              const repl::ReadConcernArgs& readConcernArgs,
+                                              PrepareConflictBehavior prepareConflictBehavior);
 
 /**
  * Given the specified read concern arguments, performs checks that the read concern can actually be
@@ -65,10 +62,9 @@ extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
  * Note: Callers should use setPrepareConflictBehaviorForReadConcern method to set the desired
  * prepare conflict behavior for their command.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
-                           const repl::ReadConcernArgs& readConcernArgs,
-                           bool allowAfterClusterTime)
-                              ->Status) waitForReadConcern;
+Status waitForReadConcern(OperationContext* opCtx,
+                          const repl::ReadConcernArgs& readConcernArgs,
+                          bool allowAfterClusterTime);
 
 /*
  * Given a linearizable read command, confirm that
@@ -77,16 +73,14 @@ extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
  * A readConcernTimeout of 0 indicates that the operation will block indefinitely waiting for read
  * concern.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx, const int readConcernTimeout)->Status)
-    waitForLinearizableReadConcern;
+Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTimeout);
 
 /**
  * Waits to satisfy a "speculative" majority read.
  *
  * This method must only be called if the operation is a speculative majority read.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
-                           repl::SpeculativeMajorityReadInfo speculativeReadInfo)
-                              ->Status) waitForSpeculativeMajorityReadConcern;
+Status waitForSpeculativeMajorityReadConcern(OperationContext* opCtx,
+                                             repl::SpeculativeMajorityReadInfo speculativeReadInfo);
 
 }  // namespace mongo

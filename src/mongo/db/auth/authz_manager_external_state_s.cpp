@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/shim.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -48,11 +49,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
-()->std::unique_ptr<AuthzManagerExternalState> {
-    return std::make_unique<AuthzManagerExternalStateMongos>();
-}
 
 namespace {
 
@@ -324,5 +320,16 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
     std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
     return foundRoles.size() > 0;
 }
+
+namespace {
+
+std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {
+    return std::make_unique<AuthzManagerExternalStateMongos>();
+}
+
+auto authzManagerExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzManagerExternalState::create, authzManagerExternalStateCreateImpl);
+
+}  // namespace
 
 }  // namespace mongo

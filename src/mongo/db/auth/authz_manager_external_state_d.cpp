@@ -35,6 +35,7 @@
 
 #include <memory>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_session_external_state_d.h"
 #include "mongo/db/auth/user_name.h"
@@ -90,9 +91,15 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                 << query);
 }
 
-MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
-()->std::unique_ptr<AuthzManagerExternalState> {
+namespace {
+
+std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {
     return std::make_unique<AuthzManagerExternalStateMongod>();
 }
+
+auto authzManagerExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzManagerExternalState::create, authzManagerExternalStateCreateImpl);
+
+}  // namespace
 
 }  // namespace mongo

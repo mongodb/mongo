@@ -29,13 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/shim.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx, TxnNumber clientTxnNumber)->void)
-    createTransactionCoordinator;
+void createTransactionCoordinator(OperationContext* opCtx, TxnNumber clientTxnNumber);
 
 }  // namespace mongo

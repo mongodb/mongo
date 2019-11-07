@@ -29,15 +29,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
 
 namespace mongo {
+namespace {
 
-MONGO_REGISTER_SHIM(createTransactionCoordinator)
-(OperationContext* opCtx, TxnNumber clientTxnNumber)->void {
+void createTransactionCoordinatorImpl(OperationContext* opCtx, TxnNumber clientTxnNumber) {
     auto clientLsid = opCtx->getLogicalSessionId().get();
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
 
@@ -50,4 +51,8 @@ MONGO_REGISTER_SHIM(createTransactionCoordinator)
         clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 }
 
+auto createTransactionCoordinatorRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    createTransactionCoordinator, createTransactionCoordinatorImpl);
+
+}  // namespace
 }  // namespace mongo

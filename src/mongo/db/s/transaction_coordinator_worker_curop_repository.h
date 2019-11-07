@@ -28,11 +28,9 @@
  */
 #pragma once
 
-#include "mongo/base/shim.h"
 #include "mongo/db/curop.h"
 
 namespace mongo {
-class TransactionCoordinatorWorkerCurOpRepository;
 
 class TransactionCoordinatorWorkerCurOpRepository {
 public:
@@ -65,6 +63,7 @@ public:
     virtual void reportState(OperationContext* opCtx, BSONObjBuilder* parent) const = 0;
 };
 
-extern MONGO_DECLARE_SHIM(()->std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>)
-    getTransactionCoordinatorWorkerCurOpRepository;
+std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+getTransactionCoordinatorWorkerCurOpRepository();
+
 }  // namespace mongo
