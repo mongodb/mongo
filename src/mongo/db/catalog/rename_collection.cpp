@@ -658,6 +658,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
                     }
                     record = cursor->next();
                 }
+
+                // Time to yield; make a safe copy of the current record before releasing our
+                // cursor.
+                if (record)
+                    record->data.makeOwned();
+
                 cursor->save();
                 // When this exits via success or WCE, we need to restore the cursor.
                 ON_BLOCK_EXIT([opCtx, ns = tmpName.ns(), &cursor]() {
