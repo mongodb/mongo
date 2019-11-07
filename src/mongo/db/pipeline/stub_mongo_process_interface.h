@@ -182,7 +182,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BackupCursorState openBackupCursor(OperationContext* opCtx) final {
+    BackupCursorState openBackupCursor(OperationContext* opCtx,
+                                       bool incrementalBackup,
+                                       boost::optional<std::string> thisBackupName,
+                                       boost::optional<std::string> srcBackupName) final {
         return BackupCursorState{UUID::gen(), boost::none, {}};
     }
 

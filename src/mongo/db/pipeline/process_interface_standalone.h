@@ -125,7 +125,10 @@ public:
         bool allowSpeculativeMajorityRead = false) final;
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
-    BackupCursorState openBackupCursor(OperationContext* opCtx) final;
+    BackupCursorState openBackupCursor(OperationContext* opCtx,
+                                       bool incrementalBackup,
+                                       boost::optional<std::string> thisBackupName,
+                                       boost::optional<std::string> srcBackupName) final;
     void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final;
     BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
                                                const UUID& backupId,

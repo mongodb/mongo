@@ -350,7 +350,10 @@ public:
     /**
      * The following methods forward to the BackupCursorHooks decorating the ServiceContext.
      */
-    virtual BackupCursorState openBackupCursor(OperationContext* opCtx) = 0;
+    virtual BackupCursorState openBackupCursor(OperationContext* opCtx,
+                                               bool incrementalBackup,
+                                               boost::optional<std::string> thisBackupName,
+                                               boost::optional<std::string> srcBackupName) = 0;
 
     virtual void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) = 0;
 

@@ -190,7 +190,10 @@ public:
      * The following methods only make sense for data-bearing nodes and should never be called on
      * a mongos.
      */
-    BackupCursorState openBackupCursor(OperationContext* opCtx) final {
+    BackupCursorState openBackupCursor(OperationContext* opCtx,
+                                       bool incrementalBackup,
+                                       boost::optional<std::string> thisBackupName,
+                                       boost::optional<std::string> srcBackupName) final {
         MONGO_UNREACHABLE;
     }
 
