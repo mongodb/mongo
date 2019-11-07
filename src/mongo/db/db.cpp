@@ -806,7 +806,8 @@ void setUpCatalog(ServiceContext* serviceContext) {
 
 auto makeReplicationExecutor(ServiceContext* serviceContext) {
     ThreadPool::Options tpOptions;
-    tpOptions.poolName = "replexec";
+    tpOptions.threadNamePrefix = "ReplCoord-";
+    tpOptions.poolName = "ReplCoordThreadPool";
     tpOptions.maxThreads = 50;
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
@@ -815,7 +816,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface("Replication", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface("ReplNetwork", nullptr, std::move(hookList)));
 }
 
 void setUpReplication(ServiceContext* serviceContext) {

@@ -293,8 +293,8 @@ std::unique_ptr<ThreadPool> makeReplWriterPool() {
 
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
     ThreadPool::Options options;
-    options.threadNamePrefix = "repl-writer-worker-";
-    options.poolName = "repl writer worker Pool";
+    options.threadNamePrefix = "ReplWriterWorker-";
+    options.poolName = "ReplWriterWorkerThreadPool";
     options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {
         Client::initThread(getThreadName());

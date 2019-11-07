@@ -137,8 +137,9 @@ ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeByte
 /**
  * Returns new thread pool for thread pool task executor.
  */
-auto makeThreadPool(const std::string& poolName) {
+auto makeThreadPool(const std::string& poolName, const std::string& threadName) {
     ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.threadNamePrefix = threadName + "-";
     threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
@@ -150,12 +151,15 @@ auto makeThreadPool(const std::string& poolName) {
 /**
  * Returns a new thread pool task executor.
  */
-auto makeTaskExecutor(ServiceContext* service, const std::string& poolName) {
+auto makeTaskExecutor(ServiceContext* service,
+                      const std::string& poolName,
+                      const std::string& threadName) {
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    auto networkName = threadName + "Network";
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
-        makeThreadPool(poolName),
-        executor::makeNetworkInterface("RS", nullptr, std::move(hookList)));
+        makeThreadPool(poolName, threadName),
+        executor::makeNetworkInterface(networkName, nullptr, std::move(hookList)));
 }
 
 /**
@@ -320,10 +324,11 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     log() << "Starting replication storage threads";
     _service->getStorageEngine()->setJournalListener(this);
 
-    _oplogApplierTaskExecutor = makeTaskExecutor(_service, "rsSync");
+    _oplogApplierTaskExecutor =
+        makeTaskExecutor(_service, "OplogApplierThreadPool", "OplogApplier");
     _oplogApplierTaskExecutor->startup();
 
-    _taskExecutor = makeTaskExecutor(_service, "replication");
+    _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternThreadPool", "ReplCoordExtern");
     _taskExecutor->startup();
 
     _writerPool = makeReplWriterPool();
