@@ -13,10 +13,10 @@
 #   - ticket: SERVER-1000
 #     test_file: jstests/core/my_test_file.js
 #
-# The above example will blacklist jstests/core/my_test_file.js from the 
+# The above example will blacklist jstests/core/my_test_file.js from the
 # 'replica_sets_multiversion_gen' task until this file has been updated with the same
 # (ticket, test_file) pair on the last-stable branch.
-# 
+#
 
 replica_sets_multiversion:
 
