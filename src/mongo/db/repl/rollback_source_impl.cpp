@@ -87,9 +87,8 @@ void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {
     std::string errmsg;
     auto tmpConn = std::make_unique<DBClientConnection>();
-    uassert(15908,
-            errmsg,
-            tmpConn->connect(_source, StringData(), errmsg) && replAuthenticate(tmpConn.get()));
+    uassert(15908, errmsg, tmpConn->connect(_source, StringData(), errmsg));
+    uassertStatusOK(replAuthenticate(tmpConn.get()));
 
     // cloner owns _conn in unique_ptr
     Cloner cloner;

@@ -40,9 +40,9 @@ namespace repl {
 /**
  * Authenticates conn using the server's cluster-membership credentials.
  *
- * Returns true on successful authentication.
+ * Returns Status::OK() on successful authentication.
  */
-bool replAuthenticate(DBClientBase* conn);
+Status replAuthenticate(DBClientBase* conn);
 
 }  // namespace repl
 }  // namespace mongo

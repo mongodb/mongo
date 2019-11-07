@@ -67,14 +67,24 @@ protected:
 
 private:
     friend class AllDatabaseClonerTest;
+    class ConnectStage : public ClonerStage<AllDatabaseCloner> {
+    public:
+        ConnectStage(std::string name, AllDatabaseCloner* cloner, ClonerRunFn stageFunc)
+            : ClonerStage<AllDatabaseCloner>(name, cloner, stageFunc){};
+        virtual bool checkRollBackIdOnRetry() {
+            return false;
+        }
+    };
+
+    /**
+     * Stage function that makes a connection to the sync source.
+     */
+    AfterStageBehavior connectStage();
 
     /**
      * Stage function that retrieves database information from the sync source.
      */
     AfterStageBehavior listDatabasesStage();
-
-    // The pre-stage for this class connects to the sync source.
-    void preStage() final;
 
     /**
      *
@@ -96,6 +106,7 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
+    ConnectStage _connectStage;                              // (R)
     ClonerStage<AllDatabaseCloner> _listDatabasesStage;      // (R)
     std::vector<std::string> _databases;                     // (X)
     std::unique_ptr<DatabaseCloner> _currentDatabaseCloner;  // (MX)

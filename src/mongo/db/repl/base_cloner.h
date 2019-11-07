@@ -101,9 +101,20 @@ protected:
 
         virtual AfterStageBehavior run() = 0;
 
-        // Returns true if the Status represents an error which should be retried.
-        virtual bool isTransientError(Status) {
-            return false;
+        /**
+         * Returns true if the Status represents an error which should be retried.
+         */
+        virtual bool isTransientError(const Status& status) {
+            return ErrorCodes::isNetworkError(status);
+        }
+
+        /**
+         * Returns true if the rollback ID should be checked before retrying.
+         * This is provided because the "connect" stage must complete successfully
+         * before checking rollback ID.
+         */
+        virtual bool checkRollBackIdOnRetry() {
+            return true;
         }
 
         std::string getName() const {
@@ -194,6 +205,13 @@ protected:
      */
     bool mustExit();
 
+    /**
+     * A stage may, but is not required, to call this when we should clear the retrying state
+     * because the operation has at least partially succeeded.  If the stage does not call this,
+     * the retrying state is cleared upon successful completion of the entire stage.
+     */
+    void clearRetryingState();
+
 private:
     virtual ClonerStages getStages() = 0;
 
@@ -205,6 +223,14 @@ private:
     virtual void postStage() {}
 
     AfterStageBehavior runStage(BaseClonerStage* stage);
+
+    AfterStageBehavior runStageWithRetries(BaseClonerStage* stage);
+
+    /**
+     * Make sure the rollback ID has not changed.  Throws an exception if it has.  Returns
+     * a not-OK status if a network error occurs.
+     */
+    Status checkRollBackIdIsUnchanged();
 
     /**
      * Supports pausing at certain stages for the initial sync fuzzer test framework.
@@ -248,6 +274,9 @@ private:
     // _stopAfterStage is used for unit testing and causes the cloner to exit after a given
     // stage.
     std::string _stopAfterStage;  // (X)
+
+    // Are we currently retrying?
+    bool _retrying = false;  // (X)
 };
 
 }  // namespace repl

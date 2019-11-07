@@ -261,3 +261,15 @@ server_parameters:
             lte:
                 expr: 100 * 1024 * 1024
 
+    # New parameters since this file was created, not taken from elsewhere.
+    initialSyncTransientErrorRetryPeriodSeconds:
+        description: >-
+            The amount of time to continue retrying transient errors during initial sync before
+            declaring the attempt failed.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: initialSyncTransientErrorRetryPeriodSeconds
+        default:
+            expr: 24 * 60 * 60
+        validator:
+            gte: 0

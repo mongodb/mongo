@@ -132,7 +132,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
                 ScopedDbConnection conn(s["host"].valuestr());
 
                 DBClientConnection* cliConn = dynamic_cast<DBClientConnection*>(&conn.conn());
-                if (cliConn && replAuthenticate(cliConn)) {
+                if (cliConn && replAuthenticate(cliConn).isOK()) {
                     BSONObj first = conn->findOne((string) "local.oplog.$" + sourcename,
                                                   Query().sort(BSON("$natural" << 1)));
                     BSONObj last = conn->findOne((string) "local.oplog.$" + sourcename,

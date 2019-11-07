@@ -187,8 +187,9 @@ double MockDBClientConnection::getSoTimeout() const {
 }
 
 void MockDBClientConnection::checkConnection() {
-    if (_isFailed && _autoReconnect) {
+    if (_isFailed && _autoReconnect && _remoteServer->isRunning()) {
         _remoteServerInstanceID = _remoteServer->getInstanceID();
+        _isFailed = false;
     }
 }
 }  // namespace mongo

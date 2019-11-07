@@ -66,8 +66,9 @@ void ClonerTestFixture::setUp() {
     _dbWorkThreadPool->startup();
     _source = HostAndPort{"local:1234"};
     _mockServer = std::make_unique<MockRemoteDBServer>(_source.toString());
-    _mockClient =
-        std::unique_ptr<DBClientConnection>(new MockDBClientConnection(_mockServer.get()));
+    const bool autoReconnect = true;
+    _mockClient = std::unique_ptr<DBClientConnection>(
+        new MockDBClientConnection(_mockServer.get(), autoReconnect));
     _sharedData = std::make_unique<InitialSyncSharedData>(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44, kInitialRollbackId);
 }

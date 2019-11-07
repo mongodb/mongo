@@ -76,7 +76,7 @@ public:
         return _retryingOperationsCount;
     }
 
-    int totalRetries(WithLock lk) {
+    int getTotalRetries(WithLock lk) {
         return _totalRetries;
     }
 

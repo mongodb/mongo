@@ -188,7 +188,8 @@ InitialSyncer::InitialSyncer(
       _storage(storage),
       _replicationProcess(replicationProcess),
       _onCompletion(onCompletion),
-      _createClientFn([] { return std::make_unique<DBClientConnection>(); }) {
+      _createClientFn(
+          [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);

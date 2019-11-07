@@ -36,6 +36,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -51,13 +52,291 @@ protected:
                                                    _source,
                                                    _mockClient.get(),
                                                    &_storageInterface,
-                                                   _dbWorkThreadPool.get());
+                                                   _dbWorkThreadPool.get(),
+                                                   &_clock);
     }
 
     std::vector<std::string> getDatabasesFromCloner(AllDatabaseCloner* cloner) {
         return cloner->_databases;
     }
+
+    ClockSourceMock _clock;
 };
+
+TEST_F(AllDatabaseClonerTest, RetriesConnect) {
+    // Bring the server down.
+    _mockServer->shutdown();
+
+    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
+    auto beforeRBIDFailPoint =
+        globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
+    auto timesEnteredRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'connect'}"));
+    auto timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'connect'}"));
+
+    auto cloner = makeAllDatabaseCloner();
+    cloner->setStopAfterStage_forTest("connect");
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+    });
+
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredRetry + 1);
+
+    // At this point we should have failed, but not recorded the failure yet.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(0, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+    // Now the failure should be recorded.
+    ASSERT_EQ(1, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    _clock.advance(Minutes(60));
+
+    timesEnteredRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'connect'}"));
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredRetry + 1);
+
+    // Only first failure is recorded.
+    ASSERT_EQ(1, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'connect'}"));
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+
+    // Second failure is recorded.
+    ASSERT_EQ(1, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(2, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    // Bring the server up.
+    unittest::log() << "Bringing mock server back up.";
+    _mockServer->reboot();
+
+    // Allow the cloner to finish.
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    // Total retries and outage time should be available.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(2, _sharedData->getTotalRetries(WithLock::withoutLock()));
+    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesConnectButFails) {
+    // Bring the server down.
+    _mockServer->shutdown();
+
+    auto beforeRBIDFailPoint =
+        globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
+    auto timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'connect'}"));
+    auto cloner = makeAllDatabaseCloner();
+    cloner->setStopAfterStage_forTest("connect");
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_NOT_OK(cloner->run());
+    });
+
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+
+    // Advance the clock enough to fail the whole attempt.
+    _clock.advance(Days(1) + Seconds(1));
+
+    // Allow the cloner to finish.
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    // Advance the clock and make sure this time isn't recorded.
+    _clock.advance(Minutes(1));
+
+    // Total retries and outage time should be available.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+    ASSERT_EQ(Days(1) + Seconds(1),
+              _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+}
+
+// Note that the code for retrying listDatabases is the same for all stages except connect, so
+// the unit tests which cover the AllDatabasesCloner listDatabase stage cover retries for all the
+// subsequent stages for all the cloners.
+TEST_F(AllDatabaseClonerTest, RetriesListDatabases) {
+    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
+    _mockServer->setCommandReply("listDatabases", fromjson("{ok:1, databases:[]}"));
+
+    // Stop at the listDatabases stage.
+    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+
+    auto cloner = makeAllDatabaseCloner();
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+    });
+
+    // Wait until we get to the listDatabases stage.
+    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+    // Bring the server down.
+    _mockServer->shutdown();
+
+    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
+    auto beforeRBIDFailPoint =
+        globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
+    auto timesEnteredRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+    auto timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+    beforeStageFailPoint->setMode(FailPoint::off, 0);
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredRetry + 1);
+
+    // At this point we should have failed, but not recorded the failure yet.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(0, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+    // Now the failure should be recorded.
+    ASSERT_EQ(1, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    _clock.advance(Minutes(60));
+
+    timesEnteredRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredRetry + 1);
+
+    // Only first failure is recorded.
+    ASSERT_EQ(1, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+
+    // Second failure is recorded.
+    ASSERT_EQ(1, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(2, _sharedData->getTotalRetries(WithLock::withoutLock()));
+
+    // Bring the server up.
+    unittest::log() << "Bringing mock server back up.";
+    _mockServer->reboot();
+
+    // Allow the cloner to finish.
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    // Total retries and outage time should be available.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(2, _sharedData->getTotalRetries(WithLock::withoutLock()));
+    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButRollBackIdChanges) {
+    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
+    _mockServer->setCommandReply("listDatabases", fromjson("{ok:1, databases:[]}"));
+
+    // Stop at the listDatabases stage.
+    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+
+    auto cloner = makeAllDatabaseCloner();
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_NOT_OK(cloner->run());
+    });
+
+    // Wait until we get to the listDatabases stage.
+    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+    // Bring the server down.
+    _mockServer->shutdown();
+
+    auto beforeRBIDFailPoint =
+        globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
+    auto timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+    beforeStageFailPoint->setMode(FailPoint::off, 0);
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+    _clock.advance(Minutes(60));
+
+    // The rollback ID has changed when we reconnect.
+    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:2}"));
+
+    // Bring the server up.
+    unittest::log() << "Bringing mock server back up.";
+    _mockServer->reboot();
+
+    // Allow the cloner to finish.
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    // Total retries and outage time should be available.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButTimesOut) {
+    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
+    _mockServer->setCommandReply("listDatabases", fromjson("{ok:1, databases:[]}"));
+
+    // Stop at the listDatabases stage.
+    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+
+    auto cloner = makeAllDatabaseCloner();
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_NOT_OK(cloner->run());
+    });
+
+    // Wait until we get to the listDatabases stage.
+    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+    // Bring the server down.
+    _mockServer->shutdown();
+
+    auto beforeRBIDFailPoint =
+        globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
+    auto timesEnteredRBID = beforeRBIDFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
+
+    beforeStageFailPoint->setMode(FailPoint::off, 0);
+    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+    // Advance the clock enough for the timeout interval to be exceeded.
+    _clock.advance(Days(1) + Seconds(1));
+
+    // Allow the cloner to finish.
+    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    // Total retries and outage time should be available.
+    ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
+    ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
+    ASSERT_EQ(Days(1) + Seconds(1),
+              _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+}
 
 TEST_F(AllDatabaseClonerTest, FailsOnListDatabases) {
     Status expectedResult{ErrorCodes::BadValue, "foo"};
@@ -145,7 +424,7 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
         0,
         fromjson("{cloner: 'DatabaseCloner', stage: 'listCollections', database: 'admin'}"));
 
-    // Run the cloner in a separate thread to
+    // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
         Client::initThread("ClonerRunner");
         ASSERT_OK(cloner->run());

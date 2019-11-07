@@ -51,10 +51,19 @@ AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                  storageInterface,
                  dbPool,
                  clockSource),
+      _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage) {}
 
 BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
-    return {&_listDatabasesStage};
+    return {&_connectStage, &_listDatabasesStage};
+}
+
+BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
+    auto* client = getClient();
+    uassertStatusOK(client->connect(getSource(), StringData()));
+    uassertStatusOK(replAuthenticate(client).withContext(
+        str::stream() << "Failed to authenticate to " << getSource()));
+    return kContinueNormally;
 }
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
@@ -80,20 +89,6 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
         }
     }
     return kContinueNormally;
-}
-
-void AllDatabaseCloner::preStage() {
-    // TODO(SERVER-43275): Implement retry logic here.  Alternately, do the initial connection
-    // in the BaseCloner retry logic and remove this method, but remember not to count the initial
-    // connection as a _re_try.
-    auto* client = getClient();
-    Status clientConnectionStatus = client->connect(getSource(), StringData());
-    if (clientConnectionStatus.isOK() && !replAuthenticate(client)) {
-        clientConnectionStatus =
-            Status{ErrorCodes::AuthenticationFailed,
-                   str::stream() << "Failed to authenticate to " << getSource()};
-    }
-    uassertStatusOK(clientConnectionStatus);
 }
 
 void AllDatabaseCloner::postStage() {
