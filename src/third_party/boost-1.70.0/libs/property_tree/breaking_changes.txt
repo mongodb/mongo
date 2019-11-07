@@ -1,0 +1,51 @@
+Copyright (C) 2009 Sebastian Redl
+Distributed under the Boost Software License, Version 1.0.
+See http://www.boost.org/LICENSE_1_0.txt
+
+
+List all breaking changes done to the interface during the update here.
+
+- Template parameters
+Template parameters have been thoroughly changed.
+Impact: If you were using a custom instantiation of basic_ptree, you have to
+  change your code.
+Rationale: The old order made no sense. It ordered the key comparison predicate
+           before the key, although it could easily be defaulted based on it,
+           and the path before the data type, when the path is something you
+           will very rarely want to change (and it could default, too).
+
+- put*
+The put and put_child functions of basic_ptree had add and add_child split from
+them, by separating along the lines of the do_not_replace parameter.
+Impact: If you were using the third parameter of these functions, you have to
+        change your code.
+Rationale: I'm not fond of using boolean parameters to change function behavior.
+           They're hard to remember and hard to read in code. When projects
+           adopt the convention of passing /*boolean=*/true,
+           /*parameters=*/false, /*like=*/false this, something's wrong.
+           It's even more wrong when the parameter has a negative name, as
+           do_not_replace had.
+
+- Custom paths
+Custom paths have been thoroughly changed.
+Impact: If you were using custom paths, you have to change your code. If you
+        referred to the basic_path template by name, you have to change your
+        code.
+Rationale: The old interface required a huge amount of repeated code for
+           custom paths. The new interface is a lot easier to implement.
+
+- Translators
+Translators have been thoroughly changed.
+Impact: If you were using translators at all, you probably have to change your
+        code.
+Rationale: The new interface makes it easier to pass custom translators to
+           specific get/put operations. It also keeps the translator out of
+           the tree's type.
+
+- find
+find() returns an assoc_iterator.
+Impact: If you use find, you may have to change your code. Most importantly,
+        you need to compare against not_found() instead of end().
+Rationale: equal_range() also returns assoc_iterators. equal_range() cannot
+           return normal iterators, since the conversion would not preserve
+           the equal range or even the range property.
