@@ -93,7 +93,7 @@ If it expires its retries then the `OplogFetcher` shuts down with an error statu
 
 The `OplogFetcher` is owned by the
 [`BackgroundSync`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/bgsync.h) thread.
-The `BackgroundSync` thread runs continuously while a node is in SECONDARY state. `BackgroundSync`
+The `BackgroundSync` thread runs continuously while a node is in `SECONDARY` state. `BackgroundSync`
 sits in a loop, where each iteration it first chooses a sync source with the `SyncSourceResolver`
 and then starts up the `OplogFetcher`. When the `OplogFetcher` terminates, `BackgroundSync` restarts
 sync source selection, exits, or goes into ROLLBACK depending on the return status. The
@@ -154,7 +154,7 @@ make sure it actually is able to fetch from the sync source candidate’s oplog.
   ahead.
 * During initial sync, rollback, or recovery from unclean shutdown, nodes will set a specific
   OpTime, **`minValid`**, that they must reach before it is safe to read from the node and before
-  the node can transition into SECONDARY state. If the secondary has a `minValid`, then the sync
+  the node can transition into `SECONDARY` state. If the secondary has a `minValid`, then the sync
   source candidate is checked for that `minValid` entry.
 * The sync source's **RollbackID** is also fetched to be checked after the first batch is returned
   by the `OplogFetcher`.
@@ -371,7 +371,7 @@ object at startup that is responsible for sending `replSetUpdatePosition` comman
 
 The `SyncSourceFeedback` starts a loop. In each iteration it first waits on a condition variable
 that is notified whenever the `ReplicationCoordinator` discovers that a node in the replica set has
-replicated more operations and become more up-to-date. It checks that it is not in PRIMARY or
+replicated more operations and become more up-to-date. It checks that it is not in `PRIMARY` or
 STARTUP state before moving on.
 
 It then gets the node's sync source and creates a
@@ -542,7 +542,7 @@ There are a number of ways that a node will run for election:
   longer than `catchUpTakeoverDelayMillis` (default 30 seconds), it will run for election. This
   behvarior is known as a **catchup takeover**. If primary catchup is taking too long, catchup
   takeover can help allow the replica set to accept writes sooner, since a more up-to-date node will
-  not spend as much time (or any time) in catchup. See the "Transitioning to PRIMARY" section for
+  not spend as much time (or any time) in catchup. See the "Transitioning to `PRIMARY`" section for
   further details on primary catchup.
 * The `replSetStepUp` command can be run on an eligible node to cause it to run for election
   immediately. We don't expect users to call this command, but it is run internally for election
@@ -602,14 +602,14 @@ the `local.replset.election` collection. This information is read into memory at
 future elections. This ensures that even if a node restarts, it does not vote for two nodes in the
 same term.
 
-### Transitioning to PRIMARY
+### Transitioning to `PRIMARY`
 
-Now that the candidate has won, it must become PRIMARY. First it clears its sync source and notifies
-all nodes that it won the election via a round of heartbeats. Then the node checks if it needs to
-catch up from the former primary. Since the node can be elected without the former primary's vote,
-the primary-elect will attempt to replicate any remaining oplog entries it has not yet replicated
-from any viable sync source. While these are guaranteed to not be committed, it is still good to
-minimize rollback when possible.
+Now that the candidate has won, it must become `PRIMARY`. First it clears its sync source and
+notifies all nodes that it won the election via a round of heartbeats. Then the node checks if it
+needs to catch up from the former primary. Since the node can be elected without the former
+primary's vote, the primary-elect will attempt to replicate any remaining oplog entries it has not
+yet replicated from any viable sync source. While these are guaranteed to not be committed, it is
+still good to minimize rollback when possible.
 
 The primary-elect uses the responses from the recent round of heartbeats to see the latest applied
 OpTime of every other node. If the primary-elect’s last applied OpTime is less than the newest last
@@ -626,8 +626,8 @@ best-effort, it could time out before the node has applied operations through th
 Even if this happens, the primary-elect will not step down.
 
 At this point, whether catchup was successful or not, the node goes into "drain mode". This is when
-the node has already logged "transition to PRIMARY", but has not yet applied all of the oplog
-entries in its oplog buffer. `replSetGetStatus` will now say the node is in PRIMARY state. The
+the node has already logged "transition to `PRIMARY`", but has not yet applied all of the oplog
+entries in its oplog buffer. `replSetGetStatus` will now say the node is in `PRIMARY` state. The
 applier keeps running, and when it completely drains the buffer, it signals to the
 `ReplicationCoordinator` to finish the step up process. The node marks that it can begin to accept
 writes. According to the Raft Protocol, we cannot update the commit point to reflect oplog entries
