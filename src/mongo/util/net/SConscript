@@ -124,6 +124,7 @@ if not get_option('ssl') == 'off':
         ],
         LIBDEPS_PRIVATE=[
             'http_client',
+            'network',
         ]
     )
 
