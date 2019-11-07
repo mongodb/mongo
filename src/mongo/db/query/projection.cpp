@@ -77,23 +77,17 @@ public:
 
     void visit(const ProjectionSliceASTNode* node) final {
         _deps->requiresDocument = true;
+        _deps->hasExpressions = true;
     }
 
     void visit(const ProjectionElemMatchASTNode* node) final {
         _deps->requiresDocument = true;
+        _deps->hasExpressions = true;
     }
 
     void visit(const ExpressionASTNode* node) final {
-        const Expression* expr = node->expressionRaw();
-        const ExpressionMeta* meta = dynamic_cast<const ExpressionMeta*>(expr);
-
-        // Only {$meta: 'sortKey'} projections can be covered. Projections with any other expression
-        // need the document.
-        if (!(meta && meta->getMetaType() == DocumentMetadataFields::MetaType::kSortKey)) {
-            _deps->requiresDocument = true;
-        }
+        _deps->hasExpressions = true;
     }
-
     void visit(const BooleanConstantASTNode* node) final {}
     void visit(const MatchExpressionASTNode* node) final {}
 
@@ -189,6 +183,7 @@ auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
     }
 
     deps.metadataRequested = tracker.metadataDeps();
+    deps.requiresDocument = deps.requiresDocument || tracker.needWholeDocument;
     return deps;
 }
 }  // namespace

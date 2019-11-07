@@ -482,14 +482,20 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     }
 
     std::vector<std::string> requiredFields = proj->getRequiredFields();
-    invariant(!requiredFields.empty());
 
-    // Keep track of whether we appended the character marking the beginning of the projection
-    // section. We may not have to if all of the fields in the projection are $-prefixed.
-    bool appendedStart = false;
+    // If the only requirement is that $sortKey be included with some value, we just act as if the
+    // entire document is needed.
+    if (requiredFields.size() == 1 && requiredFields.front() == "$sortKey") {
+        return;
+    }
+
+    // If the projection just re-writes the entire document and has no dependencies on the original
+    // document (e.g. {a: "foo", _id: 0}), then just include the projection delimiter.
+    *keyBuilder << kEncodeProjectionSection;
 
     // Encode the fields required by the projection in order.
     std::sort(requiredFields.begin(), requiredFields.end());
+    bool isFirst = true;
     for (auto&& requiredField : requiredFields) {
         invariant(!requiredField.empty());
 
@@ -499,15 +505,11 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
             continue;
         }
 
-        const bool isFirst = !appendedStart;
-
-        if (isFirst) {
-            *keyBuilder << kEncodeProjectionSection;
-            appendedStart = true;
-        } else {
+        if (!isFirst) {
             *keyBuilder << kEncodeProjectionRequirementSeparator;
         }
         encodeUserString(requiredField, keyBuilder);
+        isFirst = false;
     }
 }
 }  // namespace

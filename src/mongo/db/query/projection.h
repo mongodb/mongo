@@ -45,6 +45,8 @@ struct ProjectionDependencies {
 
     // Whether the entire document is required to do the projection.
     bool requiresDocument = false;
+    bool hasExpressions = false;
+
     // Which fields are necessary to perform the projection, or boost::none if all are required.
     boost::optional<std::vector<std::string>> requiredFields;
 
@@ -110,11 +112,12 @@ public:
 
     /**
      * A projection is considered "simple" if it doesn't require the full document, operates only
-     * on top-level fields, has no positional projection, and doesn't require the sort key.
+     * on top-level fields, has no positional projection or expressions, and doesn't require
+     * metadata.
      */
     bool isSimple() const {
         return !_deps.hasDottedPath && !_deps.requiresMatchDetails &&
-            !_deps.metadataRequested.any() && !_deps.requiresDocument;
+            !_deps.metadataRequested.any() && !_deps.requiresDocument && !_deps.hasExpressions;
     }
 
 private:

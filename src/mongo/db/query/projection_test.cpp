@@ -458,4 +458,31 @@ TEST(QueryProjectionTest, DBRefProjections) {
     // so these fields cannot be arrays.
     createFindProjection("{'a.$id': {$elemMatch: {x: 1}}}", "{'a.$id.$': 1}");
 }
+
+TEST(QueryProjectionTest, ProjectionWithExpressionIsNotSimple) {
+    auto proj = createProjection("{}", "{a: {$add: [3, 4]}}");
+    ASSERT_FALSE(proj.isSimple());
+
+    const auto& fields = proj.getRequiredFields();
+    ASSERT_EQ(fields.size(), 1);
+    ASSERT_EQ(fields[0], "_id");
+}
+
+TEST(QueryProjectionTest, ProjectionWithROOTNeedsWholeDocument) {
+    auto proj = createProjection("{}", "{a: '$$ROOT'}");
+    ASSERT_FALSE(proj.isSimple());
+    ASSERT_TRUE(proj.requiresDocument());
+}
+
+TEST(QueryProjectionTest, ProjectionWithFieldPathExpressionDoesNotNeedWholeDocument) {
+    auto proj = createProjection("{}", "{_id: 0, a: {$add: ['$b', '$c']}}");
+    ASSERT_FALSE(proj.isSimple());
+    ASSERT_FALSE(proj.requiresDocument());
+
+    const auto& fields = proj.getRequiredFields();
+    ASSERT_EQ(fields.size(), 2);
+    ASSERT_EQ(fields[0], "b");
+    ASSERT_EQ(fields[1], "c");
+}
+
 }  // namespace
