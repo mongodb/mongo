@@ -40,9 +40,9 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -123,15 +123,12 @@ auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string co
 }
 
 auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
-    auto accumulatorArguments = ExpressionObject::create(
-        expCtx,
-        make_vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>(
-            std::pair{"data"s,
-                      ExpressionFieldPath::parse(expCtx, "$emits", expCtx->variablesParseState)},
-            std::pair{"eval"s, ExpressionConstant::create(expCtx, Value{code})}));
-    auto jsReduce = AccumulationStatement{"value", std::move(accumulatorArguments), [expCtx]() {
-                                              return AccumulatorInternalJsReduce::create(expCtx);
-                                          }};
+    auto accumulatorArgument =
+        ExpressionFieldPath::parse(expCtx, "$emits", expCtx->variablesParseState);
+    auto reduceFactory = [expCtx, funcSource = code]() {
+        return AccumulatorInternalJsReduce::create(expCtx, funcSource);
+    };
+    AccumulationStatement jsReduce("value", std::move(accumulatorArgument), reduceFactory);
     auto groupExpr = ExpressionFieldPath::parse(expCtx, "$emits.k", expCtx->variablesParseState);
     return DocumentSourceGroup::create(expCtx,
                                        std::move(groupExpr),

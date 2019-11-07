@@ -95,7 +95,7 @@ assert.commandFailedWithCode(db.runCommand(command), 31244);
 
 groupPipe[0].$group.wordCount.$_internalJsReduce.eval = reduce;
 groupPipe[0].$group.wordCount.$_internalJsReduce.data = 5;
-assert.commandFailedWithCode(db.runCommand(command), 31245);
+assert.commandFailedWithCode(db.runCommand(command), 31242);
 
 groupPipe[0].$group.wordCount.$_internalJsReduce = {
     notEval: 1,

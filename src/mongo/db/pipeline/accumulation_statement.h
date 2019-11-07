@@ -52,7 +52,7 @@ namespace mongo {
     }
 
 /**
- * A class representing a user-specified accummulation, including the field name to put the
+ * A class representing a user-specified accumulation, including the field name to put the
  * accumulated result in, which accumulator to use, and the expression used to obtain the input to
  * the Accumulator.
  */
@@ -104,7 +104,9 @@ public:
     boost::intrusive_ptr<Accumulator> makeAccumulator() const;
 
 private:
-    Accumulator::Factory _factory;
+    // A no argument function object that can be called to create an Accumulator.
+    const Accumulator::Factory _factory;
 };
+
 
 }  // namespace mongo

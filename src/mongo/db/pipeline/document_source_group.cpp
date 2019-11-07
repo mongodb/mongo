@@ -35,7 +35,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -244,8 +243,7 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator();
         insides[accumulatedField.fieldName] =
-            Value(DOC(accum->getOpName()
-                      << accumulatedField.expression->serialize(static_cast<bool>(explain))));
+            Value(accum->serialize(accumulatedField.expression, static_cast<bool>(explain)));
     }
 
     if (_doingMerge) {
@@ -412,7 +410,6 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();
-
         if (pFieldName == "_id") {
             uassert(
                 15948, "a group's _id may only be specified once", pGroup->_idExpressions.empty());
@@ -695,10 +692,10 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroup::distr
         // However, for some accumulators, the expression to be accumulated will be different. The
         // original accumulator may be collecting an expression based on a field expression or
         // constant.  Here, we accumulate the output of the same name from the prior group.
-        auto copiedAccumuledField = accumulatedField;
-        copiedAccumuledField.expression =
-            ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + accumulatedField.fieldName, vps);
-        mergingGroup->addAccumulator(copiedAccumuledField);
+        auto copiedAccumulatedField = accumulatedField;
+        copiedAccumulatedField.expression =
+            ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + copiedAccumulatedField.fieldName, vps);
+        mergingGroup->addAccumulator(copiedAccumulatedField);
     }
 
     // {shardsStage, mergingStage, sortPattern}

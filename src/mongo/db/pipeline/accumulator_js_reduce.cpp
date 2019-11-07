@@ -31,52 +31,79 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/javascript_execution.h"
+#include "mongo/db/pipeline/accumulator_js_reduce.h"
+#include "mongo/db/pipeline/make_js_function.h"
 
 namespace mongo {
 
-REGISTER_ACCUMULATOR(_internalJsReduce,
-                     genericParseSingleExpressionAccumulator<AccumulatorInternalJsReduce>);
+REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::parseInternalJsReduce);
+
+std::pair<boost::intrusive_ptr<Expression>, Accumulator::Factory>
+AccumulatorInternalJsReduce::parseInternalJsReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                   BSONElement elem,
+                                                   VariablesParseState vps) {
+    uassert(31326,
+            str::stream() << kAccumulatorName << " requires a document argument, but found "
+                          << elem.type(),
+            elem.type() == BSONType::Object);
+    BSONObj obj = elem.embeddedObject();
+
+    std::string funcSource;
+    boost::intrusive_ptr<Expression> dataExpr;
+
+    for (auto&& element : obj) {
+        if (element.fieldNameStringData() == "eval") {
+            funcSource = parseReduceFunction(element);
+        } else if (element.fieldNameStringData() == "data") {
+            dataExpr = Expression::parseOperand(expCtx, element, vps);
+        } else {
+            uasserted(31243,
+                      str::stream() << "Invalid argument specified to " << kAccumulatorName << ": "
+                                    << element.toString());
+        }
+    }
+    uassert(31245,
+            str::stream() << kAccumulatorName
+                          << " requires 'eval' argument, recieved input: " << obj.toString(false),
+            !funcSource.empty());
+    uassert(31349,
+            str::stream() << kAccumulatorName
+                          << " requires 'data' argument, recieved input: " << obj.toString(false),
+            dataExpr);
+
+    auto factory = [expCtx, funcSource = funcSource]() {
+        return AccumulatorInternalJsReduce::create(expCtx, funcSource);
+    };
+
+    return {std::move(dataExpr), std::move(factory)};
+}
+
+std::string AccumulatorInternalJsReduce::parseReduceFunction(BSONElement func) {
+    uassert(
+        31244,
+        str::stream() << kAccumulatorName
+                      << " requires the 'eval' argument to be of type string, or code but found "
+                      << func.type(),
+        func.type() == BSONType::String || func.type() == BSONType::Code);
+    return func._asCode();
+}
 
 void AccumulatorInternalJsReduce::processInternal(const Value& input, bool merging) {
     if (input.missing()) {
         return;
     }
-
     uassert(31242,
             str::stream() << kAccumulatorName << " requires a document argument, but found "
                           << input.getType(),
             input.getType() == BSONType::Object);
-
-    Document accInput = input.getDocument();
-    uassert(31243,
-            str::stream() << kAccumulatorName << " requires both an 'eval' and 'data' argument",
-            accInput.size() == 2ull && !accInput["eval"].missing() && !accInput["data"].missing());
+    Document data = input.getDocument();
 
     uassert(
-        31244,
+        31251,
         str::stream() << kAccumulatorName
-                      << " requires the 'eval' argument to be of type string, or code but found "
-                      << accInput["eval"].getType(),
-        accInput["eval"].getType() == BSONType::String ||
-            accInput["eval"].getType() == BSONType::Code);
-
-    uassert(31245,
-            str::stream() << kAccumulatorName
-                          << " requires the 'data' argument to be of type Object, but found "
-                          << accInput["data"].getType(),
-            accInput["data"].getType() == BSONType::Object);
-
-    Document data = accInput["data"].getDocument();
-    _funcSource = accInput["eval"].getType() == BSONType::String ? accInput["eval"].getString()
-                                                                 : accInput["eval"].getCode();
-
-    uassert(31251,
-            str::stream() << kAccumulatorName
-                          << " requires the 'data' argument to have a 'k' and 'v' field",
-            data.size() == 2ull && !data["k"].missing() && !data["v"].missing());
+                      << " requires the 'data' argument to have a 'k' and 'v' field. Instead found"
+                      << data.toString(),
+        data.size() == 2ull && !data["k"].missing() && !data["v"].missing());
 
     _key = data["k"];
 
@@ -85,10 +112,6 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 }
 
 Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
-    uassert(31241,
-            "Cannot run server-side javascript without the javascript engine enabled",
-            getGlobalScriptEngine());
-
     auto val = [&]() {
         if (_values.size() < 1) {
             return Value{};
@@ -100,30 +123,22 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
         }
 
         auto expCtx = getExpressionContext();
-        auto jsExec = expCtx->getJsExecWithScope();
+        auto reduceFunc = makeJsFunc(expCtx, _funcSource.toString());
 
-        ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
-
-        uassert(31247, "The reduce function failed to parse in the javascript engine", func);
 
         // Function signature: reduce(key, values).
         BSONObj params = BSON_ARRAY(_key << bsonValues.arr());
         // For reduce, the key and values are both passed as 'params' so there's no need to set
         // 'this'.
         BSONObj thisObj;
-        return jsExec->callFunction(func, params, thisObj);
+        return expCtx->getJsExecWithScope()->callFunction(reduceFunc, params, thisObj);
     }();
 
     // If we're merging after this, wrap the value in the same format it was inserted in.
     if (toBeMerged) {
-        MutableDocument doc;
         MutableDocument output;
-        doc.addField("k", _key);
-        doc.addField("v", val);
-
-        output.addField("eval", Value(_funcSource));
-        output.addField("data", Value(doc.freeze()));
-
+        output.addField("k", _key);
+        output.addField("v", val);
         return Value(output.freeze());
     } else {
         return val;
@@ -131,18 +146,25 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
 }
 
 boost::intrusive_ptr<Accumulator> AccumulatorInternalJsReduce::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData funcSource) {
 
     uassert(ErrorCodes::BadValue,
             str::stream() << kAccumulatorName << " not allowed without enabling test commands.",
             getTestCommandsEnabled());
 
-    return new AccumulatorInternalJsReduce(expCtx);
+    return make_intrusive<AccumulatorInternalJsReduce>(expCtx, funcSource);
 }
 
 void AccumulatorInternalJsReduce::reset() {
     _values.clear();
     _memUsageBytes = sizeof(*this);
     _key = Value{};
+}
+
+// Returns this accumulator serialized as a Value along with the reduce function.
+Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> expression,
+                                                bool explain) const {
+    return DOC(
+        getOpName() << DOC("data" << expression->serialize(explain) << "eval" << _funcSource));
 }
 }  // namespace mongo

@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/pipeline/expression_javascript.h"
+#include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
@@ -107,18 +108,14 @@ Value ExpressionInternalJsEmit::serialize(bool explain) const {
 }
 
 Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variables) const {
-    uassert(31246,
-            "Cannot run server-side javascript without the javascript engine enabled",
-            getGlobalScriptEngine());
-
     Value thisVal = _thisRef->evaluate(root, variables);
     uassert(31225, "'this' must be an object.", thisVal.getType() == BSONType::Object);
 
     // If the scope does not exist and is created by the following call, then make sure to
     // re-bind emit() and the given function to the new scope.
     auto expCtx = getExpressionContext();
-    auto jsExec = expCtx->getJsExecWithScope();
 
+    auto jsExec = expCtx->getJsExecWithScope();
     // Inject the native "emit" function to be called from the user-defined map function. This
     // particular Expression/ExpressionContext may be reattached to a new OperationContext (and thus
     // a new JS Scope) when used across getMore operations, so this method will handle that case for
@@ -128,8 +125,7 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     // Although inefficient to "create" a new function every time we evaluate, this will usually end
     // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
     // on a new thread if the expression is evaluated across getMores.
-    auto func = jsExec->getScope()->createFunction(_funcSource.c_str());
-    uassert(31226, "The map function failed to parse in the javascript engine", func);
+    auto func = makeJsFunc(expCtx, _funcSource.c_str());
 
     BSONObj thisBSON = thisVal.getDocument().toBson();
     BSONObj params;
