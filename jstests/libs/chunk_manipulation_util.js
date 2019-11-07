@@ -234,3 +234,24 @@ function waitForMigrateStep(shardConnection, stepNumber) {
         return false;
     }, msg);
 }
+
+//
+// Run the given function in the transferMods phase.
+//
+function runCommandDuringTransferMods(
+    mongos, staticMongod, ns, bounds, fromShard, toShard, cmdFunc) {
+    let configDB = mongos.getDB('config');
+
+    // Turn on the fail point and wait for moveChunk to hit the fail point.
+    pauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
+    let joinMoveChunk =
+        moveChunkParallel(staticMongod, mongos.host, null, bounds, ns, toShard.shardName);
+    waitForMoveChunkStep(fromShard, moveChunkStepNames.startedMoveChunk);
+
+    // Run the commands.
+    cmdFunc();
+
+    // Turn off the fail point and wait for moveChunk to complete.
+    unpauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
+    joinMoveChunk();
+}
