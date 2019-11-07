@@ -46,6 +46,12 @@ server_parameters:
     description: "Do not send a client certificate when establishing intra-cluster connections"
     set_at: startup
     cpp_varname: "sslGlobalParams.tlsWithholdClientCertificate"
+  ocspEnabled:
+    description: "Enable OCSP"
+    set_at: startup
+    default: false
+    cpp_vartype: bool
+    cpp_varname: "sslOCSPEnabled"
 
   opensslCipherConfig:
     description: "Cipher configuration string for OpenSSL based TLS connections"

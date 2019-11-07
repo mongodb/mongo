@@ -8,9 +8,6 @@ import logging
 from datetime import datetime
 from ocspresponder import OCSPResponder, CertificateStatus
 
-FAULT_REVOKED = "revoked"
-FAULT_UNKNOWN = "unknown"
-
 fault = None
 
 def validate(serial: int):

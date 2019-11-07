@@ -124,4 +124,3 @@ configs:
     deprecated_short_name: sslDisabledProtocols
     arg_vartype: String
     requires: tls
-
