@@ -1,4 +1,5 @@
 // Change a write concern mode from 2 to 3 servers
+// @tags: [multiversion_incompatible]
 
 (function() {
 "use strict";

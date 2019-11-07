@@ -1,4 +1,5 @@
 // Test ReplSet default initiate with localhost-only binding
+// @tags: [multiversion_incompatible]
 
 (function() {
 'use strict';

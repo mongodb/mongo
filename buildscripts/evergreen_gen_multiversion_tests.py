@@ -127,7 +127,7 @@ class EvergreenConfigGenerator(object):
             # Fetch and download the proper mongod binaries before running multiversion tests.
             CommandDefinition().function("do multiversion setup")
         ]
-        exclude_tags = "requires_fcv_44"
+        exclude_tags = "requires_fcv_44,multiversion_incompatible"
         # TODO(SERVER-43306): Remove --dryRun command line option once we start turning on
         #  multiversion tests.
         run_tests_vars = {

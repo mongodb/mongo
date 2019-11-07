@@ -1,6 +1,7 @@
 /*
  * Sanity check that initializing will fail with bad input. There are C++ unit tests for most bad
  * configs, so this is just seeing if it fails when it's supposed to.
+ * @tags: [multiversion_incompatible]
  */
 (function() {
 "use strict";

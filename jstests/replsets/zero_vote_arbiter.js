@@ -1,6 +1,8 @@
 /*
  * Test that replSetInitiate and replSetReconfig prohibit zero-vote arbiters,
  * SERVER-13627.
+ *
+ * @tags: [multiversion_incompatible]
  */
 
 var NewReplicaSetConfigurationIncompatible = 103;

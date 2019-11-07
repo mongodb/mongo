@@ -1,4 +1,5 @@
 // Test ReplSet default initiate with 0.0.0.0 binding
+// @tags: [multiversion_incompatible]
 
 (function() {
 'use strict';
