@@ -27,7 +27,6 @@ selector:
   - jstests/core/geo_update_btree2.js  # notablescan.
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
-  - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/stages*.js  # stageDebug.
@@ -253,7 +252,6 @@ selector:
   - jstests/core/kill_cursors.js
   - jstests/core/list_collections1.js
   - jstests/core/list_indexes.js
-  - jstests/core/max_time_ms.js
   - jstests/core/oro.js
 
   # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.

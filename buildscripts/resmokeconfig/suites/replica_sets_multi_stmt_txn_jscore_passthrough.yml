@@ -226,7 +226,6 @@ selector:
   - jstests/core/kill_cursors.js
   - jstests/core/list_collections1.js
   - jstests/core/list_indexes.js
-  - jstests/core/max_time_ms.js
   - jstests/core/oro.js
 
   # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
