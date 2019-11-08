@@ -360,6 +360,9 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                            ApplyOperationInLockFn applyOperationInLock,
                            ApplyCommandInLockFn applyCommandInLock,
                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+    UnreplicatedWritesBlock uwb(opCtx);
+    DisableDocumentValidation validationDisabler(opCtx);
+
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
 
@@ -370,9 +373,6 @@ Status SyncTail::syncApply(OperationContext* opCtx,
     auto applyOp = [&](Database* db) {
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
-        UnreplicatedWritesBlock uwb(opCtx);
-        DisableDocumentValidation validationDisabler(opCtx);
-
         // We convert updates to upserts when not in initial sync because after rollback and during
         // startup we may replay an update after a delete and crash since we do not ignore
         // errors. In initial sync we simply ignore these update errors so there is no reason to

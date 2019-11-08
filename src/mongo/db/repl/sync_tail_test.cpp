@@ -398,8 +398,8 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isW());
-        ASSERT_TRUE(opCtx->writesAreReplicated());
-        ASSERT_FALSE(documentValidationDisabled(opCtx));
+        ASSERT_FALSE(opCtx->writesAreReplicated());
+        ASSERT_TRUE(documentValidationDisabled(opCtx));
         ASSERT_BSONOBJ_EQ(op, theOperation);
         return Status::OK();
     };
