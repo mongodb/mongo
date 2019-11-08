@@ -1248,6 +1248,36 @@ void IndexBuildsCoordinator::_buildIndex(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
+
+    if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
+        _buildIndexSinglePhase(
+            opCtx, dbAndUUID, replState, indexBuildOptions, exclusiveCollectionLock);
+        return;
+    }
+
+    invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
+              str::stream() << replState->buildUUID);
+    _buildIndexTwoPhase(opCtx, dbAndUUID, replState, indexBuildOptions, exclusiveCollectionLock);
+}
+
+void IndexBuildsCoordinator::_buildIndexSinglePhase(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& dbAndUUID,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions,
+    boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
+    _scanCollectionAndInsertKeysIntoSorter(opCtx, dbAndUUID, replState, exclusiveCollectionLock);
+    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+    _insertKeysFromSideTablesAndCommit(
+        opCtx, dbAndUUID, replState, indexBuildOptions, exclusiveCollectionLock, {});
+}
+
+void IndexBuildsCoordinator::_buildIndexTwoPhase(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& dbAndUUID,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions,
+    boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
     _scanCollectionAndInsertKeysIntoSorter(opCtx, dbAndUUID, replState, exclusiveCollectionLock);
     auto nss = _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
     auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, nss, replState);

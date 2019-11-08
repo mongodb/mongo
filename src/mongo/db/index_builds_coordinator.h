@@ -421,6 +421,28 @@ protected:
                      boost::optional<Lock::CollectionLock>* collLock);
 
     /**
+     * Builds the indexes single-phased.
+     * This method matches pre-4.4 behavior for a background index build driven by a single
+     * createIndexes oplog entry.
+     */
+    void _buildIndexSinglePhase(OperationContext* opCtx,
+                                const NamespaceStringOrUUID& dbAndUUID,
+                                std::shared_ptr<ReplIndexBuildState> replState,
+                                const IndexBuildOptions& indexBuildOptions,
+                                boost::optional<Lock::CollectionLock>* collLock);
+
+    /**
+     * Builds the indexes two-phased.
+     * The beginning and completion of a index build is driven by the startIndexBuild and
+     * commitIndexBuild oplog entries, respectively.
+     */
+    void _buildIndexTwoPhase(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& dbAndUUID,
+                             std::shared_ptr<ReplIndexBuildState> replState,
+                             const IndexBuildOptions& indexBuildOptions,
+                             boost::optional<Lock::CollectionLock>* collLock);
+
+    /**
      * First phase is the collection scan and insertion of the keys into the sorter.
      */
     void _scanCollectionAndInsertKeysIntoSorter(
