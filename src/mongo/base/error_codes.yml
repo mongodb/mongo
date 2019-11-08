@@ -326,6 +326,10 @@ error_codes:
     - {code: 290,name: TransactionExceededLifetimeLimitSeconds,categories: [ExceededTimeLimitError]}
     - {code: 291,name: NoQueryExecutionPlans}
     - {code: 292,name: QueryExceededMemoryLimitNoDiskUseAllowed}
+    - {code: 293,name: InvalidSeedList}
+    - {code: 294,name: InvalidTopologyType}
+    - {code: 295,name: InvalidHeartBeatFrequency}
+    - {code: 296,name: TopologySetNameRequired}
 
     # Error codes 4000-8999 are reserved.
 

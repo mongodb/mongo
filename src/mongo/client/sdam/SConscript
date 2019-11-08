@@ -1,0 +1,50 @@
+# -*- mode: python -*-
+
+Import('env')
+
+env = env.Clone()
+
+env.Library(
+    target='sdam',
+    source=[
+        'sdam_datatypes.cpp',
+        'server_description.cpp',
+        'topology_description.cpp',
+        'topology_state_machine.cpp',
+        'topology_manager.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/util/clock_sources',
+        '$BUILD_DIR/mongo/db/wire_version'
+    ],
+)
+
+env.Library(
+    target='sdam_test',
+    source=[
+        'server_description_builder.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='topology_description_test',
+    source=['topology_description_test.cpp'],
+    LIBDEPS=['sdam', 'sdam_test'],
+)
+
+env.CppUnitTest(
+    target='server_description_test',
+    source=['server_description_test.cpp'],
+    LIBDEPS=['sdam', 'sdam_test'],
+)
+
+env.CppUnitTest(
+    target='topology_state_machine_test',
+    source=['topology_state_machine_test.cpp'],
+    LIBDEPS=['sdam', 'sdam_test'],
+)
