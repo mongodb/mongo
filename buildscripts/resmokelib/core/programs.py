@@ -318,7 +318,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
         connection_string = None
 
     for var_name in global_vars:
-        _format_shell_vars(eval_sb, var_name, global_vars[var_name])
+        _format_shell_vars(eval_sb, [var_name], global_vars[var_name])
 
     if "eval" in kwargs:
         eval_sb.append(str(kwargs.pop("eval")))
@@ -370,24 +370,30 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     return make_process(logger, args, **process_kwargs)
 
 
-def _format_shell_vars(sb, path, value):
-    """Format 'value' in a way that can be passed to --eval.
-
-    If 'value' is a dictionary, then it is unrolled into the creation of
-    a new JSON object with properties assigned for each key of the
-    dictionary.
+def _format_shell_vars(sb, paths, value):
     """
+    Format 'value' in a way that can be passed to --eval.
+
+    :param sb: string builder array for the output string.
+    :param paths: path of keys represented as a list.
+    :param value: value in the object corresponding to the keys in `paths`
+    :return: Nothing.
+    """
+
+    # Convert the list ["a", "b", "c"] into the string 'a["b"]["c"]'
+    def bracketize(lst):
+        return lst[0] + ''.join(f'["{i}"]' for i in lst[1:])
 
     # Only need to do special handling for JSON objects.
     if not isinstance(value, dict):
-        sb.append("%s = %s" % (path, json.dumps(value)))
+        sb.append("%s = %s" % (bracketize(paths), json.dumps(value)))
         return
 
     # Avoid including curly braces and colons in output so that the command invocation can be
     # copied and run through bash.
-    sb.append("%s = new Object()" % (path))
+    sb.append("%s = new Object()" % bracketize(paths))
     for subkey in value:
-        _format_shell_vars(sb, ".".join((path, subkey)), value[subkey])
+        _format_shell_vars(sb, paths + [subkey], value[subkey])
 
 
 def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **kwargs):
