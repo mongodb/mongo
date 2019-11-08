@@ -34,12 +34,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::stacktrace_detail {
+namespace mongo::stack_trace {
 namespace {
-constexpr StringData kHexDigits = "0123456789ABCDEF"_sd;
 
 /**
- * Wrapper that streams a string-like object to a StackTraceSink, surrounded by double
+ * Wrapper that streams a string-like object to a Sink, surrounded by double
  * quotes.
  */
 template <typename T>
@@ -47,7 +46,7 @@ class Quoted {
 public:
     explicit Quoted(const T& v) : _v(v) {}
 
-    friend StackTraceSink& operator<<(StackTraceSink& sink, const Quoted& q) {
+    friend Sink& operator<<(Sink& sink, const Quoted& q) {
         return sink << kQuote << q._v << kQuote;
     }
 
@@ -55,30 +54,45 @@ private:
     static constexpr StringData kQuote = "\""_sd;
     const T& _v;
 };
-}  // namespace
 
-StringData Hex::toHex(uint64_t x, Buf& buf) {
-    char* data = buf.data();
-    size_t nBuf = buf.size();
-    char* p = data + nBuf;
+template <size_t base>
+StringData kDigits;
+template <>
+constexpr StringData kDigits<16> = "0123456789ABCDEF"_sd;
+template <>
+constexpr StringData kDigits<10> = "0123456789"_sd;
+
+template <size_t base, typename Buf>
+StringData toNumericBase(uint64_t x, Buf& buf) {
+    auto it = buf.rbegin();
     if (!x) {
-        *--p = '0';
+        *it++ = '0';
     } else {
-        for (int d = 0; d < 16; ++d) {
-            if (!x)
-                break;
-            *--p = kHexDigits[x & 0xf];
-            x >>= 4;
+        for (; x && it != buf.rend(); ++it) {
+            *it = kDigits<base>[x % base];
+            x /= base;
         }
     }
-    return StringData(p, data + nBuf - p);
+    const char* p = buf.data() + (it.base() - buf.begin());
+    size_t n = it - buf.rbegin();
+    return StringData(p, n);
+}
+
+}  // namespace
+
+StringData Dec::toDec(uint64_t x, Buf& buf) {
+    return toNumericBase<10>(x, buf);
+}
+
+StringData Hex::toHex(uint64_t x, Buf& buf) {
+    return toNumericBase<16>(x, buf);
 }
 
 uint64_t Hex::fromHex(StringData s) {
     uint64_t x = 0;
     for (char c : s) {
         char uc = std::toupper(static_cast<unsigned char>(c));
-        if (size_t pos = kHexDigits.find(uc); pos == std::string::npos) {
+        if (size_t pos = kDigits<16>.find(uc); pos == std::string::npos) {
             return x;
         } else {
             x <<= 4;
@@ -90,8 +104,10 @@ uint64_t Hex::fromHex(StringData s) {
 
 CheapJson::Value::Value(CheapJson* env, Kind k) : _env(env), _kind(k) {
     if (_kind == kObj) {
+        _env->indent();
         _env->_sink << "{";
     } else if (_kind == kArr) {
+        _env->indent();
         _env->_sink << "[";
     }
 }
@@ -99,8 +115,10 @@ CheapJson::Value::Value(CheapJson* env, Kind k) : _env(env), _kind(k) {
 CheapJson::Value::~Value() {
     if (_kind == kObj) {
         _env->_sink << "}";
+        _env->dedent();
     } else if (_kind == kArr) {
         _env->_sink << "]";
+        _env->dedent();
     }
 }
 
@@ -128,7 +146,7 @@ void CheapJson::Value::append(StringData v) {
 
 void CheapJson::Value::append(uint64_t v) {
     _next();
-    _env->_sink << v;
+    _env->_sink << Dec(v);
 }
 
 void CheapJson::Value::append(const BSONElement& be) {
@@ -165,12 +183,18 @@ void CheapJson::Value::_copyBsonElementValue(const BSONElement& be) {
 void CheapJson::Value::_next() {
     _env->_sink << _sep;
     _sep = ","_sd;
+    if (_env->_pretty && (_kind == kObj || _kind == kArr)) {
+        _env->_sink << "\n"_sd;
+        for (int i = 0; i < _env->_indent; ++i) {
+            _env->_sink << "  "_sd;
+        }
+    }
 }
 
 auto CheapJson::doc() -> Value {
     return Value(this);
 }
 
-CheapJson::CheapJson(StackTraceSink& sink) : _sink(sink) {}
+CheapJson::CheapJson(Sink& sink) : _sink(sink) {}
 
-}  // namespace mongo::stacktrace_detail
+}  // namespace mongo::stack_trace

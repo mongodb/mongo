@@ -36,16 +36,16 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/stacktrace.h"
 
-namespace mongo::stacktrace_detail {
+namespace mongo::stack_trace {
 
 /**
  * A utility for uint64_t <=> uppercase hex string conversions. It
  * can be used to produce a StringData.
  *
- *     sink << Hex(x).str();  // as a temporary
+ *     sink << Hex(x);  // as a temporary
  *
  *     Hex hx(x);
- *     StringData sd = hx.str()  // sd storage is in `hx`.
+ *     StringData sd = hx;  // sd storage is in `hx`.
  */
 class Hex {
 public:
@@ -57,7 +57,26 @@ public:
 
     explicit Hex(uint64_t x) : _str(toHex(x, _buf)) {}
 
-    StringData str() const {
+    operator StringData() const {
+        return _str;
+    }
+
+private:
+    Buf _buf;
+    StringData _str;
+};
+
+class Dec {
+public:
+    using Buf = std::array<char, 20>;  // ceil(64*log10(2))
+
+    static StringData toDec(uint64_t x, Buf& buf);
+
+    static uint64_t fromDec(StringData s);
+
+    explicit Dec(uint64_t x) : _str(toDec(x, _buf)) {}
+
+    operator StringData() const {
         return _str;
     }
 
@@ -71,13 +90,26 @@ class CheapJson {
 public:
     class Value;
 
-    explicit CheapJson(StackTraceSink& sink);
+    explicit CheapJson(Sink& sink);
 
     // Create an empty JSON document.
     Value doc();
 
+    void pretty() {
+        _pretty = true;
+    }
+
 private:
-    StackTraceSink& _sink;
+    void indent() {
+        ++_indent;
+    }
+    void dedent() {
+        --_indent;
+    }
+
+    bool _pretty = false;
+    int _indent = 0;
+    Sink& _sink;
 };
 
 /**
@@ -121,6 +153,10 @@ public:
      */
     void append(const BSONElement& be);
 
+    CheapJson* env() const {
+        return _env;
+    }
+
 private:
     enum Kind {
         kNop,  // A blank Value, not an aggregate, emits no punctuation. Can emit one element.
@@ -138,4 +174,4 @@ private:
     StringData _sep;  // Emitted upon append. Starts empty, then set to ",".
 };
 
-}  // namespace mongo::stacktrace_detail
+}  // namespace mongo::stack_trace

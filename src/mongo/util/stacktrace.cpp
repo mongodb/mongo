@@ -27,28 +27,7 @@
  *    it in the license file.
  */
 
-// stacktrace_${TARGET_OS_FAMILY}.cpp sets default log component to kControl.
-// Setting kDefault to preserve previous behavior in (defunct) getStacktraceLogger().
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/util/stacktrace.h"
 #include "mongo/platform/basic.h"
-#include "mongo/util/log.h"
 
-namespace mongo {
-
-void printStackTrace() {
-    // NOTE: We disable long-line truncation for the stack trace, because the JSON representation of
-    // the stack trace can sometimes exceed the long line limit.
-    printStackTrace(log().setIsTruncatable(false).stream());
-}
-
-#if defined(_WIN32)
-
-void printWindowsStackTrace(CONTEXT& context) {
-    printWindowsStackTrace(context, log().stream());
-}
-
-#endif  // defined(_WIN32)
-
-}  // namespace mongo
+namespace mongo {}  // namespace mongo

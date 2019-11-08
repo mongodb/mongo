@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,38 +27,21 @@
  *    it in the license file.
  */
 
-/**
- * Tools for working with in-process stack traces.
- */
-
 #pragma once
+
+#if defined(_WIN32)
 
 #include <iosfwd>
 
-#include "mongo/base/string_data.h"
+#include "mongo/platform/windows_basic.h"  // for CONTEXT
 
 namespace mongo {
-namespace stack_trace {
 
-const size_t kFrameMax = 100;
-
-
-/** Abstract sink onto which stacktrace is piecewise emitted. */
-class Sink {
-public:
-    Sink& operator<<(StringData v) {
-        doWrite(v);
-        return *this;
-    }
-
-private:
-    virtual void doWrite(StringData v) = 0;
-};
-
-}  // namespace stack_trace
-
-// Print stack trace information to "os", default to the log stream.
-void printStackTrace(std::ostream& os);
-void printStackTrace();
+// Print stack trace (using a specified stack context) to "os", default to the
+// LogComponent::kControl stream.
+void printWindowsStackTrace(CONTEXT& context, std::ostream& os);
+void printWindowsStackTrace(CONTEXT& context);
 
 }  // namespace mongo
+
+#endif

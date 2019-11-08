@@ -628,13 +628,18 @@ generateItoATable = env.Command(
 )
 env.Alias('generated-sources', generateItoATable)
 
-env.CppUnitTest(
+stacktraceEnv = env.Clone()
+if use_libunwind:
+    stacktraceEnv.InjectThirdParty(libraries=['unwind'])
+
+stacktraceEnv.CppUnitTest(
     target='stacktrace_test',
-    source=[
-        'stacktrace_test.cpp',
-    ],
-    LIBDEPS=[
-    ],
+    source='stacktrace_test.cpp',
+)
+
+stacktraceEnv.Benchmark(
+    target='stacktrace_bm',
+    source='stacktrace_bm.cpp',
 )
 
 if use_libunwind:
