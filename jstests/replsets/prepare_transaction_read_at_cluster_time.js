@@ -75,6 +75,15 @@ const secondary = rst.getSecondary();
 const dbName = "prepare_transaction_read_at_cluster_time";
 const collName = "testColl";
 
+// We prevent the replica set from advancing oldest_timestamp. This ensures that the snapshot
+// associated with 'clusterTime' is retained for the duration of this test.
+rst.nodes.forEach(conn => {
+    assert.commandWorked(conn.adminCommand({
+        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+        mode: "alwaysOn",
+    }));
+});
+
 const testDB = primary.getDB(dbName);
 const testDBSecondary = secondary.getDB(dbName);
 
