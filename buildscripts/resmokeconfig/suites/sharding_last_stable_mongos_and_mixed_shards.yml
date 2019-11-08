@@ -64,8 +64,6 @@ selector:
   - jstests/sharding/update_replace_id.js
   - jstests/sharding/update_sharded.js
   - jstests/sharding/upsert_sharded.js
-  # Enable if SERVER-41813 is backported or 4.4 becomes last-stable
-  - jstests/sharding/invalid_system_views_sharded_collection.js
     # Enable if SERVER-42273 is backported or 4.4 becomes last-stable
   - jstests/sharding/move_jumbo_chunk.js
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
