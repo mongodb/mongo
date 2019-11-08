@@ -419,6 +419,55 @@ protected:
                      std::shared_ptr<ReplIndexBuildState> replState,
                      const IndexBuildOptions& indexBuildOptions,
                      boost::optional<Lock::CollectionLock>* collLock);
+
+    /**
+     * First phase is the collection scan and insertion of the keys into the sorter.
+     */
+    void _scanCollectionAndInsertKeysIntoSorter(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& dbAndUUID,
+        std::shared_ptr<ReplIndexBuildState> replState,
+        boost::optional<Lock::CollectionLock>* exclusiveCollectionLock);
+
+    /**
+     * Second phase is extracting the sorted keys and writing them into the new index table.
+     * On completion, this function returns the namespace of the collection, which may have changed
+     * after the previous phase. The namespace is used in two phase index builds to determine the
+     * current replication state in _waitForCommitOrAbort().
+     */
+    NamespaceString _insertKeysFromSideTablesWithoutBlockingWrites(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& dbAndUUID,
+        std::shared_ptr<ReplIndexBuildState> replState);
+
+    /**
+     * Waits for commit or abort signal from primary.
+     *
+     * On completion, this function returns a timestamp, which may be null, that may be used to
+     * update the mdb catalog as we commit the index build. The commit index build timestamp is
+     * obtained from a commitIndexBuild oplog entry during secondary oplog application.
+     * This function returns a null timestamp on receiving a abortIndexBuild oplog entry; or if we
+     * are currently a primary, in which case we do not need to wait any external signal to commit
+     * the index build.
+     */
+    Timestamp _waitForCommitOrAbort(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    std::shared_ptr<ReplIndexBuildState> replState);
+
+    /**
+     * Third phase is catching up on all the writes that occurred during the first two phases.
+     * Accepts a commit timestamp for the index, which could be null. See _waitForCommitOrAbort()
+     * comments. This timestamp is used only for committing the index, which sets the ready flag to
+     * true, to the catalog; it is not used for the catch-up writes during the final drain phase.
+     */
+    void _insertKeysFromSideTablesAndCommit(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& dbAndUUID,
+        std::shared_ptr<ReplIndexBuildState> replState,
+        const IndexBuildOptions& indexBuildOptions,
+        boost::optional<Lock::CollectionLock>* exclusiveCollectionLock,
+        const Timestamp& commitIndexBuildTimestamp);
+
     /**
      * Returns total number of indexes in collection, including unfinished/in-progress indexes.
      *

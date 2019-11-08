@@ -1248,6 +1248,22 @@ void IndexBuildsCoordinator::_buildIndex(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
+    _scanCollectionAndInsertKeysIntoSorter(opCtx, dbAndUUID, replState, exclusiveCollectionLock);
+    auto nss = _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, nss, replState);
+    _insertKeysFromSideTablesAndCommit(opCtx,
+                                       dbAndUUID,
+                                       replState,
+                                       indexBuildOptions,
+                                       exclusiveCollectionLock,
+                                       commitIndexBuildTimestamp);
+}
+
+void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& dbAndUUID,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
     {
         auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
@@ -1290,7 +1306,16 @@ void IndexBuildsCoordinator::_buildIndex(
         log() << "Hanging after dumping inserts from bulk builder";
         hangAfterIndexBuildDumpsInsertsFromBulk.pauseWhileSet();
     }
+}
 
+/**
+ * Second phase is extracting the sorted keys and writing them into the new index table.
+ * Looks up collection namespace while holding locks.
+ */
+NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& dbAndUUID,
+    std::shared_ptr<ReplIndexBuildState> replState) {
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -1330,6 +1355,16 @@ void IndexBuildsCoordinator::_buildIndex(
         hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
 
+    return nss;
+}
+
+/**
+ * Waits for commit or abort signal from primary.
+ */
+Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::shared_ptr<ReplIndexBuildState> replState) {
     Timestamp commitIndexBuildTimestamp;
     if (shouldWaitForCommitOrAbort(opCtx, nss, *replState)) {
         log() << "Index build waiting for commit or abort before completing final phase: "
@@ -1361,7 +1396,20 @@ void IndexBuildsCoordinator::_buildIndex(
             invariant(!replState->isCommitReady, replState->buildUUID.toString());
         }
     }
+    return commitIndexBuildTimestamp;
+}
 
+/**
+ * Third phase is catching up on all the writes that occurred during the first two phases.
+ * Accepts a commit timestamp for the index (null if not available).
+ */
+void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& dbAndUUID,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions,
+    boost::optional<Lock::CollectionLock>* exclusiveCollectionLock,
+    const Timestamp& commitIndexBuildTimestamp) {
     // Need to return the collection lock back to exclusive mode, to complete the index build.
     opCtx->recoveryUnit()->abandonSnapshot();
     exclusiveCollectionLock->emplace(opCtx, dbAndUUID, MODE_X);
