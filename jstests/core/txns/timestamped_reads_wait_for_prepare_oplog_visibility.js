@@ -2,7 +2,7 @@
  * Tests that timestamped reads, reads with snapshot and afterClusterTime, wait for the prepare
  * transaction oplog entry to be visible before choosing a read timestamp.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, uses_testing_only_commands]
  */
 (function() {
 'use strict';

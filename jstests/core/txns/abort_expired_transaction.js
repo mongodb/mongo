@@ -2,7 +2,7 @@
 // 'transactionLifetimeLimitSeconds' to lower the transaction lifetime for quicker transaction
 // expiration.
 //
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 
 (function() {
 "use strict";

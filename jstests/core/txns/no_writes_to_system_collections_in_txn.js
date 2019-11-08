@@ -1,5 +1,5 @@
 // Tests that it is illegal to write to system collections within a transaction.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// @tags: [uses_transactions, uses_snapshot_read_concern, assumes_superuser_permissions]
 (function() {
 "use strict";
 

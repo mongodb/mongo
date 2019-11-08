@@ -1,7 +1,7 @@
 /**
  * Tests that transactions larger than 16MB can only be created in FCV 4.2.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, assumes_superuser_permissions]
  */
 (function() {
 "uses strict";

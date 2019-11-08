@@ -1,5 +1,5 @@
 // Test that ongoing operations in a transaction are interrupted when the transaction expires.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 (function() {
 "use strict";
 

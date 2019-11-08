@@ -1,7 +1,7 @@
 /**
  * Tests prepared transaction commit support.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 
 load("jstests/core/txns/libs/prepare_helpers.js");

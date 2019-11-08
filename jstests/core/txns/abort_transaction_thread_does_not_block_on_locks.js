@@ -4,7 +4,7 @@
 // require taking further locks that would queue up behind the drop cmd's database exclusive lock
 // request.
 //
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 (function() {
 "use strict";
 

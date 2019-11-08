@@ -1,6 +1,7 @@
 /**
  * Test that we wait for prepared transactions to finish during downgrade to FCV 4.0.
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, uses_testing_only_commands,
+ *         assumes_superuser_permissions]
  */
 (function() {
 "use strict";

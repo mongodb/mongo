@@ -3,7 +3,7 @@
  * will fail on commit. This tests the case where a race condition may lead to the running
  * transaction committing before it could be aborted due to downgrade.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_testing_only_commands]
  */
 
 (function() {

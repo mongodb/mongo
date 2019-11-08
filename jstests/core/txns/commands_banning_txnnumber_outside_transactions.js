@@ -1,6 +1,7 @@
 // Test that commands other than retryable writes may not use txnNumber outside transactions.
 // @tags: [
 //   requires_document_locking,
+//   assumes_superuser_permissions
 // ]
 (function() {
 "use strict";

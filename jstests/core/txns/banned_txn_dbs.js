@@ -1,6 +1,6 @@
 // Tests that reads and writes to the config, admin, and local databases are forbidden within
 // transactions.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 (function() {
 "use strict";
 

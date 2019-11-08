@@ -1,5 +1,5 @@
 // Test that open unprepared transactions are aborted on FCV downgrade.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 (function() {
 "use strict";
 load("jstests/libs/feature_compatibility_version.js");

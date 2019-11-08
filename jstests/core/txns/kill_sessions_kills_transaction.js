@@ -1,5 +1,5 @@
 // Tests that killSessions kills inactive transactions.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 (function() {
 "use strict";
 

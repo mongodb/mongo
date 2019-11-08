@@ -1,7 +1,7 @@
 /**
  * Tests prepared transaction abort support.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 (function() {
 "use strict";

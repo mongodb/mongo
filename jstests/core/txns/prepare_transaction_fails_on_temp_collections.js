@@ -4,7 +4,7 @@
  * Transactions should not operate on temporary collections because they are for internal use only
  * and are deleted on both repl stepup and server startup.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 
 (function() {

@@ -1,7 +1,7 @@
 /**
  * Verify that readConcern: snapshot is not permitted outside transactions.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_testing_only_commands]
  */
 
 (function() {

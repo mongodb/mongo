@@ -5,7 +5,7 @@
  * collection. Since there are prepared operations on documents in the collection, the read should
  * cause a prepare conflict.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 
 (function() {

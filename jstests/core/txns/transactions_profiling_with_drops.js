@@ -1,5 +1,5 @@
 // Tests that locks acquisitions for profiling in a transaction have a 0-second timeout.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_multiple_connections]
 (function() {
 "use strict";
 

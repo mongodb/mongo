@@ -1,7 +1,7 @@
 /**
  * Tests support for prepared transactions larger than 16MB.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 
 (function() {

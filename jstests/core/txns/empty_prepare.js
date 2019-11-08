@@ -1,7 +1,7 @@
 /**
  * Tests transactions that are prepared after no writes.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 (function() {
 "use strict";

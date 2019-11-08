@@ -1,5 +1,5 @@
 // Tests that the killCursors command is allowed in transactions.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, assumes_superuser_permissions]
 (function() {
 "use strict";
 

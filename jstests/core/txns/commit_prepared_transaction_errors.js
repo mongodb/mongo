@@ -1,7 +1,7 @@
 /**
  * Test error cases for committing prepared transactions.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, assumes_superuser_permissions]
  */
 (function() {
 "use strict";
