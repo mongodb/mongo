@@ -1,0 +1,95 @@
+/**
+ * When an index build on a secondary fails during the first two phases, we expect to receive a
+ * abortIndexBuild oplog entry from the primary eventually. If we get a commitIndexBuild oplog entry
+ * instead, the secondary should crash.
+ * @tags: [
+ *     requires_replication,
+ * ]
+ */
+(function() {
+"use strict";
+
+load('jstests/libs/check_log.js');
+load('jstests/noPassthrough/libs/index_build.js');
+
+const rst = new ReplSetTest({
+    nodes: [
+        {},
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+                votes: 0,
+            },
+        },
+    ]
+});
+const nodes = rst.startSet();
+rst.initiate();
+
+const primary = rst.getPrimary();
+
+// This test requires index builds to start on the createIndexes oplog entry and expects index
+// builds to be interrupted when the primary steps down.
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
+    rst.stopSet();
+    return;
+}
+
+const testDB = primary.getDB('test');
+const coll = testDB.getCollection('test');
+
+assert.commandWorked(coll.insert({a: 1}));
+
+IndexBuildTest.pauseIndexBuilds(primary);
+
+// Make the index build fail on the secondary during the collection scan phase.
+// When we unblock the index build on the primary, the index build will complete successfully.
+const secondary = rst.getSecondary();
+const secondaryDB = secondary.getDB(testDB.getName());
+assert.commandWorked(secondaryDB.adminCommand(
+    {configureFailPoint: 'hangAfterStartingIndexBuildUnlocked', mode: 'alwaysOn'}));
+
+const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
+
+try {
+    // Wait for the index build to start on the primary.
+    const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1');
+    IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
+
+    // The index build on the secondary will fail but will wait for the abortIndexBuild oplog entry
+    // from the primary.
+    const secondaryOpId =
+        IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), 'a_1');
+    IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, secondaryOpId);
+} finally {
+    secondaryDB.adminCommand(
+        {configureFailPoint: 'hangAfterStartingIndexBuildUnlocked', mode: 'off'});
+    IndexBuildTest.resumeIndexBuilds(primary);
+}
+
+// Wait for the index build to stop.
+IndexBuildTest.waitForIndexBuildToStop(testDB);
+
+const exitCode = createIdx();
+assert.eq(0, exitCode, 'expected shell to exit successfully');
+
+// Confirm that the index build on the secondary failed because of the invalid document.
+checkLog.contains(secondary, 'background index build aborted due to failpoint');
+
+// Check indexes on primary.
+rst.awaitReplication();
+IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+
+// Check that indexes were created on the secondary in spite of the scanning error.
+const secondaryColl = secondaryDB.getCollection(coll.getName());
+IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+
+const cmdNs = testDB.getCollection('$cmd').getFullName();
+const ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
+assert.eq(1, ops.length, 'primary did not write commitIndexBuild oplog entry: ' + tojson(ops));
+
+TestData.skipCheckDBHashes = true;
+rst.stopSet(undefined, undefined, {skipValidation: true});
+})();
