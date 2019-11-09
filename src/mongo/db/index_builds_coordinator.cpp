@@ -1278,8 +1278,29 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
-    _scanCollectionAndInsertKeysIntoSorter(opCtx, dbAndUUID, replState, exclusiveCollectionLock);
-    auto nss = _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+
+    auto nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
+    auto preAbortStatus = Status::OK();
+    try {
+        _scanCollectionAndInsertKeysIntoSorter(
+            opCtx, dbAndUUID, replState, exclusiveCollectionLock);
+        nss = _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+    } catch (DBException& ex) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto replSetAndNotPrimary =
+            replCoord->getSettings().usingReplSets() && !replCoord->canAcceptWritesFor(opCtx, nss);
+        if (!replSetAndNotPrimary) {
+            throw;
+        }
+        if (ErrorCodes::InterruptedAtShutdown == ex.code()) {
+            throw;
+        }
+        log() << "Index build failed before final phase during oplog application. "
+                 "Waiting for abort: "
+              << replState->buildUUID << ": " << ex;
+        preAbortStatus = ex.toStatus();
+    }
+
     auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, nss, replState);
     _insertKeysFromSideTablesAndCommit(opCtx,
                                        dbAndUUID,

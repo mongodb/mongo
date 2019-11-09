@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 
+load('jstests/libs/check_log.js');
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({
@@ -60,16 +61,17 @@ assert.commandWorked(
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {'a.0': 1});
 
 const secondary = rst.getSecondary();
+const secondaryDB = secondary.getDB(testDB.getName());
 try {
-    // Wait for the index build to start on the primary. We cannot check the secondary because it
-    // may have crashed by then due to the invalid document.
+    // Wait for the index build to start on the primary.
     const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a.0_1');
     IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 
-    const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
-    rst.stop(secondary, undefined, {allowedExitCode: fassertProcessExitCode});
-    assert(rawMongoProgramOutput().match('Fatal assertion 51101 Location16746: Index build: '),
-           'Index build should have aborted on error.');
+    // The index build on the secondary will fail on the invalid document but will wait for the
+    // abortIndexBuild oplog entry from the primary.
+    const secondaryOpId =
+        IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), 'a.0_1');
+    IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, secondaryOpId);
 } finally {
     testDB.adminCommand({configureFailPoint: 'hangAfterSettingUpIndexBuild', mode: 'off'});
 }
@@ -80,13 +82,20 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build failing');
 
+// Confirm that the index build on the secondary failed because of the invalid document.
+checkLog.contains(secondary, 'Location16746: Ambiguous field name found in array');
+
 // Check indexes on primary.
+rst.awaitReplication();
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+
+// Check that index was not created on the secondary.
+const secondaryColl = secondaryDB.getCollection(coll.getName());
+IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
 
 const cmdNs = testDB.getCollection('$cmd').getFullName();
 const ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
 assert.eq(1, ops.length, 'primary did not write abortIndexBuild oplog entry: ' + tojson(ops));
 
-TestData.skipCheckDBHashes = true;
 rst.stopSet();
 })();
