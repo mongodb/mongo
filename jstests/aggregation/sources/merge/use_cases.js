@@ -2,7 +2,7 @@
  * Tests a practical use case for $merge from a collection of samples to an hourly rollup output
  * collection.
  *
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, requires_spawning_own_processes]
  */
 (function() {
 "use strict";

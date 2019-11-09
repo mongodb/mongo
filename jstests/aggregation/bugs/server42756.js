@@ -1,5 +1,6 @@
 // SERVER-42756 Test that commutative arithmetic operations with special arguments doesn't violate
 // commutativity.
+// @tags: [uses_testing_only_commands]
 (function() {
 "use strict";
 

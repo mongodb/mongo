@@ -5,7 +5,7 @@
  * Must be banned from suites that use a sharding fixture, since this test starts its own sharded
  * cluster. Must be banned in the $facet passthrough, since that suite changes the pipeline
  * splitting and merging behavior expected by this test.
- * @tags: [requires_sharding,do_not_wrap_aggregations_in_facets]
+ * @tags: [requires_sharding,do_not_wrap_aggregations_in_facets, requires_spawning_own_processes]
  */
 (function() {
 "use strict";

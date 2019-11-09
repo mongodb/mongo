@@ -1,7 +1,7 @@
 /**
  * Test $merge and exchange with explain.
  *
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, requires_spawning_own_processes]
  */
 load('jstests/aggregation/extras/utils.js');
 
