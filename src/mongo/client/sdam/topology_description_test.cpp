@@ -104,13 +104,9 @@ TEST_F(TopologyDescriptionTestFixture, ShouldAllowTypeSingleWithASingleSeed) {
 }
 
 TEST_F(TopologyDescriptionTestFixture, DoesNotAllowMultipleSeedsWithSingle) {
-    ASSERT_THROWS_CODE(
-        {
-            auto config = SdamConfiguration(kTwoServersNormalCase, TopologyType::kSingle);
-            TopologyDescription topologyDescription(config);
-        },
-        DBException,
-        ErrorCodes::InvalidSeedList);
+    ASSERT_THROWS_CODE(TopologyDescription({kTwoServersNormalCase, TopologyType::kSingle}),
+                       DBException,
+                       ErrorCodes::InvalidSeedList);
 }
 
 TEST_F(TopologyDescriptionTestFixture, ShouldSetTheReplicaSetName) {
@@ -123,21 +119,15 @@ TEST_F(TopologyDescriptionTestFixture, ShouldSetTheReplicaSetName) {
 
 TEST_F(TopologyDescriptionTestFixture, ShouldNotAllowSettingTheReplicaSetNameWithWrongType) {
     ASSERT_THROWS_CODE(
-        {
-            auto config =
-                SdamConfiguration(kOneServer, TopologyType::kUnknown, mongo::Seconds(10), kSetName);
-            TopologyDescription topologyDescription(config);
-        },
+        TopologyDescription({kOneServer, TopologyType::kUnknown, mongo::Seconds(10), kSetName}),
         DBException,
         ErrorCodes::InvalidTopologyType);
 }
 
 TEST_F(TopologyDescriptionTestFixture, ShouldNotAllowTopologyTypeRSNoPrimaryWithoutSetName) {
     ASSERT_THROWS_CODE(
-        {
-            SdamConfiguration(
-                kOneServer, TopologyType::kReplicaSetNoPrimary, mongo::Seconds(10), boost::none);
-        },
+        SdamConfiguration(
+            kOneServer, TopologyType::kReplicaSetNoPrimary, mongo::Seconds(10), boost::none),
         DBException,
         ErrorCodes::TopologySetNameRequired);
 }
@@ -153,18 +143,10 @@ TEST_F(TopologyDescriptionTestFixture, ShouldOnlyAllowSingleAndRsNoPrimaryWithSe
                         topologyTypes.end());
 
     for (const auto topologyType : topologyTypes) {
+        unittest::log() << "Check TopologyType " << toString(topologyType)
+                        << " with setName value.";
         ASSERT_THROWS_CODE(
-            {
-                std::cout << "Check TopologyType " << toString(topologyType)
-                          << " with setName value." << std::endl;
-                auto config =
-                    SdamConfiguration(kOneServer, topologyType, mongo::Seconds(10), kSetName);
-                // This is here to ensure that the compiler actually generates code for the above
-                // statement.
-                std::cout << "Test failed for topologyType " << config.getInitialType()
-                          << std::endl;
-                MONGO_UNREACHABLE;
-            },
+            SdamConfiguration(kOneServer, topologyType, mongo::Seconds(10), kSetName),
             DBException,
             ErrorCodes::InvalidTopologyType);
     }
@@ -185,7 +167,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldNotAllowChangingTheHeartbeatFrequen
     auto belowThresholdFrequency =
         mongo::Milliseconds(SdamConfiguration::kMinHeartbeatFrequencyMS.count() - 1);
     ASSERT_THROWS_CODE(
-        { SdamConfiguration config(boost::none, TopologyType::kUnknown, belowThresholdFrequency); },
+        SdamConfiguration(boost::none, TopologyType::kUnknown, belowThresholdFrequency),
         DBException,
         ErrorCodes::InvalidHeartBeatFrequency);
 }
