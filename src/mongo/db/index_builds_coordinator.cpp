@@ -1301,7 +1301,7 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
         preAbortStatus = ex.toStatus();
     }
 
-    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, nss, replState);
+    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, nss, replState, preAbortStatus);
     _insertKeysFromSideTablesAndCommit(opCtx,
                                        dbAndUUID,
                                        replState,
@@ -1415,7 +1415,8 @@ NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlocking
 Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    std::shared_ptr<ReplIndexBuildState> replState) {
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const Status& preAbortStatus) {
     Timestamp commitIndexBuildTimestamp;
     if (shouldWaitForCommitOrAbort(opCtx, nss, *replState)) {
         log() << "Index build waiting for commit or abort before completing final phase: "
@@ -1439,11 +1440,16 @@ Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
                   << ", collection UUID: " << replState->collectionUUID;
             commitIndexBuildTimestamp = replState->commitTimestamp;
             invariant(!replState->aborted, replState->buildUUID.toString());
+            uassertStatusOK(preAbortStatus.withContext(
+                str::stream() << "index build failed on this node but we received a "
+                                 "commitIndexBuild oplog entry from the primary with timestamp: "
+                              << replState->commitTimestamp.toString()));
         } else if (replState->aborted) {
             log() << "Aborting index build: " << replState->buildUUID
                   << ", timestamp: " << replState->abortTimestamp
                   << ", reason: " << replState->abortReason
-                  << ", collection UUID: " << replState->collectionUUID;
+                  << ", collection UUID: " << replState->collectionUUID
+                  << ", local index error (if any): " << preAbortStatus;
             invariant(!replState->isCommitReady, replState->buildUUID.toString());
         }
     }

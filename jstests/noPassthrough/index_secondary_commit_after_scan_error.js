@@ -75,21 +75,19 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx();
 assert.eq(0, exitCode, 'expected shell to exit successfully');
 
-// Confirm that the index build on the secondary failed because of the invalid document.
-checkLog.contains(secondary, 'background index build aborted due to failpoint');
+// Secondary should crash on receiving the unexpected commitIndexBuild oplog entry.
+const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
+rst.stop(secondary, undefined, {allowedExitCode: fassertProcessExitCode});
+assert(rawMongoProgramOutput().match('Fatal assertion 51101 OperationFailed: Index build:'),
+       'Index build should have aborted secondary due to unexpected commitIndexBuild oplog entry.');
 
 // Check indexes on primary.
-rst.awaitReplication();
 IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
-
-// Check that indexes were created on the secondary in spite of the scanning error.
-const secondaryColl = secondaryDB.getCollection(coll.getName());
-IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
 
 const cmdNs = testDB.getCollection('$cmd').getFullName();
 const ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
 assert.eq(1, ops.length, 'primary did not write commitIndexBuild oplog entry: ' + tojson(ops));
 
 TestData.skipCheckDBHashes = true;
-rst.stopSet(undefined, undefined, {skipValidation: true});
+rst.stopSet();
 })();
