@@ -148,7 +148,9 @@ genericParseSingleExpressionAccumulator(boost::intrusive_ptr<ExpressionContext> 
 
 class AccumulatorAddToSet final : public Accumulator {
 public:
-    explicit AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static constexpr int kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
+    explicit AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 int maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -168,6 +170,7 @@ public:
 
 private:
     ValueUnorderedSet _set;
+    int _maxMemUsageBytes;
 };
 
 class AccumulatorFirst final : public Accumulator {
@@ -282,7 +285,9 @@ public:
 
 class AccumulatorPush final : public Accumulator {
 public:
-    explicit AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static constexpr int kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
+    explicit AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             int maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -293,7 +298,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
-    std::vector<Value> vpValue;
+    std::vector<Value> _array;
+    int _maxMemUsageBytes;
 };
 
 class AccumulatorAvg final : public Accumulator {
