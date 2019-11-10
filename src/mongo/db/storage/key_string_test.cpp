@@ -159,7 +159,7 @@ TEST(InvalidKeyStringTest, FuzzedCodeWithScopeNesting) {
         "00000000000000000000000000000000000000000000000000aafa00aa0200aa00aaaa00000000000000000400"
         "00000000000000000000000000000000"_sd,
         &keyData);
-    char typeBitsData[] = {0, 16, 0, 0, -127, 1};
+    signed char typeBitsData[] = {0, 16, 0, 0, -127, 1};
     BufReader typeBitsReader(typeBitsData, sizeof(typeBitsData));
     KeyString::TypeBits typeBits =
         KeyString::TypeBits::fromBuffer(KeyString::Version::kLatestVersion, &typeBitsReader);
