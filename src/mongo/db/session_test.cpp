@@ -699,6 +699,12 @@ TEST_F(SessionTest, StashAndUnstashResources) {
 
 TEST_F(SessionTest, ReportStashedResources) {
     Date_t startTime = Date_t::now();
+
+    // Sleep a bit after recording the startTime but before starting the transaction to account for
+    // any clock discrepancy between the Date_t clock and the clock used to track the transaction
+    // stats start time.
+    mongo::sleepmillis(10);
+
     const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const bool autocommit = false;
@@ -798,6 +804,12 @@ TEST_F(SessionTest, ReportStashedResources) {
 
 TEST_F(SessionTest, ReportUnstashedResources) {
     Date_t startTime = Date_t::now();
+
+    // Sleep a bit after recording the startTime but before starting the transaction to account for
+    // any clock discrepancy between the Date_t clock and the clock used to track the transaction
+    // stats start time.
+    mongo::sleepmillis(10);
+
     const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const bool autocommit = false;
