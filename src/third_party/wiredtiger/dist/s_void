@@ -57,6 +57,7 @@ func_ok()
 	    -e '/int __wt_block_write_size$/d' \
 	    -e '/int __wt_buf_catfmt$/d' \
 	    -e '/int __wt_buf_fmt$/d' \
+	    -e '/int __wt_count_birthmarks$/d' \
 	    -e '/int __wt_curjoin_joined$/d' \
 	    -e '/int __wt_cursor_noop$/d' \
 	    -e '/int __wt_epoch$/d' \

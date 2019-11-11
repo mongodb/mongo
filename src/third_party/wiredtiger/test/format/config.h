@@ -65,6 +65,12 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"alter", "if altering the table is enabled", /* 10% */
     C_BOOL, 10, 0, 0, &g.c_alter, NULL},
 
+  {"assert_commit_timestamp", "if assert commit_timestamp", /* 5% */
+    C_BOOL, 0, 0, 0, &g.c_assert_commit_timestamp, NULL},
+
+  {"assert_read_timestamp", "if assert read_timestamp", /* 5% */
+    C_BOOL, 0, 0, 0, &g.c_assert_read_timestamp, NULL},
+
   {"auto_throttle", "if LSM inserts are throttled", /* 90% */
     C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL},
 
@@ -113,8 +119,8 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"data_extend", "if data files are extended", /* 5% */
     C_BOOL, 5, 0, 0, &g.c_data_extend, NULL},
 
-  {"data_source", "data source (file | helium | kvsbdb | lsm | table)", C_IGNORE | C_STRING, 0, 0,
-    0, NULL, &g.c_data_source},
+  {"data_source", "data source (file | lsm | table)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
+    &g.c_data_source},
 
   {"delete_pct", "percent operations that are deletes", C_IGNORE, 0, 0, 100, &g.c_delete_pct, NULL},
 
@@ -216,6 +222,9 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
 
   {"quiet", "quiet run (same as -q)", C_IGNORE | C_BOOL, 0, 0, 1, &g.c_quiet, NULL},
 
+  {"random_cursor", "if random cursor reads configured", /* 10% */
+    C_BOOL, 10, 0, 0, &g.c_random_cursor, NULL},
+
   {"read_pct", "percent operations that are reads", C_IGNORE, 0, 0, 100, &g.c_read_pct, NULL},
 
   {"rebalance", "rebalance testing", /* 100% */
@@ -277,8 +286,8 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"timing_stress_split_8", "stress splits (#8)", /* 2% */
     C_BOOL, 2, 0, 0, &g.c_timing_stress_split_8, NULL},
 
-  {"transaction_timestamps", /* 10% */
-    "enable transaction timestamp support", C_BOOL, 10, 0, 0, &g.c_txn_timestamps, NULL},
+  {"transaction_timestamps", /* 70% */
+    "enable transaction timestamp support", C_BOOL, 70, 0, 0, &g.c_txn_timestamps, NULL},
 
   {"transaction-frequency", "percent operations done inside an explicit transaction", 0x0, 1, 100,
     100, &g.c_txn_freq, NULL},

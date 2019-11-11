@@ -37,6 +37,18 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * signal_handler --
+ *     Handle signals.
+ */
+static void signal_handler(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void
+signal_handler(int signo)
+{
+    fprintf(stderr, "format caught signal %d, aborting the process\n", signo);
+    __wt_abort(NULL);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -49,6 +61,19 @@ main(int argc, char *argv[])
     config = NULL;
 
     (void)testutil_set_progname(argv);
+
+/*
+ * Windows and Linux support different sets of signals, be conservative about installing handlers.
+ */
+#ifdef SIGALRM
+    (void)signal(SIGALRM, signal_handler);
+#endif
+#ifdef SIGHUP
+    (void)signal(SIGHUP, signal_handler);
+#endif
+#ifdef SIGTERM
+    (void)signal(SIGTERM, signal_handler);
+#endif
 
 #if 0
 	/* Configure the GNU malloc for debugging. */
@@ -65,7 +90,7 @@ main(int argc, char *argv[])
     /* Set values from the command line. */
     home = NULL;
     onerun = 0;
-    while ((ch = __wt_getopt(progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "1C:c:h:lqrt:")) != EOF)
         switch (ch) {
         case '1': /* One run */
             onerun = 1;
@@ -76,22 +101,11 @@ main(int argc, char *argv[])
         case 'c': /* Configuration from a file */
             config = __wt_optarg;
             break;
-        case 'H':
-            g.helium_mount = __wt_optarg;
-            break;
         case 'h':
             home = __wt_optarg;
             break;
-        case 'L': /* Re-direct output to a log */
-                  /*
-                   * The -l option is a superset of -L, ignore -L if we have already configured
-                   * logging for operations.
-                   */
-            if (g.logging == 0)
-                g.logging = LOG_FILE;
-            break;
-        case 'l': /* Turn on operation logging */
-            g.logging = LOG_OPS;
+        case 'l': /* Log operations to a file */
+            g.logging = true;
             break;
         case 'q': /* Quiet */
             g.c_quiet = 1;
@@ -120,11 +134,10 @@ main(int argc, char *argv[])
     }
 
     /*
-     * If we weren't given a configuration file, set values from "CONFIG",
-     * if it exists.
+     * If we weren't given a configuration file, set values from "CONFIG", if it exists.
      *
-     * Small hack to ignore any CONFIG file named ".", that just makes it
-     * possible to ignore any local CONFIG file, used when running checks.
+     * Small hack to ignore any CONFIG file named ".", that just makes it possible to ignore any
+     * local CONFIG file, used when running checks.
      */
     if (config == NULL && access("CONFIG", R_OK) == 0)
         config = "CONFIG";
@@ -135,7 +148,7 @@ main(int argc, char *argv[])
      * The rest of the arguments are individual configurations that modify the base configuration.
      */
     for (; *argv != NULL; ++argv)
-        config_single(*argv, 1);
+        config_single(*argv, true);
 
     /*
      * Multithreaded runs can be replayed: it's useful and we'll get the configuration correct.
@@ -170,18 +183,14 @@ main(int argc, char *argv[])
     while (++g.run_cnt <= g.c_runs || g.c_runs == 0) {
         startup(); /* Start a run */
 
-        config_setup();  /* Run configuration */
-        config_print(0); /* Dump run configuration */
-        key_init();      /* Setup keys/values */
+        config_setup();      /* Run configuration */
+        config_print(false); /* Dump run configuration */
+        key_init();          /* Setup keys/values */
         val_init();
 
         start = time(NULL);
         track("starting up", 0ULL, NULL);
 
-#ifdef HAVE_BERKELEY_DB
-        if (SINGLETHREADED)
-            bdb_open(); /* Initial file config */
-#endif
         wts_open(g.home, true, &g.wts_conn);
         wts_init();
 
@@ -203,12 +212,10 @@ main(int argc, char *argv[])
                 wts_ops(reps == FORMAT_OPERATION_REPS);
 
                 /*
-                 * Copy out the run's statistics after the last
-                 * set of operations.
+                 * Copy out the run's statistics after the last set of operations.
                  *
-                 * XXX
-                 * Verify closes the underlying handle and
-                 * discards the statistics, read them first.
+                 * XXX Verify closes the underlying handle and discards the statistics, read them
+                 * first.
                  */
                 if (reps == FORMAT_OPERATION_REPS)
                     wts_stats();
@@ -218,22 +225,12 @@ main(int argc, char *argv[])
             }
 
         track("shutting down", 0ULL, NULL);
-#ifdef HAVE_BERKELEY_DB
-        if (SINGLETHREADED)
-            bdb_close();
-#endif
         wts_close();
 
         /*
          * Rebalance testing.
          */
         wts_rebalance();
-
-        /*
-         * If single-threaded, we can dump and compare the WiredTiger and Berkeley DB data sets.
-         */
-        if (SINGLETHREADED)
-            wts_dump("standard", 1);
 
         /*
          * Salvage testing.
@@ -254,7 +251,7 @@ main(int argc, char *argv[])
     fclose_and_clear(&g.logfp);
     fclose_and_clear(&g.randfp);
 
-    config_print(0);
+    config_print(false);
 
     testutil_check(pthread_rwlock_destroy(&g.append_lock));
     testutil_check(pthread_rwlock_destroy(&g.backup_lock));
@@ -284,7 +281,7 @@ startup(void)
         testutil_die(ret, "home directory initialization failed");
 
     /* Open/truncate the logging file. */
-    if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
+    if (g.logging && (g.logfp = fopen(g.home_log, "w")) == NULL)
         testutil_die(errno, "fopen: %s", g.home_log);
 
     /* Open/truncate the random number logging file. */
@@ -299,24 +296,29 @@ startup(void)
 static void
 format_die(void)
 {
+
     /*
-     * Single-thread error handling, our caller exits after calling us - don't release the lock.
+     * Turn off tracking and logging so we don't obscure the error message. The lock we're about to
+     * acquire will act as a barrier to flush the writes. This is really a "best effort" more than a
+     * guarantee, there's too much stuff in flight to be sure.
+     */
+    g.c_quiet = 1;
+    g.logging = false;
+
+    /*
+     * Single-thread error handling, our caller exits after calling us (we never release the lock).
      */
     (void)pthread_rwlock_wrlock(&g.death_lock);
-
-    /* Try and turn off tracking so it doesn't obscure the error message. */
-    if (!g.c_quiet) {
-        g.c_quiet = 1;
-        fprintf(stderr, "\n");
-    }
 
     /* Flush/close any logging information. */
     fclose_and_clear(&g.logfp);
     fclose_and_clear(&g.randfp);
 
+    fprintf(stderr, "\n");
+
     /* Display the configuration that failed. */
     if (g.run_cnt)
-        config_print(1);
+        config_print(true);
 }
 
 /*
@@ -327,18 +329,15 @@ static void
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s [-1Llqr] [-C wiredtiger-config]\n    "
-      "[-c config-file] [-H mount] [-h home] "
-      "[name=value ...]\n",
+      "usage: %s [-1lqr] [-C wiredtiger-config]\n    "
+      "[-c config-file] [-h home] [name=value ...]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-1 run once\n"
       "\t-C specify wiredtiger_open configuration arguments\n"
       "\t-c read test program configuration from a file\n"
-      "\t-H mount Helium volume mount point\n"
       "\t-h home (default 'RUNDIR')\n"
-      "\t-L output to a log file\n"
-      "\t-l log operations (implies -L)\n"
+      "\t-l log operations to a file\n"
       "\t-q run quietly\n"
       "\t-r replay the last run\n");
 

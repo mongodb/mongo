@@ -102,8 +102,7 @@ key_gen_common(WT_ITEM *key, uint64_t keyno, const char *const suffix)
     len = 13;
 
     /*
-     * In a column-store, the key is only used for Berkeley DB inserts, and so it doesn't need a
-     * random length.
+     * In a column-store, the key isn't used, it doesn't need a random length.
      */
     if (g.type == ROW) {
         p[len] = '/';
@@ -166,9 +165,8 @@ val_init(void)
     /*
      * Set initial buffer contents to recognizable text.
      *
-     * Add a few extra bytes in order to guarantee we can always offset
-     * into the buffer by a few extra bytes, used to generate different
-     * data for column-store run-length encoded files.
+     * Add a few extra bytes in order to guarantee we can always offset into the buffer by a few
+     * extra bytes, used to generate different data for column-store run-length encoded files.
      */
     val_len = MAX(KILOBYTE(100), g.c_value_max) + 20;
     val_base = dmalloc(val_len);
@@ -282,26 +280,25 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
         return;
 
     if (tinfo == NULL && cnt == 0)
-        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%4d: %s", g.run_cnt, tag));
+        testutil_check(
+          __wt_snprintf_len_set(msg, sizeof(msg), &len, "%4" PRIu32 ": %s", g.run_cnt, tag));
     else if (tinfo == NULL)
-        testutil_check(
-          __wt_snprintf_len_set(msg, sizeof(msg), &len, "%4d: %s: %" PRIu64, g.run_cnt, tag, cnt));
+        testutil_check(__wt_snprintf_len_set(
+          msg, sizeof(msg), &len, "%4" PRIu32 ": %s: %" PRIu64, g.run_cnt, tag, cnt));
     else
-        testutil_check(
-          __wt_snprintf_len_set(msg, sizeof(msg), &len,
-            "%4d: %s: "
-            "search %" PRIu64 "%s, "
-            "insert %" PRIu64 "%s, "
-            "update %" PRIu64 "%s, "
-            "remove %" PRIu64 "%s",
-            g.run_cnt, tag, tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search,
-            tinfo->search > M(9) ? "M" : "",
-            tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert,
-            tinfo->insert > M(9) ? "M" : "",
-            tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
-            tinfo->update > M(9) ? "M" : "",
-            tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
-            tinfo->remove > M(9) ? "M" : ""));
+        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%4" PRIu32 ": %s: "
+                                                                     "search %" PRIu64 "%s, "
+                                                                     "insert %" PRIu64 "%s, "
+                                                                     "update %" PRIu64 "%s, "
+                                                                     "remove %" PRIu64 "%s",
+          g.run_cnt, tag, tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search,
+          tinfo->search > M(9) ? "M" : "",
+          tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert,
+          tinfo->insert > M(9) ? "M" : "",
+          tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
+          tinfo->update > M(9) ? "M" : "",
+          tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
+          tinfo->remove > M(9) ? "M" : ""));
 
     if (lastlen > len) {
         memset(msg + len, ' ', (size_t)(lastlen - len));
@@ -332,6 +329,11 @@ path_setup(const char *home)
     g.home_log = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_log, len, "%s/%s", g.home, "log"));
 
+    /* Page dump file. */
+    len = strlen(g.home) + strlen("pagedump") + 2;
+    g.home_pagedump = dmalloc(len);
+    testutil_check(__wt_snprintf(g.home_pagedump, len, "%s/%s", g.home, "pagedump"));
+
     /* RNG log file. */
     len = strlen(g.home) + strlen("rand") + 2;
     g.home_rand = dmalloc(len);
@@ -347,18 +349,12 @@ path_setup(const char *home)
     g.home_stats = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_stats, len, "%s/%s", g.home, "stats"));
 
-    /* BDB directory. */
-    len = strlen(g.home) + strlen("bdb") + 2;
-    g.home_bdb = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb"));
-
 /*
- * Home directory initialize command: create the directory if it doesn't
- * exist, else remove everything except the RNG log file, create the KVS
- * subdirectory.
+ * Home directory initialize command: create the directory if it doesn't exist, else remove
+ * everything except the RNG log file.
  *
- * Redirect the "cd" command to /dev/null so chatty cd implementations
- * don't add the new working directory to our output.
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
  */
 #undef CMD
 #ifdef _WIN32
@@ -366,17 +362,15 @@ path_setup(const char *home)
     "del /q rand.copy & "                               \
     "(IF EXIST %s\\rand copy /y %s\\rand rand.copy) & " \
     "(IF EXIST %s rd /s /q %s) & mkdir %s & "           \
-    "(IF EXIST rand.copy copy rand.copy %s\\rand) & "   \
-    "cd %s & mkdir KVS"
+    "(IF EXIST rand.copy copy rand.copy %s\\rand)"
     len = strlen(g.home) * 7 + strlen(CMD) + 1;
     g.home_init = dmalloc(len);
     testutil_check(
       __wt_snprintf(g.home_init, len, CMD, g.home, g.home, g.home, g.home, g.home, g.home, g.home));
 #else
-#define CMD                                            \
-    "test -e %s || mkdir %s; "                         \
-    "cd %s > /dev/null && rm -rf `ls | sed /rand/d`; " \
-    "mkdir KVS"
+#define CMD                    \
+    "test -e %s || mkdir %s; " \
+    "cd %s > /dev/null && rm -rf `ls | sed /rand/d`"
     len = strlen(g.home) * 3 + strlen(CMD) + 1;
     g.home_init = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_init, len, CMD, g.home, g.home, g.home));
@@ -403,11 +397,10 @@ path_setup(const char *home)
       "BACKUP_COPY", g.home, "BACKUP", g.home, "BACKUP_COPY"));
 
 /*
- * Salvage command, save the interesting files so we can replay the
- * salvage command as necessary.
+ * Salvage command, save the interesting files so we can replay the salvage command as necessary.
  *
- * Redirect the "cd" command to /dev/null so chatty cd implementations
- * don't add the new working directory to our output.
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
  */
 #undef CMD
 #ifdef _WIN32
@@ -444,12 +437,11 @@ rng(WT_RAND_STATE *rnd)
         rnd = &g.rnd;
 
     /*
-     * We can reproduce a single-threaded run based on the random numbers
-     * used in the initial run, plus the configuration files.
+     * We can reproduce a single-threaded run based on the random numbers used in the initial run,
+     * plus the configuration files.
      *
-     * Check g.replay and g.rand_log_stop: multithreaded runs log/replay
-     * until they get to the operations phase, then turn off log/replay,
-     * threaded operation order can't be replayed.
+     * Check g.replay and g.rand_log_stop: multithreaded runs log/replay until they get to the
+     * operations phase, then turn off log/replay, threaded operation order can't be replayed.
      */
     if (g.rand_log_stop)
         return (__wt_random(rnd));
@@ -532,7 +524,7 @@ checkpoint(void *arg)
          */
         ckpt_config = NULL;
         backup_locked = false;
-        if (!DATASOURCE("helium") && !DATASOURCE("kvsbdb") && !DATASOURCE("lsm"))
+        if (!DATASOURCE("lsm"))
             switch (mmrand(NULL, 1, 20)) {
             case 1:
                 /*
@@ -669,39 +661,4 @@ alter(void *arg)
 
     testutil_check(session->close(session, NULL));
     return (WT_THREAD_RET_VALUE);
-}
-
-/*
- * print_item_data --
- *     Display a single data/size pair, with a tag.
- */
-void
-print_item_data(const char *tag, const uint8_t *data, size_t size)
-{
-    static const char hex[] = "0123456789abcdef";
-    u_char ch;
-
-    fprintf(stderr, "\t%s {", tag);
-    if (g.type == FIX)
-        fprintf(stderr, "0x%02x", data[0]);
-    else
-        for (; size > 0; --size, ++data) {
-            ch = data[0];
-            if (__wt_isprint(ch))
-                fprintf(stderr, "%c", (int)ch);
-            else
-                fprintf(
-                  stderr, "%x%x", (u_int)hex[(data[0] & 0xf0) >> 4], (u_int)hex[data[0] & 0x0f]);
-        }
-    fprintf(stderr, "}\n");
-}
-
-/*
- * print_item --
- *     Display a single data/size pair, with a tag.
- */
-void
-print_item(const char *tag, WT_ITEM *item)
-{
-    print_item_data(tag, item->data, item->size);
 }

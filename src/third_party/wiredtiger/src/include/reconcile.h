@@ -35,17 +35,15 @@ typedef struct {
 
     /* Track the page's min/maximum transactions. */
     uint64_t max_txn;
-    wt_timestamp_t max_timestamp;
-
-    /* Lookaside boundary tracking. */
-    uint64_t unstable_txn;
-    wt_timestamp_t unstable_timestamp;
+    wt_timestamp_t max_ts;
+    wt_timestamp_t max_ondisk_ts;
+    wt_timestamp_t min_skipped_ts;
 
     u_int updates_seen;     /* Count of updates seen. */
     u_int updates_unstable; /* Count of updates not visible_all. */
 
-    bool update_uncommitted; /* An update was uncommitted */
-    bool update_used;        /* An update could be used */
+    bool update_uncommitted; /* An update was uncommitted. */
+    bool update_used;        /* An update could be used. */
 
     /*
      * When we can't mark the page clean (for example, checkpoint found some uncommitted updates),

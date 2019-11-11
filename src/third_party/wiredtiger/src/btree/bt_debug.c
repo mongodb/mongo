@@ -1141,6 +1141,7 @@ static int
 __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 {
     char hex_timestamp[WT_TS_HEX_SIZE];
+    const char *prepare_state;
 
     for (; upd != NULL; upd = upd->next) {
         switch (upd->type) {
@@ -1170,6 +1171,7 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
             WT_RET(ds->f(ds, "\tvalue {tombstone}\n"));
             break;
         }
+
         if (upd->txnid == WT_TXN_ABORTED)
             WT_RET(ds->f(ds,
               "\t"
@@ -1184,6 +1186,24 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
             __wt_timestamp_to_hex_string(hex_timestamp, upd->timestamp);
             WT_RET(ds->f(ds, ", stamp %s", hex_timestamp));
         }
+
+        prepare_state = NULL;
+        switch (upd->prepare_state) {
+        case WT_PREPARE_INIT:
+            break;
+        case WT_PREPARE_INPROGRESS:
+            prepare_state = "in-progress";
+            break;
+        case WT_PREPARE_LOCKED:
+            prepare_state = "locked";
+            break;
+        case WT_PREPARE_RESOLVED:
+            prepare_state = "resolved";
+            break;
+        }
+        if (prepare_state != NULL)
+            WT_RET(ds->f(ds, ", prepare %s", prepare_state));
+
         WT_RET(ds->f(ds, "\n"));
     }
     return (0);

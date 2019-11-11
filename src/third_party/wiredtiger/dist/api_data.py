@@ -1383,8 +1383,8 @@ methods = {
         dropped while a hot backup is in progress or if open in
         a cursor''', type='list'),
     Config('force', 'false', r'''
-        by default, checkpoints may be skipped if the underlying object
-        has not been modified, this option forces the checkpoint''',
+        if false (the default), checkpoints may be skipped if the underlying object has not been
+        modified, if true, this option forces the checkpoint''',
         type='boolean'),
     Config('name', '', r'''
         if set, specify a name for the checkpoint (note that checkpoints
@@ -1392,10 +1392,9 @@ methods = {
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects''', type='list'),
     Config('use_timestamp', 'true', r'''
-        by default, create the checkpoint as of the last stable timestamp
-        if timestamps are in use, or all current updates if there is no
-        stable timestamp set.  If false, this option generates a checkpoint
-        with all updates including those later than the timestamp''',
+        if true (the default), create the checkpoint as of the last stable timestamp if timestamps
+        are in use, or all current updates if there is no stable timestamp set. If false, this
+        option generates a checkpoint with all updates including those later than the timestamp''',
         type='boolean'),
 ]),
 

@@ -768,10 +768,16 @@ __wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session, const char *cfg[], bool 
                 txn->read_timestamp = txn_global->oldest_timestamp;
             else {
                 __wt_readunlock(session, &txn_global->rwlock);
-                WT_RET_MSG(session, EINVAL,
-                  "read timestamp "
-                  "%s older than oldest timestamp %s",
-                  hex_timestamp[0], hex_timestamp[1]);
+                /*
+                 * In some cases, MongoDB sets a read timestamp older than the oldest timestamp,
+                 * relying on WiredTiger's concurrency to detect and fail the set. In other cases
+                 * it's a bug and MongoDB wants error context to make it easier to find those
+                 * problems. Don't output an error message because that logs a MongoDB error, use an
+                 * informational message to provide the context instead.
+                 */
+                WT_RET(__wt_msg(session, "read timestamp %s older than oldest timestamp %s",
+                  hex_timestamp[0], hex_timestamp[1]));
+                return (EINVAL);
             }
         } else {
             txn->read_timestamp = ts;

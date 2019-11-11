@@ -82,11 +82,12 @@ class test_las01(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(uri, None)
         # Skip the initial rows, which were not updated
         for i in range(0, nrows+1):
-            self.assertEquals(cursor.next(), 0)
-        if (check_value != cursor.get_value()):
-            print "Check value : " + str(check_value)
-            print "value : " + str(cursor.get_value())
-        self.assertTrue(check_value == cursor.get_value())
+            self.assertEqual(cursor.next(), 0)
+        if check_value != cursor.get_value():
+            session.breakpoint()
+        self.assertTrue(check_value == cursor.get_value(),
+            "for key " + str(i) + ", expected " + str(check_value) +
+            ", got " + str(cursor.get_value()))
         cursor.close()
         session.close()
         conn.close()

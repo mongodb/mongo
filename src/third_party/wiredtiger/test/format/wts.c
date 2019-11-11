@@ -93,6 +93,14 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *messa
     (void)(handler);
     (void)(session);
 
+    /*
+     * WiredTiger logs a verbose message when the read timestamp is set to a value older than the
+     * oldest timestamp. Ignore the message, it happens when repeating operations to confirm
+     * timestamped values don't change underneath us.
+     */
+    if (strstr(message, "older than oldest timestamp") != NULL)
+        return (0);
+
     /* Write and flush the message so we're up-to-date on error. */
     if (g.logfp == NULL) {
         out = printf("%p:%s\n", (void *)session, message);
@@ -141,9 +149,8 @@ void
 wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 {
     WT_CONNECTION *conn;
-    WT_DECL_RET;
     size_t max;
-    char *config, *p, helium_config[1024];
+    char *config, *p;
 
     *connp = NULL;
 
@@ -221,6 +228,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 
     /* Optionally stress operations. */
     CONFIG_APPEND(p, ",timing_stress_for_test=[");
+    if (g.c_timing_stress_aggressive_sweep)
+        CONFIG_APPEND(p, ",aggressive_sweep");
     if (g.c_timing_stress_checkpoint)
         CONFIG_APPEND(p, ",checkpoint_slow");
     if (g.c_timing_stress_lookaside_sweep)
@@ -246,12 +255,11 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     /* Extensions. */
     CONFIG_APPEND(p,
       ",extensions=["
-      "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+      "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
       g.c_reverse ? REVERSE_PATH : "", access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
       access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
       access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-      access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "", access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "",
-      DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
+      access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "", access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "");
 
     /*
      * Put configuration file configuration options second to last. Put command line configuration
@@ -278,23 +286,6 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     if (set_api)
         g.wt_api = conn->get_extension_api(conn);
 
-    /*
-     * Load the Helium shared library: it would be possible to do this as part of the extensions
-     * configured for wiredtiger_open, there's no difference, I am doing it here because it's easier
-     * to work with the configuration strings.
-     */
-    if (DATASOURCE("helium")) {
-        if (g.helium_mount == NULL)
-            testutil_die(EINVAL, "no Helium mount point specified");
-        testutil_check(__wt_snprintf(helium_config, sizeof(helium_config),
-          "entry=wiredtiger_extension_init,config=["
-          "helium_verbose=0,"
-          "dev1=[helium_devices=\"he://./%s\","
-          "helium_o_volume_truncate=1]]",
-          g.helium_mount));
-        if ((ret = conn->load_extension(conn, HELIUM_PATH, helium_config)) != 0)
-            testutil_die(ret, "WT_CONNECTION.load_extension: %s:%s", HELIUM_PATH, helium_config);
-    }
     *connp = conn;
 }
 
@@ -401,14 +392,15 @@ wts_init(void)
     /* Configure Btree split page percentage. */
     CONFIG_APPEND(p, ",split_pct=%" PRIu32, g.c_split_pct);
 
-    /* Configure LSM and data-sources. */
-    if (DATASOURCE("helium"))
-        CONFIG_APPEND(p, ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
-          g.c_compression_flag == COMPRESS_NONE ? 0 : 1);
+    /*
+     * Assertions. Assertions slow down the code for additional diagnostic checking.
+     */
+    if (g.c_txn_timestamps && g.c_assert_commit_timestamp)
+        CONFIG_APPEND(p, ",assert=(commit_timestamp=key_consistent)");
+    if (g.c_txn_timestamps && g.c_assert_read_timestamp)
+        CONFIG_APPEND(p, ",assert=(read_timestamp=always)");
 
-    if (DATASOURCE("kvsbdb"))
-        CONFIG_APPEND(p, ",type=kvsbdb");
-
+    /* Configure LSM. */
     if (DATASOURCE("lsm")) {
         CONFIG_APPEND(p, ",type=lsm,lsm=(");
         CONFIG_APPEND(p, "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
@@ -454,38 +446,6 @@ wts_close(void)
 }
 
 void
-wts_dump(const char *tag, int dump_bdb)
-{
-#ifdef HAVE_BERKELEY_DB
-    size_t len;
-    char *cmd;
-
-    /*
-     * In-memory configurations and data-sources don't support dump through the wt utility.
-     */
-    if (g.c_in_memory != 0)
-        return;
-    if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-        return;
-
-    track("dump files and compare", 0ULL, NULL);
-
-    len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
-    cmd = dmalloc(len);
-    testutil_check(
-      __wt_snprintf(cmd, len, "sh s_dumpcmp -h %s %s %s %s %s %s", g.home, dump_bdb ? "-b " : "",
-        dump_bdb ? BERKELEY_DB_PATH : "", g.type == FIX || g.type == VAR ? "-c" : "",
-        g.uri == NULL ? "" : "-n", g.uri == NULL ? "" : g.uri));
-
-    testutil_checkfmt(system(cmd), "%s: dump comparison failed", tag);
-    free(cmd);
-#else
-    (void)tag;      /* [-Wunused-variable] */
-    (void)dump_bdb; /* [-Wunused-variable] */
-#endif
-}
-
-void
 wts_verify(const char *tag)
 {
     WT_CONNECTION *conn;
@@ -499,9 +459,7 @@ wts_verify(const char *tag)
     track("verify", 0ULL, NULL);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    if (g.logging != 0)
-        (void)g.wt_api->msg_printf(
-          g.wt_api, session, "=============== verify start ===============");
+    logop(session, "%s", "=============== verify start");
 
     /*
      * Verify can return EBUSY if the handle isn't available. Don't yield and retry, in the case of
@@ -510,9 +468,7 @@ wts_verify(const char *tag)
     ret = session->verify(session, g.uri, "strict");
     testutil_assertfmt(ret == 0 || ret == EBUSY, "session.verify: %s: %s", g.uri, tag);
 
-    if (g.logging != 0)
-        (void)g.wt_api->msg_printf(
-          g.wt_api, session, "=============== verify stop ===============");
+    logop(session, "%s", "=============== verify stop");
     testutil_check(session->close(session, NULL));
 }
 
@@ -535,10 +491,6 @@ wts_stats(void)
 
     /* Ignore statistics if they're not configured. */
     if (g.c_statistics == 0)
-        return;
-
-    /* Some data-sources don't support statistics. */
-    if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
         return;
 
     conn = g.wts_conn;

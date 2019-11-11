@@ -424,26 +424,36 @@ __wt_las_page_skip_locked(WT_SESSION_IMPL *session, WT_REF *ref)
 
     /*
      * If some of the page's history overlaps with the reader's snapshot then we have to read it.
-     * This is only relevant if we chose versions that were unstable when the page was written.
      */
-    if (ref->page_las->skew_newest && WT_TXNID_LE(txn->snap_min, ref->page_las->unstable_txn))
+    if (WT_TXNID_LE(txn->snap_min, ref->page_las->max_txn))
         return (false);
 
+    /*
+     * Otherwise, if not reading at a timestamp, the page's history is in the past, so the page
+     * image is correct if it contains the most recent versions of everything and nothing was
+     * prepared.
+     */
     if (!F_ISSET(txn, WT_TXN_HAS_TS_READ))
-        return (ref->page_las->skew_newest);
+        return (!ref->page_las->has_prepares && ref->page_las->min_skipped_ts == WT_TS_MAX);
 
     /*
-     * Skip lookaside pages if reading as of a timestamp, we evicted new versions of data and all
-     * the updates are in the past.
+     * Skip lookaside history if reading as of a timestamp, we evicted new
+     * versions of data and all the updates are in the past.  This is not
+     * possible for prepared updates, because the commit timestamp was not
+     * known when the page was evicted.
+     *
+     * Otherwise, skip reading lookaside history if everything on the page
+     * is older than the read timestamp, and the oldest update in lookaside
+     * newer than the page is in the future of the reader.  This seems
+     * unlikely, but is exactly what eviction tries to do when a checkpoint
+     * is running.
      */
-    if (ref->page_las->skew_newest && txn->read_timestamp > ref->page_las->unstable_timestamp)
+    if (!ref->page_las->has_prepares && ref->page_las->min_skipped_ts == WT_TS_MAX &&
+      txn->read_timestamp >= ref->page_las->max_ondisk_ts)
         return (true);
 
-    /*
-     * Skip lookaside pages if reading as of a timestamp, we evicted old versions of data and all
-     * the unstable updates are in the future.
-     */
-    if (!ref->page_las->skew_newest && txn->read_timestamp < ref->page_las->unstable_timestamp)
+    if (txn->read_timestamp >= ref->page_las->max_ondisk_ts &&
+      txn->read_timestamp < ref->page_las->min_skipped_ts)
         return (true);
 
     return (false);
@@ -549,8 +559,7 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_MULTI *
     double pct_dirty, pct_full;
     uint64_t ckpt_gen_current, ckpt_gen_last;
     uint32_t btree_id;
-    char hex_timestamp[WT_TS_HEX_SIZE];
-    const char *ts;
+    char max_ondisk_ts[WT_TS_HEX_SIZE], min_skipped_ts[WT_TS_HEX_SIZE];
 
     btree_id = btree->id;
 
@@ -572,21 +581,21 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_MULTI *
         (void)__wt_eviction_clean_needed(session, &pct_full);
         (void)__wt_eviction_dirty_needed(session, &pct_dirty);
 
-        __wt_timestamp_to_hex_string(hex_timestamp, multi->page_las.unstable_timestamp);
-        ts = hex_timestamp;
+        __wt_timestamp_to_hex_string(max_ondisk_ts, multi->page_las.max_ondisk_ts);
+        __wt_timestamp_to_hex_string(min_skipped_ts, multi->page_las.min_skipped_ts);
         __wt_verbose(session, WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
           "Page reconciliation triggered lookaside write "
           "file ID %" PRIu32 ", page ID %" PRIu64
           ". "
           "Max txn ID %" PRIu64
-          ", unstable timestamp %s, %s. "
+          ", max ondisk timestamp %s, "
+          "first skipped ts %s. "
           "Entries now in lookaside file: %" PRId64
           ", "
           "cache dirty: %2.3f%% , "
           "cache use: %2.3f%%",
-          btree_id, multi->page_las.las_pageid, multi->page_las.max_txn, ts,
-          multi->page_las.skew_newest ? "newest" : "not newest",
-          WT_STAT_READ(conn->stats, cache_lookaside_entries), pct_dirty, pct_full);
+          btree_id, multi->page_las.las_pageid, multi->page_las.max_txn, max_ondisk_ts,
+          min_skipped_ts, WT_STAT_READ(conn->stats, cache_lookaside_entries), pct_dirty, pct_full);
     }
 
     /* Never skip updating the tracked generation */
@@ -681,7 +690,24 @@ __wt_las_insert_block(
         if (list->ripcip != NULL)
             slot = page->type == WT_PAGE_ROW_LEAF ? WT_ROW_SLOT(page, list->ripcip) :
                                                     WT_COL_SLOT(page, list->ripcip);
-        first_upd = upd = list->ins == NULL ? page->modify->mod_row_update[slot] : list->ins->upd;
+        first_upd = list->ins == NULL ? page->modify->mod_row_update[slot] : list->ins->upd;
+
+        /*
+         * Trim any updates before writing to lookaside. This saves wasted work, but is also
+         * necessary because the reconciliation only resolves existing birthmarks if they aren't
+         * obsolete.
+         */
+        WT_WITH_BTREE(
+          session, btree, upd = __wt_update_obsolete_check(session, page, first_upd, true));
+        if (upd != NULL)
+            __wt_free_update_list(session, upd);
+        upd = first_upd;
+
+        /*
+         * It's not OK for the update list to contain a birthmark on entry - we will generate one
+         * below if necessary.
+         */
+        WT_ASSERT(session, __wt_count_birthmarks(first_upd) == 0);
 
         /*
          * Walk the list of updates, storing each key/value pair into the lookaside table. Skip
@@ -698,13 +724,14 @@ __wt_las_insert_block(
                 las_value.data = upd->data;
                 las_value.size = upd->size;
                 break;
-            case WT_UPDATE_BIRTHMARK:
-                WT_ASSERT(session, upd != first_upd || multi->page_las.skew_newest);
-            /* FALLTHROUGH */
             case WT_UPDATE_TOMBSTONE:
                 las_value.size = 0;
                 break;
             default:
+                /*
+                 * It is never OK to see a birthmark here - it would be referring to the wrong page
+                 * image.
+                 */
                 WT_ERR(__wt_illegal_value(session, upd->type));
             }
 
@@ -718,7 +745,6 @@ __wt_las_insert_block(
             if (upd == list->onpage_upd && upd->size > 0 &&
               (upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_MODIFY)) {
                 las_value.size = 0;
-                WT_ASSERT(session, upd != first_upd || multi->page_las.skew_newest);
                 cursor->set_value(cursor, upd->txnid, upd->timestamp, upd->prepare_state,
                   WT_UPDATE_BIRTHMARK, &las_value);
             } else

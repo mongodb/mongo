@@ -61,12 +61,11 @@ corrupt(void)
     char buf[8 * 1024], copycmd[2 * 1024];
 
     /*
-     * If it's a single Btree file (not LSM), open the file, and corrupt
-     * roughly 2% of the file at a random spot, including the beginning
-     * of the file and overlapping the end.
+     * If it's a single Btree file (not LSM), open the file, and corrupt roughly 2% of the file at a
+     * random spot, including the beginning of the file and overlapping the end.
      *
-     * It's a little tricky: if the data source is a file, we're looking
-     * for "wt", if the data source is a table, we're looking for "wt.wt".
+     * It's a little tricky: if the data source is a file, we're looking for "wt", if the data
+     * source is a table, we're looking for "wt.wt".
      */
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME));
     if ((fd = open(buf, O_RDWR)) != -1) {
@@ -136,10 +135,6 @@ wts_salvage(void)
 {
     WT_DECL_RET;
 
-    /* Some data-sources don't support salvage. */
-    if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-        return;
-
     if (g.c_salvage == 0)
         return;
 
@@ -154,15 +149,6 @@ wts_salvage(void)
     salvage();
     wts_verify("post-salvage verify");
     wts_close();
-
-    /*
-     * If no records were deleted, dump and compare against Berkeley DB.
-     * (The problem with deleting records is salvage restores deleted
-     * records if a page splits leaving a deleted record on one side of
-     * the split, so we cannot depend on correctness in that case.)
-     */
-    if (g.c_delete_pct == 0)
-        wts_dump("salvage", SINGLETHREADED);
 
     /* Corrupt the file randomly, salvage, then verify. */
     if (corrupt()) {

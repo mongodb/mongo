@@ -224,8 +224,6 @@ LZO
 LeafGreen
 LevelDB
 Levyx
-Llqr
-Llqrt
 LmT
 LoadLoad
 LockFile
@@ -935,6 +933,8 @@ lookaside
 lookup
 lookups
 lossy
+lqr
+lqrt
 lr
 lrt
 lru
@@ -1060,6 +1060,7 @@ ownp
 pR
 pS
 packv
+pagedump
 pagesize
 parens
 pareto

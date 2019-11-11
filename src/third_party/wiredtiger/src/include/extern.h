@@ -326,6 +326,7 @@ extern int __wt_value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_count_birthmarks(WT_UPDATE *upd) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
   WT_REF **refp, size_t *incrp, bool closing) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -385,7 +386,7 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session, const WT_ITEM *key, u
 extern int __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, WT_UPDATE **updp,
   size_t *sizep, u_int modify_type) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern WT_UPDATE *__wt_update_obsolete_check(
-  WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd);
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd, bool update_accounting);
 extern int __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
   WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *srch_key, WT_REF *leaf,

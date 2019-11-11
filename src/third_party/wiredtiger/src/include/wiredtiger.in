@@ -1854,16 +1854,17 @@ struct __wt_session {
 	 * "to=<checkpoint>" to drop all checkpoints before and including the named checkpoint.
 	 * Checkpoints cannot be dropped while a hot backup is in progress or if open in a cursor.,
 	 * a list of strings; default empty.}
-	 * @config{force, by default\, checkpoints may be skipped if the underlying object has not
-	 * been modified\, this option forces the checkpoint., a boolean flag; default \c false.}
+	 * @config{force, if false (the default)\, checkpoints may be skipped if the underlying
+	 * object has not been modified\, if true\, this option forces the checkpoint., a boolean
+	 * flag; default \c false.}
 	 * @config{name, if set\, specify a name for the checkpoint (note that checkpoints including
 	 * LSM trees may not be named)., a string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a list of strings;
 	 * default empty.}
-	 * @config{use_timestamp, by default\, create the checkpoint as of the last stable timestamp
-	 * if timestamps are in use\, or all current updates if there is no stable timestamp set.
-	 * If false\, this option generates a checkpoint with all updates including those later than
-	 * the timestamp., a boolean flag; default \c true.}
+	 * @config{use_timestamp, if true (the default)\, create the checkpoint as of the last
+	 * stable timestamp if timestamps are in use\, or all current updates if there is no stable
+	 * timestamp set.  If false\, this option generates a checkpoint with all updates including
+	 * those later than the timestamp., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -2423,18 +2424,16 @@ struct __wt_connection {
 	/*!
 	 * Rollback in-memory non-logged state to an earlier point in time.
 	 *
-	 * This method uses a timestamp to define the rollback point, and thus
-	 * requires that the application uses timestamps and that the
-	 * stable_timestamp must have been set via a call to
-	 * WT_CONNECTION::set_timestamp. Any updates to checkpoint durable
-	 * tables that are more recent than the stable timestamp are removed.
+	 * This method uses a timestamp to define the rollback point, and requires the application
+	 * use timestamps, the stable_timestamp have been set via a call to
+	 * WT_CONNECTION::set_timestamp, and a checkpoint operating on the last stable timestamp
+	 * to have completed. Any updates to checkpoint durable tables that are more recent than
+	 * the stable timestamp are removed.
 	 *
-	 * This method requires that there are no active operations for the
-	 * duration of the call.
+	 * This method requires that there are no active operations for the duration of the call.
 	 *
-	 * Any updates made to logged tables will not be rolled back. Any
-	 * updates made without an associated timestamp will not be rolled
-	 * back. See @ref transaction_timestamps.
+	 * Any updates made to logged tables will not be rolled back. Any updates made without an
+	 * associated timestamp will not be rolled back. See @ref transaction_timestamps.
 	 *
 	 * @snippet ex_all.c rollback to stable
 	 *

@@ -40,7 +40,7 @@ wts_rebalance(void)
 
     track("rebalance", 0ULL, NULL);
 
-    /* Dump the current object. */
+    /* Dump the current object */
     testutil_check(__wt_snprintf(cmd, sizeof(cmd), ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
                                                    " -h %s dump -f %s/rebalance.orig %s",
       g.home, g.home, g.uri));
@@ -50,20 +50,15 @@ wts_rebalance(void)
     wts_reopen();
     conn = g.wts_conn;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    if (g.logging != 0)
-        (void)g.wt_api->msg_printf(
-          g.wt_api, session, "=============== rebalance start ===============");
+    logop(session, "%s", "=============== rebalance start");
 
     testutil_checkfmt(session->rebalance(session, g.uri, NULL), "%s", g.uri);
 
-    if (g.logging != 0)
-        (void)g.wt_api->msg_printf(
-          g.wt_api, session, "=============== rebalance stop ===============");
+    logop(session, "%s", "=============== rebalance stop");
     testutil_check(session->close(session, NULL));
 
     wts_verify("post-rebalance verify");
     wts_close();
-
     testutil_check(__wt_snprintf(cmd, sizeof(cmd), ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
                                                    " -h %s dump -f %s/rebalance.new %s",
       g.home, g.home, g.uri));
