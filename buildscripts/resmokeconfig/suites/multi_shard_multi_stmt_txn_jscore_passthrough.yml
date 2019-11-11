@@ -145,9 +145,6 @@ selector:
   # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
   - jstests/core/type8.js
 
-  # TODO: SERVER-38690 Mongos should throw write targeting errors in a transaction.
-  - jstests/core/update_setOnInsert.js
-
   # Reads from system.views.
   - jstests/core/views/views_drop.js
 
