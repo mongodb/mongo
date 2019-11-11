@@ -18,8 +18,20 @@
 # (ticket, test_file) pair on the last-stable branch.
 #
 
+change_streams_multiversion:
+
+change_streams_sharded_collections_multiversion_passthrough:
+
+concurrency_replication_multiversion:
+
+concurrency_sharded_replication_multiversion:
+
+replica_sets_jscore_multiversion_passthrough:
+
 replica_sets_multiversion:
 
 sharding_multiversion:
 
-replica_sets_jscore_multiversion_passthrough:
+sharding_jscore_multiversion_passthrough:
+
+sharded_collections_jscore_multiversion_passthrough:
