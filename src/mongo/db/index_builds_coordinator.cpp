@@ -1286,13 +1286,17 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
             opCtx, dbAndUUID, replState, exclusiveCollectionLock);
         nss = _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
     } catch (DBException& ex) {
+        // Locks may no longer be held when we are interrupted. We should return immediately and, in
+        // the case of a primary index build, signal downstream nodes to abort via the
+        // abortIndexBuild oplog entry. On secondaries, a server shutdown is the only way an index
+        // build can be interrupted (InterruptedAtShutdown).
+        if (ex.isA<ErrorCategory::Interruption>()) {
+            throw;
+        }
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto replSetAndNotPrimary =
             replCoord->getSettings().usingReplSets() && !replCoord->canAcceptWritesFor(opCtx, nss);
         if (!replSetAndNotPrimary) {
-            throw;
-        }
-        if (ErrorCodes::InterruptedAtShutdown == ex.code()) {
             throw;
         }
         log() << "Index build failed before final phase during oplog application. "
