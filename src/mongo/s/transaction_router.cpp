@@ -416,8 +416,6 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
         }
     }
 
-    // TODO: SERVER-37045 assert when attaching startTransaction to killCursors command.
-
     // The first command sent to a participant must start a transaction, unless it is a transaction
     // command, which don't support the options that start transactions, i.e. startTransaction and
     // readConcern. Otherwise the command must not have a read concern.
