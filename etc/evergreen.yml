@@ -1383,6 +1383,55 @@ functions:
   - *set_up_credentials
   - *fetch_benchrun_embedded_files
 
+  "do multiversion setup": &do_multiversion_setup
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+
+        rm -rf /data/install /data/multiversion
+
+        edition="${multiversion_edition|base}"
+        platform="${multiversion_platform|linux}"
+        architecture="${multiversion_architecture|x86_64}"
+
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 3.2 3.4 3.6 4.0
+
+        # The platform and architecture for how some of the binaries are reported in
+        # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
+        # Certain build variants define additional multiversion_*_42_or_later expansions in order to
+        # be able to fetch a complete set of versions.
+
+        if [ ! -z "${multiversion_edition_42_or_later}" ]; then
+          edition="${multiversion_edition_42_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_platform_42_or_later}" ]; then
+          platform="${multiversion_platform_42_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
+          architecture="${multiversion_architecture_42_or_later}"
+        fi
+
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 4.2
+
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
     type: test
@@ -1581,6 +1630,61 @@ functions:
       params:
         files:
           - src/generated_burn_in_tags_config/burn_in_tags_gen.json
+
+  "generate randomized multiversion tasks":
+    - command: manifest.load
+    - *git_get_project
+    - *set_task_expansion_macros
+    - *set_up_virtualenv
+    - *upload_pip_requirements
+    - *configure_evergreen_api_credentials
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
+
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+
+          ${activate_virtualenv}
+          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
+    - *do_multiversion_setup
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=${suite} --task-path-suffix=${use_multiversion} --is-generated-suite=true
+    - command: archive.targz_pack
+      params:
+        target: generate_tasks_config.tgz
+        source_dir: src/generated_resmoke_config
+        include:
+          - "*"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: generate_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Generated Task Config - Execution ${execution}
+        optional: true
+
+    - command: generate.tasks
+      params:
+        optional: true
+        files:
+          - src/generated_resmoke_config/*.json
 
   "generate resmoke tasks":
     - command: manifest.load
@@ -1973,6 +2077,16 @@ functions:
     - command: expansions.write
       params:
         file: src/expansions.yml
+    - *do_multiversion_setup
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          $python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file expansions.yml
 
     - command: shell.exec
       params:
@@ -1982,7 +2096,7 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_multiversion_tests.py --expansion-file expansions.yml
+          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=${task_name} --task-path-suffix=${task_path_suffix} --is-generated-suite=true
 
     - command: archive.targz_pack
       params:
@@ -2275,56 +2389,6 @@ functions:
           fi
           echo "Exiting powercycle with code $exit_code"
           exit $exit_code
-
-
-  "do multiversion setup":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-
-        rm -rf /data/install /data/multiversion
-
-        edition="${multiversion_edition|base}"
-        platform="${multiversion_platform|linux}"
-        architecture="${multiversion_architecture|x86_64}"
-
-        $python buildscripts/setup_multiversion_mongodb.py   \
-          --installDir /data/install                         \
-          --linkDir /data/multiversion                       \
-          --edition $edition                                 \
-          --platform $platform                               \
-          --architecture $architecture                       \
-          --useLatest 3.2 3.4 3.6 4.0
-
-        # The platform and architecture for how some of the binaries are reported in
-        # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
-        # Certain build variants define additional multiversion_*_42_or_later expansions in order to
-        # be able to fetch a complete set of versions.
-
-        if [ ! -z "${multiversion_edition_42_or_later}" ]; then
-          edition="${multiversion_edition_42_or_later}"
-        fi
-
-        if [ ! -z "${multiversion_platform_42_or_later}" ]; then
-          platform="${multiversion_platform_42_or_later}"
-        fi
-
-        if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
-          architecture="${multiversion_architecture_42_or_later}"
-        fi
-
-        $python buildscripts/setup_multiversion_mongodb.py   \
-          --installDir /data/install                         \
-          --linkDir /data/multiversion                       \
-          --edition $edition                                 \
-          --platform $platform                               \
-          --architecture $architecture                       \
-          --useLatest 4.2
 
   "do snmp setup":
     command: shell.exec
@@ -5991,8 +6055,7 @@ tasks:
       resmoke_args: "--suites=jstestfuzz_sharded_session --storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: jstestfuzz_sharded_session
 
-- <<: *multiversion_template
-  name: replica_sets_jscore_multiversion_passthrough_gen
+- name: replica_sets_jscore_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   commands:
   - func: "generate multiversion tasks"
@@ -7583,8 +7646,18 @@ tasks:
   name: replica_sets_multiversion
   tags: ["random_multiversion_replica_sets"]
   commands:
+  - func: "git get project"
   - func: "do setup"
   - func: "do multiversion setup"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=replica_sets_multiversion --task-path-suffix=/data/multiversion --is-generated-suite=false
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion
@@ -7610,12 +7683,13 @@ tasks:
 - name: sharding_multiversion_gen
   tags: ["random_multiversion_replica_sets"]
   commands:
-  - func: "generate resmoke tasks"
+  - func: "generate randomized multiversion tasks"
     vars:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger --dryRun=tests
       fallback_num_sub_suites: 32
       use_multiversion: /data/multiversion
+      suite: sharding_multiversion
 
 - name: sharding_rs_matching_disabled_gen
   tags: ["sharding", "common"]
