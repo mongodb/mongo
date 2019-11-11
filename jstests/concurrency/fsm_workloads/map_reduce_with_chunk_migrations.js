@@ -32,7 +32,6 @@ var $config = extendWorkload($config, function($config, $super) {
     // By default, the collection that will be sharded with concurrent chunk migrations will be the
     // one that the aggregate is run against.
     $config.data.collWithMigrations = $config.collName;
-    $config.data.resultsCollection = "map_reduce_with_chunk_migrations_out";
 
     $config.transitions = {
         init: {mapReduce: 1},
@@ -64,10 +63,7 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db[collName].mapReduce(map, reduce, {out: {replace: this.resultsCollection}});
         assertWhenOwnColl.commandWorked(res);
 
-        // TODO SERVER-43290 Support for cluster stats should be able to enable this check.
-        // assertWhenOwnColl.eq(
-        //     this.numDocs, res.counts.output, `Expected each _id to be output once:
-        //     ${tojson(res)}`);
+        assert.eq(this.numDocs, db[this.resultsCollection].find().itcount());
     };
 
     /**
@@ -81,6 +77,10 @@ var $config = extendWorkload($config, function($config, $super) {
         if (collName != this.collWithMigrations) {
             $super.states.init.apply(this, [db, this.collWithMigrations, connCache]);
         }
+
+        // Use a unique target collection name per thread to avoid colliding during the final rename
+        // of the mapReduce.
+        this.resultsCollection = "map_reduce_with_chunk_migrations_out_" + this.tid;
     };
 
     /**
