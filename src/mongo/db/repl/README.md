@@ -760,7 +760,9 @@ During the last few steps of the data modification section, we clear the state o
 `DropPendingCollectionReaper`, which manages collections that are marked as drop-pending by the Two
 Phase Drop algorithm, and make sure it aligns with what is currently on disk. After doing so, we can
 run through the oplog recovery process, which truncates the oplog after the `common point` (at the
-truncate point) and applies all oplog entries through the end of the sync source's oplog.
+truncate point) and applies all oplog entries through the end of the sync source's oplog. See the
+[Startup Recovery](#startup-recovery) section for more information on truncating the oplog and
+applying oplog entries.
 
 The last thing we do before exiting the data modification section is reconstruct prepared
 transactions. We must also restore their in-memory state to what it was prior to the rollback in
@@ -851,9 +853,9 @@ Otherwise, the new node iterates through all of the buffered operations, writes 
 and if their timestamp is after the `beginApplyingTimestamp`, applies them to the data on disk.
 Oplog entries continue to be fetched and added to the buffer while this is occurring.
 
-One notable exception is that the node will not apply "prepareTransaction" oplog entries. Similar
+One notable exception is that the node will not apply `prepareTransaction` oplog entries. Similar
 to how we reconstruct prepared transactions in startup and rollback recovery, we will update the
-transactions table every time we see a "prepareTransaction" oplog entry. Because the nodes wrote
+transactions table every time we see a `prepareTransaction` oplog entry. Because the nodes wrote
 all oplog entries starting at the `beginFetchingTimestamp` into the oplog, the node will have all
 the oplog entries it needs to reconstruct the state for all prepared transactions after the oplog
 application phase is done.
@@ -892,6 +894,50 @@ After that it will reconstruct all prepared transactions. The node will then cle
 flag and tell the storage engine that the [`initialDataTimestamp`](#replication-timestamp-glossary)
 is the node's last applied OpTime. Finally, the `InitialSyncer` shuts down and the
 `ReplicationCoordinator` starts steady state replication.
+
+# Startup Recovery
+
+*Startup recovery* is a node's process for putting both the oplog and data into a consistent state
+during startup (and happens while the node is in the `STARTUP` state). If a node has an empty or
+non-existent oplog, or already has the initial sync flag set when starting up, then it will skip
+startup recovery and go through [initial sync](#initial-sync) instead.
+
+If the node already has data, it will go through
+[startup recovery](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_recovery.cpp).
+It will first get the *recovery timestamp* from the storage engine, which is the timestamp through
+which changes are reflected in the data at startup (and the timestamp used to set the
+`initialDataTimestamp`). The recovery timestamp will be a `stable_timestamp` so that the node
+recovers from a *stable checkpoint*, which is a durable view of the data at a particular timestamp.
+It should be noted that due to journaling, the oplog and many collections in the local database are
+an exception and are up-to-date at startup rather than reflecting the recovery timestamp.
+
+If a node went through an unclean shutdown, then it might have been in the middle of writing a batch
+of oplog entries to its oplog. Since this is done in parallel, it could mean that there are gaps in
+the oplog from entries in the batch that weren't written yet, called *oplog holes*. During startup,
+a node wouldn't be able to tell which oplog entries were successfully written into the oplog. To fix
+this, after getting the recovery timestamp, the node will truncate its oplog to a point that it can
+guarantee didn't have any oplog holes using the `oplogTruncateAfterPoint` document. This document is
+journaled and untimestamped so that it will reflect information more recent than the latest stable
+checkpoint even after a shutdown. During oplog application, before writing a batch of oplog entries
+to the oplog, the node will set the `oplogTruncateAfterPoint` to be the first entry in the batch. If
+the node shuts down before finishing writing the batch, then during startup recovery, the node will
+truncate the oplog to the point before the batch (meaning it will truncate inclusive of the
+`oplogTruncateAfterPoint`). If the node successfully finishes writing the batch to the oplog during
+oplog application, it will reset the `oplogTruncateAfterPoint` since there are no oplog holes and
+the oplog wouldn't need to be truncated if the node restarted.
+
+After truncating the oplog, the node will see if the recovery timestamp differs from the top of the
+newly truncated oplog. If it does, this means that there are oplog entries that must be applied to
+make the data consistent with the oplog. The node will apply all the operations starting at the
+recovery timestamp through the top of the oplog. The one exception is that it will not apply
+`prepareTransaction` oplog entries. Similar to how a node reconstructs prepared transactions during
+initial sync and rollback, the node will update the transactions table every time it see a
+`prepareTransaction` oplog entry. Once the node has finished applying all the oplog entries through
+<!-- TODO SERVER-43783: Link to process for reconstructing prepared transactions -->
+the top of the oplog, it will reconstruct all transactions still in the prepare state.
+
+Finally, the node will finish loading the replica set configuration, set its `lastApplied` and
+`lastDurable` timestamps to the top of the oplog and start steady state replication.
 
 # Dropping Collections and Databases
 
