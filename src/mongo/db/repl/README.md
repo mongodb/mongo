@@ -339,23 +339,22 @@ assigns itself a priority takeover timeout proportional to its rank. After that 
 node will check if it's eligible to run for election and if so will begin an election. The timeout
 is simply: `(election timeout) * (priority rank + 1)`.
 
-### Commit Point Propogation
+### Commit Point Propagation
 
 The replication majority *commit point* refers to an OpTime such that all oplog entries with an
 OpTime earlier or equal to it have been replicated to a majority of nodes in the replica set. It is
-influenced by the `lastApplied` and the `lastDurable` OpTimes.
-
-The `lastApplied` is the OpTime of the latest applied oplog entry on a node. The `lastDurable` is
-the OpTime of the latest applied oplog entry that has been flushed to journal.
+influenced by the [`lastApplied`](#replication-timestamp-glossary) and the
+[`lastDurable`](#replication-timestamp-glossary) OpTimes.
 
 On the primary, we advance the commit point by checking what the highest `lastApplied` or
 `lastDurable` is on a majority of the nodes. This OpTime must be greater than the current
 `commit point` for the primary to advance it. Any threads blocking on a writeConcern are woken up
 to check if they now fulfill their requested writeConcern.
 
-When `getWriteConcernMajorityShouldJournal` is set to true, the `_lastCommittedOpTime` is set to the
-`lastDurable` OpTime. This means that the server acknowledges a write operation after a majority has
-written to the on-disk journal. Otherwise, `_lastCommittedOpTime` is set using the `lastApplied`.
+When `getWriteConcernMajorityShouldJournal` is set to true, the
+[`_lastCommittedOpTime`](#replication-timestamp-glossary) is set to the `lastDurable` OpTime. This
+means that the server acknowledges a write operation after a majority has written to the on-disk
+journal. Otherwise, `_lastCommittedOpTime` is set using the `lastApplied`.
 
 Secondaries advance their commit point via heartbeats by checking if the commit point is in the
 same term as their `lastApplied` OpTime. This ensures that the secondary is on the same branch of
@@ -494,13 +493,14 @@ global resource that helps manage the concurrency of running operations while a 
 applying a batch of oplog entries. Since secondary oplog application applies batches in parallel,
 operations will not necessarily be applied in order, so a node will hold the PBWM while it is
 waiting for the entire batch to be applied. For secondaries, in order to read at a consistent state
-without needing the PBWM lock, a node will try to read at the `lastApplied` timestamp. Since
-`lastApplied` is set after a batch is completed, it is guaranteed to be at a batch boundary.
-However, during initial sync there could be changes from a background index build that occur after
-the `lastApplied` timestamp. Since there is no guarantee that `lastApplied` will be advanced again,
-if a node sees that there are pending changes ahead of `lastApplied`, it will acquire the PBWM to
-make sure that there isn't an in-progress batch when reading, and read without a timestamp to ensure
-all writes are visible, including those later than the `lastApplied`.
+without needing the PBWM lock, a node will try to read at the
+[`lastApplied`](#replication-timestamp-glossary) timestamp. Since `lastApplied` is set after a batch
+is completed, it is guaranteed to be at a batch boundary. However, during initial sync there could
+be changes from a background index build that occur after the `lastApplied` timestamp. Since there
+is no guarantee that `lastApplied` will be advanced again, if a node sees that there are pending
+changes ahead of `lastApplied`, it will acquire the PBWM to make sure that there isn't an in-progress
+batch when reading, and read without a timestamp to ensure all writes are visible, including those
+later than the `lastApplied`.
 
 ## Replication State Transition Lock
 
@@ -645,7 +645,8 @@ The `replSetStepDown` command is one way that a node relinquishes its position a
 consider this a conditional step down because it can fail if the following conditions are not met:
 * `force` is true and now > `waitUntil` deadline, which is the amount of time we will wait before
 stepping down (Note: If `force` is true, only this condition needs to be met)
-* The `lastApplied` OpTime of the primary must be replicated to a majority of the nodes
+* The [`lastApplied`](#replication-timestamp-glossary) OpTime of the primary must be replicated to
+a majority of the nodes
 * At least one of the up-to-date secondaries is also electable
 
 When a `replSetStepDown` command comes in, the node begins to check if it can step down. First, the
@@ -712,9 +713,9 @@ rollback is not necessary if there are no uncommitted writes.
 As of 4.0, Replication supports the [`Recover To A Timestamp`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/rollback_impl.h#L158)
 algorithm (RTT), in which a node recovers to a consistent point in time and applies operations until
 it catches up to the sync source's branch of history. RTT uses the WiredTiger storage engine to
-recover to a stable timestamp, which is the highest timestamp at which the storage engine can take
-a checkpoint. This can be considered a consistent, majority committed point in time for replication
-and storage.
+recover to a [`stable_timestamp`](#replication-timestamp-glossary), which is the highest timestamp
+at which the storage engine can take a checkpoint. This can be considered a consistent, majority
+committed point in time for replication and storage.
 
 A node goes into rollback when its last fetched OpTime is greater than its sync source's last
 applied OpTime, but it is in a lower term. In this case, the `OplogFetcher` will return an empty
@@ -748,11 +749,11 @@ in order to avoid unnecessary prepare conflicts when trying to read documents th
 those transactions, which must be aborted for rollback anyway. Finally, if we have rolled back any
 operations, we invalidate all sessions on this server.
 
-Now, we are ready to tell the storage engine to recover to the last stable timestamp. Upon success,
-the storage engine restores the data reflected in the database to the data reflected at the last
-stable timestamp. This does not, however, revert the oplog. In order to revert the oplog, rollback
-must remove all oplog entries after the `common point`. This is called the truncate point and is
-written into the `oplogTruncateAfterPoint` document. Now, the recovery process knows where to
+Now, we are ready to tell the storage engine to recover to the last `stable_timestamp`. Upon
+success, the storage engine restores the data reflected in the database to the data reflected at the
+last `stable_timestamp`. This does not, however, revert the oplog. In order to revert the oplog,
+rollback must remove all oplog entries after the `common point`. This is called the truncate point
+and is written into the `oplogTruncateAfterPoint` document. Now, the recovery process knows where to
 truncate the oplog on the rollback node.
 
 During the last few steps of the data modification section, we clear the state of the
@@ -885,11 +886,12 @@ The oplog application phase concludes when the node applies an oplog entry at `s
 node checks its sync source's Rollback ID to see if a rollback occurred and if so, restarts initial
 sync. Otherwise, the `InitialSyncer` will begin tear down.
 
-It will register the node's `lastApplied` OpTime with the storage engine to make sure that all oplog
-entries prior to that will be visible when querying the oplog. After that it will reconstruct all
-prepared transactions. The node will then clear the initial sync flag and tell the storage engine
-that the `initialDataTimestamp` is the node's last applied OpTime. Finally, the `InitialSyncer`
-shuts down and the `ReplicationCoordinator` starts steady state replication.
+It will register the node's [`lastApplied`](#replication-timestamp-glossary) OpTime with the storage
+engine to make sure that all oplog entries prior to that will be visible when querying the oplog.
+After that it will reconstruct all prepared transactions. The node will then clear the initial sync
+flag and tell the storage engine that the [`initialDataTimestamp`](#replication-timestamp-glossary)
+is the node's last applied OpTime. Finally, the `InitialSyncer` shuts down and the
+`ReplicationCoordinator` starts steady state replication.
 
 # Dropping Collections and Databases
 
@@ -923,3 +925,85 @@ When a node receives a `dropDatabase` command, it will initiate a Two Phase Drop
 for each collection in the relevant database. Once all collection drops are replicated to a majority
 of nodes, the node will drop the now empty database and a `dropDatabase` command oplog entry is
 written to the oplog.
+
+# Replication Timestamp Glossary
+
+In this section, when we refer to the word "transaction" without any other qualifier, we are talking
+about a storage transaction. Transactions in the replication layer will be referred to as
+multi-document or prepared transactions.
+
+`all_durable`: All transactions with timestamps earlier than the `all_durable` timestamp are
+committed. This is the point at which the oplog has no gaps, which are created when we reserve
+timestamps before executing the associated write. Since this timestamp is used to maintain the oplog
+visibility point, it is important that all operations up to and including this timestamp are
+committed and durable on disk. This is so that we can replicate the oplog without any gaps.
+
+`stable_timestamp`: The newest timestamp at which the storage engine is allowed to take a
+checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
+storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
+majority committed so that RTT rollback can use it. In the case when `eMRC=false`, the stable
+<!-- TODO SERVER-43788: Link to eMRC=false section -->
+timestamp may not be majority committed, which is why we must use the Rollback via Refetch rollback
+algorithm.
+
+This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
+special case during rollback it is possible for the `stableTimestamp` to move backwards.
+
+`oldest_timestamp`: The earliest timestamp that the storage engine is guaranteed to have history
+for. New transactions can never start a timestamp earlier than this timestamp. Since we advance this
+as we advance the `stable_timestamp`, it will be less than or equal to the `stable_timestamp`.
+
+`initialDataTimestamp`: A timestamp used to indicate the timestamp at which history “begins”. When
+a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp` is
+the node's `lastApplied`.
+
+By setting this value to 0, it informs the storage engine to take unstable checkpoints. Stable
+checkpoints can be viewed as timestamped reads that persist the data they read into a checkpoint.
+Unstable checkpoints simply open a transaction and read all data that is currently committed at the
+time the transaction is opened. They read a consistent snapshot of data, but the snapshot they read
+from is not associated with any particular timestamp.
+
+`lastApplied`: In-memory record of the latest applied oplog entry optime. It may lag behind the
+optime of the newest oplog entry that is visible in the storage engine because it is updated after
+a storage transaction commits.
+
+`lastDurable`: Optime of the latest oplog entry that has been flushed to the journal. It is
+asynchronously updated by the storage engine as new writes become durable. Default journaling
+frequency is 100ms, so this could lag up to that amount behind lastApplied.
+
+`lastCommittedOpTime`: A node’s local view of the latest majority committed optime. Every time we
+update this optime, we also recalculate the `stable_timestamp`. Note that the `lastCommittedOpTime`
+can advance beyond a node's `lastApplied` if it has not yet replicated the most recent majority
+committed oplog entry. For more information about how the `lastCommittedOpTime` is updated and
+propagated, please see [Commit Point Propagation](#commit-point-propagation).
+
+`currentCommittedSnapshot`: An optime maintained in `ReplicationCoordinator` that is used to serve
+majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this is
+currently set to the stable optime, which is guaranteed to be in a node’s oplog. Since it is reset
+every time we recalculate the stable optime, it will also be up to date.
+
+When `eMRC=false`, this is set to the `lastCommittedOpTime`, so it may not be in the node’s oplog. The
+`stable_timestamp` is not allowed to advance past the `all_durable`. So, this value shouldn’t be
+ahead of `all_durable` unless `eMRC=false`.
+
+`readConcernMajorityOpTime`: Exposed in replSetGetStatus as “readConcernMajorityOpTime” but is
+populated internally from the `currentCommittedSnapshot` timestamp inside `ReplicationCoordinator`.
+
+`prepareTimestamp`: The timestamp of the ‘prepare’ oplog entry for a prepared transaction. This is
+the earliest timestamp at which it is legal to commit the transaction. This timestamp is provided to
+the storage engine to block reads that are trying to read prepared data until the storage engines
+knows whether the prepared transaction has committed or aborted.
+
+`commit oplog entry timestamp`: The timestamp of the ‘commitTransaction’ oplog entry for a prepared
+transaction, or the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a
+cross-shard transaction each shard may have a different commit oplog entry timestamp. This is
+guaranteed to be greater than the `prepareTimestamp`.
+
+`commitTimestamp`: The timestamp at which we committed a multi-document transaction. This will be
+the `commitTimestamp` field in the `commitTransaction` oplog entry for a prepared transaction, or
+the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a cross-shard
+transaction this timestamp is the same across all shards. The effects of the transaction are visible
+as of this timestamp. Note that `commitTimestamp` and the `commit oplog entry timestamp` are the
+same for non-prepared transactions because we do not write down the oplog entry until we commit the
+transaction. For a prepared transaction, we have the following guarantee: `prepareTimestamp` <=
+`commitTimestamp` <= `commit oplog entry timestamp`
