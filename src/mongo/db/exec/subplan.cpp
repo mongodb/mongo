@@ -165,13 +165,6 @@ Status SubplanStage::planSubqueries() {
             branchResult->solutions = std::move(solutions.getValue());
 
             LOG(5) << "Subplanner: got " << branchResult->solutions.size() << " solutions";
-
-            if (0 == branchResult->solutions.size()) {
-                // If one child doesn't have an indexed solution, bail out.
-                str::stream ss;
-                ss << "No solutions for subchild " << branchResult->canonicalQuery->toString();
-                return Status(ErrorCodes::BadValue, ss);
-            }
         }
     }
 
@@ -371,16 +364,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
             str::stream() << "error processing query: " << _query->toString()
                           << " planner returned error");
     }
-
     auto solutions = std::move(statusWithSolutions.getValue());
-
-    // We cannot figure out how to answer the query.  Perhaps it requires an index
-    // we do not have?
-    if (0 == solutions.size()) {
-        return Status(ErrorCodes::NoQueryExecutionPlans,
-                      str::stream() << "error processing query: " << _query->toString()
-                                    << " No query solutions");
-    }
 
     if (1 == solutions.size()) {
         // Only one possible plan.  Run it.  Build the stages from the solution.

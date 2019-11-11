@@ -587,13 +587,12 @@ TEST_F(QueryPlannerTest, CompoundMultikeyBoundsNoIntersect) {
 
 TEST_F(QueryPlannerTest, NoTableScanBasic) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
-    runQuery(BSONObj());
-    assertNumSolutions(0U);
+    runInvalidQuery(BSONObj());
+    assertNoSolutions();
 
     addIndex(BSON("x" << 1));
-
-    runQuery(BSONObj());
-    assertNumSolutions(0U);
+    runInvalidQuery(BSONObj());
+    assertNoSolutions();
 
     runQuery(fromjson("{x: {$gte: 0}}"));
     assertNumSolutions(1U);

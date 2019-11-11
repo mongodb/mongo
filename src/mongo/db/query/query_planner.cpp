@@ -532,8 +532,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
            << "Canonical query:" << endl
            << redact(query.toString()) << "=============================";
 
-    std::vector<std::unique_ptr<QuerySolution>> out;
-
     for (size_t i = 0; i < params.indices.size(); ++i) {
         LOG(5) << "Index " << i << " is " << params.indices[i].toString();
     }
@@ -544,12 +542,23 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // If the query requests a tailable cursor, the only solution is a collscan + filter with
     // tailable set on the collscan.
     if (isTailable) {
-        if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) && canTableScan) {
-            auto soln = buildCollscanSoln(query, isTailable, params);
-            if (soln) {
-                out.push_back(std::move(soln));
-            }
+        if (!canTableScan) {
+            return Status(
+                ErrorCodes::NoQueryExecutionPlans,
+                "Running with 'notablescan', so tailable cursors (which always do a table "
+                "scan) are not allowed");
         }
+        if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Tailable cursors and geo $near cannot be used together");
+        }
+        auto soln = buildCollscanSoln(query, isTailable, params);
+        if (!soln) {
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Failed to build collection scan soln");
+        }
+        std::vector<std::unique_ptr<QuerySolution>> out;
+        out.push_back(std::move(soln));
         return {std::move(out)};
     }
 
@@ -567,14 +576,22 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         // scan if there is a $natural sort with a non-$natural hint.
         if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
             LOG(5) << "Forcing a table scan due to hinted $natural";
-            // min/max are incompatible with $natural.
-            if (canTableScan && query.getQueryRequest().getMin().isEmpty() &&
-                query.getQueryRequest().getMax().isEmpty()) {
-                auto soln = buildCollscanSoln(query, isTailable, params);
-                if (soln) {
-                    out.push_back(std::move(soln));
-                }
+            if (!canTableScan) {
+                return Status(ErrorCodes::NoQueryExecutionPlans,
+                              "hint $natural is not allowed, because 'notablescan' is enabled");
             }
+            if (!query.getQueryRequest().getMin().isEmpty() ||
+                !query.getQueryRequest().getMax().isEmpty()) {
+                return Status(ErrorCodes::NoQueryExecutionPlans,
+                              "min and max are incompatible with $natural");
+            }
+            auto soln = buildCollscanSoln(query, isTailable, params);
+            if (!soln) {
+                return Status(ErrorCodes::NoQueryExecutionPlans,
+                              "Failed to build collection scan soln");
+            }
+            std::vector<std::unique_ptr<QuerySolution>> out;
+            out.push_back(std::move(soln));
             return {std::move(out)};
         }
     }
@@ -682,10 +699,12 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         invariant(solnRoot);
 
         auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
-        if (soln) {
-            out.push_back(std::move(soln));
+        if (!soln) {
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Sort and covering analysis failed while planning hint/min/max query");
         }
-
+        std::vector<std::unique_ptr<QuerySolution>> out;
+        out.push_back(std::move(soln));
         return {std::move(out)};
     }
 
@@ -767,6 +786,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         LOG(5) << "Rated tree after text processing:" << redact(query.root()->debugString());
     }
 
+    std::vector<std::unique_ptr<QuerySolution>> out;
+
     // If we have any relevant indices, we try to create indexed plans.
     if (0 < relevantIndices.size()) {
         // The enumerator spits out trees tagged with IndexTag(s).
@@ -845,14 +866,23 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // desired behavior when an index is hinted that is not relevant to the query. In the case that
     // $** index is hinted, we do not want this behavior.
     if (!hintedIndex.isEmpty() && relevantIndices.size() == 1) {
-        if (0 == out.size() && relevantIndices.front().type != IndexType::INDEX_WILDCARD) {
-            // Push hinted index solution to output list if found.
-            auto soln = buildWholeIXSoln(relevantIndices.front(), query, params);
-            if (soln) {
-                LOG(5) << "Planner: outputting soln that uses hinted index as scan.";
-                out.push_back(std::move(soln));
-            }
+        if (out.size() > 0) {
+            return {std::move(out)};
         }
+        if (relevantIndices.front().type == IndexType::INDEX_WILDCARD) {
+            return Status(
+                ErrorCodes::NoQueryExecutionPlans,
+                "$hint: refusing to build whole-index solution, because it's a wildcard index");
+        }
+        // Return hinted index solution if found.
+        auto soln = buildWholeIXSoln(relevantIndices.front(), query, params);
+        if (!soln) {
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Failed to build whole-index solution for $hint");
+        }
+        LOG(5) << "Planner: outputting soln that uses hinted index as scan.";
+        std::vector<std::unique_ptr<QuerySolution>> out;
+        out.push_back(std::move(soln));
         return {std::move(out)};
     }
 
@@ -979,20 +1009,31 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    // The caller can explicitly ask for a collscan.
+    bool collscanRequested = (params.options & QueryPlannerParams::INCLUDE_COLLSCAN);
+
+    // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
+    bool collScanRequired = 0 == out.size();
+    if (collScanRequired && !canTableScan) {
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "No indexed plans available, and running with 'notablescan'");
+    }
+
     // geoNear and text queries *require* an index.
     // Also, if a hint is specified it indicates that we MUST use it.
     bool possibleToCollscan =
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) && hintedIndex.isEmpty();
+    if (collScanRequired && !possibleToCollscan) {
+        return Status(ErrorCodes::NoQueryExecutionPlans, "No query solutions");
+    }
 
-    // The caller can explicitly ask for a collscan.
-    bool collscanRequested = (params.options & QueryPlannerParams::INCLUDE_COLLSCAN);
-
-    // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
-    bool collscanNeeded = (0 == out.size() && canTableScan);
-
-    if (possibleToCollscan && (collscanRequested || collscanNeeded)) {
+    if (possibleToCollscan && (collscanRequested || collScanRequired)) {
         auto collscan = buildCollscanSoln(query, isTailable, params);
+        if (!collscan && collScanRequired) {
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Failed to build collection scan soln");
+        }
         if (collscan) {
             LOG(5) << "Planner: outputting a collscan:" << endl << redact(collscan->toString());
             SolutionCacheData* scd = new SolutionCacheData();
@@ -1002,6 +1043,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    invariant(out.size() > 0);
     return {std::move(out)};
 }
 

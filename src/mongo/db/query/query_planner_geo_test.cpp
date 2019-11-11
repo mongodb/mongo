@@ -947,9 +947,9 @@ TEST_F(QueryPlannerGeo2dsphereTest,
     addIndex(BSON("a" << 1 << "b" << 1 << "geo"
                       << "2dsphere"),
              multikeyPaths);
-    runQuery(fromjson("{a: {$ne: 3}, b: 2, geo: {$nearSphere: [0, 0]}}"));
+    runInvalidQuery(fromjson("{a: {$ne: 3}, b: 2, geo: {$nearSphere: [0, 0]}}"));
 
-    assertNumSolutions(0U);
+    assertNoSolutions();
 }
 
 TEST_F(QueryPlannerGeo2dsphereTest,
@@ -1303,6 +1303,23 @@ TEST_F(QueryPlannerGeo2dsphereTest, CannotIntersectBoundsOn2dsphereFieldWhenItIs
 // A fixture to help run tests for multiple 2dsphere index versions.
 class QueryPlanner2dsphereVersionTest : public QueryPlannerTest {
 public:
+    // For each 2dsphere index version in 'versions', verifies the planner returns
+    // 'errorCode' for 'predicate' given 'keyPatterns'.
+    void assertExpectedFailureFor2dsphereIndexVersions(std::vector<int> versions,
+                                                       std::vector<BSONObj> keyPatterns,
+                                                       BSONObj predicate,
+                                                       ErrorCodes::Error errorCode) {
+        for (auto version : versions) {
+            params.indices.clear();
+            for (auto keyPattern : keyPatterns) {
+                addIndex(keyPattern, BSON("2dsphereIndexVersion" << version));
+            }
+
+            runInvalidQuery(predicate);
+            ASSERT_EQUALS(plannerStatus.code(), errorCode);
+        }
+    }
+
     // For each 2dsphere index version in 'versions', verifies the planner generates
     // 'expectedSolutions' for 'predicate' given 'keyPatterns'.
     void testMultiple2dsphereIndexVersions(std::vector<int> versions,
@@ -1564,9 +1581,8 @@ TEST_F(QueryPlanner2dsphereVersionTest, NegationWithoutGeoPredCannotUseGeoIndex)
     BSONObj predicate = fromjson("{a: {$ne: 3}}");
 
     // Only a COLLSCAN is possible, but COLLSCANs are prohibited above.
-    std::vector<std::string> solutions = {};
-
-    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+    ErrorCodes::Error err = ErrorCodes::NoQueryExecutionPlans;
+    assertExpectedFailureFor2dsphereIndexVersions(versions, keyPatterns, predicate, err);
 }
 
 TEST_F(QueryPlannerTest, 2dInexactFetchPredicateOverTrailingFieldHandledCorrectly) {
@@ -1703,9 +1719,9 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverLeadingFieldMultik
                       << "2dsphere"),
              multikey);
 
-    runQuery(
+    runInvalidQuery(
         fromjson("{a: {$_internalExprEq: 0}, b: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}"));
-    assertNumSolutions(0U);
+    assertNoSolutions();
 }
 
 TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingField) {

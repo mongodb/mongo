@@ -203,16 +203,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
             str::stream() << "error processing query: " << _canonicalQuery->toString()
                           << " planner returned error");
     }
-
     auto solutions = std::move(statusWithSolutions.getValue());
-
-    // We cannot figure out how to answer the query.  Perhaps it requires an index
-    // we do not have?
-    if (0 == solutions.size()) {
-        return Status(ErrorCodes::NoQueryExecutionPlans,
-                      str::stream() << "error processing query: " << _canonicalQuery->toString()
-                                    << " No query solutions");
-    }
 
     if (1 == solutions.size()) {
         // Only one possible plan. Build the stages from the solution.

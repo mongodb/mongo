@@ -59,6 +59,7 @@ void QueryPlannerTest::setUp() {
 }
 
 void QueryPlannerTest::clearState() {
+    plannerStatus = Status::OK();
     solns.clear();
     cq.reset();
     relaxBoundsCheck = false;
@@ -418,7 +419,8 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     cq = std::move(statusWithCQ.getValue());
 
     auto statusWithSolutions = QueryPlanner::plan(*cq, params);
-    ASSERT_NOT_OK(statusWithSolutions.getStatus());
+    plannerStatus = statusWithSolutions.getStatus();
+    ASSERT_NOT_OK(plannerStatus);
 }
 
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
@@ -465,7 +467,8 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     cq = std::move(statusWithCQ.getValue());
 
     auto statusWithSolutions = QueryPlanner::plan(*cq, params);
-    ASSERT_NOT_OK(statusWithSolutions.getStatus());
+    plannerStatus = statusWithSolutions.getStatus();
+    ASSERT_NOT_OK(plannerStatus);
 }
 
 size_t QueryPlannerTest::getNumSolutions() const {
@@ -535,6 +538,10 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
        << " but got " << matches << " instead. all solutions generated: " << '\n';
     dumpSolutions(ss);
     FAIL(ss);
+}
+
+void QueryPlannerTest::assertNoSolutions() const {
+    ASSERT_EQUALS(plannerStatus.code(), ErrorCodes::NoQueryExecutionPlans);
 }
 
 void QueryPlannerTest::assertHasOnlyCollscan() const {

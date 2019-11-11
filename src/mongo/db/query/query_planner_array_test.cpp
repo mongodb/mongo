@@ -1002,10 +1002,9 @@ TEST_F(QueryPlannerTest, CantIndexNegationBelowElemMatchValue) {
     // true means multikey
     addIndex(BSON("a" << 1), true);
 
-    runQuery(fromjson("{a: {$elemMatch: {$not: {$mod: [2, 0]}}}}"));
-
     // There are no indexed solutions, because negations of $mod are not indexable.
-    assertNumSolutions(0);
+    runInvalidQuery(fromjson("{a: {$elemMatch: {$not: {$mod: [2, 0]}}}}"));
+    assertNoSolutions();
 }
 
 /**

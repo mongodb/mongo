@@ -293,19 +293,23 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           nullptr /* projExec */);
     plannerParams.indices.push_back(std::move(indexEntry));
 
-    auto solutions = uassertStatusOK(QueryPlanner::plan(canonicalQuery, plannerParams));
+    auto plannerResult = QueryPlanner::plan(canonicalQuery, plannerParams);
+    if (plannerResult.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
+        auto solutions = uassertStatusOK(std::move(plannerResult));
 
+        // Pick any solution that has non-trivial IndexBounds. bounds.size() == 0 represents a
+        // trivial IndexBounds where none of the fields' values are bounded.
+        for (auto&& soln : solutions) {
+            IndexBounds bounds = collapseQuerySolution(soln->root.get());
+            if (bounds.size() > 0) {
+                return bounds;
+            }
+        }
+    }
+
+    // We cannot plan the query without collection scan, so target to all shards.
     IndexBounds bounds;
-
-    for (auto&& soln : solutions) {
-        // Try next solution if we failed to generate index bounds, i.e. bounds.size() == 0
-        bounds = collapseQuerySolution(soln->root.get());
-    }
-
-    if (bounds.size() == 0) {
-        // We cannot plan the query without collection scan, so target to all shards.
-        IndexBoundsBuilder::allValuesBounds(key, &bounds);  // [minKey, maxKey]
-    }
+    IndexBoundsBuilder::allValuesBounds(key, &bounds);  // [minKey, maxKey]
     return bounds;
 }
 

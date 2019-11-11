@@ -1,6 +1,7 @@
 // check notablescan mode
 //
 // @tags: [
+//   assumes_against_mongod_not_mongos,
 //   # This test attempts to perform read operations after having enabled the notablescan server
 //   # parameter. The former operations may be routed to a secondary in the replica set, whereas the
 //   # latter must be routed to the primary.
@@ -21,21 +22,27 @@ try {
         });
     }
     t.save({a: 1});
-    if (0) {  // SERVER-2222
-        assert.throws(function() {
-            t.count({a: 1});
-        });
+    assert.throws(function() {
+        t.count({a: 1});
+    });
+    if (0) {
         assert.throws(function() {
             t.find({}).toArray();
         });
     }
     assert.eq(1, t.find({}).itcount());  // SERVER-274
-    assert.throws(function() {
+
+    let err = assert.throws(function() {
         t.find({a: 1}).toArray();
     });
-    assert.throws(function() {
+    assert.includes(err.toString(), "No indexed plans available, and running with 'notablescan'");
+
+    err = assert.throws(function() {
         t.find({a: 1}).hint({$natural: 1}).toArray();
     });
+    assert.includes(err.toString(),
+                    "hint $natural is not allowed, because 'notablescan' is enabled");
+
     t.ensureIndex({a: 1});
     assert.eq(0, t.find({a: 1, b: 1}).itcount());
     assert.eq(1, t.find({a: 1, b: null}).itcount());

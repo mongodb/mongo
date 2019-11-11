@@ -216,6 +216,11 @@ protected:
     void assertHasOnlyCollscan() const;
 
     /**
+     * Check that query planning failed with NoQueryExecutionPlans.
+     */
+    void assertNoSolutions() const;
+
+    /**
      * Helper function to parse a MatchExpression.
      */
     static std::unique_ptr<MatchExpression> parseMatchExpression(
@@ -232,6 +237,7 @@ protected:
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;
+    Status plannerStatus = Status::OK();
     std::vector<std::unique_ptr<QuerySolution>> solns;
 
     bool relaxBoundsCheck = false;

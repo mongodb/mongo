@@ -1022,8 +1022,8 @@ TEST_F(QueryPlannerWildcardTest, QueryNotInWildcardIndexHint) {
     addWildcardIndex(BSON("a.$**" << 1));
     addIndex(BSON("x" << 1));
 
-    runQueryHint(fromjson("{x: {$eq: 1}}"), BSON("a.$**" << 1));
-    assertNumSolutions(0U);
+    runInvalidQueryHint(fromjson("{x: {$eq: 1}}"), BSON("a.$**" << 1));
+    assertNoSolutions();
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotExist) {
@@ -1037,8 +1037,8 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexHintWithPartialFilter) {
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
     addWildcardIndex(BSON("$**" << 1), {}, {}, filterExpr.get());
 
-    runQueryHint(fromjson("{a: {$eq: 1}}"), BSON("$**" << 1));
-    assertNumSolutions(0U);
+    runInvalidQueryHint(fromjson("{a: {$eq: 1}}"), BSON("$**" << 1));
+    assertNoSolutions();
 }
 
 TEST_F(QueryPlannerWildcardTest, MultipleWildcardIndexesHintWithPartialFilter) {
@@ -1046,8 +1046,8 @@ TEST_F(QueryPlannerWildcardTest, MultipleWildcardIndexesHintWithPartialFilter) {
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
     addWildcardIndex(BSON("$**" << 1), {}, {}, filterExpr.get());
 
-    runQueryHint(fromjson("{a: {$eq: 1}, b: {$eq: 1}}"), BSON("$**" << 1));
-    assertNumSolutions(0U);
+    runInvalidQueryHint(fromjson("{a: {$eq: 1}, b: {$eq: 1}}"), BSON("$**" << 1));
+    assertNoSolutions();
 }
 
 //

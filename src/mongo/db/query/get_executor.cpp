@@ -508,14 +508,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                           << " planner returned error");
     }
     auto solutions = std::move(statusWithSolutions.getValue());
-
-    // We cannot figure out how to answer the query.  Perhaps it requires an index
-    // we do not have?
-    if (0 == solutions.size()) {
-        return Status(ErrorCodes::NoQueryExecutionPlans,
-                      str::stream() << "error processing query: " << canonicalQuery->toString()
-                                    << " No query solutions");
-    }
+    // The planner should have returned an error status if there are no solutions.
+    invariant(solutions.size() > 0);
 
     // See if one of our solutions is a fast count hack in disguise.
     if (plannerParams.options & QueryPlannerParams::IS_COUNT) {
