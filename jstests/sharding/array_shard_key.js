@@ -1,4 +1,5 @@
 // Ensure you can't shard on an array key
+// @tags: [uses_transactions, uses_multi_shard_transaction]
 (function() {
 'use strict';
 
