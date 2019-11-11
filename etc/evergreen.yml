@@ -290,18 +290,18 @@ variables:
 
 # Use this template for enterprise Windows testing coverage on non-pushing
 # variants
-- &enterprise-windows-64-2k8-nopush-template
-  name: enterprise-windows-64-2k8-nopush-template
+- &enterprise-windows-nopush-template
+  name: enterprise-windows-nopush-template
   run_on:
   - windows-64-vs2017-test
   modules:
   - enterprise
-  expansions: &enterprise-windows-64-2k8-nopush-expansions-template
+  expansions: &enterprise-windows-nopush-expansions-template
     platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -401,14 +401,14 @@ variables:
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
-  - enterprise-windows-64-2k8
-  - enterprise-windows-64-2k8-async
-  - enterprise-windows-64-2k8-compile-all
-  - enterprise-windows-64-2k8-debug-unoptimized
-  - enterprise-windows-64-2k8-inmem
-  - enterprise-windows-64-2k8-nopush-template
-  - enterprise-windows-64-2k8-required
-  - enterprise-windows-64-2k8-wtdevelop
+  - enterprise-windows
+  - enterprise-windows-async
+  - enterprise-windows-compile-all
+  - enterprise-windows-debug-unoptimized
+  - enterprise-windows-inmem
+  - enterprise-windows-nopush-template
+  - enterprise-windows-required
+  - enterprise-windows-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite
@@ -425,7 +425,7 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
-  - enterprise-windows-64-2k8
+  - enterprise-windows
 
 #######################################
 #            Functions                #
@@ -2737,7 +2737,7 @@ functions:
           ${set_sudo}
           # Set up curator to collect system & process stats on remote.
           if [ "Windows_NT" = "$OS" ]; then
-             variant=windows-64
+             variant=windows
           else
              variant=ubuntu1604
           fi
@@ -3889,8 +3889,8 @@ tasks:
         content_type: ${content_type|application/gzip}
         display_name: Source tarball
         # We only need to upload the source tarball from one of the build variants
-        # because it should be the same everywhere, so just use rhel70/windows-64-2k8-ssl.
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        # because it should be the same everywhere, so just use rhel70/windows.
+        build_variants: [rhel70, windows]
     - command: s3.put
       params:
         optional: true
@@ -8315,7 +8315,7 @@ tasks:
         remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        build_variants: [rhel70, windows]
     - func: "apply compile expansions"
     - func: "fetch debugsymbols archive"
     - func: "set up remote credentials"
@@ -8338,7 +8338,7 @@ tasks:
           mv mh.tgz mh-${push_name}-${push_arch}-${suffix}.${ext|tgz} || true
           mv mongo-debugsymbols.tgz mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
           mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
-          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
+          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-${push_arch}-${suffix}.msi || true
 
           /usr/local/bin/notary-client.py --key-name "server-4.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz} mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
 
@@ -8394,7 +8394,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        build_variants: [rhel70, windows]
 
     # Put the debug symbols
     - command: s3.put
@@ -8452,7 +8452,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        build_variants: [rhel70, windows]
 
     # Put the debug symbols signature
     - command: s3.put
@@ -8472,11 +8472,11 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         permissions: public-read
-        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi
+        build_variants: ["enterprise-windows", "windows"]
+        local_file: src/mongodb-${push_arch}-${suffix}.msi
         bucket: build-push-testing
         content_type: application/x-msi
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi
 
     # Put the binaries tarball sha1
     - command: s3.put
@@ -8522,7 +8522,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        build_variants: [rhel70, windows]
 
     # Put the debug symbols sha1
     - command: s3.put
@@ -8542,11 +8542,11 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         permissions: public-read
-        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1
+        build_variants: ["enterprise-windows", "windows"]
+        local_file: src/mongodb-${push_arch}-${suffix}.msi.sha1
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi.sha1
 
     # Put the binaries tarball sha256
     - command: s3.put
@@ -8592,7 +8592,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        build_variants: [rhel70, windows]
 
     # Put the debug symbols sha256
     - command: s3.put
@@ -8611,11 +8611,11 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256
+        build_variants: ["enterprise-windows", "windows"]
+        local_file: src/mongodb-${push_arch}-${suffix}.msi.sha256
         bucket: build-push-testing
         permissions: public-read
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi.sha256
         content_type: text/plain
 
     # Put the binaries tarball md5
@@ -8662,7 +8662,7 @@ tasks:
         permissions: public-read
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
-        build_variants: [rhel70, windows-64-2k8-ssl]
+        build_variants: [rhel70, windows]
 
     # Put the debug symbols md5
     - command: s3.put
@@ -8681,12 +8681,12 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5
+        build_variants: ["enterprise-windows", "windows"]
+        local_file: src/mongodb-${push_arch}-${suffix}.msi.md5
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi.md5
 
     - command: s3Copy.copy
       params:
@@ -8714,12 +8714,12 @@ tasks:
             #Source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
+               'build_variants': ['rhel70', 'windows']}
 
             #MSI (Windows only)
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}.msi', 'bucket': '${push_bucket}'},
+               'build_variants': ['enterprise-windows', 'windows']}
 
             #Binaries Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
@@ -8737,7 +8737,7 @@ tasks:
             #Source tarball signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
+               'build_variants': ['rhel70', 'windows']}
 
             #SHA1 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
@@ -8755,12 +8755,12 @@ tasks:
             #SHA1 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
+               'build_variants': ['rhel70', 'windows']}
 
             #SHA1 for MSI
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}.msi.sha1', 'bucket': '${push_bucket}'},
+               'build_variants': ['enterprise-windows', 'windows']}
 
             #SHA256 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
@@ -8778,12 +8778,12 @@ tasks:
             #SHA256 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
+               'build_variants': ['rhel70', 'windows']}
 
             #SHA256 for MSI files
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}.msi.sha256', 'bucket': '${push_bucket}'},
+               'build_variants': ['enterprise-windows', 'windows']}
 
             #MD5 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
@@ -8801,12 +8801,12 @@ tasks:
             #MD5 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
+               'build_variants': ['rhel70', 'windows']}
 
             #MD5 for MSIs
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}.msi.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}.msi.md5', 'bucket': '${push_bucket}'},
+               'build_variants': ['enterprise-windows', 'windows']}
 
     # Debug symbols are not created for all variants and the copy is optional.
     - command: s3Copy.copy
@@ -9811,20 +9811,20 @@ buildvariants:
 #         Windows buildvariants           #
 ###########################################
 
-- name: enterprise-windows-64-2k8-required
-  display_name: "! Enterprise Windows 2008R2"
+- name: enterprise-windows-required
+  display_name: "! Enterprise Windows"
   modules:
     - enterprise
   run_on:
     - windows-64-vs2017-test
-  expansions: &enterprise_windows_64_2k8_expansions
-    burn_in_tests_build_variant: enterprise-windows-64-2k8
+  expansions: &enterprise_windows_expansions
+    burn_in_tests_build_variant: enterprise-windows
     platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     mh_target: archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9852,15 +9852,15 @@ buildvariants:
         - windows-64-vs2017-compile
     - name: noPassthrough_gen
 
-- name: windows-64-2k8-debug
-  display_name: "* Windows 2008R2 DEBUG"
+- name: windows-debug
+  display_name: "* Windows DEBUG"
   run_on:
   - windows-64-vs2017-test
   expansions:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2012plus
+    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=windows
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9919,18 +9919,18 @@ buildvariants:
   - name: sharding_gen
   - name: .stitch
 
-- name: enterprise-windows-64-2k8
-  display_name: "* Enterprise Windows 2008R2"
+- name: enterprise-windows
+  display_name: "* Enterprise Windows"
   modules:
   - enterprise
   run_on:
   - windows-64-vs2017-test
   expansions:
-    <<: *enterprise_windows_64_2k8_expansions
-    push_path: win32
+    <<: *enterprise_windows_expansions
+    push_path: windows
     push_bucket: downloads.10gen.com
-    push_name: win32
-    push_arch: x86_64-enterprise-windows-64
+    push_name: windows
+    push_arch: x86-enterprise
   tasks:
   - name: compile_TG
     requires:
@@ -9975,20 +9975,20 @@ buildvariants:
     distros:
     - rhel70-small
 
-- <<: *enterprise-windows-64-2k8-nopush-template
-  name: enterprise-windows-64-2k8-wtdevelop
-  display_name: "~ Enterprise Windows 2008R2 WiredTiger develop"
+- <<: *enterprise-windows-nopush-template
+  name: enterprise-windows-wtdevelop
+  display_name: "~ Enterprise Windows WiredTiger develop"
   batchtime: 1440 # 1 day
   modules:
   - enterprise
   - wtdevelop
   expansions:
-    <<: *enterprise-windows-64-2k8-nopush-expansions-template
+    <<: *enterprise-windows-nopush-expansions-template
     use_wt_develop: true
 
-- <<: *enterprise-windows-64-2k8-nopush-template
-  name: enterprise-windows-64-2k8-compile-all
-  display_name: "* Enterprise Windows 2008R2 compile_all"
+- <<: *enterprise-windows-nopush-template
+  name: enterprise-windows-compile-all
+  display_name: "* Enterprise Windows compile_all"
   run_on:
   - windows-64-vs2017-test
   tasks:
@@ -9997,8 +9997,8 @@ buildvariants:
     - windows-64-vs2017-compile
   # Do not add more tasks to this list.
 
-- name: enterprise-windows-64-2k8-async
-  display_name: "~ Enterprise Windows 2008R2 async"
+- name: enterprise-windows-async
+  display_name: "~ Enterprise Windows async"
   modules:
   - enterprise
   run_on:
@@ -10010,7 +10010,7 @@ buildvariants:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10031,8 +10031,8 @@ buildvariants:
   - name: replica_sets
   - name: sharding_gen
 
-- name: enterprise-windows-64-2k8-inmem
-  display_name: Enterprise Windows 2008R2 (inMemory)
+- name: enterprise-windows-inmem
+  display_name: Enterprise Windows (inMemory)
   modules:
   - enterprise
   run_on:
@@ -10043,7 +10043,7 @@ buildvariants:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10083,23 +10083,23 @@ buildvariants:
   - name: snmp
   - name: .ssl
 
-- name: windows-64-2k8-ssl
-  display_name: Windows 2008R2
+- name: windows
+  display_name: Windows
   run_on:
   - windows-64-vs2017-test
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
-    push_path: win32
+    push_path: windows
     push_bucket: downloads.mongodb.org
-    push_name: win32
-    push_arch: x86_64-2012plus
+    push_name: windows
+    push_arch: x64
     multiversion_platform: windows_x86_64-2008plus-ssl
     multiversion_platform_42_or_later: windows_x86_64-2012plus
     msi_target: msi
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=2012plus -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
+    compile_flags: --ssl MONGO_DISTMOD=windows -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10146,8 +10146,8 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: enterprise-windows-64-2k8-debug-unoptimized
-  display_name: Enterprise Windows 2008R2 DEBUG (Unoptimized)
+- name: enterprise-windows-debug-unoptimized
+  display_name: Enterprise Windows DEBUG (Unoptimized)
   modules:
   - enterprise
   run_on:
@@ -10157,7 +10157,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
+    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))

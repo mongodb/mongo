@@ -428,11 +428,18 @@ add_option('osx-version-min',
     help='minimum OS X version to support',
 )
 
+# https://docs.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt?view=vs-2017
+# https://docs.microsoft.com/en-us/windows-server/get-started/windows-server-release-info
 win_version_min_choices = {
-    'win7'    : ('0601', '0000'),
-    'ws08r2'  : ('0601', '0000'),
-    'win8'    : ('0602', '0000'),
-    'win81'   : ('0603', '0000'),
+    'win7'     : ('0601', '0000'),
+    'ws08r2'   : ('0601', '0000'),
+    'win8'     : ('0602', '0000'),
+    'ws2012'   : ('0602', '0000'),
+    'win81'    : ('0603', '0000'),
+    'ws2012r2' : ('0603', '0000'),
+    'win10'    : ('0A00', '0000'),
+    'ws2016'   : ('0A00', '1607'),
+    'ws2019'   : ('0A00', '1809')
 }
 
 add_option('win-version-min',
@@ -2146,7 +2153,7 @@ def doConfigure(myenv):
             win_version_min = get_option('win-version-min')
         else:
             # If no minimum version has beeen specified, use our default
-            win_version_min = 'ws08r2'
+            win_version_min = 'win10'
 
         env['WIN_VERSION_MIN'] = win_version_min
         win_version_min = win_version_min_choices[win_version_min]
