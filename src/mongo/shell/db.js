@@ -1511,12 +1511,17 @@ DB.prototype._authOrThrow = function() {
     if (arguments.length == 2) {
         params = {user: arguments[0], pwd: arguments[1]};
     } else if (arguments.length == 1) {
-        if (typeof (arguments[0]) != "object")
+        if (typeof (arguments[0]) === "string") {
+            let password = passwordPrompt();
+            params = {user: arguments[0], pwd: password};
+        } else if (typeof (arguments[0]) === "object") {
+            params = Object.extend({}, arguments[0]);
+        } else {
             throw Error("Single-argument form of auth expects a parameter object");
-        params = Object.extend({}, arguments[0]);
+        }
     } else {
         throw Error(
-            "auth expects either (username, password) or ({ user: username, pwd: password })");
+            "auth expects (username), (username, password), or ({ user: username, pwd: password })");
     }
 
     if (params.mechanism === undefined) {
