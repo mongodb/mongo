@@ -1072,7 +1072,6 @@ void InitialSyncer::_allDatabaseClonerCallback(
     log() << "Finished cloning data: " << redact(databaseClonerFinishStatus)
           << ". Beginning oplog replay.";
     _client->shutdownAndDisallowReconnect();
-    _client.reset();
 
     if (MONGO_unlikely(initialSyncHangAfterDataCloning.shouldFail())) {
         // This could have been done with a scheduleWorkAt but this is used only by JS tests where
@@ -1086,6 +1085,7 @@ void InitialSyncer::_allDatabaseClonerCallback(
     }
 
     stdx::lock_guard<Latch> lock(_mutex);
+    _client.reset();
     auto status = _checkForShutdownAndConvertStatus_inlock(databaseClonerFinishStatus,
                                                            "error cloning databases");
     if (!status.isOK()) {
