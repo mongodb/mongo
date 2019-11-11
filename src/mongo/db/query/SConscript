@@ -93,6 +93,7 @@ env.CppUnitTest(
 env.Library(
     target="query_common",
     source=[
+        "explain_common.cpp",
         "find_common.cpp",
         "parsed_distinct.cpp",
     ],
