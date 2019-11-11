@@ -32,25 +32,40 @@
 
         // Output is of the format: 'glibc x.yz'
         var output = rawMongoProgramOutput();
+        clearRawMongoProgramOutput();
+
+        jsTestLog(`getconf GNU_LIBC_VERSION\n${output}`);
+
         var fields = output.split(" ");
         var glibc_version = parseFloat(fields[2]);
+
+        var rc = runProgram("cat", "/etc/os-release");
+        if (rc != 0) {
+            jsTestLog(
+                `Failed the check for /etc/os-release, we are probably not on a *nix. Skipping this test.`);
+            return;
+        }
+
+        var osRelease = rawMongoProgramOutput();
+        clearRawMongoProgramOutput();
+
+        jsTestLog(`cat /etc/os-release\n${osRelease}`);
+
+        var suzeMatch = osRelease.match(/ID="?sles"?/);
 
         // Fail this test if we are on GLIBC >= 2.2 and HOSTALIASES still doesn't work
         if (glibc_version < 2.2) {
             jsTestLog(`HOSTALIASES does not seem to work as expected on this system. GLIBC
                 version is ${glibc_version}, skipping this test.`);
             return;
-        } else {
-            var verCheck =
-                runProgram("grep", "/etc/os-release", "\"SUSE Linux Enterprise Server\"");
-            if (verCheck == 0) {
-                jsTestLog(`HOSTALIASES does not seem to work as expected but we detected SLES. GLIBC
-                    version is ${glibc_version}, skipping this test.`);
-                return;
-            }
-            assert(false, `HOSTALIASES does not seem to work as expected on this system. GLIBC
-                version is ${glibc_version}`);
+        } else if (suzeMatch) {
+            jsTestLog(`HOSTALIASES does not seem to work as expected but we detected SLES. GLIBC
+                version is ${glibc_version}, skipping this test.`);
+            return;
         }
+
+        assert(false, `HOSTALIASES does not seem to work as expected on this system. GLIBC
+            version is ${glibc_version}`);
     }
 
     var replTest = new ReplSetTest({
