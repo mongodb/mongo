@@ -34,7 +34,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
@@ -88,21 +87,14 @@ protected:
         // Prevent DistLockManager from writing to lockpings collection before we create the
         // indexes.
         _autoDb = setUpAndLockConfigDb();
-
-        // Locking the RSTL makes the index build run synchronously in the IndexBuildsCoordinator.
-        // This is also how the config db is initialized in a replica set node on stepup.
-        _rstlGuard =
-            std::make_unique<repl::ReplicationStateTransitionLockGuard>(operationContext(), MODE_X);
     }
 
     void tearDown() override {
-        _rstlGuard = {};
         _autoDb = {};
         ConfigServerTestFixture::tearDown();
     }
 
     std::unique_ptr<AutoGetDb> _autoDb;
-    std::unique_ptr<repl::ReplicationStateTransitionLockGuard> _rstlGuard;
 };
 
 TEST_F(ConfigInitializationTest, UpgradeNotNeeded) {

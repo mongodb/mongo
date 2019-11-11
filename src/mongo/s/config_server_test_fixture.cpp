@@ -41,7 +41,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/write_ops.h"
@@ -119,10 +118,6 @@ std::unique_ptr<AutoGetDb> ConfigServerTestFixture::setUpAndLockConfigDb() {
 void ConfigServerTestFixture::setUpAndInitializeConfigDb() {
     // Prevent DistLockManager from writing to lockpings collection before we create the indexes.
     auto autoDb = setUpAndLockConfigDb();
-
-    // Locking the RSTL makes the index build run synchronously in the IndexBuildsCoordinator. This
-    // is also how the config db is initialized in a replica set node on stepup.
-    repl::ReplicationStateTransitionLockGuard rstlGuard(operationContext(), MODE_X);
 
     // Initialize the config database while we have exclusive access.
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
