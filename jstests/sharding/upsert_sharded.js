@@ -10,7 +10,6 @@ var st = new ShardingTest({shards: 2, mongos: 1});
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("foo.bar");
-var sessionColl = mongos.startSession({retryWrites: true}).getDatabase("foo").bar;
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
@@ -22,8 +21,7 @@ var upsertedResult = function(upsertColl, query, expr) {
 
 var upsertedField = function(upsertColl, query, expr, fieldName) {
     assert.commandWorked(upsertedResult(upsertColl, query, expr));
-    // Don't use upsertColl because it may be from a session, which would fail in op query suites.
-    return coll.findOne()[fieldName];
+    return upsertColl.findOne()[fieldName];
 };
 
 var upsertedXVal = function(upsertColl, query, expr) {
@@ -39,15 +37,15 @@ assert.commandWorked(admin.runCommand(
 st.printShardingStatus();
 
 // Upserted replacement update can result in no shard key.
-assert.commandWorked(upsertedResult(sessionColl, {x: 1}, {_id: 1}));
+assert.commandWorked(upsertedResult(coll, {x: -1}, {_id: 1}));
 assert.docEq(coll.findOne({}), {_id: 1});
 
 // Upserted op style update will propagate shard key by default.
-assert.commandWorked(upsertedResult(sessionColl, {x: 1}, {$set: {_id: 1}}));
-assert.docEq(coll.findOne({}), {_id: 1, x: 1});
+assert.commandWorked(upsertedResult(coll, {x: -1}, {$set: {_id: 1}}));
+assert.docEq(coll.findOne({}), {_id: 1, x: -1});
 
 // Upserted op style update can unset propagated shard key.
-assert.commandWorked(upsertedResult(sessionColl, {x: 1}, {$set: {_id: 1}, $unset: {x: 1}}));
+assert.commandWorked(upsertedResult(coll, {x: -1}, {$set: {_id: 1}, $unset: {x: 1}}));
 assert.docEq(coll.findOne({}), {_id: 1});
 
 // updates with upsert must contain shard key in query when $op style
@@ -99,18 +97,18 @@ assert.commandWorked(admin.runCommand(
 st.printShardingStatus();
 
 // Upserted replacement update can result in no shard key with nested shard key.
-assert.commandWorked(upsertedResult(sessionColl, {"x.x": 1}, {_id: 1}));
+assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {_id: 1}));
 assert.docEq(coll.findOne({}), {_id: 1});
 
 // Upserted op style update will propagate shard key by default with nested shard key.
-assert.commandWorked(upsertedResult(sessionColl, {"x.x": 1}, {$set: {_id: 1}}));
-assert.docEq(coll.findOne({}), {_id: 1, x: {x: 1}});
+assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {$set: {_id: 1}}));
+assert.docEq(coll.findOne({}), {_id: 1, x: {x: -1}});
 
 // Upserted op style update can unset propagated shard key fields with nested shard key.
-assert.commandWorked(upsertedResult(sessionColl, {"x.x": 1}, {$set: {_id: 1}, $unset: {"x.x": 1}}));
+assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {$set: {_id: 1}, $unset: {"x.x": 1}}));
 assert.docEq(coll.findOne({}), {_id: 1, x: {}});
 
-assert.commandWorked(upsertedResult(sessionColl, {"x.x": 1}, {$set: {_id: 1}, $unset: {"x": 1}}));
+assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {$set: {_id: 1}, $unset: {"x": 1}}));
 assert.docEq(coll.findOne({}), {_id: 1});
 
 // nested field extraction with nested shard key
@@ -133,18 +131,18 @@ assert.commandFailedWithCode(upsertedResult(coll, {x: [{x: 1}]}, {$set: {a: 1}})
                              ErrorCodes.ShardKeyNotFound);
 
 // No arrays at any level for document insertion for replacement and op style updates.
-assert.commandFailedWithCode(upsertedResult(sessionColl, {"x.x": 1}, {$set: {x: {x: []}}}),
+assert.commandFailedWithCode(upsertedResult(coll, {"x.x": -1}, {$set: {x: {x: []}}}),
                              ErrorCodes.NotSingleValueField);
-assert.commandFailedWithCode(upsertedResult(sessionColl, {"x.x": 1}, {$set: {x: [{x: 1}]}}),
+assert.commandFailedWithCode(upsertedResult(coll, {"x.x": -1}, {$set: {x: [{x: 1}]}}),
                              ErrorCodes.NotSingleValueField);
 
-assert.commandFailedWithCode(upsertedResult(sessionColl, {"x.x": 1}, {x: {x: []}}),
+assert.commandFailedWithCode(upsertedResult(coll, {"x.x": -1}, {x: {x: []}}),
                              ErrorCodes.NotSingleValueField);
-assert.commandFailedWithCode(upsertedResult(sessionColl, {"x.x": 1}, {x: [{x: 1}]}),
+assert.commandFailedWithCode(upsertedResult(coll, {"x.x": -1}, {x: [{x: 1}]}),
                              ErrorCodes.NotSingleValueField);
 
 // Can't set sub-fields of nested key
-assert.commandFailedWithCode(upsertedResult(sessionColl, {"x.x.x": {$eq: 1}}, {$set: {a: 1}}),
+assert.commandFailedWithCode(upsertedResult(coll, {"x.x.x": {$eq: 1}}, {$set: {a: 1}}),
                              ErrorCodes.ShardKeyNotFound);
 
 st.stop();
