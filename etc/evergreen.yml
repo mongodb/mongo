@@ -9087,7 +9087,6 @@ buildvariants:
   display_name: ~ Linux Repeated Execution
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
     test_flags: >-
@@ -9122,6 +9121,7 @@ buildvariants:
 - &linux-64-debug-template
   name: linux-64-debug
   display_name: "! Linux DEBUG"
+  batchtime: 60 # 1 hour
   run_on:
   - rhel62-large
   expansions:
@@ -9162,7 +9162,6 @@ buildvariants:
 - <<: *linux-64-debug-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 1440 # 1 day
   modules:
   - wtdevelop
   expansions:
@@ -9177,7 +9176,6 @@ buildvariants:
   display_name: Linux (No Journal)
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions: &linux-64-required-duroff-expansions
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
     multiversion_platform: rhel62
@@ -9211,7 +9209,6 @@ buildvariants:
   display_name: Ubuntu 18.04
   run_on:
   - ubuntu1804-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -9265,7 +9262,6 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -9313,7 +9309,6 @@ buildvariants:
   display_name: Ubuntu 16.04
   run_on:
   - ubuntu1604-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -9380,7 +9375,6 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-arm64-large
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -9429,7 +9423,6 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-arm64-build
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -9476,7 +9469,6 @@ buildvariants:
   display_name: Ubuntu 18.04 arm64
   run_on:
   - ubuntu1804-arm64-build
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -9510,7 +9502,6 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-power8-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -9655,7 +9646,6 @@ buildvariants:
   - enterprise
   run_on:
   - amazon1-2018-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -9707,7 +9697,6 @@ buildvariants:
   display_name: Amazon Linux
   run_on:
   - amazon1-2018-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -9762,7 +9751,6 @@ buildvariants:
   - enterprise
   run_on:
   - amazon2-test
-  batchtime: 1440 # 1 day
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286
@@ -9817,7 +9805,6 @@ buildvariants:
   display_name: Amazon Linux 2
   run_on:
   - amazon2-test
-  batchtime: 1440 # 1 day
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286
@@ -9876,7 +9863,6 @@ buildvariants:
   display_name: "~ TIG Daily Cron"
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
@@ -9887,6 +9873,7 @@ buildvariants:
 
 - name: enterprise-windows-required
   display_name: "! Enterprise Windows"
+  batchtime: 60 # 1 hour
   modules:
     - enterprise
   run_on:
@@ -9928,6 +9915,7 @@ buildvariants:
 
 - name: windows-debug
   display_name: "* Windows DEBUG"
+  batchtime: 60 # 1 hour
   run_on:
   - windows-64-vs2017-test
   expansions:
@@ -9995,6 +9983,7 @@ buildvariants:
 
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
@@ -10052,7 +10041,6 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-wtdevelop
   display_name: "~ Enterprise Windows WiredTiger develop"
-  batchtime: 1440 # 1 day
   modules:
   - enterprise
   - wtdevelop
@@ -10063,6 +10051,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-compile-all
   display_name: "* Enterprise Windows compile_all"
+  batchtime: 60 # 1 hour
   run_on:
   - windows-64-vs2017-test
   tasks:
@@ -10111,7 +10100,6 @@ buildvariants:
   - enterprise
   run_on:
   - windows-64-vs2017-test
-  batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -10161,7 +10149,6 @@ buildvariants:
   display_name: Windows
   run_on:
   - windows-64-vs2017-test
-  batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -10226,7 +10213,6 @@ buildvariants:
   - enterprise
   run_on:
   - windows-64-vs2017-test
-  batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -10258,7 +10244,6 @@ buildvariants:
   display_name: macOS
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
@@ -10306,6 +10291,7 @@ buildvariants:
 
 - name: macos-debug
   display_name: "* macOS DEBUG"
+  batchtime: 60 # 1 hour
   run_on:
   - macos-1014
   expansions:
@@ -10336,7 +10322,6 @@ buildvariants:
   - enterprise
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
@@ -10621,7 +10606,6 @@ buildvariants:
   display_name: "Embedded SDK - Ubuntu 16.04 x86_64"
   run_on:
   - ubuntu1604-build
-  batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     # We need --allocator=system here to work around SERVER-27675
@@ -10801,6 +10785,7 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit
   display_name: "! Enterprise RHEL 6.2"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
@@ -10986,7 +10971,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
     # Ban tests that run prepareTransaction or multi-shard transactions (which use
     # prepareTransaction). prepareTransaction is rejected on nodes with
@@ -11241,6 +11225,7 @@ buildvariants:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
@@ -11304,7 +11289,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-build
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -11361,7 +11345,6 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
   display_name: "~ Enterprise RHEL 7.0 (Dagger, tcmalloc-profiling, libunwind)"
-  batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl --use-cpu-profiler --use-libunwind MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -11378,7 +11361,6 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
-  batchtime: 1440 # 1 day
   run_on:
   - rhel70
   expansions:
@@ -11394,7 +11376,6 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-libunwind
   display_name: "~ Enterprise RHEL 7.0 (libunwind)"
-  batchtime: 1440 # 1 day
   runs_on:
   - rhel70
   expansions:
@@ -11436,6 +11417,7 @@ buildvariants:
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
+  batchtime: 60 # 1 hour
   run_on:
   - ubuntu1604-test
   expansions:
@@ -11461,7 +11443,6 @@ buildvariants:
   display_name: RHEL 6.2
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -11511,7 +11492,6 @@ buildvariants:
   display_name: RHEL 7.0
   run_on:
   - rhel70-small
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -11563,7 +11543,6 @@ buildvariants:
   display_name: RHEL 8.0
   run_on:
   - rhel80-build
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -11616,7 +11595,6 @@ buildvariants:
   display_name: RHEL 7.0/7.6 Cross-ABI
   run_on:
   - rhel76-test
-  batchtime: 1440 # 1 day
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
   tasks:
@@ -11633,7 +11611,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel71-power8-test
-  batchtime: 1440 # 1 day
   stepback: false
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
@@ -11750,7 +11727,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel67-zseries-test
-  batchtime: 1440 # 1 day
   stepback: false
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
@@ -11801,7 +11777,6 @@ buildvariants:
   display_name: RHEL 7.2 s390x
   run_on:
   - rhel72-zseries-test
-  batchtime: 1440 # 1 day
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
@@ -11830,7 +11805,6 @@ buildvariants:
   display_name: RHEL 6.7 s390x
   run_on:
   - rhel67-zseries-test
-  batchtime: 1440 # 1 day
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
     has_packages: true
@@ -11865,7 +11839,6 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -11913,6 +11886,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang
   display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang)"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
@@ -11933,6 +11907,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
@@ -11948,6 +11923,7 @@ buildvariants:
 
 - name: ubuntu-dynamic-1604-clang
   display_name: "* Shared Library Ubuntu 16.04 (Clang)"
+  batchtime: 60 # 1 hour
   run_on:
    - ubuntu1604-test
   expansions:
@@ -11974,7 +11950,6 @@ buildvariants:
   - enterprise
   run_on:
   - suse12-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -12107,7 +12082,6 @@ buildvariants:
   display_name: SUSE 12
   run_on:
   - suse12-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -12157,7 +12131,6 @@ buildvariants:
   - enterprise
   run_on:
   - suse15-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -12195,7 +12168,6 @@ buildvariants:
   display_name: SUSE 15
   run_on:
   - suse15-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -12249,7 +12221,6 @@ buildvariants:
   - enterprise
   run_on:
   - debian92-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -12296,7 +12267,6 @@ buildvariants:
   display_name: Debian 9.2
   run_on:
   - debian92-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -12353,7 +12323,6 @@ buildvariants:
   - enterprise
   run_on:
   - debian10-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -12400,7 +12369,6 @@ buildvariants:
   display_name: Debian 10
   run_on:
   - debian10-test
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -12459,7 +12427,6 @@ buildvariants:
   display_name: RHEL 6.2 (Biggie)
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions:
     test_flags: --storageEngine=biggie --excludeWithAnyTags=SERVER-38379,requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
     compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -12479,7 +12446,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions: &enterprise-rhel-62-64-bit-inmem-expansions
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -12630,6 +12596,7 @@ buildvariants:
 
 - name: rhel-62-64-bit-required-mobile
   display_name: "! RHEL 6.2 (mobile)"
+  batchtime: 60 # 1 hour
   run_on:
   - rhel62-small
   expansions:
@@ -12694,7 +12661,6 @@ buildvariants:
   display_name: Linux (ephemeralForTest)
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
   expansions:
     # Transactions are not explicitly supported on the ephemeralForTest storage engine.
     # Speculative majority reads are currently only allowed for change streams, which are only supported on WiredTiger.
@@ -12842,7 +12808,6 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   stepback: true
-  batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
@@ -12905,7 +12870,6 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   stepback: true
-  batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
@@ -12934,7 +12898,6 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   stepback: true
-  batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for UBSAN.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
@@ -12991,6 +12954,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
@@ -13019,7 +12983,6 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   stepback: false
-  batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
@@ -13043,7 +13006,6 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   stepback: true
-  batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
@@ -13090,6 +13052,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
+  batchtime: 60 # 1 hour
   modules:
   - enterprise
   expansions:
@@ -13109,7 +13072,6 @@ buildvariants:
   display_name: "Shared SCons Cache Pruning"
   run_on:
   - ubuntu1604-test
-  batchtime: 1440 # 1 day
   stepback: false
   tasks:
   - name: shared_scons_cache_pruning
@@ -13119,7 +13081,6 @@ buildvariants:
   display_name: "Windows shared SCons Cache Pruning"
   run_on:
   - windows-64-vs2017-test
-  batchtime: 1440 # 1 day
   stepback: false
   tasks:
   - name: win_shared_scons_cache_pruning
