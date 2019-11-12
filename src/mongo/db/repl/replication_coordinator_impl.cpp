@@ -202,6 +202,8 @@ ReplicationCoordinatorImpl::ThreadWaiter::ThreadWaiter(OpTime _opTime,
 
 void ReplicationCoordinatorImpl::ThreadWaiter::notify_inlock() {
     invariant(condVar);
+
+    ++notifyCount;
     condVar->notify_all();
 }
 
@@ -1418,27 +1420,36 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
             return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
         }
 
-        // If we are doing a majority committed read we only need to wait for a new snapshot.
         if (isMajorityCommittedRead) {
+            // If we are doing a majority committed read we only need to wait for a new snapshot to
+            // update getCurrentOpTime() past targetOpTime. This block should only run once and
+            // return without further looping.
+
             LOG(3) << "waitUntilOpTime: waiting for a new snapshot until " << opCtx->getDeadline();
 
-            auto waitStatus =
-                opCtx->waitForConditionOrInterruptNoAssert(_currentCommittedSnapshotCond, lock);
-            if (!waitStatus.isOK()) {
-                return waitStatus.withContext(
+            try {
+                opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock, [&] {
+                    return _inShutdown || (targetOpTime <= getCurrentOpTime());
+                });
+            } catch (const DBException& e) {
+                return e.toStatus().withContext(
                     str::stream() << "Error waiting for snapshot not less than "
                                   << targetOpTime.toString() << ", current relevant optime is "
                                   << getCurrentOpTime().toString() << ".");
             }
-            if (!_currentCommittedSnapshot) {
-                // It is possible for the thread to be awoken due to a spurious wakeup, meaning
-                // the condition variable was never set.
-                LOG(3) << "waitUntilOpTime: awoken but current committed snapshot is null."
-                       << " Continuing to wait for new snapshot.";
-            } else {
+
+            if (_inShutdown) {
+                return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
+            }
+
+            if (_currentCommittedSnapshot) {
+                // It seems that targetOpTime can sometimes be default OpTime{}. When there is no
+                // _currentCommittedSnapshot, _getCurrentCommittedSnapshotOpTime_inlock() and thus
+                // getCurrentOpTime() also return default OpTime{}. Hence this branch that only runs
+                // if _currentCommittedSnapshot actually exists.
                 LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
             }
-            continue;
+            return Status::OK();
         }
 
         // We just need to wait for the opTime to catch up to what we need (not majority RC).
@@ -1449,20 +1460,14 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         LOG(3) << "waitUntilOpTime: OpID " << opCtx->getOpID() << " is waiting for OpTime "
                << waiter << " until " << opCtx->getDeadline();
 
-        auto waitStatus = Status::OK();
-        if (deadline) {
-            auto waitUntilStatus =
-                opCtx->waitForConditionOrInterruptNoAssertUntil(condVar, lock, *deadline);
-            waitStatus = waitUntilStatus.getStatus();
-        } else {
-            waitStatus = opCtx->waitForConditionOrInterruptNoAssert(condVar, lock);
-        }
-
-        if (!waitStatus.isOK()) {
-            return waitStatus.withContext(str::stream()
-                                          << "Error waiting for optime " << targetOpTime.toString()
-                                          << ", current relevant optime is "
-                                          << getCurrentOpTime().toString() << ".");
+        try {
+            opCtx->waitForConditionOrInterruptUntil(
+                condVar, lock, deadline.value_or(Date_t::max()), waiter.makePredicate());
+        } catch (const DBException& e) {
+            return e.toStatus().withContext(str::stream() << "Error waiting for optime "
+                                                          << targetOpTime.toString()
+                                                          << ", current relevant optime is "
+                                                          << getCurrentOpTime().toString() << ".");
         }
 
         // If deadline is set no need to wait until the targetTime time is reached.
@@ -1799,13 +1804,13 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
             return {ErrorCodes::ShutdownInProgress, "Replication is being shut down"};
         }
 
-        auto status = opCtx->waitForConditionOrInterruptNoAssertUntil(condVar, *lock, wTimeoutDate);
-        if (!status.isOK()) {
-            return status.getStatus();
-        }
-
-        if (status.getValue() == stdx::cv_status::timeout) {
-            return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
+        try {
+            if (!opCtx->waitForConditionOrInterruptUntil(
+                    condVar, *lock, wTimeoutDate, waiter.makePredicate())) {
+                return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
+            }
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
 
         stepdownStatus = checkForStepDown();
@@ -2103,7 +2108,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // tryToStartStepDown again will cause tryToStartStepDown to return ExceededTimeLimit
             // with the proper error message.
             opCtx->waitForConditionOrInterruptUntil(
-                condVar, lk, std::min(stepDownUntil, waitUntil));
+                condVar, lk, std::min(stepDownUntil, waitUntil), waiter.makePredicate());
         }
     }
 
@@ -3965,10 +3970,11 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* op
     uassert(ErrorCodes::NotYetInitialized,
             "Cannot use snapshots until replica set is finished initializing.",
             _rsConfigState != kConfigUninitialized && _rsConfigState != kConfigInitiating);
-    while (!_currentCommittedSnapshot ||
-           _currentCommittedSnapshot->opTime.getTimestamp() < untilSnapshot) {
-        opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock);
-    }
+
+    opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock, [&] {
+        return _currentCommittedSnapshot &&
+            _currentCommittedSnapshot->opTime.getTimestamp() >= untilSnapshot;
+    });
 }
 
 size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {

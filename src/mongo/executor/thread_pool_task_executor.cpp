@@ -306,18 +306,18 @@ StatusWith<stdx::cv_status> ThreadPoolTaskExecutor::waitForEvent(OperationContex
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
     stdx::unique_lock<Latch> lk(_mutex);
 
-    // std::condition_variable::wait() can wake up spuriously, so we have to loop until the event
-    // is signalled or we time out.
-    while (!eventState->isSignaledFlag) {
-        auto status = opCtx->waitForConditionOrInterruptNoAssertUntil(
-            eventState->isSignaledCondition, lk, deadline);
-
-        if (!status.isOK() || stdx::cv_status::timeout == status) {
-            return status;
+    try {
+        if (opCtx->waitForConditionOrInterruptUntil(
+                eventState->isSignaledCondition, lk, deadline, [&] {
+                    return eventState->isSignaledFlag;
+                })) {
+            return stdx::cv_status::no_timeout;
         }
-    }
 
-    return stdx::cv_status::no_timeout;
+        return stdx::cv_status::timeout;
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
 }
 
 void ThreadPoolTaskExecutor::waitForEvent(const EventHandle& event) {
@@ -531,9 +531,9 @@ void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle, Interruptible*
     if (!cbState->finishedCondition) {
         cbState->finishedCondition.emplace();
     }
-    while (!cbState->isFinished.load()) {
-        interruptible->waitForConditionOrInterrupt(*cbState->finishedCondition, lk);
-    }
+
+    interruptible->waitForConditionOrInterrupt(
+        *cbState->finishedCondition, lk, [&] { return cbState->isFinished.load(); });
 }
 
 void ThreadPoolTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) const {

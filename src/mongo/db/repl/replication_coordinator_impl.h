@@ -607,6 +607,17 @@ private:
             return false;
         }
 
+        // This predicate is an extremely simple way to never miss a notification. When the
+        // ThreadWater::notify_inlock() is called, notifyCount is incremented. As should be obvious,
+        // this predicate should only be called "inlock" as well. The ThreadWaiter itself goes away
+        // with SERVER-43135 so this function and notifyCount as a concept is a v4.2 only measure.
+        auto makePredicate() {
+            return [this, startingNotifyCount = notifyCount]() -> bool {
+                return notifyCount != startingNotifyCount;
+            };
+        }
+
+        uint64_t notifyCount = 0;
         stdx::condition_variable* condVar = nullptr;
     };
 

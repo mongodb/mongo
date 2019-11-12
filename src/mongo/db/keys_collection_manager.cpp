@@ -199,12 +199,10 @@ void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) 
                       "aborting keys cache refresh because node is shutting down");
         }
 
-        if (_refreshRequest) {
-            return _refreshRequest;
+        if (!_refreshRequest) {
+            _refreshRequest = std::make_shared<Notification<void>>();
         }
-
         _refreshNeededCV.notify_all();
-        _refreshRequest = std::make_shared<Notification<void>>();
         return _refreshRequest;
     }();
 
@@ -222,8 +220,9 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
     ThreadClient tc(threadName, service);
 
     while (true) {
-        bool hasRefreshRequestInitially = false;
         unsigned errorCount = 0;
+
+        decltype(_refreshRequest) request;
         std::shared_ptr<RefreshFunc> doRefresh;
         {
             stdx::lock_guard<Latch> lock(_mutex);
@@ -234,7 +233,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
             invariant(_doRefresh.get() != nullptr);
             doRefresh = _doRefresh;
-            hasRefreshRequestInitially = _refreshRequest.get() != nullptr;
+            request = std::move(_refreshRequest);
         }
 
         Milliseconds nextWakeup = kRefreshIntervalIfErrored;
@@ -262,6 +261,11 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                     nextWakeup = kMaxRefreshWaitTime;
                 }
             }
+
+            // Notify all waiters that the refresh has finished and they can move on
+            if (request) {
+                request->set();
+            }
         }
 
         MONGO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {
@@ -273,15 +277,9 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         }
 
         stdx::unique_lock<Latch> lock(_mutex);
-
         if (_refreshRequest) {
-            if (!hasRefreshRequestInitially) {
-                // A fresh request came in, fulfill the request before going to sleep.
-                continue;
-            }
-
-            _refreshRequest->set();
-            _refreshRequest.reset();
+            // A fresh request came in, fulfill the request before going to sleep.
+            continue;
         }
 
         if (_inShutdown) {
@@ -292,24 +290,33 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         auto opCtx = cc().makeOperationContext();
 
         MONGO_IDLE_THREAD_BLOCK;
-        auto sleepStatus = opCtx->waitForConditionOrInterruptNoAssertUntil(
-            _refreshNeededCV, lock, Date_t::now() + nextWakeup);
+        try {
+            opCtx->waitForConditionOrInterruptFor(
+                _refreshNeededCV, lock, nextWakeup, [&]() -> bool {
+                    return _inShutdown || _refreshRequest;
+                });
+        } catch (const DBException& e) {
+            LOG(1) << "Unable to wait for refresh request due to: " << e;
 
-        if (ErrorCodes::isShutdownError(sleepStatus.getStatus().code())) {
-            break;
+            if (ErrorCodes::isShutdownError(e.code())) {
+                return;
+            }
         }
-    }
-
-    stdx::unique_lock<Latch> lock(_mutex);
-    if (_refreshRequest) {
-        _refreshRequest->set();
-        _refreshRequest.reset();
     }
 }
 
 void KeysCollectionManager::PeriodicRunner::setFunc(RefreshFunc newRefreshStrategy) {
     stdx::lock_guard<Latch> lock(_mutex);
+    if (_inShutdown) {
+        uasserted(ErrorCodes::ShutdownInProgress,
+                  "aborting KeysCollectionManager::PeriodicRunner::setFunc because node is "
+                  "shutting down");
+    }
+
     _doRefresh = std::make_shared<RefreshFunc>(std::move(newRefreshStrategy));
+    if (!_refreshRequest) {
+        _refreshRequest = std::make_shared<Notification<void>>();
+    }
     _refreshNeededCV.notify_all();
 }
 

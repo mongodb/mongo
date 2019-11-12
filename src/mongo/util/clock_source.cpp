@@ -29,8 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
+
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/waitable.h"
 
 namespace mongo {

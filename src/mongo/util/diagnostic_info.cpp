@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/log.h"
@@ -74,6 +75,16 @@ private:
         Mutex mutex = MONGO_MAKE_LATCH(kBlockedOpMutexName);
     };
     LatchState _latchState;
+
+    struct InterruptibleState {
+        bool isWaiting = false;
+        boost::optional<stdx::thread> thread{boost::none};
+
+        stdx::condition_variable cv;
+        Mutex mutex = MONGO_MAKE_LATCH(kBlockedOpInterruptibleName);
+        bool isDone = false;
+    };
+    InterruptibleState _interruptibleState;
 } gBlockedOp;
 
 // This function causes us to make an additional thread with a self-contended lock so that
@@ -83,6 +94,7 @@ void BlockedOp::start(ServiceContext* serviceContext) {
     stdx::unique_lock<stdx::mutex> lk(_m);
 
     invariant(!_latchState.thread);
+    invariant(!_interruptibleState.thread);
 
     _latchState.mutex.lock();
     _latchState.thread = stdx::thread([this, serviceContext]() mutable {
@@ -95,7 +107,21 @@ void BlockedOp::start(ServiceContext* serviceContext) {
         log() << "Joining currentOpSpawnsThreadWaitingForLatch thread";
     });
 
-    _cv.wait(lk, [this] { return _latchState.isContended; });
+    _interruptibleState.thread = stdx::thread([this, serviceContext]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestInterruptible", serviceContext);
+        auto opCtx = tc->makeOperationContext();
+
+        log() << "Entered currentOpSpawnsThreadWaitingForLatch thread for interruptibles";
+        stdx::unique_lock lk(_interruptibleState.mutex);
+        opCtx->waitForConditionOrInterrupt(
+            _interruptibleState.cv, lk, [&] { return _interruptibleState.isDone; });
+        _interruptibleState.isDone = false;
+
+        log() << "Joining currentOpSpawnsThreadWaitingForLatch thread for interruptibles";
+    });
+
+
+    _cv.wait(lk, [this] { return _latchState.isContended && _interruptibleState.isWaiting; });
     log() << "Started threads for currentOpSpawnsThreadWaitingForLatch";
 }
 
@@ -103,24 +129,42 @@ void BlockedOp::start(ServiceContext* serviceContext) {
 // remaining
 void BlockedOp::join() {
     decltype(_latchState.thread) latchThread;
+    decltype(_interruptibleState.thread) interruptibleThread;
     {
         stdx::lock_guard<stdx::mutex> lk(_m);
 
         invariant(_latchState.thread);
+        invariant(_interruptibleState.thread);
 
         _latchState.mutex.unlock();
         _latchState.isContended = false;
 
+        {
+            stdx::lock_guard lk(_interruptibleState.mutex);
+            _interruptibleState.isDone = true;
+            _interruptibleState.cv.notify_one();
+        }
+        _interruptibleState.isWaiting = false;
+
         std::swap(_latchState.thread, latchThread);
+        std::swap(_interruptibleState.thread, interruptibleThread);
     }
 
     latchThread->join();
+    interruptibleThread->join();
 }
 
 void BlockedOp::setIsContended(bool value) {
     log() << "Setting isContended to " << (value ? "true" : "false");
     stdx::lock_guard lk(_m);
     _latchState.isContended = value;
+    _cv.notify_one();
+}
+
+void BlockedOp::setIsWaiting(bool value) {
+    log() << "Setting isWaiting to " << (value ? "true" : "false");
+    stdx::lock_guard lk(_m);
+    _interruptibleState.isWaiting = value;
     _cv.notify_one();
 }
 
@@ -167,6 +211,52 @@ MONGO_INITIALIZER(LockListener)(InitializerContext* context) {
     // Intentionally leaked, people use Latches in detached threads
     static auto& listener = *new LockListener;
     Mutex::addLockListener(&listener);
+
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
+    class WaitListener : public Interruptible::WaitListener {
+        using WakeReason = Interruptible::WakeReason;
+        using WakeSpeed = Interruptible::WakeSpeed;
+
+        void addInfo(const StringData& name) {
+            if (auto client = Client::getCurrent()) {
+                auto& handle = getDiagnosticInfoHandle(client);
+                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+                handle.list.emplace_front(DiagnosticInfo::capture(name));
+
+                if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
+                    (name == kBlockedOpInterruptibleName)) {
+                    gBlockedOp.setIsWaiting(true);
+                }
+            }
+        }
+
+        void removeInfo(const StringData& name) {
+            if (auto client = Client::getCurrent()) {
+                auto& handle = getDiagnosticInfoHandle(client);
+                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+
+                invariant(!handle.list.empty());
+                handle.list.pop_front();
+            }
+        }
+
+        void onLongSleep(const StringData& name) override {
+            addInfo(name);
+        }
+
+        void onWake(const StringData& name, WakeReason, WakeSpeed speed) override {
+            if (speed == WakeSpeed::kSlow) {
+                removeInfo(name);
+            }
+        }
+    };
+
+    // Intentionally leaked, people can use in detached threads
+    static auto& listener = *new WaitListener();
+    Interruptible::addWaitListener(&listener);
 
     return Status::OK();
 }

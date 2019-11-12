@@ -28,7 +28,7 @@ const getCurrentOp = function() {
 
 const blockedOpClients = {
     "DiagnosticCaptureTestLatch": {"seen": false},
-    //    "DiagnosticCaptureTestInterruptible": {"seen": false},
+    "DiagnosticCaptureTestInterruptible": {"seen": false},
 };
 
 const getClientName = function() {

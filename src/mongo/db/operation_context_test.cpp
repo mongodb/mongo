@@ -257,7 +257,7 @@ public:
         auto m = MONGO_MAKE_LATCH();
         stdx::condition_variable cv;
         stdx::unique_lock<Latch> lk(m);
-        opCtx->waitForConditionOrInterrupt(cv, lk);
+        opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; });
     }
 
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
@@ -337,7 +337,9 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, opCtx->waitForConditionOrInterruptNoAssert(cv, lk));
+    ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; }),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
@@ -346,10 +348,10 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
-    ASSERT_EQ(
-        ErrorCodes::ExceededTimeLimit,
-        opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now() + Seconds{10})
-            .getStatus());
+    ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterruptUntil(
+                           cv, lk, mockClock->now() + Seconds{10}, [] { return false; }),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(OperationDeadlineTests, NestedTimeoutsTimeoutInOrder) {
@@ -601,7 +603,9 @@ TEST_F(OperationDeadlineTests, WaitForKilledOpCV) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
-    ASSERT_EQ(ErrorCodes::Interrupted, opCtx->waitForConditionOrInterruptNoAssert(cv, lk));
+    ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; }),
+                       DBException,
+                       ErrorCodes::Interrupted);
 }
 
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCV) {
@@ -609,9 +613,8 @@ TEST_F(OperationDeadlineTests, WaitForUntilExpiredCV) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
-    ASSERT(stdx::cv_status::timeout ==
-           unittest::assertGet(
-               opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now())));
+    ASSERT_FALSE(
+        opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }));
 }
 
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCVWithMaxTimeSet) {
@@ -620,9 +623,8 @@ TEST_F(OperationDeadlineTests, WaitForUntilExpiredCVWithMaxTimeSet) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
-    ASSERT(stdx::cv_status::timeout ==
-           unittest::assertGet(
-               opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now())));
+    ASSERT_FALSE(
+        opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }));
 }
 
 TEST_F(OperationDeadlineTests, WaitForDurationExpired) {
@@ -640,8 +642,10 @@ TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpirati
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
-    ASSERT(ErrorCodes::ExceededTimeLimit ==
-           opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now()));
+    ASSERT_THROWS_CODE(
+        opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }),
+        DBException,
+        ErrorCodes::ExceededTimeLimit);
 }
 
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
@@ -937,17 +941,17 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
     ASSERT_FALSE(waiterResult.get());
 }
 
-TEST(OperationContextTest, TestWaitForConditionOrInterruptNoAssertUntilAPI) {
-    // `waitForConditionOrInterruptNoAssertUntil` can have three outcomes:
+TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
+    // `waitForConditionOrInterruptUntil` can have three outcomes:
     //
     // 1) The condition is satisfied before any timeouts.
     // 2) The explicit `deadline` function argument is triggered.
     // 3) The operation context implicitly times out, or is interrupted from a killOp command or
     //    shutdown, etc.
     //
-    // Case (1) must return a Status::OK with a value of `cv_status::no_timeout`. Case (2) must also
-    // return a Status::OK with a value of `cv_status::timeout`. Case (3) must return an error
-    // status. The error status returned is otherwise configurable.
+    // Case (1) must return true.
+    // Case (2) must return false.
+    // Case (3) must throw a DBException.
     //
     // Case (1) is the hardest to test. The condition variable must be notified by a second thread
     // when the client is waiting on it. Case (1) is also the least in need of having the API
@@ -962,17 +966,16 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptNoAssertUntilAPI) {
 
     // Case (2). Expect a Status::OK with a cv_status::timeout.
     Date_t deadline = Date_t::now() + Milliseconds(500);
-    StatusWith<stdx::cv_status> ret =
-        opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, deadline);
-    ASSERT_OK(ret.getStatus());
-    ASSERT(ret.getValue() == stdx::cv_status::timeout);
+    ASSERT_EQ(opCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }),
+              false);
 
     // Case (3). Expect an error of `MaxTimeMSExpired`.
     opCtx->setDeadlineByDate(Date_t::now(), ErrorCodes::MaxTimeMSExpired);
     deadline = Date_t::now() + Seconds(500);
-    ret = opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, deadline);
-    ASSERT_FALSE(ret.isOK());
-    ASSERT_EQUALS(ErrorCodes::MaxTimeMSExpired, ret.getStatus().code());
+    ASSERT_THROWS_CODE(
+        opCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }),
+        DBException,
+        ErrorCodes::MaxTimeMSExpired);
 }
 
 }  // namespace

@@ -101,7 +101,7 @@ class DummyInterruptable final : public Interruptible {
         MONGO_UNREACHABLE;
     }
     Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
-        MONGO_UNREACHABLE;
+        return Date_t::now() + waitFor;
     }
 };
 

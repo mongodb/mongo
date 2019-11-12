@@ -79,14 +79,13 @@ public:
         _waitForMajorityCallCount++;
         _callCountChangedCV.notify_one();
 
-        while (!_isTestReady) {
-            auto status = opCtx->waitForConditionOrInterruptNoAssert(_isTestReadyCV, lk);
-            if (!status.isOK()) {
-                _isTestReady = false;
-                _finishWaitingOneOpTimeCV.notify_one();
+        try {
+            opCtx->waitForConditionOrInterrupt(_isTestReadyCV, lk, [&] { return _isTestReady; });
+        } catch (const DBException& e) {
+            _isTestReady = false;
+            _finishWaitingOneOpTimeCV.notify_one();
 
-                return status;
-            }
+            return e.toStatus();
         }
 
         _lastOpTimeWaited = opTime;
