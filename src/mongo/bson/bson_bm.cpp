@@ -27,13 +27,39 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <benchmark/benchmark.h>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
+namespace {
+
+BSONObj buildSampleObj(long long unsigned int i) {
+
+    int age = i * 8391 % 97 + 12;
+    int istr = (1 << 16) + i;
+    int zip_code = 10'000 + i * 316'731 % 90'000;
+    int random = i * 83'438 % 9'999'999;
+    std::string phone_no = fmt::format("{}-{:04d}", i * 2923 % 900 + 100, i * 32'347 % 9999);
+    std::string long_string = fmt::format("{}{:a<50s}", i * 234'397'31, "");
+
+    return BSON(GENOID << "name"
+                       << "Wile E. Coyote"
+                       << "age" << age << "i" << istr << "address"
+                       << BSON("street"
+                               << "433 W 43rd St"
+                               << "zip_code" << zip_code << "city"
+                               << "New York")
+                       << "random" << random << "phone_no" << phone_no << "long_string"
+                       << long_string);
+}
+}  // namespace
 
 void BM_arrayBuilder(benchmark::State& state) {
     size_t totalBytes = 0;
@@ -55,6 +81,7 @@ void BM_arrayLookup(benchmark::State& state) {
     for (auto j = 0; j < len; j++)
         builder.append(j);
     BSONObj array = builder.done();
+
     for (auto _ : state) {
         benchmark::ClobberMemory();
         benchmark::DoNotOptimize(array[len]);
@@ -63,7 +90,30 @@ void BM_arrayLookup(benchmark::State& state) {
     state.SetItemsProcessed(totalLen);
 }
 
+void BM_validate(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    size_t totalSize = 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(buildSampleObj(j));
+    BSONObj array = builder.done();
+
+    const auto& elem = array[0].Obj();
+    auto status = validateBSON(elem.objdata(), elem.objsize());
+    if (!status.isOK())
+        LOGV2(4440100, "Validate failed", "elem"_attr = elem, "status"_attr = status);
+    invariant(status.isOK());
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(validateBSON(array.objdata(), array.objsize()));
+        totalSize += array.objsize();
+    }
+    state.SetBytesProcessed(totalSize);
+}
+
 BENCHMARK(BM_arrayBuilder)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_arrayLookup)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_validate)->Ranges({{{1}, {1'000}}});
 
 }  // namespace mongo
