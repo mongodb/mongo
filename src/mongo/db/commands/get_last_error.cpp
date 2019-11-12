@@ -224,12 +224,14 @@ public:
             writeConcern = repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
         }
 
-        Status status = writeConcern.parse(writeConcernDoc);
+        auto sw = WriteConcernOptions::parse(writeConcernDoc);
+        Status status = sw.getStatus();
 
         //
         // Validate write concern no matter what, this matches 2.4 behavior
         //
         if (status.isOK()) {
+            writeConcern = sw.getValue();
             status = validateWriteConcern(opCtx, writeConcern);
         }
 

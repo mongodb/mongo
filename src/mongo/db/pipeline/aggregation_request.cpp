@@ -186,8 +186,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                             << fieldName << " must be an object, not a " << typeName(elem.type())};
             }
 
-            WriteConcernOptions writeConcern;
-            uassertStatusOK(writeConcern.parse(elem.embeddedObject()));
+            auto writeConcern = uassertStatusOK(WriteConcernOptions::parse(elem.embeddedObject()));
             request.setWriteConcern(writeConcern);
         } else if (kRuntimeConstants == fieldName) {
             try {

@@ -254,11 +254,12 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             if (!writeConcernEltStatus.isOK()) {
                 return writeConcernEltStatus;
             }
-            auto status = writeConcernOptions.parse(writeConcernElt.embeddedObject());
-            if (!status.isOK()) {
-                return status;
+            auto sw = WriteConcernOptions::parse(writeConcernElt.embeddedObject());
+            if (!sw.isOK()) {
+                return sw.getStatus();
             } else {
                 writeConcernOptionsSet = true;
+                writeConcernOptions = sw.getValue();
             }
         } else if (!isGenericArgument(field) &&
                    !std::count(_knownFields.begin(), _knownFields.end(), field)) {

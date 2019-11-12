@@ -594,10 +594,11 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         BSONElement writeConcernElement = cmdObj[WriteConcernOptions::kWriteConcernField];
         bool initialCmdHadWriteConcern = !writeConcernElement.eoo();
         if (initialCmdHadWriteConcern) {
-            Status status = writeConcern.parse(writeConcernElement.Obj());
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatusNoThrow(*result, status);
+            auto sw = WriteConcernOptions::parse(writeConcernElement.Obj());
+            if (!sw.isOK()) {
+                return CommandHelpers::appendCommandStatusNoThrow(*result, sw.getStatus());
             }
+            writeConcern = sw.getValue();
 
             if (!(writeConcern.wNumNodes == 1 ||
                   writeConcern.wMode == WriteConcernOptions::kMajority)) {

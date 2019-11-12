@@ -76,7 +76,7 @@ public:
 
     WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
 
-    Status parse(const BSONObj& obj);
+    static StatusWith<WriteConcernOptions> parse(const BSONObj& obj);
 
     /**
      * Returns an instance of WriteConcernOptions from a BSONObj.

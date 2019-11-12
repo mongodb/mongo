@@ -91,8 +91,7 @@ WriteConcernOptions::WriteConcernOptions(const std::string& mode,
                                          Milliseconds timeout)
     : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(durationCount<Milliseconds>(timeout)) {}
 
-Status WriteConcernOptions::parse(const BSONObj& obj) {
-    *this = WriteConcernOptions();
+StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
     if (obj.isEmpty()) {
         return Status(ErrorCodes::FailedToParse, "write concern object cannot be empty");
     }
@@ -100,6 +99,7 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
     BSONElement jEl;
     BSONElement fsyncEl;
     BSONElement wEl;
+    int wTimeout = 0;
 
     for (auto e : obj) {
         const auto fieldName = e.fieldNameStringData();
@@ -132,40 +132,43 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
 
     const bool j = jEl.trueValue();
     const bool fsync = fsyncEl.trueValue();
-
-    if (j && fsync)
+    if (j && fsync) {
         return Status(ErrorCodes::FailedToParse, "fsync and j options cannot be used together");
+    }
+
+    WriteConcernOptions writeConcern;
 
     if (j) {
-        syncMode = SyncMode::JOURNAL;
+        writeConcern.syncMode = SyncMode::JOURNAL;
     } else if (fsync) {
-        syncMode = SyncMode::FSYNC;
+        writeConcern.syncMode = SyncMode::FSYNC;
     } else if (!jEl.eoo()) {
-        syncMode = SyncMode::NONE;
+        writeConcern.syncMode = SyncMode::NONE;
     }
 
     if (wEl.isNumber()) {
-        wNumNodes = wEl.numberInt();
-        usedDefaultW = false;
+        writeConcern.wNumNodes = wEl.numberInt();
+        writeConcern.usedDefaultW = false;
     } else if (wEl.type() == String) {
-        wNumNodes = 0;
-        wMode = wEl.valuestrsafe();
-        usedDefaultW = false;
+        writeConcern.wNumNodes = 0;
+        writeConcern.wMode = wEl.valuestrsafe();
+        writeConcern.usedDefaultW = false;
     } else if (wEl.eoo() || wEl.type() == jstNULL || wEl.type() == Undefined) {
-        wNumNodes = 1;
+        writeConcern.wNumNodes = 1;
     } else {
         return Status(ErrorCodes::FailedToParse, "w has to be a number or a string");
     }
 
-    return Status::OK();
+    writeConcern.wTimeout = wTimeout;
+
+    return writeConcern;
 }
 
 WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) {
-    WriteConcernOptions writeConcern;
     if (!obj.isEmpty()) {
-        uassertStatusOK(writeConcern.parse(obj));
+        return uassertStatusOK(parse(obj));
     }
-    return writeConcern;
+    return WriteConcernOptions();
 }
 
 StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const BSONObj& cmdObj) {
@@ -191,12 +194,12 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
         return writeConcern;
     }
 
-    wcStatus = writeConcern.parse(writeConcernObj);
-    writeConcern.usedDefault = false;
-    if (!wcStatus.isOK()) {
-        return wcStatus;
+    auto sw = parse(writeConcernObj);
+    if (!sw.isOK()) {
+        return sw.getStatus();
     }
-
+    writeConcern = sw.getValue();
+    writeConcern.usedDefault = false;
     return writeConcern;
 }
 

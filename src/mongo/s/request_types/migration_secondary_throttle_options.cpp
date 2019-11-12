@@ -108,10 +108,9 @@ StatusWith<MigrationSecondaryThrottleOptions> MigrationSecondaryThrottleOptions:
     invariant(writeConcernBSON.is_initialized());
 
     // Make sure the write concern parses correctly
-    WriteConcernOptions writeConcern;
-    Status status = writeConcern.parse(*writeConcernBSON);
-    if (!status.isOK()) {
-        return status;
+    auto sw = WriteConcernOptions::parse(*writeConcernBSON);
+    if (!sw.isOK()) {
+        return sw.getStatus();
     }
 
     return MigrationSecondaryThrottleOptions(secondaryThrottle, std::move(writeConcernBSON));
@@ -138,23 +137,18 @@ MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONObj& obj) 
     if (!status.isOK())
         return status;
 
-    WriteConcernOptions writeConcern;
-    Status writeConcernParseStatus = writeConcern.parse(elem.Obj());
-    if (!writeConcernParseStatus.isOK()) {
-        return writeConcernParseStatus;
+    auto sw = WriteConcernOptions::parse(elem.Obj());
+    if (!sw.isOK()) {
+        return sw.getStatus();
     }
-
-    return MigrationSecondaryThrottleOptions::createWithWriteConcern(writeConcern);
+    return MigrationSecondaryThrottleOptions::createWithWriteConcern(sw.getValue());
 }
 
 WriteConcernOptions MigrationSecondaryThrottleOptions::getWriteConcern() const {
     invariant(_secondaryThrottle != kOff);
     invariant(_writeConcernBSON);
 
-    WriteConcernOptions writeConcern;
-    fassert(34414, writeConcern.parse(*_writeConcernBSON));
-
-    return writeConcern;
+    return fassert(34414, WriteConcernOptions::parse(*_writeConcernBSON));
 }
 
 void MigrationSecondaryThrottleOptions::append(BSONObjBuilder* builder) const {

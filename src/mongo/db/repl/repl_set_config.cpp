@@ -320,9 +320,11 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     status = bsonExtractTypedField(
         settings, kGetLastErrorDefaultsFieldName, Object, &gleDefaultsElement);
     if (status.isOK()) {
-        status = _defaultWriteConcern.parse(gleDefaultsElement.Obj());
-        if (!status.isOK())
-            return status;
+        auto sw = WriteConcernOptions::parse(gleDefaultsElement.Obj());
+        if (!sw.isOK()) {
+            return sw.getStatus();
+        }
+        _defaultWriteConcern = sw.getValue();
     } else if (status == ErrorCodes::NoSuchKey) {
         // Default write concern is w: 1.
         _defaultWriteConcern = WriteConcernOptions();
