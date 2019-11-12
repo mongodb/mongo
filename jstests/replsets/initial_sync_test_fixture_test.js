@@ -20,6 +20,28 @@ load("jstests/libs/check_log.js");
 load("jstests/replsets/libs/initial_sync_test.js");
 
 /**
+ * Helper function to check that specific messages appeared or did not appear in the logs.
+ */
+function checkLogForMsg(node, msg, contains) {
+    if (contains) {
+        assert(checkLog.checkContainsOnce(node, msg));
+    } else {
+        assert(!checkLog.checkContainsOnce(node, msg));
+    }
+}
+
+/**
+ * Helper function to check that specific messages appeared or did not appear in the logs. If we
+ * expect the log message to appear, this will show that the node is paused after getting the
+ * specified timestamp.
+ */
+function checkLogForGetTimestampMsg(node, timestampName, timestamp, contains) {
+    let msg = "Initial Syncer got the " + timestampName + ": { ts: " + timestamp;
+
+    checkLogForMsg(node, msg, contains);
+}
+
+/**
  * Helper function to check that specific messages appeared or did not appear in the logs. If
  * the command was listIndexes and we expect the message to appear, we also add the collection
  * UUID to make sure that it corresponds to the expected collection.
@@ -31,11 +53,7 @@ function checkLogForCollectionClonerMsg(node, commandName, dbname, contains, col
         msg += ": " + collUUID;
     }
 
-    if (contains) {
-        assert(checkLog.checkContainsOnce(node, msg));
-    } else {
-        assert(!checkLog.checkContainsOnce(node, msg));
-    }
+    checkLogForMsg(node, msg, contains);
 }
 
 /**
@@ -62,7 +80,8 @@ assert.commandWorked(db.foo.insert({a: 1}));
 assert.commandWorked(db.bar.insert({b: 1}));
 
 // Prepare a transaction so that we know that step() can restart the secondary even if there is
-// a prepared transaction.
+// a prepared transaction. The prepareTimestamp will be used as the beginFetchingTimestamp and
+// beginApplyingTimestamp during initial sync.
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase("test");
 const sessionColl = sessionDB.getCollection("foo");
@@ -70,15 +89,55 @@ session.startTransaction();
 assert.commandWorked(sessionColl.insert({c: 1}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-// Do same listDatabases command as CollectionCloner.
-const databases =
-    assert.commandWorked(primary.adminCommand({listDatabases: 1, nameOnly: true})).databases;
-
-// This step call restarts the secondary and causes it to go into initial sync.
+// This step call restarts the secondary and causes it to go into initial sync. It will pause
+// initial sync after the node has fetched the defaultBeginFetchingTimestamp.
 assert(!initialSyncTest.step());
 
 secondary = initialSyncTest.getSecondary();
 secondary.setSlaveOk();
+
+// Make sure that we cannot read from this node yet.
+assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
+                             ErrorCodes.NotMasterOrSecondary);
+
+// Make sure that we see that the node got the defaultBeginFetchingTimestamp, but hasn't gotten the
+// beginFetchingTimestamp yet.
+checkLogForGetTimestampMsg(secondary, "defaultBeginFetchingTimestamp", prepareTimestamp, true);
+checkLogForGetTimestampMsg(secondary, "beginFetchingTimestamp", prepareTimestamp, false);
+checkLogForGetTimestampMsg(secondary, "beginApplyingTimestamp", prepareTimestamp, false);
+
+// This step call will resume initial sync and pause it again after the node gets the
+// beginFetchingTimestamp from its sync source.
+assert(!initialSyncTest.step());
+
+// Make sure that we cannot read from this node yet.
+assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
+                             ErrorCodes.NotMasterOrSecondary);
+
+// Make sure that we see that the node got the beginFetchingTimestamp, but hasn't gotten the
+// beginApplyingTimestamp yet.
+checkLogForGetTimestampMsg(secondary, "defaultBeginFetchingTimestamp", prepareTimestamp, false);
+checkLogForGetTimestampMsg(secondary, "beginFetchingTimestamp", prepareTimestamp, true);
+checkLogForGetTimestampMsg(secondary, "beginApplyingTimestamp", prepareTimestamp, false);
+
+// This step call will resume initial sync and pause it again after the node gets the
+// beginApplyingTimestamp from its sync source.
+assert(!initialSyncTest.step());
+
+// Make sure that we cannot read from this node yet.
+assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
+                             ErrorCodes.NotMasterOrSecondary);
+
+// Make sure that we see that the node got the beginApplyingTimestamp, but that we don't see the
+// listDatabases call yet.
+checkLogForGetTimestampMsg(secondary, "defaultBeginFetchingTimestamp", prepareTimestamp, false);
+checkLogForGetTimestampMsg(secondary, "beginFetchingTimestamp", prepareTimestamp, false);
+checkLogForGetTimestampMsg(secondary, "beginApplyingTimestamp", prepareTimestamp, true);
+checkLogForCollectionClonerMsg(secondary, "listDatabases", "admin", false);
+
+// This step call will resume initial sync and pause it again after the node gets the
+// listDatabases result from its sync source.
+assert(!initialSyncTest.step());
 
 // Make sure that we cannot read from this node yet.
 assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
@@ -89,6 +148,10 @@ assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
 checkLogForCollectionClonerMsg(secondary, "listDatabases", "admin", true);
 checkLogForCollectionClonerMsg(secondary, "listCollections", "admin", false);
 checkLogForCollectionClonerMsg(secondary, "listIndexes", "admin", false);
+
+// Do same listDatabases command as CollectionCloner.
+const databases =
+    assert.commandWorked(primary.adminCommand({listDatabases: 1, nameOnly: true})).databases;
 
 // Iterate over the databases and collections in the same order that the test fixture would so
 // that we can check the log messages to make sure initial sync is paused as expected.

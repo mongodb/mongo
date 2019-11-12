@@ -170,6 +170,21 @@ StatusWith<OpTimeAndWallTime> parseOpTimeAndWallTime(const QueryResponseStatus& 
     return OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(docs.front());
 }
 
+void pauseAtInitialSyncFuzzerSyncronizationPoints(std::string msg) {
+    // Set and unset by the InitialSyncTest fixture to cause initial sync to pause so that the
+    // Initial Sync Fuzzer can run commands on the sync source.
+    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint1.shouldFail())) {
+        log() << msg;
+        log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
+        initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
+    }
+
+    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
+        log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
+        initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
+    }
+}
+
 }  // namespace
 
 InitialSyncer::InitialSyncer(
@@ -701,6 +716,10 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime(
     // beginFetchingTimestamp.
     const auto& defaultBeginFetchingOpTime = opTimeResult.getValue().opTime;
 
+    std::string logMsg = str::stream() << "Initial Syncer got the defaultBeginFetchingTimestamp: "
+                                       << defaultBeginFetchingOpTime.toString();
+    pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
+
     status = _scheduleGetBeginFetchingOpTime_inlock(onCompletionGuard, defaultBeginFetchingOpTime);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
@@ -794,6 +813,10 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
         }
     }
 
+    std::string logMsg = str::stream()
+        << "Initial Syncer got the beginFetchingTimestamp: " << beginFetchingOpTime.toString();
+    pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
+
     if (MONGO_unlikely(initialSyncHangAfterGettingBeginFetchingTimestamp.shouldFail())) {
         log() << "initialSyncHangAfterGettingBeginFetchingTimestamp fail point enabled.";
         initialSyncHangAfterGettingBeginFetchingTimestamp.pauseWhileSet();
@@ -832,6 +855,10 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     }
 
     const auto& lastOpTime = opTimeResult.getValue().opTime;
+
+    std::string logMsg = str::stream()
+        << "Initial Syncer got the beginApplyingTimestamp: " << lastOpTime.toString();
+    pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
 
     BSONObjBuilder queryBob;
     queryBob.append("find", NamespaceString::kServerConfigurationNamespace.coll());
@@ -1193,19 +1220,10 @@ void InitialSyncer::_getNextApplierBatchCallback(
         return;
     }
 
-    // Set and unset by the InitialSyncTest fixture to cause initial sync to pause so that the
-    // Initial Sync Fuzzer can run commands on the sync source.
-    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint1.shouldFail())) {
-        log() << "Initial Syncer is about to apply the next oplog batch of size: "
-              << batchResult.getValue().size();
-        log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
-        initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
-    }
-
-    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
-        log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
-        initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
-    }
+    std::string logMsg = str::stream()
+        << "Initial Syncer is about to apply the next oplog batch of size: "
+        << batchResult.getValue().size();
+    pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
 
     if (MONGO_unlikely(failInitialSyncBeforeApplyingBatch.shouldFail())) {
         log() << "initial sync - failInitialSyncBeforeApplyingBatch fail point enabled. Pausing"
