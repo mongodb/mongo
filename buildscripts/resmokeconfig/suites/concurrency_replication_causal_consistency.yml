@@ -63,8 +63,4 @@ executor:
         # no-op writer.
         writePeriodicNoops: 1
     num_nodes: 5
-    # We give each of the nodes a vote in a 5-node replica set so that the
-    # secondaries have different beliefs about the majority commit point
-    # relative to the cluster's majority commit point.
-    voting_secondaries: true
     linear_chain: true

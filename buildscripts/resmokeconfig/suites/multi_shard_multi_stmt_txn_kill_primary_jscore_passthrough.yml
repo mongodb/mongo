@@ -499,4 +499,3 @@ executor:
       replset_config_options:
         settings:
           catchUpTimeoutMillis: 0
-      voting_secondaries: true

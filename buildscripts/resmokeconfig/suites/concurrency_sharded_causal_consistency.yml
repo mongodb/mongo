@@ -139,8 +139,6 @@ executor:
     shard_options:
       mongod_options:
         oplogSize: 1024
-      # TODO SERVER-32572 remove voting_secondaries: true
-      voting_secondaries: true
     mongod_options:
       set_parameters:
         enableTestCommands: 1

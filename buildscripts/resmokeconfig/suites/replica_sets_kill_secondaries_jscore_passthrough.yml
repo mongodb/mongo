@@ -50,3 +50,9 @@ executor:
             recovery: 2
     num_nodes: 2
     voting_secondaries: false
+    replset_config_options:
+      settings:
+        # Secondaries don't vote, so turning the election timeout down will not cause undesirable
+        # elections. It will make desirable elections (on fixture restart) go faster though. We
+        # can't turn it down too low since that will lower the heartbeat interval and spam the logs.
+        electionTimeoutMillis: 5000

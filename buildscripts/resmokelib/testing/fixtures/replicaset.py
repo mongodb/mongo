@@ -25,7 +25,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
             self, logger, job_num, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
             num_nodes=2, start_initial_sync_node=False, write_concern_majority_journal_default=None,
-            auth_options=None, replset_config_options=None, voting_secondaries=None,
+            auth_options=None, replset_config_options=None, voting_secondaries=True,
             all_nodes_electable=False, use_replica_set_connection_string=None, linear_chain=False,
             mixed_bin_versions=None):
         """Initialize ReplicaSetFixture."""
@@ -67,11 +67,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 msg = (("The number of binary versions specified: {} do not match the number of"\
                         " nodes in the replica set: {}.")).format(num_versions, num_nodes)
                 raise errors.ServerFailure(msg)
-
-        # If voting_secondaries has not been set, set a default. By default, secondaries have zero
-        # votes unless they are also nodes capable of being elected primary.
-        if self.voting_secondaries is None:
-            self.voting_secondaries = self.all_nodes_electable
 
         # By default, we only use a replica set connection string if all nodes are capable of being
         # elected primary.
@@ -167,9 +162,9 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             replset_settings = self.replset_config_options["settings"]
             repl_config["settings"] = replset_settings
 
-        # If secondaries vote and no election timeout was specified, then we increase the election
-        # timeout to 24 hours to prevent spurious elections.
-        if self.voting_secondaries:
+        # If not all nodes are electable and no election timeout was specified, then we increase
+        # the election timeout to 24 hours to prevent spurious elections.
+        if not self.all_nodes_electable:
             repl_config.setdefault("settings", {})
             if "electionTimeoutMillis" not in repl_config["settings"]:
                 repl_config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
