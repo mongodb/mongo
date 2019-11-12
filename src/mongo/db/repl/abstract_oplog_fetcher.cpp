@@ -48,6 +48,9 @@ namespace mongo {
 namespace repl {
 
 namespace {
+// TODO(SERVER-43279): This failpoint is needed to test cloner network error behavior until
+// OplogFetcher error behavior is made the same.  It may be removed if not needed after that.
+MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 
 Counter64 readersCreatedStats;
 ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
@@ -131,6 +134,7 @@ void AbstractOplogFetcher::_makeAndScheduleFetcherCallback(
 Status AbstractOplogFetcher::_doStartup_inlock() noexcept {
     return _scheduleWorkAndSaveHandle_inlock(
         [this](const executor::TaskExecutor::CallbackArgs& args) {
+            hangBeforeStartingOplogFetcher.pauseWhileSet();
             _makeAndScheduleFetcherCallback(args);
         },
         &_makeAndScheduleFetcherHandle,
