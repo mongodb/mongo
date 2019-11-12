@@ -1,2 +1,3 @@
 # Platform-specific components
 pypiwin32==223; sys_platform == "win32" and python_version > "3"
+pywin32==225; sys_platform == "win32" and python_version > "3"
