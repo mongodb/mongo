@@ -97,6 +97,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
+MONGO_FAIL_POINT_DEFINE(hangAndFailAfterDocumentInsertsReserveOpTimes);
 // The withLock fail points are for testing interruptability of these operations, so they will not
 // themselves check for interrupt.
 MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchInsert);
@@ -316,6 +317,17 @@ void insertDocuments(OperationContext* opCtx,
             }
         }
     }
+
+    hangAndFailAfterDocumentInsertsReserveOpTimes.executeIf(
+        [&](const BSONObj& data) {
+            hangAndFailAfterDocumentInsertsReserveOpTimes.pauseWhileSet(opCtx);
+            uasserted(51269, "hangAndFailAfterDocumentInsertsReserveOpTimes fail point enabled");
+        },
+        [&](const BSONObj& data) {
+            // Check if the failpoint specifies no collection or matches the existing one.
+            const auto collElem = data["collectionNS"];
+            return !collElem || collection->ns().ns() == collElem.str();
+        });
 
     uassertStatusOK(
         collection->insertDocuments(opCtx, begin, end, &CurOp::get(opCtx)->debug(), fromMigrate));

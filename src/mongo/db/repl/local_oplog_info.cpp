@@ -120,21 +120,29 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
 
     // Allow the storage engine to start the transaction outside the critical section.
     opCtx->recoveryUnit()->preallocateSnapshot();
-    stdx::lock_guard<Latch> lk(_newOpMutex);
+    {
+        stdx::lock_guard<Latch> lk(_newOpMutex);
 
-    ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
-    const bool orderedCommit = false;
+        ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
+        const bool orderedCommit = false;
 
-    // The local oplog collection pointer must already be established by this point.
-    // We can't establish it here because that would require locking the local database, which would
-    // be a lock order violation.
-    invariant(_oplog);
-    fassert(28560, _oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
-
+        // The local oplog collection pointer must already be established by this point.
+        // We can't establish it here because that would require locking the local database, which
+        // would be a lock order violation.
+        invariant(_oplog);
+        fassert(28560, _oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+    }
     std::vector<OplogSlot> oplogSlots(count);
     for (std::size_t i = 0; i < count; i++) {
         oplogSlots[i] = {Timestamp(ts.asULL() + i), term};
     }
+
+    // If we abort a transaction that has reserved an optime, we should make sure to update the
+    // stable timestamp if necessary, since this oplog hole may have been holding back the stable
+    // timestamp.
+    opCtx->recoveryUnit()->onRollback(
+        [replCoord]() { replCoord->attemptToAdvanceStableTimestamp(); });
+
     return oplogSlots;
 }
 
