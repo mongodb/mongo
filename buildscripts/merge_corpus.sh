@@ -14,18 +14,29 @@ if [ ! -f $input ] || [ ! -d $corpus_dir ]; then
     exit 0
 fi
 
-# We need to merge the corpus once it has been tested
-while IFS= read -r line
-do
-    mkdir "$corpus_dir"/corpus-"${line##*/}"-new
-    ./"$line" "$corpus_dir"/corpus-"${line##*/}"-new "$corpus_dir"/corpus-"${line##*/}" -merge=1
+# For each test, merge in new data.
+while IFS= read -r line; do
+    corpus_file="$corpus_dir/corpus-${line##*/}"
+
+    if [ -d "${corpus_file}-new" ]; then
+        if [ ! -d "${corpus_file}" ]; then
+            # An error in a prior run left old corpus data orphaned, reclaim it.
+            mv -v "${corpus_file}-new" "${corpus_file}"
+        else
+            # Somehow we have multiple corpii, treat non '-new' as official.
+            rm -rv "${corpus_file}-new"
+        fi
+    fi
+
+    # Create a new merge from old corpus and new run.
+    mkdir -v "${corpus_file}-new"
+    ./"$line" "${corpus_file}-new" "$corpus_file" -merge=1
 done < "$input"
 
-# Delete old corpus
+# Delete old corpus.
 find corpus/* -not -name '*-new' -type d -exec rm -rv {} +
 
-# Rename new corpus to old corpus
-for f in ./corpus/*
-do
-    mv "$f" "${f%-new}"
+# Rename new corpus to old corpus.
+for f in "$corpus_dir"/*-new; do
+    mv -v "$f" "${f%-new}"
 done
