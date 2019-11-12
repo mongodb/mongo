@@ -1181,50 +1181,27 @@ Status applyOperation_inlock(OperationContext* opCtx,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
             collection || !ViewCatalog::get(db)->lookup(opCtx, requestNss.ns()));
 
-    // This code must decide what timestamp the storage engine should make the upcoming writes
-    // visible with. The requirements and use-cases:
-    //
-    // Requirement: A client calling the `applyOps` command must not be able to dictate timestamps
-    //      that violate oplog ordering. Disallow this regardless of whether the timestamps chosen
-    //      are otherwise legal.
-    //
-    // Use cases:
-    //   Secondary oplog application: Use the timestamp in the operation document. These
-    //     operations are replicated to the oplog and this is not nested in a parent
-    //     `WriteUnitOfWork`.
-    //
-    //   Non-atomic `applyOps`: The server receives an `applyOps` command with a series of
-    //     operations that cannot be run under a single transaction. The common exemption from
-    //     being "transactionable" is containing a command operation. These will not be under a
-    //     parent `WriteUnitOfWork`. We do not use the timestamps provided by the operations; if
-    //     replicated, these operations will be assigned timestamps when logged in the oplog.
-    //
-    //   Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
-    //    run under a single transaction. In this case the caller has already opened a
-    //    `WriteUnitOfWork` and expects all writes to become visible at the same time. Moreover,
-    //    the individual operations will not contain a `ts` field. The caller is responsible for
-    //    setting the timestamp before committing. Assigning a competing timestamp in this
-    //    codepath would break that atomicity. Sharding is a consumer of this use-case.
+    // Decide whether to timestamp the write with the 'ts' field found in the operation. In general,
+    // we do this for secondary oplog application, but there are some exceptions.
     const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork, mode] {
         const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
-            // timestamp once they are logged.
+            // timestamp once they are logged. The operation may contain a timestamp if it is part
+            // of a non-atomic applyOps command, but we ignore it so that we don't violate oplog
+            // ordering.
             return false;
         } else if (haveWrappingWriteUnitOfWork) {
             // We do not assign timestamps to non-replicated writes that have a wrapping
-            // WriteUnitOfWork, as they will get the timestamp on that WUOW.
-            // The typical usage of this is for operations inside of atomic 'applyOps' commands
-            // being applied on a secondary. They will get the timestamp of the outer 'applyOps'
-            // oplog entry in their wrapper WUOW.
-            // We also use a WUOW for replaying a prepared transaction when we encounter its
-            // corresponding commitTransaction entry during recovery. We set the timestamp on the
-            // WUOW to be the commit timestamp.
+            // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include: (1)
+            // Atomic applyOps (used by sharding). (2) Secondary oplog application of prepared
+            // transactions.
             return false;
         } else {
             switch (replMode) {
                 case ReplicationCoordinator::modeReplSet: {
-                    // We typically timestamp these writes, unless they are in a WUOW.
+                    // Secondary oplog application not in a WUOW uses the timestamp in the operation
+                    // document.
                     return true;
                 }
                 case ReplicationCoordinator::modeNone: {
