@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_request.h"
 
 namespace mongo {
@@ -78,7 +79,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kDefaultSpecialFeatures);
+            MatchExpressionParser::kDefaultSpecialFeatures,
+        const ProjectionPolicies& projectionPolicies =
+            ProjectionPolicies::findProjectionPolicies());
 
     /**
      * For testing or for internal clients to use.
@@ -216,7 +219,8 @@ private:
                 std::unique_ptr<QueryRequest> qr,
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
-                std::unique_ptr<CollatorInterface> collator);
+                std::unique_ptr<CollatorInterface> collator,
+                const ProjectionPolicies& projectionPolicies);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

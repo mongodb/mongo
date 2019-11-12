@@ -133,7 +133,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     std::unique_ptr<QueryRequest> qr,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback,
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    const ProjectionPolicies& projectionPolicies) {
     auto qrStatus = qr->validate();
     if (!qrStatus.isOK()) {
         return qrStatus;
@@ -174,7 +175,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                  std::move(qr),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
-                 std::move(collator));
+                 std::move(collator),
+                 projectionPolicies);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -210,7 +212,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  std::move(qr),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
-                                 std::move(collator));
+                                 std::move(collator),
+                                 ProjectionPolicies::findProjectionPolicies());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -223,7 +226,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             std::unique_ptr<QueryRequest> qr,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
-                            std::unique_ptr<CollatorInterface> collator) {
+                            std::unique_ptr<CollatorInterface> collator,
+                            const ProjectionPolicies& projectionPolicies) {
     _expCtx = expCtx;
     _qr = std::move(qr);
     _collator = std::move(collator);
@@ -241,11 +245,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
         try {
-            _proj.emplace(projection_ast::parse(expCtx,
-                                                _qr->getProj(),
-                                                _root.get(),
-                                                _qr->getFilter(),
-                                                ProjectionPolicies::findProjectionPolicies()));
+            _proj.emplace(projection_ast::parse(
+                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), projectionPolicies));
         } catch (const DBException& e) {
             return e.toStatus();
         }

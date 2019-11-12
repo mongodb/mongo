@@ -231,9 +231,20 @@ TEST(QueryProjectionTest, ProjectionDefaults) {
     ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kTextScore]);
 }
 
-TEST(QueryProjectionTest, SortKeyMetaProjectionInExclusionProjection) {
-    // A projection with just a $meta projection defaults to an exclusion projection.
+TEST(QueryProjectionTest, SortKeyMetaProjectionInAgg) {
+    // A projection with just a $meta projection defaults to an exclusion projection in find().
     auto proj = createProjection("{}", "{foo: {$meta: 'sortKey'}}");
+
+    ASSERT_TRUE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_FALSE(proj.requiresMatchDetails());
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_FALSE(proj.requiresDocument());
+}
+
+TEST(QueryProjectionTest, SortKeyMetaProjectionInFind) {
+    // A projection with just a $meta projection defaults to an exclusion projection in find().
+    auto proj = createFindProjection("{}", "{foo: {$meta: 'sortKey'}}");
 
     ASSERT_TRUE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_FALSE(proj.requiresMatchDetails());

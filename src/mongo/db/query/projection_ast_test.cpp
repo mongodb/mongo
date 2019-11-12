@@ -95,6 +95,11 @@ void assertCanClone(Projection proj) {
     ASSERT_BSONOBJ_EQ(cloneBSON, cloneBSON2);
 }
 
+TEST_F(ProjectionASTTest, TestParsingTypeEmptyProjectionIsExclusion) {
+    Projection proj = parseWithDefaultPolicies(fromjson("{}"));
+    ASSERT(proj.type() == ProjectType::kExclusion);
+}
+
 TEST_F(ProjectionASTTest, TestParsingTypeInclusion) {
     Projection proj = parseWithDefaultPolicies(fromjson("{a: 1, b: 1}"));
     ASSERT(proj.type() == ProjectType::kInclusion);
@@ -128,6 +133,11 @@ TEST_F(ProjectionASTTest, TestParsingTypeExclusionWithNesting) {
     ASSERT(p.type() == ProjectType::kExclusion);
 }
 
+TEST_F(ProjectionASTTest, TestParsingTypeExclusionIdOnly) {
+    Projection proj = parseWithDefaultPolicies(fromjson("{_id: 0}"));
+    ASSERT(proj.type() == ProjectType::kExclusion);
+}
+
 TEST_F(ProjectionASTTest, TestParsingTypeExclusionWithIdIncluded) {
     {
         Projection p = parseWithDefaultPolicies(fromjson("{'a.b': 0, _id: 1}"));
@@ -138,6 +148,26 @@ TEST_F(ProjectionASTTest, TestParsingTypeExclusionWithIdIncluded) {
         Projection p = parseWithDefaultPolicies(fromjson("{_id: 1, 'a.b': 0}"));
         ASSERT(p.type() == ProjectType::kExclusion);
     }
+}
+
+TEST_F(ProjectionASTTest, MetaProjectionInAggDefaultsToInclusion) {
+    const auto proj = parseWithDefaultPolicies(fromjson("{foo: {$meta: 'sortKey'}}"));
+    ASSERT(proj.type() == ProjectType::kInclusion);
+}
+
+TEST_F(ProjectionASTTest, MetaProjectionInFindDefaultsToExclusion) {
+    const auto proj = parseWithFindFeaturesEnabled(fromjson("{foo: {$meta: 'sortKey'}}"));
+    ASSERT(proj.type() == ProjectType::kExclusion);
+}
+
+TEST_F(ProjectionASTTest, MetaProjectionWithIdInFindDefaultsToInclusion) {
+    const auto proj = parseWithFindFeaturesEnabled(fromjson("{_id: 0, foo: {$meta: 'sortKey'}}"));
+    ASSERT(proj.type() == ProjectType::kExclusion);
+}
+
+TEST_F(ProjectionASTTest, MetaProjectionWithIdInAggDefaultsToInclusion) {
+    const auto proj = parseWithDefaultPolicies(fromjson("{_id: 0, foo: {$meta: 'sortKey'}}"));
+    ASSERT(proj.type() == ProjectType::kInclusion);
 }
 
 TEST_F(ProjectionASTTest, TestParsingTypeExclusionWithNestingObjectSyntax) {
@@ -155,7 +185,17 @@ TEST_F(ProjectionASTTest, TestParsingTypeOnlySlice) {
     ASSERT(p.type() == ProjectType::kExclusion);
 }
 
-TEST_F(ProjectionASTTest, TestParsingTypeOnlyElemMatchAndSlice) {
+TEST_F(ProjectionASTTest, TestParsingTypeOnlyIdInclusionAndSlice) {
+    Projection p = parseWithFindFeaturesEnabled(fromjson("{_id: 1, a: {$slice: 1}}"));
+    ASSERT(p.type() == ProjectType::kInclusion);
+}
+
+TEST_F(ProjectionASTTest, TestParsingTypeOnlyIdExclusionAndSlice) {
+    Projection p = parseWithFindFeaturesEnabled(fromjson("{_id: 0, a: {$slice: 1}}"));
+    ASSERT(p.type() == ProjectType::kExclusion);
+}
+
+TEST_F(ProjectionASTTest, TestParsingTypeSliceHasHigherPriorityThanElemMatch) {
     {
         Projection p =
             parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {foo: 3}}, b: {$slice: 1}}"));
@@ -167,6 +207,45 @@ TEST_F(ProjectionASTTest, TestParsingTypeOnlyElemMatchAndSlice) {
         Projection p =
             parseWithFindFeaturesEnabled(fromjson("{a: {$slice: 1}, b: {$elemMatch: {foo: 3}}}"));
         ASSERT(p.type() == ProjectType::kExclusion);
+    }
+}
+
+// When only _id and $elemMatch are provided, the default is inclusion, regardless of the value for
+// _id.
+TEST_F(ProjectionASTTest, TestParsingTypeOnlyElemMatchAndIdExclusion) {
+    {
+        Projection p = parseWithFindFeaturesEnabled(fromjson("{_id: 0, x: {$elemMatch: {a: 1}}}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection p = parseWithFindFeaturesEnabled(fromjson("{x: {$elemMatch: {a: 1}}, _id: 0}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+}
+
+TEST_F(ProjectionASTTest, TestParsingTypeOnlyElemMatchAndIdInclusion) {
+    {
+        Projection p = parseWithFindFeaturesEnabled(fromjson("{_id: 1, x: {$elemMatch: {a: 1}}}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+    {
+        Projection p = parseWithFindFeaturesEnabled(fromjson("{x: {$elemMatch: {a: 1}}, _id: 1}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+}
+
+TEST_F(ProjectionASTTest, TestParsingElemMatchHasHigherPriorityThanMeta) {
+    {
+        Projection p = parseWithFindFeaturesEnabled(
+            fromjson("{_id: 1, x: {$elemMatch: {a: 1}}, z: {$meta: 'recordId'}}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection p = parseWithFindFeaturesEnabled(
+            fromjson("{_id: 0, x: {$elemMatch: {a: 1}}, z: {$meta: 'recordId'}}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
     }
 }
 
@@ -560,7 +639,7 @@ TEST_F(ProjectionASTTest, ShouldSucceedWhenParsingAggSliceWithFindFeaturesOff) {
 TEST_F(ProjectionASTTest, ShouldThrowWhenParsingElemMatchWithFindFeaturesOff) {
     ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {foo: 3}}}")),
                        AssertionException,
-                       31325);
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST_F(ProjectionASTTest, ShouldThrowWhenParsingPositionalWithFindFeaturesOff) {

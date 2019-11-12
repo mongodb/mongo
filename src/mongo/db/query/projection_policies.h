@@ -71,6 +71,13 @@ struct ProjectionPolicies {
             ProjectionPolicies::FindOnlyFeaturesPolicy::kAllowFindOnlyFeatures};
     }
 
+    static ProjectionPolicies aggregateProjectionPolicies() {
+        return ProjectionPolicies{ProjectionPolicies::kDefaultIdPolicyDefault,
+                                  ProjectionPolicies::kArrayRecursionPolicyDefault,
+                                  ProjectionPolicies::kComputedFieldsPolicyDefault,
+                                  ProjectionPolicies::FindOnlyFeaturesPolicy::kBanFindOnlyFeatures};
+    }
+
     ProjectionPolicies(
         DefaultIdPolicy idPolicy = kDefaultIdPolicyDefault,
         ArrayRecursionPolicy arrayRecursionPolicy = kArrayRecursionPolicyDefault,

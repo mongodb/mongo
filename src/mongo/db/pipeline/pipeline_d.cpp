@@ -100,7 +100,6 @@ using std::unique_ptr;
 using write_ops::Insert;
 
 namespace {
-
 /**
  * Return whether the given sort spec can be used in a find() sort.
  */
@@ -219,8 +218,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
 
     const ExtensionsCallbackReal extensionsCallback(expCtx->opCtx, &nss);
 
-    auto cq = CanonicalQuery::canonicalize(
-        expCtx->opCtx, std::move(qr), expCtx, extensionsCallback, matcherFeatures);
+    auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
+                                           std::move(qr),
+                                           expCtx,
+                                           extensionsCallback,
+                                           matcherFeatures,
+                                           ProjectionPolicies::aggregateProjectionPolicies());
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of

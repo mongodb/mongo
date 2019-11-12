@@ -37,6 +37,71 @@ namespace projection_ast {
 namespace {
 
 /**
+ * In some arcane situations, when a projection is empty, only contains top-level _id projections
+ * and find expressions, it is non-trivial to determine the type of the projection. These rules are
+ * kept purely for compatibility reasons.
+ *
+ * The significance of an _id inclusion or exclusion depends on the presence of the expressions find
+ * $slice, $elemMatch and $meta.
+ */
+ProjectType computeProjectionType(bool hasFindSlice,
+                                  bool hasElemMatch,
+                                  bool hasMeta,
+                                  const ProjectionPolicies& policies,
+                                  bool idIncludedEntirely,
+                                  bool idExcludedEntirely) {
+    if (hasFindSlice) {
+        // If there's a find $slice then the presence of an {_id: 1} overrides, regardless of other
+        // find() expressions. If there's no _id, then it defaults to exclusion.
+        if (idIncludedEntirely) {
+            return ProjectType::kInclusion;
+        } else {
+            // Either _id is explicitly excluded _or_ not mentioned at all, in which case we
+            // default to exclusion.
+            return ProjectType::kExclusion;
+        }
+    } else if (hasElemMatch) {
+        // If there's an $elemMatch (but no $slice) then it's an inclusion projection. Note that
+        // this is _regardless_ of what value is provided for _id. This is consistent with the
+        // behavior of most expressions: for an arbitrary $func expression, the rule is that {foo:
+        // {$func: ...}}, {_id: 0, foo: {$func: ...}}, and {_id: 1, foo: {$func: ...}} are all
+        // inclusions.
+        return ProjectType::kInclusion;
+    } else if (hasMeta) {
+        if (policies.findOnlyFeaturesAllowed()) {
+            // In find, {_id: 0, x: {$meta: ...}} is considered exclusion.
+            if (idExcludedEntirely) {
+                return ProjectType::kExclusion;
+            }
+
+            // In find, {_id: 1, x: {$meta: ...}} is considered inclusion.
+            if (idIncludedEntirely) {
+                return ProjectType::kInclusion;
+            }
+
+            // Just $meta by itself is exclusion.
+            return ProjectType::kExclusion;
+        } else {
+            // In aggregate(), any projection with a $meta is an inclusion projection.
+            return ProjectType::kInclusion;
+        }
+    } else if (idIncludedEntirely) {
+        // There were no expressions. So this is an {_id: 1} projection. It is an
+        // inclusion. The ParseContext's type field was not marked as an inclusion, because a
+        // projection {_id: 1, a: 0} is also valid, but considered exclusion.
+        return ProjectType::kInclusion;
+    } else if (idExcludedEntirely) {
+        // There were no expressions, but there is an {_id: 0} element. This is an exclusion.  The
+        // ParseContext's 'type' field was not marked as an exclusion because a projection {_id: 0,
+        // a: 1} is valid but considered inclusion.
+        return ProjectType::kExclusion;
+    }
+
+    // Default is exclusion otherwise.
+    return ProjectType::kExclusion;
+}
+
+/**
  * Returns whether an element's type implies that the element is an inclusion or exclusion.
  */
 bool isInclusionOrExclusionType(BSONType type) {
@@ -163,10 +228,14 @@ struct ParseContext {
     bool hasPositional = false;
     bool hasElemMatch = false;
     bool hasFindSlice = false;
+    bool hasMeta = false;
     boost::optional<ProjectType> type;
 
-    // Whether there's an {_id: 1} projection.
+    // Whether there's an {_id: 1} field in the projection.
     bool idIncludedEntirely = false;
+
+    // Whether there's an {_id: 0} field in the projection.
+    bool idExcludedEntirely = false;
 };
 
 void attemptToParseFindSlice(ParseContext* parseCtx,
@@ -235,6 +304,7 @@ bool attemptToParseGenericExpression(ParseContext* parseCtx,
     auto expr = Expression::parseExpression(
         parseCtx->expCtx, subObj, parseCtx->expCtx->variablesParseState);
     addNodeAtPath(parent, path, std::make_unique<ExpressionASTNode>(expr));
+    parseCtx->hasMeta = parseCtx->hasMeta || isMeta;
     return true;
 }
 
@@ -304,6 +374,10 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
             parseCtx->hasElemMatch = true;
             return true;
         }
+    } else if (subObj.firstElementFieldNameStringData() == "$elemMatch") {
+        // find()-only features are not and the user tried invoking elemMatch. Here we can give a
+        // nicer error than the generic "unknown expression."
+        uasserted(ErrorCodes::InvalidPipelineOperator, "Cannot use $elemMatch in this context");
     }
 
     return attemptToParseGenericExpression(parseCtx, path, subObj, parent);
@@ -406,6 +480,8 @@ void parseExclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
                               << " in inclusion projection",
                 !ctx->type || *ctx->type == ProjectType::kExclusion);
         ctx->type = ProjectType::kExclusion;
+    } else {
+        ctx->idExcludedEntirely = true;
     }
 }
 
@@ -531,25 +607,15 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
         parseElement(&ctx, elem, boost::none, &root);
     }
 
-    // find() defaults about inclusion/exclusion. These rules are preserved for compatibility
-    // reasons. If there are no explicit inclusion/exclusion fields, the type depends on which
-    // find() expressions (if any) are used in the following order: $slice, $elemMatch, $meta.
+    // If we have not yet determined the type, we must fall back to the defaults for ambiguous
+    // projections.
     if (!ctx.type) {
-        if (ctx.idIncludedEntirely) {
-            // The projection {_id: 1} is considered an inclusion. The ParseContext's type field was
-            // not marked as such, because a projection {_id: 1, a: 0} is also valid, but considered
-            // exclusion.
-            ctx.type = ProjectType::kInclusion;
-        } else if (ctx.hasFindSlice) {
-            // If the projection has only find() expressions, then $slice has highest precedence.
-            ctx.type = ProjectType::kExclusion;
-        } else if (ctx.hasElemMatch) {
-            // $elemMatch has next-highest precedent.
-            ctx.type = ProjectType::kInclusion;
-        } else {
-            // This happens only when the projection is entirely $meta expressions.
-            ctx.type = ProjectType::kExclusion;
-        }
+        ctx.type = computeProjectionType(ctx.hasFindSlice,
+                                         ctx.hasElemMatch,
+                                         ctx.hasMeta,
+                                         ctx.policies,
+                                         ctx.idIncludedEntirely,
+                                         ctx.idExcludedEntirely);
     }
     invariant(ctx.type);
 

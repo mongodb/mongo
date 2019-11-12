@@ -622,7 +622,8 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         // Create an empty/dummy expression context without access to the operation context and
         // collator. This should be sufficient to parse a projection.
         auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr);
-        auto projection = projection_ast::parse(expCtx, spec.Obj(), {});
+        auto projection =
+            projection_ast::parse(expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
         auto specProjObj = projection_ast::astToDebugBSON(projection.root());
         auto solnProjObj = projection_ast::astToDebugBSON(pn->proj.root());
         return SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj) &&
