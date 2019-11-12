@@ -449,7 +449,10 @@ Status renameBetweenDBs(OperationContext* opCtx,
     boost::optional<Lock::DBLock> sourceDbLock;
     boost::optional<Lock::CollectionLock> sourceCollLock;
     if (!opCtx->lockState()->isCollectionLockedForMode(source, MODE_S)) {
-        sourceDbLock.emplace(opCtx, source.db(), MODE_IS);
+        // Lock the DB using MODE_IX to ensure we have the global lock in that mode, as to prevent
+        // upgrade from MODE_IS to MODE_IX, which caused deadlock on systems not supporting Database
+        // locking and should be avoided in general.
+        sourceDbLock.emplace(opCtx, source.db(), MODE_IX);
         sourceCollLock.emplace(opCtx, source, MODE_S);
     }
 
