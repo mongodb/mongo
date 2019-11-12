@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include <string>
 #include <utility>
 
 #include "mongo/db/commands/map_reduce_out_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 using namespace std::string_literals;
+
+// Used to occasionally log deprecation messages.
+Rarely shardedDeprecationSampler;
 
 MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& element) {
     if (element.type() == BSONType::String) {
@@ -61,6 +67,9 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
                         sharded.type() == Bool);
                 uassert(
                     ErrorCodes::BadValue, "sharded field value must be true", sharded.boolean());
+                if (shardedDeprecationSampler.tick()) {
+                    warning() << "The out.sharded option in MapReduce is deprecated";
+                }
                 return true;
             } else {
                 --allowedNFields;
