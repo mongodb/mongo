@@ -43,6 +43,14 @@
 
 
 namespace mongo::sdam {
+
+namespace {
+
+std::set<ServerType> kDataServerTypes{
+    ServerType::kMongos, ServerType::kRSPrimary, ServerType::kRSSecondary, ServerType::kStandalone};
+
+}  // namespace
+
 ServerDescription::ServerDescription(ClockSource* clockSource,
                                      const IsMasterOutcome& isMasterOutcome,
                                      boost::optional<IsMasterRTT> lastRtt)

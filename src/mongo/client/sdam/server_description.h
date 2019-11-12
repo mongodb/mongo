@@ -120,11 +120,6 @@ private:
     void saveTags(BSONObj tagsObj);
     void saveElectionId(BSONElement electionId);
 
-    static inline const std::set<ServerType> kDataServerTypes{ServerType::kMongos,
-                                                              ServerType::kRSPrimary,
-                                                              ServerType::kRSSecondary,
-                                                              ServerType::kStandalone};
-
     static inline const std::string kIsDbGrid = "isdbgrid";
     static inline const double kRttAlpha = 0.2;
 
