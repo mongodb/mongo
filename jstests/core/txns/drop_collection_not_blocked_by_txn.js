@@ -1,7 +1,7 @@
 /**
  * Test that drop collection only takes database IX lock and will not be blocked by transactions.
  *
- * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
+ * @tags: [uses_transactions, requires_spawning_own_processes, requires_db_locking, assumes_unsharded_collection]
  */
 
 (function() {
