@@ -1,7 +1,7 @@
 /**
  * Test that running explain() providing a collection UUID rather than collection name will fail
  * cleanly.
- * @tags: [expects_auth_parameters] 
+ * @tags: [uses_multiple_connections] 
  */
 (function() {
 "use strict";

@@ -8,7 +8,7 @@
  * @tags: [
  *  assumes_read_preference_unchanged,
  *  requires_fastcount,
- *
+ *  assumes_superuser_permissions,
  *  # top command is not available on embedded
  *  incompatible_with_embedded]
  */
