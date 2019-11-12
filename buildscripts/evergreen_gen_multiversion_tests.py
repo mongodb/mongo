@@ -5,6 +5,7 @@ import datetime
 from datetime import timedelta
 import logging
 import os
+import sys
 import tempfile
 
 from collections import namedtuple
@@ -28,6 +29,7 @@ import buildscripts.resmokelib.parser
 import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
 import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
+import buildscripts.evergreen_gen_fuzzer_tests as gen_fuzzer
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -40,7 +42,7 @@ LAST_STABLE_MONGO_BINARY = "mongo-4.2"
 
 DEFAULT_CONFIG_VALUES = generate_resmoke.DEFAULT_CONFIG_VALUES
 CONFIG_DIR = DEFAULT_CONFIG_VALUES["generated_config_dir"]
-DEFAULT_CONFIG_VALUES["is_sharded"] = False
+DEFAULT_CONFIG_VALUES["is_jstestfuzz"] = False
 TEST_SUITE_DIR = DEFAULT_CONFIG_VALUES["test_suites_dir"]
 CONFIG_FILE = generate_resmoke.CONFIG_FILE
 CONFIG_FORMAT_FN = generate_resmoke.CONFIG_FORMAT_FN
@@ -50,11 +52,22 @@ SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
 BURN_IN_TASK = "burn_in_tests_multiversion"
 BURN_IN_CONFIG_KEY = "use_in_multiversion_burn_in_tests"
 PASSTHROUGH_TAG = "multiversion_passthrough"
+EXCLUDE_TAGS = "requires_fcv_44,multiversion_incompatible"
 
 # The directory in which BACKPORTS_REQUIRED_FILE resides.
 ETC_DIR = "etc"
 BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
 BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/mongodb/mongo"
+
+
+def enable_logging():
+    """Enable INFO level logging."""
+    logging.basicConfig(
+        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
+        level=logging.INFO,
+        stream=sys.stdout,
+    )
+    structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
 
 def prepare_directory_for_suite(directory):
@@ -173,13 +186,12 @@ class EvergreenConfigGenerator(object):
             # Fetch and download the proper mongod binaries before running multiversion tests.
             CommandDefinition().function("do multiversion setup")
         ]
-        exclude_tags = "requires_fcv_44,multiversion_incompatible"
         # TODO(SERVER-43306): Remove --dryRun command line option once we start turning on
         #  multiversion tests.
         run_tests_vars = {
             "resmoke_args":
                 "{0} --suite={1} --mixedBinVersions={2} --excludeWithAnyTags={3} --dryRun=tests ".
-                format(self.options.resmoke_args, suite, mixed_version_config, exclude_tags),
+                format(self.options.resmoke_args, suite, mixed_version_config, EXCLUDE_TAGS),
             "task":
                 gen_task_name,
         }
@@ -215,6 +227,34 @@ class EvergreenConfigGenerator(object):
                                     burn_in_test)
         return self.evg_config
 
+    def _get_fuzzer_options(self, version_config, suite_file):
+        fuzzer_config = generate_resmoke.ConfigOptions(self.options.config)
+        fuzzer_config.name = f"{self.options.suite}_multiversion"
+        fuzzer_config.num_files = int(self.options.num_files)
+        fuzzer_config.num_tasks = int(self.options.num_tasks)
+        fuzzer_config.resmoke_args = f"{self.options.resmoke_args} "\
+            f"--mixedBinVersions={version_config} --excludeWithAnyTags={EXCLUDE_TAGS}"\
+            f" --suites={CONFIG_DIR}/{suite_file}"
+        return fuzzer_config
+
+    def _generate_fuzzer_tasks(self, config):
+        suite_file = self.options.suite + ".yml"
+        # Update the jstestfuzz yml suite with the proper multiversion configurations.
+        source_config = generate_resmoke.read_yaml(TEST_SUITE_DIR, suite_file)
+        config.update_yaml(source_config)
+        updated_yml = generate_resmoke.generate_resmoke_suite_config(source_config, suite_file)
+        file_dict = {f"{self.options.suite}.yml": updated_yml}
+        dt = DisplayTaskDefinition(self.task)
+
+        for version_config in config.version_configs:
+            fuzzer_config = self._get_fuzzer_options(version_config, suite_file)
+            gen_fuzzer.generate_evg_tasks(fuzzer_config, self.evg_config,
+                                          task_name_suffix=version_config, display_task=dt)
+        generate_resmoke.write_file_dict(CONFIG_DIR, file_dict)
+        dt.execution_task(f"{fuzzer_config.name}_gen")
+        self.evg_config.variant(self.options.variant).display_task(dt)
+        return self.evg_config
+
     def generate_evg_tasks(self, burn_in_test=None, burn_in_idx=0):
         # pylint: disable=too-many-locals
         """
@@ -225,6 +265,16 @@ class EvergreenConfigGenerator(object):
 
         :param burn_in_test: The test to be run as part of the burn in multiversion suite.
         """
+        if is_suite_sharded(TEST_SUITE_DIR, self.options.suite):
+            config = MultiversionConfig(update_suite_config_for_multiversion_sharded,
+                                        SHARDED_MIXED_VERSION_CONFIGS)
+        else:
+            config = MultiversionConfig(update_suite_config_for_multiversion_replset,
+                                        REPL_MIXED_VERSION_CONFIGS)
+
+        if self.options.is_jstestfuzz:
+            return self._generate_fuzzer_tasks(config)
+
         # Divide tests into suites based on run-time statistics for the last
         # LOOKBACK_DURATION_DAYS. Tests without enough run-time statistics will be placed
         # in the misc suite.
@@ -236,12 +286,6 @@ class EvergreenConfigGenerator(object):
         for suite in suites:
             suite.source_name = self.task
         # Render the given suites into yml files that can be used by resmoke.py.
-        if is_suite_sharded(TEST_SUITE_DIR, self.options.suite):
-            config = MultiversionConfig(update_suite_config_for_multiversion_sharded,
-                                        SHARDED_MIXED_VERSION_CONFIGS)
-        else:
-            config = MultiversionConfig(update_suite_config_for_multiversion_replset,
-                                        REPL_MIXED_VERSION_CONFIGS)
         config_file_dict = generate_resmoke.render_suite_files(
             suites, self.options.suite, gen_suites.test_list, TEST_SUITE_DIR, config.update_yaml)
         # Update the base misc suite name to the multiversion name.
@@ -278,6 +322,7 @@ class EvergreenConfigGenerator(object):
         if not generate_resmoke.should_tasks_be_generated(self.evg_api, self.options.task_id):
             LOGGER.info("Not generating configuration due to previous successful generation.")
             return
+
         self.generate_evg_tasks()
         self._write_evergreen_config_to_file(self.task)
 
@@ -331,10 +376,16 @@ def generate_exclude_yaml(suite, task_path_suffix, is_generated_suite):
     last-stable branch to determine which tests should be blacklisted.
     """
 
+    enable_logging()
+
     suite_name = generate_resmoke.remove_gen_suffix(suite)
 
     # Get the backports_required_for_multiversion_tests.yml on the current version branch.
     backports_required_latest = generate_resmoke.read_yaml(ETC_DIR, BACKPORTS_REQUIRED_FILE)
+    if suite_name not in backports_required_latest:
+        LOGGER.info(f"Generating exclude files not supported for '{suite_name}''.")
+        return
+
     latest_suite_yaml = backports_required_latest[suite_name]
 
     if not latest_suite_yaml:

@@ -3,6 +3,8 @@
 import unittest
 import mock
 
+from shrub.config import Configuration
+
 from buildscripts import evergreen_gen_fuzzer_tests as gft
 
 # pylint: disable=missing-docstring,protected-access
@@ -24,13 +26,15 @@ class TestGenerateEvgTasks(unittest.TestCase):
         options.resmoke_jobs_max = 0
         options.should_shuffle = "false"
         options.timeout_secs = "1800"
+        options.suite = "test_suite"
 
         return options
 
     def test_evg_config_is_created_without_multiversion(self):
+        evg_config = Configuration()
         options = self._create_options_mock()
 
-        config = gft._generate_evg_tasks(options).to_map()
+        config = gft.generate_evg_tasks(options, evg_config).to_map()
 
         self.assertEqual(options.num_tasks, len(config["tasks"]))
 
@@ -50,10 +54,11 @@ class TestGenerateEvgTasks(unittest.TestCase):
         self.assertIn(options.name + "_gen", buildvariant["display_tasks"][0]["execution_tasks"])
 
     def test_evg_config_is_created_with_multiversion(self):
+        evg_config = Configuration()
         options = self._create_options_mock()
         options.use_multiversion = "/data/multiversion"
 
-        config = gft._generate_evg_tasks(options).to_map()
+        config = gft.generate_evg_tasks(options, evg_config).to_map()
 
         self.assertEqual("do multiversion setup", config["tasks"][0]["commands"][1]["func"])
         self.assertEqual("/data/multiversion",

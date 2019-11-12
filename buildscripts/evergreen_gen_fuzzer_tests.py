@@ -13,10 +13,12 @@ from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
 
+import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
 import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
 
 CONFIG_DIRECTORY = "generated_resmoke_config"
+TEST_SUITE_DIR = generate_resmoke.DEFAULT_TEST_SUITE_DIR
 
 ConfigOptions = namedtuple("ConfigOptions", [
     "num_files",
@@ -31,6 +33,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "should_shuffle",
     "timeout_secs",
     "use_multiversion",
+    "suite",
 ])
 
 
@@ -72,9 +75,11 @@ def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-m
     use_multiversion = read_config.get_config_value("task_path_suffix", cmd_line_options,
                                                     config_file_data, default=False)
 
+    suite = read_config.get_config_value("suite", cmd_line_options, config_file_data, required=True)
+
     return ConfigOptions(num_files, num_tasks, resmoke_args, npm_command, jstestfuzz_vars, name,
                          variant, continue_on_failure, resmoke_jobs_max, should_shuffle,
-                         timeout_secs, use_multiversion)
+                         timeout_secs, use_multiversion, suite)
 
 
 def _name_task(parent_name, task_index, total_tasks):
@@ -90,20 +95,31 @@ def _name_task(parent_name, task_index, total_tasks):
     return "{0}_{1}".format(parent_name, str(task_index).zfill(index_width))
 
 
-def _generate_evg_tasks(options):
+def _write_fuzzer_yaml(options):
+    """Write the fuzzer yaml to CONFIG_DIRECTORY."""
+    suite_file = options.suite + ".yml"
+    source_config = generate_resmoke.read_yaml(TEST_SUITE_DIR, suite_file)
+    gen_yml = generate_resmoke.generate_resmoke_suite_config(source_config, suite_file)
+    file_dict = {f"{options.suite}.yml": gen_yml}
+    generate_resmoke.write_file_dict(CONFIG_DIRECTORY, file_dict)
+
+
+def generate_evg_tasks(options, evg_config, task_name_suffix=None, display_task=None):
     """
     Generate an evergreen configuration for fuzzers based on the options given.
 
     :param options: task options.
+    :param evg_config: evergreen configuration.
+    :param task_name_suffix: suffix to be appended to each task name.
+    :param display_task: an existing display task definition to append to.
     :return: An evergreen configuration.
     """
-    evg_config = Configuration()
-
     task_names = []
     task_specs = []
 
     for task_index in range(options.num_tasks):
-        name = taskname.name_generated_task(options.name, task_index, options.num_tasks,
+        task_name = options.name if not task_name_suffix else f"{options.name}_{task_name_suffix}"
+        name = taskname.name_generated_task(task_name, task_index, options.num_tasks,
                                             options.variant)
         task_names.append(name)
         task_specs.append(TaskSpec(name))
@@ -120,21 +136,29 @@ def _generate_evg_tasks(options):
             "npm_command":
                 options.npm_command
         }))
+        # Unix path separators are used because Evergreen only runs this script in unix shells,
+        # even on Windows.
+        suite_arg = f"--suites={CONFIG_DIRECTORY}/{options.suite}.yml"
         run_tests_vars = {
             "continue_on_failure": options.continue_on_failure,
-            "resmoke_args": options.resmoke_args,
+            "resmoke_args": f"{suite_arg} {options.resmoke_args}",
             "resmoke_jobs_max": options.resmoke_jobs_max,
             "should_shuffle": options.should_shuffle,
             "task_path_suffix": options.use_multiversion,
             "timeout_secs": options.timeout_secs,
-        }
+            "task": options.name
+        }  # yapf: disable
 
-        commands.append(CommandDefinition().function("run tests").vars(run_tests_vars))
+        commands.append(CommandDefinition().function("run generated tests").vars(run_tests_vars))
         task.dependency(TaskDependency("compile")).commands(commands)
 
-    dt = DisplayTaskDefinition(options.name).execution_tasks(task_names)\
-        .execution_task("{0}_gen".format(options.name))
-    evg_config.variant(options.variant).tasks(task_specs).display_task(dt)
+    # Create a new DisplayTaskDefinition or append to the one passed in.
+    dt = DisplayTaskDefinition(task_name) if not display_task else display_task
+    dt.execution_tasks(task_names)
+    evg_config.variant(options.variant).tasks(task_specs)
+    if not display_task:
+        dt.execution_task("{0}_gen".format(options.name))
+        evg_config.variant(options.variant).display_task(dt)
 
     return evg_config
 
@@ -165,12 +189,14 @@ def main():
                         help="should_shuffle value for generated tasks.")
     parser.add_argument("--timeout-secs", dest="timeout_secs",
                         help="timeout_secs value for generated tasks.")
+    parser.add_argument("--suite", dest="suite", help="Suite to run using resmoke.")
 
     options = parser.parse_args()
 
     config_options = _get_config_options(options, options.expansion_file)
-
-    evg_config = _generate_evg_tasks(config_options)
+    evg_config = Configuration()
+    _write_fuzzer_yaml(config_options)
+    generate_evg_tasks(config_options, evg_config)
 
     if not os.path.exists(CONFIG_DIRECTORY):
         os.makedirs(CONFIG_DIRECTORY)
