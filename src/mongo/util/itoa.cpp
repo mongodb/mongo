@@ -91,15 +91,15 @@ struct Entry {
     char s[kTableDigits];
 };
 
-template <int... D>
+template <int D0, int... Dn>
 constexpr uint8_t printedWidth() {
-    size_t magnitude = sizeof...(D);
-    for (int d : {D...}) {
-        if (d != 0)
-            return magnitude;
-        --magnitude;
-    }
-    return 1;  // The all-zeros pattern still has 1 digit when printed.
+    const int kMag = sizeof...(Dn);
+    if constexpr (D0 != 0)
+        return 1 + kMag;
+    else if constexpr (kMag == 0)
+        return 1;  // The all-zeros pattern still has 1 digit when printed.
+    else
+        return printedWidth<Dn...>();
 }
 
 template <int... D>
