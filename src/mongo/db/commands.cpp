@@ -50,6 +50,7 @@
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -471,6 +472,11 @@ constexpr StringData CommandHelpers::kHelpFieldName;
 MONGO_FAIL_POINT_DEFINE(failCommand);
 MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
 
+// A decoration representing error labels specified in a failCommand failpoint that has affected a
+// command in this OperationContext.
+const OperationContext::Decoration<boost::optional<BSONArray>> errorLabelsOverride =
+    OperationContext::declareDecoration<boost::optional<BSONArray>>();
+
 bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                         StringData cmdName,
                                                         Client* client,
@@ -515,7 +521,16 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
     bool hasErrorCode;
     long long errorCode;
     failCommand.executeIf(
-        [&](const BSONObj&) {
+        [&](const BSONObj& data) {
+            if (data.hasField(kErrorLabelsFieldName) &&
+                data[kErrorLabelsFieldName].type() == Array) {
+                // Propagate error labels specified in the failCommand failpoint to the
+                // OperationContext decoration to override getErrorLabels() behaviors.
+                invariant(!errorLabelsOverride(opCtx));
+                errorLabelsOverride(opCtx).emplace(
+                    data.getObjectField(kErrorLabelsFieldName).getOwned());
+            }
+
             if (closeConnection) {
                 opCtx->getClient()->session()->end();
                 log() << "Failing command '" << commandName

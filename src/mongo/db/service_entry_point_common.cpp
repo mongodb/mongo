@@ -628,6 +628,14 @@ bool runCommandImpl(OperationContext* opCtx,
                 [&](const BSONObj& data) {
                     bb.append(data["writeConcernError"]);
                     reallyWait = false;
+                    if (data.hasField(kErrorLabelsFieldName) &&
+                        data[kErrorLabelsFieldName].type() == Array) {
+                        // Propagate error labels specified in the failCommand failpoint to the
+                        // OperationContext decoration to override getErrorLabels() behaviors.
+                        invariant(!errorLabelsOverride(opCtx));
+                        errorLabelsOverride(opCtx).emplace(
+                            data.getObjectField(kErrorLabelsFieldName).getOwned());
+                    }
                 },
                 [&](const BSONObj& data) {
                     return CommandHelpers::shouldActivateFailCommandFailPoint(
@@ -719,8 +727,8 @@ bool runCommandImpl(OperationContext* opCtx,
         }
         auto isInternalClient = opCtx->getClient()->session() &&
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-        auto errorLabels =
-            getErrorLabels(sessionOptions, command->getName(), code, wcCode, isInternalClient);
+        auto errorLabels = getErrorLabels(
+            opCtx, sessionOptions, command->getName(), code, wcCode, isInternalClient);
         replyBuilder->getBodyBuilder().appendElements(errorLabels);
     }
 
@@ -1024,8 +1032,8 @@ void execCommandDatabase(OperationContext* opCtx,
         }
         auto isInternalClient = opCtx->getClient()->session() &&
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-        auto errorLabels =
-            getErrorLabels(sessionOptions, command->getName(), e.code(), wcCode, isInternalClient);
+        auto errorLabels = getErrorLabels(
+            opCtx, sessionOptions, command->getName(), e.code(), wcCode, isInternalClient);
         extraFieldsBuilder.appendElements(errorLabels);
 
         BSONObjBuilder metadataBob;

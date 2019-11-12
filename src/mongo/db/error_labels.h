@@ -32,7 +32,7 @@
 #include "mongo/db/logical_session_id.h"
 
 namespace mongo {
-
+static constexpr StringData kErrorLabelsFieldName = "errorLabels"_sd;
 namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
 static constexpr StringData kTransientTransaction = "TransientTransactionError"_sd;
@@ -71,7 +71,8 @@ private:
 /**
  * Returns the error labels for the given error.
  */
-BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
+BSONObj getErrorLabels(OperationContext* opCtx,
+                       const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
                        boost::optional<ErrorCodes::Error> code,
                        boost::optional<ErrorCodes::Error> wcCode,

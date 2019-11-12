@@ -44,6 +44,28 @@ let res = secondarySessionDb.runCommand({
 assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
+jsTest.log("failCommand with errorLabels but without errorCode or writeConcernError should not " +
+           "interfere with server's error labels attaching");
+txnNumber++;
+// This failCommand should have no effect.
+assert.commandWorked(secondary.adminCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {errorLabels: ["foo"], failCommands: ["insert"]}
+}));
+res = secondarySessionDb.runCommand({
+    insert: collName,
+    documents: [{_id: "insert-1"}],
+    readConcern: {level: "snapshot"},
+    txnNumber: NumberLong(txnNumber),
+    startTransaction: true,
+    autocommit: false
+});
+assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
+// Server should continue to return TransientTransactionError label.
+assert.eq(res.errorLabels, ["TransientTransactionError"]);
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+
 jsTest.log("Insert as a retryable write on secondary should fail with retryable error labels");
 txnNumber++;
 // Insert as a retryable write.

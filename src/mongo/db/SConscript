@@ -1335,6 +1335,7 @@ env.Library(
         'error_labels.cpp',
     ],
     LIBDEPS=[
+        'commands',
         'logical_session_id',
     ],
 )
