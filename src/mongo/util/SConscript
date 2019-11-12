@@ -615,19 +615,6 @@ if env.TargetOSIs('windows'):
         ],
     )
 
-generateItoATable = env.Command(
-    target=[
-        'itoa_table_4.h',
-    ],
-    source=[
-        'generate_itoa_table.py',
-    ],
-    action=[
-        '$PYTHON ${SOURCES[0]} --digit_count=4 --output=${TARGETS[0]}'
-    ],
-)
-env.Alias('generated-sources', generateItoATable)
-
 stacktraceEnv = env.Clone()
 if use_libunwind:
     stacktraceEnv.InjectThirdParty(libraries=['unwind'])
