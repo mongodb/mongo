@@ -272,8 +272,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit()
             AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
 
-            if (setField.hasField(ShardCollectionType::kLastRefreshedCollectionVersionFieldName) &&
-                !setField.getBoolField("refreshing")) {
+            auto refreshingField = setField.getField(ShardCollectionType::kRefreshingFieldName);
+            if (refreshingField.isBoolean() && !refreshingField.boolean()) {
                 opCtx->recoveryUnit()->registerChange(
                     std::make_unique<CollectionVersionLogOpHandler>(opCtx, updatedNss));
             }
