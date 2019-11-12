@@ -569,8 +569,6 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     // entries from the oplog until we finish writing.
     Lock::ParallelBatchWriterMode pbwm(opCtx->lockState());
 
-    // TODO (SERVER-42996): This is a temporary invariant to protect against segfaults. This will
-    // be removed once ApplierState is moved from ReplicationCoordinator to OplogApplier.
     invariant(_replCoord);
     if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
         severe() << "attempting to replicate ops while primary";
