@@ -74,7 +74,7 @@ OpQueue OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
 }
 
 void OpQueueBatcher::startup() {
-    _thread = std::make_unique<stdx::thread>([this] { run(); });
+    _thread = std::make_unique<stdx::thread>([this] { _run(); });
 }
 
 void OpQueueBatcher::shutdown() {
@@ -99,7 +99,7 @@ boost::optional<Date_t> OpQueueBatcher::_calculateSlaveDelayLatestTimestamp() {
     return fastClockSource->now() - slaveDelay;
 }
 
-void OpQueueBatcher::run() {
+void OpQueueBatcher::_run() {
     Client::initThread("ReplBatcher");
 
     OplogApplier::BatchLimits batchLimits;
@@ -112,6 +112,7 @@ void OpQueueBatcher::run() {
         // Check the limits once per batch since users can change them at runtime.
         batchLimits.ops = getBatchLimitOplogEntries();
 
+        // Use the OplogBuffer to populate a local OpQueue. Note that the buffer may be empty.
         OpQueue ops(batchLimits.ops);
         {
             auto opCtx = cc().makeOperationContext();
@@ -144,26 +145,21 @@ void OpQueueBatcher::run() {
             }
         }
 
+        // The applier may be in its 'Draining' state. Determines if the OpQueueBatcher has finished
+        // draining the OplogBuffer and should notify the OplogApplier to signal draining is
+        // complete.
         if (ops.empty() && !ops.mustShutdown()) {
-            // Check whether we have drained the oplog buffer. The states checked here can be
-            // stale when it's used by the applier. signalDrainComplete() needs to check the
-            // applier is still draining in the same term to make sure these states have not
-            // changed.
+            // Store the current term. It's checked in signalDrainComplete() to detect if the node
+            // has stepped down and stepped back up again. See the declaration of
+            // signalDrainComplete() for more details.
             auto replCoord = ReplicationCoordinator::get(cc().getServiceContext());
-            // Check the term first to detect DRAINING -> RUNNING -> DRAINING when signaling
-            // drain complete.
-            //
-            // Batcher can delay arbitrarily. After stepup, if the batcher drained the buffer
-            // and blocks when it's about to notify the applier to signal drain complete, the
-            // node may step down and fetch new data into the buffer and then step up again.
-            // Now the batcher will resume and let the applier signal drain complete even if
-            // the buffer has new data. Checking the term before and after ensures nothing
-            // changed in between.
             auto termWhenBufferIsEmpty = replCoord->getTerm();
+
             // Draining state guarantees the producer has already been fully stopped and no more
             // operations will be pushed in to the oplog buffer until the applier state changes.
             auto isDraining =
                 replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining;
+
             // Check the oplog buffer after the applier state to ensure the producer is stopped.
             if (isDraining && _oplogBuffer->isEmpty()) {
                 ops.setTermWhenExhausted(termWhenBufferIsEmpty);

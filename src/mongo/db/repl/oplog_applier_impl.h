@@ -51,8 +51,8 @@ namespace repl {
  * replication and initial sync.
  *
  * When used for steady state replication, runs a thread that reads batches of operations from
- * an oplog buffer (through the BackgroundSync interface), writes them into the oplog collection,
- * and applies the batch of operations.
+ * an oplog buffer populated through the BackgroundSync interface, writes them into the oplog
+ * collection, and applies the batch of operations.
  */
 class OplogApplierImpl : public OplogApplier {
     OplogApplierImpl(const OplogApplierImpl&) = delete;

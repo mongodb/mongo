@@ -34,6 +34,9 @@
 namespace mongo {
 namespace repl {
 
+/**
+ * Stores a batch of oplog entries for oplog application.
+ */
 class OpQueue {
 public:
     explicit OpQueue(std::size_t batchLimitOps) : _bytes(0) {
@@ -88,8 +91,8 @@ public:
     }
 
     /**
-     * If the oplog buffer is exhausted, return the term before we learned that the buffer was
-     * empty.
+     * Passes the term when the buffer is exhausted to a higher level in case the node has stepped
+     * down and then stepped up again. See its caller for more context.
      */
     boost::optional<long long> termWhenExhausted() const {
         return _termWhenExhausted;
@@ -113,14 +116,15 @@ private:
     boost::optional<long long> _termWhenExhausted;
 };
 
+/**
+ * Consumes batches of oplog entries from the OplogBuffer to give to the oplog applier, freeing
+ * up space for more operations to be fetched from a sync source and allocated onto the OplogBuffer.
+ */
 class OpQueueBatcher {
     OpQueueBatcher(const OpQueueBatcher&) = delete;
     OpQueueBatcher& operator=(const OpQueueBatcher&) = delete;
 
 public:
-    /**
-     * Constructs an OpQueueBatcher
-     */
     OpQueueBatcher(OplogApplier* oplogApplier,
                    StorageInterface* storageInterface,
                    OplogBuffer* oplogBuffer,
@@ -129,18 +133,18 @@ public:
     virtual ~OpQueueBatcher();
 
     /**
-     *  Retrieves the next batch of ops that are ready to apply.
+     * Returns the batch of oplog entries and clears _ops so the batcher can store a new batch.
      */
     OpQueue getNextBatch(Seconds maxWaitTime);
 
     /**
-     * Starts up a thread to continuously pull from the oplog buffer into the OpQueueBatcher's oplog
+     * Starts up a thread to continuously pull from the OplogBuffer into the OpQueueBatcher's oplog
      * queue.
      */
     void startup();
 
     /**
-     * Shuts down the thread that pulls from the oplog buffer to the oplog queue.
+     * Shuts down the thread that pulls from the OplogBuffer to the oplog queue.
      */
     void shutdown();
 
@@ -151,7 +155,7 @@ private:
      */
     boost::optional<Date_t> _calculateSlaveDelayLatestTimestamp();
 
-    void run();
+    void _run();
 
     OplogApplier* _oplogApplier;
     StorageInterface* const _storageInterface;
@@ -160,6 +164,10 @@ private:
 
     Mutex _mutex = MONGO_MAKE_LATCH("OpQueueBatcher::_mutex");
     stdx::condition_variable _cv;
+
+    /**
+     * The latest batch of oplog entries ready for the applier.
+     */
     OpQueue _ops;
 
     std::unique_ptr<stdx::thread> _thread;
