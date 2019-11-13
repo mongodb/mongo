@@ -201,9 +201,9 @@ public:
             StringData message = extract<StringData>(attributes::message(), rec).get();
             const auto& attrs = extract<AttributeArgumentSet>(attributes::attributes(), rec).get();
 
-            _buffer.clear();
-            fmt::internal::vformat_to(_buffer, to_string_view(message), attrs._values);
-            strm.write(_buffer.data(), _buffer.size());
+            fmt::memory_buffer buffer;
+            fmt::internal::vformat_to(buffer, to_string_view(message), attrs._values);
+            strm.write(buffer.data(), buffer.size());
         } else {
             logv2::TextFormatter::operator()(rec, strm);
         }

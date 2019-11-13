@@ -30,8 +30,6 @@
 #pragma once
 
 #include <boost/log/sinks/basic_sink_backend.hpp>
-#include <boost/log/sinks/unlocked_frontend.hpp>
-#include <boost/make_shared.hpp>
 #include <string>
 
 #include "mongo/logv2/ramlog.h"
@@ -54,17 +52,6 @@ public:
     typedef typename base_type::string_type string_type;
     //! Output stream type
     typedef std::basic_ostream<char_type> stream_type;
-
-    static boost::shared_ptr<boost::log::sinks::unlocked_sink<RamLogSink>> create(RamLog* ramlog) {
-        using namespace boost::log;
-
-        auto backend = boost::make_shared<RamLogSink>(ramlog);
-
-        auto sink =
-            boost::make_shared<boost::log::sinks::unlocked_sink<RamLogSink>>(boost::move(backend));
-
-        return sink;
-    }
 
     explicit RamLogSink(RamLog* ramlog) : _ramlog(ramlog) {}
     // The function consumes the log records that come from the frontend

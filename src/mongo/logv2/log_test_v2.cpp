@@ -321,7 +321,8 @@ TEST_F(LogTestV2, Threads) {
 TEST_F(LogTestV2, Ramlog) {
     RamLog* ramlog = RamLog::get("test_ramlog");
 
-    auto sink = RamLogSink::create(ramlog);
+    auto sink = boost::make_shared<boost::log::sinks::unlocked_sink<RamLogSink>>(
+        boost::make_shared<RamLogSink>(ramlog));
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());

@@ -48,18 +48,6 @@ namespace logv2 {
 
 class TextFormatter {
 public:
-    TextFormatter() = default;
-
-    // Boost log synchronizes calls to a formatter within a backend sink. If this is copied for some
-    // reason (to another backend sink), no need to copy the buffer. This is just storage so we
-    // don't need to allocate this memory every time. A final solution should format directly into
-    // the formatting_ostream.
-    TextFormatter(TextFormatter const&) {}
-
-    TextFormatter& operator=(TextFormatter const&) {
-        return *this;
-    }
-
     static bool binary() {
         return false;
     };
@@ -70,27 +58,24 @@ public:
         StringData message = extract<StringData>(attributes::message(), rec).get();
         const auto& attrs = extract<AttributeArgumentSet>(attributes::attributes(), rec).get();
 
-        _buffer.clear();
+        fmt::memory_buffer buffer;
         fmt::format_to(
-            _buffer,
+            buffer,
             "{} {:<2} {:<8} [{}] ",
             extract<Date_t>(attributes::timeStamp(), rec).get().toString(),
             extract<LogSeverity>(attributes::severity(), rec).get().toStringDataCompact(),
             extract<LogComponent>(attributes::component(), rec).get().getNameForLog(),
             extract<StringData>(attributes::threadName(), rec).get());
-        strm.write(_buffer.data(), _buffer.size());
+        strm.write(buffer.data(), buffer.size());
 
         if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kStartupWarnings)) {
             strm << "** WARNING: ";
         }
 
-        _buffer.clear();
-        fmt::internal::vformat_to(_buffer, to_string_view(message), attrs._values);
-        strm.write(_buffer.data(), _buffer.size());
+        buffer.clear();
+        fmt::internal::vformat_to(buffer, to_string_view(message), attrs._values);
+        strm.write(buffer.data(), buffer.size());
     }
-
-protected:
-    fmt::memory_buffer _buffer;
 };
 
 }  // namespace logv2
