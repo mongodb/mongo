@@ -19,10 +19,10 @@ MongoRunner.stopMongod(conn);
 var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
 
-var SERVER_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server";
-var INTERNAL_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=internal";
-var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
-var INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid";
+var SERVER_USER = 'CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
+var INTERNAL_USER = 'CN=internal,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
+var CLIENT_USER = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
+var INVALID_CLIENT_USER = 'CN=invalid,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 
 function authAndTest(mongo) {
     external = mongo.getDB("$external");
