@@ -95,6 +95,17 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               const UUID& buildUUID,
                                               IndexBuildProtocol protocol,
                                               IndexBuildOptions indexBuildOptions) {
+    // This lock serializes setting up the index build and scheduling it on the thread pool between
+    // concurrent callers. It guarantees that if this thread replicates a "startIndexBuild" oplog
+    // entry in the setup, no other concurrent thread can schedule its work ahead of this one. The
+    // thread pool can become saturated with work such that the task gets queued and not immediately
+    // run. The serialization in this function guarantees that primaries and secondaries will
+    // execute these steps in the same order, which is important to avoid deadlocks due to thread
+    // pool resource contention.
+    // TODO(SERVER-44609): Remove this mutex and setup the index build on the scheduled index build
+    // thread.
+    stdx::unique_lock<Latch> lk(_startBuildMutex);
+
     auto statusWithOptionalResult = _registerAndSetUpIndexBuild(
         opCtx, dbName, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
     if (!statusWithOptionalResult.isOK()) {
