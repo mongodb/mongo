@@ -264,6 +264,18 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow) {
     return newCmdBuilder.obj();
 }
 
+BSONObj stripWriteConcern(const BSONObj& cmdObj) {
+    BSONObjBuilder output;
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (name == WriteConcernOptions::kWriteConcernField) {
+            continue;
+        }
+        output.append(elem);
+    }
+    return output.obj();
+}
+
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
     StringData dbName,

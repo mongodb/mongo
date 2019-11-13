@@ -294,6 +294,24 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 mongos.getDB(kDbName).foo.drop();
 
+// ----Assert that specifying writeConcern succeeds----
+
+shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+cleanupOrphanedDocs(st, ns);
+
+assert.commandWorked(sessionDB.foo.update({x: 4}, {$set: {x: 1000}}, {writeConcern: {w: 1}}));
+
+assert.commandWorked(sessionDB.runCommand({
+    findAndModify: 'foo',
+    query: {x: 78},
+    update: {$set: {x: 250}},
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(1),
+    writeConcern: {w: 1},
+}));
+
+mongos.getDB(kDbName).foo.drop();
+
 // ----Assert retryable write result has WCE when the internal commitTransaction fails----
 
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
@@ -314,14 +332,13 @@ res = sessionDB.foo.update({x: 4}, {$set: {x: 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 assert.eq(12345, res.getWriteConcernError().code);
 
-let findAndModCmd = {
+res = sessionDB.runCommand({
     findAndModify: 'foo',
     query: {x: 78},
     update: {$set: {x: 250}},
     lsid: {id: UUID()},
     txnNumber: NumberLong(1),
-};
-res = sessionDB.runCommand(findAndModCmd);
+});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 assert.eq(res.writeConcernError.code, 12345);
 assert(res.writeConcernError.errmsg.includes("dummy error"));

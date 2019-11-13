@@ -310,9 +310,13 @@ private:
                     // Re-run the findAndModify command that will change the shard key value in a
                     // transaction. We call _runCommand recursively, and this second time through
                     // since it will be run as a transaction it will take the other code path to
-                    // updateShardKeyValueOnWouldChangeOwningShardError.
+                    // updateShardKeyValueOnWouldChangeOwningShardError.  We ensure the retried
+                    // operation does not include WC inside the transaction by stripping it from the
+                    // cmdObj.  The transaction commit will still use the WC, because it uses the WC
+                    // from the opCtx (which has been set previously in Strategy).
                     documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-                    _runCommand(opCtx, shardId, shardVersion, nss, cmdObj, result);
+                    _runCommand(
+                        opCtx, shardId, shardVersion, nss, stripWriteConcern(cmdObj), result);
                     auto commitResponse =
                         documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
