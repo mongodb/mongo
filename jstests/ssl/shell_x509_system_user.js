@@ -37,11 +37,10 @@
 
     const subShellCommands = function() {
         TestData = {
-            authUser: 'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server',
+            authUser: 'CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US',
             authenticationDatabase: '$external',
             keyFile: 'dummyKeyFile',
             clusterAuthMode: 'x509',
-
         };
         // Explicitly check asCluster can succeed.
         authutil.asCluster(db.getMongo(), 'dummyKeyFile', function() {
