@@ -43,16 +43,15 @@ REGISTER_EXPRESSION(_internalJs, ExpressionInternalJs::parse);
 namespace {
 
 /**
- * This function is called from the JavaScript function provided to the expression. Objects are
- * converted from BSON to Document/Value after JS engine has run completely.
+ * This function is called from the JavaScript function provided to the expression.
  */
 BSONObj emitFromJS(const BSONObj& args, void* data) {
     uassert(31220, "emit takes 2 args", args.nFields() == 2);
-    auto emitted = static_cast<std::vector<BSONObj>*>(data);
+    auto emitState = static_cast<ExpressionInternalJsEmit::EmitState*>(data);
     if (args.firstElement().type() == Undefined) {
-        emitted->push_back(BSON("k" << BSONNULL << "v" << args["1"]));
+        emitState->emit(DOC("k" << BSONNULL << "v" << args["1"]));
     } else {
-        emitted->push_back(BSON("k" << args["0"] << "v" << args["1"]));
+        emitState->emit(DOC("k" << args["0"] << "v" << args["1"]));
     }
     return BSONObj();
 }
@@ -63,9 +62,9 @@ ExpressionInternalJsEmit::ExpressionInternalJsEmit(
     boost::intrusive_ptr<Expression> thisRef,
     std::string funcSource)
     : Expression(expCtx, {std::move(thisRef)}),
+      _emitState{{}, internalQueryMaxJsEmitBytes.load(), 0},
       _thisRef(_children[0]),
-      _funcSource(std::move(funcSource)),
-      _byteLimit(internalQueryMaxJsEmitBytes.load()) {}
+      _funcSource(std::move(funcSource)) {}
 
 void ExpressionInternalJsEmit::_doAddDependencies(mongo::DepsTracker* deps) const {
     _children[0]->addDependencies(deps);
@@ -120,7 +119,7 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     // particular Expression/ExpressionContext may be reattached to a new OperationContext (and thus
     // a new JS Scope) when used across getMore operations, so this method will handle that case for
     // us by only injecting if we haven't already.
-    jsExec->injectEmitIfNecessary(emitFromJS, &_emittedObjects);
+    jsExec->injectEmitIfNecessary(emitFromJS, &_emitState);
 
     // Although inefficient to "create" a new function every time we evaluate, this will usually end
     // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
@@ -131,20 +130,9 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     BSONObj params;
     jsExec->callFunctionWithoutReturn(func, params, thisBSON);
 
-    std::vector<Value> output;
-    size_t bytesUsed = 0;
-    for (auto&& obj : _emittedObjects) {
-        bytesUsed += obj.objsize();
-        uassert(31292,
-                str::stream() << "Size of emitted values exceeds the set size limit of "
-                              << _byteLimit << " bytes",
-                bytesUsed < _byteLimit);
-        output.push_back(Value(std::move(obj)));
-    }
-
-    _emittedObjects.clear();
-
-    return Value{std::move(output)};
+    auto returnValue = Value(std::move(_emitState.emittedObjects));
+    _emitState.reset();
+    return returnValue;
 }
 
 ExpressionInternalJs::ExpressionInternalJs(const boost::intrusive_ptr<ExpressionContext>& expCtx,

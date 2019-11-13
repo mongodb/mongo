@@ -66,6 +66,28 @@ public:
         return visitor->visit(this);
     }
 
+    // For a given invocation of the user-defined function, this struct holds the results of each
+    // call to emit(). Mark as mutable since it needs to be modified for each call to evaluate().
+    mutable struct EmitState {
+        void emit(Document&& doc) {
+            bytesUsed += doc.getApproximateSize();
+            uassert(31292,
+                    str::stream() << "Size of emitted values exceeds the set size limit of "
+                                  << byteLimit << " bytes",
+                    bytesUsed < byteLimit);
+            emittedObjects.emplace_back(std::move(doc));
+        }
+
+        auto reset() {
+            emittedObjects.clear();
+            bytesUsed = 0;
+        }
+
+        std::vector<Value> emittedObjects;
+        int byteLimit;
+        int bytesUsed;
+    } _emitState;
+
 private:
     ExpressionInternalJsEmit(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              boost::intrusive_ptr<Expression> thisRef,
@@ -75,11 +97,6 @@ private:
 
     const boost::intrusive_ptr<Expression>& _thisRef;
     std::string _funcSource;
-
-    // For a given invocation of the user-defined function, this vector holds the results of each
-    // call to emit(). Mark as mutable since it needs to be cleared for each call to evaluate().
-    mutable std::vector<BSONObj> _emittedObjects;
-    size_t _byteLimit;
 };
 
 /**
