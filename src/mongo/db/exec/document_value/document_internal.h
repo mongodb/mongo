@@ -280,7 +280,6 @@ public:
           _numFields(0),
           _hashTabMask(0),
           _bson(bson),
-          _bsonIt(_bson),
           _stripMetadata(stripMetadata),
           _modified(modified) {}
 
@@ -378,7 +377,6 @@ public:
 
     void makeOwned() {
         _bson = _bson.getOwned();
-        _bsonIt = BSONObjIterator(_bson);
     }
 
     /**
@@ -533,7 +531,6 @@ private:
     unsigned _hashTabMask;  // equal to hashTabBuckets()-1 but used more often
 
     BSONObj _bson;
-    mutable BSONObjIterator _bsonIt;
 
     // If '_stripMetadata' is true, tracks whether or not the metadata has been lazy-loaded from the
     // backing '_bson' object. If so, then no attempt will be made to load the metadata again, even

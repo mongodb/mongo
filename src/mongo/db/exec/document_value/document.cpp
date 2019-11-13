@@ -160,15 +160,9 @@ Position DocumentStorage::findField(StringData requested, LookupPolicy policy) c
         return pos;
     }
 
-    while (_bsonIt.more()) {
-        BSONElement bsonElement(_bsonIt.next());
-        // In order to avoid repeatedly scanning the BSON we were constructed from, we'll bring in a
-        // copy of every value we encounter while searching here. That way the next time we search
-        // we won't have to reconsider elements we've already examined and can avoid an O(N^2) worst
-        // case performance.
-        auto pos = const_cast<DocumentStorage*>(this)->constructInCache(bsonElement);
+    for (auto&& bsonElement : _bson) {
         if (requested == bsonElement.fieldNameStringData()) {
-            return pos;
+            return const_cast<DocumentStorage*>(this)->constructInCache(bsonElement);
         }
     }
 
@@ -344,7 +338,6 @@ DocumentStorage::~DocumentStorage() {
 
 void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
     _bson = bson;
-    _bsonIt = BSONObjIterator(_bson);
     _stripMetadata = stripMetadata;
     _modified = false;
 
