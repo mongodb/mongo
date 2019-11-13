@@ -9,3 +9,4 @@ from . import sighandler
 from . import suitesconfig
 from . import testing
 from . import utils
+from . import multiversionconstants

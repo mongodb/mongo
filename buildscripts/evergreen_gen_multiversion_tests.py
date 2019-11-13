@@ -25,6 +25,8 @@ from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
 
 from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib.multiversionconstants import (LAST_STABLE_MONGO_BINARY,
+                                                           REQUIRES_FCV_TAG)
 import buildscripts.resmokelib.parser
 import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
@@ -38,8 +40,6 @@ REQUIRED_CONFIG_KEYS = {
     "use_multiversion"
 }
 
-LAST_STABLE_MONGO_BINARY = "mongo-4.2"
-
 DEFAULT_CONFIG_VALUES = generate_resmoke.DEFAULT_CONFIG_VALUES
 CONFIG_DIR = DEFAULT_CONFIG_VALUES["generated_config_dir"]
 DEFAULT_CONFIG_VALUES["is_jstestfuzz"] = False
@@ -52,7 +52,7 @@ SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
 BURN_IN_TASK = "burn_in_tests_multiversion"
 BURN_IN_CONFIG_KEY = "use_in_multiversion_burn_in_tests"
 PASSTHROUGH_TAG = "multiversion_passthrough"
-EXCLUDE_TAGS = "requires_fcv_44,multiversion_incompatible"
+EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible"
 
 # The directory in which BACKPORTS_REQUIRED_FILE resides.
 ETC_DIR = "etc"

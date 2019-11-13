@@ -9,6 +9,7 @@ import pymongo.errors
 from ... import config
 from ... import errors
 from ... import logging
+from ... import multiversionconstants as multiversion
 from ... import utils
 from ...utils import registry
 
@@ -30,9 +31,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
     # is defined for all subclasses of Fixture.
     REGISTERED_NAME = "Fixture"
 
-    _LAST_STABLE_FCV = "4.2"
-    _LATEST_FCV = "4.4"
-    _LAST_STABLE_BIN_VERSION = "4.2"
+    _LAST_STABLE_FCV = multiversion.LAST_STABLE_FCV
+    _LATEST_FCV = multiversion.LATEST_FCV
+    _LAST_STABLE_BIN_VERSION = multiversion.LAST_STABLE_BIN_VERSION
 
     def __init__(self, logger, job_num, dbpath_prefix=None):
         """Initialize the fixture with a logger instance."""
