@@ -528,24 +528,6 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
 }
 
 bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
-    if (!replEnabled) {
-        // All tables on standalones are logged.
-        return true;
-    }
-
-    // Of the replica set configurations:
-    if (ns.db() != "local") {
-        // All replicated collections are not logged.
-        return false;
-    }
-
-    if (ns.coll() == "replset.checkpointTimestamp" || ns.coll() == "replset.minvalid") {
-        // Of local collections, these two are derived from the state of the data and therefore
-        // are not logged.
-        return false;
-    }
-
-    // The remainder of local gets logged. In particular, the oplog and user created collections.
     return true;
 }
 
