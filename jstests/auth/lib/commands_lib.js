@@ -5448,8 +5448,15 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
                 privileges: [{resource: {db: 'config', collection: 'shards'}, actions: ['update']}],
+              },
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["enableSharding"]}],
               },
           ]
         },
@@ -5468,11 +5475,18 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
                 privileges: [
                     {resource: {db: 'config', collection: 'shards'}, actions: ['update']},
                     {resource: {db: 'config', collection: 'tags'}, actions: ['find']}
                 ],
+              },
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["enableSharding"]}],
               },
           ]
         },
@@ -5491,7 +5505,6 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
                 privileges: [
                     {resource: {db: 'config', collection: 'shards'}, actions: ['find']},
                     {
@@ -5500,6 +5513,16 @@ var authCommandsLib = {
                     },
                 ],
                 expectFail: true
+              },
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+                expectFail: true,
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["enableSharding"]}],
+                expectFail: true,
               },
           ]
         },
