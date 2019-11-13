@@ -2789,13 +2789,13 @@ TEST_F(QueryPlannerTest, SparseIndexCanSupportGTEOrLTENull) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {i: {$gte: null}}, node: {ixscan: {pattern: "
-        "{i: 1}, bounds: {i: [[null,null,true,true]]}}}}}");
+        "{i: 1}, bounds: {i: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
 
     runQuery(fromjson("{i: {$lte: null}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {i: {$lte: null}}, node: {ixscan: {pattern: "
-        "{i: 1}, bounds: {i: [[null,null,true,true]]}}}}}");
+        "{i: 1}, bounds: {i: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
 }
 
 //

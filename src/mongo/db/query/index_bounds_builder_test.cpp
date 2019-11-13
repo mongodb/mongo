@@ -2174,22 +2174,29 @@ void assertBoundsRepresentNotEqualsNull(const OrderedIntervalList& oil) {
     }
 }
 
+const std::vector<BSONObj> kNeNullQueries = {BSON("a" << BSON("$ne" << BSONNULL)),
+                                             BSON("a" << BSON("$not" << BSON("$lte" << BSONNULL))),
+                                             BSON("a" << BSON("$not" << BSON("$gte" << BSONNULL)))};
+
 TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsIfIndexIsNotMultiKey) {
     BSONObj indexPattern = BSON("a" << 1);
     auto testIndex = buildSimpleIndexEntry(indexPattern);
 
-    BSONObj obj = BSON("a" << BSON("$ne" << BSONNULL));
-    auto expr = parseMatchExpression(obj);
+    for (BSONObj obj : kNeNullQueries) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
 
-    OrderedIntervalList oil;
-    IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
 
-    // Bounds should be [MinKey, undefined), (null, MaxKey].
-    ASSERT_EQUALS(oil.name, "a");
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
-    assertBoundsRepresentNotEqualsNull(oil);
+        // Bounds should be [MinKey, undefined), (null, MaxKey].
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+        assertBoundsRepresentNotEqualsNull(oil);
+    }
 }
 
 TEST(IndexBoundsBuilderTest,
@@ -2198,36 +2205,42 @@ TEST(IndexBoundsBuilderTest,
     auto testIndex = buildSimpleIndexEntry(indexPattern);
     testIndex.multikeyPaths = {{}, {0}};  // "a" is not multi-key, but "b" is.
 
-    BSONObj obj = BSON("a" << BSON("$ne" << BSONNULL));
-    auto expr = parseMatchExpression(obj);
+    for (BSONObj obj : kNeNullQueries) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
 
-    OrderedIntervalList oil;
-    IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
 
-    // Bounds should be [MinKey, undefined), (null, MaxKey].
-    ASSERT_EQUALS(oil.name, "a");
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
-    assertBoundsRepresentNotEqualsNull(oil);
+        // Bounds should be [MinKey, undefined), (null, MaxKey].
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+        assertBoundsRepresentNotEqualsNull(oil);
+    }
 }
 
 TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsOnReverseIndex) {
     BSONObj indexPattern = BSON("a" << -1);
     auto testIndex = buildSimpleIndexEntry(indexPattern);
 
-    BSONObj obj = BSON("a" << BSON("$ne" << BSONNULL));
-    auto expr = parseMatchExpression(obj);
+    for (BSONObj obj : kNeNullQueries) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
 
-    OrderedIntervalList oil;
-    IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
 
-    // Bounds should be [MinKey, undefined), (null, MaxKey].
-    ASSERT_EQUALS(oil.name, "a");
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
-    assertBoundsRepresentNotEqualsNull(oil);
+        // Bounds should be [MinKey, undefined), (null, MaxKey].
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+        assertBoundsRepresentNotEqualsNull(oil);
+    }
 }
 
 TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildInexactBoundsIfIndexIsMultiKey) {
@@ -2235,17 +2248,95 @@ TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildInexactBoundsIfIn
     auto testIndex = buildSimpleIndexEntry(indexPattern);
     testIndex.multikey = true;
 
-    BSONObj matchObj = BSON("a" << BSON("$ne" << BSONNULL));
-    auto expr = parseMatchExpression(matchObj);
+    for (BSONObj obj : kNeNullQueries) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
 
-    OrderedIntervalList oil;
-    IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
 
-    ASSERT_EQUALS(oil.name, "a");
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
-    assertBoundsRepresentNotEqualsNull(oil);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        assertBoundsRepresentNotEqualsNull(oil);
+    }
+}
+
+TEST(IndexBoundsBuilderTest, TranslateInequalityToNullShouldProduceExactEmptyBounds) {
+    BSONObj indexPattern = BSON("a" << 1);
+    auto testIndex = buildSimpleIndexEntry(indexPattern);
+
+    const std::vector<BSONObj> inequalities = {BSON("a" << BSON("$lt" << BSONNULL)),
+                                               BSON("a" << BSON("$gt" << BSONNULL))};
+
+    for (BSONObj obj : inequalities) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = parseMatchExpression(obj);
+
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+        ASSERT(oil.intervals.empty());
+    }
+}
+
+TEST(IndexBoundsBuilderTest, TranslateNotInequalityToNullShouldProduceExactFullBounds) {
+    BSONObj indexPattern = BSON("a" << 1);
+    auto testIndex = buildSimpleIndexEntry(indexPattern);
+
+    const std::vector<BSONObj> inequalities = {
+        BSON("a" << BSON("$not" << BSON("$lt" << BSONNULL))),
+        BSON("a" << BSON("$not" << BSON("$gt" << BSONNULL)))};
+
+    for (BSONObj obj : inequalities) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+        ASSERT_EQ(oil.intervals.size(), 1U);
+        ASSERT(oil.intervals.front().isMinToMax());
+    }
+}
+
+TEST(IndexBoundsBuilderTest,
+     TranslateNotInequalityToNullOnMultiKeyIndexShouldProduceInexactFullBounds) {
+    BSONObj indexPattern = BSON("a" << 1);
+    auto testIndex = buildSimpleIndexEntry(indexPattern);
+    testIndex.multikey = true;
+
+    const std::vector<BSONObj> inequalities = {
+        BSON("a" << BSON("$not" << BSON("$lt" << BSONNULL))),
+        BSON("a" << BSON("$not" << BSON("$gt" << BSONNULL)))};
+
+    for (BSONObj obj : inequalities) {
+        // It's necessary to call optimize since the $not will have a singleton $and child, which
+        // IndexBoundsBuilder::translate cannot handle.
+        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQ(oil.intervals.size(), 1U);
+        ASSERT(oil.intervals.front().isMinToMax());
+    }
 }
 
 TEST(IndexBoundsBuilderTest,
