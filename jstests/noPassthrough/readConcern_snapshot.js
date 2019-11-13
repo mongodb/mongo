@@ -125,9 +125,8 @@ assert.commandWorked(
     sessionDb.runCommand({geoSearch: collName, near: [0, 0], maxDistance: 1, search: {a: 1}}));
 
 // readConcern 'snapshot' is not supported by non-CRUD commands.
-assert.commandFailedWithCode(
-    sessionDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
-    ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(sessionDb.runCommand({dropIndexes: collName, index: "a_1"}),
+                             ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandWorked(session.abortTransaction_forTesting());
 session.endSession();
 rst.stopSet();

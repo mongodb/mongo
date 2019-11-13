@@ -29,8 +29,14 @@ var $config = extendWorkload($config, function($config, $super) {
         if (this.isWriterThread(this.tid)) {
             this.insertDocuments(db, this.collName);
         } else {
-            assertWhenOwnColl.commandWorked(db[this.collName].createIndex(
-                {x: 1}, {unique: true, background: Random.rand() < 0.5}));
+            const res = db[this.collName].createIndex(
+                {x: 1}, {unique: true, background: Random.rand() < 0.5});
+            if (TestData.runInsideTransaction) {
+                assertWhenOwnColl.commandWorkedOrFailedWithCode(
+                    res, ErrorCodes.IndexBuildAlreadyInProgress);
+            } else {
+                assertWhenOwnColl.commandWorked(res);
+            }
         }
     };
 

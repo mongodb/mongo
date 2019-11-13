@@ -12,7 +12,6 @@ const dbName = "test";
 const collName = "ensure_index_no_conflicts";
 const testDB = db.getSiblingDB(dbName);
 testDB.dropDatabase();
-assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
 assert.commandWorked(testDB.createCollection(collName));
 const testColl = testDB.getCollection(collName);
 assert.commandWorked(testColl.createIndex({a: 1}));

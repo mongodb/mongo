@@ -9,6 +9,7 @@
  *
  * This workload was designed to reproduce SERVER-24761.
  */
+load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 var $config = (function() {
     // Use the workload name as the collection name, since the workload name is assumed to be
     // unique. Note that we choose our own collection name instead of using the collection provided
@@ -59,8 +60,13 @@ var $config = (function() {
 
             // Recreate the index that was dropped. (See populateIndexes() for why we ignore the
             // CannotImplicitlyCreateCollection error.)
-            assertAlways.commandWorkedOrFailedWithCode(db[this.collName].createIndex(indexSpec),
-                                                       ErrorCodes.CannotImplicitlyCreateCollection);
+            let res = db[this.collName].createIndex(indexSpec);
+            assertWorkedOrFailedHandleTxnErrors(res,
+                                                [
+                                                    ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.IndexBuildAlreadyInProgress
+                                                ],
+                                                ErrorCodes.CannotImplicitlyCreateCollection);
         }
     };
 
@@ -78,8 +84,12 @@ var $config = (function() {
             // collection (as in the 'dropCollection' state of this test), then we run out of
             // retries and get a CannotImplicitlyCreateCollection error once in a while, which we
             // have to ignore.
-            assertAlways.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
-                                                       ErrorCodes.CannotImplicitlyCreateCollection);
+            assertWorkedOrFailedHandleTxnErrors(coll.createIndex(indexSpec),
+                                                [
+                                                    ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.IndexBuildAlreadyInProgress
+                                                ],
+                                                ErrorCodes.CannotImplicitlyCreateCollection);
         });
     }
 

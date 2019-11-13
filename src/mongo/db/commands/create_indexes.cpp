@@ -685,6 +685,13 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             return true;
         }
 
+        // Multi-document transactions should not take exclusive locks, so do not proceed further
+        // if we are in a multi-document transaction.
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create new indexes on " << ns.ns()
+                              << " in a multi-document transaction.",
+                !opCtx->inMultiDocumentTransaction());
+
         auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
 
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -849,7 +856,8 @@ public:
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
         // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index
-        // specs, then we will wait for the build(s) to finish before trying again.
+        // specs, then we will wait for the build(s) to finish before trying again unless we are in
+        // a multi-document transaction.
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         bool shouldLogMessageOnAlreadyBuildingError = true;
         while (true) {
@@ -861,7 +869,11 @@ public:
                 }
                 return runCreateIndexesWithCoordinator(opCtx, dbname, cmdObj, errmsg, result);
             } catch (const DBException& ex) {
-                if (ex.toStatus() != ErrorCodes::IndexBuildAlreadyInProgress) {
+                // We can only wait for an existing index build to finish if we are able to release
+                // our locks, in order to allow the existing index build to proceed. We cannot
+                // release locks in transactions, so we bypass the below logic in transactions.
+                if (ex.toStatus() != ErrorCodes::IndexBuildAlreadyInProgress ||
+                    opCtx->inMultiDocumentTransaction()) {
                     throw;
                 }
                 if (shouldLogMessageOnAlreadyBuildingError) {
@@ -877,8 +889,8 @@ public:
                 // Unset the response fields so we do not write duplicate fields.
                 errmsg = "";
                 result.resetToEmpty();
-                // Reset the snapshot because we have released locks and may reacquire them again
-                // later.
+                // Reset the snapshot because we have released locks and need a fresh snapshot
+                // if we reacquire the locks again later.
                 opCtx->recoveryUnit()->abandonSnapshot();
                 // This is a bit racy since we are not holding a lock across discovering an
                 // in-progress build and starting to listen for completion. It is good enough,

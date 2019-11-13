@@ -11,6 +11,7 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
 var $config = (function() {
     let data = {
@@ -42,7 +43,8 @@ var $config = (function() {
             assertAlways.eq(this.numDocs, res.nInserted, tojson(res));
 
             this.indexSpecs.forEach(indexSpec => {
-                assertAlways.commandWorked(db[collName].createIndex(indexSpec));
+                let res = db[collName].createIndex(indexSpec);
+                assertWorkedHandleTxnErrors(res, ErrorCodes.IndexBuildAlreadyInProgress);
             });
         },
 

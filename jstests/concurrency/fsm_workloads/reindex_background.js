@@ -22,10 +22,14 @@ var $config = extendWorkload($config, function($config, $super) {
         const options = {background: true};
 
         // The number of indexes created here is also stored in data.nIndexes.
-        assertAlways.commandWorked(coll.createIndex({text: 'text'}, options));
-        assertAlways.commandWorked(coll.createIndex({geo: '2dsphere'}, options));
-        assertAlways.commandWorked(coll.createIndex({integer: 1}, options));
-        assertAlways.commandWorked(coll.createIndex({"$**": 1}, options));
+        assertWorkedHandleTxnErrors(coll.createIndex({text: 'text'}, options),
+                                    ErrorCodes.IndexBuildAlreadyInProgress);
+        assertWorkedHandleTxnErrors(coll.createIndex({geo: '2dsphere'}, options),
+                                    ErrorCodes.IndexBuildAlreadyInProgress);
+        assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}, options),
+                                    ErrorCodes.IndexBuildAlreadyInProgress);
+        assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}, options),
+                                    ErrorCodes.IndexBuildAlreadyInProgress);
     };
 
     return $config;

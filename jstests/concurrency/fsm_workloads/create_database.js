@@ -13,14 +13,18 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeralForTest
+load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
 var $config = (function() {
     let data = {
         checkCommandResult: function checkCommandResult(mayFailWithDatabaseDifferCase, res) {
             if (mayFailWithDatabaseDifferCase && !res.ok)
-                assertAlways.commandFailedWithCode(res, ErrorCodes.DatabaseDifferCase);
+                assertWorkedOrFailedHandleTxnErrors(
+                    res,
+                    [ErrorCodes.IndexBuildAlreadyInProgress, ErrorCodes.DatabaseDifferCase],
+                    ErrorCodes.DatabaseDifferCase);
             else
-                assertAlways.commandWorked(res);
+                assertWorkedHandleTxnErrors(res, ErrorCodes.IndexBuildAlreadyInProgress);
             return res;
         },
 

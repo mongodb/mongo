@@ -15,6 +15,7 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
+load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
 var $config = (function() {
     var data = {
@@ -37,13 +38,16 @@ var $config = (function() {
         function createIndexes(db, collName) {
             // The number of indexes created here is also stored in data.nIndexes
             var aResult = db[collName].ensureIndex({a: 1});
-            assertAlways.commandWorked(aResult);
+
+            assertWorkedHandleTxnErrors(aResult, ErrorCodes.IndexBuildAlreadyInProgress);
 
             var bResult = db[collName].ensureIndex({b: 1});
-            assertAlways.commandWorked(bResult);
+
+            assertWorkedHandleTxnErrors(bResult, ErrorCodes.IndexBuildAlreadyInProgress);
 
             var cResult = db[collName].ensureIndex({c: 1});
-            assertAlways.commandWorked(cResult);
+
+            assertWorkedHandleTxnErrors(cResult, ErrorCodes.IndexBuildAlreadyInProgress);
         }
 
         // This method is independent of collectionSetup to allow it to be overridden in

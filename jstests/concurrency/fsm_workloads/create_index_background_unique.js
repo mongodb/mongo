@@ -7,7 +7,7 @@
  *
  * @tags: [creates_background_indexes]
  */
-
+load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 var $config = (function() {
     var data = {
         prefix: "create_index_background_unique_",
@@ -35,7 +35,16 @@ var $config = (function() {
                 createIndexes: this.getCollectionNameForThread(this.tid),
                 indexes: [{key: {x: 1}, name: "x_1", unique: true, background: true}]
             });
-            assertAlways.commandWorked(res);
+            // Multi-statement Transactions can fail with SnapshotUnavailable if there are
+            // pending catalog changes as of the transaction start (see SERVER-43018).
+            assertWorkedOrFailedHandleTxnErrors(res,
+                                                [
+                                                    ErrorCodes.IndexBuildAlreadyInProgress,
+                                                    ErrorCodes.SnapshotUnavailable,
+                                                    ErrorCodes.SnapshotTooOld,
+                                                    ErrorCodes.NotMaster
+                                                ],
+                                                [ErrorCodes.NotMaster]);
         }
 
         function dropIndex(db, collName) {

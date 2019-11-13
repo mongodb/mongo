@@ -9,6 +9,7 @@
  *
  * @tags: [requires_sharding, assumes_balancer_off]
  */
+load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
 var $config = (function() {
     var data = {numSplitPoints: 100, shardKey: {key: 1}};
@@ -43,7 +44,8 @@ var $config = (function() {
             db[collName].dropIndex(this.shardKey);
 
             // Re-create the index that was dropped.
-            assertAlways.commandWorked(db[collName].createIndex(this.shardKey));
+            assertWorkedHandleTxnErrors(db[collName].createIndex(this.shardKey),
+                                        ErrorCodes.IndexBuildAlreadyInProgress);
         }
 
     };
