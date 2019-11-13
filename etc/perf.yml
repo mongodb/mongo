@@ -170,14 +170,16 @@ functions:
         working_dir: src
         silent: true
         script: |
-          set -o errexit
-
-          # Create the Evergreen API credentials
-          cat > .evergreen.yml <<END_OF_CREDS
-          api_server_host: https://evergreen.mongodb.com/api
-          api_key: "${evergreen_api_key}"
-          user: "${evergreen_api_user}"
-          END_OF_CREDS
+          is_patch=${is_patch}
+          task_id=${task_id}
+          perf_jira_user=${perf_jira_user}
+          perf_jira_pw=${perf_jira_pw}
+          dsi_analysis_atlas_user=${dsi_analysis_atlas_user}
+          dsi_analysis_atlas_pw=${dsi_analysis_atlas_pw}
+          evergreen_api_key=${evergreen_api_key}
+          evergreen_api_user=${evergreen_api_user}
+          source ./buildscripts/signal_processing_setup.sh
+          detect-changes --evergreen-api-config .evergreen.yml
     - command: shell.exec
       params:
         working_dir: src
@@ -202,6 +204,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
+          ./dsi/run-dsi setup
           source ./dsi/dsi_venv/bin/activate
 
           # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
