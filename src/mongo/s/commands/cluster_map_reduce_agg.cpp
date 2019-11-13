@@ -135,9 +135,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         involvedNamespaces.insert(resolvedOutNss);
     }
 
-    const auto pipelineBuilder = [&](boost::optional<CachedCollectionRoutingInfo> routingInfo) {
-        return map_reduce_common::translateFromMR(
-            parsedMr, makeExpressionContext(opCtx, parsedMr, routingInfo));
+    auto routingInfo = uassertStatusOK(
+        sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
+    auto expCtx = makeExpressionContext(opCtx, parsedMr, routingInfo);
+
+    const auto pipelineBuilder = [&]() {
+        return map_reduce_common::translateFromMR(parsedMr, expCtx);
     };
 
     auto namespaces =
@@ -150,23 +153,22 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     // expected mapReduce output.
     BSONObjBuilder tempResults;
 
-    auto targeter = uassertStatusOK(
-        sharded_agg_helpers::AggregationTargeter::make(opCtx,
-                                                       parsedMr.getNamespace(),
-                                                       pipelineBuilder,
-                                                       involvedNamespaces,
-                                                       false,   // hasChangeStream
-                                                       true));  // allowedToPassthrough
+    auto targeter = sharded_agg_helpers::AggregationTargeter::make(opCtx,
+                                                                   parsedMr.getNamespace(),
+                                                                   pipelineBuilder,
+                                                                   routingInfo,
+                                                                   involvedNamespaces,
+                                                                   false,  // hasChangeStream
+                                                                   true);  // allowedToPassthrough
 
     switch (targeter.policy) {
         case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
             // For the passthrough case, the targeter will not build a pipeline since its not needed
             // in the normal aggregation path. For this translation, though, we need to build the
             // pipeline to serialize and send to the primary shard.
-            auto serialized =
-                serializeToCommand(cmd, parsedMr, pipelineBuilder(targeter.routingInfo).get());
+            auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
             uassertStatusOK(
-                sharded_agg_helpers::runPipelineOnPrimaryShard(opCtx,
+                sharded_agg_helpers::runPipelineOnPrimaryShard(targeter.pipeline->getContext(),
                                                                namespaces,
                                                                targeter.routingInfo->db(),
                                                                boost::none,  // explain

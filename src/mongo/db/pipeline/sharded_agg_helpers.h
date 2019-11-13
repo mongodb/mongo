@@ -76,11 +76,11 @@ struct AggregationTargeter {
      * Populates and returns targeting info for an aggregation pipeline on the given namespace
      * 'executionNss'.
      */
-    static StatusWith<AggregationTargeter> make(
+    static AggregationTargeter make(
         OperationContext* opCtx,
         const NamespaceString& executionNss,
-        const std::function<std::unique_ptr<Pipeline, PipelineDeleter>(
-            boost::optional<CachedCollectionRoutingInfo>)> buildPipelineFn,
+        const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
+        boost::optional<CachedCollectionRoutingInfo> routingInfo,
         stdx::unordered_set<NamespaceString> involvedNamespaces,
         bool hasChangeStream,
         bool allowedToPassthrough);
@@ -95,7 +95,7 @@ struct AggregationTargeter {
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
 };
 
-Status runPipelineOnPrimaryShard(OperationContext* opCtx,
+Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  const ClusterAggregate::Namespaces& namespaces,
                                  const CachedDatabaseInfo& dbInfo,
                                  boost::optional<ExplainOptions::Verbosity> explain,
@@ -150,5 +150,15 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline);
 
+/**
+ * Returns the proper routing table to use for targeting shards: either a historical routing table
+ * based on the global read timestamp if there is an active transaction with snapshot level read
+ * concern or the latest routing table otherwise.
+ *
+ * Returns 'ShardNotFound' or 'NamespaceNotFound' if there are no shards in the cluster or if
+ * collection 'execNss' does not exist, respectively.
+ */
+StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                                  const NamespaceString& execNss);
 }  // namespace sharded_agg_helpers
 }  // namespace mongo

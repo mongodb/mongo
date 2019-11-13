@@ -167,7 +167,26 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto hasChangeStream = litePipe.hasChangeStream();
     auto involvedNamespaces = litePipe.getInvolvedNamespaces();
 
-    const auto pipelineBuilder = [&](boost::optional<CachedCollectionRoutingInfo> routingInfo) {
+    // If the routing table is valid, we obtain a reference to it. If the table is not valid, then
+    // either the database does not exist, or there are no shards in the cluster. In the latter
+    // case, we always return an empty cursor. In the former case, if the requested aggregation is a
+    // $changeStream, we allow the operation to continue so that stream cursors can be established
+    // on the given namespace before the database or collection is actually created. If the database
+    // does not exist and this is not a $changeStream, then we return an empty cursor.
+    boost::optional<CachedCollectionRoutingInfo> routingInfo;
+    auto executionNsRoutingInfoStatus =
+        sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
+    if (executionNsRoutingInfoStatus.isOK()) {
+        routingInfo = std::move(executionNsRoutingInfoStatus.getValue());
+    } else if (!(hasChangeStream &&
+                 executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
+        appendEmptyResultSetWithStatus(
+            opCtx, namespaces.requestedNss, executionNsRoutingInfoStatus.getStatus(), result);
+        return Status::OK();
+    }
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    const auto pipelineBuilder = [&]() {
         // Populate the collection UUID and the appropriate collation to use.
         auto [collationObj, uuid] = [&]() -> std::pair<BSONObj, boost::optional<UUID>> {
             // If this is a change stream, take the user-defined collation if one exists, or an
@@ -186,7 +205,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
         // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by
         // the pipeline's stages.
-        auto expCtx = makeExpressionContext(
+        expCtx = makeExpressionContext(
             opCtx, request, collationObj, uuid, resolveInvolvedNamespaces(involvedNamespaces));
 
         // Parse and optimize the full pipeline.
@@ -195,20 +214,23 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return pipeline;
     };
 
-    auto targetingStatus =
+    auto targeter =
         sharded_agg_helpers::AggregationTargeter::make(opCtx,
                                                        namespaces.executionNss,
                                                        pipelineBuilder,
+                                                       routingInfo,
                                                        involvedNamespaces,
                                                        hasChangeStream,
                                                        litePipe.allowedToPassthroughFromMongos());
-    if (!targetingStatus.isOK()) {
-        appendEmptyResultSetWithStatus(
-            opCtx, namespaces.requestedNss, targetingStatus.getStatus(), result);
-        return Status::OK();
+
+    if (!expCtx) {
+        // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
+        // 'pipelineBuilder' function, so we never get an expression context. Because this is a
+        // passthrough, we only need a bare minimum expression context anyway.
+        invariant(targeter.policy == sharded_agg_helpers::AggregationTargeter::kPassthrough);
+        expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr);
     }
 
-    auto targeter = std::move(targetingStatus.getValue());
     if (request.getExplain()) {
         explain_common::generateServerInfo(result);
     }
@@ -217,7 +239,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
             // A pipeline with $changeStream should never be allowed to passthrough.
             invariant(!hasChangeStream);
-            return sharded_agg_helpers::runPipelineOnPrimaryShard(opCtx,
+            return sharded_agg_helpers::runPipelineOnPrimaryShard(expCtx,
                                                                   namespaces,
                                                                   targeter.routingInfo->db(),
                                                                   request.getExplain(),

@@ -150,7 +150,7 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
 }
 
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
-                                  OperationContext* opCtx,
+                                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                   const boost::optional<RuntimeConstants>& constants,
                                   BSONObj collationObj) {
@@ -169,20 +169,22 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards[AggregationRequest::kCollationName] = Value(collationObj);
     }
 
-    if (opCtx->getTxnNumber()) {
+    if (expCtx->opCtx->getTxnNumber()) {
         invariant(cmdForShards.peek()[OperationSessionInfo::kTxnNumberFieldName].missing(),
                   str::stream() << "Command for shards unexpectedly had the "
                                 << OperationSessionInfo::kTxnNumberFieldName
                                 << " field set: " << cmdForShards.peek().toString());
         cmdForShards[OperationSessionInfo::kTxnNumberFieldName] =
-            Value(static_cast<long long>(*opCtx->getTxnNumber()));
+            Value(static_cast<long long>(*expCtx->opCtx->getTxnNumber()));
     }
 
-    // TODO (SERVER-43361): We set this flag to indicate to the shards that the mongos will be able
-    // to understand change stream sort keys in the new format. After branching for 4.5, there will
-    // only be one sort key format for changes streams, so there will be no need to set this flag
-    // anymore. This flag has no effect on pipelines without a change stream.
-    cmdForShards[AggregationRequest::kUse44SortKeys] = Value(true);
+    if (expCtx->inMongos) {
+        // TODO (SERVER-43361): We set this flag to indicate to the shards that the mongos will be
+        // able to understand change stream sort keys in the new format. After branching for 4.5,
+        // there will only be one sort key format for changes streams, so there will be no need to
+        // set this flag anymore. This flag has no effect on pipelines without a change stream.
+        cmdForShards[AggregationRequest::kUse44SortKeys] = Value(true);
+    }
 
     return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), false);
 }
@@ -272,25 +274,6 @@ ShardId pickMergingShard(OperationContext* opCtx,
     // shard for the database.
     return needsPrimaryShardMerge ? primaryShard
                                   : targetedShards[prng.nextInt32(targetedShards.size())];
-}
-
-StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                                  const NamespaceString& execNss) {
-    // First, verify that there are shards present in the cluster. If not, then we return the
-    // stronger 'ShardNotFound' error rather than 'NamespaceNotFound'. We must do this because
-    // $changeStream aggregations ignore NamespaceNotFound in order to allow streams to be opened on
-    // a collection before its enclosing database is created. However, if there are no shards
-    // present, then $changeStream should immediately return an empty cursor just as other
-    // aggregations do when the database does not exist.
-    std::vector<ShardId> shardIds;
-    Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx, &shardIds);
-    if (shardIds.size() == 0) {
-        return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
-    }
-
-    // This call to getCollectionRoutingInfoForTxnCmd will return !OK if the database does not
-    // exist.
-    return getCollectionRoutingInfoForTxnCmd(opCtx, execNss);
 }
 
 Status appendExplainResults(sharded_agg_helpers::DispatchShardPipelineResults&& dispatchResults,
@@ -396,7 +379,7 @@ BSONObj createCommandForTargetedShards(
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
     return genericTransformForShards(std::move(targetedCmd),
-                                     expCtx->opCtx,
+                                     expCtx,
                                      expCtx->explain,
                                      expCtx->getRuntimeConstants(),
                                      expCtx->getCollatorBSON());
@@ -518,7 +501,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
 }
 
 BSONObj createPassthroughCommandForShard(
-    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     const boost::optional<RuntimeConstants>& constants,
@@ -531,7 +514,7 @@ BSONObj createPassthroughCommandForShard(
     }
 
     return genericTransformForShards(
-        std::move(targetedCmd), opCtx, explainVerbosity, constants, collationObj);
+        std::move(targetedCmd), expCtx, explainVerbosity, constants, collationObj);
 }
 
 /**
@@ -606,7 +589,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     BSONObj targetedCommand = splitPipeline
         ? createCommandForTargetedShards(
               expCtx, serializedCommand, *splitPipeline, exchangeSpec, true)
-        : createPassthroughCommandForShard(expCtx->opCtx,
+        : createPassthroughCommandForShard(expCtx,
                                            serializedCommand,
                                            expCtx->explain,
                                            expCtx->getRuntimeConstants(),
@@ -1030,11 +1013,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     return mergePipeline;
 }
 
-StatusWith<AggregationTargeter> AggregationTargeter::make(
+AggregationTargeter AggregationTargeter::make(
     OperationContext* opCtx,
     const NamespaceString& executionNss,
-    const std::function<std::unique_ptr<Pipeline, PipelineDeleter>(
-        boost::optional<CachedCollectionRoutingInfo>)> buildPipelineFn,
+    const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
+    boost::optional<CachedCollectionRoutingInfo> routingInfo,
     stdx::unordered_set<NamespaceString> involvedNamespaces,
     bool hasChangeStream,
     bool allowedToPassthrough) {
@@ -1054,21 +1037,6 @@ StatusWith<AggregationTargeter> AggregationTargeter::make(
     // Determine whether this aggregation must be dispatched to all shards in the cluster.
     const bool mustRunOnAll = mustRunOnAllShards(executionNss, hasChangeStream);
 
-    // If the routing table is valid, we obtain a reference to it. If the table is not valid, then
-    // either the database does not exist, or there are no shards in the cluster. In the latter
-    // case, we always return an empty cursor. In the former case, if the requested aggregation is a
-    // $changeStream, we allow the operation to continue so that stream cursors can be established
-    // on the given namespace before the database or collection is actually created. If the database
-    // does not exist and this is not a $changeStream, then we return an empty cursor.
-    boost::optional<CachedCollectionRoutingInfo> routingInfo;
-    auto executionNsRoutingInfoStatus = getExecutionNsRoutingInfo(opCtx, executionNss);
-    if (executionNsRoutingInfoStatus.isOK()) {
-        routingInfo = std::move(executionNsRoutingInfoStatus.getValue());
-    } else if (!(hasChangeStream &&
-                 executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
-        return executionNsRoutingInfoStatus.getStatus();
-    }
-
     // If we don't have a routing table, then this is a $changeStream which must run on all shards.
     invariant(routingInfo || (mustRunOnAll && hasChangeStream));
 
@@ -1086,25 +1054,27 @@ StatusWith<AggregationTargeter> AggregationTargeter::make(
         !involvesShardedCollections) {
         return AggregationTargeter{TargetingPolicy::kPassthrough, nullptr, routingInfo};
     } else {
-        auto pipeline = buildPipelineFn(routingInfo);
+        auto pipeline = buildPipelineFn();
         auto policy = pipeline->requiredToRunOnMongos() ? TargetingPolicy::kMongosRequired
                                                         : TargetingPolicy::kAnyShard;
         return AggregationTargeter{policy, std::move(pipeline), routingInfo};
     }
 }
 
-Status runPipelineOnPrimaryShard(OperationContext* opCtx,
+Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  const ClusterAggregate::Namespaces& namespaces,
                                  const CachedDatabaseInfo& dbInfo,
                                  boost::optional<ExplainOptions::Verbosity> explain,
                                  Document serializedCommand,
                                  const PrivilegeVector& privileges,
                                  BSONObjBuilder* out) {
+    auto opCtx = expCtx->opCtx;
+
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     BSONObj cmdObj =
         CommandHelpers::filterCommandRequestForPassthrough(createPassthroughCommandForShard(
-            opCtx, serializedCommand, explain, boost::none, nullptr, BSONObj()));
+            expCtx, serializedCommand, explain, boost::none, nullptr, BSONObj()));
 
     const auto shardId = dbInfo.primary()->getId();
     const auto cmdObjWithShardVersion = (shardId != ShardRegistry::kConfigServerShardId)
@@ -1295,6 +1265,25 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
     // obtain the collection default or simple collation as appropriate, and return
     // it along with the collection's UUID.
     return {collation.isEmpty() ? getCollation() : collation, getUUID()};
+}
+
+StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                                  const NamespaceString& execNss) {
+    // First, verify that there are shards present in the cluster. If not, then we return the
+    // stronger 'ShardNotFound' error rather than 'NamespaceNotFound'. We must do this because
+    // $changeStream aggregations ignore NamespaceNotFound in order to allow streams to be opened on
+    // a collection before its enclosing database is created. However, if there are no shards
+    // present, then $changeStream should immediately return an empty cursor just as other
+    // aggregations do when the database does not exist.
+    std::vector<ShardId> shardIds;
+    Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx, &shardIds);
+    if (shardIds.size() == 0) {
+        return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
+    }
+
+    // This call to getCollectionRoutingInfoForTxnCmd will return !OK if the database does not
+    // exist.
+    return getCollectionRoutingInfoForTxnCmd(opCtx, execNss);
 }
 
 }  // namespace mongo::sharded_agg_helpers
