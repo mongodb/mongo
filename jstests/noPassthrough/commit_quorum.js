@@ -60,7 +60,7 @@ try {
     awaitShell = startParallelShell(function() {
         // Use the index builds coordinator for a two-phase index build.
         assert.commandWorked(db.runCommand({
-            twoPhaseCreateIndexes: 'twoPhaseIndexBuild',
+            createIndexes: 'twoPhaseIndexBuild',
             indexes: [{key: {a: 1}, name: 'a_1'}],
             commitQuorum: "majority"
         }));
