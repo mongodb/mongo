@@ -15,6 +15,8 @@
  *     upgradeMongos: <bool>, // defaults to true
  * }
  */
+load("jstests/multiVersion/libs/multi_rs.js");  // Used by upgradeSet.
+
 ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     options = options || {};
     if (options.upgradeShards == undefined)

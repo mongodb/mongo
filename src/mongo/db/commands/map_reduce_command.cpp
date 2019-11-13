@@ -69,7 +69,12 @@ private:
                   const BSONObj& cmd,
                   std::string& errmsg,
                   BSONObjBuilder& result) final {
-        if (getTestCommandsEnabled() && internalQueryUseAggMapReduce.load()) {
+        // Execute the mapReduce as an aggregation pipeline only if fully upgraded to 4.4, since
+        // a 4.2 mongos in a mixed version cluster expects a fundamentally different response that
+        // is not supported by the aggregation equivalent.
+        if (getTestCommandsEnabled() && internalQueryUseAggMapReduce.load() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
             return map_reduce_agg::runAggregationMapReduce(opCtx, dbname, cmd, errmsg, result);
         }
         return mr::runMapReduce(opCtx, dbname, cmd, errmsg, result);
