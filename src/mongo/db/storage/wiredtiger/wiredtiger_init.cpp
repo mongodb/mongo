@@ -122,6 +122,7 @@ public:
         new WiredTigerEngineRuntimeConfigParameter(kv);
         new WiredTigerMaxCacheOverflowSizeGBParameter(
             kv, wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB);
+        new OplogStonesServerStatusSection();
 
         KVStorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
