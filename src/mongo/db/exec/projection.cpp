@@ -174,7 +174,8 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
     : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
       _wantRecordId{projection->metadataDeps()[DocumentMetadataFields::kRecordId]},
       _projectType{projection->type()},
-      _executor{projection_executor::buildProjectionExecutor(expCtx, projection, {})} {}
+      _executor{projection_executor::buildProjectionExecutor(
+          expCtx, projection, {}, true /* optimizeExecutor */)} {}
 
 Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     Document input;

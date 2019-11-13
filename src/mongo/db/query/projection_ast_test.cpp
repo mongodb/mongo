@@ -95,9 +95,12 @@ void assertCanClone(Projection proj) {
     ASSERT_BSONOBJ_EQ(cloneBSON, cloneBSON2);
 }
 
-TEST_F(ProjectionASTTest, TestParsingTypeEmptyProjectionIsExclusion) {
-    Projection proj = parseWithDefaultPolicies(fromjson("{}"));
+TEST_F(ProjectionASTTest, TestParsingTypeEmptyProjectionIsExclusionInFind) {
+    Projection proj = parseWithFindFeaturesEnabled(fromjson("{}"));
     ASSERT(proj.type() == ProjectType::kExclusion);
+}
+TEST_F(ProjectionASTTest, TestParsingTypeEmptyProjectionFailsInAggregation) {
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{}")), AssertionException, 51272);
 }
 
 TEST_F(ProjectionASTTest, TestParsingTypeInclusion) {

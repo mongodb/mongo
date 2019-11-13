@@ -217,8 +217,6 @@ assert.eq(res[0].scoreAgain, res[0].score);
 assertErrorCode(coll, [{$sort: {text: 1}}, {$match: {$text: {$search: 'apple banana'}}}], 17313);
 
 // wrong $stage, but correct position
-assertErrorCode(coll,
-                [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}],
-                ErrorCodes.InvalidPipelineOperator);
+assertErrorCode(coll, [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}], 31325);
 assertErrorCode(coll, [{$sort: {$text: {$search: 'apple banana'}}}], 17312);
 })();

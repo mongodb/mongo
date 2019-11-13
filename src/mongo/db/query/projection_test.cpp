@@ -96,7 +96,11 @@ void assertInvalidProjection(const char* queryStr, const char* projStr) {
 }
 
 TEST(QueryProjectionTest, MakeEmptyProjection) {
-    Projection proj(createProjection("{}", "{}"));
+    ASSERT_THROWS_CODE(createProjection("{}", "{}"), AssertionException, 51272);
+}
+
+TEST(QueryProjectionTest, MakeEmptyFindProjection) {
+    Projection proj(createFindProjection("{}", "{}"));
     ASSERT_TRUE(proj.requiresDocument());
 }
 
@@ -220,8 +224,30 @@ TEST(QueryProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression)
         DBException);
 }
 
-TEST(QueryProjectionTest, ProjectionDefaults) {
-    auto proj = createProjection("{}", "{}");
+TEST(QueryProjectionTest, InclusionProjectionDefaults) {
+    auto proj = createProjection("{}", "{_id: 1}");
+
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_FALSE(proj.requiresDocument());
+    ASSERT_FALSE(proj.requiresMatchDetails());
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kTextScore]);
+}
+
+TEST(QueryProjectionTest, ExclusionProjectionDefaults) {
+    auto proj = createProjection("{}", "{_id: 0}");
+
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_TRUE(proj.requiresDocument());
+    ASSERT_FALSE(proj.requiresMatchDetails());
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kTextScore]);
+}
+
+TEST(QueryProjectionTest, FindProjectionDefaults) {
+    auto proj = createFindProjection("{}", "{}");
 
     ASSERT_FALSE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_TRUE(proj.requiresDocument());

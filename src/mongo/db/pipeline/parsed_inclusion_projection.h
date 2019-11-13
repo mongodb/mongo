@@ -53,11 +53,33 @@ namespace parsed_aggregation_projection {
  */
 class InclusionNode final : public ProjectionNode {
 public:
-    InclusionNode(ProjectionPolicies policies, std::string pathToNode = "");
+    InclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
+        : ProjectionNode(policies, std::move(pathToNode)) {}
 
-    InclusionNode* addOrGetChild(const std::string& field);
+    InclusionNode* addOrGetChild(const std::string& field) {
+        return static_cast<InclusionNode*>(ProjectionNode::addOrGetChild(field));
+    }
 
-    void reportDependencies(DepsTracker* deps) const final;
+    void reportDependencies(DepsTracker* deps) const final {
+        for (auto&& includedField : _projectedFields) {
+            deps->fields.insert(FieldPath::getFullyQualifiedPath(_pathToNode, includedField));
+        }
+
+        if (!_pathToNode.empty() && !_expressions.empty()) {
+            // The shape of any computed fields in the output will change depending on if the field
+            // is an array or not, so in addition to any dependencies of the expression itself, we
+            // need to add this field to our dependencies.
+            deps->fields.insert(_pathToNode);
+        }
+
+        for (auto&& expressionPair : _expressions) {
+            expressionPair.second->addDependencies(deps);
+        }
+
+        for (auto&& childPair : _children) {
+            childPair.second->reportDependencies(deps);
+        }
+    }
 
 protected:
     // For inclusions, we can apply an optimization here by simply appending to the output document
@@ -111,20 +133,17 @@ public:
     }
 
     /**
-     * Parses the projection specification given by 'spec', populating internal data structures.
-     */
-    void parse(const BSONObj& spec) final;
-
-    /**
      * Serialize the projection.
      */
     Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
-        if (_idExcluded) {
-            output.addField("_id", Value(false));
-        }
+
         _root->serialize(explain, &output);
+        if (output.peek()["_id"].missing()) {
+            output.addField("_id", Value{false});
+        }
+
         return output.freeze();
     }
 
@@ -172,32 +191,11 @@ public:
      * Arrays will be traversed, with any dotted/nested exclusions or computed fields applied to
      * each element in the array.
      */
-    Document applyProjection(const Document& inputDoc) const final;
+    Document applyProjection(const Document& inputDoc) const final {
+        return _root->applyToDocument(inputDoc);
+    }
 
 private:
-    /**
-     * Attempts to parse 'objSpec' as an expression like {$add: [...]}. Adds a computed field to
-     * '_root' and returns true if it was successfully parsed as an expression. Returns false if it
-     * was not an expression specification.
-     *
-     * Throws an error if it was determined to be an expression specification, but failed to parse
-     * as a valid expression.
-     */
-    bool parseObjectAsExpression(StringData pathToObject,
-                                 const BSONObj& objSpec,
-                                 const VariablesParseState& variablesParseState);
-
-    /**
-     * Traverses 'subObj' and parses each field. Adds any included or computed fields at this level
-     * to 'node'.
-     */
-    void parseSubObject(const BSONObj& subObj,
-                        const VariablesParseState& variablesParseState,
-                        InclusionNode* node);
-
-    // Not strictly necessary to track here, but makes serialization easier.
-    bool _idExcluded = false;
-
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;
 };

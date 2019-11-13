@@ -38,8 +38,10 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/parsed_inclusion_projection.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -52,20 +54,24 @@ BSONObj wrapInLiteral(const T& arg) {
 }
 
 // Helper to simplify the creation of a ParsedAggregationProjection with default policies.
-std::unique_ptr<ParsedAggregationProjection> makeProjectionWithDefaultPolicies(BSONObj spec) {
+auto makeProjectionWithDefaultPolicies(BSONObj spec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ProjectionPolicies defaultPolicies;
-    return ParsedAggregationProjection::create(expCtx, spec, defaultPolicies);
+    auto projection = projection_ast::parse(expCtx, spec, defaultPolicies);
+    return projection_executor::buildProjectionExecutor(
+        expCtx, &projection, defaultPolicies, true /* optimizeExecutor */);
 }
 
 // Helper to simplify the creation of a ParsedAggregationProjection which bans computed fields.
-std::unique_ptr<ParsedAggregationProjection> makeProjectionWithBannedComputedFields(BSONObj spec) {
+auto makeProjectionWithBannedComputedFields(BSONObj spec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ProjectionPolicies banComputedFields{
         ProjectionPolicies::kDefaultIdPolicyDefault,
         ProjectionPolicies::kArrayRecursionPolicyDefault,
         ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields};
-    return ParsedAggregationProjection::create(expCtx, spec, banComputedFields);
+    auto projection = projection_ast::parse(expCtx, spec, banComputedFields);
+    return projection_executor::buildProjectionExecutor(
+        expCtx, &projection, banComputedFields, true /* optimizeExecutor */);
 }
 
 //
@@ -274,13 +280,6 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectMixOfExclusionAndComputedFie
                   AssertionException);
 }
 
-TEST(ParsedAggregationProjectionErrors, ShouldRejectDottedFieldInSubDocument) {
-    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << true))),
-                  AssertionException);
-    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << wrapInLiteral(1)))),
-                  AssertionException);
-}
-
 TEST(ParsedAggregationProjectionErrors, ShouldRejectFieldNamesStartingWithADollar) {
     ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$dollar" << 0)), AssertionException);
     ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$dollar" << 1)), AssertionException);
@@ -382,6 +381,17 @@ TEST(ParsedAggregationProjectionErrors, ShouldNotErrorOnTwoNestedFields) {
 //
 // Determining exclusion vs. inclusion.
 //
+
+TEST(ParsedAggregationProjectionType, ShouldAllowDottedFieldInSubDocument) {
+    auto proj = makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << true)));
+    ASSERT(proj->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    proj = makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << wrapInLiteral(1))));
+    ASSERT(proj->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    proj = makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << false)));
+    ASSERT(proj->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+}
 
 TEST(ParsedAggregationProjectionType, ShouldDefaultToInclusionProjection) {
     auto parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << true));

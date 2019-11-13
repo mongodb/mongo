@@ -32,8 +32,10 @@
 #include "mongo/db/exec/projection_exec_agg.h"
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
 
 namespace mongo {
@@ -78,7 +80,9 @@ public:
         ProjectionPolicies projectionPolicies{idPolicy, recursionPolicy, computedFieldsPolicy};
 
         // Construct a ParsedAggregationProjection for the given projection spec and policies.
-        _projection = ParsedAggregationProjection::create(expCtx, projSpec, projectionPolicies);
+        const auto proj = projection_ast::parse(expCtx, projSpec, projectionPolicies);
+        _projection = projection_executor::buildProjectionExecutor(
+            expCtx, &proj, projectionPolicies, true /* optimizeExecutor */);
 
         // For an inclusion, record the exhaustive set of fields retained by the projection.
         if (getType() == ProjectionType::kInclusionProjection) {

@@ -34,8 +34,10 @@
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 
@@ -71,11 +73,18 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
             // is caught here so we can add the name that was actually specified by the user, be it
             // $project or an alias.
             try {
-                return ParsedAggregationProjection::create(
-                    expCtx,
-                    projectSpec,
-                    {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
-                     ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays});
+                auto policies = ProjectionPolicies::aggregateProjectionPolicies();
+                auto projection = projection_ast::parse(expCtx, projectSpec, policies);
+                // We won't optimize the executor on creation, and will do it as part of the
+                // pipeline optimization process when requested via the 'optimize()' method on
+                // 'DocumentSourceSingleDocumentTransformation'.
+                //
+                // Note that this is also important for $lookup inner pipelines to not being
+                // optimized too early, as it may lead to incorrect positioning of the caching
+                // stage due to missing dependencies on certain variables, as they could have been
+                // optimized away.
+                return projection_executor::buildProjectionExecutor(
+                    expCtx, &projection, policies, false /* optimizeExecutor */);
             } catch (DBException& ex) {
                 ex.addContext("Invalid " + specifiedName.toString());
                 throw;

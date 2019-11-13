@@ -246,13 +246,16 @@ private:
 template <typename Executor>
 auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const projection_ast::ProjectionPathASTNode* root,
-                             const ProjectionPolicies policies) {
+                             const ProjectionPolicies policies,
+                             bool optimizeExecutor) {
     ProjectionExecutorVisitorContext<Executor> context{
         {std::make_unique<Executor>(expCtx, policies), expCtx}};
     ProjectionExecutorVisitor<Executor> executorVisitor{&context};
     projection_ast::PathTrackingWalker walker{&context, {&executorVisitor}, {}};
     projection_ast_walker::walk(&walker, root);
-    context.data().executor->optimize();
+    if (optimizeExecutor) {
+        context.data().executor->optimize();
+    }
     return std::move(context.data().executor);
 }
 }  // namespace
@@ -260,16 +263,17 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
 std::unique_ptr<ParsedAggregationProjection> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const projection_ast::Projection* projection,
-    const ProjectionPolicies policies) {
+    const ProjectionPolicies policies,
+    bool optimizeExecutor) {
     invariant(projection);
 
     switch (projection->type()) {
         case kInclusion:
             return buildProjectionExecutor<ParsedInclusionProjection>(
-                expCtx, projection->root(), policies);
+                expCtx, projection->root(), policies, optimizeExecutor);
         case kExclusion:
             return buildProjectionExecutor<ParsedExclusionProjection>(
-                expCtx, projection->root(), policies);
+                expCtx, projection->root(), policies, optimizeExecutor);
         default:
             MONGO_UNREACHABLE;
     }

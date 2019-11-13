@@ -598,7 +598,7 @@ TEST(IndexSpecWildcard, FailsWithInclusionExcludingIdSubfield) {
                                                << "wildcardProjection"
                                                << BSON("_id.field" << 0 << "a" << 1 << "b" << 1)),
                                     serverGlobalParams.featureCompatibility);
-    ASSERT_EQ(result.getStatus().code(), 40179);
+    ASSERT_EQ(result.getStatus().code(), 31253);
 }
 
 TEST(IndexSpecWildcard, FailsWithExclusionIncludingIdSubfield) {
@@ -608,7 +608,7 @@ TEST(IndexSpecWildcard, FailsWithExclusionIncludingIdSubfield) {
                                                << "wildcardProjection"
                                                << BSON("_id.field" << 1 << "a" << 0 << "b" << 0)),
                                     serverGlobalParams.featureCompatibility);
-    ASSERT_EQ(result.getStatus().code(), 40178);
+    ASSERT_EQ(result.getStatus().code(), 31254);
 }
 
 TEST(IndexSpecWildcard, FailsWithMixedProjection) {
@@ -618,7 +618,7 @@ TEST(IndexSpecWildcard, FailsWithMixedProjection) {
                                      << "indexName"
                                      << "wildcardProjection" << BSON("a" << 1 << "b" << 0)),
                           serverGlobalParams.featureCompatibility);
-    ASSERT_EQ(result.getStatus().code(), 40178);
+    ASSERT_EQ(result.getStatus().code(), 31254);
 }
 
 TEST(IndexSpecWildcard, FailsWithComputedFieldsInProjection) {
@@ -629,7 +629,7 @@ TEST(IndexSpecWildcard, FailsWithComputedFieldsInProjection) {
                                                << BSON("a" << 1 << "b"
                                                            << "string")),
                                     serverGlobalParams.featureCompatibility);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(result.getStatus().code(), 51271);
 }
 
 TEST(IndexSpecWildcard, FailsWhenProjectionPluginNotWildcard) {

@@ -35,6 +35,16 @@
 namespace mongo {
 namespace projection_ast {
 namespace {
+/**
+ * Uassert that the given policy permits using computed fields in a projection.
+ */
+void verifyComputedFieldsAllowed(const ProjectionPolicies& policies) {
+    uassert(51271,
+            "Bad projection specification, cannot use computed fields when parsing "
+            "a spec in kBanComputedFields mode",
+            policies.computedFieldsPolicy !=
+                ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields);
+}
 
 /**
  * In some arcane situations, when a projection is empty, only contains top-level _id projections
@@ -115,6 +125,30 @@ bool isInclusionOrExclusionType(BSONType type) {
         default:
             return false;
     }
+}
+
+/**
+ * Given the 'root' of the AST and the field 'path', returns the last inner 'ProjectionPathASTNode'
+ * in the AST on that 'path'. For example, if the AST represents a projection {'a.b.c': 1} and the
+ * 'path' is 'a.b',  the returned node will be 'b'. If the node doesn't exist in the tree, or if the
+ * last node is a leaf node, the function returns 'nullptr'. For example, given the same projection
+ * specification and the 'path' of 'a.b.c.d', the function will return 'nullptr'.
+ */
+ProjectionPathASTNode* findLastInnerNodeOnPath(ProjectionPathASTNode* root,
+                                               const FieldPath& path,
+                                               size_t componentIndex) {
+    invariant(root);
+    invariant(path.getPathLength() > componentIndex);
+
+    auto child = exact_pointer_cast<ProjectionPathASTNode*>(
+        root->getChild(path.getFieldName(componentIndex)));
+    if (path.getPathLength() == componentIndex + 1) {
+        return child;
+    } else if (!child) {
+        return nullptr;
+    }
+
+    return findLastInnerNodeOnPath(child, path, componentIndex + 1);
 }
 
 void addNodeAtPathHelper(ProjectionPathASTNode* root,
@@ -292,6 +326,8 @@ bool attemptToParseGenericExpression(ParseContext* parseCtx,
     }
 
     // It must be an expression.
+    verifyComputedFieldsAllowed(parseCtx->policies);
+
     const bool isMeta = subObj.firstElementFieldNameStringData() == "$meta";
     uassert(31252,
             "Cannot use expression other than $meta in exclusion projection",
@@ -320,9 +356,10 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
                                 const FieldPath& path,
                                 const BSONObj& subObj,
                                 ProjectionPathASTNode* parent) {
-
     if (parseCtx->policies.findOnlyFeaturesAllowed()) {
         if (subObj.firstElementFieldNameStringData() == "$slice") {
+            verifyComputedFieldsAllowed(parseCtx->policies);
+
             Status findSliceStatus = Status::OK();
             try {
                 attemptToParseFindSlice(parseCtx, path, subObj, parent);
@@ -344,6 +381,8 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
 
             return true;
         } else if (subObj.firstElementFieldNameStringData() == "$elemMatch") {
+            verifyComputedFieldsAllowed(parseCtx->policies);
+
             // Validate $elemMatch arguments and dependencies.
             uassert(31274,
                     str::stream() << "elemMatch: Invalid argument, object required, but got "
@@ -403,6 +442,8 @@ void parseInclusion(ParseContext* ctx,
             ctx->idIncludedEntirely = true;
         }
     } else {
+        verifyComputedFieldsAllowed(ctx->policies);
+
         uassert(31276,
                 "Cannot specify more than one positional projection per query.",
                 !ctx->hasPositional);
@@ -489,6 +530,8 @@ void parseExclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
  * Treats the given element as a literal value (e.g. {a: "foo"}) and updates the tree as necessary.
  */
 void parseLiteral(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* parent) {
+    verifyComputedFieldsAllowed(ctx->policies);
+
     auto expr = Expression::parseOperand(ctx->expCtx, elem, ctx->expCtx->variablesParseState);
 
     FieldPath pathFromParent(elem.fieldNameStringData());
@@ -516,6 +559,11 @@ void parseSubObject(ParseContext* ctx,
                     boost::optional<FieldPath> fullPathToParent,
                     const BSONObj& obj,
                     ProjectionPathASTNode* parent) {
+    uassert(
+        51270,
+        str::stream() << "An empty sub-projection is not a valid value. Found empty object at path",
+        !obj.isEmpty());
+
     FieldPath path(objFieldName);
 
     if (obj.nFields() == 1 && obj.firstElementFieldNameStringData().startsWith("$")) {
@@ -537,12 +585,11 @@ void parseSubObject(ParseContext* ctx,
         }
     }
 
-    // It's not an expression. Create a node to represent the new layer in the tree.
-    ProjectionPathASTNode* newParent = nullptr;
-    {
+    ProjectionPathASTNode* newParent = findLastInnerNodeOnPath(parent, path, 0);
+    if (!newParent) {
         auto ownedChild = std::make_unique<ProjectionPathASTNode>();
         newParent = ownedChild.get();
-        parent->addChild(objFieldName, std::move(ownedChild));
+        addNodeAtPath(parent, path, std::move(ownedChild));
     }
 
     const FieldPath fullPathToNewParent = fullPathToParent ? fullPathToParent->concat(path) : path;
@@ -597,6 +644,11 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const MatchExpression* const query,
                  const BSONObj& queryObj,
                  ProjectionPolicies policies) {
+    if (!policies.findOnlyFeaturesAllowed()) {
+        // In agg-style syntax it is illegal to have an empty projection specification.
+        uassert(51272, "projection specification must have at least one field", !obj.isEmpty());
+    }
+
     ProjectionPathASTNode root;
 
     ParseContext ctx{expCtx, query, queryObj, obj, policies};
@@ -619,10 +671,16 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     invariant(ctx.type);
 
-    if (!ctx.idSpecified && policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kIncludeId &&
-        *ctx.type == ProjectType::kInclusion) {
-        // Add a node to the root indicating that _id is included.
-        addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
+    if (!ctx.idSpecified) {
+        if (policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kIncludeId &&
+            *ctx.type == ProjectType::kInclusion) {
+            // Add a node to the root indicating that _id is included.
+            addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
+        } else if (policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kExcludeId &&
+                   *ctx.type == ProjectType::kExclusion) {
+            // Add a node to the root indicating that _id is not included.
+            addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(false));
+        }
     }
 
     if (*ctx.type == ProjectType::kExclusion && ctx.idSpecified && ctx.idIncludedEntirely) {

@@ -104,19 +104,16 @@ public:
     }
 
     Document serializeTransformation(
-        boost::optional<ExplainOptions::Verbosity> explain) const final;
-
-    /**
-     * Parses the projection specification given by 'spec', populating internal data structures.
-     */
-    void parse(const BSONObj& spec) final {
-        parse(spec, _root.get(), 0);
+        boost::optional<ExplainOptions::Verbosity> explain) const final {
+        return _root->serialize(explain);
     }
 
     /**
      * Exclude the fields specified.
      */
-    Document applyProjection(const Document& inputDoc) const final;
+    Document applyProjection(const Document& inputDoc) const final {
+        return _root->applyToDocument(inputDoc);
+    }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
         if (_rootReplacementExpression) {
@@ -138,15 +135,6 @@ public:
     }
 
 private:
-    /**
-     * Helper for parse() above.
-     *
-     * Traverses 'spec' and parses each field. Adds any excluded fields at this level to 'node',
-     * and recurses on any sub-objects.
-     */
-    void parse(const BSONObj& spec, ExclusionNode* node, size_t depth);
-
-
     // The ExclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<ExclusionNode> _root;
 };

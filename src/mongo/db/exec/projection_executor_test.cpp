@@ -38,6 +38,9 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::projection_executor {
+namespace {
+constexpr auto kOptimzeExecutor = true;
+
 class ProjectionExecutorTest : public AggregationContextFixture {
 public:
     projection_ast::Projection parseWithDefaultPolicies(
@@ -70,13 +73,13 @@ public:
 
 TEST_F(ProjectionExecutorTest, CanProjectInclusionWithIdPath) {
     auto projWithId = parseWithDefaultPolicies(fromjson("{a: 1, _id: 1}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &projWithId, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &projWithId, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{_id: 123, a: 'abc'}")},
                        executor->applyTransformation(
                            Document{fromjson("{_id: 123, a: 'abc', b: 'def', c: 'ghi'}")}));
 
     auto projWithoutId = parseWithDefaultPolicies(fromjson("{a: 1, _id: 0}"));
-    executor = buildProjectionExecutor(getExpCtx(), &projWithoutId, {});
+    executor = buildProjectionExecutor(getExpCtx(), &projWithoutId, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: 'abc'}")},
                        executor->applyTransformation(
                            Document{fromjson("{_id: 123, a: 'abc', b: 'def', c: 'ghi'}")}));
@@ -84,7 +87,7 @@ TEST_F(ProjectionExecutorTest, CanProjectInclusionWithIdPath) {
 
 TEST_F(ProjectionExecutorTest, CanProjectInclusionUndottedPath) {
     auto proj = parseWithDefaultPolicies(fromjson("{a: 1, b: 1}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: 'abc', b: 'def'}")},
         executor->applyTransformation(Document{fromjson("{a: 'abc', b: 'def', c: 'ghi'}")}));
@@ -92,7 +95,7 @@ TEST_F(ProjectionExecutorTest, CanProjectInclusionUndottedPath) {
 
 TEST_F(ProjectionExecutorTest, CanProjectInclusionDottedPath) {
     auto proj = parseWithDefaultPolicies(fromjson("{'a.b': 1, 'a.d': 1}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: 'abc', d: 'ghi'}}")},
         executor->applyTransformation(Document{fromjson("{a: {b: 'abc', c: 'def', d: 'ghi'}}")}));
@@ -100,14 +103,14 @@ TEST_F(ProjectionExecutorTest, CanProjectInclusionDottedPath) {
 
 TEST_F(ProjectionExecutorTest, CanProjectExpression) {
     auto proj = parseWithDefaultPolicies(fromjson("{c: {$add: ['$a', '$b']}}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{c: 3}")},
                        executor->applyTransformation(Document{fromjson("{a: 1, b: 2}")}));
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectExclusionWithIdPath) {
     auto projWithoutId = parseWithDefaultPolicies(fromjson("{a: 0, _id: 0}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &projWithoutId, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &projWithoutId, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{b: 'def', c: 'ghi'}")},
                        executor->applyTransformation(
                            Document{fromjson("{_id: 123, a: 'abc', b: 'def', c: 'ghi'}")}));
@@ -115,7 +118,7 @@ TEST_F(ProjectionExecutorTest, CanProjectExclusionWithIdPath) {
 
 TEST_F(ProjectionExecutorTest, CanProjectExclusionUndottedPath) {
     auto proj = parseWithDefaultPolicies(fromjson("{a: 0, b: 0}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{c: 'ghi'}")},
         executor->applyTransformation(Document{fromjson("{a: 'abc', b: 'def', c: 'ghi'}")}));
@@ -123,7 +126,7 @@ TEST_F(ProjectionExecutorTest, CanProjectExclusionUndottedPath) {
 
 TEST_F(ProjectionExecutorTest, CanProjectExclusionDottedPath) {
     auto proj = parseWithDefaultPolicies(fromjson("{'a.b': 0, 'a.d': 0}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {c: 'def'}}")},
         executor->applyTransformation(Document{fromjson("{a: {b: 'abc', c: 'def', d: 'ghi'}}")}));
@@ -132,7 +135,7 @@ TEST_F(ProjectionExecutorTest, CanProjectExclusionDottedPath) {
 TEST_F(ProjectionExecutorTest, CanProjectFindPositional) {
     auto proj =
         parseWithFindFeaturesEnabled(fromjson("{'a.b.$': 1}"), fromjson("{'a.b': {$gte: 3}}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [3]}}")},
                        executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}}")}));
 
@@ -142,7 +145,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindPositional) {
 
 TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithInclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: {$gte: 3}}}, c: 1}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: [{b: 3}]}")},
         executor->applyTransformation(Document{fromjson("{a: [{b: 1}, {b: 2}, {b: 3}]}")}));
@@ -153,14 +156,14 @@ TEST_F(ProjectionExecutorTest, CanProjectFindElemMatch) {
     const BSONObj obj = fromjson("{a: [{b: 3, c: 1}, {b: 1, c: 2}, {b: 1, c: 3}]}");
     {
         auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: 1}}}"));
-        auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+        auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
         ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 2}]}")},
                            executor->applyTransformation(Document{obj}));
     }
 
     {
         auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: 1, c: 3}}}"));
-        auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+        auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
         ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 3}]}")},
                            executor->applyTransformation(Document{obj}));
     }
@@ -171,8 +174,7 @@ TEST_F(ProjectionExecutorTest, ElemMatchRespectsCollator) {
     getExpCtx()->setCollator(&collator);
 
     auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {$gte: 'abc'}}}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
-
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
 
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{ a: [ \"zdd\" ] }")},
@@ -181,7 +183,7 @@ TEST_F(ProjectionExecutorTest, ElemMatchRespectsCollator) {
 
 TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithExclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: {$gte: 3}}}, c: 0}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 3}], d: 'def'}")},
                        executor->applyTransformation(Document{
                            fromjson("{a: [{b: 1}, {b: 2}, {b: 3}], c: 'abc', d: 'def'}")}));
@@ -189,7 +191,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithExclusion) {
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithInclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}, c: 'abc'}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3]}, c: 'abc'}")}));
@@ -197,7 +199,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithInclusion) {
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceSkipLimitWithInclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}, c: 'abc'}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: 'abc'}")}));
@@ -205,7 +207,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceSkipLimitWithInclusion) {
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceBasicWithExclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: 3}, c: 0}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [1,2,3]}}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: 'abc'}")}));
@@ -213,7 +215,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceBasicWithExclusion) {
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceSkipLimitWithExclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 0}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: 'abc'}")}));
@@ -222,7 +224,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceSkipLimitWithExclusion) {
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceAndPositional) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, 'c.$': 1}"),
                                              fromjson("{c: {$gte: 6}}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}, c: [6]}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: [5,6,7]}")}));
@@ -230,8 +232,9 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceAndPositional) {
 
 TEST_F(ProjectionExecutorTest, ExecutorOptimizesExpression) {
     auto proj = parseWithDefaultPolicies(fromjson("{a: 1, b: {$add: [1, 2]}}"));
-    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {}, kOptimzeExecutor);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{_id: true, a: true, b: {$const: 3}}")},
                        executor->serializeTransformation(boost::none));
 }
+}  // namespace
 }  // namespace mongo::projection_executor

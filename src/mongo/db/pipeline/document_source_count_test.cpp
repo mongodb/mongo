@@ -78,7 +78,7 @@ public:
         auto groupExplain = explainedStages[0];
         ASSERT_VALUE_EQ(groupExplain["$group"], expectedGroupExplain);
 
-        Value expectedProjectExplain = Value{Document{{"_id", false}, {countName, true}}};
+        Value expectedProjectExplain = Value{Document{{countName, true}, {"_id", false}}};
         auto projectExplain = explainedStages[1];
         ASSERT_VALUE_EQ(projectExplain["$project"], expectedProjectExplain);
     }

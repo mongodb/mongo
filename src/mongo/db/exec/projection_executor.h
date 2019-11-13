@@ -37,9 +37,12 @@ namespace mongo::projection_executor {
 /**
  * Builds a projection execution tree from the given 'projection' and using the given projection
  * 'policies' by walking an AST tree starting at the root node stored within the 'projection'.
+ * Set 'optimizeExecutor' to 'true' when the 'optimize()' method needs to be called on the newly
+ * created executor before returning it to the caller.
  */
 std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const projection_ast::Projection* projection,
-    ProjectionPolicies policies);
+    ProjectionPolicies policies,
+    bool optimizeExecutor);
 }  // namespace mongo::projection_executor

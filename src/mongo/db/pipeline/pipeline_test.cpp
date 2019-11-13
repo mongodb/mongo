@@ -1067,15 +1067,15 @@ TEST(PipelineOptimizationTest, PartiallyDependentMatchWithRenameShouldSplitAcros
 
 TEST(PipelineOptimizationTest, NorCanSplitAcrossProjectWithRename) {
     string inputPipe =
-        "[{$project: {_id: false, x: true, y: '$z'}},"
+        "[{$project: {x: true, y: '$z', _id: false}},"
         "{$match: {$nor: [{w: {$eq: 1}}, {y: {$eq: 1}}]}}]";
     string outputPipe =
         R"([{$match: {z : {$not: {$eq: 1}}}},
-             {$project: {_id: false, x: true, y: "$z"}},
+             {$project: {x: true, y: "$z", _id: false}},
              {$match: {w: {$not: {$eq: 1}}}}])";
     string serializedPipe = R"(
         [{$match: {$nor: [ {z : {$eq: 1}}]}},
-         {$project: {_id: false, x: true, y: "$z"}},
+         {$project: {x: true, y: "$z", _id: false}},
          {$match: {$nor: [ {w: {$eq: 1}}]}}]
         )";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -1083,19 +1083,19 @@ TEST(PipelineOptimizationTest, NorCanSplitAcrossProjectWithRename) {
 
 TEST(PipelineOptimizationTest, MatchCanMoveAcrossSeveralRenames) {
     string inputPipe =
-        "[{$project: {_id: false, c: '$d'}},"
+        "[{$project: {c: '$d', _id: false}},"
         "{$addFields: {b: '$c'}},"
         "{$project: {a: '$b', z: 1}},"
         "{$match: {a: 1, z: 2}}]";
     string outputPipe =
         "[{$match: {d: {$eq: 1}}},"
-        "{$project: {_id: false, c: '$d'}},"
+        "{$project: {c: '$d', _id: false}},"
         "{$match: {z: {$eq: 2}}},"
         "{$addFields: {b: '$c'}},"
         "{$project: {_id: true, z: true, a: '$b'}}]";
     string serializedPipe = R"(
         [{$match: {d : {$eq: 1}}},
-         {$project: {_id: false, c: "$d"}},
+         {$project: {c: "$d", _id: false}},
          {$match: {z : {$eq: 2}}},
          {$addFields: {b: "$c"}},
          {$project: {_id: true, z: true, a: "$b"}}])";
@@ -1104,7 +1104,7 @@ TEST(PipelineOptimizationTest, MatchCanMoveAcrossSeveralRenames) {
 
 TEST(PipelineOptimizationTest, RenameShouldNotBeAppliedToDependentMatch) {
     string pipeline =
-        "[{$project: {_id: false, x: {$add: ['$foo', '$bar']}, y: '$z'}},"
+        "[{$project: {x: {$add: ['$foo', '$bar']}, y: '$z', _id: false}},"
         "{$match: {$or: [{x: {$eq: 1}}, {y: {$eq: 1}}]}}]";
     assertPipelineOptimizesTo(pipeline, pipeline);
 }
@@ -1115,8 +1115,8 @@ TEST(PipelineOptimizationTest, MatchCannotMoveAcrossAddFieldsRenameOfDottedPath)
 }
 
 TEST(PipelineOptimizationTest, MatchCannotMoveAcrossProjectRenameOfDottedPath) {
-    string inputPipe = "[{$project: {_id: false, a: '$$CURRENT.b.c'}}, {$match: {a: {$eq: 1}}}]";
-    string outputPipe = "[{$project: {_id: false, a: '$b.c'}}, {$match: {a: {$eq: 1}}}]";
+    string inputPipe = "[{$project: {a: '$$CURRENT.b.c', _id: false}}, {$match: {a: {$eq: 1}}}]";
+    string outputPipe = "[{$project: {a: '$b.c', _id: false}}, {$match: {a: {$eq: 1}}}]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
@@ -2065,7 +2065,7 @@ class MatchWithSkipGroupAndLimit : public Base {
         return "[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]";
     }
     string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}, {$project: {_id: false, y: true}}]";
+        return "[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]";
     }
     string mergePipeJson() {
         return "[{$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]";
@@ -2123,7 +2123,7 @@ class JustNeedsNonId : public Base {
         return "[{$limit:1}, {$group: {_id: '$a.b'}}]";
     }
     string shardPipeJson() {
-        return "[{$limit:1}, {$project: {_id: false, a: {b: true}}}]";
+        return "[{$limit:1}, {$project: {a: {b: true}, _id: false}}]";
     }
     string mergePipeJson() {
         return "[{$limit:1}, {$group: {_id: '$a.b'}}]";
@@ -2239,7 +2239,7 @@ class ShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup : public Base {
     }
     string shardPipeJson() {
         return "[{$sort: {sortKey: {a: 1}}}"
-               ",{$project : {_id: false, a: true}}"
+               ",{$project : {a: true, _id: false}}"
                "]";
     }
     string mergePipeJson() {

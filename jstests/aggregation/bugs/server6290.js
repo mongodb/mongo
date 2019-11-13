@@ -8,19 +8,20 @@ t.drop();
 
 t.save({});
 
-var error = ErrorCodes.InvalidPipelineOperator;
-
 // $isoDate is an invalid operator.
-assertErrorCode(t, {$project: {a: {$isoDate: [{year: 1}]}}}, error);
+assertErrorCode(t, {$project: {a: {$isoDate: [{year: 1}]}}}, 31325);
 // $date is an invalid operator.
-assertErrorCode(t, {$project: {a: {$date: [{year: 1}]}}}, error);
+assertErrorCode(t, {$project: {a: {$date: [{year: 1}]}}}, 31325);
 
 // Alternative operands.
-assertErrorCode(t, {$project: {a: {$isoDate: []}}}, error);
-assertErrorCode(t, {$project: {a: {$date: []}}}, error);
-assertErrorCode(t, {$project: {a: {$isoDate: 'foo'}}}, error);
-assertErrorCode(t, {$project: {a: {$date: 'foo'}}}, error);
+assertErrorCode(t, {$project: {a: {$isoDate: []}}}, 31325);
+assertErrorCode(t, {$project: {a: {$date: []}}}, 31325);
+assertErrorCode(t, {$project: {a: {$isoDate: 'foo'}}}, 31325);
+assertErrorCode(t, {$project: {a: {$date: 'foo'}}}, 31325);
 
 // Test with $group.
-assertErrorCode(t, {$group: {_id: 0, a: {$first: {$isoDate: [{year: 1}]}}}}, error);
-assertErrorCode(t, {$group: {_id: 0, a: {$first: {$date: [{year: 1}]}}}}, error);
+assertErrorCode(t,
+                {$group: {_id: 0, a: {$first: {$isoDate: [{year: 1}]}}}},
+                ErrorCodes.InvalidPipelineOperator);
+assertErrorCode(
+    t, {$group: {_id: 0, a: {$first: {$date: [{year: 1}]}}}}, ErrorCodes.InvalidPipelineOperator);

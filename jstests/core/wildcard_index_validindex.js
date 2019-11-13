@@ -106,11 +106,11 @@ assert.commandFailedWithCode(coll.createIndex({"$**": "hello"}), ErrorCodes.Cann
 
 // Cannot create an wildcard index with mixed inclusion exclusion.
 assert.commandFailedWithCode(
-    createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 0}}), 40178);
+    createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 0}}), 31254);
 // Cannot create an wildcard index with computed fields.
 assert.commandFailedWithCode(
     createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: "string"}}),
-    ErrorCodes.FailedToParse);
+    51271);
 // Cannot create an wildcard index with an empty projection.
 assert.commandFailedWithCode(
     createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {}}),

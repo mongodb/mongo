@@ -970,22 +970,25 @@ env.Library(
 )
 
 env.Library(
-    target='projection_exec_agg',
+    target='projection_executor',
     source=[
-        'exec/projection_exec_agg.cpp',
+        'exec/find_projection_executor.cpp',
+        'exec/projection_executor.cpp',
     ],
     LIBDEPS=[
+        'matcher/expressions',
         'pipeline/parsed_aggregation_projection',
     ],
 )
 
 env.Library(
-    target='projection_executor',
+    target='projection_exec_agg',
     source=[
-        'exec/find_projection_executor.cpp',
+        'exec/projection_exec_agg.cpp'
     ],
     LIBDEPS=[
-        'matcher/expressions'
+        'projection_executor',
+        'query/projection_ast',
     ],
 )
 
@@ -1018,7 +1021,6 @@ env.Library(
         'exec/pipeline_proxy.cpp',
         'exec/plan_stage.cpp',
         'exec/projection.cpp',
-        'exec/projection_executor.cpp',
         'exec/queued_data_stage.cpp',
         'exec/record_store_fast_count.cpp',
         'exec/requires_all_indices_stage.cpp',

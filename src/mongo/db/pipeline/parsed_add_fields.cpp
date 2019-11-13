@@ -33,11 +33,100 @@
 
 #include <algorithm>
 
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
 namespace mongo {
-
 namespace parsed_aggregation_projection {
+
+using TransformerType = TransformerInterface::TransformerType;
+
+using expression::isPathPrefixOf;
+
+//
+// ProjectionSpecValidator
+//
+
+void ProjectionSpecValidator::uassertValid(const BSONObj& spec) {
+    ProjectionSpecValidator(spec).validate();
+}
+
+void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string& path) {
+    auto result = _seenPaths.emplace(path);
+    auto pos = result.first;
+
+    // Check whether the path was a duplicate of an existing path.
+    auto conflictingPath = boost::make_optional(!result.second, *pos);
+
+    // Check whether the preceding path prefixes this path.
+    if (!conflictingPath && pos != _seenPaths.begin()) {
+        conflictingPath =
+            boost::make_optional(isPathPrefixOf(*std::prev(pos), path), *std::prev(pos));
+    }
+
+    // Check whether this path prefixes the subsequent path.
+    if (!conflictingPath && std::next(pos) != _seenPaths.end()) {
+        conflictingPath =
+            boost::make_optional(isPathPrefixOf(path, *std::next(pos)), *std::next(pos));
+    }
+
+    uassert(40176,
+            str::stream() << "specification contains two conflicting paths. "
+                             "Cannot specify both '"
+                          << path << "' and '" << *conflictingPath << "': " << _rawObj.toString(),
+            !conflictingPath);
+}
+
+void ProjectionSpecValidator::validate() {
+    if (_rawObj.isEmpty()) {
+        uasserted(40177, "specification must have at least one field");
+    }
+    for (auto&& elem : _rawObj) {
+        parseElement(elem, FieldPath(elem.fieldName()));
+    }
+}
+
+void ProjectionSpecValidator::parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
+    if (elem.type() == BSONType::Object) {
+        parseNestedObject(elem.Obj(), pathToElem);
+    } else {
+        ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
+    }
+}
+
+void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
+                                                const FieldPath& prefix) {
+    if (thisLevelSpec.isEmpty()) {
+        uasserted(
+            40180,
+            str::stream() << "an empty object is not a valid value. Found empty object at path "
+                          << prefix.fullPath());
+    }
+    for (auto&& elem : thisLevelSpec) {
+        auto fieldName = elem.fieldNameStringData();
+        if (fieldName[0] == '$') {
+            // This object is an expression specification like {$add: [...]}. It will be parsed
+            // into an Expression later, but for now, just track that the prefix has been
+            // specified and skip it.
+            if (thisLevelSpec.nFields() != 1) {
+                uasserted(40181,
+                          str::stream() << "an expression specification must contain exactly "
+                                           "one field, the name of the expression. Found "
+                                        << thisLevelSpec.nFields() << " fields in "
+                                        << thisLevelSpec.toString() << ", while parsing object "
+                                        << _rawObj.toString());
+            }
+            ensurePathDoesNotConflictOrThrow(prefix.fullPath());
+            continue;
+        }
+        if (fieldName.find('.') != std::string::npos) {
+            uasserted(40183,
+                      str::stream() << "cannot use dotted field name '" << fieldName
+                                    << "' in a sub object: " << _rawObj.toString());
+        }
+        parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
+    }
+}
 
 std::unique_ptr<ParsedAddFields> ParsedAddFields::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) {

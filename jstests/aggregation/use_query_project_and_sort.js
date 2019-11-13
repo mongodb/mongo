@@ -21,7 +21,7 @@ assert.commandWorked(bulk.execute());
 
 function assertQueryCoversProjectionAndSort(pipeline) {
     const explainOutput = coll.explain().aggregate(pipeline);
-    assert(isQueryPlan(explainOutput));
+    assert(isQueryPlan(explainOutput), explainOutput);
     assert(!planHasStage(db, explainOutput, "FETCH"),
            "Expected pipeline " + tojsononeline(pipeline) +
                " *not* to include a FETCH stage in the explain output: " + tojson(explainOutput));

@@ -8,7 +8,7 @@ c.drop();
 
 c.save({});
 
-assertErrorCode(c, {$project: {'x': {$add: [1]}, 'x.b': 1}}, 40176);
-assertErrorCode(c, {$project: {'x.b': 1, 'x': {$add: [1]}}}, 40176);
-assertErrorCode(c, {$project: {'x': {'b': 1}, 'x.b': 1}}, 40176);
-assertErrorCode(c, {$project: {'x.b': 1, 'x': {'b': 1}}}, 40176);
+assertErrorCode(c, {$project: {'x': {$add: [1]}, 'x.b': 1}}, 31249);
+assertErrorCode(c, {$project: {'x.b': 1, 'x': {$add: [1]}}}, 31250);
+assertErrorCode(c, {$project: {'x': {'b': 1}, 'x.b': 1}}, 31250);
+assertErrorCode(c, {$project: {'x.b': 1, 'x': {'b': 1}}}, 31250);
