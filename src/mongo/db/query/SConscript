@@ -63,6 +63,7 @@ env.Library(
     target="query_common",
     source=[
         "collation/collator_factory_icu_decoration.cpp",
+        "explain_common.cpp",
         "find_common.cpp",
         "parsed_distinct.cpp",
     ],

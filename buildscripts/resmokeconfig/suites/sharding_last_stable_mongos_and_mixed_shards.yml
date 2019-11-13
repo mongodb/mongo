@@ -111,6 +111,8 @@ selector:
   - jstests/sharding/server_status_crud_metrics.js
   # Enable after SERVER-31083 is backported and available on 4.2 and 4.0 binaries
   - jstests/sharding/enable_sharding_with_primary.js
+  # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.
+  - jstests/sharding/explain_cmd.js
 
 executor:
   config:

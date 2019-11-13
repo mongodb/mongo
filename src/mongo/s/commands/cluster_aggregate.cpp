@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
@@ -938,6 +939,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << AggregationRequest::kMergeByPBRTName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.needsMerge() && !request.isFromMongos() && !request.mergeByPBRT());
+    if (request.getExplain()) {
+        explain_common::generateServerInfo(result);
+    }
+
     auto executionNsRoutingInfoStatus = getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
     LiteParsedPipeline litePipe(request);

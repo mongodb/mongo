@@ -51,6 +51,8 @@
     assert("executionStats" in explain);
     assert.eq(2, explain.queryPlanner.winningPlan.shards.length);
     assert.eq(2, explain.executionStats.executionStages.shards.length);
+    assert("serverInfo" in explain, explain);
+    assert.hasFields(explain.serverInfo, ['host', 'port', 'version', 'gitVersion']);
 
     // An explain of a command that doesn't exist should fail gracefully.
     explain = db.runCommand({

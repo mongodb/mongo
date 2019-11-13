@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_explain.h"
@@ -373,6 +374,7 @@ Status ClusterExplain::buildExplainResult(OperationContext* opCtx,
 
     buildPlannerInfo(opCtx, shardResults, mongosStageName, out);
     buildExecStats(shardResults, mongosStageName, millisElapsed, out);
+    explain_common::generateServerInfo(out);
 
     return Status::OK();
 }
