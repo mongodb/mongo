@@ -15,10 +15,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
     const CLIENT_CERT_NO_ROLES = "jstests/libs/client.pem";
 
     const CLIENT_USER =
-        "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel Users,CN=Kernel Client Peer Role";
+        'CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US';
 
     const CLIENT_USER_NO_ROLES =
-        "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
+        'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
     const smokeScript =
         'assert(db.getSiblingDB(\'$external\').auth({ mechanism: \'MONGODB-X509\' }));';
 

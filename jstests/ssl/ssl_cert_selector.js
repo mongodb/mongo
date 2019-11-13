@@ -14,8 +14,12 @@ requireSSLProvider('windows', function() {
 
         // Import a pfx file since it contains both a cert and private key and is easy to import
         // via command line.
-        runProgram(
-            "certutil.exe", "-importpfx", "-f", "-p", "foo", "jstests\\libs\\trusted-client.pfx");
+        runProgram("certutil.exe",
+                   "-importpfx",
+                   "-f",
+                   "-p",
+                   "qwerty",
+                   "jstests\\libs\\trusted-client.pfx");
     }
 
     const conn = MongoRunner.runMongod(
@@ -39,7 +43,13 @@ requireSSLProvider('windows', function() {
     };
 
     assert.doesNotThrow(function() {
-        testWithCert("thumbprint=9ca511552f14d3fc2009d425873599bf77832238");
+        try {
+            // trusted-client.pfx
+            testWithCert("thumbprint=6AE38B35F4551B6BDCDB89AFABE0B277046F2735");
+        } catch (e) {
+            // Transitional: Pre Oct-2019 trusted-client.pfx
+            testWithCert("thumbprint=9ca511552f14d3fc2009d425873599bf77832238");
+        }
     });
 
     assert.doesNotThrow(function() {
