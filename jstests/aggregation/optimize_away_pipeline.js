@@ -7,7 +7,7 @@
 // be wrapped into a facet stage to not prevent this optimization.
 // TODO SERVER-40323: Plan analyzer helper functions cannot correctly handle explain output for
 // sharded collections.
-// @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection]
+// @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection, assumes_superuser_permissions]
 (function() {
 "use strict";
 

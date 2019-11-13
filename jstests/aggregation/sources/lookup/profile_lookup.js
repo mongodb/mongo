@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns, requires_profiling]
+// @tags: [does_not_support_stepdowns, requires_profiling, assumes_superuser_permissions]
 //
 // Tests that profiled $lookups contain the correct namespace and that Top is updated accordingly.
 
