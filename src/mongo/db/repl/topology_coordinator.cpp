@@ -171,6 +171,7 @@ void TopologyCoordinator::PingStats::miss() {
 
 TopologyCoordinator::TopologyCoordinator(Options options)
     : _role(Role::kFollower),
+      _topologyVersion(instanceId, 0),
       _term(OpTime::kUninitializedTerm),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
@@ -186,6 +187,10 @@ TopologyCoordinator::TopologyCoordinator(Options options)
 
 TopologyCoordinator::Role TopologyCoordinator::getRole() const {
     return _role;
+}
+
+TopologyVersion TopologyCoordinator::getTopologyVersion() const {
+    return _topologyVersion;
 }
 
 void TopologyCoordinator::setForceSyncSourceIndex(int index) {

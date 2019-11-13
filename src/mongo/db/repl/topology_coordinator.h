@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/split_horizon.h"
+#include "mongo/db/repl/topology_version_gen.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/net/hostandport.h"
@@ -110,6 +111,11 @@ public:
      * Gets the role of this member in the replication protocol.
      */
     Role getRole() const;
+
+    /**
+     * Gets the current topology version of this member.
+     */
+    TopologyVersion getTopologyVersion() const;
 
     /**
      * Gets the MemberState of this member in the replica set.
@@ -885,6 +891,9 @@ private:
 
     // This node's role in the replication protocol.
     Role _role;
+
+    // This node's topology version. This is updated upon a significant topology change.
+    TopologyVersion _topologyVersion;
 
     // This is a unique id that is generated and set each time we transition to PRIMARY, as the
     // result of an election.

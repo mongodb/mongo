@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
@@ -318,6 +319,11 @@ private:
     int _selfIndex;
     TopologyCoordinator::Options _options;
 };
+
+TEST_F(TopoCoordTest, TopologyVersionInitializedAtStartup) {
+    ASSERT_EQ(repl::instanceId, getTopoCoord().getTopologyVersion().getProcessId());
+    ASSERT_EQ(0, getTopoCoord().getTopologyVersion().getCounter());
+}
 
 TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
     // if we do not have an index in the config, we should get an empty syncsource
