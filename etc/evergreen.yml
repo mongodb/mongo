@@ -1482,7 +1482,8 @@ tasks:
 
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
-  depends_on: compile
+  depends_on: 
+  - name: compile
   commands:
     - command: manifest.load
     - *git_get_project
