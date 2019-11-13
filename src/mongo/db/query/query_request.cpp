@@ -105,6 +105,8 @@ const char kOptionsField[] = "options";
 const char kReadOnceField[] = "readOnce";
 const char kAllowSpeculativeMajorityReadField[] = "allowSpeculativeMajorityRead";
 const char kInternalReadAtClusterTimeField[] = "$_internalReadAtClusterTime";
+const char kRequestResumeTokenField[] = "$_requestResumeToken";
+const char kResumeAfterField[] = "$_resumeAfter";
 
 // Field names for sorting options.
 const char kNaturalSortField[] = "$natural";
@@ -397,6 +399,18 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
             qr->_internalReadAtClusterTime = el.timestamp();
+        } else if (fieldName == kResumeAfterField) {
+            Status status = checkFieldType(el, Object);
+            if (!status.isOK()) {
+                return status;
+            }
+            qr->_resumeAfter = el.embeddedObject();
+        } else if (fieldName == kRequestResumeTokenField) {
+            Status status = checkFieldType(el, Bool);
+            if (!status.isOK()) {
+                return status;
+            }
+            qr->_requestResumeToken = el.boolean();
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -573,6 +587,14 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
     if (_internalReadAtClusterTime) {
         cmdBuilder->append(kInternalReadAtClusterTimeField, *_internalReadAtClusterTime);
     }
+
+    if (_requestResumeToken) {
+        cmdBuilder->append(kRequestResumeTokenField, _requestResumeToken);
+    }
+
+    if (!_resumeAfter.isEmpty()) {
+        cmdBuilder->append(kResumeAfterField, _resumeAfter);
+    }
 }
 
 void QueryRequest::addShowRecordIdMetaProj() {
@@ -677,6 +699,29 @@ Status QueryRequest::validate() const {
         }
     }
 
+    if (_requestResumeToken) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(_hint != BSON(kNaturalSortField << 1))) {
+            return Status(ErrorCodes::BadValue,
+                          "hint must be {$natural:1} if 'requestResumeToken' is enabled");
+        }
+        if (!_sort.isEmpty() &&
+            SimpleBSONObjComparator::kInstance.evaluate(_sort != BSON(kNaturalSortField << 1))) {
+            return Status(ErrorCodes::BadValue,
+                          "sort must be unset or {$natural:1} if 'requestResumeToken' is enabled");
+        }
+        if (!_resumeAfter.isEmpty()) {
+            if (_resumeAfter.nFields() != 1 ||
+                _resumeAfter["$recordId"].type() != BSONType::NumberLong) {
+                return Status(ErrorCodes::BadValue,
+                              "Malformed resume token: the '_resumeAfter' object must contain"
+                              " exactly one field named '$recordId', of type NumberLong.");
+            }
+        }
+    } else if (!_resumeAfter.isEmpty()) {
+        return Status(ErrorCodes::BadValue,
+                      "'requestResumeToken' must be true if 'resumeAfter' is"
+                      " specified");
+    }
     return Status::OK();
 }
 
@@ -1052,6 +1097,18 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_internalReadAtClusterTime) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kInternalReadAtClusterTimeField
+                              << " not supported in aggregation."};
+    }
+
+    if (_requestResumeToken) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kRequestResumeTokenField
+                              << " not supported in aggregation."};
+    }
+
+    if (!_resumeAfter.isEmpty()) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kResumeAfterField
                               << " not supported in aggregation."};
     }
 

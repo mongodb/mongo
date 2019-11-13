@@ -408,6 +408,23 @@ public:
         return _internalReadAtClusterTime;
     }
 
+    bool getRequestResumeToken() const {
+        return _requestResumeToken;
+    }
+
+    void setRequestResumeToken(bool requestResumeToken) {
+        _requestResumeToken = requestResumeToken;
+    }
+
+    const BSONObj& getResumeAfterResumeToken() const {
+        return _resumeAfter;
+    }
+
+    void setResumeAfterResumeToken(BSONObj resumeAfter) {
+        _resumeAfter = resumeAfter;
+    }
+
+
     /**
      * Return options as a bit vector.
      */
@@ -486,6 +503,13 @@ private:
     // This object will be empty when no readPreference is specified or if the request does not
     // originate from mongos.
     BSONObj _unwrappedReadPref;
+
+    // If true, each cursor response will include a 'postBatchResumeToken' field containing the
+    // RecordID of the last observed document.
+    bool _requestResumeToken = false;
+    // If non-empty, instructs the query to resume from the RecordId given by the object's $recordId
+    // field.
+    BSONObj _resumeAfter;
 
     bool _wantMore = true;
 

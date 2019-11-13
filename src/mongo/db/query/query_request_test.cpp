@@ -263,6 +263,99 @@ TEST(QueryRequestTest, ForbidMetaSortOnFieldWithoutMetaProject) {
     ASSERT_NOT_OK(qrNonMatching.validate());
 }
 
+TEST(QueryRequestTest, RequestResumeTokenWithHint) {
+    QueryRequest qr(testns);
+    qr.setRequestResumeToken(true);
+    ASSERT_NOT_OK(qr.validate());
+    qr.setHint(fromjson("{a: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, RequestResumeTokenWithSort) {
+    QueryRequest qr(testns);
+    qr.setRequestResumeToken(true);
+    // Hint must be explicitly set for the query request to validate.
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr.validate());
+    qr.setSort(fromjson("{a: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+    qr.setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
+    QueryRequest qr(testns);
+    BSONObj resumeAfter = BSON("$recordId" << 1);
+    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setRequestResumeToken(true);
+    // Hint must be explicitly set for the query request to validate.
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+    resumeAfter = BSON("$recordId" << 1LL);
+    qr.setResumeAfterResumeToken(resumeAfter);
+    ASSERT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
+    QueryRequest qr(testns);
+    BSONObj resumeAfter = BSON("$recordId" << 1LL << "$extra" << 1);
+    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setRequestResumeToken(true);
+    // Hint must be explicitly set for the query request to validate.
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, ResumeAfterWithHint) {
+    QueryRequest qr(testns);
+    BSONObj resumeAfter = BSON("$recordId" << 1LL);
+    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setRequestResumeToken(true);
+    ASSERT_NOT_OK(qr.validate());
+    qr.setHint(fromjson("{a: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, ResumeAfterWithSort) {
+    QueryRequest qr(testns);
+    BSONObj resumeAfter = BSON("$recordId" << 1LL);
+    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setRequestResumeToken(true);
+    // Hint must be explicitly set for the query request to validate.
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr.validate());
+    qr.setSort(fromjson("{a: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+    qr.setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
+    QueryRequest qr(testns);
+    BSONObj resumeAfter = BSON("$recordId" << 1LL);
+    qr.setResumeAfterResumeToken(resumeAfter);
+    // Hint must be explicitly set for the query request to validate.
+    qr.setHint(fromjson("{$natural: 1}"));
+    ASSERT_NOT_OK(qr.validate());
+    qr.setRequestResumeToken(true);
+    ASSERT_OK(qr.validate());
+}
+
+TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
+    QueryRequest qr(NamespaceString::kRsOplogNamespace);
+    BSONObj resumeAfter = fromjson("{}");
+    // Hint must be explicitly set for the query request to validate.
+    qr.setHint(fromjson("{$natural: 1}"));
+    qr.setResumeAfterResumeToken(resumeAfter);
+    ASSERT_OK(qr.validate());
+    qr.setRequestResumeToken(true);
+    ASSERT_OK(qr.validate());
+}
+
 //
 // Text meta BSON element validation
 //
@@ -895,6 +988,46 @@ TEST(QueryRequestTest, ParseFromCommandDefaultBatchSize) {
     ASSERT(!qr->getLimit());
 }
 
+TEST(QueryRequestTest, ParseFromCommandRequestResumeToken) {
+    BSONObj cmdObj = BSON("find"
+                          << "testns"
+                          << "hint" << BSON("$natural" << 1) << "sort" << BSON("$natural" << 1)
+                          << "$_requestResumeToken" << true);
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT(qr->getRequestResumeToken());
+}
+
+TEST(QueryRequestTest, ParseFromCommandResumeToken) {
+    BSONObj cmdObj =
+        BSON("find"
+             << "testns"
+             << "hint" << BSON("$natural" << 1) << "sort" << BSON("$natural" << 1)
+             << "$_requestResumeToken" << true << "$_resumeAfter" << BSON("$recordId" << 1LL));
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT(!qr->getResumeAfterResumeToken().isEmpty());
+    ASSERT(qr->getRequestResumeToken());
+}
+
+TEST(QueryRequestTest, ParseFromCommandEmptyResumeToken) {
+    BSONObj resumeAfter = fromjson("{}");
+    BSONObj cmdObj = BSON("find"
+                          << "testns"
+                          << "hint" << BSON("$natural" << 1) << "sort" << BSON("$natural" << 1)
+                          << "$_requestResumeToken" << true << "$_resumeAfter" << resumeAfter);
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT(qr->getRequestResumeToken());
+    ASSERT(qr->getResumeAfterResumeToken().isEmpty());
+}
+
 //
 // Test asFindCommand ns and uuid variants.
 //
@@ -953,6 +1086,32 @@ TEST(QueryRequestTest, AsFindCommandWithUuidNoAvailableNamespace) {
     QueryRequest qr(NamespaceStringOrUUID(
         "test", UUID::parse("01234567-89ab-cdef-edcb-a98765432101").getValue()));
     ASSERT_BSONOBJ_EQ(cmdObj, qr.asFindCommandWithUuid());
+}
+
+TEST(QueryRequestTest, AsFindCommandWithResumeToken) {
+    BSONObj cmdObj =
+        BSON("find"
+             << "testns"
+             << "sort" << BSON("$natural" << 1) << "hint" << BSON("$natural" << 1)
+             << "$_requestResumeToken" << true << "$_resumeAfter" << BSON("$recordId" << 1LL));
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT_BSONOBJ_EQ(cmdObj, qr->asFindCommand());
+}
+
+TEST(QueryRequestTest, AsFindCommandWithEmptyResumeToken) {
+    BSONObj resumeAfter = fromjson("{}");
+    BSONObj cmdObj = BSON("find"
+                          << "testns"
+                          << "hint" << BSON("$natural" << 1) << "sort" << BSON("$natural" << 1)
+                          << "$_requestResumeToken" << true << "$_resumeAfter" << resumeAfter);
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT(qr->asFindCommand().getField("$_resumeAfter").eoo());
 }
 
 //
@@ -1274,6 +1433,19 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
 TEST(QueryRequestTest, ConvertToAggregationWithNToReturnFails) {
     QueryRequest qr(testns);
     qr.setNToReturn(7);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
+    QueryRequest qr(testns);
+    qr.setRequestResumeToken(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
+    QueryRequest qr(testns);
+    BSONObj resumeAfter = BSON("$recordId" << 1LL);
+    qr.setResumeAfterResumeToken(resumeAfter);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
