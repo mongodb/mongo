@@ -95,4 +95,10 @@ Status waitForShardRegistryReload(OperationContext* opCtx);
 
 Status preCacheMongosRoutingInfo(OperationContext* opCtx);
 
+/**
+ * Warms up connections to shards with best effort strategy.
+ */
+
+Status preWarmConnectionPool(OperationContext* opCtx);
+
 }  // namespace mongo

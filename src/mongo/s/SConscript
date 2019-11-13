@@ -105,11 +105,13 @@ env.Library(
     source=[
         'sharding_initialization.cpp',
         'sharding_task_executor_pool_controller.cpp',
+        'pre_warm_connection_pool_impl.cpp',
         env.Idlc('sharding_task_executor_pool.idl')[0],
         'client/sharding_connection_hook.cpp',
         'client/sharding_network_connection_hook.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',

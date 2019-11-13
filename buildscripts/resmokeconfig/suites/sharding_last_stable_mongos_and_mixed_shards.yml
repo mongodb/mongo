@@ -64,6 +64,7 @@ selector:
   - jstests/sharding/update_replace_id.js
   - jstests/sharding/update_sharded.js
   - jstests/sharding/upsert_sharded.js
+  - jstests/sharding/warm_up_connection_pool.js
     # Enable if SERVER-42273 is backported or 4.4 becomes last-stable
   - jstests/sharding/move_jumbo_chunk.js
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
@@ -71,6 +72,9 @@ selector:
   - jstests/sharding/enable_sharding_with_primary.js
   # Enable after SERVER-43941 is backported or 4.4 becomes last-stable
   - jstests/sharding/transactions_error_labels.js
+  # Enable if SERVER-41813 is backported or 4.4 becomes last-stable
+  - jstests/sharding/invalid_system_views_sharded_collection.js
+
 executor:
   config:
     shell_options:
