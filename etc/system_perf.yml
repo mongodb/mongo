@@ -196,6 +196,57 @@ functions:
           done
         fi
 
+  "write yml config": &write_yml_config
+    command: shell.exec
+    params:
+      working_dir: work
+      script: |
+        cat > bootstrap.yml <<EOF
+        auto_genny_workload: ${auto_workload_path}
+        infrastructure_provisioning: ${cluster}
+        platform: ${platform}
+        mongodb_setup: ${setup}
+        storageEngine: ${storageEngine}
+        test_control: ${test}
+        test_name: ${test}
+        production: true
+        authentication: ${authentication}
+        overrides:
+          workload_setup:
+            local_repos:
+              workloads: ../src/workloads/workloads
+              ycsb: ../src/YCSB/YCSB
+              linkbench: ../src/linkbench/linkbench
+              tpcc: ../src/tpcc/tpcc
+              genny: ../src/genny/genny
+          mongodb_setup:
+            mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
+        EOF
+
+        cat > runtime.yml <<EOF
+        # evergreen default expansions
+        branch_name: ${branch_name}
+        build_id: ${build_id}
+        build_variant: ${build_variant}
+        execution: ${execution}
+        is_patch: ${is_patch|false}
+        order: ${revision_order_id}
+        project: ${project}
+        project_dir: ${project_dir}
+        revision: ${revision}
+        task_id: ${task_id}
+        task_name: ${task_name}
+        version_id: ${version_id}
+        workdir: ${workdir}
+
+        # sys-perf expansions
+        dsi_rev: ${dsi_rev}
+        enterprise_rev: ${enterprise_rev}
+        ext: ${ext}
+        script_flags : ${script_flags}
+        workloads_rev: ${workloads_rev}
+        EOF
+
   "prepare environment":
     - command: shell.exec
       params:
@@ -207,54 +258,7 @@ functions:
     # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
     # the repositories defined in the build variant's "modules" section.
     - *git_get_project
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          cat > bootstrap.yml <<EOF
-          infrastructure_provisioning: ${cluster}
-          platform: ${platform}
-          mongodb_setup: ${setup}
-          storageEngine: ${storageEngine}
-          test_control: ${test}
-          production: true
-          authentication: ${authentication}
-          overrides:
-            workload_setup:
-              local_repos:
-                workloads: ../src/workloads/workloads
-                ycsb: ../src/YCSB/YCSB
-                linkbench: ../src/linkbench/linkbench
-                tpcc: ../src/tpcc/tpcc
-                genny: ../src/genny/genny
-            mongodb_setup:
-              mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
-          EOF
-
-          cat > runtime.yml <<EOF
-          # evergreen default expansions
-          branch_name: ${branch_name}
-          build_id: ${build_id}
-          build_variant: ${build_variant}
-          execution: ${execution}
-          is_patch: ${is_patch|false}
-          order: ${revision_order_id}
-          project: ${project}
-          project_dir: ${project_dir}
-          revision: ${revision}
-          task_id: ${task_id}
-          task_name: ${task_name}
-          version_id: ${version_id}
-          workdir: ${workdir}
-
-          # sys-perf expansions
-          dsi_rev: ${dsi_rev}
-          enterprise_rev: ${enterprise_rev}
-          ext: ${ext}
-          script_flags : ${script_flags}
-          workloads_rev: ${workloads_rev}
-          EOF
-
+    - *write_yml_config
     - command: shell.exec
       params:
         silent: true
@@ -418,66 +422,6 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: insert_big_docs
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "insert_big_docs"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
-- name: insert_remove
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "insert_remove"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
-- name: background_validate_cmd
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "background_validate_cmd"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
-- name: validate_cmd
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "validate_cmd"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
-- name: service_architecture_workloads
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "service_architecture_workloads"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
-- name: big_update
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "big_update"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
 - name: industry_benchmarks
   priority: 5
   commands:
@@ -614,16 +558,6 @@ tasks:
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
-
-- name: genny_overhead
-  priority: 5
-  commands:
-  - func: "prepare environment"
-    vars:
-      test: "genny_overhead"
-  - func: "deploy cluster"
-  - func: "run test"
-  - func: "analyze"
 
 - name: retryable_writes_workloads
   priority: 5
@@ -859,45 +793,59 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: create_big_index
+- name: genny_generate_all_tasks
   priority: 5
   commands:
-    - func: "prepare environment"
-      vars:
-        test: "create_big_index"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
+    - func: "git get project"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          genny/genny/scripts/genny_auto_tasks.sh --generate-all-tasks --output build/all_tasks.json
+    - command: generate.tasks
+      params:
+        files:
+          - src/genny/genny/build/all_tasks.json
 
-- name: create_index
+- name: genny_auto_tasks
   priority: 5
   commands:
-    - func: "prepare environment"
-      vars:
-        test: "create_index"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
+    - func: "git get project"
+    - command: shell.exec
+      params:
+        script: |
+          mkdir work
+    - *write_yml_config
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          ../src/genny/genny/scripts/genny_auto_tasks.sh --output build/auto_tasks.json --variants "${build_variant}" --autorun
+          cat ../src/genny/genny/build/auto_tasks.json
+    - command: generate.tasks
+      params:
+        files:
+          - src/genny/genny/build/auto_tasks.json
 
-- name: out_of_cache_scanner
+- name: genny_patch_tasks
+  patch_only: true
   priority: 5
   commands:
-    - func: "prepare environment"
-      vars:
-        test: "out_of_cache_scanner"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
+    - func: "git get project"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          # add --forced-workloads to run specific workloads in addition, i.e. adding the following to the end of the command below:
+          # --forced-workloads scale/BigUpdate.yml execution/CreateIndex.yml
+          # will run all locally added/modified workloads, plus big_update and create_index
 
-- name: parallel_insert
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "parallel_insert"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
+          genny/genny/scripts/genny_auto_tasks.sh --output build/patch_tasks.json --variants "${build_variant}" --modified
+          cat genny/genny/build/patch_tasks.json
+    - command: generate.tasks
+      params:
+        files:
+          - src/genny/genny/build/patch_tasks.json
 
 #######################################
 #               Modules               #
@@ -947,6 +895,7 @@ buildvariants:
   display_name: Compile
   modules:
     - enterprise
+    - genny
   batchtime: 1440 # 24 hours
   expansions: &compile-expansions
     platform: linux
@@ -964,6 +913,7 @@ buildvariants:
       - "amazon2-build"
   tasks:
     - name: compile
+    - name: genny_generate_all_tasks
 
 - <<: *compile-amazon2
   name: wtdevelop-compile-amazon2
@@ -1017,6 +967,8 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: &1nodetasks
     - name: industry_benchmarks
     - name: ycsb_60GB
@@ -1038,12 +990,8 @@ buildvariants:
     - name: linkbench
     - name: tpcc
     - name: jasper_smoke
-    - name: insert_big_docs
-    - name: insert_remove
-    - name: big_update
-    - name: create_big_index
-    - name: create_index
-    - name: parallel_insert
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -1061,15 +1009,15 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: &standalonetasks
     - name: industry_benchmarks
     - name: ycsb_60GB
     - name: crud_workloads
     - name: jasper_smoke
     - name: genny_canaries
-    - name: genny_overhead
     - name: cursor_manager
-    - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -1080,9 +1028,8 @@ buildvariants:
     - name: bestbuy_agg_merge_same_db
     - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
-    - name: big_update
-    - name: validate_cmd
-    - name: background_validate_cmd
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-standalone-audit
   display_name: Linux Standalone Audit
@@ -1100,10 +1047,14 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
     - name: smoke_test
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-1-node-replSet-fle
   display_name: Linux 1-Node ReplSet FLE
@@ -1122,9 +1073,13 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: &standalonetasks
     - name: industry_benchmarks
     - name: linkbench
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-1-node-replSet-ese-cbc
   display_name: Linux 1-Node ReplSet ESE CBC
@@ -1142,9 +1097,13 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: smoke_test
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-1-node-replSet-ese-gcm
   display_name: Linux 1-Node ReplSet ESE GCM
@@ -1162,9 +1121,13 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: smoke_test
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-1-node-15gbwtcache
   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
@@ -1182,10 +1145,13 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: smoke_test
-    - name: out_of_cache_scanner
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -1203,11 +1169,12 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
     - name: jasper_smoke
-    - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -1218,6 +1185,8 @@ buildvariants:
     - name: change_streams_throughput
     - name: change_streams_latency
     - name: change_streams_multi_mongos
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-shard-lite
   display_name: Linux Shard Lite Cluster
@@ -1234,6 +1203,8 @@ buildvariants:
       - "rhel70-perf-shard-lite"
   depends_on:
       - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
         variant: compile-amazon2
   tasks: &shardlitetasks
     - name: bestbuy_agg
@@ -1254,6 +1225,8 @@ buildvariants:
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
     - name: smoke_test
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 
 - name: linux-3-node-replSet
@@ -1272,6 +1245,8 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: &3nodetasks
     - name: industry_benchmarks
     - name: ycsb_60GB
@@ -1279,9 +1254,6 @@ buildvariants:
     - name: crud_workloads
     - name: crud_workloads_majority
     - name: jasper_smoke
-    - name: insert_big_docs
-    - name: insert_remove
-    - name: service_architecture_workloads
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -1302,8 +1274,8 @@ buildvariants:
     - name: secondary_reads
     - name: tpcc
     - name: linkbench
-    - name: big_update
-    - name: parallel_insert
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
@@ -1321,12 +1293,13 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
     - name: crud_workloads_majority
-    - name: service_architecture_workloads
     - name: mixed_workloads
     - name: smoke_test
     - name: industry_benchmarks_wmajority
@@ -1334,8 +1307,8 @@ buildvariants:
     - name: change_streams_latency
     - name: tpcc
     - name: linkbench
-    - name: big_update
-    - name: parallel_insert
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-3-node-replSet-ssl
   display_name: Linux 3-Node ReplSet (SSL)
@@ -1353,9 +1326,13 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: mixed_workloads
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
@@ -1372,12 +1349,16 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   run_on:
       - "rhel70-perf-replset"
   tasks:
     - name: initialsync
     - name: initialsync-logkeeper-short
     - name: initialsync-large
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-replSet-initialsync-logkeeper
   display_name: Linux ReplSet Initial Sync LogKeeper
@@ -1396,8 +1377,12 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:
     - name: initialsync-logkeeper
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 #######################################
 #  Atlas Like Buildvariants           #
@@ -1419,6 +1404,8 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-rhel70
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
     - name: industry_benchmarks
     - name: ycsb_60GB
@@ -1426,8 +1413,6 @@ buildvariants:
     - name: crud_workloads
     - name: crud_workloads_majority
     - name: jasper_smoke
-    # - name: insert_remove
-    # - name: service_architecture_workloads
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -1446,8 +1431,8 @@ buildvariants:
     - name: secondary_reads
     # - name: tpcc # TPCC with SSL currently broken https://jira.mongodb.org/browse/TIG-1681
     - name: linkbench
-    # - name: big_update
-    - name: parallel_insert
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 
 #######################################
@@ -1470,6 +1455,8 @@ buildvariants:
   depends_on:
       - name: compile
         variant: wtdevelop-compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: *1nodetasks
 
 - name: wtdevelop-standalone
@@ -1489,6 +1476,8 @@ buildvariants:
   depends_on:
       - name: compile
         variant: wtdevelop-compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: *standalonetasks
 
 - name: wtdevelop-3-node-replSet
@@ -1508,6 +1497,8 @@ buildvariants:
   depends_on:
       - name: compile
         variant: wtdevelop-compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
   tasks: *3nodetasks
 
 # Disabled: SERVER-35586
