@@ -15,10 +15,18 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [1, 2, 3], z: [11, 12, 13]}));
 assert.eq(coll.find({z: 13}, {a: {$slice: 2}}).toArray(), [{_id: 0, a: [1, 2], z: [11, 12, 13]}]);
 assert.eq(coll.find({z: 13}, {a: {$slice: 2}, "z.$": 1}).toArray(), [{_id: 0, a: [1, 2], z: [13]}]);
+coll.drop();
+
+coll.insert({_id: 0, importing: [{foo: "a"}, {foo: "b"}], "jobs": [{num: 1}, {num: 2}, {num: 3}]});
+assert.eq(coll.find({"importing.foo": "b"}, {jobs: {'$slice': 2}, 'importing.$': 1}).toArray(),
+          [{_id: 0, importing: [{foo: "b"}], jobs: [{num: 1}, {num: 2}]}]);
+assert.eq(coll.find({"importing.foo": "b"}, {jobs: {'$slice': -1}, 'importing.$': 1}).toArray(),
+          [{_id: 0, importing: [{foo: "b"}], jobs: [{num: 3}]}]);
 
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, a: [{b: 1, c: 2}, {b: 3, c: 4}], z: [11, 12, 13]}));
 assert.eq(coll.find({z: 12}, {"a.b": 1}).toArray(), [{_id: 1, a: [{"b": 1}, {"b": 3}]}]);
+
 // The positional projection on 'z' which limits it to one element shouldn't be applied to 'a' as
 // well.
 assert.eq(coll.find({z: 12}, {"a.b": 1, "z.$": 1}).toArray(),
