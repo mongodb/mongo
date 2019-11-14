@@ -85,7 +85,6 @@ selector:
   - jstests/sharding/key_many.js
   - jstests/sharding/geo_near_random2.js
   - jstests/sharding/parallel.js
-  - jstests/sharding/autosplit_with_balancer.js
   - jstests/sharding/migrateBig_balancer.js
   - jstests/sharding/lagged_config_secondary.js
   - jstests/sharding/auto_rebalance_parallel.js
