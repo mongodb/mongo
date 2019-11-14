@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -38,6 +39,11 @@ namespace repl {
  * Log execution traces so we can compare MongoDB's implementation to our TLA+ specs.
  */
 extern FailPoint logForTLAPlusSpecs;
+
+/**
+ * Trace an event for the RaftMongo spec.
+ */
+void tlaPlusRaftMongoEvent(OperationContext* opCtx, RaftMongoSpecActionEnum action);
 
 }  // namespace repl
 }  // namespace mongo

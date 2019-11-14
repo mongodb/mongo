@@ -558,10 +558,14 @@ env.Library(
     target='tla_plus_trace_repl',
     source=[
         'tla_plus_trace_repl.cpp',
+        env.Idlc('tla_plus_trace_repl.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/fail_point',
+        'repl_coordinator_interface',
     ],
 )
 
