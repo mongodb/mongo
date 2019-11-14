@@ -47,23 +47,19 @@ var collSlaveOk = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
 collSlaveOk.setSlaveOk();
 assert.eq(2100, collSlaveOk.find().itcount());
 
-for (i = 0; i < 20; i++) {
-    // Needs to waitForDelete because we'll be performing a slaveOk query, and secondaries don't
-    // have a chunk manager so it doesn't know how to filter out docs it doesn't own.
-    assert.commandWorked(s.s0.adminCommand({
-        moveChunk: 'TestDB.TestColl',
-        find: {_id: i * 100},
-        to: s.shard1.shardName,
-        _secondaryThrottle: true,
-        writeConcern: {w: 2},
-        _waitForDelete: true
-    }));
+assert.commandWorked(s.s0.adminCommand({
+    moveChunk: 'TestDB.TestColl',
+    find: {_id: 0},
+    to: s.shard1.shardName,
+    _secondaryThrottle: true,
+    writeConcern: {w: 2},
+    _waitForDelete: true
+}));
 
-    assert.eq(2100,
-              collSlaveOk.find().itcount(),
-              'Incorrect count when reading from secondary. Count from primary is ' +
-                  collPrimary.find().itcount());
-}
+assert.eq(2100,
+          collSlaveOk.find().itcount(),
+          'Incorrect count when reading from secondary. Count from primary is ' +
+              collPrimary.find().itcount());
 
 s.stop();
 }());
