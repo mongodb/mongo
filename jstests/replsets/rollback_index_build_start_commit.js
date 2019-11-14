@@ -1,11 +1,5 @@
 /**
  * Tests different permutations of rolling-back index build start and commit oplog entries.
- *
- * TODO: SERVER-39451 Add recover to a stable timestamp logic for startIndexBuild, abortIndexBuild,
- * and commitIndexBuild.
- * @tags: [
- *   two_phase_index_builds_unsupported
- * ]
  */
 (function() {
 "use strict";
