@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/server_options.h"
@@ -317,8 +318,8 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
  * Third, a DurableCatalog may have an index ident that the KVEngine does not. This method will
  * rebuild the index.
  */
-StatusWith<std::vector<StorageEngine::IndexIdentifier>>
-StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
+StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAndIdents(
+    OperationContext* opCtx) {
     // Gather all tables known to the storage engine and drop those that aren't cross-referenced
     // in the _mdb_catalog. This can happen for two reasons.
     //
@@ -405,7 +406,7 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
     //
     // Also, remove unfinished builds except those that were background index builds started on a
     // secondary.
-    std::vector<StorageEngine::IndexIdentifier> ret;
+    StorageEngine::ReconcileResult ret;
     for (DurableCatalog::Entry entry : catalogEntries) {
         BSONCollectionCatalogEntry::MetaData metaData =
             _catalog->getMetaData(opCtx, entry.catalogId);
@@ -440,7 +441,32 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
             if (indexMetaData.ready && !foundIdent) {
                 log() << "Expected index data is missing, rebuilding. Collection: " << coll
                       << " Index: " << indexName;
-                ret.push_back({entry.catalogId, coll, indexName});
+                ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
+                continue;
+            }
+
+            // Any index build with a UUID is an unfinished two-phase build and must be restarted.
+            // There are no special cases to handle on primaries or secondaries. An index build may
+            // be associated with multiple indexes.
+            if (indexMetaData.buildUUID) {
+                invariant(!indexMetaData.ready);
+                invariant(indexMetaData.runTwoPhaseBuild);
+
+                auto collUUID = metaData.options.uuid;
+                invariant(collUUID);
+                auto buildUUID = *indexMetaData.buildUUID;
+
+                log() << "Found index from unfinished build. Collection: " << coll << "("
+                      << *collUUID << "), index: " << indexName << ", build UUID: " << buildUUID;
+
+                // Insert in the map if a build has not already been registered.
+                auto existingIt = ret.indexBuildsToRestart.find(buildUUID);
+                if (existingIt == ret.indexBuildsToRestart.end()) {
+                    ret.indexBuildsToRestart.insert({buildUUID, IndexBuildToRestart(*collUUID)});
+                    existingIt = ret.indexBuildsToRestart.find(buildUUID);
+                }
+
+                existingIt->second.indexSpecs.emplace_back(indexMetaData.spec);
                 continue;
             }
 
@@ -486,7 +512,7 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
                 log() << "Expected background index build did not complete, rebuilding. "
                          "Collection: "
                       << coll << " Index: " << indexName;
-                ret.push_back({entry.catalogId, coll, indexName});
+                ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
 

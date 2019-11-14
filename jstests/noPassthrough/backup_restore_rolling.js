@@ -11,9 +11,12 @@
  *
  * Some methods for backup used in this test checkpoint the files in the dbpath. This technique will
  * not work for ephemeral storage engines, as they do not store any data in the dbpath.
+ * TODO: (SERVER-44467) Remove two_phase_index_builds_unsupported tag when startup recovery works
+ * for two-phase index builds.
  * @tags: [
  *     requires_persistence,
  *     requires_wiredtiger,
+ *     two_phase_index_builds_unsupported,
  * ]
  */
 

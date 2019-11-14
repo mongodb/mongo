@@ -88,7 +88,7 @@ public:
         return _storageEngine->getEngine()->dropIdent(opCtx, ident);
     }
 
-    StatusWith<std::vector<StorageEngine::IndexIdentifier>> reconcile(OperationContext* opCtx) {
+    StatusWith<StorageEngine::ReconcileResult> reconcile(OperationContext* opCtx) {
         return _storageEngine->reconcileCatalogAndIdents(opCtx);
     }
 
@@ -116,7 +116,8 @@ public:
                        NamespaceString collNs,
                        std::string key,
                        bool isBackgroundSecondaryBuild) {
-        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild);
+        auto buildUUID = UUID::gen();
+        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild, buildUUID);
         if (!ret.isOK()) {
             return ret;
         }
@@ -128,7 +129,8 @@ public:
     Status startIndexBuild(OperationContext* opCtx,
                            NamespaceString collNs,
                            std::string key,
-                           bool isBackgroundSecondaryBuild) {
+                           bool isBackgroundSecondaryBuild,
+                           boost::optional<UUID> buildUUID) {
         BSONObjBuilder builder;
         {
             BSONObjBuilder keyObj;
@@ -143,24 +145,9 @@ public:
         auto ret = DurableCatalog::get(opCtx)->prepareForIndexBuild(opCtx,
                                                                     collection->getCatalogId(),
                                                                     descriptor.get(),
-                                                                    UUID::gen(),
+                                                                    buildUUID,
                                                                     isBackgroundSecondaryBuild);
         return ret;
-    }
-
-    void indexBuildScan(OperationContext* opCtx,
-                        NamespaceString collNs,
-                        std::string key,
-                        std::string sideWritesIdent,
-                        std::string constraintViolationsIdent) {
-        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNs);
-        DurableCatalog::get(opCtx)->setIndexBuildScanning(
-            opCtx, collection->getCatalogId(), key, sideWritesIdent, constraintViolationsIdent);
-    }
-
-    void indexBuildDrain(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNs);
-        DurableCatalog::get(opCtx)->setIndexBuildDraining(opCtx, collection->getCatalogId(), key);
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {

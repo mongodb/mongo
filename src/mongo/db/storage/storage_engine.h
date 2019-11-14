@@ -497,11 +497,37 @@ public:
     };
 
     /**
-     * Drop abandoned idents. In the successful case, returns a list of collection, index name
-     * pairs to rebuild.
+     * Describes an index build on a collection that should be restarted.
      */
-    virtual StatusWith<std::vector<IndexIdentifier>> reconcileCatalogAndIdents(
-        OperationContext* opCtx) = 0;
+    struct IndexBuildToRestart {
+        IndexBuildToRestart(UUID collUUID) : collUUID(collUUID) {}
+
+        // Collection UUID.
+        const UUID collUUID;
+
+        // Index specs for the build.
+        std::vector<BSONObj> indexSpecs;
+    };
+
+    /*
+     * ReconcileResult is the result of reconciling abandoned storage engine idents and unfinished
+     * index builds.
+     */
+    struct ReconcileResult {
+        // A list of IndexIdentifiers that must be rebuilt to completion.
+        std::vector<IndexIdentifier> indexesToRebuild;
+
+        // A map of unfinished two-phase indexes that must be restarted in the background, but
+        // not to completion; they will wait for replicated commit or abort operations. This is a
+        // mapping from index build UUID to index build.
+        std::map<UUID, IndexBuildToRestart> indexBuildsToRestart;
+    };
+
+    /**
+     * Drop abandoned idents. If successful, returns a ReconcileResult with indexes that need to be
+     * rebuilt or builds that need to be restarted.
+     * */
+    virtual StatusWith<ReconcileResult> reconcileCatalogAndIdents(OperationContext* opCtx) = 0;
 
     /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the

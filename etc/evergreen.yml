@@ -11226,6 +11226,7 @@ buildvariants:
   - name: replica_sets
     distros:
     - rhel62-large
+  - name: rollback_fuzzer_gen
   - name: sharding_gen
 
 - name: enterprise-rhel-62-64-bit-coverage

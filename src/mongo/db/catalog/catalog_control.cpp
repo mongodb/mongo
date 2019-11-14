@@ -110,13 +110,12 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     storageEngine->loadCatalog(opCtx);
 
     log() << "openCatalog: reconciling catalog and idents";
-    auto indexesToRebuild = storageEngine->reconcileCatalogAndIdents(opCtx);
-    fassert(40688, indexesToRebuild.getStatus());
+    auto reconcileResult = fassert(40688, storageEngine->reconcileCatalogAndIdents(opCtx));
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;
-    for (StorageEngine::IndexIdentifier indexIdentifier : indexesToRebuild.getValue()) {
+    for (StorageEngine::IndexIdentifier indexIdentifier : reconcileResult.indexesToRebuild) {
         auto indexName = indexIdentifier.indexName;
         auto indexSpecs =
             getIndexNameObjs(opCtx,
@@ -158,6 +157,13 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
     }
 
+    // Once all unfinished index builds have been dropped and the catalog has been reloaded, restart
+    // any unfinished index builds. This will not restart any index builds to completion, but rather
+    // start the background thread, build the index, and wait for a replicated commit or abort oplog
+    // entry.
+    IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
+        opCtx, reconcileResult.indexBuildsToRestart);
+
     // Open all databases and repopulate the CollectionCatalog.
     log() << "openCatalog: reopening all databases";
     auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -187,6 +193,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
             }
         }
     }
+
     // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
     // catalog. Clear the pre-closing state.
     CollectionCatalog::get(opCtx).onOpenCatalog(opCtx);

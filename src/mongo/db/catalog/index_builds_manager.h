@@ -69,7 +69,6 @@ public:
         SetupOptions();
         IndexConstraints indexConstraints = IndexConstraints::kEnforce;
         IndexBuildProtocol protocol = IndexBuildProtocol::kSinglePhase;
-        bool forRecovery = false;
     };
 
     IndexBuildsManager() = default;

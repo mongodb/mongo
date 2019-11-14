@@ -117,8 +117,8 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     // Rebuild the indexes provided by 'indexSpecs'.
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     UUID buildUUID = UUID::gen();
-    auto swRebuild = indexBuildsCoord->startIndexRebuildForRecovery(
-        opCtx, collection->ns(), indexSpecs, buildUUID);
+    auto swRebuild =
+        indexBuildsCoord->rebuildIndexesForRecovery(opCtx, collection->ns(), indexSpecs, buildUUID);
     if (!swRebuild.isOK()) {
         return swRebuild.getStatus();
     }

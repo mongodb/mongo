@@ -264,10 +264,11 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 }
 
 void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
-    std::vector<StorageEngine::IndexIdentifier> indexesToRebuild =
-        fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
+    auto reconcileResult = fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
+    // TODO (SERVER-44467): Restart two-phase index builds during startup
+    invariant(reconcileResult.indexBuildsToRestart.empty());
 
-    if (!indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
+    if (!reconcileResult.indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
         log() << "note: restart the server with --noIndexBuildRetry "
               << "to skip index rebuilds";
     }
@@ -280,7 +281,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;
-    for (auto&& idxIdentifier : indexesToRebuild) {
+    for (auto&& idxIdentifier : reconcileResult.indexesToRebuild) {
         NamespaceString collNss = idxIdentifier.nss;
         const std::string& indexName = idxIdentifier.indexName;
         auto swIndexSpecs =

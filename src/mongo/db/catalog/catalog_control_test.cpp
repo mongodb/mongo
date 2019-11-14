@@ -148,9 +148,9 @@ public:
     }
     void setCachePressureForTest(int pressure) final {}
     void triggerJournalFlush() const final {}
-    StatusWith<std::vector<IndexIdentifier>> reconcileCatalogAndIdents(
+    StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx) final {
-        return std::vector<IndexIdentifier>();
+        return ReconcileResult{};
     }
     Timestamp getAllDurableTimestamp() const final {
         return {};

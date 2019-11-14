@@ -109,13 +109,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         return ex.toStatus();
     }
 
-    if (options.forRecovery) {
-        log() << "Index build initialized: " << buildUUID << ": " << nss
-              << ": indexes: " << indexes.size();
-    } else {
-        log() << "Index build initialized: " << buildUUID << ": " << nss << " ("
-              << collection->uuid() << " ): indexes: " << indexes.size();
-    }
+    log() << "Index build initialized: " << buildUUID << ": " << nss << " (" << collection->uuid()
+          << " ): indexes: " << indexes.size();
 
     return Status::OK();
 }

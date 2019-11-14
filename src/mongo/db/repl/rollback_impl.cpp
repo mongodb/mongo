@@ -424,6 +424,9 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
             case OplogEntry::CommandType::kDrop:
             case OplogEntry::CommandType::kCreateIndexes:
             case OplogEntry::CommandType::kDropIndexes:
+            case OplogEntry::CommandType::kStartIndexBuild:
+            case OplogEntry::CommandType::kAbortIndexBuild:
+            case OplogEntry::CommandType::kCommitIndexBuild:
             case OplogEntry::CommandType::kCollMod: {
                 // For all other command types, we should be able to parse the collection name from
                 // the first command argument.
@@ -435,12 +438,6 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                 }
                 break;
             }
-            // TODO(SERVER-39451): Ignore no-op startIndexBuild, abortIndexBuild, and
-            // commitIndexBuild commands.
-            // Revisit when we are ready to implement rollback logic.
-            case OplogEntry::CommandType::kStartIndexBuild:
-            case OplogEntry::CommandType::kAbortIndexBuild:
-            case OplogEntry::CommandType::kCommitIndexBuild:
             case OplogEntry::CommandType::kCommitTransaction:
             case OplogEntry::CommandType::kAbortTransaction: {
                 break;

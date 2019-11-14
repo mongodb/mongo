@@ -344,11 +344,7 @@ public:
         return _engine->isInIndividuallyCheckpointedIndexesList(ident);
     }
 
-    /**
-     * Drop abandoned idents. Returns a list of indexes to rebuild.
-     */
-    StatusWith<std::vector<StorageEngine::IndexIdentifier>> reconcileCatalogAndIdents(
-        OperationContext* opCtx) override;
+    StatusWith<ReconcileResult> reconcileCatalogAndIdents(OperationContext* opCtx) override;
 
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
 

@@ -2,9 +2,18 @@
  * Starts a replica set with arbiter, builds an index in background.
  * Kills the secondary once the index build starts with a failpoint.
  * The index build should resume when the secondary is restarted.
+ *
+ * TODO: (SERVER-44467) Remove two_phase_index_builds_unsupported tag when startup recovery works
+ * for two-phase index builds.
+ *
+ * @tags: [
+ *   requires_persistence,
+ *   requires_journaling,
+ *   requires_replication,
+ *   two_phase_index_builds_unsupported,
+ * ]
  */
 
-// @tags: [requires_persistence, requires_journaling, requires_replication]
 (function() {
 'use strict';
 

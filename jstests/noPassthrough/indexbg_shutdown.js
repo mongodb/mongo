@@ -3,7 +3,13 @@
  * shuts down a secondary while it's building that index, and confirms that the secondary
  * shuts down cleanly, without an fassert.
  * Also confirms that killOp has no effect on the background index build on the secondary.
- * @tags: [requires_replication]
+ *
+ * TODO(SERVER-44467): Remove two_phase_index_builds_unsupported tag when startup recovery works
+ * for two-phase index builds.
+ * @tags: [
+ *   requires_replication,
+ *   two_phase_index_builds_unsupported,
+ * ]
  */
 
 (function() {

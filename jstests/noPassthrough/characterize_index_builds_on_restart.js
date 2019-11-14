@@ -2,10 +2,13 @@
  * Characterizes the actions (rebuilds or drops the index) taken upon unfinished indexes when
  * restarting mongod from (standalone -> standalone) and (replica set member -> standalone).
  *
+ * TODO(SERVER-44468): Remove two_phase_index_builds_unsupported tag when standalone startup works
+ * with two-phase builds
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
+ *   two_phase_index_builds_unsupported,
  * ]
  */
 (function() {

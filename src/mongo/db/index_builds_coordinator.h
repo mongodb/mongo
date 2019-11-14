@@ -75,6 +75,7 @@ public:
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
         bool replSetAndNotPrimaryAtStart = false;
+        bool twoPhaseRecovery = false;
     };
 
     /**
@@ -125,14 +126,22 @@ public:
         IndexBuildOptions indexBuildOptions) = 0;
 
     /**
-     * Sets up the in-memory and persisted state of the index build.
-     *
-     * This function should only be called when in recovery mode, because we create new Collection
-     * objects and replace old ones after dropping existing indexes.
+     * Given a vector of two-phase index builds, start, but do not complete each one in a background
+     * thread. Each index build will wait for a replicate commit or abort, as in steady-state
+     * replication.
+     */
+    void restartIndexBuildsForRecovery(
+        OperationContext* opCtx,
+        const std::map<UUID, StorageEngine::IndexBuildToRestart>& buildsToRestart);
+
+    /**
+     * Runs the full index rebuild for recovery. This will only rebuild single-phase index builds.
+     * Rebuilding an index in recovery mode verifies each document to ensure that it is a valid
+     * BSON object. It will remove any documents with invalid BSON.
      *
      * Returns the number of records and the size of the data iterated over, if successful.
      */
-    StatusWith<std::pair<long long, long long>> startIndexRebuildForRecovery(
+    StatusWith<std::pair<long long, long long>> rebuildIndexesForRecovery(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const std::vector<BSONObj>& specs,
@@ -370,6 +379,18 @@ private:
      */
     Status _registerIndexBuild(WithLock, std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
 
+    /**
+     * Sets up the in-memory and persisted state of the index build.
+     *
+     * This function should only be called when in recovery mode, because we drop and replace
+     * existing indexes in a single WriteUnitOfWork.
+     */
+    Status _startIndexBuildForRecovery(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const std::vector<BSONObj>& specs,
+                                       const UUID& buildUUID,
+                                       IndexBuildProtocol protocol);
+
 protected:
     /**
      * Unregisters the index build.
@@ -394,6 +415,16 @@ protected:
                                 IndexBuildProtocol protocol,
                                 boost::optional<CommitQuorumOptions> commitQuorum);
 
+    /**
+     * Sets up the in-memory and persisted state of the index build for two-phase recovery.
+     *
+     * Helper function for startIndexBuild during the two-phase index build recovery process.
+     */
+    Status _registerAndSetUpIndexBuildForTwoPhaseRecovery(OperationContext* opCtx,
+                                                          StringData dbName,
+                                                          CollectionUUID collectionUUID,
+                                                          const std::vector<BSONObj>& specs,
+                                                          const UUID& buildUUID);
     /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting
      * the index build's Promise with the outcome of the index build.
@@ -526,10 +557,7 @@ protected:
      * Returns the number of records and the size of the data iterated over, if successful.
      */
     StatusWith<std::pair<long long, long long>> _runIndexRebuildForRecovery(
-        OperationContext* opCtx,
-        Collection* collection,
-        ReplIndexBuildState::IndexCatalogStats& indexCatalogStats,
-        const UUID& buildUUID) noexcept;
+        OperationContext* opCtx, Collection* collection, const UUID& buildUUID) noexcept;
 
     /**
      * Looks up active index build by UUID.
