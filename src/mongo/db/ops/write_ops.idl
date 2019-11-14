@@ -127,6 +127,11 @@ structs:
                               operation inserts only a single document."
                 type: bool
                 default: false
+            upsertSupplied:
+                description: "Only applicable when upsert is true. If set, and if no documents match
+                              the query, the update subsystem will insert the document supplied as
+                              'c.new' rather than generating a new document from the update spec."
+                type: optionalBool
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object

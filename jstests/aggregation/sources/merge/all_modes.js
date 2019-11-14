@@ -199,7 +199,7 @@ const target = db.all_modes_target;
 })();
 
 // Test 'whenMatched=[pipeline] whenNotMatched=insert' mode. This is an equivalent of a
-// pipeline-style update with upsert=true.
+// pipeline-style update with upsert=true and upsertSupplied=true.
 (function testWhenMatchedPipelineUpdateWhenNotMatchedInsert() {
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, b: 1}));
@@ -207,9 +207,11 @@ const target = db.all_modes_target;
         $merge:
             {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "insert"}
     }]));
+    // We match {_id: 1} and apply the pipeline to add the field {x: 2}. The other source collection
+    // documents are copied directly into the target collection.
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, b: 1, x: 2}, {_id: 2, x: 2}, {_id: 3, x: 2}]
+        expected: [{_id: 1, b: 1, x: 2}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 3, b: "c"}]
     });
 })();
 

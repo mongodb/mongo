@@ -56,16 +56,7 @@ public:
         RETURN_NEW
     };
 
-    inline UpdateRequest(const NamespaceString& nsString)
-        : _nsString(nsString),
-          _god(false),
-          _upsert(false),
-          _multi(false),
-          _fromMigration(false),
-          _fromOplogApplication(false),
-          _isExplain(false),
-          _returnDocs(ReturnDocOption::RETURN_NONE),
-          _yieldPolicy(PlanExecutor::NO_YIELD) {}
+    inline UpdateRequest(const NamespaceString& nsString) : _nsString(nsString) {}
 
     const NamespaceString& getNamespaceString() const {
         return _nsString;
@@ -152,6 +143,14 @@ public:
 
     bool isUpsert() const {
         return _upsert;
+    }
+
+    inline void setUpsertSuppliedDocument(bool value = true) {
+        _upsertSuppliedDocument = value;
+    }
+
+    bool shouldUpsertSuppliedDocument() const {
+        return _upsertSuppliedDocument;
     }
 
     inline void setMulti(bool value = true) {
@@ -306,22 +305,26 @@ private:
 
     // God bypasses _id checking and index generation. It is only used on behalf of system
     // updates, never user updates.
-    bool _god;
+    bool _god = false;
 
     // True if this should insert if no matching document is found.
-    bool _upsert;
+    bool _upsert = false;
+
+    // True if this upsert operation should insert the document supplied as 'c.new' if the query
+    // does not match any documents.
+    bool _upsertSuppliedDocument = false;
 
     // True if this update is allowed to affect more than one document.
-    bool _multi;
+    bool _multi = false;
 
     // True if this update is on behalf of a chunk migration.
-    bool _fromMigration;
+    bool _fromMigration = false;
 
     // True if this update was triggered by the application of an oplog entry.
-    bool _fromOplogApplication;
+    bool _fromOplogApplication = false;
 
     // Whether or not we are requesting an explained update. Explained updates are read-only.
-    bool _isExplain;
+    bool _isExplain = false;
 
     // Specifies which version of the documents to return, if any.
     //
@@ -335,10 +338,10 @@ private:
     //
     // This allows findAndModify to execute an update and retrieve the resulting document
     // without another query before or after the update.
-    ReturnDocOption _returnDocs;
+    ReturnDocOption _returnDocs = ReturnDocOption::RETURN_NONE;
 
     // Whether or not the update should yield. Defaults to NO_YIELD.
-    PlanExecutor::YieldPolicy _yieldPolicy;
+    PlanExecutor::YieldPolicy _yieldPolicy = PlanExecutor::NO_YIELD;
 };
 
 }  // namespace mongo

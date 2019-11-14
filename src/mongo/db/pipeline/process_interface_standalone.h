@@ -73,7 +73,7 @@ public:
                                     const NamespaceString& ns,
                                     BatchedObjects&& batch,
                                     const WriteConcernOptions& wc,
-                                    bool upsert,
+                                    UpsertType upsert,
                                     bool multi,
                                     boost::optional<OID> targetEpoch) override;
 
@@ -183,7 +183,7 @@ protected:
     Update buildUpdateOp(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const NamespaceString& nss,
                          BatchedObjects&& batch,
-                         bool upsert,
+                         UpsertType upsert,
                          bool multi);
 
 private:

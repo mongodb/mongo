@@ -45,6 +45,7 @@
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -232,7 +233,7 @@ public:
             auto eofStage = make_unique<EOFStage>(&_opCtx);
 
             auto updateStage =
-                make_unique<UpdateStage>(&_opCtx, params, ws.get(), collection, eofStage.release());
+                make_unique<UpsertStage>(&_opCtx, params, ws.get(), collection, eofStage.release());
 
             runUpdate(updateStage.get());
         }

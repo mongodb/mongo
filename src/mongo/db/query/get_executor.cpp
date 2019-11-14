@@ -54,6 +54,7 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
@@ -938,8 +939,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     invariant(root);
     updateStageParams.canonicalQuery = cq.get();
 
-    root = std::make_unique<UpdateStage>(
-        opCtx, updateStageParams, ws.get(), collection, root.release());
+    const bool isUpsert = updateStageParams.request->isUpsert();
+    root = (isUpsert ? std::make_unique<UpsertStage>(
+                           opCtx, updateStageParams, ws.get(), collection, root.release())
+                     : std::make_unique<UpdateStage>(
+                           opCtx, updateStageParams, ws.get(), collection, root.release()));
 
     if (!request->getProj().isEmpty()) {
         invariant(request->shouldReturnAnyDocs());

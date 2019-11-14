@@ -364,6 +364,7 @@ private:
             updateRequest.setArrayFilters(write_ops::arrayFiltersOf(_batch.getUpdates()[0]));
             updateRequest.setMulti(_batch.getUpdates()[0].getMulti());
             updateRequest.setUpsert(_batch.getUpdates()[0].getUpsert());
+            updateRequest.setUpsertSuppliedDocument(_batch.getUpdates()[0].getUpsertSupplied());
             updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
             updateRequest.setHint(_batch.getUpdates()[0].getHint());
             updateRequest.setExplain();

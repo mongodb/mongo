@@ -64,6 +64,8 @@ public:
 
     FieldRefSet();
 
+    FieldRefSet(const std::vector<std::unique_ptr<FieldRef>>& paths);
+    FieldRefSet(const std::vector<const FieldRef*>& paths);
     FieldRefSet(const std::vector<FieldRef*>& paths);
 
     /** Returns 'true' if the set is empty */
@@ -89,9 +91,9 @@ public:
     }
 
     /**
-     * Returns true if the field 'toInsert' can be added in the set without
-     * conflicts. Otherwise returns false and fill in '*conflict' with the field 'toInsert'
-     * clashed with.
+     * Returns true if the field 'toInsert' was added to the set without conflicts.
+     *
+     * Otherwise, returns false and fills '*conflict' with the field 'toInsert' clashed with.
      *
      * There is no ownership transfer of 'toInsert'. The caller is responsible for
      * maintaining it alive for as long as the FieldRefSet is so. By the same token
@@ -100,11 +102,23 @@ public:
     bool insert(const FieldRef* toInsert, const FieldRef** conflict);
 
     /**
-     * Fills the set with the supplied FieldRef*s
+     * Returns true if the field 'toInsert' was added to the set without conflicts.
+     */
+    bool insertNoConflict(const FieldRef* toInsert);
+
+    /**
+     * Fills the set with the supplied FieldRef pointers.
      *
      * Note that *no* conflict resolution occurs here.
      */
     void fillFrom(const std::vector<FieldRef*>& fields);
+
+    /**
+     * Fills the set with the supplied FieldRefs. Does not take ownership of the managed pointers.
+     *
+     * Note that *no* conflict resolution occurs here.
+     */
+    void fillFrom(const std::vector<std::unique_ptr<FieldRef>>& fields);
 
     /**
      * Replace any existing conflicting FieldRef with the shortest (closest to root) one.

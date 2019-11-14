@@ -85,6 +85,12 @@ public:
         std::tuple<BSONObj, write_ops::UpdateModification, boost::optional<BSONObj>>;
     using BatchedObjects = std::vector<BatchObject>;
 
+    enum class UpsertType {
+        kNone,              // This operation is not an upsert.
+        kGenerateNewDoc,    // If no documents match, generate a new document using the update spec.
+        kInsertSuppliedDoc  // If no documents match, insert the document supplied in 'c.new' as-is.
+    };
+
     enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
     enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
     enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
@@ -166,7 +172,7 @@ public:
                                             const NamespaceString& ns,
                                             BatchedObjects&& batch,
                                             const WriteConcernOptions& wc,
-                                            bool upsert,
+                                            UpsertType upsert,
                                             bool multi,
                                             boost::optional<OID> targetEpoch) = 0;
 

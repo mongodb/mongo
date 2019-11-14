@@ -31,6 +31,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/namespace_string.h"
+        - "mongo/idl/basic_types.h"
         - "mongo/util/uuid.h"
 
 types:
@@ -92,10 +93,21 @@ types:
         cpp_type: bool
         deserializer: "mongo::BSONElement::trueValue"
 
+    optionalBool:
+        bson_serialization_type: any
+        description: "An optional bool type that does not serialize unless explicitly set. Can be
+                      used in place of boost::optional<bool> to provide more intuitive semantics,
+                      since the standard optional will coerce to true if populated regardless of
+                      its internal value."
+        cpp_type: "mongo::OptionalBool"
+        default: "mongo::OptionalBool()"
+        deserializer: "mongo::OptionalBool::parseFromBSON"
+        serializer: "mongo::OptionalBool::serializeToBSON"
+
     bindata_generic:
         bson_serialization_type: bindata
         bindata_subtype: generic
-        description: "A BSON bindata of "
+        description: "A BSON bindata of generic sub type"
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
 
