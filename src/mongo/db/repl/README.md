@@ -1057,20 +1057,28 @@ timestamps before executing the associated write. Since this timestamp is used t
 visibility point, it is important that all operations up to and including this timestamp are
 committed and durable on disk. This is so that we can replicate the oplog without any gaps.
 
-`stable_timestamp`: The newest timestamp at which the storage engine is allowed to take a
-checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
-storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
-majority committed so that RTT rollback can use it. In the case when `eMRC=false`, the stable
-<!-- TODO SERVER-43788: Link to eMRC=false section -->
-timestamp may not be majority committed, which is why we must use the Rollback via Refetch rollback
-algorithm.
+`commit oplog entry timestamp`: The timestamp of the ‘commitTransaction’ oplog entry for a prepared
+transaction, or the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a
+cross-shard transaction each shard may have a different commit oplog entry timestamp. This is
+guaranteed to be greater than the `prepareTimestamp`.
 
-This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
-special case during rollback it is possible for the `stableTimestamp` to move backwards.
+`commitTimestamp`: The timestamp at which we committed a multi-document transaction. This will be
+the `commitTimestamp` field in the `commitTransaction` oplog entry for a prepared transaction, or
+the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a cross-shard
+transaction this timestamp is the same across all shards. The effects of the transaction are visible
+as of this timestamp. Note that `commitTimestamp` and the `commit oplog entry timestamp` are the
+same for non-prepared transactions because we do not write down the oplog entry until we commit the
+transaction. For a prepared transaction, we have the following guarantee: `prepareTimestamp` <=
+`commitTimestamp` <= `commit oplog entry timestamp`
 
-`oldest_timestamp`: The earliest timestamp that the storage engine is guaranteed to have history
-for. New transactions can never start a timestamp earlier than this timestamp. Since we advance this
-as we advance the `stable_timestamp`, it will be less than or equal to the `stable_timestamp`.
+`currentCommittedSnapshot`: An optime maintained in `ReplicationCoordinator` that is used to serve
+majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this is
+currently set to the stable optime, which is guaranteed to be in a node’s oplog. Since it is reset
+every time we recalculate the stable optime, it will also be up to date.
+
+When `eMRC=false`, this is set to the `lastCommittedOpTime`, so it may not be in the node’s oplog.
+The `stable_timestamp` is not allowed to advance past the `all_durable`. So, this value shouldn’t be
+ahead of `all_durable` unless `eMRC=false`.
 
 `initialDataTimestamp`: A timestamp used to indicate the timestamp at which history “begins”. When
 a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp` is
@@ -1086,43 +1094,35 @@ from is not associated with any particular timestamp.
 optime of the newest oplog entry that is visible in the storage engine because it is updated after
 a storage transaction commits.
 
-`lastDurable`: Optime of the latest oplog entry that has been flushed to the journal. It is
-asynchronously updated by the storage engine as new writes become durable. Default journaling
-frequency is 100ms, so this could lag up to that amount behind lastApplied.
-
 `lastCommittedOpTime`: A node’s local view of the latest majority committed optime. Every time we
 update this optime, we also recalculate the `stable_timestamp`. Note that the `lastCommittedOpTime`
 can advance beyond a node's `lastApplied` if it has not yet replicated the most recent majority
 committed oplog entry. For more information about how the `lastCommittedOpTime` is updated and
 propagated, please see [Commit Point Propagation](#commit-point-propagation).
 
-`currentCommittedSnapshot`: An optime maintained in `ReplicationCoordinator` that is used to serve
-majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this is
-currently set to the stable optime, which is guaranteed to be in a node’s oplog. Since it is reset
-every time we recalculate the stable optime, it will also be up to date.
+`lastDurable`: Optime of the latest oplog entry that has been flushed to the journal. It is
+asynchronously updated by the storage engine as new writes become durable. Default journaling
+frequency is 100ms, so this could lag up to that amount behind lastApplied.
 
-When `eMRC=false`, this is set to the `lastCommittedOpTime`, so it may not be in the node’s oplog. The
-`stable_timestamp` is not allowed to advance past the `all_durable`. So, this value shouldn’t be
-ahead of `all_durable` unless `eMRC=false`.
-
-`readConcernMajorityOpTime`: Exposed in replSetGetStatus as “readConcernMajorityOpTime” but is
-populated internally from the `currentCommittedSnapshot` timestamp inside `ReplicationCoordinator`.
+`oldest_timestamp`: The earliest timestamp that the storage engine is guaranteed to have history
+for. New transactions can never start a timestamp earlier than this timestamp. Since we advance this
+as we advance the `stable_timestamp`, it will be less than or equal to the `stable_timestamp`.
 
 `prepareTimestamp`: The timestamp of the ‘prepare’ oplog entry for a prepared transaction. This is
 the earliest timestamp at which it is legal to commit the transaction. This timestamp is provided to
 the storage engine to block reads that are trying to read prepared data until the storage engines
 knows whether the prepared transaction has committed or aborted.
 
-`commit oplog entry timestamp`: The timestamp of the ‘commitTransaction’ oplog entry for a prepared
-transaction, or the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a
-cross-shard transaction each shard may have a different commit oplog entry timestamp. This is
-guaranteed to be greater than the `prepareTimestamp`.
+`readConcernMajorityOpTime`: Exposed in replSetGetStatus as “readConcernMajorityOpTime” but is
+populated internally from the `currentCommittedSnapshot` timestamp inside `ReplicationCoordinator`.
 
-`commitTimestamp`: The timestamp at which we committed a multi-document transaction. This will be
-the `commitTimestamp` field in the `commitTransaction` oplog entry for a prepared transaction, or
-the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a cross-shard
-transaction this timestamp is the same across all shards. The effects of the transaction are visible
-as of this timestamp. Note that `commitTimestamp` and the `commit oplog entry timestamp` are the
-same for non-prepared transactions because we do not write down the oplog entry until we commit the
-transaction. For a prepared transaction, we have the following guarantee: `prepareTimestamp` <=
-`commitTimestamp` <= `commit oplog entry timestamp`
+`stable_timestamp`: The newest timestamp at which the storage engine is allowed to take a
+checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
+storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
+majority committed so that RTT rollback can use it. In the case when `eMRC=false`, the stable
+<!-- TODO SERVER-43788: Link to eMRC=false section -->
+timestamp may not be majority committed, which is why we must use the Rollback via Refetch rollback
+algorithm.
+
+This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
+special case during rollback it is possible for the `stableTimestamp` to move backwards.
