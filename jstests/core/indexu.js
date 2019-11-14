@@ -6,13 +6,18 @@
 t = db.jstests_indexu;
 t.drop();
 
-var dupDoc = {a: [{'0': 1}]};  // There are two 'a.0' fields in this doc.
+var dupDoc = {_id: 0, a: [{'0': 1}]};  // There are two 'a.0' fields in this doc.
 var dupDoc2 = {a: [{'1': 1}, 'c']};
 var noDupDoc = {a: [{'1': 1}]};
 
 // Test that we can't index dupDoc.
 assert.commandWorked(t.save(dupDoc));
 assert.commandFailed(t.ensureIndex({'a.0': 1}));
+
+// Test that we can fail gracefully when dupDoc has a large array padded with nulls.
+// Index is based on max padding constant in mongo/db/update/path_support.h
+assert.commandWorked(t.update({_id: 0}, {$set: {'a.1500001': 1}}));
+assert.commandFailedWithCode(t.ensureIndex({'a.0': 1}), 16746);
 
 t.remove({});
 assert.commandWorked(t.ensureIndex({'a.0': 1}));

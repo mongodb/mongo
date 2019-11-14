@@ -94,11 +94,24 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
 
     // An index component field name cannot exist in both a document
     // array and one of that array's children.
+    auto arrayObjAsString = [](const BSONObj& arrayObj) {
+        auto msg = arrayObj.toString();
+        const auto kMaxLength = 1024U;
+        if (msg.length() < kMaxLength) {
+            return msg;
+        }
+        str::stream ss;
+        ss << msg.substr(0, kMaxLength / 3);
+        ss << " .......... ";
+        ss << msg.substr(msg.size() - (kMaxLength / 3));
+        return std::string(ss);
+    };
     uassert(
         16746,
         str::stream() << "Ambiguous field name found in array (do not use numeric field names in "
                          "embedded elements in an array), field: '"
-                      << arrField.fieldName() << "' for array: " << positionalInfo.arrayObj,
+                      << arrField.fieldName()
+                      << "' for array: " << arrayObjAsString(positionalInfo.arrayObj),
         !haveObjField || !positionalInfo.hasPositionallyIndexedElt());
 
     *arrayNestedArray = false;
