@@ -3,7 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/replsets/*.js
-
+  exclude_with_any_tags:
+  - multiversion_incompatible
+  - requires_fcv_44
 executor:
   config:
     shell_options:

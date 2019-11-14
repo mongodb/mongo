@@ -1,4 +1,5 @@
 // This test ensures that explain of an aggregate through mongos has the intended format.
+// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

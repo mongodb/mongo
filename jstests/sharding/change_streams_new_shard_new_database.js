@@ -5,7 +5,7 @@
  * Tagging as 'requires_find_command' to ensure that this test is not run in the legacy protocol
  * passthroughs. Legacy getMore fails in cases where it is run on a database or collection which
  * does not yet exist.
- * @tags: [uses_change_streams, requires_sharding, requires_find_command]
+ * @tags: [uses_change_streams, requires_sharding, requires_find_command, requires_fcv_44]
  */
 (function() {
 

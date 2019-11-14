@@ -3,6 +3,9 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   uses_map_reduce_with_temp_collections,
 //   does_not_support_stepdowns,
+//   # TODO SERVER-42511: Remove this requires_fcv tag once the internalQueryUseAggMapReduce knob
+//   # is removed.
+//   requires_fcv_44,
 // ]
 (function() {
 "use strict";

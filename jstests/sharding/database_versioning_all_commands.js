@@ -1,6 +1,7 @@
 /**
  * Specifies for each command whether it is expected to send a databaseVersion, and verifies that
  * the commands match the specification.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

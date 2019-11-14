@@ -190,8 +190,8 @@ class EvergreenConfigGenerator(object):
         #  multiversion tests.
         run_tests_vars = {
             "resmoke_args":
-                "{0} --suite={1} --mixedBinVersions={2} --excludeWithAnyTags={3} --dryRun=tests ".
-                format(self.options.resmoke_args, suite, mixed_version_config, EXCLUDE_TAGS),
+                "{0} --suite={1} --mixedBinVersions={2} --excludeWithAnyTags={3} ".format(
+                    self.options.resmoke_args, suite, mixed_version_config, EXCLUDE_TAGS),
             "task":
                 gen_task_name,
         }

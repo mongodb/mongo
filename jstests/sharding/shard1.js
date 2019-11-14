@@ -1,5 +1,6 @@
 /**
  * this tests some of the ground work
+ * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

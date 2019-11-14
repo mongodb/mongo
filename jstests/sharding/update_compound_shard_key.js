@@ -1,6 +1,6 @@
 /**
  * Tests to validate the functionality of update command in the presence of a compound shard key.
- * @tags: [uses_transactions, uses_multi_shard_transaction]
+ * @tags: [uses_transactions, uses_multi_shard_transaction, requires_fcv_44]
  */
 (function() {
 'use strict';

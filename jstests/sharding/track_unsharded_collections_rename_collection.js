@@ -1,5 +1,6 @@
 /**
  * Tests that renaming a collection is successful within a DB and across DBs.
+ * @tags: [requires_fcv_44]
  */
 // TODO (SERVER-42394): The UUID consistency hook should not check shards' caches once shards have
 // an "UNKNOWN" state for collection filtering metadata.

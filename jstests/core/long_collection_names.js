@@ -2,7 +2,7 @@
  * Tests varying lengths of large collection names to ensure that the system continues to operate as
  * expected when handling large collection names.
  *
- * @tags: [requires_collstats]
+ * @tags: [requires_collstats, requires_fcv_44]
  */
 (function() {
 'use strict';

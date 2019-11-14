@@ -1,4 +1,5 @@
 // Tests that mongos will wait for CSRS replica set to initiate.
+// @tags: [multiversion_incompatible]
 
 var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});

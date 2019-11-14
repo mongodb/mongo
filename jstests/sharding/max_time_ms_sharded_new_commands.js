@@ -1,4 +1,5 @@
 // Make sure the setFeatureCompatibilityVersion command respects maxTimeMs.
+// @tags: [multiversion_incompatible]
 (function() {
 'use strict';
 

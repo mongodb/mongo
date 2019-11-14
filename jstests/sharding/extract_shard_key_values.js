@@ -2,7 +2,7 @@
 // Tests that documents in a sharded collection with missing shard key fields are treated as if they
 // contain an explicit null value for any missing fields.
 //
-// @tags: [requires_find_command, uses_transactions, uses_multi_shard_transactions]
+// @tags: [requires_find_command, uses_transactions, uses_multi_shard_transactions, requires_fcv_44]
 
 (function() {
 'use strict';

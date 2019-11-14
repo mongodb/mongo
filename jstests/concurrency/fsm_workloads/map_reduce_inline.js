@@ -11,6 +11,9 @@
  * @tags: [
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
+ *   # TODO SERVER-42511: Remove this requires_fcv tag once the internalQueryUseAggMapReduce knob
+ *   # is removed from the fsm workloads.
+ *   requires_fcv_44
  * ]
  */
 var $config = (function() {

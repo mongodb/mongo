@@ -2,6 +2,7 @@
 
 // Test that the 'cloneCatalogData' command works correctly.
 // Eventually, _shardsvrMovePrimary will use this command.
+// @tags: [requires_fcv_44]
 
 (() => {
     function sortByName(a, b) {

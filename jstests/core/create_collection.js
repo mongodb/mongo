@@ -1,7 +1,8 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
+// FCV4.4 is required for creating a collection with a long name.
 // @tags: [assumes_no_implicit_collection_creation_after_drop, requires_capped,
-//         assumes_against_mongod_not_mongos]
+//         assumes_against_mongod_not_mongos, requires_fcv_44]
 
 // Tests for the "create" command.
 (function() {

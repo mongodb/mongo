@@ -1,4 +1,5 @@
 // Waits for the balancer to run once, then stops it and checks that it is no longer running.
+// @tags: [requires_fcv_44]
 
 (function() {
 

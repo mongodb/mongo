@@ -7775,7 +7775,7 @@ tasks:
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion
-      resmoke_args: --suites=replica_sets_multiversion --dryRun=tests --storageEngine=wiredTiger
+      resmoke_args: --suites=replica_sets_multiversion --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sasl
@@ -7800,7 +7800,7 @@ tasks:
   - func: "generate randomized multiversion tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger --dryRun=tests
+      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 32
       use_multiversion: /data/multiversion
       suite: sharding_multiversion

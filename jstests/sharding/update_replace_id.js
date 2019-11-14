@@ -11,7 +11,7 @@
  * into its replacement, and in the case of an upsert will use the value of _id from the query
  * filter.
  *
- * @tags: [requires_find_command, uses_transactions, uses_multi_shard_transactions]
+ * @tags: [requires_find_command, uses_transactions, uses_multi_shard_transactions, requires_fcv_44]
  */
 (function() {
 load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.

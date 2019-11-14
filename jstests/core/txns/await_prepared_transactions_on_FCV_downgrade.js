@@ -2,7 +2,7 @@
  * Test that we wait for prepared transactions to finish during FCV downgrade. This test covers the
  * locking behavior as of v4.2. It is safe to change this test's behavior or remove this test
  * entirely if the locking behavior changes post v4.2.
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, multiversion_incompatible]
  */
 (function() {
 "use strict";

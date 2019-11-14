@@ -6,6 +6,7 @@
  *   -- the request will either return a view definition or CommandNotSupportedOnView
  * - if the namespace does not exist, the shard executes the request
  *   -- the request will either return empty results or NamespaceNotFound
+ * @tags: [requires_fcv_44]
  */
 
 // TODO (PM-1051): The UUID consistency hook should not check shards' caches once shards have an

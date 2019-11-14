@@ -1,7 +1,7 @@
 /**
  * Confirms that, for a query with 'allowPartialResults' enabled, the 'nShards' log entry reflects
  * the number of shards that were actually available during each find or getMore operation.
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [requires_replication, requires_sharding, requires_fcv_44]
  */
 (function() {
 "use strict";
