@@ -284,11 +284,6 @@ var {
                 }
             }
 
-            // TODO SERVER-31868: A user should get back an error if they attempt to advance the
-            // DriverSession's operationTime manually when talking to a stand-alone mongod. Removing
-            // the `(client.isReplicaSetMember() || client.isMongos())` condition will also involve
-            // calling resetOperationTime_forTesting() in JavaScript tests that start different
-            // cluster types.
             if (serverSupports(kWireVersionSupportingCausalConsistency) &&
                 (client.isReplicaSetMember() || client.isMongos()) &&
                 (driverSession.getOptions().isCausalConsistency() ||
