@@ -40,6 +40,7 @@
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -334,26 +335,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs.updatedDoc);
 
-            const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
-                ? CollectionShardingRuntime::kNow
-                : CollectionShardingRuntime::kDelayed;
-
-            AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
-
-            if (!autoColl.getCollection() ||
-                autoColl.getCollection()->uuid() != deletionTask.getCollectionUuid()) {
-                LOG(0) << "Collection UUID doesn't match the one marked for deletion: "
-                       << autoColl.getCollection()->uuid()
-                       << " != " << deletionTask.getCollectionUuid();
-            } else {
-                LOG(0) << "Scheduling range " << deletionTask.getRange() << " in namespace "
-                       << deletionTask.getNss() << " for deletion.";
-
-                auto notification = CollectionShardingRuntime::get(opCtx, deletionTask.getNss())
-                                        ->cleanUpRange(*deletionTask.getRange(), whenToClean);
-
-                notification.abandon();
-            }
+            migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
         }
     }
 

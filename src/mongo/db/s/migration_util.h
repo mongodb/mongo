@@ -70,6 +70,17 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
                                   const ChunkRange& range,
                                   const UUID& uuid);
 
+// Submits a RangeDeletionTask to the CollectionRangeDeleter.
+// Returns false if the submission failed and is not retryable.
+bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& deletionTask);
+
+// Queries the rangeDeletions collection for ranges that are ready to be deleted and submits them to
+// the range deleter.
+void submitPendingDeletions(OperationContext* opCtx);
+
+// Asynchronously calls submitPendingDeletions using the fixed executor pool.
+void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
+
 }  // namespace migrationutil
 
 }  // namespace mongo

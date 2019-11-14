@@ -27,14 +27,24 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/migration_util.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/query.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace migrationutil {
@@ -74,9 +84,90 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
                                   const UUID& uuid) {
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
-    auto results = store.query(opCtx, overlappingRangeQuery(range, uuid));
+    return store.count(opCtx, overlappingRangeQuery(range, uuid)) > 0;
+}
 
-    return !results.empty();
+bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& deletionTask) {
+    const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
+        ? CollectionShardingRuntime::kNow
+        : CollectionShardingRuntime::kDelayed;
+
+    AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
+
+    if (!autoColl.getCollection()) {
+        LOG(0) << "Namespace not found: " << deletionTask.getNss();
+        return false;
+    }
+
+    if (autoColl.getCollection()->uuid() != deletionTask.getCollectionUuid()) {
+        LOG(0) << "Collection UUID doesn't match the one marked for deletion: "
+               << autoColl.getCollection()->uuid() << " != " << deletionTask.getCollectionUuid();
+
+        return false;
+    }
+
+    LOG(0) << "Scheduling range " << deletionTask.getRange() << " in namespace "
+           << deletionTask.getNss() << " for deletion.";
+
+    auto css = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
+
+    // TODO (SERVER-44554): This is needed for now because of the invariant that throws on cleanup
+    // if the metadata is not set.
+    if (!css->getCurrentMetadataIfKnown()) {
+        LOG(0) << "Current metadata is not available";
+        return false;
+    }
+
+    auto notification = css->cleanUpRange(*deletionTask.getRange(), whenToClean);
+
+    if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
+        LOG(0) << "Failed to resubmit range for deletion: "
+               << causedBy(notification.waitStatus(opCtx));
+    } else {
+        notification.abandon();
+    }
+
+    return true;
+}
+
+void submitPendingDeletions(OperationContext* opCtx) {
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+
+    auto query = QUERY("pending" << BSON("$exists" << false));
+
+    std::vector<RangeDeletionTask> invalidRanges;
+    store.forEach(opCtx, query, [&opCtx, &invalidRanges](const RangeDeletionTask& deletionTask) {
+        forceShardFilteringMetadataRefresh(opCtx, deletionTask.getNss(), true);
+
+        auto taskValid = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+
+        if (!taskValid)
+            invalidRanges.push_back(deletionTask);
+
+        return true;
+    });
+
+    for (const auto& range : invalidRanges) {
+        store.remove(opCtx, Query(range.toBSON()));
+    }
+}
+
+void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
+    LOG(0) << "Starting pending deletion submission thread.";
+
+    auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
+
+    ExecutorFuture<void>(executor).getAsync([serviceContext](const Status& status) {
+        ThreadClient tc("ResubmitRangeDeletions", serviceContext);
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc->setSystemOperationKillable(lk);
+        }
+
+        auto opCtx = tc->makeOperationContext();
+
+        submitPendingDeletions(opCtx.get());
+    });
 }
 
 }  // namespace migrationutil

@@ -80,7 +80,7 @@ TEST_F(PersistentTaskStoreTest, TestAdd) {
     ASSERT_EQ(store.count(opCtx), 3);
 }
 
-TEST_F(PersistentTaskStoreTest, TestQuery) {
+TEST_F(PersistentTaskStoreTest, TestForEach) {
     auto opCtx = operationContext();
 
     PersistentTaskStore<TestTask> store(opCtx, kNss);
@@ -92,20 +92,42 @@ TEST_F(PersistentTaskStoreTest, TestQuery) {
     ASSERT_EQ(store.count(opCtx), 3);
 
     // No match.
-    auto results = store.query(opCtx,
-                               QUERY("key"
-                                     << "four"));
-    ASSERT_EQ(results.size(), 0);
+    int count = 0;
+    store.forEach(opCtx,
+                  QUERY("key"
+                        << "four"),
+                  [&count](const TestTask& t) {
+                      ++count;
+                      return true;
+                  });
+    ASSERT_EQ(count, 0);
 
     // Multiple matches.
-    results = store.query(opCtx, QUERY("min" << GTE << 10));
-    ASSERT_EQ(results.size(), 2);
+    count = 0;
+    store.forEach(opCtx, QUERY("min" << GTE << 10), [&count](const TestTask& t) {
+        ++count;
+        return true;
+    });
+    ASSERT_EQ(count, 2);
+
+    // Multiple matches, only take one.
+    count = 0;
+    store.forEach(opCtx, QUERY("min" << GTE << 10), [&count](const TestTask& t) {
+        ++count;
+        return count < 1;
+    });
+    ASSERT_EQ(count, 1);
 
     // Single match.
-    results = store.query(opCtx,
-                          QUERY("key"
-                                << "one"));
-    ASSERT_EQ(results.size(), 1);
+    count = 0;
+    store.forEach(opCtx,
+                  QUERY("key"
+                        << "one"),
+                  [&count](const TestTask& t) {
+                      ++count;
+                      return true;
+                  });
+    ASSERT_EQ(count, 1);
 }
 
 TEST_F(PersistentTaskStoreTest, TestRemove) {
@@ -160,24 +182,24 @@ TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
         PersistentTaskStore<TestTask> store(opCtx, kNss);
         ASSERT_EQ(store.count(opCtx), 3);
 
-        auto results = store.query(opCtx, QUERY("min" << GTE << 10));
-        ASSERT_EQ(results.size(), 2);
+        auto count = store.count(opCtx, QUERY("min" << GTE << 10));
+        ASSERT_EQ(count, 2);
 
         store.remove(opCtx,
                      QUERY("key"
                            << "two"));
         ASSERT_EQ(store.count(opCtx), 2);
 
-        results = store.query(opCtx, QUERY("min" << GTE << 10));
-        ASSERT_EQ(results.size(), 1);
+        count = store.count(opCtx, QUERY("min" << GTE << 10));
+        ASSERT_EQ(count, 1);
     }
 
     {
         PersistentTaskStore<TestTask> store(opCtx, kNss);
         ASSERT_EQ(store.count(opCtx), 2);
 
-        auto results = store.query(opCtx, QUERY("min" << GTE << 10));
-        ASSERT_EQ(results.size(), 1);
+        auto count = store.count(opCtx, QUERY("min" << GTE << 10));
+        ASSERT_EQ(count, 1);
     }
 }
 

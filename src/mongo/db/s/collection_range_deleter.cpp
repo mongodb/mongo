@@ -197,6 +197,9 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         try {
             swNumDeleted = self->_doDeletion(
                 opCtx, collection, metadata->getKeyPattern(), *range, maxToDelete);
+            if (swNumDeleted.isOK()) {
+                LOG(0) << "Deleted " << swNumDeleted.getValue() << " documents in pass.";
+            }
         } catch (const DBException& e) {
             swNumDeleted = e.toStatus();
             warning() << e.what();

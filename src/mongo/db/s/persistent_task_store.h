@@ -100,21 +100,22 @@ public:
         uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
     }
 
-    std::vector<T> query(OperationContext* opCtx, Query query) {
+    // Executes the specified query on the collection and calls the callback for each element.
+    // Iteration can be stopped early if the callback returns false indicating that it doesn't want
+    // to continue.
+    void forEach(OperationContext* opCtx, Query query, std::function<bool(const T&)> handler) {
         DBDirectClient dbClient(opCtx);
 
         auto cursor = dbClient.query(_storageNss, query);
-
-        std::vector<T> results;
 
         while (cursor->more()) {
             auto bson = cursor->next();
             auto t = T::parse(
                 IDLParserErrorContext("PersistentTaskStore:" + _storageNss.toString()), bson);
-            results.push_back(t);
-        }
 
-        return results;
+            if (bool shouldContinue = handler(t); !shouldContinue)
+                return;
+        }
     }
 
     size_t count(OperationContext* opCtx, Query query = Query()) {
