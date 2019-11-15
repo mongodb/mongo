@@ -356,6 +356,7 @@ env.Library(
         "dbhash.cpp",
         "driverHelpers.cpp",
         "haystack.cpp",
+        "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "map_reduce_command.cpp",
         "map_reduce_finish_command.cpp",
         "mr.cpp",
@@ -371,6 +372,7 @@ env.Library(
         "txn_cmds.cpp",
         "user_management_commands.cpp",
         "vote_commit_index_build_command.cpp",
+        env.Idlc('internal_rename_if_options_and_indexes_match.idl')[0],
         env.Idlc('vote_commit_index_build.idl')[0],
     ],
     LIBDEPS=[

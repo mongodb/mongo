@@ -62,7 +62,9 @@ MapReduceStats::MapReduceStats(const std::vector<CommonStats>& pipelineStats,
             _timing.reduce = stageStats.executionTimeMillis - prevTime;
             _counts.output = stageStats.advanced;
         } else {
-            invariant(stageName == "$out"_sd || stageName == "$merge"_sd, stageName);
+            invariant(stageName == "$out"_sd || stageName == "$internalOutToDifferentDB"_sd ||
+                          stageName == "$merge"_sd,
+                      stageName);
         }
 
         prevTime = stageStats.executionTimeMillis;

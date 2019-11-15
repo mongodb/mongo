@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -706,6 +707,49 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
 }  // namespace
 
+void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
+                                                    const NamespaceString& sourceNs,
+                                                    const NamespaceString& targetNs,
+                                                    bool dropTarget,
+                                                    bool stayTemp,
+                                                    std::list<BSONObj> originalIndexes,
+                                                    BSONObj originalCollectionOptions) {
+    AutoGetDb dbLock(opCtx, targetNs.db(), MODE_X);
+    auto collection = dbLock.getDb()
+        ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(targetNs)
+        : nullptr;
+    BSONObj collectionOptions = {};
+    if (collection) {
+        // We do not include the UUID field in the options comparison. It is ok if the target
+        // collection was dropped and recreated, as long as the new target collection has the same
+        // options and indexes as the original one did. This is mainly to support concurrent $out
+        // to the same collection.
+        collectionOptions = DurableCatalog::get(opCtx)
+                                ->getCollectionOptions(opCtx, collection->getCatalogId())
+                                .toBSON()
+                                .removeField("uuid");
+    }
+
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "collection options of target collection " << targetNs.ns()
+                          << " changed during processing. Original options: "
+                          << originalCollectionOptions << ", new options: " << collectionOptions,
+            SimpleBSONObjComparator::kInstance.evaluate(
+                originalCollectionOptions.removeField("uuid") == collectionOptions));
+
+    auto currentIndexes =
+        listIndexesEmptyListIfMissing(opCtx, targetNs, false /* includeBuildUUIDs */);
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "indexes of target collection " << targetNs.ns()
+                          << " changed during processing.",
+            originalIndexes.size() == currentIndexes.size() &&
+                std::equal(originalIndexes.begin(),
+                           originalIndexes.end(),
+                           currentIndexes.begin(),
+                           SimpleBSONObjComparator::kInstance.makeEqualTo()));
+
+    validateAndRunRenameCollection(opCtx, sourceNs, targetNs, dropTarget, stayTemp);
+}
 void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& source,
                                     const NamespaceString& target,

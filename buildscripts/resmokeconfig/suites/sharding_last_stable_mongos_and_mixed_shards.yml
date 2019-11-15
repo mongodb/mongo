@@ -20,6 +20,10 @@ selector:
   - jstests/sharding/merge_stale_on_fields.js
   - jstests/sharding/refresh_sessions.js
   - jstests/sharding/lookup.js
+  # Enable when 4.4 becomes last stable
+  - jstests/sharding/out_fails_to_replace_sharded_collection.js
+  - jstests/sharding/merge_from_stale_mongos.js
+
 executor:
   config:
     shell_options:

@@ -42,6 +42,13 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
+void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
+                                                    const NamespaceString& sourceNs,
+                                                    const NamespaceString& targetNs,
+                                                    bool dropTarget,
+                                                    bool stayTemp,
+                                                    std::list<BSONObj> originalIndexes,
+                                                    BSONObj collectionOptions);
 /**
  * Renames the collection from "source" to "target" and drops the existing collection iff
  * "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its

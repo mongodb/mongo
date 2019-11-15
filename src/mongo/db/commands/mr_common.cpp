@@ -159,13 +159,8 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx, std::stri
 }
 
 auto translateOutReplace(boost::intrusive_ptr<ExpressionContext> expCtx,
-                         const StringData inputDatabase,
                          NamespaceString targetNss) {
-    uassert(31278,
-            "MapReduce must output to the database belonging to its input collection - Input: "s +
-                inputDatabase + " Output: " + targetNss.db(),
-            inputDatabase == targetNss.db());
-    return DocumentSourceOut::create(std::move(targetNss), expCtx);
+    return DocumentSourceOut::createAndAllowDifferentDB(std::move(targetNss), expCtx);
 }
 
 auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx, NamespaceString targetNss) {
@@ -205,12 +200,11 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
                   const OutputType outputType,
-                  const StringData inputDatabase,
                   NamespaceString targetNss,
                   std::string reduceCode) {
     switch (outputType) {
         case OutputType::Replace:
-            return boost::make_optional(translateOutReplace(expCtx, inputDatabase, targetNss));
+            return boost::make_optional(translateOutReplace(expCtx, targetNss));
         case OutputType::Merge:
             return boost::make_optional(translateOutMerge(expCtx, targetNss));
         case OutputType::Reduce:
@@ -388,11 +382,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 parsedMr.getFinalize().map([&](auto&& finalize) {
                     return translateFinalize(expCtx, parsedMr.getFinalize()->getCode());
                 }),
-                translateOut(expCtx,
-                             outType,
-                             parsedMr.getNamespace().db(),
-                             std::move(outNss),
-                             parsedMr.getReduce().getCode())),
+                translateOut(expCtx, outType, std::move(outNss), parsedMr.getReduce().getCode())),
             expCtx));
         pipeline->optimizePipeline();
         return pipeline;

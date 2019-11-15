@@ -26,6 +26,27 @@ assert.commandWorked(coll.insert({_id: 0}));
 coll.aggregate(pipeline);
 assert.eq(1, targetColl.find().itcount());
 
+// Test $internalOutToDifferentDB with a non-existent database. This is only expected to work in a
+// non-sharded environment.
+const destDB = db.getSiblingDB("outDifferentDB");
+destDB.dropDatabase();
+if (FixtureHelpers.isMongos(db)) {
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{
+            $internalOutToDifferentDB:
+                {db: destDB.getName(), coll: destDB.outDifferentColl.getName()}
+        }]
+    }),
+                                 ErrorCodes.NamespaceNotFound);
+} else {
+    coll.aggregate({
+        $internalOutToDifferentDB: {db: destDB.getName(), coll: destDB.outDifferentColl.getName()}
+    });
+    assert.eq(1, destDB.outDifferentColl.find().itcount());
+}
+
 //
 // Test $out with an existing output collection.
 //

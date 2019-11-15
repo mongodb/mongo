@@ -395,6 +395,7 @@ env.Library(
         'drop_database.cpp',
         'drop_indexes.cpp',
         'rename_collection.cpp',
+        'list_indexes.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

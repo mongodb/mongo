@@ -313,6 +313,7 @@ let viewsCommandTests = {
     hostInfo: {skip: isUnrelated},
     httpClientRequest: {skip: isAnInternalCommand},
     insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
+    internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
     invalidateUserCache: {skip: isUnrelated},
     isdbgrid: {skip: isUnrelated},
     isMaster: {skip: isUnrelated},

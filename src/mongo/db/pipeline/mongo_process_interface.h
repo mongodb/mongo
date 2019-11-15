@@ -125,17 +125,11 @@ public:
     virtual ~MongoProcessInterface(){};
 
     /**
-     * Sets the OperationContext of the DBDirectClient returned by directClient(). This method must
-     * be called after updating the 'opCtx' member of the ExpressionContext associated with the
-     * document source.
+     * Sets the OperationContext of the DBDirectClient used by mongo process interface functions.
+     * This method must be called after updating the 'opCtx' member of the ExpressionContext
+     * associated with the document source.
      */
     virtual void setOperationContext(OperationContext* opCtx) = 0;
-
-    /**
-     * Always returns a DBDirectClient. The return type in the function signature is a DBClientBase*
-     * because DBDirectClient isn't linked into mongos.
-     */
-    virtual DBClientBase* directClient() = 0;
 
     /**
      * Creates a new TransactionHistoryIterator object. Only applicable in processes which support
@@ -179,6 +173,10 @@ public:
     virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                   const NamespaceString& ns) = 0;
 
+    virtual std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                             const NamespaceString& ns,
+                                             bool includeBuildUUIDs) = 0;
+
     /**
      * Appends operation latency statistics for collection "nss" to "builder"
      */
@@ -213,7 +211,7 @@ public:
      * ErrorCodes::CommandNotSupportedOnView if 'nss' describes a view. Future callers may want to
      * parameterize this behavior.
      */
-    virtual BSONObj getCollectionOptions(const NamespaceString& nss) = 0;
+    virtual BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
      * Performs the given rename command if the collection given by 'targetNs' has the same options
@@ -227,6 +225,24 @@ public:
         const NamespaceString& targetNs,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) = 0;
+
+    /**
+     * Creates a collection on the given database by running the given command. On shardsvr targets
+     * the primary shard of 'dbName'.
+     */
+    virtual void createCollection(OperationContext* opCtx,
+                                  const std::string& dbName,
+                                  const BSONObj& cmdObj) = 0;
+
+    /**
+     * Runs createIndexes on the given database for the given index specs. If running on a shardsvr
+     * this targets the primary shard of the database part of 'ns'.
+     */
+    virtual void createIndexes(OperationContext* opCtx,
+                               const NamespaceString& ns,
+                               const std::vector<BSONObj>& indexSpecs) = 0;
+
+    virtual void dropCollection(OperationContext* opCtx, const NamespaceString& collection) = 0;
 
     /**
      * Parses a Pipeline from a vector of BSONObjs representing DocumentSources. The state of the

@@ -67,10 +67,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    DBClientBase* directClient() final {
-        MONGO_UNREACHABLE;
-    }
-
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -93,6 +89,11 @@ public:
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) final {
+        MONGO_UNREACHABLE;
+    }
+    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     bool includeBuildUUIDs) final {
         MONGO_UNREACHABLE;
     }
 
@@ -122,7 +123,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj getCollectionOptions(const NamespaceString& nss) final {
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }
 
@@ -131,6 +132,22 @@ public:
                                                  const NamespaceString& targetNs,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void createCollection(OperationContext* opCtx,
+                          const std::string& dbName,
+                          const BSONObj& cmdObj) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void createIndexes(OperationContext* opCtx,
+                       const NamespaceString& ns,
+                       const std::vector<BSONObj>& indexSpecs) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final {
         MONGO_UNREACHABLE;
     }
 

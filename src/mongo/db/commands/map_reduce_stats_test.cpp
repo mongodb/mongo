@@ -190,7 +190,8 @@ TEST_F(MapReduceStatsTest, ConfirmStatsUnshardedWithFinalizeProjectStage) {
 
 DEATH_TEST_F(MapReduceStatsTest,
              DeathByUnknownStage,
-             "Invariant failure stageName == \"$out\"_sd || stageName == \"$merge\"_sd") {
+             "Invariant failure stageName == \"$out\"_sd || stageName == "
+             "\"$internalOutToDifferentDB\"_sd || stageName == \"$merge\"_sd") {
     addInvalidStageForMapReduce();
     MapReduceStats mapReduceStats(buildMapReducePipelineStats(),
                                   MapReduceStats::ResponseType::kUnsharded,

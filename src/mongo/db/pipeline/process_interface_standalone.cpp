@@ -36,10 +36,15 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/list_indexes.h"
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -58,6 +63,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -149,10 +155,6 @@ MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) : _c
 
 void MongoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {
     _client.setOpCtx(opCtx);
-}
-
-DBClientBase* MongoInterfaceStandalone::directClient() {
-    return &_client;
 }
 
 std::unique_ptr<TransactionHistoryIteratorBase>
@@ -272,6 +274,12 @@ CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext
     return CollectionQueryInfo::get(collection).getIndexUsageStats();
 }
 
+std::list<BSONObj> MongoInterfaceStandalone::getIndexSpecs(OperationContext* opCtx,
+                                                           const NamespaceString& ns,
+                                                           bool includeBuildUUIDs) {
+    return listIndexesEmptyListIfMissing(opCtx, ns, includeBuildUUIDs);
+}
+
 void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   bool includeHistograms,
@@ -325,24 +333,22 @@ Status MongoInterfaceStandalone::appendQueryExecStats(OperationContext* opCtx,
     return Status::OK();
 }
 
-BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
-    std::list<BSONObj> infos;
-
-    try {
-        infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
-        if (infos.empty()) {
-            return BSONObj();
-        }
-    } catch (const DBException& e) {
-        uasserted(ErrorCodes::CommandFailed, e.reason());
+BSONObj MongoInterfaceStandalone::getCollectionOptions(OperationContext* opCtx,
+                                                       const NamespaceString& nss) {
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    BSONObj collectionOptions = {};
+    if (!autoColl.getDb()) {
+        return collectionOptions;
+    }
+    Collection* collection = autoColl.getCollection();
+    if (!collection) {
+        return collectionOptions;
     }
 
-    const auto& infoObj = infos.front();
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << nss.toString() << " is a view, not a collection",
-            infoObj["type"].valueStringData() != "view"_sd);
-
-    return infoObj.getObjectField("options").getOwned();
+    collectionOptions = DurableCatalog::get(opCtx)
+                            ->getCollectionOptions(opCtx, collection->getCatalogId())
+                            .toBSON();
+    return collectionOptions;
 }
 
 void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
@@ -351,30 +357,31 @@ void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
-    Lock::DBLock lk(opCtx, targetNs.db(), MODE_X);
+    NamespaceString sourceNs = NamespaceString(renameCommandObj["renameCollection"].String());
+    doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
+                                                   sourceNs,
+                                                   targetNs,
+                                                   renameCommandObj["dropTarget"].trueValue(),
+                                                   renameCommandObj["stayTemp"].trueValue(),
+                                                   originalIndexes,
+                                                   originalCollectionOptions);
+}
 
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "collection options of target collection " << targetNs.ns()
-                          << " changed during processing. Original options: "
-                          << originalCollectionOptions
-                          << ", new options: " << getCollectionOptions(targetNs),
-            SimpleBSONObjComparator::kInstance.evaluate(originalCollectionOptions ==
-                                                        getCollectionOptions(targetNs)));
+void MongoInterfaceStandalone::createCollection(OperationContext* opCtx,
+                                                const std::string& dbName,
+                                                const BSONObj& cmdObj) {
+    uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
+}
 
-    auto currentIndexes = _client.getIndexSpecs(targetNs);
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "indexes of target collection " << targetNs.ns()
-                          << " changed during processing.",
-            originalIndexes.size() == currentIndexes.size() &&
-                std::equal(originalIndexes.begin(),
-                           originalIndexes.end(),
-                           currentIndexes.begin(),
-                           SimpleBSONObjComparator::kInstance.makeEqualTo()));
-
-    BSONObj info;
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "renameCollection failed: " << info,
-            _client.runCommand("admin", renameCommandObj, info));
+void MongoInterfaceStandalone::createIndexes(OperationContext* opCtx,
+                                             const NamespaceString& ns,
+                                             const std::vector<BSONObj>& indexSpecs) {
+    _client.createIndexes(ns.ns(), indexSpecs);
+}
+void MongoInterfaceStandalone::dropCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    BSONObjBuilder result;
+    uassertStatusOK(mongo::dropCollection(
+        opCtx, ns, result, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipeline(

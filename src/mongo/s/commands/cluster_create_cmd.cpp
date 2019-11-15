@@ -78,6 +78,9 @@ public:
         uassert(ErrorCodes::InvalidOptions,
                 "specify size:<n> when capped is true",
                 !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber());
+        uassert(ErrorCodes::InvalidOptions,
+                "the 'temp' field is an invalid option",
+                !cmdObj.hasField("temp"));
 
         ConfigsvrCreateCollection configCreateCmd(nss);
         configCreateCmd.setDbName(NamespaceString::kAdminDb);

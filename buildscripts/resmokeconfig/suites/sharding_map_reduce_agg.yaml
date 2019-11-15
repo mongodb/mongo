@@ -14,6 +14,7 @@ selector:
   - jstests/sharding/map_reduce_scope.js
   - jstests/sharding/max_time_ms_sharded.js
   - jstests/sharding/mr_and_agg_versioning.js
+  - jstests/sharding/mr_replace_different_db_sharded.js
   - jstests/sharding/mr_shard_version.js
   - jstests/sharding/query_config.js
   - jstests/sharding/shard_targeting.js

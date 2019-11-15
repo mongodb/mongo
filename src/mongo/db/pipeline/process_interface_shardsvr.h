@@ -87,6 +87,22 @@ public:
 
     std::unique_ptr<ShardFilterer> getShardFilterer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override final;
+
+    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     bool includeBuildUUIDs) final;
+    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
+                                                 const BSONObj& renameCommandObj,
+                                                 const NamespaceString& targetNs,
+                                                 const BSONObj& originalCollectionOptions,
+                                                 const std::list<BSONObj>& originalIndexes) final;
+    void createCollection(OperationContext* opCtx,
+                          const std::string& dbName,
+                          const BSONObj& cmdObj) final;
+    void createIndexes(OperationContext* opCtx,
+                       const NamespaceString& ns,
+                       const std::vector<BSONObj>& indexSpecs) final;
+    void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final;
 };
 
 }  // namespace mongo

@@ -343,7 +343,9 @@ public:
         if (cmd.getTemp()) {
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "the 'temp' field is an invalid option",
-                    opCtx->getClient()->isInDirectClient());
+                    opCtx->getClient()->isInDirectClient() ||
+                        (opCtx->getClient()->session()->getTags() |
+                         transport::Session::kInternalClient));
         }
 
         // Validate _id index spec and fill in missing fields.

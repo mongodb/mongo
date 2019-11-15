@@ -175,14 +175,12 @@ assert.commandWorked(st.rs0.getPrimary().getDB('test').adminCommand(
         numExpectedMatches: 1
     });
 
-    // Test that $out cannot be run against a secondary since it writes directly to a local temp
-    // collection.
-    assert.commandFailedWithCode(
-        source.runCommand(
-            "aggregate",
-            {pipeline: [{$out: "non_existent"}], cursor: {}, $readPreference: {mode: "secondary"}}),
-        16994,
-        "Expected $out to fail to create the temp collection.");
+    // Test that $out can be run against a secondary.
+    // Note that running on secondaries in every case is not yet supported.
+    // https://jira.mongodb.org/browse/SERVER-37250
+    assert.commandWorked(source.runCommand(
+        "aggregate",
+        {pipeline: [{$out: "non_existent"}], cursor: {}, $readPreference: {mode: "secondary"}}));
 })();
 
 st.stop();

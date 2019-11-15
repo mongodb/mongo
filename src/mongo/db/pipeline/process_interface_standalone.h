@@ -55,7 +55,6 @@ public:
     virtual ~MongoInterfaceStandalone() = default;
 
     void setOperationContext(OperationContext* opCtx) final;
-    DBClientBase* directClient() final;
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
 
@@ -78,6 +77,9 @@ public:
                                     boost::optional<OID> targetEpoch) override;
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
+    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     bool includeBuildUUIDs);
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,
@@ -92,12 +94,19 @@ public:
     Status appendQueryExecStats(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final override;
-    BSONObj getCollectionOptions(const NamespaceString& nss) final;
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
     void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                  const BSONObj& renameCommandObj,
                                                  const NamespaceString& targetNs,
                                                  const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes) final;
+                                                 const std::list<BSONObj>& originalIndexes);
+    void createCollection(OperationContext* opCtx,
+                          const std::string& dbName,
+                          const BSONObj& cmdObj);
+    void createIndexes(OperationContext* opCtx,
+                       const NamespaceString& ns,
+                       const std::vector<BSONObj>& indexSpecs);
+    void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -46,6 +46,7 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_map_reduce_agg.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 
@@ -126,9 +127,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              BSONObjBuilder& result) {
     auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
-    auto resolvedOutNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
-                                              ? *parsedMr.getOutOptions().getDatabaseName()
-                                              : parsedMr.getNamespace().db(),
+    auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
+    auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),
                                           parsedMr.getOutOptions().getCollectionName()};
 
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {

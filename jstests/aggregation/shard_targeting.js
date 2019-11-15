@@ -139,21 +139,31 @@ function runAggShardTargetTest({splitPoint}) {
     }));
 
     // We expect one aggregation on shard0, none on shard1, and no $mergeCursors on shard0 (the
-    // primary shard).
+    // primary shard). We expect some of these commands may fail with staleDBVersion and be
+    // retried, so we will ignore those entries in the profiler.
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
-        filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+        filter: {
+            "command.aggregate": mongosColl.getName(),
+            "command.comment": testName,
+            errMsg: {$exists: false}
+        }
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard1DB,
-        filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+        filter: {
+            "command.aggregate": mongosColl.getName(),
+            "command.comment": testName,
+            errMsg: {$exists: false}
+        }
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: primaryShardDB,
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            "command.pipeline.$mergeCursors": {$exists: 1}
+            "command.pipeline.$mergeCursors": {$exists: 1},
+            errMsg: {$exists: false}
         }
     });
 

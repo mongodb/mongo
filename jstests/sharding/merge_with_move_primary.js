@@ -80,14 +80,6 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
 assert.commandWorked(sourceColl.insert({shardKey: -1}));
 assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-// Note that the actual error is NamespaceNotFound but it is wrapped in a generic error code by
-// mistake.
-runPipelineWithStage({
-    stage: {$out: targetColl.getName()},
-    shardedColl: sourceColl,
-    expectedfailCode: ErrorCodes.CommandFailed
-});
-
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     runPipelineWithStage({
         stage: {
@@ -110,12 +102,6 @@ st.shardColl(sourceColl.getName(), {shardKey: 1}, {shardKey: 0}, false, mongosDB
 // Write a document to each chunk of the source collection.
 assert.commandWorked(sourceColl.insert({shardKey: -1}));
 assert.commandWorked(sourceColl.insert({shardKey: 1}));
-
-runPipelineWithStage({
-    stage: {$out: targetColl.getName()},
-    shardedColl: sourceColl,
-    expectedfailCode: ErrorCodes.CommandFailed
-});
 
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     runPipelineWithStage({
@@ -142,12 +128,7 @@ st.shardColl(sourceColl.getName(), {shardKey: 1}, {shardKey: 0}, false, mongosDB
 assert.commandWorked(sourceColl.insert({shardKey: -1}));
 assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-runPipelineWithStage({
-    stage: {$out: targetColl.getName()},
-    shardedColl: targetColl,
-    expectedfailCode: ErrorCodes.CommandFailed
-});
-
+// Note that the legacy $out is not supported with an existing sharded output collection.
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     runPipelineWithStage({
         stage: {
@@ -175,7 +156,6 @@ st.shardColl(targetColl.getName(), {shardKey: 1}, {shardKey: 0}, false, mongosDB
 assert.commandWorked(sourceColl.insert({shardKey: -1}));
 assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-// Note that the legacy $out is not supported with an existing sharded output collection.
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     runPipelineWithStage({
         stage: {

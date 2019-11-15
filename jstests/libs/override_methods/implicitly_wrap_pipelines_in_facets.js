@@ -30,8 +30,16 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         return originalRunCommand.apply(this, arguments);
     }
 
-    const stagesDisallowedInsideFacet =
-        ['$changeStream', '$collStats', '$facet', '$geoNear', '$indexStats', '$merge', '$out'];
+    const stagesDisallowedInsideFacet = [
+        '$changeStream',
+        '$collStats',
+        '$facet',
+        '$geoNear',
+        '$indexStats',
+        '$merge',
+        '$out',
+        '$internalOutToDifferentDB'
+    ];
     for (let stageSpec of originalPipeline) {
         // Skip wrapping the pipeline in a $facet stage if it has an invalid stage
         // specification.

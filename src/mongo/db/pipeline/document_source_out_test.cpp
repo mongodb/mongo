@@ -85,13 +85,13 @@ public:
 
 TEST_F(DocumentSourceOutTest, FailsToParseIncorrectType) {
     BSONObj spec = BSON("$out" << 1);
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 31278);
 
     spec = BSON("$out" << BSONArray());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 31278);
 
     spec = BSON("$out" << BSONObj());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 31278);
 }
 
 TEST_F(DocumentSourceOutTest, AcceptsStringArgument) {

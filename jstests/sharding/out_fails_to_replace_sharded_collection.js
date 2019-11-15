@@ -33,7 +33,7 @@ const cursorResponse = assert.commandWorked(mongosDB.runCommand({
 }));
 st.shardColl(targetColl, {_id: 1}, false);
 error = assert.throws(() => new DBCommandCursor(mongosDB, cursorResponse).itcount());
-assert.eq(error.code, ErrorCodes.CommandFailed);
+assert.eq(error.code, ErrorCodes.IllegalOperation);
 
 st.stop();
 }());

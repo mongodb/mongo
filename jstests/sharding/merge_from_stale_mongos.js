@@ -232,14 +232,14 @@ runOutTest([staleMongosSource, staleMongosTarget]);
 
 setupStaleMongos({shardedSource: true, shardedTarget: true});
 assert.eq(assert.throws(() => runOutTest(staleMongosSource)).code, 28769);
-assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, 17017);
+assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, ErrorCodes.IllegalOperation);
 
 setupStaleMongos({shardedSource: true, shardedTarget: false});
 runOutTest([staleMongosSource, staleMongosTarget]);
 
 setupStaleMongos({shardedSource: false, shardedTarget: true});
 assert.eq(assert.throws(() => runOutTest(staleMongosSource)).code, 28769);
-assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, 17017);
+assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, ErrorCodes.IllegalOperation);
 
 st.stop();
 }());
