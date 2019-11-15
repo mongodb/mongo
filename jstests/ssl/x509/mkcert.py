@@ -530,8 +530,8 @@ def process_cert(cert):
     if cert.get('Subject'):
         create_cert(cert)
     elif append_certs:
-        # Pure composing certificate, unlink first so that the append loop doesn't retain old versions.
-        os.remove(make_filename(cert))
+        # Pure composing certificate. Start with a basic preamble.
+        open(make_filename(cert), 'wt').write(get_header_comment(cert) + "\n")
     else:
         raise ValueError("Certificate definitions must have at least one of 'Subject' and/or 'append_cert'")
 

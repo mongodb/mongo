@@ -517,6 +517,14 @@ certs:
     subjectAltName:
       DNS: ['localhost', '127.0.0.1']
 
+# Both ca.pem and trusted-ca.pem
+- name: 'root-and-trusted-ca.pem'
+  description: Combined ca.pem and trusted-ca.pem
+  output_path: 'jstests/ssl/x509/'
+  append_cert:
+  - 'ca.pem'
+  - 'trusted-ca.pem'
+
 ###
 # ECDSA tree
 ###
