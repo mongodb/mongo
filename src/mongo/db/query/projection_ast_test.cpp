@@ -126,6 +126,30 @@ TEST_F(ProjectionASTTest, TestParsingTypeInclusionWithNestingObjectSyntax) {
     ASSERT(proj.type() == ProjectType::kInclusion);
 }
 
+TEST_F(ProjectionASTTest, TestParsingTypeInclusionWithMixedSyntax) {
+    {
+        Projection proj = parseWithDefaultPolicies(fromjson("{'a.b': 1, a: {c: 1}}"));
+        ASSERT(proj.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection proj = parseWithDefaultPolicies(fromjson("{a: {c: 1}, 'a.b': 1}"));
+        ASSERT(proj.type() == ProjectType::kInclusion);
+    }
+}
+
+TEST_F(ProjectionASTTest, TestParsingTypeExclusionWithMixedSyntax) {
+    {
+        Projection proj = parseWithDefaultPolicies(fromjson("{'a.b': 0, a: {c: 0}}"));
+        ASSERT(proj.type() == ProjectType::kExclusion);
+    }
+
+    {
+        Projection proj = parseWithDefaultPolicies(fromjson("{a: {c: 0}, 'a.b': 0}"));
+        ASSERT(proj.type() == ProjectType::kExclusion);
+    }
+}
+
 TEST_F(ProjectionASTTest, TestParsingTypeExclusion) {
     Projection p = parseWithDefaultPolicies(fromjson("{a: 0, _id: 0}"));
     ASSERT(p.type() == ProjectType::kExclusion);
@@ -492,6 +516,20 @@ TEST_F(ProjectionASTTest, ParserErrorsOnCollisionNestedFieldFirst) {
 TEST_F(ProjectionASTTest, ParserErrorsOnCollisionNestedFieldLast) {
     ASSERT_THROWS_CODE(
         parseWithDefaultPolicies(fromjson("{a: 1, d: 1, 'a.b': 1}")), DBException, 31249);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnCollisionIdenticalField) {
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(BSON("a" << 1 << "a" << 1)), DBException, 31250);
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(BSON("a" << BSON("b" << 1) << "a.b" << 1)), DBException, 31250);
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(BSON("a.b" << 1 << "a" << BSON("b" << 1))), DBException, 31250);
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(BSON("a" << 1 << "a" << BSON("b" << 1))), DBException, 31250);
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(BSON("a.b" << 1 << "a" << BSON("b" << BSON("c" << 1)))),
+        DBException,
+        31250);
 }
 
 TEST_F(ProjectionASTTest, ParserErrorsOnSliceWithWrongNumberOfArguments) {
