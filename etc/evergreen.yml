@@ -3906,6 +3906,7 @@ tasks:
           - "src/mongo/util/options_parser/test_config_files/**"
           - "library_dependency_graph.json"
           - "src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
+          - "src/third_party/mock_ocsp_responder/**"
           - "bypass_compile_expansions.yml"
           - "patch_files.txt"
           - "artifacts.json"
@@ -8207,6 +8208,16 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: ocsp
+  tags: ["ocsp"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=ocsp
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: jsonSchema
   commands:
   - func: "do setup"
@@ -9263,6 +9274,7 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: .ocsp
   - name: .read_write_concern
   - name: .replica_sets !.encrypt
   - name: .retry
@@ -10976,6 +10988,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion
+  - name: .ocsp
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:

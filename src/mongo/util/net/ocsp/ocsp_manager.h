@@ -41,6 +41,6 @@ constexpr Seconds kOCSPRequestTimeoutSeconds(5);
  * Constructs the HTTP client and sends the OCSP request to the responder.
  * Returns a vector of bytes to be constructed into a OCSP response.
  */
-StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, HostAndPort hostAndPort);
+StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, StringData responderURI);
 
 }  // namespace mongo

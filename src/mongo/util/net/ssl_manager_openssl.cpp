@@ -1495,7 +1495,7 @@ struct OCSPRequestAndIDs {
  */
 Status addOCSPUrlToMap(SSL* conn,
                        X509* cert,
-                       std::map<HostAndPort, OCSPRequestAndIDs>& ocspRequestMap,
+                       std::map<std::string, OCSPRequestAndIDs>& ocspRequestMap,
                        OCSPCertIDSet& uniqueCertIds) {
 
     UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(cert));
@@ -1549,7 +1549,8 @@ Status addOCSPUrlToMap(SSL* conn,
 
             OCSPRequestAndIDs reqAndIDs{UniqueOCSPRequest(OCSP_REQUEST_new()), OCSPCertIDSet()};
 
-            auto [mapIter, _] = ocspRequestMap.try_emplace(hostAndPort, std::move(reqAndIDs));
+            auto [mapIter, _] = ocspRequestMap.try_emplace(
+                str::stream() << host << ":" << port << path, std::move(reqAndIDs));
 
             OCSP_request_add0_id(mapIter->second.request.get(), certID.release());
             mapIter->second.certIDs.insert(std::move(certIDForArray));
@@ -1565,7 +1566,7 @@ Status addOCSPUrlToMap(SSL* conn,
 }
 
 struct OCSPContext {
-    std::map<HostAndPort, OCSPRequestAndIDs> ocspRequestMap;
+    std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
     OCSPCertIDSet uniqueCertIds;
 };
 
@@ -1579,7 +1580,7 @@ StatusWith<OCSPContext> extractOcspUris(SSL* conn,
                                         X509* peerCert,
                                         STACK_OF(X509) * intermediateCerts) {
 
-    std::map<HostAndPort, OCSPRequestAndIDs> ocspRequestMap;
+    std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
     OCSPCertIDSet uniqueCertIds;
 
     auto status = addOCSPUrlToMap(conn, peerCert, ocspRequestMap, uniqueCertIds);

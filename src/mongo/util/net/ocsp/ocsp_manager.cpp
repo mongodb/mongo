@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, HostAndPort hostAndPort) {
+StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, StringData responderURI) {
     auto client = HttpClient::create();
     if (!client) {
         return Status(ErrorCodes::InternalErrorNotSupported, "HTTP Client not supported");
@@ -42,7 +42,7 @@ StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, HostAndP
     client->allowInsecureHTTP(true);
     client->setTimeout(kOCSPRequestTimeoutSeconds);
     client->setHeaders({"Content-Type: application/ocsp-request"});
-    auto dataBuilder = client->post("http://" + hostAndPort.toString(), data);
+    auto dataBuilder = client->post("http://" + responderURI, data);
     if (dataBuilder.size() == 0) {
         return Status(ErrorCodes::SSLHandshakeFailed, "OCSP Validation Failed");
     }

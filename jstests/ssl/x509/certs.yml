@@ -324,6 +324,81 @@ certs:
   extensions: {basicConstraints: {CA: true}}
 
 ###
+# OCSP Tree
+###
+
+- name: 'ca_ocsp.pem'
+  description: >-
+    Primary Root Certificate Authority
+    Most Certificates are issued by this CA.
+  Subject: {CN: 'Kernel Test CA'}
+  Issuer: self
+  include_header: false
+  output_path: 'jstests/libs/ocsp/'
+  extensions:
+    basicConstraints:
+      critical: true
+      CA: true
+
+- name: 'server_ocsp.pem'
+  description: >-
+    OCSP certificate for the mongodb server.
+  Subject:
+    CN: 'localhost'
+    C: US
+    ST: NY
+    L: OCSP-1
+  Issuer: 'ca_ocsp.pem'
+  include_header: false
+  output_path: 'jstests/libs/ocsp/'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status/'
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth, clientAuth]
+
+- name: 'client_ocsp.pem'
+  description: >-
+    OCSP certificate for the mongodb client.
+  Subject:
+    CN: 'localhost'
+    C: US
+    ST: NY
+    L: OCSP-2
+  Issuer: 'ca_ocsp.pem'
+  include_header: false
+  output_path: 'jstests/libs/ocsp/'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status/'
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+
+- name: 'ocsp_responder.crt'
+  description: Certificate and key for the OCSP responder
+  Subject:
+    CN: 'localhost'
+    C: US
+    ST: NY
+    L: OCSP-3
+  Issuer: 'ca_ocsp.pem'
+  include_header: false
+  keyfile: 'ocsp_responder.key'
+  output_path: 'jstests/libs/ocsp/'
+  extensions:
+    basicConstraints: {CA: false}
+    keyUsage: [nonRepudiation, digitalSignature, keyEncipherment]
+    extendedKeyUsage: [OCSPSigning]
+
+###
 # Rollover tree
 ###
 

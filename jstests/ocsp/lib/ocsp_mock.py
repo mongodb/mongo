@@ -5,25 +5,12 @@ Python script to interface as a mock OCSP responder.
 
 import argparse
 import logging
-from datetime import datetime
-from ocspresponder import OCSPResponder, CertificateStatus
+import sys
+import os
 
-fault = None
+sys.path.append(os.path.join(os.getcwd() ,'src', 'third_party', 'mock_ocsp_responder'))
 
-def validate(serial: int):
-    if fault == FAULT_REVOKED:
-        return (CertificateStatus.revoked, datetime.today())
-    elif fault == FAULT_UNKNOWN:
-        return (CertificateStatus.unknown, None)
-    return (CertificateStatus.good, None)
-
-def get_cert(serial: int):
-    """
-    Assume the certificates are stored in the ``certs`` directory with the
-    serial as base filename.
-    """
-    with open('jstests/libs/ocsp/serial/server-%s.pem' % serial, 'r') as f:
-        return f.read().strip()
+import mock_ocsp_responder
 
 def main():
     """Main entry point"""
@@ -39,22 +26,14 @@ def main():
 
     parser.add_argument('--ocsp_responder_key', type=str, required=True, help="OCSP Responder Keyfile")
 
-    parser.add_argument('--fault', choices=[FAULT_REVOKED, FAULT_UNKNOWN], type=str, help="Specify a specific fault to test")
+    parser.add_argument('--fault', choices=[mock_ocsp_responder.FAULT_REVOKED, mock_ocsp_responder.FAULT_UNKNOWN], type=str, help="Specify a specific fault to test")
 
     args = parser.parse_args()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
-    global fault
-    if args.fault:
-        fault = args.fault
-
     print('Initializing OCSP Responder')
-    app = OCSPResponder(
-        args.ca_file, args.ocsp_responder_cert, args.ocsp_responder_key,
-        validate_func=validate,
-        cert_retrieve_func=get_cert,
-    )
+    app = mock_ocsp_responder.OCSPResponder(args.ca_file, args.ocsp_responder_cert, args.ocsp_responder_key, args.fault)
 
     if args.verbose:
         app.serve(args.port, debug=True)

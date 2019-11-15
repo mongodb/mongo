@@ -2,6 +2,7 @@
  * Starts a mock OCSP Server to test
  * OCSP certificate revocation.
  */
+load("jstests/ocsp/lib/ocsp_helpers.js");
 
 // These are a list of faults to match the list of faults
 // in ocsp_mock.py.
@@ -25,9 +26,9 @@ class MockOCSPServer {
         }
 
         print("Using python interpreter: " + this.python);
-        this.ca_file = "jstests/libs/ocsp/ca.crt";
-        this.ocsp_cert_file = "jstests/libs/ocsp/ocsp_cert.crt";
-        this.ocsp_cert_key = "jstests/libs/ocsp/ocsp_cert.key";
+        this.ca_file = OCSP_CA_CERT;
+        this.ocsp_cert_file = OCSP_RESPONDER_CERT;
+        this.ocsp_cert_key = OCSP_RESPONDER_KEY;
         // The port must be hard coded to match the port of the
         // responder in the certificates.
         this.port = 8100;
@@ -45,15 +46,15 @@ class MockOCSPServer {
             "--ocsp_responder_key=" + this.ocsp_cert_key
         ];
 
-        this.pid = _startMongoProgram({args: args});
-        assert(checkProgram(this.pid).alive);
-
         if (this.fault_type) {
             args.push("--fault=" + this.fault_type);
         }
 
+        this.pid = _startMongoProgram({args: args});
+        assert(checkProgram(this.pid).alive);
+
         assert.soon(function() {
-            return rawMongoProgramOutput().search("Mock OCSP Responder is running") !== -1;
+            return rawMongoProgramOutput().search("Listening on") !== -1;
         });
 
         sleep(1000);
