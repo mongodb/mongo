@@ -3900,7 +3900,7 @@ if get_option('install-mode') == 'hygienic':
         # TODO: we should be able to move this to where the mqlrun binary is
         # defined when AIB correctly uses environments instead of hooking into
         # the first environment used.
-        name="${MH_DIST_BASENAME}",
+        name="${MH_DIST_BASENAME}-binaries",
     )
 
     env.AddPackageNameAlias(
@@ -4108,7 +4108,7 @@ def add_version_to_distsrc(env, archive):
 env.AddDistSrcCallback(add_version_to_distsrc)
 
 env['SERVER_DIST_BASENAME'] = env.subst('mongodb-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
-env['MH_DIST_BASENAME'] = env.subst('mh-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
+env['MH_DIST_BASENAME'] = 'mh'
 if get_option('legacy-tarball') == 'true':
     if ('tar-dist' not in COMMAND_LINE_TARGETS and
         'zip-dist' not in COMMAND_LINE_TARGETS and

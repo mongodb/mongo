@@ -3819,8 +3819,6 @@ tasks:
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
-          mv mh-*-debugsymbols.${ext|tgz} mh-debugsymbols.${ext|tgz} || true
-          mv mh-mongodb*.${ext|tgz} mh-binaries.${ext|tgz} || true
 
     # Tar unstripped dbtest, to be archived in case of failure
     - command: archive.targz_pack
