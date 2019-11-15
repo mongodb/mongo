@@ -227,7 +227,6 @@ selector:
   - jstests/core/kill_cursors.js
   - jstests/core/list_collections1.js
   - jstests/core/list_indexes.js
-  - jstests/core/max_time_ms.js
   - jstests/core/oro.js
 
   # Expects certain number of operations in the system.profile collection.

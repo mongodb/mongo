@@ -22,7 +22,6 @@ selector:
   - jstests/core/awaitdata_getmore_cmd.js
   # This test uses a very short timeout for a read that becomes unreliable with read concern
   # linearizable.
-  - jstests/core/max_time_ms.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the
