@@ -9,7 +9,6 @@
 "use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/check_log.js");
 load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: 2});
@@ -36,8 +35,6 @@ let session = primary.startSession();
 const sessionID = session.getSessionId();
 let sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
-
-let failPoint = configureFailPoint(secondary, "WTPrintPrepareConflictLog");
 
 // Insert a document that we will later modify in a transaction.
 assert.commandWorked(primaryColl.insert({_id: 1}));
@@ -68,9 +65,8 @@ assert.commandFailedWithCode(secondaryDB.runCommand({
 }),
                              ErrorCodes.MaxTimeMSExpired);
 
-// Clear secondary log so that when we wait for the WTPrintPrepareConflictLog fail point, we
-// do not count the previous find.
-assert.commandWorked(secondaryDB.adminCommand({clearLog: "global"}));
+// Set a failpoint so we can wait when we hit the prepare conflict.
+let failPoint = configureFailPoint(secondary, "WTPrintPrepareConflictLog");
 
 TestData.dbName = dbName;
 TestData.collName = collName;
