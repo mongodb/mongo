@@ -317,6 +317,8 @@ private:
                     documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
                     _runCommand(
                         opCtx, shardId, shardVersion, nss, stripWriteConcern(cmdObj), result);
+                    uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
+
                     auto commitResponse =
                         documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
