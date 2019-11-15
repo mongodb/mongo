@@ -5,6 +5,7 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");
+load("jstests/libs/retryable_writes_util.js");
 
 const testDB = db.getSiblingDB("test_failcommand");
 const adminDB = db.getSiblingDB("admin");
@@ -405,9 +406,11 @@ res = assert.commandWorked(testDB.runCommand({ping: 1}));
 assert(!res.hasOwnProperty("errorLabels"), res);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-// Only run error labels override tests for replica set because the tests require retryable writes.
+// Only run error labels override tests for replica set if storage engine supports document-level
+// locking because the tests require retryable writes.
 // And mongos doesn't return RetryableWriteError labels.
-if (!FixtureHelpers.isReplSet(adminDB)) {
+if (!FixtureHelpers.isReplSet(adminDB) ||
+    !RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
     jsTestLog("Skipping error labels override tests");
     return;
 }
