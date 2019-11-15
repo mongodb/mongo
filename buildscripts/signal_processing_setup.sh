@@ -27,7 +27,7 @@ user: "${evergreen_api_user}"
 END_OF_CREDS
 
 source ./signal_processing_venv/bin/activate
-pip install dag-signal-processing~=1.0
+pip install dag-signal-processing~=1.0.14
 
 export analysis_user="${dsi_analysis_atlas_user}"
 export analysis_password="${dsi_analysis_atlas_pw}"
