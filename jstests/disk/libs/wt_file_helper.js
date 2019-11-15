@@ -123,15 +123,16 @@ let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFu
  * Returns the started node.
  */
 let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResync, testFunc) {
-    jsTestLog("The node should rejoin the replica set. Clean data: " + cleanData,
+    jsTestLog("The node should rejoin the replica set. Clean data: " + cleanData +
               ". Expect resync: " + expectResync);
-    let node = replSet.start(
-        originalNode, {dbpath: originalNode.dbpath, port: originalNode.port, restart: !cleanData});
-
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
+    let node = replSet.start(originalNode, {
+        dbpath: originalNode.dbpath,
+        port: originalNode.port,
+        restart: !cleanData,
+        setParameter: {"failpoint.skipClearInitialSyncState": "{'mode':'alwaysOn'}"}
+    });
 
     replSet.awaitSecondaryNodes();
 
