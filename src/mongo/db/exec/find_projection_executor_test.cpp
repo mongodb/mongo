@@ -30,289 +30,253 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/find_projection_executor.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_find_internal.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
-namespace projection_executor {
-namespace positional_projection_tests {
-/**
- * Applies a find()-style positional projection at the given 'path' using 'matchSpec' to create
- * a 'MatchExpression' to match an element on the first array in the 'path'. If no value for
- * 'postImage' is provided, then the post-image used will be the value passed for the 'preImage'.
- */
-auto applyPositional(const BSONObj& matchSpec,
-                     const std::string& path,
-                     const Document& preImage,
-                     boost::optional<Document> postImage = boost::none) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, expCtx));
-    return projection_executor::applyPositionalProjection(
-        preImage, postImage.value_or(preImage), *matchExpr, path);
+namespace mongo::projection_executor {
+constexpr auto kProjectionPostImageVarName =
+    projection_executor::ProjectionExecutor::kProjectionPostImageVarName;
+
+auto createProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const BSONObj& projSpec,
+                              ProjectionPolicies policies) {
+    auto projection = projection_ast::parse(expCtx, projSpec, policies);
+    return projection_executor::buildProjectionExecutor(
+        expCtx, &projection, policies, true /* optimizeExecutor */);
 }
 
-TEST(PositionalProjection, CorrectlyProjectsSimplePath) {
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar: 1, foo: [6]}")},
-                       applyPositional(fromjson("{bar: 1, foo: {$gte: 5}}"),
+class PositionalProjectionExecutionTest : public AggregationContextFixture {
+protected:
+    auto applyPositional(const BSONObj& projSpec,
+                         const BSONObj& matchSpec,
+                         const std::string& path,
+                         const Document& input) {
+        auto executor = createProjectionExecutor(getExpCtx(), projSpec, {});
+        auto matchExpr = CopyableMatchExpression{matchSpec,
+                                                 getExpCtx(),
+                                                 std::make_unique<ExtensionsCallbackNoop>(),
+                                                 MatchExpressionParser::kBanAllSpecialFeatures};
+        auto expr = make_intrusive<ExpressionInternalFindPositional>(
+            getExpCtx(),
+            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(
+                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            path,
+            std::move(matchExpr));
+        executor->setRootReplacementExpression(expr);
+        return executor->applyTransformation(input);
+    }
+};
+
+class SliceProjectionExecutionTest : public AggregationContextFixture {
+protected:
+    auto applySlice(const BSONObj& projSpec,
+                    const std::string& path,
+                    boost::optional<int> skip,
+                    int limit,
+                    const Document& input) {
+        auto executor = createProjectionExecutor(getExpCtx(), projSpec, {});
+        auto expr = make_intrusive<ExpressionInternalFindSlice>(
+            getExpCtx(),
+            ExpressionFieldPath::parse(
+                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            path,
+            skip,
+            limit);
+        executor->setRootReplacementExpression(expr);
+        return executor->applyTransformation(input);
+    }
+};
+
+TEST_F(PositionalProjectionExecutionTest, CanApplyPositionalWithInclusionProjection) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: [6]}")},
+                       applyPositional(fromjson("{foo: 1}"),
+                                       fromjson("{foo: {$gte: 5}}"),
+                                       "foo",
+                                       Document{fromjson("{foo: [1,2,6,10]}")}));
+
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar:1, foo: [6]}")},
+                       applyPositional(fromjson("{bar: 1, foo: 1}"),
+                                       fromjson("{bar: 1, foo: {$gte: 5}}"),
                                        "foo",
                                        Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}));
 }
 
-TEST(PositionalProjection, CorrectlyProjectsDottedPath) {
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: 1, x: {y: [6]}}")},
-                       applyPositional(fromjson("{a: 1, 'x.y': {$gte: 5}}"),
-                                       "x.y",
-                                       Document{fromjson("{a: 1, x: {y: [1,2,6,10]}}")}));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: 1, x: {y: {z: [6]}}}")},
-                       applyPositional(fromjson("{a: 1, 'x.y.z': {$gte: 5}}"),
-                                       "x.y.z",
-                                       Document{fromjson("{a: 1, x: {y: {z: [1,2,6,10]}}}")}));
+TEST_F(PositionalProjectionExecutionTest, AppliesProjectionToPreImage) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{b: [6], c: 'abc'}")},
+                       applyPositional(fromjson("{b: 1, c: 1}"),
+                                       fromjson("{a: 1, b: {$gte: 5}}"),
+                                       "b",
+                                       Document{fromjson("{a: 1, b: [1,2,6,10], c: 'abc'}")}));
 }
 
-TEST(PositionalProjection, ProjectsValueUnmodifiedIfFieldIsNotArray) {
-    auto doc = Document{fromjson("{foo: 3}")};
-    ASSERT_DOCUMENT_EQ(doc, applyPositional(fromjson("{foo: 3}"), "foo", doc));
+TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocumentToDependencies) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
+    auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
+    auto matchExpr = CopyableMatchExpression{matchSpec,
+                                             getExpCtx(),
+                                             std::make_unique<ExtensionsCallbackNoop>(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures};
+    auto expr = make_intrusive<ExpressionInternalFindPositional>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo.bar",
+        std::move(matchExpr));
+    executor->setRootReplacementExpression(expr);
+
+    DepsTracker deps;
+    executor->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 2UL);
+    ASSERT_EQ(deps.fields.count("bar"), 1UL);
+    ASSERT_EQ(deps.fields.count("foo.bar"), 1UL);
+    ASSERT(deps.needWholeDocument);
 }
 
-TEST(PositionalProjection, FailsToProjectPositionalPathComponentsForNestedArrays) {
-    ASSERT_THROWS_CODE(applyPositional(fromjson("{'x.0.y': 42}"),
-                                       "x.0.y",
-                                       Document{fromjson("{x: [{y: [11, 42]}]}")}),
-                       AssertionException,
-                       51247);
+TEST_F(PositionalProjectionExecutionTest, ShouldConsiderAllPathsAsModified) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
+    auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
+    auto matchExpr = CopyableMatchExpression{matchSpec,
+                                             getExpCtx(),
+                                             std::make_unique<ExtensionsCallbackNoop>(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures};
+    auto expr = make_intrusive<ExpressionInternalFindPositional>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo.bar",
+        std::move(matchExpr));
+    executor->setRootReplacementExpression(expr);
+
+    auto modifiedPaths = executor->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllPaths);
 }
 
-TEST(PositionalProjection, CorrectlyProjectsNestedArrays) {
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [1,2]}]}")},
-                       applyPositional(fromjson("{'a.b': 1}"),
-                                       "a",
-                                       Document{fromjson("{a: [{b: [1,2]}, {b: [3,4]}]}")}));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [3,4]}]}")},
-                       applyPositional(fromjson("{'a.b': 3}"),
-                                       "a",
-                                       Document{fromjson("{a: [{b: [1,2]}, {b: [3,4]}]}")}));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [3,4]}]}")},
-                       applyPositional(fromjson("{'a.b': 3}"),
-                                       "a.b",
-                                       Document{fromjson("{a: [{b: [1,2]}, {b: [3,4]}]}")}));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [['d','e','f']]}")},
-                       applyPositional(fromjson("{a: {$gt: ['a','b','c']}}"),
-                                       "a",
-                                       Document{fromjson("{a: [['a','b','c'],['d','e','f']]}")}));
-}
-
-TEST(PositionalProjection, FailsToProjectWithMultipleConditionsOnArray) {
-    ASSERT_THROWS_CODE(applyPositional(fromjson("{$or: [{'x.y': 1}, {'x.y': 2}]}"),
-                                       "x",
-                                       Document{fromjson("{x: [{y: [1,2]}]}")}),
-                       AssertionException,
-                       51246);
-}
-
-TEST(PositionalProjection, CanMergeWithExistingFieldsInOutputDocument) {
-    auto doc = Document{fromjson("{foo: {bar: [1,2,6,10]}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: {bar: [6]}}")},
-                       applyPositional(fromjson("{'foo.bar': {$gte: 5}}"), "foo.bar", doc));
-
-    doc = Document{fromjson("{bar: 1, foo: {bar: [1,2,6,10]}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar: 1, foo: {bar: [6]}}")},
-                       applyPositional(fromjson("{bar: 1, 'foo.bar': {$gte: 5}}"), "foo.bar", doc));
-
-    doc = Document{fromjson("{bar: 1, foo: 3}")};
-    ASSERT_DOCUMENT_EQ(doc, applyPositional(fromjson("{foo: 3}"), "foo", doc));
-}
-
-TEST(PositionalProjection, AppliesMatchExpressionToPreImageAndStoresResultInPostImage) {
-    auto preImage = Document{fromjson("{foo: 1, bar: [1,2,6,10]}")};
-    auto postImage = Document{fromjson("{bar: [1,2,6,10]}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar: [6]}")},
-                       applyPositional(fromjson("{foo: 1, bar: 6}"), "bar", preImage, postImage));
-}
-}  // namespace positional_projection_tests
-
-namespace elem_match_projection_tests {
-auto applyElemMatch(const BSONObj& match, const std::string& path, const Document& input) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto matchObj = BSON(path << BSON("$elemMatch" << match));
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchObj, expCtx));
-    return projection_executor::applyElemMatchProjection(input, *matchExpr, path);
-}
-
-TEST(ElemMatchProjection, CorrectlyProjectsNonObjectElement) {
-    ASSERT_VALUE_EQ(
-        Document{fromjson("{foo: [4]}")}["foo"],
-        applyElemMatch(fromjson("{$in: [4]}"), "foo", Document{fromjson("{foo: [1,2,3,4]}")}));
-    ASSERT_VALUE_EQ(
-        Document{fromjson("{foo: [4]}")}["foo"],
-        applyElemMatch(fromjson("{$nin: [1,2,3]}"), "foo", Document{fromjson("{foo: [1,2,3,4]}")}));
-}
-
-TEST(ElemMatchProjection, CorrectlyProjectsObjectElement) {
-    ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
-                    applyElemMatch(fromjson("{bar: {$gte: 5}}"),
-                                   "foo",
-                                   Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
-                                                     "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
-}
-
-TEST(ElemMatchProjection, CorrectlyProjectsArrayElement) {
-    ASSERT_VALUE_EQ(Document{fromjson("{foo: [[3,4]]}")}["foo"],
-                    applyElemMatch(fromjson("{$gt: [1,2]}"),
-                                   "foo",
-                                   Document{fromjson("{foo: [[1,2], [3,4]]}")}));
-}
-
-TEST(ElemMatchProjection, ProjectsAsEmptyDocumentIfInputIsEmpty) {
-    ASSERT_VALUE_EQ({}, applyElemMatch(fromjson("{bar: {$gte: 5}}"), "foo", {}));
-}
-
-TEST(ElemMatchProjection, RemovesFieldFromOutputDocumentIfUnableToMatchArrayElement) {
-    ASSERT_VALUE_EQ({},
-                    applyElemMatch(fromjson("{bar: {$gte: 5}}"),
-                                   "foo",
-                                   Document{fromjson("{foo: [{bar: 1, z: 1}, "
-                                                     "{bar: 2, z: 2}]}")}));
-    ASSERT_VALUE_EQ(
-        {},
-        applyElemMatch(fromjson("{bar: {$gte: 20}}"),
-                       "foo",
-                       Document{fromjson("{bar: 1, foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
-                                         "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
-}
-
-TEST(ElemMatchProjection, CorrectlyProjectsWithMultipleCriteriaInMatchExpression) {
-    ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 2, z: 2}]}")}["foo"],
-                    applyElemMatch(fromjson("{bar: {$gt: 1, $lt: 6}}"),
-                                   "foo",
-                                   Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
-                                                     "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
-}
-
-TEST(ElemMatchProjection, CanMergeWithExistingFieldsInInputDocument) {
-    ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
-                    applyElemMatch(fromjson("{bar: {$gte: 5}}"),
-                                   "foo",
-                                   Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
-                                                     "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
-
-    ASSERT_VALUE_EQ(
-        Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
-        applyElemMatch(fromjson("{bar: {$gte: 5}}"),
-                       "foo",
-                       Document{fromjson("{bar: 1, foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
-                                         "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
-}
-
-TEST(ElemMatchProjection, RertursEmptyValuefItContainsNumericSubfield) {
-    ASSERT_VALUE_EQ(
-        {}, applyElemMatch(fromjson("{$gt: 2}"), "foo", Document{BSON("foo" << BSON(0 << 3))}));
-
-    ASSERT_VALUE_EQ({},
-                    applyElemMatch(fromjson("{$gt: 2}"),
-                                   "foo",
-                                   Document{BSON("bar" << 1 << "foo" << BSON(0 << 3))}));
-}
-}  // namespace elem_match_projection_tests
-
-namespace slice_projection_tests {
-DEATH_TEST(SliceProjection,
-           ShouldFailIfNegativeLimitSpecifiedWithPositiveSkip,
-           "Invariant failure limit >= 0") {
-    auto doc = Document{fromjson("{a: [1,2,3,4]}")};
-    applySliceProjection(doc, "a", 1, -1);
-}
-
-DEATH_TEST(SliceProjection,
-           ShouldFailIfNegativeLimitSpecifiedWithNegativeSkip,
-           "Invariant failure limit >= 0") {
-    auto doc = Document{fromjson("{a: [1,2,3,4]}")};
-    applySliceProjection(doc, "a", -1, -1);
-}
-
-TEST(SliceProjection, CorrectlyProjectsSimplePath) {
-    auto doc = Document{fromjson("{a: [1,2,3,4]}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [1,2,3]}")},
-                       applySliceProjection(doc, "a", boost::none, 3));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [2,3,4]}")},
-                       applySliceProjection(doc, "a", boost::none, -3));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [2]}")}, applySliceProjection(doc, "a", -3, 1));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [2,3,4]}")}, applySliceProjection(doc, "a", -3, 4));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [4]}")}, applySliceProjection(doc, "a", 3, 1));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [1,2,3,4]}")}, applySliceProjection(doc, "a", -5, 5));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: []}")}, applySliceProjection(doc, "a", 5, 2));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [1,2]}")}, applySliceProjection(doc, "a", -5, 2));
+TEST_F(SliceProjectionExecutionTest, CanApplySliceWithInclusionProjection) {
     ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{a: [1,2,3,4]}")},
-        applySliceProjection(doc, "a", boost::none, std::numeric_limits<int>::max()));
-    ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{a: [1,2,3,4]}")},
-        applySliceProjection(doc, "a", boost::none, std::numeric_limits<int>::min()));
-    ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{a: [1,2,3,4]}")},
-        applySliceProjection(
-            doc, "a", std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
-    ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{a: []}")},
-        applySliceProjection(
-            doc, "a", std::numeric_limits<int>::max(), std::numeric_limits<int>::max()));
+        Document{fromjson("{foo: [1,2]}")},
+        applySlice(
+            fromjson("{foo: 1}"), "foo", boost::none, 2, Document{fromjson("{foo: [1,2,6,10]}")}));
 
-    doc = Document{fromjson("{a: [{b: 1, c: 1}, {b: 2, c: 2}, {b: 3, c: 3}], d: 2}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 1}], d: 2}")},
-                       applySliceProjection(doc, "a", boost::none, 1));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 3, c: 3}], d: 2}")},
-                       applySliceProjection(doc, "a", boost::none, -1));
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 2, c: 2}], d: 2}")},
-                       applySliceProjection(doc, "a", 1, 1));
-
-    doc = Document{fromjson("{a: 1}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: 1}")},
-                       applySliceProjection(doc, "a", boost::none, 2));
-
-    doc = Document{fromjson("{a: {b: 1}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: 1}}")},
-                       applySliceProjection(doc, "a", boost::none, 2));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar:1, foo: [6]}")},
+                       applySlice(fromjson("{bar: 1, foo: 1}"),
+                                  "foo",
+                                  2,
+                                  1,
+                                  Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}));
 }
 
-TEST(SliceProjection, CorrectlyProjectsDottedPath) {
-    auto doc = Document{fromjson("{a: {b: [1,2,3], c: 1}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [1,2], c: 1}}")},
-                       applySliceProjection(doc, "a.b", boost::none, 2));
-
-    doc = Document{fromjson("{a: {b: [1,2,3], c: 1}, d: 1}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [1,2], c: 1}, d: 1}")},
-                       applySliceProjection(doc, "a.b", boost::none, 2));
-
-    doc = Document{fromjson("{a: {b: [[1,2], [3,4], [5,6]]}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [[1,2], [3,4]]}}")},
-                       applySliceProjection(doc, "a.b", boost::none, 2));
-
-    doc = Document{fromjson("{a: [{b: {c: [1,2,3,4]}}, {b: {c: [5,6,7,8]}}], d: 1}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: {c: [4]}}, {b: {c: [8]}}], d: 1}")},
-                       applySliceProjection(doc, "a.b.c", -1, 2));
-
-    doc = Document{fromjson("{a: {b: 1}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: 1}}")},
-                       applySliceProjection(doc, "a.b", boost::none, 2));
-
-    doc = Document{fromjson("{a: {b: {c: 1}}}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: {c: 1}}}")},
-                       applySliceProjection(doc, "a.b", boost::none, 2));
-
-    doc = Document{fromjson("{a: [{b: [1,2,3], c: 1}]}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [3], c: 1}]}")},
-                       applySliceProjection(doc, "a.b", boost::none, -1));
-
-    doc = Document{fromjson("{a: [{b: [1,2,3], c: 4}, {b: [5,6,7], c: 8}]}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [3], c: 4}, {b: [7], c: 8}]}")},
-                       applySliceProjection(doc, "a.b", boost::none, -1));
-
-    doc = Document{fromjson("{a: [{b: [{x:1, c: [1, 2]}, {y: 1, c: [3, 4]}]}], z: 1}")};
-    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [{x:1, c: [1]}, {y: 1, c: [3]}]}], z: 1}")},
-                       applySliceProjection(doc, "a.b.c", boost::none, 1));
+TEST_F(SliceProjectionExecutionTest, AppliesProjectionToPostImage) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{b: [1,2], c: 'abc'}")},
+                       applySlice(fromjson("{b: 1, c: 1}"),
+                                  "b",
+                                  boost::none,
+                                  2,
+                                  Document{fromjson("{a: 1, b: [1,2,6,10], c: 'abc'}")}));
 }
-}  // namespace slice_projection_tests
-}  // namespace projection_executor
-}  // namespace mongo
+
+TEST_F(SliceProjectionExecutionTest, CanApplySliceAndPositionalProjectionsTogether) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{foo: 1, bar: 1}"), {});
+    auto matchSpec = fromjson("{foo: {$gte: 3}}");
+    auto matchExpr = CopyableMatchExpression{matchSpec,
+                                             getExpCtx(),
+                                             std::make_unique<ExtensionsCallbackNoop>(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures};
+    auto positionalExpr = make_intrusive<ExpressionInternalFindPositional>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo",
+        std::move(matchExpr));
+    auto sliceExpr =
+        make_intrusive<ExpressionInternalFindSlice>(getExpCtx(), positionalExpr, "bar", 1, 1);
+    executor->setRootReplacementExpression(sliceExpr);
+
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{foo: [3], bar: [6]}")},
+        executor->applyTransformation(Document{fromjson("{foo: [1,2,3,4], bar: [5,6,7,8]}")}));
+}
+
+TEST_F(SliceProjectionExecutionTest, CanApplySliceWithExclusionProjection) {
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{foo: [6]}")},
+        applySlice(
+            fromjson("{bar: 0}"), "foo", 2, 1, Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}));
+}
+
+TEST_F(SliceProjectionExecutionTest,
+       ShouldAddFieldsAndWholeDocumentToDependenciesWithInclusionProjection) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
+    auto expr = make_intrusive<ExpressionInternalFindSlice>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo.bar",
+        1,
+        1);
+    executor->setRootReplacementExpression(expr);
+
+    DepsTracker deps;
+    executor->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 1UL);
+    ASSERT_EQ(deps.fields.count("bar"), 1UL);
+    ASSERT(deps.needWholeDocument);
+}
+
+TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithInclusionProjection) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1}"), {});
+    auto expr = make_intrusive<ExpressionInternalFindSlice>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo.bar",
+        1,
+        1);
+    executor->setRootReplacementExpression(expr);
+
+    auto modifiedPaths = executor->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllPaths);
+}
+
+TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithExclusionProjection) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 0}"), {});
+    auto expr = make_intrusive<ExpressionInternalFindSlice>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo.bar",
+        1,
+        1);
+    executor->setRootReplacementExpression(expr);
+
+    auto modifiedPaths = executor->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllPaths);
+}
+
+TEST_F(SliceProjectionExecutionTest, ShouldAddWholeDocumentToDependenciesWithExclusionProjection) {
+    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 0}"), {});
+    auto expr = make_intrusive<ExpressionInternalFindSlice>(
+        getExpCtx(),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+        "foo.bar",
+        1,
+        1);
+    executor->setRootReplacementExpression(expr);
+
+    DepsTracker deps;
+    executor->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 0UL);
+    ASSERT(deps.needWholeDocument);
+}
+}  // namespace mongo::projection_executor

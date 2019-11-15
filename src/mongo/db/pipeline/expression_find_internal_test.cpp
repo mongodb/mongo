@@ -30,14 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::expression_internal_tests {
 constexpr auto kProjectionPostImageVarName =
-    parsed_aggregation_projection::ParsedAggregationProjection::kProjectionPostImageVarName;
+    projection_executor::ProjectionExecutor::kProjectionPostImageVarName;
 
 auto defineAndSetProjectionPostImageVariable(boost::intrusive_ptr<ExpressionContext> expCtx,
                                              Value postImage) {

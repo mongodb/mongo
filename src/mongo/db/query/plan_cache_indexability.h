@@ -32,16 +32,17 @@
 #include <functional>
 #include <vector>
 
-#include "mongo/db/exec/projection_exec_agg.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-
 class BSONObj;
 class CollatorInterface;
 class CompositeIndexabilityDiscriminator;
 class MatchExpression;
 struct CoreIndexInfo;
+namespace projection_executor {
+class ProjectionExecutor;
+}
 
 using IndexabilityDiscriminator = std::function<bool(const MatchExpression* me)>;
 using IndexabilityDiscriminators = std::vector<IndexabilityDiscriminator>;
@@ -116,7 +117,7 @@ private:
      * index.
      */
     struct WildcardIndexDiscriminatorContext {
-        WildcardIndexDiscriminatorContext(const ProjectionExecAgg* proj,
+        WildcardIndexDiscriminatorContext(projection_executor::ProjectionExecutor* proj,
                                           std::string name,
                                           const MatchExpression* filter,
                                           const CollatorInterface* coll)
@@ -126,7 +127,7 @@ private:
               catalogName(std::move(name)) {}
 
         // These are owned by the catalog.
-        const ProjectionExecAgg* projectionExec;
+        projection_executor::ProjectionExecutor* projectionExec;
         const MatchExpression* filterExpr;  // For partial indexes.
         const CollatorInterface* collator;
 

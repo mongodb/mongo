@@ -71,7 +71,7 @@ protected:
         const bool isMultikey = !multikeyPathSet.empty();
         BSONObj infoObj = BSON("wildcardProjection" << wildcardProjection);
 
-        _projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, wildcardProjection);
+        _projExec = WildcardKeyGenerator::createProjectionExecutor(keyPattern, wildcardProjection);
 
         params.indices.push_back({std::move(keyPattern),
                                   IndexType::INDEX_WILDCARD,
@@ -87,7 +87,7 @@ protected:
                                   _projExec.get()});
     }
 
-    std::unique_ptr<ProjectionExecAgg> _projExec;
+    std::unique_ptr<projection_executor::ProjectionExecutor> _projExec;
 };
 
 //

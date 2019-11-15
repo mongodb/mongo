@@ -64,18 +64,24 @@ struct ProjectionPolicies {
         FindOnlyFeaturesPolicy::kBanFindOnlyFeatures;
 
     static ProjectionPolicies findProjectionPolicies() {
-        return ProjectionPolicies{
-            ProjectionPolicies::kDefaultIdPolicyDefault,
-            ProjectionPolicies::kArrayRecursionPolicyDefault,
-            ProjectionPolicies::kComputedFieldsPolicyDefault,
-            ProjectionPolicies::FindOnlyFeaturesPolicy::kAllowFindOnlyFeatures};
+        return ProjectionPolicies{kDefaultIdPolicyDefault,
+                                  kArrayRecursionPolicyDefault,
+                                  kComputedFieldsPolicyDefault,
+                                  FindOnlyFeaturesPolicy::kAllowFindOnlyFeatures};
     }
 
     static ProjectionPolicies aggregateProjectionPolicies() {
-        return ProjectionPolicies{ProjectionPolicies::kDefaultIdPolicyDefault,
-                                  ProjectionPolicies::kArrayRecursionPolicyDefault,
-                                  ProjectionPolicies::kComputedFieldsPolicyDefault,
-                                  ProjectionPolicies::FindOnlyFeaturesPolicy::kBanFindOnlyFeatures};
+        return ProjectionPolicies{kDefaultIdPolicyDefault,
+                                  kArrayRecursionPolicyDefault,
+                                  kComputedFieldsPolicyDefault,
+                                  FindOnlyFeaturesPolicy::kBanFindOnlyFeatures};
+    }
+
+    static ProjectionPolicies wildcardIndexSpecProjectionPolicies() {
+        return ProjectionPolicies{DefaultIdPolicy::kExcludeId,
+                                  ArrayRecursionPolicy::kDoNotRecurseNestedArrays,
+                                  ComputedFieldsPolicy::kBanComputedFields,
+                                  FindOnlyFeaturesPolicy::kBanFindOnlyFeatures};
     }
 
     ProjectionPolicies(

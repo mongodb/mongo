@@ -31,20 +31,10 @@
 
 #include <memory>
 
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection_node.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_node.h"
 
-namespace mongo {
-
-class FieldPath;
-class Value;
-
-namespace parsed_aggregation_projection {
-
+namespace mongo::projection_executor {
 /**
  * A node used to define the parsed structure of an inclusion projection. Each InclusionNode
  * represents one 'level' of the parsed specification. The root InclusionNode represents all top
@@ -103,22 +93,22 @@ protected:
 };
 
 /**
- * A ParsedInclusionProjection represents a parsed form of the raw BSON specification.
+ * A InclusionProjectionExecutor represents an execution tree for an inclusion projection.
  *
- * This class is mostly a wrapper around an InclusionNode tree. It contains logic to parse a
- * specification object into the corresponding InclusionNode tree, but defers most execution logic
- * to the underlying tree.
+ * This class is mostly a wrapper around an InclusionNode tree and defers most execution logic to
+ * the underlying tree.
  */
-class ParsedInclusionProjection : public ParsedAggregationProjection {
+class InclusionProjectionExecutor : public ProjectionExecutor {
 public:
-    ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              ProjectionPolicies policies,
-                              std::unique_ptr<InclusionNode> root)
-        : ParsedAggregationProjection(expCtx, policies), _root(std::move(root)) {}
+    InclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                ProjectionPolicies policies,
+                                std::unique_ptr<InclusionNode> root)
+        : ProjectionExecutor(expCtx, policies), _root(std::move(root)) {}
 
-    ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              ProjectionPolicies policies)
-        : ParsedInclusionProjection(expCtx, policies, std::make_unique<InclusionNode>(policies)) {}
+    InclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                ProjectionPolicies policies)
+        : InclusionProjectionExecutor(expCtx, policies, std::make_unique<InclusionNode>(policies)) {
+    }
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;
@@ -151,7 +141,7 @@ public:
      * Optimize any computed expressions.
      */
     void optimize() final {
-        ParsedAggregationProjection::optimize();
+        ProjectionExecutor::optimize();
         _root->optimize();
     }
 
@@ -199,5 +189,4 @@ private:
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;
 };
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

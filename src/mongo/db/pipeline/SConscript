@@ -334,6 +334,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/exec/projection_executor',
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/exec/sort_executor',
         '$BUILD_DIR/mongo/db/generic_cursor',
@@ -342,7 +343,6 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-        '$BUILD_DIR/mongo/db/projection_executor',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
@@ -364,24 +364,10 @@ pipelineEnv.Library(
         'expression_context',
         'expression_javascript',
         'granularity_rounder',
-        'parsed_aggregation_projection',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/rpc/command_status',
-    ]
-)
-
-env.Library(
-    target='parsed_aggregation_projection',
-    source=[
-        'parsed_aggregation_projection_node.cpp',
-        'parsed_add_fields.cpp',
-    ],
-    LIBDEPS=[
-        'expression',
-        'field_path',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
     ]
 )
 
@@ -477,11 +463,6 @@ env.CppUnitTest(
         'granularity_rounder_preferred_numbers_test.cpp',
         'lookup_set_cache_test.cpp',
         'mongos_process_interface_test.cpp',
-        'parsed_add_fields_test.cpp',
-        'parsed_aggregation_projection_test.cpp',
-        'parsed_exclusion_projection_test.cpp',
-        'parsed_find_projection_test.cpp',
-        'parsed_inclusion_projection_test.cpp',
         'pipeline_metadata_tree_test.cpp',
         'pipeline_test.cpp',
         'process_interface_standalone_test.cpp',
@@ -497,7 +478,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
-        '$BUILD_DIR/mongo/db/projection_executor',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
@@ -520,7 +500,6 @@ env.CppUnitTest(
         'mongo_process_common',
         'mongo_process_interface',
         'mongos_process_interface',
-        'parsed_aggregation_projection',
         'pipeline',
         'process_interface_shardsvr',
         'process_interface_standalone',

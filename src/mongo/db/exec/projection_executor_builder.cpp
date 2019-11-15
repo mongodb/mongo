@@ -30,23 +30,19 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
+#include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
-#include "mongo/db/pipeline/parsed_exclusion_projection.h"
-#include "mongo/db/pipeline/parsed_inclusion_projection.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/query/projection_ast_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo::projection_executor {
 namespace {
-using ParsedAggregationProjection = parsed_aggregation_projection::ParsedAggregationProjection;
-using ParsedInclusionProjection = parsed_aggregation_projection::ParsedInclusionProjection;
-using ParsedExclusionProjection = parsed_aggregation_projection::ParsedExclusionProjection;
-
 constexpr auto kInclusion = projection_ast::ProjectType::kInclusion;
 constexpr auto kExclusion = projection_ast::ProjectType::kExclusion;
-constexpr auto kProjectionPostImageVarName =
-    parsed_aggregation_projection::ParsedAggregationProjection::kProjectionPostImageVarName;
+constexpr auto kProjectionPostImageVarName = ProjectionExecutor::kProjectionPostImageVarName;
 
 /**
  * Holds data used to built a projection executor while walking an AST tree. This struct is attached
@@ -174,7 +170,7 @@ public:
     }
 
     void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
-        constexpr auto isInclusion = std::is_same_v<Executor, ParsedInclusionProjection>;
+        constexpr auto isInclusion = std::is_same_v<Executor, InclusionProjectionExecutor>;
         invariant(isInclusion);
 
         const auto& path = _context->fullPath();
@@ -191,7 +187,7 @@ public:
         // A $slice expression can be applied to an exclusion projection. In this case we don't need
         // to project out the path to which $slice is applied, since it will already be included
         // into the output document.
-        if constexpr (std::is_same_v<Executor, ParsedInclusionProjection>) {
+        if constexpr (std::is_same_v<Executor, InclusionProjectionExecutor>) {
             userData.rootNode()->addProjectionForPath(path.fullPath());
         }
 
@@ -219,7 +215,7 @@ public:
 
         // In an inclusion projection only the _id field can be excluded from the result document.
         // If this is the case, then we don't need to include the field into the projection.
-        if constexpr (std::is_same_v<Executor, ParsedInclusionProjection>) {
+        if constexpr (std::is_same_v<Executor, InclusionProjectionExecutor>) {
             const auto isIdField = path == "_id";
             if (isIdField && !node->value()) {
                 return;
@@ -260,7 +256,7 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
 }
 }  // namespace
 
-std::unique_ptr<ParsedAggregationProjection> buildProjectionExecutor(
+std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const projection_ast::Projection* projection,
     const ProjectionPolicies policies,
@@ -269,10 +265,10 @@ std::unique_ptr<ParsedAggregationProjection> buildProjectionExecutor(
 
     switch (projection->type()) {
         case kInclusion:
-            return buildProjectionExecutor<ParsedInclusionProjection>(
+            return buildProjectionExecutor<InclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, optimizeExecutor);
         case kExclusion:
-            return buildProjectionExecutor<ParsedExclusionProjection>(
+            return buildProjectionExecutor<ExclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, optimizeExecutor);
         default:
             MONGO_UNREACHABLE;

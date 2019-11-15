@@ -31,8 +31,11 @@
 
 #include "mongo/db/index/wildcard_key_generator.h"
 
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 namespace {
@@ -62,8 +65,8 @@ void popPathComponent(BSONElement elem, bool enclosingObjIsArray, FieldRef* path
 
 constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 
-std::unique_ptr<ProjectionExecAgg> WildcardKeyGenerator::createProjectionExec(
-    BSONObj keyPattern, BSONObj pathProjection) {
+std::unique_ptr<projection_executor::ProjectionExecutor>
+WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern, BSONObj pathProjection) {
     // We should never have a key pattern that contains more than a single element.
     invariant(keyPattern.nFields() == 1);
 
@@ -82,13 +85,14 @@ std::unique_ptr<ProjectionExecAgg> WildcardKeyGenerator::createProjectionExec(
                          ? BSON(indexRoot.substr(0, suffixPos) << 1)
                          : pathProjection.isEmpty() ? kDefaultProjection : pathProjection);
 
-    // If the projection spec does not explicitly specify _id, we exclude it by default. We also
-    // prevent the projection from recursing through nested arrays, in order to ensure that the
-    // output document aligns with the match system's expectations.
-    return ProjectionExecAgg::create(
-        projSpec,
-        ProjectionExecAgg::DefaultIdPolicy::kExcludeId,
-        ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
+    // Construct a dummy ExpressionContext for ProjectionExecutor. It's OK to set the
+    // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' here; since we
+    // ban computed fields from the projection, the ExpressionContext will never be used.
+    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr);
+    auto policies = ProjectionPolicies::wildcardIndexSpecProjectionPolicies();
+    auto projection = projection_ast::parse(expCtx, projSpec, policies);
+    return projection_executor::buildProjectionExecutor(
+        expCtx, &projection, policies, true /* optimizeExecutor */);
 }
 
 WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
@@ -96,20 +100,23 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
                                            const CollatorInterface* collator,
                                            KeyString::Version keyStringVersion,
                                            Ordering ordering)
-    : _collator(collator),
+    : _projExec(createProjectionExecutor(keyPattern, pathProjection)),
+      _collator(collator),
       _keyPattern(keyPattern),
       _keyStringVersion(keyStringVersion),
-      _ordering(ordering) {
-    _projExec = createProjectionExec(keyPattern, pathProjection);
-}
+      _ordering(ordering) {}
 
 void WildcardKeyGenerator::generateKeys(BSONObj inputDoc,
                                         KeyStringSet* keys,
                                         KeyStringSet* multikeyPaths,
                                         boost::optional<RecordId> id) const {
     FieldRef rootPath;
-    _traverseWildcard(
-        _projExec->applyProjection(inputDoc), false, &rootPath, keys, multikeyPaths, id);
+    _traverseWildcard(_projExec->applyTransformation(Document{inputDoc}).toBson(),
+                      false,
+                      &rootPath,
+                      keys,
+                      multikeyPaths,
+                      id);
 }
 
 void WildcardKeyGenerator::_traverseWildcard(BSONObj obj,

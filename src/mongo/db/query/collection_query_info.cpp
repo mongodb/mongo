@@ -39,6 +39,8 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop_metrics.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
@@ -60,9 +62,9 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
     auto accessMethod = ice.accessMethod();
     invariant(accessMethod);
 
-    const ProjectionExecAgg* projExec = nullptr;
+    projection_executor::ProjectionExecutor* projExec = nullptr;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
-        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec();
+        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExecutor();
 
     return {desc->keyPattern(),
             desc->getIndexType(),
@@ -102,15 +104,17 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx) {
         if (descriptor->getAccessMethodName() == IndexNames::WILDCARD) {
             // Obtain the projection used by the $** index's key generator.
             const auto* pathProj =
-                static_cast<const WildcardAccessMethod*>(iam)->getProjectionExec();
+                static_cast<const WildcardAccessMethod*>(iam)->getProjectionExecutor();
             // If the projection is an exclusion, then we must check the new document's keys on all
             // updates, since we do not exhaustively know the set of paths to be indexed.
-            if (pathProj->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection) {
+            if (pathProj->getType() ==
+                TransformerInterface::TransformerType::kExclusionProjection) {
                 _indexedPaths.allPathsIndexed();
             } else {
                 // If a subtree was specified in the keyPattern, or if an inclusion projection is
                 // present, then we need only index the path(s) preserved by the projection.
-                for (const auto& path : pathProj->getExhaustivePaths()) {
+                for (const auto& path :
+                     projection_executor_utils::extractExhaustivePaths(pathProj)) {
                     _indexedPaths.addPath(path);
                 }
             }

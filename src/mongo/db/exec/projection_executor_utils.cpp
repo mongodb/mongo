@@ -27,12 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/exec/projection_executor.h"
 
-#include "mongo/db/exec/find_projection_executor.h"
+namespace mongo::projection_executor_utils {
+bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor,
+                               StringData field) {
+    const FieldPath fp{field};
+    MutableDocument md;
+    md.setNestedField(fp, Value{1.0});
+    auto output = executor->applyTransformation(md.freeze());
+    return !output.getNestedField(fp).missing();
+    return false;
+}
 
-namespace mongo {
-namespace projection_executor {
+stdx::unordered_set<std::string> applyProjectionToFields(
+    projection_executor::ProjectionExecutor* executor,
+    const stdx::unordered_set<std::string>& fields) {
+    stdx::unordered_set<std::string> out;
+
+    for (const auto& field : fields) {
+        if (applyProjectionToOneField(executor, field)) {
+            out.insert(field);
+        }
+    }
+
+    return out;
+}
+
+std::set<FieldRef> extractExhaustivePaths(const projection_executor::ProjectionExecutor* executor) {
+    std::set<FieldRef> exhaustivePaths;
+
+    if (executor->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
+        DepsTracker depsTracker;
+        executor->addDependencies(&depsTracker);
+        for (auto&& field : depsTracker.fields) {
+            exhaustivePaths.insert(FieldRef{field});
+        }
+    }
+
+    return exhaustivePaths;
+}
+
 namespace {
 /**
  * Holds various parameters required to apply a $slice projection. Populated from the arguments
@@ -44,9 +79,21 @@ struct SliceParams {
     const int limit;
 };
 
-Value applySliceProjectionHelper(const Document& input,
-                                 const SliceParams& params,
-                                 size_t fieldPathIndex);
+/**
+ * Extracts an element from the array 'arr' at position 'elemIndex'. The 'elemIndex' string
+ * parameter must hold a value which can be converted to an unsigned integer. If 'elemIndex' is not
+ * within array boundaries, an empty Value is returned.
+ */
+Value extractArrayElement(const Value& arr, const std::string& elemIndex) {
+    auto index = str::parseUnsignedBase10Integer(elemIndex);
+    invariant(index);
+    return arr[*index];
+}
+
+
+Value applyFindSliceProjectionHelper(const Document& input,
+                                     const SliceParams& params,
+                                     size_t fieldPathIndex);
 
 /**
  * Returns a portion of the 'array', skipping a number of elements as indicated by the 'skip'
@@ -95,16 +142,16 @@ Value sliceArray(const std::vector<Value>& array, boost::optional<int> skip, int
  * on the path "a.b", but {a: [{b: 1}]} does, so nested arrays are stored within the output array
  * as regular values.
  */
-Value applySliceProjectionToArray(const std::vector<Value>& array,
-                                  const SliceParams& params,
-                                  size_t fieldPathIndex) {
+Value applyFindSliceProjectionToArray(const std::vector<Value>& array,
+                                      const SliceParams& params,
+                                      size_t fieldPathIndex) {
     std::vector<Value> output;
     output.reserve(array.size());
 
     for (const auto& elem : array) {
         output.push_back(
             elem.getType() == BSONType::Object
-                ? applySliceProjectionHelper(elem.getDocument(), params, fieldPathIndex)
+                ? applyFindSliceProjectionHelper(elem.getDocument(), params, fieldPathIndex)
                 : elem);
     }
 
@@ -123,9 +170,9 @@ Value applySliceProjectionToArray(const std::vector<Value>& array,
  *       the result in 'val'.
  *     * Store the computed 'val' in the 'output' document under the current field name.
  */
-Value applySliceProjectionHelper(const Document& input,
-                                 const SliceParams& params,
-                                 size_t fieldPathIndex) {
+Value applyFindSliceProjectionHelper(const Document& input,
+                                     const SliceParams& params,
+                                     size_t fieldPathIndex) {
     invariant(fieldPathIndex < params.path.getPathLength());
 
     auto fieldName = params.path.getFieldName(fieldPathIndex++);
@@ -135,11 +182,11 @@ Value applySliceProjectionHelper(const Document& input,
         case BSONType::Array:
             val = (fieldPathIndex == params.path.getPathLength())
                 ? sliceArray(val.getArray(), params.skip, params.limit)
-                : applySliceProjectionToArray(val.getArray(), params, fieldPathIndex);
+                : applyFindSliceProjectionToArray(val.getArray(), params, fieldPathIndex);
             break;
         case BSONType::Object:
             if (fieldPathIndex < params.path.getPathLength()) {
-                val = applySliceProjectionHelper(val.getDocument(), params, fieldPathIndex);
+                val = applyFindSliceProjectionHelper(val.getDocument(), params, fieldPathIndex);
             }
             break;
         default:
@@ -152,16 +199,10 @@ Value applySliceProjectionHelper(const Document& input,
 }
 }  // namespace
 
-Value extractArrayElement(const Value& arr, const std::string& elemIndex) {
-    auto index = str::parseUnsignedBase10Integer(elemIndex);
-    invariant(index);
-    return arr[*index];
-}
-
-Document applyPositionalProjection(const Document& preImage,
-                                   const Document& postImage,
-                                   const MatchExpression& matchExpr,
-                                   const FieldPath& path) {
+Document applyFindPositionalProjection(const Document& preImage,
+                                       const Document& postImage,
+                                       const MatchExpression& matchExpr,
+                                       const FieldPath& path) {
     MutableDocument output(postImage);
 
     // Try to find the first matching array element from the 'input' document based on the condition
@@ -217,9 +258,9 @@ Document applyPositionalProjection(const Document& preImage,
     return output.freeze();
 }
 
-Value applyElemMatchProjection(const Document& input,
-                               const MatchExpression& matchExpr,
-                               const FieldPath& path) {
+Value applyFindElemMatchProjection(const Document& input,
+                                   const MatchExpression& matchExpr,
+                                   const FieldPath& path) {
     invariant(path.getPathLength() == 1);
 
     // Try to find the first matching array element from the 'input' document based on the condition
@@ -241,14 +282,13 @@ Value applyElemMatchProjection(const Document& input,
     return Value{std::vector<Value>{matchingElem}};
 }
 
-Document applySliceProjection(const Document& input,
-                              const FieldPath& path,
-                              boost::optional<int> skip,
-                              int limit) {
+Document applyFindSliceProjection(const Document& input,
+                                  const FieldPath& path,
+                                  boost::optional<int> skip,
+                                  int limit) {
     auto params = SliceParams{path, skip, limit};
-    auto val = applySliceProjectionHelper(input, params, 0);
+    auto val = applyFindSliceProjectionHelper(input, params, 0);
     invariant(val.getType() == BSONType::Object);
     return val.getDocument();
 }
-}  // namespace projection_executor
-}  // namespace mongo
+}  // namespace mongo::projection_executor_utils

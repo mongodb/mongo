@@ -430,7 +430,7 @@ StatusWith<BSONObj> validateIndexSpec(
             try {
                 // We use WildcardKeyGenerator::createProjectionExec to parse and validate the path
                 // projection spec.
-                WildcardKeyGenerator::createProjectionExec(key, indexSpecElem.embeddedObject());
+                WildcardKeyGenerator::createProjectionExecutor(key, indexSpecElem.embeddedObject());
             } catch (const DBException& ex) {
                 return ex.toStatus(str::stream() << "Failed to parse: "
                                                  << IndexDescriptor::kPathProjectionFieldName);

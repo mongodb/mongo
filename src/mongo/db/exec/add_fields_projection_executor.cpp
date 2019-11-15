@@ -29,23 +29,104 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/parsed_add_fields.h"
+#include "mongo/db/exec/add_fields_projection_executor.h"
 
 #include <algorithm>
 
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
-namespace mongo {
-namespace parsed_aggregation_projection {
-
+namespace mongo::projection_executor {
+namespace {
 using TransformerType = TransformerInterface::TransformerType;
-
 using expression::isPathPrefixOf;
 
-//
-// ProjectionSpecValidator
-//
+/**
+ * This class ensures that the specification was valid: that none of the paths specified conflict
+ * with one another, that there is at least one field, etc. Here "projection" includes $addFields
+ * specifications.
+ */
+class ProjectionSpecValidator {
+public:
+    /**
+     * Throws if the specification is not valid for a projection. Because this validator is meant to
+     * be generic, the error thrown is generic.  Callers at the DocumentSource level should modify
+     * the error message if they want to include information specific to the stage name used.
+     */
+    static void uassertValid(const BSONObj& spec);
+
+private:
+    ProjectionSpecValidator(const BSONObj& spec) : _rawObj(spec) {}
+
+    /**
+     * Uses '_seenPaths' to see if 'path' conflicts with any paths that have already been specified.
+     *
+     * For example, a user is not allowed to specify {'a': 1, 'a.b': 1}, or some similar conflicting
+     * paths.
+     */
+    void ensurePathDoesNotConflictOrThrow(const std::string& path);
+
+    /**
+     * Throws if an invalid projection specification is detected.
+     */
+    void validate();
+
+    /**
+     * Parses a single BSONElement. 'pathToElem' should include the field name of 'elem'.
+     *
+     * Delegates to parseSubObject() if 'elem' is an object. Otherwise adds the full path to 'elem'
+     * to '_seenPaths'.
+     *
+     * Calls ensurePathDoesNotConflictOrThrow with the path to this element, throws on conflicting
+     * path specifications.
+     */
+    void parseElement(const BSONElement& elem, const FieldPath& pathToElem);
+
+    /**
+     * Traverses 'thisLevelSpec', parsing each element in turn.
+     *
+     * Throws if any paths conflict with each other or existing paths, 'thisLevelSpec' contains a
+     * dotted path, or if 'thisLevelSpec' represents an invalid expression.
+     */
+    void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix);
+
+    // The original object. Used to generate more helpful error messages.
+    const BSONObj& _rawObj;
+
+    // Custom comparator that orders fieldpath strings by path prefix first, then by field.
+    struct PathPrefixComparator {
+        static constexpr char dot = '.';
+
+        // Returns true if the lhs value should sort before the rhs, false otherwise.
+        bool operator()(const std::string& lhs, const std::string& rhs) const {
+            for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {
+                auto &lchar = lhs[pos], &rchar = rhs[pos];
+                if (lchar == rchar) {
+                    continue;
+                }
+
+                // Consider the path delimiter '.' as being less than all other characters, so that
+                // paths sort directly before any paths they prefix and directly after any paths
+                // which prefix them.
+                if (lchar == dot) {
+                    return true;
+                } else if (rchar == dot) {
+                    return false;
+                }
+
+                // Otherwise, default to normal character comparison.
+                return lchar < rchar;
+            }
+
+            // If we get here, then we have reached the end of lhs and/or rhs and all of their path
+            // segments up to this point match. If lhs is shorter than rhs, then lhs prefixes rhs
+            // and should sort before it.
+            return lhs.size() < rhs.size();
+        }
+    };
+
+    // Tracks which paths we've seen to ensure no two paths conflict with each other.
+    std::set<std::string, PathPrefixComparator> _seenPaths;
+};
 
 void ProjectionSpecValidator::uassertValid(const BSONObj& spec) {
     ProjectionSpecValidator(spec).validate();
@@ -127,19 +208,20 @@ void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
         parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
     }
 }
+}  // namespace
 
-std::unique_ptr<ParsedAddFields> ParsedAddFields::create(
+std::unique_ptr<AddFieldsProjectionExecutor> AddFieldsProjectionExecutor::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) {
     // Verify that we don't have conflicting field paths, etc.
     ProjectionSpecValidator::uassertValid(spec);
-    std::unique_ptr<ParsedAddFields> parsedAddFields = std::make_unique<ParsedAddFields>(expCtx);
+    auto executor = std::make_unique<AddFieldsProjectionExecutor>(expCtx);
 
     // Actually parse the specification.
-    parsedAddFields->parse(spec);
-    return parsedAddFields;
+    executor->parse(spec);
+    return executor;
 }
 
-void ParsedAddFields::parse(const BSONObj& spec) {
+void AddFieldsProjectionExecutor::parse(const BSONObj& spec) {
     for (auto elem : spec) {
         auto fieldName = elem.fieldNameStringData();
 
@@ -170,7 +252,7 @@ void ParsedAddFields::parse(const BSONObj& spec) {
     }
 }
 
-Document ParsedAddFields::applyProjection(const Document& inputDoc) const {
+Document AddFieldsProjectionExecutor::applyProjection(const Document& inputDoc) const {
     // The output doc is the same as the input doc, with the added fields.
     MutableDocument output(inputDoc);
     _root->applyExpressions(inputDoc, &output);
@@ -180,9 +262,10 @@ Document ParsedAddFields::applyProjection(const Document& inputDoc) const {
     return output.freeze();
 }
 
-bool ParsedAddFields::parseObjectAsExpression(StringData pathToObject,
-                                              const BSONObj& objSpec,
-                                              const VariablesParseState& variablesParseState) {
+bool AddFieldsProjectionExecutor::parseObjectAsExpression(
+    StringData pathToObject,
+    const BSONObj& objSpec,
+    const VariablesParseState& variablesParseState) {
     if (objSpec.firstElementFieldName()[0] == '$') {
         // This is an expression like {$add: [...]}. We already verified that it has only one field.
         invariant(objSpec.nFields() == 1);
@@ -193,9 +276,9 @@ bool ParsedAddFields::parseObjectAsExpression(StringData pathToObject,
     return false;
 }
 
-void ParsedAddFields::parseSubObject(const BSONObj& subObj,
-                                     const VariablesParseState& variablesParseState,
-                                     InclusionNode* node) {
+void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
+                                                 const VariablesParseState& variablesParseState,
+                                                 InclusionNode* node) {
     for (auto&& elem : subObj) {
         invariant(elem.fieldName()[0] != '$');
         // Dotted paths in a sub-object have already been detected and disallowed by the function
@@ -221,6 +304,4 @@ void ParsedAddFields::parseSubObject(const BSONObj& subObj,
         }
     }
 }
-
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

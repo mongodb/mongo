@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/parsed_exclusion_projection.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
 
 #include <iostream>
 #include <iterator>
@@ -42,33 +42,32 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
-namespace parsed_aggregation_projection {
+namespace mongo::projection_executor {
 namespace {
-
 using std::vector;
 
 auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& policies) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto projection = projection_ast::parse(expCtx, spec, policies);
-    auto executor = projection_executor::buildProjectionExecutor(
-        expCtx, &projection, policies, true /* optimizeExecutor */);
+    auto executor =
+        buildProjectionExecutor(expCtx, &projection, policies, true /* optimizeExecutor */);
     invariant(executor->getType() == TransformerInterface::TransformerType::kExclusionProjection);
     return executor;
 }
 
-// Helper to simplify the creation of a ParsedExclusionProjection with default policies.
+// Helper to simplify the creation of a ExclusionProjectionExecutor with default policies.
 auto makeExclusionProjectionWithDefaultPolicies(const BSONObj& spec) {
     return createProjectionExecutor(spec, {});
 }
 
-// Helper to simplify the creation of a ParsedExclusionProjection which excludes _id by default.
+// Helper to simplify the creation of a ExclusionProjectionExecutor which excludes _id by default.
 auto makeExclusionProjectionWithDefaultIdExclusion(const BSONObj& spec) {
     ProjectionPolicies defaultExcludeId{ProjectionPolicies::DefaultIdPolicy::kExcludeId,
                                         ProjectionPolicies::kArrayRecursionPolicyDefault,
@@ -76,7 +75,7 @@ auto makeExclusionProjectionWithDefaultIdExclusion(const BSONObj& spec) {
     return createProjectionExecutor(spec, defaultExcludeId);
 }
 
-// Helper to simplify the creation of a ParsedExclusionProjection which does not recurse arrays.
+// Helper to simplify the creation of a ExclusionProjectionExecutor which does not recurse arrays.
 auto makeExclusionProjectionWithNoArrayRecursion(const BSONObj& spec) {
     ProjectionPolicies noArrayRecursion{
         ProjectionPolicies::kDefaultIdPolicyDefault,
@@ -454,5 +453,4 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotRetainNestedArraysIfNoRecursionN
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 }  // namespace
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

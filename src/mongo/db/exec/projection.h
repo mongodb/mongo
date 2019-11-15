@@ -104,7 +104,7 @@ private:
     // True, if the projection contains a recordId $meta expression.
     const bool _wantRecordId;
     const projection_ast::ProjectType _projectType;
-    std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> _executor;
+    std::unique_ptr<projection_executor::ProjectionExecutor> _executor;
 };
 
 /**

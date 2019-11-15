@@ -31,7 +31,7 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/exec/find_projection_executor.h"
+#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/pipeline/expression.h"
 
@@ -66,7 +66,7 @@ public:
                 "Positional operator post-image can only be an object, but got {}"_format(
                     typeName(postImage.getType())),
                 postImage.getType() == BSONType::Object);
-        return Value{projection_executor::applyPositionalProjection(
+        return Value{projection_executor_utils::applyFindPositionalProjection(
             preImage.getDocument(), postImage.getDocument(), *_matchExpr, _path)};
     }
 
@@ -137,7 +137,7 @@ public:
                 "$slice operator can only be applied to an object, but got {}"_format(
                     typeName(postImage.getType())),
                 postImage.getType() == BSONType::Object);
-        return Value{projection_executor::applySliceProjection(
+        return Value{projection_executor_utils::applyFindSliceProjection(
             postImage.getDocument(), _path, _skip, _limit)};
     }
 
@@ -197,7 +197,7 @@ public:
                 "$elemMatch operator can only be applied to an object, but got {}"_format(
                     typeName(input.getType())),
                 input.getType() == BSONType::Object);
-        return projection_executor::applyElemMatchProjection(
+        return projection_executor_utils::applyFindElemMatchProjection(
             input.getDocument(), *_matchExpr, _path);
     }
 

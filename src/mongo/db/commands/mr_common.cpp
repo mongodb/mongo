@@ -39,6 +39,8 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/exec/projection_node.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -51,8 +53,6 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_javascript.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection_node.h"
-#include "mongo/db/pipeline/parsed_inclusion_projection.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log.h"
@@ -110,11 +110,11 @@ auto translateSort(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj
 auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
     auto emitExpression = ExpressionInternalJsEmit::create(
         expCtx, ExpressionFieldPath::parse(expCtx, "$$ROOT", expCtx->variablesParseState), code);
-    auto node = std::make_unique<parsed_aggregation_projection::InclusionNode>(
+    auto node = std::make_unique<projection_executor::InclusionNode>(
         ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId});
     node->addExpressionForPath(FieldPath{"emits"s}, std::move(emitExpression));
     auto inclusion = std::unique_ptr<TransformerInterface>{
-        std::make_unique<parsed_aggregation_projection::ParsedInclusionProjection>(
+        std::make_unique<projection_executor::InclusionProjectionExecutor>(
             expCtx,
             ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId},
             std::move(node))};
@@ -145,12 +145,12 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx, std::stri
                 ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState),
                 ExpressionFieldPath::parse(expCtx, "$value", expCtx->variablesParseState))),
         code);
-    auto node = std::make_unique<parsed_aggregation_projection::InclusionNode>(
+    auto node = std::make_unique<projection_executor::InclusionNode>(
         ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
     node->addProjectionForPath(FieldPath{"_id"s});
     node->addExpressionForPath(FieldPath{"value"s}, std::move(jsExpression));
     auto inclusion = std::unique_ptr<TransformerInterface>{
-        std::make_unique<parsed_aggregation_projection::ParsedInclusionProjection>(
+        std::make_unique<projection_executor::InclusionProjectionExecutor>(
             expCtx,
             ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId},
             std::move(node))};

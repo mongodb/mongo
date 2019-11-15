@@ -48,6 +48,7 @@
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/shard_filter.h"
@@ -165,17 +166,18 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 
     const bool isMultikey = desc->isMultikey();
 
-    const ProjectionExecAgg* projExec = nullptr;
+    projection_executor::ProjectionExecutor* projExec = nullptr;
     std::set<FieldRef> multikeyPathSet;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec();
+        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExecutor();
         if (isMultikey) {
             MultikeyMetadataAccessStats mkAccessStats;
 
             if (canonicalQuery) {
                 stdx::unordered_set<std::string> fields;
                 QueryPlannerIXSelect::getFields(canonicalQuery->root(), &fields);
-                const auto projectedFields = projExec->applyProjectionToFields(fields);
+                const auto projectedFields =
+                    projection_executor_utils::applyProjectionToFields(projExec, fields);
 
                 multikeyPathSet =
                     accessMethod->getMultikeyPathSet(opCtx, projectedFields, &mkAccessStats);
@@ -1389,9 +1391,10 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                 indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
-            const auto* proj =
-                static_cast<const WildcardAccessMethod*>(ice->accessMethod())->getProjectionExec();
-            if (proj->applyProjectionToOneField(parsedDistinct.getKey())) {
+            auto* proj = static_cast<const WildcardAccessMethod*>(ice->accessMethod())
+                             ->getProjectionExecutor();
+            if (projection_executor_utils::applyProjectionToOneField(proj,
+                                                                     parsedDistinct.getKey())) {
                 plannerParams.indices.push_back(
                     indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
             }

@@ -32,7 +32,6 @@
 #include <set>
 #include <string>
 
-#include "mongo/db/exec/projection_exec_agg.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -41,9 +40,11 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
 class CollatorInterface;
 class MatchExpression;
+namespace projection_executor {
+class ProjectionExecutor;
+}
 
 /**
  * A CoreIndexInfo is a representation of an index in the catalog with parsed information which is
@@ -60,7 +61,7 @@ struct CoreIndexInfo {
                   Identifier ident,
                   const MatchExpression* fe = nullptr,
                   const CollatorInterface* ci = nullptr,
-                  const ProjectionExecAgg* projExec = nullptr)
+                  projection_executor::ProjectionExecutor* projExec = nullptr)
         : identifier(std::move(ident)),
           keyPattern(kp),
           filterExpr(fe),
@@ -137,7 +138,7 @@ struct CoreIndexInfo {
 
     // For $** indexes, a pointer to the projection executor owned by the index access method. Null
     // unless this IndexEntry represents a wildcard index, in which case this is always non-null.
-    const ProjectionExecAgg* wildcardProjection = nullptr;
+    projection_executor::ProjectionExecutor* wildcardProjection = nullptr;
 };
 
 /**
@@ -159,7 +160,7 @@ struct IndexEntry : CoreIndexInfo {
                const MatchExpression* fe,
                const BSONObj& io,
                const CollatorInterface* ci,
-               const ProjectionExecAgg* projExec)
+               projection_executor::ProjectionExecutor* projExec)
         : CoreIndexInfo(kp, type, sp, std::move(ident), fe, ci, projExec),
           multikey(mk),
           multikeyPaths(mkp),

@@ -29,13 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/db/exec/projection_executor.h"
 
 #include "mongo/db/query/projection_policies.h"
 
-namespace mongo {
-namespace parsed_aggregation_projection {
-
+namespace mongo::projection_executor {
 /**
  * A node used to define the parsed structure of a projection. Each ProjectionNode represents one
  * 'level' of the parsed specification. The root ProjectionNode represents all top level projections
@@ -197,6 +195,4 @@ private:
     // example above, '_orderToProcessAdditionsAndChildren' would be ["a", "b", "d"].
     std::vector<std::string> _orderToProcessAdditionsAndChildren;
 };
-
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

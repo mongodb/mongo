@@ -30,17 +30,31 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/field_path.h"
 
-namespace mongo {
-namespace projection_executor {
+namespace mongo::projection_executor_utils {
 /**
- * Extracts an element from the array 'arr' at position 'elemIndex'. The 'elemIndex' string
- * parameter must hold a value which can be converted to an unsigned integer. If 'elemIndex' is not
- * within array boundaries, an empty Value is returned.
+ * Applies the projection to a single field name. Returns whether or not the projection would
+ * allow that field to remain in a document.
+ **/
+bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor, StringData field);
+
+/**
+ * Applies the projection to each field from the 'fields' set and stores it in the returned set
+ * if the projection would allow that field to remain in a document.
+ **/
+stdx::unordered_set<std::string> applyProjectionToFields(
+    projection_executor::ProjectionExecutor* executor,
+    const stdx::unordered_set<std::string>& fields);
+
+/**
+ * Returns the exhaustive set of all paths that will be preserved by this projection, or an
+ * empty set if the exhaustive set cannot be determined. An inclusion will always produce an
+ * exhaustive set; an exclusion will always produce an empty set.
  */
-Value extractArrayElement(const Value& arr, const std::string& elemIndex);
+std::set<FieldRef> extractExhaustivePaths(const projection_executor::ProjectionExecutor* executor);
 
 /**
  * Applies a positional projection on the first array found in the 'path' on a projection
@@ -63,10 +77,10 @@ Value extractArrayElement(const Value& arr, const std::string& elemIndex);
  * Throws an AssertionException if 'matchExpr' matches the input document, but an array element
  * satisfying positional projection requirements cannot be found.
  */
-Document applyPositionalProjection(const Document& preImage,
-                                   const Document& postImage,
-                                   const MatchExpression& matchExpr,
-                                   const FieldPath& path);
+Document applyFindPositionalProjection(const Document& preImage,
+                                       const Document& postImage,
+                                       const MatchExpression& matchExpr,
+                                       const FieldPath& path);
 /**
  * Applies an $elemMatch projection on the array at the given 'path' on the 'input' document. The
  * applied projection is stored in the output Value. The 'matchExpr' specifies a condition to
@@ -85,9 +99,9 @@ Document applyPositionalProjection(const Document& preImage,
  * Since the $elemMatch projection cannot be used with a nested field, the 'path' value must not
  * be a dotted path, otherwise an invariant will be triggered.
  */
-Value applyElemMatchProjection(const Document& input,
-                               const MatchExpression& matchExpr,
-                               const FieldPath& path);
+Value applyFindElemMatchProjection(const Document& input,
+                                   const MatchExpression& matchExpr,
+                                   const FieldPath& path);
 /**
  * Applies a $slice projection on the array at the given 'path' on the 'input' document. The applied
  * projection is returned as a Document. The 'skip' parameter indicates the number of items in the
@@ -107,10 +121,8 @@ Value applyElemMatchProjection(const Document& input,
  *
  * The resulting document will contain the following element: {foo: [{bar: 2}, {bar: 3}]}.
  */
-Document applySliceProjection(const Document& input,
-                              const FieldPath& path,
-                              boost::optional<int> skip,
-                              int limit);
-
-}  // namespace projection_executor
-}  // namespace mongo
+Document applyFindSliceProjection(const Document& input,
+                                  const FieldPath& path,
+                                  boost::optional<int> skip,
+                                  int limit);
+}  // namespace mongo::projection_executor_utils

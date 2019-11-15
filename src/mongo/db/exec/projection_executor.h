@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,20 +29,103 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_ast_walker.h"
+#include "mongo/platform/basic.h"
+
+#include <boost/intrusive_ptr.hpp>
+#include <memory>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/projection_policies.h"
 
 namespace mongo::projection_executor {
 /**
- * Builds a projection execution tree from the given 'projection' and using the given projection
- * 'policies' by walking an AST tree starting at the root node stored within the 'projection'.
- * Set 'optimizeExecutor' to 'true' when the 'optimize()' method needs to be called on the newly
- * created executor before returning it to the caller.
+ * A ProjectionExecutor is responsible for parsing and executing a $project. It represents either an
+ * inclusion or exclusion projection. This is the common interface between the two types of
+ * projections.
  */
-std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> buildProjectionExecutor(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const projection_ast::Projection* projection,
-    ProjectionPolicies policies,
-    bool optimizeExecutor);
+class ProjectionExecutor : public TransformerInterface {
+public:
+    /**
+     * The name of an internal variable to bind a projection post image to, which is used by the
+     * '_rootReplacementExpression' to replace the content of the transformed document.
+     */
+    static constexpr StringData kProjectionPostImageVarName{"INTERNAL_PROJ_POST_IMAGE"_sd};
+
+    /**
+     * Optimize any expressions contained within this projection.
+     */
+    void optimize() override {
+        if (_rootReplacementExpression) {
+            _rootReplacementExpression->optimize();
+        }
+    }
+
+    /**
+     * Add any dependencies needed by this projection or any sub-expressions to 'deps'.
+     */
+    DepsTracker::State addDependencies(DepsTracker* deps) const override {
+        return DepsTracker::State::NOT_SUPPORTED;
+    }
+
+    /**
+     * Apply the projection transformation.
+     */
+    Document applyTransformation(const Document& input) override {
+        auto output = applyProjection(input);
+        if (_rootReplacementExpression) {
+            return _applyRootReplacementExpression(input, output);
+        }
+        return output;
+    }
+
+    /**
+     * Sets 'expr' as a root-replacement expression to this tree. A root-replacement expression,
+     * once evaluated, will replace an entire output document. A projection post image document
+     * will be accessible via the special variable, whose name is stored in
+     * 'kProjectionPostImageVarName', if this expression needs access to it.
+     */
+    void setRootReplacementExpression(boost::intrusive_ptr<Expression> expr) {
+        _rootReplacementExpression = expr;
+    }
+
+protected:
+    ProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       ProjectionPolicies policies)
+        : _expCtx(expCtx),
+          _policies(policies),
+          _projectionPostImageVarId{
+              _expCtx->variablesParseState.defineVariable(kProjectionPostImageVarName)} {}
+
+    /**
+     * Apply the projection to 'input'.
+     */
+    virtual Document applyProjection(const Document& input) const = 0;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+
+    ProjectionPolicies _policies;
+
+    boost::intrusive_ptr<Expression> _rootReplacementExpression;
+
+private:
+    Document _applyRootReplacementExpression(const Document& input, const Document& output) {
+        using namespace fmt::literals;
+
+        _expCtx->variables.setValue(_projectionPostImageVarId, Value{output});
+        auto val = _rootReplacementExpression->evaluate(input, &_expCtx->variables);
+        uassert(51254,
+                "Root-replacement expression must return a document, but got {}"_format(
+                    typeName(val.getType())),
+                val.getType() == BSONType::Object);
+        return val.getDocument();
+    }
+
+    // This variable id is used to bind a projection post-image so that it can be accessed by
+    // root-replacement expressions which apply projection to the entire post-image document, rather
+    // than to a specific field.
+    Variables::Id _projectionPostImageVarId;
+};
 }  // namespace mongo::projection_executor

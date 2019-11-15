@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/parsed_inclusion_projection.h"
+#include "mongo/db/exec/inclusion_projection_executor.h"
 
 #include <vector>
 
@@ -40,16 +40,15 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
-namespace parsed_aggregation_projection {
+namespace mongo::projection_executor {
 namespace {
-
 using std::vector;
 
 template <typename T>
@@ -60,18 +59,18 @@ BSONObj wrapInLiteral(const T& arg) {
 auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& policies) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto projection = projection_ast::parse(expCtx, spec, policies);
-    auto executor = projection_executor::buildProjectionExecutor(
-        expCtx, &projection, policies, true /* optimizeExecutor */);
+    auto executor =
+        buildProjectionExecutor(expCtx, &projection, policies, true /* optimizeExecutor */);
     invariant(executor->getType() == TransformerInterface::TransformerType::kInclusionProjection);
     return executor;
 }
 
-// Helper to simplify the creation of a ParsedInclusionProjection with default policies.
+// Helper to simplify the creation of a InclusionProjectionExecutor with default policies.
 auto makeInclusionProjectionWithDefaultPolicies(BSONObj spec) {
     return createProjectionExecutor(spec, {});
 }
 
-// Helper to simplify the creation of a ParsedInclusionProjection which excludes _id by default.
+// Helper to simplify the creation of a InclusionProjectionExecutor which excludes _id by default.
 auto makeInclusionProjectionWithDefaultIdExclusion(BSONObj spec) {
     ProjectionPolicies defaultExcludeId{ProjectionPolicies::DefaultIdPolicy::kExcludeId,
                                         ProjectionPolicies::kArrayRecursionPolicyDefault,
@@ -79,7 +78,7 @@ auto makeInclusionProjectionWithDefaultIdExclusion(BSONObj spec) {
     return createProjectionExecutor(spec, defaultExcludeId);
 }
 
-// Helper to simplify the creation of a ParsedInclusionProjection which does not recurse arrays.
+// Helper to simplify the creation of a InclusionProjectionExecutor which does not recurse arrays.
 auto makeInclusionProjectionWithNoArrayRecursion(BSONObj spec) {
     ProjectionPolicies noArrayRecursion{
         ProjectionPolicies::kDefaultIdPolicyDefault,
@@ -805,5 +804,4 @@ TEST(InclusionProjectionExecutionTest, ComputedFieldShouldReplaceNestedArrayForN
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 }  // namespace
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

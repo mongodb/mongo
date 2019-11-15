@@ -35,14 +35,13 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
-using ParsedAggregationProjection = parsed_aggregation_projection::ParsedAggregationProjection;
 
 REGISTER_DOCUMENT_SOURCE(project,
                          LiteParsedDocumentSourceDefault::parse,
@@ -68,10 +67,10 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
         expCtx,
         [&]() {
-            // The ParsedAggregationProjection will internally perform a check to see if the
-            // provided specification is valid, and throw an exception if it was not. The exception
-            // is caught here so we can add the name that was actually specified by the user, be it
-            // $project or an alias.
+            // The ProjectionExecutor will internally perform a check to see if the provided
+            // specification is valid, and throw an exception if it was not. The exception is caught
+            // here so we can add the name that was actually specified by the user, be it $project
+            // or an alias.
             try {
                 auto policies = ProjectionPolicies::aggregateProjectionPolicies();
                 auto projection = projection_ast::parse(expCtx, projectSpec, policies);

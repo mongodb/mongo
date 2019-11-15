@@ -31,130 +31,37 @@
 
 #include <memory>
 
+#include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
-#include "mongo/db/pipeline/parsed_inclusion_projection.h"
 
-namespace mongo {
-namespace parsed_aggregation_projection {
+namespace mongo::projection_executor {
 /**
- * This class ensures that the specification was valid: that none of the paths specified conflict
- * with one another, that there is at least one field, etc. Here "projection" includes $addFields
- * specifications.
- */
-class ProjectionSpecValidator {
-public:
-    /**
-     * Throws if the specification is not valid for a projection. Because this validator is meant to
-     * be generic, the error thrown is generic.  Callers at the DocumentSource level should modify
-     * the error message if they want to include information specific to the stage name used.
-     */
-    static void uassertValid(const BSONObj& spec);
-
-private:
-    ProjectionSpecValidator(const BSONObj& spec) : _rawObj(spec) {}
-
-    /**
-     * Uses '_seenPaths' to see if 'path' conflicts with any paths that have already been specified.
-     *
-     * For example, a user is not allowed to specify {'a': 1, 'a.b': 1}, or some similar conflicting
-     * paths.
-     */
-    void ensurePathDoesNotConflictOrThrow(const std::string& path);
-
-    /**
-     * Throws if an invalid projection specification is detected.
-     */
-    void validate();
-
-    /**
-     * Parses a single BSONElement. 'pathToElem' should include the field name of 'elem'.
-     *
-     * Delegates to parseSubObject() if 'elem' is an object. Otherwise adds the full path to 'elem'
-     * to '_seenPaths'.
-     *
-     * Calls ensurePathDoesNotConflictOrThrow with the path to this element, throws on conflicting
-     * path specifications.
-     */
-    void parseElement(const BSONElement& elem, const FieldPath& pathToElem);
-
-    /**
-     * Traverses 'thisLevelSpec', parsing each element in turn.
-     *
-     * Throws if any paths conflict with each other or existing paths, 'thisLevelSpec' contains a
-     * dotted path, or if 'thisLevelSpec' represents an invalid expression.
-     */
-    void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix);
-
-    // The original object. Used to generate more helpful error messages.
-    const BSONObj& _rawObj;
-
-    // Custom comparator that orders fieldpath strings by path prefix first, then by field.
-    struct PathPrefixComparator {
-        static constexpr char dot = '.';
-
-        // Returns true if the lhs value should sort before the rhs, false otherwise.
-        bool operator()(const std::string& lhs, const std::string& rhs) const {
-            for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {
-                auto &lchar = lhs[pos], &rchar = rhs[pos];
-                if (lchar == rchar) {
-                    continue;
-                }
-
-                // Consider the path delimiter '.' as being less than all other characters, so that
-                // paths sort directly before any paths they prefix and directly after any paths
-                // which prefix them.
-                if (lchar == dot) {
-                    return true;
-                } else if (rchar == dot) {
-                    return false;
-                }
-
-                // Otherwise, default to normal character comparison.
-                return lchar < rchar;
-            }
-
-            // If we get here, then we have reached the end of lhs and/or rhs and all of their path
-            // segments up to this point match. If lhs is shorter than rhs, then lhs prefixes rhs
-            // and should sort before it.
-            return lhs.size() < rhs.size();
-        }
-    };
-
-    // Tracks which paths we've seen to ensure no two paths conflict with each other.
-    std::set<std::string, PathPrefixComparator> _seenPaths;
-};
-
-/**
- * A ParsedAddFields represents a parsed form of the raw BSON specification for the AddFields
- * stage.
+ * A AddFieldsProjectionExecutor represents a projection execution tree for the $addFields stage.
  *
  * This class is mostly a wrapper around an InclusionNode tree. It contains logic to parse a
  * specification object into the corresponding InclusionNode tree, but defers most execution logic
- * to the underlying tree. In this way it is similar to ParsedInclusionProjection, but it differs
+ * to the underlying tree. In this way it is similar to InclusionProjectionExecutor, but it differs
  * by not applying inclusions before adding computed fields, thus keeping all existing fields.
  */
-class ParsedAddFields : public ParsedAggregationProjection {
+class AddFieldsProjectionExecutor : public ProjectionExecutor {
 public:
     /**
-     * TODO SERVER-25510: The ParsedAggregationProjection _id and array-recursion policies are not
+     * TODO SERVER-25510: The ProjectionExecutor _id and array-recursion policies are not
      * applicable to the $addFields "projection" stage. We make them non-configurable here.
      */
-    ParsedAddFields(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ParsedAggregationProjection(
-              expCtx,
-              {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
-               ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays,
-               ProjectionPolicies::ComputedFieldsPolicy::kAllowComputedFields}),
+    AddFieldsProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ProjectionExecutor(expCtx,
+                             {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
+                              ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays,
+                              ProjectionPolicies::ComputedFieldsPolicy::kAllowComputedFields}),
           _root(new InclusionNode(_policies)) {}
 
     /**
      * Creates the data needed to perform an AddFields.
      * Verifies that there are no conflicting paths in the specification.
-     * Overrides the ParsedAggregationProjection's create method.
      */
-    static std::unique_ptr<ParsedAddFields> create(
+    static std::unique_ptr<AddFieldsProjectionExecutor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec);
 
     TransformerType getType() const final {
@@ -234,5 +141,4 @@ private:
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;
 };
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

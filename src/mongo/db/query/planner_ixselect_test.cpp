@@ -1050,15 +1050,15 @@ TEST(QueryPlannerIXSelectTest, NoStringComparisonType) {
     }
 }
 
-// Helper which constructs an IndexEntry and returns it along with an owned ProjectionExecAgg, which
-// is non-null if the requested entry represents a wildcard index and null otherwise. When non-null,
-// it simulates the ProjectionExecAgg that is owned by the $** IndexAccessMethod.
+// Helper which constructs an IndexEntry and returns it along with an owned ProjectionExecutor,
+// which is non-null if the requested entry represents a wildcard index and null otherwise. When
+// non-null, it simulates the ProjectionExecutor that is owned by the $** IndexAccessMethod.
 auto makeIndexEntry(BSONObj keyPattern,
                     MultikeyPaths multiKeyPaths,
                     std::set<FieldRef> multiKeyPathSet = {},
                     BSONObj infoObj = BSONObj()) {
     auto projExec = (keyPattern.firstElement().fieldNameStringData().endsWith("$**"_sd)
-                         ? WildcardKeyGenerator::createProjectionExec(
+                         ? WildcardKeyGenerator::createProjectionExecutor(
                                keyPattern, infoObj.getObjectField("wildcardProjection"))
                          : nullptr);
 

@@ -51,9 +51,9 @@ using boost::intrusive_ptr;
 using std::vector;
 
 //
-// DocumentSourceProject delegates much of its responsibilities to the ParsedAggregationProjection.
-// Most of the functional tests are testing ParsedAggregationProjection directly. These are meant as
-// simpler integration tests.
+// DocumentSourceProject delegates much of its responsibilities to the ProjectionExecutor. Most of
+// the functional tests are testing ProjectionExecutor directly. These are meant as simpler
+// integration tests.
 //
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.

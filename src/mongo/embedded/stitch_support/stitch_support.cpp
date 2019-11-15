@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -202,8 +203,7 @@ struct stitch_support_v1_projection {
 
     mongo::ServiceContext::UniqueClient client;
     mongo::ServiceContext::UniqueOperationContext opCtx;
-    std::unique_ptr<mongo::parsed_aggregation_projection::ParsedAggregationProjection>
-        projectionExec;
+    std::unique_ptr<mongo::projection_executor::ProjectionExecutor> projectionExec;
 
     bool requiresMatch = false;
     stitch_support_v1_matcher* matcher;

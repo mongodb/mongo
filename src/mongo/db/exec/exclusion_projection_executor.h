@@ -32,18 +32,10 @@
 #include <memory>
 #include <string>
 
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection_node.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_node.h"
 
-namespace mongo {
-
-class FieldPath;
-class Value;
-
-namespace parsed_aggregation_projection {
-
+namespace mongo::projection_executor {
 /**
  * A node used to define the parsed structure of an exclusion projection. Each ExclusionNode
  * represents one 'level' of the parsed specification. The root ExclusionNode represents all top
@@ -79,17 +71,16 @@ protected:
 };
 
 /**
- * A ParsedExclusionProjection represents a parsed form of the raw BSON specification.
+ * A ExclusionProjectionExecutor represents an execution tree for an exclusion projection.
  *
- * This class is mostly a wrapper around an ExclusionNode tree. It contains logic to parse a
- * specification object into the corresponding ExclusionNode tree, but defers most execution logic
- * to the underlying tree.
+ * This class is mostly a wrapper around an ExclusionNode tree and defers most execution logic to
+ * the underlying tree.
  */
-class ParsedExclusionProjection : public ParsedAggregationProjection {
+class ExclusionProjectionExecutor : public ProjectionExecutor {
 public:
-    ParsedExclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              ProjectionPolicies policies)
-        : ParsedAggregationProjection(expCtx, policies), _root(new ExclusionNode(_policies)) {}
+    ExclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                ProjectionPolicies policies)
+        : ProjectionExecutor(expCtx, policies), _root(new ExclusionNode(_policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;
@@ -138,6 +129,4 @@ private:
     // The ExclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<ExclusionNode> _root;
 };
-
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

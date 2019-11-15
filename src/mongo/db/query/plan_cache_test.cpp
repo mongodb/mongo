@@ -239,12 +239,13 @@ void assertEquivalent(const char* queryStr,
     FAIL(ss);
 }
 
-// Helper which constructs a $** IndexEntry and returns it along with an owned ProjectionExecAgg.
-// The latter simulates the ProjectionExecAgg which, during normal operation, is owned and
+// Helper which constructs a $** IndexEntry and returns it along with an owned ProjectionExecutor.
+// The latter simulates the ProjectionExecutor which, during normal operation, is owned and
 // maintained by the $** index's IndexAccessMethod, and is required because the plan cache will
 // obtain unowned pointers to it.
-std::pair<IndexEntry, std::unique_ptr<ProjectionExecAgg>> makeWildcardEntry(BSONObj keyPattern) {
-    auto projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, {});
+std::pair<IndexEntry, std::unique_ptr<projection_executor::ProjectionExecutor>> makeWildcardEntry(
+    BSONObj keyPattern) {
+    auto projExec = WildcardKeyGenerator::createProjectionExecutor(keyPattern, {});
     return {IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                        false,  // multikey
@@ -261,9 +262,9 @@ std::pair<IndexEntry, std::unique_ptr<ProjectionExecAgg>> makeWildcardEntry(BSON
 }
 
 // A version of the above for CoreIndexInfo, used for plan cache update tests.
-std::pair<CoreIndexInfo, std::unique_ptr<ProjectionExecAgg>> makeWildcardUpdate(
-    BSONObj keyPattern) {
-    auto projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, {});
+std::pair<CoreIndexInfo, std::unique_ptr<projection_executor::ProjectionExecutor>>
+makeWildcardUpdate(BSONObj keyPattern) {
+    auto projExec = WildcardKeyGenerator::createProjectionExecutor(keyPattern, {});
     return {CoreIndexInfo(keyPattern,
                           IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                           false,                                // sparse

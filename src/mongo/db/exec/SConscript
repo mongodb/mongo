@@ -56,6 +56,19 @@ sortExecutorEnv.Library(
 )
 
 env.Library(
+    target='projection_executor',
+    source=[
+        'add_fields_projection_executor.cpp',
+        'projection_executor_builder.cpp',
+        'projection_executor_utils.cpp',
+        'projection_node.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/matcher/expressions'
+    ],
+)
+
+env.Library(
     target='stagedebug_cmd',
     source=[
         'stagedebug_cmd.cpp'
@@ -77,9 +90,14 @@ env.CppUnitTest(
         "document_value/document_value_test.cpp",
         "document_value/document_value_test_util_self_test.cpp",
         "document_value/value_comparator_test.cpp",
+        "add_fields_projection_executor_test.cpp",
+        "exclusion_projection_executor_test.cpp",
         "find_projection_executor_test.cpp",
-        "projection_exec_agg_test.cpp",
+        "inclusion_projection_executor_test.cpp",
+        "projection_executor_builder_test.cpp",
         "projection_executor_test.cpp",
+        "projection_executor_utils_test.cpp",
+        "projection_executor_wildcard_access_test.cpp",
         "queued_data_stage_test.cpp",
         "sort_test.cpp",
         "working_set_test.cpp",
@@ -87,7 +105,6 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/projection_exec_agg",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
@@ -98,6 +115,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "document_value/document_value",
         "document_value/document_value_test_util",
+        "projection_executor",
         "working_set",
     ],
 )

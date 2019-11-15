@@ -29,11 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/parsed_aggregation_projection_node.h"
+#include "mongo/db/exec/projection_node.h"
 
-namespace mongo {
-namespace parsed_aggregation_projection {
-
+namespace mongo::projection_executor {
 using ArrayRecursionPolicy = ProjectionPolicies::ArrayRecursionPolicy;
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
 using DefaultIdPolicy = ProjectionPolicies::DefaultIdPolicy;
@@ -284,6 +282,4 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
         }
     }
 }
-
-}  // namespace parsed_aggregation_projection
-}  // namespace mongo
+}  // namespace mongo::projection_executor

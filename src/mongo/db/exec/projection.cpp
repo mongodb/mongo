@@ -36,6 +36,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
