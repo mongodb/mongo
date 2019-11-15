@@ -1325,6 +1325,8 @@ functions:
         value: ${project}/${build_variant}/${revision}/binaries/mongo-cryptd-${build_id}.${ext|tgz}
       - key: mh_archive
         value: ${project}/${build_variant}/${revision}/binaries/mh-${build_id}.${ext|tgz}
+      - key: mh_debugsymbols
+        value: ${project}/${build_variant}/${revision}/debugsymbols/mh-debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_debugsymbols
         value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_shell
@@ -3951,7 +3953,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mh-debugsymbols.${ext|tgz}
-        remote_file: ${mh_archive}
+        remote_file: ${mh_debugsymbols}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
