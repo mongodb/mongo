@@ -1,7 +1,12 @@
 // Test that internalRenameIfOptionsAndIndexesMatch command works as expected.
 //
 // This command cannot be run against mongos.
-// @tags: [assumes_against_mongod_not_mongos, requires_fcv_44]
+// @tags: [
+//     assumes_against_mongod_not_mongos,
+//     incompatible_with_embedded,
+//     requires_capped,
+//     requires_fcv_44,
+// ]
 
 (function() {
 "use strict";
