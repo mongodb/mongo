@@ -398,6 +398,20 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
 }
 
 /**
+ * Returns true if index specs include any unique indexes. Due to uniqueness constraints set up at
+ * the start of the index build, we are not able to support failing over a two phase index build on
+ * a unique index to a new primary on stepdown.
+ */
+bool containsUniqueIndexes(const std::vector<BSONObj>& specs) {
+    for (const auto& spec : specs) {
+        if (spec["unique"].trueValue()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Creates indexes using the given specs for the mobile storage engine.
  * TODO(SERVER-42513): Remove this function.
  */
@@ -741,7 +755,8 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // If this node is no longer a primary, the index build will continue to run in the
             // background and will complete when this node receives a commitIndexBuild oplog entry
             // from the new primary.
-            if (indexBuildsCoord->supportsTwoPhaseIndexBuild() &&
+            // TODO(SERVER-44654): re-enable failover support for unique indexes.
+            if (indexBuildsCoord->supportsTwoPhaseIndexBuild() && !containsUniqueIndexes(specs) &&
                 ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
                 log() << "Index build continuing in background: " << buildUUID;
                 throw;
@@ -766,7 +781,8 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
             // The index build will continue to run in the background and will complete when this
             // node receives a commitIndexBuild oplog entry from the new primary.
-            if (indexBuildsCoord->supportsTwoPhaseIndexBuild()) {
+            // TODO(SERVER-44654): re-enable failover support for unique indexes.
+            if (indexBuildsCoord->supportsTwoPhaseIndexBuild() && !containsUniqueIndexes(specs)) {
                 log() << "Index build continuing in background: " << buildUUID;
                 throw;
             }
