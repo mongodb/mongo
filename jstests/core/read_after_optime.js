@@ -1,4 +1,5 @@
 // Test that attempting to read after optime fails if replication is not enabled.
+// @tags: [multiversion_incompatible]
 
 (function() {
 "use strict";
