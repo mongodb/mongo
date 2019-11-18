@@ -1,5 +1,6 @@
 /**
  * Ensure that orphaned documents are submitted for deletion on step up.
+ * @tags: [multiversion_incompatible]
  */
 
 (function() {

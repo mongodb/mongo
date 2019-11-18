@@ -6,10 +6,6 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_44
-  exclude_files:
-  - jstests/sharding/updates_to_rangedeletions_collection_trigger_range_deletions.js
-  - jstests/sharding/resubmit_rangedeletions_on_stepup.js
-  - jstests/sharding/migration_fails_if_exists_in_rangedeletions.js
 executor:
   config:
     shell_options:
