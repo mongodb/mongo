@@ -606,11 +606,13 @@ __wt_rec_col_var(
 
     btree = S2BT(session);
     vpack = &_vpack;
-    cbt = &r->update_modify_cbt;
     page = pageref->page;
     upd = NULL;
     size = 0;
     data = NULL;
+
+    cbt = &r->update_modify_cbt;
+    cbt->iface.session = (WT_SESSION *)session;
 
     /*
      * Acquire the newest-durable timestamp for this page so we can roll it forward. If it exists,
@@ -772,8 +774,7 @@ __wt_rec_col_var(
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
                     cbt->slot = WT_COL_SLOT(page, cip);
-                    WT_ERR(
-                      __wt_value_return_upd(session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                    WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;
@@ -1030,8 +1031,7 @@ compare:
                      * Impossible slot, there's no backing on-page item.
                      */
                     cbt->slot = UINT32_MAX;
-                    WT_ERR(
-                      __wt_value_return_upd(session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                    WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;

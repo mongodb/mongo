@@ -277,12 +277,6 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     conn = S2C(session);
     cache = conn->cache;
 
-/*
- * The thread group code calls us repeatedly. So each call is one pass through eviction.
- */
-#ifdef HAVE_DIAGNOSTIC
-    __wt_seconds32(session, &session->op_5043_seconds);
-#endif
     if (conn->evict_server_running && __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
         /*
          * Cannot use WT_WITH_PASS_LOCK because this is a try lock. Fix when that is supported. We
@@ -2214,7 +2208,13 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
      */
     __wt_cache_read_gen_bump(session, ref->page);
 
+#ifdef HAVE_DIAGNOSTIC
+    __wt_seconds32(session, &session->op_5043_seconds);
+#endif
     WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, previous_state, 0));
+#ifdef HAVE_DIAGNOSTIC
+    session->op_5043_seconds = 0;
+#endif
 
     (void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
@@ -2266,9 +2266,6 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     if (timer)
         time_start = __wt_clock(session);
 
-#ifdef HAVE_DIAGNOSTIC
-    __wt_seconds32(session, &session->op_5043_seconds);
-#endif
     for (initial_progress = cache->eviction_progress;; ret = 0) {
         /*
          * If eviction is stuck, check if this thread is likely causing problems and should be

@@ -17,6 +17,30 @@
  */
 
 /*
+ * __gen_name --
+ *     Return the generation name.
+ */
+static const char *
+__gen_name(int which)
+{
+    switch (which) {
+    case WT_GEN_CHECKPOINT:
+        return ("checkpoint");
+    case WT_GEN_COMMIT:
+        return ("commit");
+    case WT_GEN_EVICT:
+        return ("evict");
+    case WT_GEN_HAZARD:
+        return ("hazard");
+    case WT_GEN_SPLIT:
+        return ("split");
+    default:
+        break;
+    }
+    return ("unknown");
+}
+
+/*
  * __wt_gen_init --
  *     Initialize the connection's generations.
  */
@@ -78,11 +102,13 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 {
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *s;
-    uint64_t v;
+    uint64_t v, start, stop;
     uint32_t i, session_cnt;
+    u_int minutes;
     int pause_cnt;
 
     conn = S2C(session);
+    start = 0; /* [-Wconditional-uninitialized] */
 
     /*
      * No lock is required because the session array is fixed size, but it may contain inactive
@@ -91,7 +117,7 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
      * the sessions that could have been active when we started our check.
      */
     WT_ORDERED_READ(session_cnt, conn->session_cnt);
-    for (pause_cnt = 0, s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
+    for (minutes = 0, pause_cnt = 0, s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
         if (!s->active)
             continue;
 
@@ -122,6 +148,23 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
                 WT_PAUSE();
             else
                 __wt_sleep(0, 10);
+
+            /*
+             * If we wait for more than a minute, log the event. In DIAGNOSTIC mode, abort if we
+             * ever wait more than 3 minutes, that's forever.
+             */
+            if (minutes == 0) {
+                minutes = 1;
+                __wt_seconds(session, &start);
+            } else {
+                __wt_seconds(session, &stop);
+                if (stop - start > minutes * WT_MINUTE) {
+                    WT_IGNORE_RET(__wt_msg(session, "%s generation drain waited %u minutes",
+                      __gen_name(which), minutes));
+                    ++minutes;
+                }
+                WT_ASSERT(session, stop - start < 3 * WT_MINUTE);
+            }
         }
     }
 }

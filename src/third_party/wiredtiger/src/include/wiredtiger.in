@@ -718,8 +718,9 @@ struct __wt_cursor {
 #define	WT_CURSTD_OVERWRITE	0x02000u
 #define	WT_CURSTD_RAW		0x04000u
 #define	WT_CURSTD_RAW_SEARCH	0x08000u
-#define	WT_CURSTD_VALUE_EXT	0x10000u	/* Value points out of tree. */
-#define	WT_CURSTD_VALUE_INT	0x20000u	/* Value points into tree. */
+#define	WT_CURSTD_UPDATE_LOCAL	0x10000u
+#define	WT_CURSTD_VALUE_EXT	0x20000u	/* Value points out of tree. */
+#define	WT_CURSTD_VALUE_INT	0x40000u	/* Value points into tree. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
