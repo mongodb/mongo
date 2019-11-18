@@ -12,8 +12,6 @@ selector:
   # SERVER-33683: We added a restriction on using an aggregation within a transaction against
   # mongos. This should be removed and the test can be adjusted and re-added to this passthrough.
   - jstests/sharding/aggregations_in_session.js
-  # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.
-  - jstests/sharding/explain_cmd.js
   # Enable when SERVER-43860 is backported by BACKPORT-5471 or 4.4 becomes last-stable
   - jstests/sharding/agg_merge_hashed.js
   - jstests/sharding/merge_from_stale_mongos.js
