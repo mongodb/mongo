@@ -4,6 +4,8 @@
  * collmod_writeconflict.js
  *
  * Ensures collMod successfully handles WriteConflictExceptions.
+ *
+ * @tags: [requires_fcv_44]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/collmod.js');     // for $config

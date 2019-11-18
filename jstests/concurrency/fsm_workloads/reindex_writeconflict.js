@@ -4,6 +4,8 @@
  * reindex_writeconflict.js
  *
  * Ensures reIndex successfully handles WriteConflictExceptions.
+ *
+ * @tags: [requires_fcv_44]
  */
 var $config = (function() {
     var states = {
