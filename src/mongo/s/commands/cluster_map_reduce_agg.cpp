@@ -168,7 +168,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             // pipeline to serialize and send to the primary shard.
             auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
             uassertStatusOK(
-                sharded_agg_helpers::runPipelineOnPrimaryShard(targeter.pipeline->getContext(),
+                sharded_agg_helpers::runPipelineOnPrimaryShard(expCtx,
                                                                namespaces,
                                                                targeter.routingInfo->db(),
                                                                boost::none,  // explain

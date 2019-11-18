@@ -6886,7 +6886,7 @@ tasks:
 
 - <<: *task_template
   name: sharding_map_reduce_agg
-  tags: ["sharding"]
+  tags: ["sharding", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"
