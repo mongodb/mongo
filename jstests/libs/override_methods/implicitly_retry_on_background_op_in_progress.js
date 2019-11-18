@@ -17,6 +17,7 @@ const commandWhitelist = new Set([
     "drop",
     "dropDatabase",
     "dropIndexes",
+    "reIndex",
     "renameCollection",
 ]);
 

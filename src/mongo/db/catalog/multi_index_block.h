@@ -273,6 +273,8 @@ public:
      */
     bool isBackgroundBuilding() const;
 
+    void setIndexBuildMethod(IndexBuildMethod indexBuildMethod);
+
     /**
      * State transitions:
      *
