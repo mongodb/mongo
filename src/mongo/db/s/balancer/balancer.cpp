@@ -54,6 +54,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
@@ -65,6 +66,8 @@ using std::string;
 using std::vector;
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(overrideBalanceRoundInterval);
 
 const Seconds kBalanceRoundDefaultInterval(10);
 
@@ -389,9 +392,21 @@ void Balancer::_mainThread() {
                 LOG(1) << "*** End of balancing round";
             }
 
-            _endRound(opCtx.get(),
-                      _balancedLastTime ? kShortBalanceRoundInterval
-                                        : kBalanceRoundDefaultInterval);
+
+            auto balancerInterval = [&]() -> Milliseconds {
+                MONGO_FAIL_POINT_BLOCK(overrideBalanceRoundInterval, data) {
+                    int interval = data.getData()["intervalMs"].numberInt();
+                    log() << "overrideBalanceRoundInterval: using shorter balancing interval: "
+                          << interval << "ms";
+
+                    return Milliseconds(interval);
+                }
+
+                return _balancedLastTime ? kShortBalanceRoundInterval
+                                         : kBalanceRoundDefaultInterval;
+            }();
+
+            _endRound(opCtx.get(), balancerInterval);
         } catch (const std::exception& e) {
             log() << "caught exception while doing balance: " << e.what();
 
@@ -439,7 +454,7 @@ void Balancer::_beginRound(OperationContext* opCtx) {
     _condVar.notify_all();
 }
 
-void Balancer::_endRound(OperationContext* opCtx, Seconds waitTimeout) {
+void Balancer::_endRound(OperationContext* opCtx, Milliseconds waitTimeout) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _inBalancerRound = false;
@@ -451,7 +466,7 @@ void Balancer::_endRound(OperationContext* opCtx, Seconds waitTimeout) {
     _sleepFor(opCtx, waitTimeout);
 }
 
-void Balancer::_sleepFor(OperationContext* opCtx, Seconds waitTimeout) {
+void Balancer::_sleepFor(OperationContext* opCtx, Milliseconds waitTimeout) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _condVar.wait_for(lock, waitTimeout.toSystemDuration(), [&] { return _state != kRunning; });
 }
