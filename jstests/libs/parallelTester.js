@@ -155,9 +155,13 @@ if (typeof _threadInject != "undefined") {
             "index_bigkeys_nofail.js",
             "index_bigkeys_validation.js",
 
+            // Tests that set the notablescan parameter, which makes queries fail rather than use a
+            // non-indexed plan.
+            "notablescan.js",
+            "notablescan_capped.js",
+
             "mr_fail_invalid_js.js",
             "run_program1.js",
-            "notablescan.js",
             "bench_test1.js",
 
             // These tests use the getLastError command, which is unsafe to use in this environment,
