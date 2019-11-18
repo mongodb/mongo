@@ -214,7 +214,7 @@ let outColReduce = "big_out_reduce";
 
     // Stop the balancer to prevent new writes from happening and make sure that replication can
     // keep up even on slow machines
-    s.stopBalancer();
+    s.stopBalancer(5 * 60 * 1000);
     s.rs0.awaitReplication();
     assert.eq(51200, primary.getDB("test")[outColReduce].find().itcount(), "Wrong count");
 
