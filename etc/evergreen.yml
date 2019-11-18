@@ -1980,7 +1980,7 @@ functions:
           fi
 
           echo "Shared Cache with setting: ${scons_cache_scope}"
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
 
         # Legacy Expansion generation
         else

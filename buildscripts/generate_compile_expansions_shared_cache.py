@@ -99,8 +99,8 @@ def generate_scons_cache_expansions():
             shared_mount_root = '/efs'
         default_cache_path = os.path.join(shared_mount_root, system_uuid, "scons-cache")
         expansions["scons_cache_path"] = default_cache_path
-        # Patches are read only
-        if os.getenv("IS_PATCH"):
+        # Patches are read only, unless they are for a commit queue merge.
+        if os.getenv("IS_PATCH") and os.getenv("IS_COMMIT_QUEUE") != "true":
             expansions[
                 "scons_cache_args"] = "--cache={0} --cache-dir='{1}' --cache-readonly".format(
                     scons_cache_mode, default_cache_path)
