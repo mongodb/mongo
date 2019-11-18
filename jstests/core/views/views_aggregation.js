@@ -132,13 +132,13 @@ assert.commandWorked(viewsDB.runCommand({
     }
     assertErrorCode(viewsDB.largeColl,
                     [{$sort: {x: -1}}],
-                    16819,
+                    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
                     "Expected in-memory sort to fail due to excessive memory usage");
     viewsDB.largeView.drop();
     assert.commandWorked(viewsDB.createView("largeView", "largeColl", []));
     assertErrorCode(viewsDB.largeView,
                     [{$sort: {x: -1}}],
-                    16819,
+                    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
                     "Expected in-memory sort to fail due to excessive memory usage");
 
     assert.commandWorked(

@@ -43,8 +43,8 @@ assert.eq(profileObj.ns, coll.getFullName(), profileObj);
 assert.eq(profileObj.replanned, true, profileObj);
 assert.eq(
     profileObj.replanReason,
-    "cached plan returned: Location16819: Sort exceeded memory limit of 1 bytes, but did not opt " +
-        "in to external sorting.",
+    "cached plan returned: QueryExceededMemoryLimitNoDiskUseAllowed: Sort exceeded memory limit " +
+        "of 1 bytes, but did not opt in to external sorting.",
     profileObj);
 
 MongoRunner.stopMongod(conn);

@@ -17,8 +17,6 @@ const kMaxMemoryUsageBytes = 100 * 1024;
 const kNumDocsWithinMemLimit = 70;
 const kNumDocsExceedingMemLimit = 100;
 
-const kMemoryLimitExceededErrCode = 16819;
-
 const options = {
     setParameter: "internalQueryMaxBlockingSortMemoryUsageBytes=" + kMaxMemoryUsageBytes
 };
@@ -74,7 +72,7 @@ for (let i = kNumDocsWithinMemLimit; i < kNumDocsExceedingMemLimit; ++i) {
 // The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
 assert.commandFailedWithCode(
     testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}}),
-    kMemoryLimitExceededErrCode);
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 assert.eq(kNumDocsExceedingMemLimit,
           collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
@@ -103,7 +101,7 @@ assert.commandWorked(testDb.createView("identityView", collection.getName(), [])
 const identityView = testDb.identityView;
 assert.commandFailedWithCode(
     testDb.runCommand({find: identityView.getName(), sort: {sequenceNumber: -1}}),
-    kMemoryLimitExceededErrCode);
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 assert.eq(kNumDocsExceedingMemLimit,
           identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 

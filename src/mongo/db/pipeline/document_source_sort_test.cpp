@@ -443,7 +443,8 @@ TEST_F(DocumentSourceSortExecutionTest,
                                                    Document{{"_id", 1}, {"largeStr", largeStr}}});
     sort->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(sort->getNext(), AssertionException, 16819);
+    ASSERT_THROWS_CODE(
+        sort->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
@@ -465,7 +466,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     ASSERT_TRUE(sort->getNext().isPaused());
 
     // The next should realize it's used too much memory.
-    ASSERT_THROWS_CODE(sort->getNext(), AssertionException, 16819);
+    ASSERT_THROWS_CODE(
+        sort->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 }  // namespace

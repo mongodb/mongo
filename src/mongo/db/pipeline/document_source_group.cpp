@@ -483,7 +483,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
     GetNextResult input = pSource->getNext();
     for (; input.isAdvanced(); input = pSource->getNext()) {
         if (_memoryUsageBytes > _maxMemoryUsageBytes) {
-            uassert(16945,
+            uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                     "Exceeded memory limit for $group, but didn't allow external sort."
                     " Pass allowDiskUse:true to opt in.",
                     _allowDiskUse);

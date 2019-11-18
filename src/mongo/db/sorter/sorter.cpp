@@ -595,11 +595,11 @@ private:
             return;
 
         if (!_opts.extSortAllowed) {
-            // XXX This error message is only correct for aggregation, but it is also the
-            // only way this code could be hit at the moment. If the Sorter is used
-            // elsewhere where extSortAllowed could possibly be false, this message will
-            // need to be revisited.
-            uasserted(16819,
+            // This error message only applies to sorts from user queries made through the find or
+            // aggregation commands. Other clients, such as bulk index builds, should suppress this
+            // error, either by allowing external sorting or by catching and throwing a more
+            // appropriate error.
+            uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                       str::stream() << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
                                     << " bytes, but did not opt in to external sorting.");
         }
@@ -880,11 +880,10 @@ private:
             return;
 
         if (!_opts.extSortAllowed) {
-            // XXX This error message is only correct for aggregation, but it is also the
-            // only way this code could be hit at the moment. If the Sorter is used
-            // elsewhere where extSortAllowed could possibly be false, this message will
-            // need to be revisited.
-            uasserted(16820,
+            // This error message only applies to sorts from user queries made through the find or
+            // aggregation commands. Other clients should suppress this error, either by allowing
+            // external sorting or by catching and throwing a more appropriate error.
+            uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                       str::stream()
                           << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting. Aborting operation."

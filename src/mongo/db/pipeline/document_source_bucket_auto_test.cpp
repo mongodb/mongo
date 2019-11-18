@@ -644,7 +644,9 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
         {Document{{"a", 0}, {"largeStr", largeStr}}, Document{{"a", 1}, {"largeStr", largeStr}}});
     bucketAutoStage->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(bucketAutoStage->getNext(), AssertionException, 16819);
+    ASSERT_THROWS_CODE(bucketAutoStage->getNext(),
+                       AssertionException,
+                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
@@ -687,7 +689,9 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
 
     // The next should realize it's used too much memory.
-    ASSERT_THROWS_CODE(bucketAutoStage->getNext(), AssertionException, 16819);
+    ASSERT_THROWS_CODE(bucketAutoStage->getNext(),
+                       AssertionException,
+                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(BucketAutoTests, ShouldRoundUpMaximumBoundariesWithGranularitySpecified) {

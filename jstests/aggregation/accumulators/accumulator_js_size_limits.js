@@ -83,5 +83,5 @@ res = runExample("$_id", {
     },
     lang: 'js',
 });
-assert.commandFailedWithCode(res, [16945]);
+assert.commandFailedWithCode(res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed]);
 })();

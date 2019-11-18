@@ -203,7 +203,7 @@ assert.commandFailedWithCode(testDB.runCommand({
     allowDiskUse: false,
     cursor: {}
 }),
-                             16945);
+                             ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
 // Reset to default value.
 FixtureHelpers.runCommandOnEachPrimary({

@@ -49,51 +49,51 @@ function test({pipeline, expectedCodes, canSpillToDisk}) {
     }
 }
 
-const groupCode = 16945;
-const sortCode = 16819;
-const sortLimitCode = 16820;
-
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}],
-    expectedCodes: groupCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 
 // Sorting with _id would use index which doesn't require external sort, so sort by 'random'
 // instead.
-test({pipeline: [{$sort: {random: 1}}], expectedCodes: sortCode, canSpillToDisk: true});
+test({
+    pipeline: [{$sort: {random: 1}}],
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+    canSpillToDisk: true
+});
 test({
     pipeline: [{$sort: {bigStr: 1}}],  // big key and value
-    expectedCodes: sortCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 
 // Test that sort + large limit won't crash the server (SERVER-10136)
 test({
     pipeline: [{$sort: {bigStr: 1}}, {$limit: 1000 * 1000 * 1000}],
-    expectedCodes: sortLimitCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 
 // Test combining two external sorts in both same and different orders.
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: 1}}],
-    expectedCodes: groupCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: -1}}],
-    expectedCodes: groupCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {random: 1}}],
-    expectedCodes: groupCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 test({
     pipeline: [{$sort: {random: 1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}],
-    expectedCodes: sortCode,
+    expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
 
@@ -101,13 +101,15 @@ test({
 // so may hit the group error code before we hit ExceededMemoryLimit.
 test({
     pipeline: [{$group: {_id: null, bigArray: {$push: '$bigStr'}}}],
-    expectedCodes: [groupCode, ErrorCodes.ExceededMemoryLimit],
+    expectedCodes:
+        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
     canSpillToDisk: false
 });
 test({
     pipeline:
         [{$group: {_id: null, bigArray: {$addToSet: {$concat: ['$bigStr', {$toString: "$_id"}]}}}}],
-    expectedCodes: [groupCode, ErrorCodes.ExceededMemoryLimit],
+    expectedCodes:
+        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
     canSpillToDisk: false
 });
 
