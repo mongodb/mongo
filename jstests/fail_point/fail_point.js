@@ -3,13 +3,15 @@
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
+
 /**
- * Performs basic checks on the configureFailPoint command. Also check
- * mongo/util/fail_point_test.cpp for unit tests.
+ * Performs basic checks on the configureFailPoint and waitForFailPoint command.
+ * Also check mongo/util/fail_point_test.cpp for unit tests.
  *
  * @param adminDB {DB} the admin database database object
  */
-function runTest(adminDB) {
+function runBasicTest(adminDB) {
     function expectFailPointState(fpState, expectedMode, expectedData) {
         assert.eq(expectedMode, fpState.mode);
 
@@ -95,13 +97,47 @@ function runTest(adminDB) {
                                  40414);
 }
 
+// Test the parameter handling.
 var conn = MongoRunner.runMongod();
-runTest(conn.getDB('admin'));
+runBasicTest(conn.getDB('admin'));
 MongoRunner.stopMongod(conn);
 
-///////////////////////////////////////////////////////////
-// Test mongos
 var st = new ShardingTest({shards: 1});
-runTest(st.s.getDB('admin'));
+runBasicTest(st.s.getDB('admin'));
+
+// Test the functionality of the commands.
+const testDB = st.shard0.getDB("test");
+const testColl = testDB["user"];
+const failPointName = "hangAfterCollectionInserts";
+
+// Turn on the fail point and check that the returned count is 0.
+var configureFailPointRes = assert.commandWorked(testDB.adminCommand({
+    configureFailPoint: failPointName,
+    mode: "alwaysOn",
+    data: {collectionNS: testColl.getFullName()}
+}));
+assert.eq(0, configureFailPointRes.count);
+
+const joinHungWrite = startParallelShell(() => {
+    assert.commandWorked(db.getSiblingDB("test").user.insert({_id: 0}));
+}, st.rs0.getPrimary().port);
+
+// Wait for the fail point to be entered.
+assert.commandWorked(testDB.adminCommand({
+    waitForFailPoint: failPointName,
+    timesEntered: 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
+
+// Wait for a while before turning it off.
+sleep(200);
+configureFailPointRes =
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: failPointName, mode: "off"}));
+
+// Check that waiting does not cause the count to be incremented.
+assert.eq(1, configureFailPointRes.count);
+
+joinHungWrite();
+
 st.stop();
 })();

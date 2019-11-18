@@ -131,7 +131,7 @@ void FailPoint::_disable() {
     _fpInfo.fetchAndBitAnd(~kActiveBit);
 }
 
-FailPoint::RetCode FailPoint::_slowShouldFailOpenBlockImpl(
+FailPoint::RetCode FailPoint::_slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
     std::function<bool(const BSONObj&)> cb) noexcept {
     ValType localFpInfo = _fpInfo.addAndFetch(1);
 
@@ -176,7 +176,7 @@ FailPoint::RetCode FailPoint::_slowShouldFailOpenBlockImpl(
 
 FailPoint::RetCode FailPoint::_slowShouldFailOpenBlock(
     std::function<bool(const BSONObj&)> cb) noexcept {
-    auto ret = _slowShouldFailOpenBlockImpl(cb);
+    auto ret = _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(cb);
     if (ret == slowOn) {
         _timesEntered.addAndFetch(1);
     }

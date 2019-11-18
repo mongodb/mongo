@@ -25,7 +25,7 @@ function commitTxn(st, lsid, txnNumber, expectedError = null) {
 }
 
 function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
-    jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to appear in the log ${
+    jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to be entered ${
         timesEntered} time(s).`);
     failPoint.wait(timesEntered);
 

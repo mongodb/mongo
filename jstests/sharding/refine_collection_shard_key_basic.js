@@ -340,7 +340,7 @@ const awaitShellToTriggerStaleEpoch = startParallelShell(() => {
         db.adminCommand({refineCollectionShardKey: 'db.foo', key: {_id: 1, aKey: 1}}),
         ErrorCodes.StaleEpoch);
 }, staleMongos.port);
-hangAfterRefreshFailPoint.wait(2);
+hangAfterRefreshFailPoint.wait();
 
 // Drop and re-shard namespace 'db.foo' without staleMongos refreshing its metadata.
 dropAndReshardColl({_id: 1});
