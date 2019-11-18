@@ -465,9 +465,20 @@ Status renameBetweenDBs(OperationContext* opCtx,
                         const RenameCollectionOptions& options) {
     invariant(source.db() != target.db());
 
-    boost::optional<Lock::GlobalWrite> globalWriteLock;
-    if (!opCtx->lockState()->isW())
-        globalWriteLock.emplace(opCtx);
+    boost::optional<Lock::DBLock> sourceDbLock;
+    boost::optional<Lock::CollectionLock> sourceCollLock;
+    if (!opCtx->lockState()->isCollectionLockedForMode(source, MODE_S)) {
+        // Lock the DB using MODE_IX to ensure we have the global lock in that mode, as to prevent
+        // upgrade from MODE_IS to MODE_IX, which caused deadlock on systems not supporting Database
+        // locking and should be avoided in general.
+        sourceDbLock.emplace(opCtx, source.db(), MODE_IX);
+        sourceCollLock.emplace(opCtx, source, MODE_S);
+    }
+
+    boost::optional<Lock::DBLock> targetDBLock;
+    if (!opCtx->lockState()->isDbLockedForMode(target.db(), MODE_X)) {
+        targetDBLock.emplace(opCtx, target.db(), MODE_X);
+    }
 
     DisableDocumentValidation validationDisabler(opCtx);
 
@@ -657,26 +668,21 @@ Status renameBetweenDBs(OperationContext* opCtx,
     }
 
     {
-        // Copy over all the data from source collection to temporary collection.
-        // We do not need global write exclusive access after obtaining the collection locks on the
-        // source and temporary collections. After copying the documents, each remaining stage of
-        // the cross-database rename will be responsible for its own lock management.
-        // Therefore, unless the caller has already acquired the global write lock prior to invoking
-        // this function, we relinquish global write access to the database after acquiring the
-        // collection locks.
-        // Collection locks must be obtained while holding the global lock to avoid any possibility
-        // of a deadlock.
-        AutoGetCollectionForRead autoSourceColl(opCtx, source);
-        AutoGetCollection autoTmpColl(opCtx, tmpName, MODE_IX);
+        NamespaceStringOrUUID tmpCollUUID =
+            NamespaceStringOrUUID(std::string(tmpName.db()), *tmpColl->uuid());
         statsTracker.reset();
 
-        if (opCtx->getServiceContext()->getStorageEngine()->supportsDBLocking()) {
-            if (globalWriteLock) {
-                opCtx->lockState()->downgrade(resourceIdGlobal, MODE_IX);
-                invariant(!opCtx->lockState()->isW());
-            } else {
-                invariant(opCtx->lockState()->isW());
-            }
+        // Copy over all the data from source collection to temporary collection. For this we can
+        // drop the exclusive database lock on the target and grab an intent lock on the temporary
+        // collection.
+        targetDBLock.reset();
+
+        AutoGetCollection autoTmpColl(opCtx, tmpCollUUID, MODE_IX);
+        tmpColl = autoTmpColl.getCollection();
+        if (!tmpColl) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Temporary collection '" << tmpName
+                                        << "' was removed while renaming collection across DBs");
         }
 
         auto cursor = sourceColl->getCursor(opCtx);
@@ -717,7 +723,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 return status;
         }
     }
-    globalWriteLock.reset();
+    sourceCollLock.reset();
+    sourceDbLock.reset();
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
