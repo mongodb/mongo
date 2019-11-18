@@ -127,8 +127,8 @@ struct Cloner::Fun {
         : lastLog(0), opCtx(opCtx), _dbName(dbName) {}
 
     void operator()(DBClientCursorBatchIterator& i) {
-        // XXX: can probably take dblock instead
-        unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(opCtx));
+        boost::optional<Lock::DBLock> dbLock;
+        dbLock.emplace(opCtx, _dbName, MODE_X);
         uassert(
             ErrorCodes::NotMaster,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
@@ -184,11 +184,11 @@ struct Cloner::Fun {
                 }
                 opCtx->checkForInterrupt();
 
-                globalWriteLock.reset();
+                dbLock.reset();
 
                 CurOp::get(opCtx)->yielded();
 
-                globalWriteLock.reset(new Lock::GlobalWrite(opCtx));
+                dbLock.emplace(opCtx, _dbName, MODE_X);
 
                 // Check if everything is still all right.
                 if (opCtx->writesAreReplicated()) {
