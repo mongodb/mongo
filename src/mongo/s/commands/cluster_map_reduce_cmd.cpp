@@ -33,7 +33,6 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_command_base.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_map_reduce.h"
@@ -55,7 +54,7 @@ public:
                   const BSONObj& cmd,
                   std::string& errmsg,
                   BSONObjBuilder& result) final {
-        if (getTestCommandsEnabled() && internalQueryUseAggMapReduce.load()) {
+        if (internalQueryUseAggMapReduce.load()) {
             return runAggregationMapReduce(opCtx, dbname, cmd, errmsg, result);
         }
         return runMapReduce(opCtx, dbname, applyReadWriteConcern(opCtx, this, cmd), errmsg, result);

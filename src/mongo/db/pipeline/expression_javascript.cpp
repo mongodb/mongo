@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/pipeline/expression_javascript.h"
 #include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -74,10 +73,6 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
     const VariablesParseState& vps) {
-
-    uassert(ErrorCodes::BadValue,
-            str::stream() << kExpressionName << " not allowed without enabling test commands.",
-            getTestCommandsEnabled());
 
     uassert(31221,
             str::stream() << kExpressionName
@@ -156,10 +151,6 @@ boost::intrusive_ptr<Expression> ExpressionInternalJs::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
     const VariablesParseState& vps) {
-
-    uassert(ErrorCodes::BadValue,
-            str::stream() << kExpressionName << " not allowed without enabling test commands.",
-            getTestCommandsEnabled());
 
     uassert(31260,
             str::stream() << kExpressionName

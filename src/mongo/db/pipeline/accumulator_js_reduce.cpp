@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/make_js_function.h"
 
@@ -147,10 +146,6 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
 
 boost::intrusive_ptr<Accumulator> AccumulatorInternalJsReduce::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData funcSource) {
-
-    uassert(ErrorCodes::BadValue,
-            str::stream() << kAccumulatorName << " not allowed without enabling test commands.",
-            getTestCommandsEnabled());
 
     return make_intrusive<AccumulatorInternalJsReduce>(expCtx, funcSource);
 }
