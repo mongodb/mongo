@@ -366,19 +366,12 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
       _writerPool(writerPool),
       _storageInterface(storageInterface),
       _consistencyMarkers(consistencyMarkers),
-      _beginApplyingOpTime(options.beginApplyingOpTime) {
-    auto getNextApplierBatchFn = [this](OperationContext* opCtx, const BatchLimits& batchLimits) {
-        return getNextApplierBatch(opCtx, batchLimits);
-    };
-
-    _opQueueBatcher = std::make_unique<OpQueueBatcher>(
-        this, _storageInterface, oplogBuffer, getNextApplierBatchFn);
-}
+      _beginApplyingOpTime(options.beginApplyingOpTime) {}
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     // Start up a thread from the batcher to pull from the oplog buffer into the batcher's oplog
     // queue.
-    _opQueueBatcher->startup();
+    _opQueueBatcher->startup(_storageInterface);
 
     ON_BLOCK_EXIT([this] { _opQueueBatcher->shutdown(); });
 

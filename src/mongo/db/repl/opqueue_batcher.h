@@ -29,25 +29,25 @@
 
 #pragma once
 
-#include "mongo/db/repl/initial_syncer.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/invariant.h"
 
 namespace mongo {
 namespace repl {
+
+class OplogApplier;
 
 /**
  * Stores a batch of oplog entries for oplog application.
  */
 class OpQueue {
 public:
-    explicit OpQueue(std::size_t batchLimitOps) : _bytes(0) {
+    explicit OpQueue(std::size_t batchLimitOps) {
         _batch.reserve(batchLimitOps);
-    }
-
-    size_t getBytes() const {
-        return _bytes;
-    }
-    size_t getCount() const {
-        return _batch.size();
     }
     bool empty() const {
         return _batch.empty();
@@ -66,11 +66,9 @@ public:
 
     void emplace_back(OplogEntry oplog) {
         invariant(!_mustShutdown);
-        _bytes += oplog.getRawObjSizeBytes();
         _batch.emplace_back(std::move(oplog));
     }
     void pop_back() {
-        _bytes -= back().getRawObjSizeBytes();
         _batch.pop_back();
     }
 
@@ -111,7 +109,6 @@ public:
 
 private:
     std::vector<OplogEntry> _batch;
-    size_t _bytes;
     bool _mustShutdown = false;
     boost::optional<long long> _termWhenExhausted;
 };
@@ -125,10 +122,29 @@ class OpQueueBatcher {
     OpQueueBatcher& operator=(const OpQueueBatcher&) = delete;
 
 public:
-    OpQueueBatcher(OplogApplier* oplogApplier,
-                   StorageInterface* storageInterface,
-                   OplogBuffer* oplogBuffer,
-                   OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn);
+    /**
+     * Controls what can popped from the oplog buffer into a single batch of operations that can be
+     * applied using OplogApplier::applyOplogBatch().
+     */
+    class BatchLimits {
+    public:
+        size_t bytes = 0;
+        size_t ops = 0;
+
+        // If provided, the batch will not include any operations with timestamps after this point.
+        // This is intended for implementing slaveDelay, so it should be some number of seconds
+        // before now.
+        boost::optional<Date_t> slaveDelayLatestTimestamp = {};
+
+        // If non-null, the batch will include operations with timestamps either
+        // before-and-including this point or after it, not both.
+        Timestamp forceBatchBoundaryAfter;
+    };
+
+    /**
+     * Constructs an OpQueueBatcher
+     */
+    OpQueueBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer);
 
     virtual ~OpQueueBatcher();
 
@@ -141,12 +157,23 @@ public:
      * Starts up a thread to continuously pull from the OplogBuffer into the OpQueueBatcher's oplog
      * queue.
      */
-    void startup();
+    void startup(StorageInterface* storageInterface);
 
     /**
      * Shuts down the thread that pulls from the OplogBuffer to the oplog queue.
      */
     void shutdown();
+
+    /**
+     * Returns a new batch of ops to apply.
+     * A batch may consist of:
+     *     at most "BatchLimits::ops" OplogEntries
+     *     at most "BatchLimits::bytes" worth of OplogEntries
+     *     only OplogEntries from before the "BatchLimits::slaveDelayLatestTimestamp" point
+     *     a single command OplogEntry (excluding applyOps, which are grouped with CRUD ops)
+     */
+    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(OperationContext* opCtx,
+                                                            const BatchLimits& batchLimits);
 
 private:
     /**
@@ -155,12 +182,15 @@ private:
      */
     boost::optional<Date_t> _calculateSlaveDelayLatestTimestamp();
 
-    void _run();
+    /**
+     * Pops the operation at the front of the OplogBuffer.
+     */
+    void _consume(OperationContext* opCtx, OplogBuffer* oplogBuffer);
+
+    void _run(StorageInterface* storageInterface);
 
     OplogApplier* _oplogApplier;
-    StorageInterface* const _storageInterface;
     OplogBuffer* const _oplogBuffer;
-    OplogApplier::GetNextApplierBatchFn const _getNextApplierBatchFn;
 
     Mutex _mutex = MONGO_MAKE_LATCH("OpQueueBatcher::_mutex");
     stdx::condition_variable _cv;
@@ -173,6 +203,18 @@ private:
     std::unique_ptr<stdx::thread> _thread;
 };
 
+/**
+ * Returns maximum number of operations in each batch that can be applied using
+ * applyOplogBatch().
+ */
+std::size_t getBatchLimitOplogEntries();
+
+/**
+ * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
+ * size.
+ * Batches are limited to 10% of the oplog.
+ */
+std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface);
 
 }  // namespace repl
 }  // namespace mongo

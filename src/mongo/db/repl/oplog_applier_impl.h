@@ -35,7 +35,6 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/oplog_applier.h"
-#include "mongo/db/repl/opqueue_batcher.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics.h"
@@ -119,8 +118,6 @@ private:
     // Used to determine which operations should be applied during initial sync. If this is null,
     // we will apply all operations that were fetched.
     OpTime _beginApplyingOpTime = OpTime();
-
-    std::unique_ptr<OpQueueBatcher> _opQueueBatcher;
 
     void fillWriterVectors(OperationContext* opCtx,
                            MultiApplier::Operations* ops,

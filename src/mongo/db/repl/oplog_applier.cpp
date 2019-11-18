@@ -34,7 +34,6 @@
 #include "mongo/db/repl/oplog_applier.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/util/log.h"
@@ -51,7 +50,9 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,
                            Observer* observer,
                            const Options& options)
-    : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {}
+    : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {
+    _opQueueBatcher = std::make_unique<OpQueueBatcher>(this, oplogBuffer);
+}
 
 OplogBuffer* OplogApplier::getBuffer() const {
     return _oplogBuffer;
@@ -114,157 +115,6 @@ void OplogApplier::enqueue(OperationContext* opCtx,
     _oplogBuffer->push(opCtx, begin, end);
 }
 
-namespace {
-
-/**
- * Returns whether an oplog entry represents an implicit commit for a transaction which has not
- * been prepared.  An entry is an unprepared commit if it has a boolean "prepared" field set to
- * false and "isPartial" is not present.
- */
-bool isUnpreparedCommit(const OplogEntry& entry) {
-    if (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
-        return false;
-    }
-
-    if (entry.isPartialTransaction()) {
-        return false;
-    }
-
-    if (entry.shouldPrepare()) {
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Returns whether an oplog entry represents an applyOps which doesn't imply prepare.
- * It could be a partial transaction oplog entry, an implicit commit applyOps or an applyOps outside
- * of transaction.
- */
-bool isUnpreparedApplyOps(const OplogEntry& entry) {
-    return entry.getCommandType() == OplogEntry::CommandType::kApplyOps && !entry.shouldPrepare();
-}
-
-/**
- * Returns true if this oplog entry must be processed in its own batch and cannot be grouped with
- * other entries.
- *
- * Commands must be processed one at a time. The exceptions to this are unprepared applyOps, because
- * applyOps oplog entries are effectively containers for CRUD operations, and unprepared
- * commitTransaction, because that also expands to CRUD operations. Therefore, it is safe to batch
- * applyOps commands with CRUD operations when reading from the oplog buffer.
- *
- * Oplog entries on 'system.views' should also be processed one at a time. View catalog immediately
- * reflects changes for each oplog entry so we can see inconsistent view catalog if multiple oplog
- * entries on 'system.views' are being applied out of the original order.
- *
- * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
- * processing each operation matches the primary's when committing that operation.
- */
-bool mustProcessIndividually(const OplogEntry& entry) {
-    if (entry.isCommand()) {
-        if (isUnpreparedCommit(entry)) {
-            return false;
-        } else if (isUnpreparedApplyOps(entry)) {
-            return false;
-        }
-        return true;
-    } else if (entry.getNss().isSystemDotViews()) {
-        return true;
-    } else if (entry.getNss().isServerConfigurationCollection()) {
-        return true;
-    }
-    return false;
-}
-
-/**
- * Returns the number of logical operations represented by an oplog entry.
- * This is usually one but may be greater than one in certain cases, such as in a commitTransaction
- * command.
- */
-std::size_t getOpCount(const OplogEntry& entry) {
-    if (isUnpreparedCommit(entry)) {
-        auto count = entry.getObject().getIntField(CommitTransactionOplogObject::kCountFieldName);
-        if (count > 0) {
-            return std::size_t(count);
-        }
-    }
-    return 1U;
-}
-
-}  // namespace
-
-StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
-    OperationContext* opCtx, const BatchLimits& batchLimits) {
-    if (batchLimits.ops == 0) {
-        return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
-    }
-
-    std::size_t totalOps = 0;
-    std::uint32_t totalBytes = 0;
-    Operations ops;
-    BSONObj op;
-    while (_oplogBuffer->peek(opCtx, &op)) {
-        auto entry = OplogEntry(op);
-
-        // Check for oplog version change.
-        if (entry.getVersion() != OplogEntry::kOplogVersion) {
-            std::string message = str::stream()
-                << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
-                << entry.getVersion() << " in oplog entry: " << redact(entry.toBSON());
-            severe() << message;
-            return {ErrorCodes::BadValue, message};
-        }
-
-        if (batchLimits.slaveDelayLatestTimestamp) {
-            auto entryTime =
-                Date_t::fromDurationSinceEpoch(Seconds(entry.getTimestamp().getSecs()));
-            if (entryTime > *batchLimits.slaveDelayLatestTimestamp) {
-                if (ops.empty()) {
-                    // Sleep if we've got nothing to do. Only sleep for 1 second at a time to allow
-                    // reconfigs and shutdown to occur.
-                    sleepsecs(1);
-                }
-                return std::move(ops);
-            }
-        }
-
-        if (mustProcessIndividually(entry)) {
-            if (ops.empty()) {
-                ops.push_back(std::move(entry));
-                _consume(opCtx, _oplogBuffer);
-            }
-
-            // Otherwise, apply what we have so far and come back for this entry.
-            return std::move(ops);
-        }
-
-        // Apply replication batch limits. Avoid returning an empty batch.
-        auto opCount = getOpCount(entry);
-        auto opBytes = entry.getRawObjSizeBytes();
-        if (totalOps > 0) {
-            if (totalOps + opCount > batchLimits.ops || totalBytes + opBytes > batchLimits.bytes) {
-                return std::move(ops);
-            }
-        }
-
-        // If we have a forced batch boundary, apply it.
-        if (totalOps > 0 && !batchLimits.forceBatchBoundaryAfter.isNull() &&
-            entry.getOpTime().getTimestamp() > batchLimits.forceBatchBoundaryAfter &&
-            ops.back().getOpTime().getTimestamp() <= batchLimits.forceBatchBoundaryAfter) {
-            return std::move(ops);
-        }
-
-        // Add op to buffer.
-        totalOps += opCount;
-        totalBytes += opBytes;
-        ops.push_back(std::move(entry));
-        _consume(opCtx, _oplogBuffer);
-    }
-    return std::move(ops);
-}
-
 StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx, Operations ops) {
     _observer->onBatchBegin(ops);
     auto lastApplied = _applyOplogBatch(opCtx, std::move(ops));
@@ -272,19 +122,13 @@ StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx, Operat
     return lastApplied;
 }
 
-const OplogApplier::Options& OplogApplier::getOptions() const {
-    return _options;
+StatusWith<std::vector<OplogEntry>> OplogApplier::getNextApplierBatch(
+    OperationContext* opCtx, const BatchLimits& batchLimits) {
+    return _opQueueBatcher->getNextApplierBatch(opCtx, batchLimits);
 }
 
-void OplogApplier::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
-    // This is just to get the op off the queue; it's been peeked at and queued for application
-    // already.
-    // If we failed to get an op off the queue, this means that shutdown() was called between the
-    // consumer's calls to peek() and consume(). shutdown() cleared the buffer so there is nothing
-    // for us to consume here. Since our postcondition is already met, it is safe to return
-    // successfully.
-    BSONObj opToPopAndDiscard;
-    invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || inShutdown());
+const OplogApplier::Options& OplogApplier::getOptions() const {
+    return _options;
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool() {
@@ -303,17 +147,6 @@ std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
     auto pool = std::make_unique<ThreadPool>(options);
     pool->startup();
     return pool;
-}
-
-std::size_t getBatchLimitOplogEntries() {
-    return std::size_t(replBatchLimitOperations.load());
-}
-
-std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface) {
-    auto oplogMaxSizeResult =
-        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
-    auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
-    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));
 }
 
 }  // namespace repl

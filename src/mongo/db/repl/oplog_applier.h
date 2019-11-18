@@ -38,6 +38,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/opqueue_batcher.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
@@ -80,35 +81,17 @@ public:
         const bool skipWritesToOplog;
     };
 
-    /**
-     * Controls what can popped from the oplog buffer into a single batch of operations that can be
-     * applied using applyOplogBatch().
-     */
-    class BatchLimits {
-    public:
-        size_t bytes = 0;
-        size_t ops = 0;
-
-        // If provided, the batch will not include any operations with timestamps after this point.
-        // This is intended for implementing slaveDelay, so it should be some number of seconds
-        // before now.
-        boost::optional<Date_t> slaveDelayLatestTimestamp = {};
-
-        // If non-null, the batch will include operations with timestamps either
-        // before-and-including this point or after it, not both.
-        Timestamp forceBatchBoundaryAfter;
-    };
-
     // Used to report oplog application progress.
     class Observer;
 
     using Operations = std::vector<OplogEntry>;
 
-    // TODO (SERVER-43001): This potentially violates layering as OpQueueBatcher calls an
-    // OplogApplier method.
-    // Used to access batching logic.
-    using GetNextApplierBatchFn = std::function<StatusWith<OplogApplier::Operations>(
-        OperationContext* opCtx, const BatchLimits& batchLimits)>;
+    /**
+     * OpQueueBatcher is an implementation detail that should be abstracted from all levels above
+     * the OplogApplier. Parts of the system that need to modify BatchLimits can do so through the
+     * OplogApplier.
+     */
+    using BatchLimits = OpQueueBatcher::BatchLimits;
 
     /**
      * Constructs this OplogApplier with specific options.
@@ -161,18 +144,6 @@ public:
     void enqueue(OperationContext* opCtx,
                  OplogBuffer::Batch::const_iterator begin,
                  OplogBuffer::Batch::const_iterator end);
-
-    /**
-     * Returns a new batch of ops to apply.
-     * A batch may consist of:
-     *     at most "BatchLimits::ops" OplogEntries
-     *     at most "BatchLimits::bytes" worth of OplogEntries
-     *     only OplogEntries from before the "BatchLimits::slaveDelayLatestTimestamp" point
-     *     a single command OplogEntry (excluding applyOps, which are grouped with CRUD ops)
-     */
-    StatusWith<Operations> getNextApplierBatch(OperationContext* opCtx,
-                                               const BatchLimits& batchLimits);
-
     /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
      * using a set of threads to apply the operations.
@@ -189,14 +160,15 @@ public:
      */
     StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, Operations ops);
 
+    /**
+     * Calls the OpQueueBatcher's getNextApplierBatch.
+     */
+    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(OperationContext* opCtx,
+                                                            const BatchLimits& batchLimits);
+
     const Options& getOptions() const;
 
 private:
-    /**
-     * Pops the operation at the front of the OplogBuffer.
-     */
-    void _consume(OperationContext* opCtx, OplogBuffer* oplogBuffer);
-
     /**
      * Called from startup() to run oplog application loop.
      * Currently applicable to steady state replication only.
@@ -228,6 +200,10 @@ private:
 
     // Configures this OplogApplier.
     const Options _options;
+
+protected:
+    // Handles consuming oplog entries from the OplogBuffer for oplog application.
+    std::unique_ptr<OpQueueBatcher> _opQueueBatcher;
 };
 
 /**
@@ -265,19 +241,6 @@ extern NoopOplogApplierObserver noopOplogApplierObserver;
  */
 std::unique_ptr<ThreadPool> makeReplWriterPool();
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount);
-
-/**
- * Returns maximum number of operations in each batch that can be applied using
- * applyOplogBatch().
- */
-std::size_t getBatchLimitOplogEntries();
-
-/**
- * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
- * size.
- * Batches are limited to 10% of the oplog.
- */
-std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface);
 
 }  // namespace repl
 }  // namespace mongo

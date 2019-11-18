@@ -1730,7 +1730,6 @@ Status InitialSyncer::_enqueueDocuments(Fetcher::Documents::const_iterator begin
         return Status::OK();
     }
 
-    // TODO (SERVER-43001): Remove this invariant once _oplogBuffer is moved out of initial_syncer.h
     invariant(_oplogBuffer);
 
     // Wait for enough space.
