@@ -55,7 +55,7 @@ functions:
         set -o verbose
         if [ "$OS" != "Windows_NT" ]; then
           sh reconf
-          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb"} \
+          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"} \
             ../configure ${configure_python_setting|} \
             ${posix_configure_flags|--enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL}
         fi
@@ -123,7 +123,7 @@ functions:
         set -o errexit
         set -o verbose
 
-        ${test_env_vars|} ${python_binary|python} ../test/suite/run.py -v 2 ${smp_command|} 2>&1
+        ${test_env_vars|} ${python_binary|python} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1
   "test format":
     command: shell.exec
     params:
@@ -132,7 +132,7 @@ functions:
         set -o errexit
         set -o verbose
         for i in $(seq ${times|1}); do
-          ./t ${test_format_args|-1 -c ../../../test/format/CONFIG.stress}
+          ./t -1 -c ${config|../../../test/format/CONFIG.stress} ${extra_args|}
         done
   "upload artifact":
     - command: archive.targz_pack
@@ -187,7 +187,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
 
   - name: compile-msan
@@ -195,7 +195,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=memory -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=memory -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
 
   - name: compile-ubsan
@@ -203,7 +203,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ CFLAGS="-fsanitize=undefined -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=undefined -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic
 
   # production build with --disable-shared
@@ -248,7 +248,7 @@ tasks:
           dependent_task: compile-msan
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=memory -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=memory -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make check all"
         vars:
@@ -263,7 +263,7 @@ tasks:
           dependent_task: compile-asan
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make check all"
         vars:
@@ -315,7 +315,7 @@ tasks:
           dependent_task: compile-asan
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=address -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=address -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make check directory"
         vars:
@@ -493,7 +493,7 @@ tasks:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ CFLAGS="-fsanitize=undefined -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=undefined -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic
       - command: shell.exec
         params:
@@ -1026,6 +1026,15 @@ tasks:
       - func: "fetch artifacts"
       - func: "unit test"
 
+  - name: unit-test-long
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 --long
+
   - name: unit-linux-no-ftruncate-test
     depends_on:
     - name: compile-linux-no-ftruncate
@@ -1055,7 +1064,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [ab] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket01
     tags: ["pull_request", "unit_test"]
@@ -1071,7 +1080,7 @@ tasks:
             set -o verbose
 
             # Reserve this bucket only for compat tests, which take a long time to run
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py compat -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py compat ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket02
     tags: ["pull_request", "unit_test"]
@@ -1088,7 +1097,7 @@ tasks:
 
             # Non-compat tests in the 'c' family
             non_compat_tests=$(ls ../test/suite/test_c*.py | xargs -n1 basename | grep -v compat)
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_compat_tests -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_compat_tests ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket03
     tags: ["pull_request", "unit_test"]
@@ -1103,7 +1112,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defghijk] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defghijk] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket04
     tags: ["pull_request", "unit_test"]
@@ -1118,7 +1127,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [lmnopq] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket05
     tags: ["pull_request", "unit_test"]
@@ -1133,7 +1142,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [rs] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket06
     tags: ["pull_request", "unit_test"]
@@ -1149,7 +1158,7 @@ tasks:
             set -o verbose
 
             # Reserve this bucket only for timestamp tests, which take a long time to run
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py timestamp -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py timestamp ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket07
     tags: ["pull_request", "unit_test"]
@@ -1166,8 +1175,8 @@ tasks:
 
             # Non-timestamp tests in the 't' family
             non_ts_tests=$(ls ../test/suite/test_t*.py | xargs -n1 basename | grep -v timestamp)
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_ts_tests -v 2 ${smp_command|} 2>&1
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_ts_tests ${unit_test_args|-v 2} ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [uvwxyz] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   # End of Python unit test tasks
 
@@ -1300,7 +1309,8 @@ tasks:
       - func: "test format"
         vars:
           times: 10
-          test_format_args: -1 -h "WT_TEST.$i" -c ../../../test/format/CONFIG.endian
+          config: ../../../test/format/CONFIG.endian
+          extra_args: -h "WT_TEST.$i"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix/test/format"
@@ -1361,7 +1371,8 @@ tasks:
       - func: "test format"
         vars:
           times: 10
-          test_format_args: -1 -h "WT_TEST.$i" -c ../../../test/format/CONFIG.endian
+          config: ../../../test/format/CONFIG.endian
+          extra_args: -h "WT_TEST.$i"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix/test/format"
@@ -1435,6 +1446,15 @@ tasks:
             set -o errexit
             set -o verbose
             ./configure_combinations.sh ${smp_command|} 2>&1
+      # Handle special build combination for running all the diagnostic tests.
+      - func: "configure wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-g -Werror"
+          posix_configure_flags: --enable-silent-rules --enable-diagnostic --disable-static
+      - func: "make wiredtiger"
+        vars:
+          make_command: make all
+      - func: "make check all"
   
   - name: linux-directio
     depends_on:
@@ -1445,7 +1465,8 @@ tasks:
       - func: "test format"
         vars:
           times: 3
-          test_format_args: -1 -C "direct_io=[data]" -c ../../../test/format/CONFIG.stress
+          config: ../../../test/format/CONFIG.stress
+          extra_args: -C "direct_io=[data]"
 
   - name: format-linux-no-ftruncate
     depends_on:
@@ -1482,7 +1503,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${python_binary|python} syscall.py --verbose
+            ${python_binary|python} syscall.py --verbose --preserve
 
   - name: checkpoint-filetypes-test
     commands:
@@ -1501,13 +1522,77 @@ tasks:
         vars:
           checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
 
+  - name: coverage-report
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="--coverage -fPIC -ggdb" LDFLAGS=--coverage
+          posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python --with-builtins=lz4,snappy,zlib
+      - func: "make check all"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 --long
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row direct_io=1 firstfit=1 internal_key_truncation=1
+      - func: "test format"
+        vars:
+          extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_key=1 huffman_value=1
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row isolation=random transaction_timestamps=0
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row data_source=lsm bloom=1
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
+      - func: "test format"
+        vars:
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+            # FIX ME Remove once BUILD-5025 is done
+            pip install gcovr --user
+            GCOV=/opt/mongodbtoolchain/v3/bin/gcov /home/ubuntu/.local/bin/gcovr -r .. -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' --html -o ../coverage_report.html
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger/coverage_report.html
+          bucket: build_external
+          permissions: public-read
+          content_type: text/html
+          display_name: Coverage report
+          remote_file: wiredtiger/${build_variant}/${revision}/coverage_report/coverage_report_${build_id}.html
+
 buildvariants:
 - name: ubuntu1804
   display_name: Ubuntu 18.04
   run_on:
   - ubuntu1804-test
   expansions:
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
@@ -1521,13 +1606,15 @@ buildvariants:
     - name: make-check-asan-test
     - name: configure-combinations
     - name: checkpoint-filetypes-test
+    - name: coverage-report
+    - name: unit-test-long
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
   run_on:
   - ubuntu1804-test
   expansions:
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_python_setting: PYTHON=python3
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
@@ -1565,7 +1652,7 @@ buildvariants:
   run_on:
   - ubuntu1804-test
   expansions:
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
@@ -1579,7 +1666,7 @@ buildvariants:
   run_on:
   - rhel80-test
   expansions:
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    test_env_vars: LD_PRELOAD=/usr/local/lib/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
@@ -1619,8 +1706,9 @@ buildvariants:
   run_on:
   - macos-1012
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     smp_command: -j $(sysctl -n hw.logicalcpu)
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb"
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
@@ -1658,3 +1746,27 @@ buildvariants:
   - name: generate-datafile-big-endian
   - name: verify-datafile-big-endian
   - name: verify-datafile-from-little-endian
+
+- name: ubuntu1804-ppc
+  display_name: Ubuntu 18.04 PPC
+  run_on:
+  - ubuntu1804-power8-test
+  expansions:
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+  tasks:
+  - name: compile
+  - name: unit-test
+
+- name: ubuntu1804-zseries
+  display_name: Ubuntu 18.04 zSeries
+  run_on:
+  - ubuntu1804-zseries-test
+  expansions:
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+  tasks:
+  - name: compile
+  - name: unit-test

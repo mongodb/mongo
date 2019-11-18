@@ -11,11 +11,12 @@ CC=clang CFLAGS=\"-Wall -Werror -Qunused-arguments -Wno-self-assign -Wno-parenth
 
 options="--enable-diagnostic
 --disable-shared
---disable-static
+--disable-static --enable-python
 --enable-java --enable-python
 --enable-snappy --enable-zlib --enable-lz4
 --with-builtins=lz4,snappy,zlib
---enable-diagnostic --enable-java --enable-python"
+--enable-diagnostic --enable-java --enable-python
+--enable-strict --disable-shared"
 
 saved_IFS=$IFS
 cr_IFS="
@@ -64,7 +65,6 @@ for flag in $flags ; do
                        echo "*** ERROR: $flag, $option"
                fi
                IFS="$cr_IFS"
-               echo hello
        done
 done
 IFS=$saved_IFS

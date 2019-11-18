@@ -383,8 +383,6 @@ extern int __wt_config_check(WT_SESSION_IMPL *session, const WT_CONFIG_ENTRY *en
   const char *config, size_t config_len) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_config_collapse(WT_SESSION_IMPL *session, const char **cfg, char **config_ret)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_config_discard_defaults(WT_SESSION_IMPL *session, const char **cfg,
-  const char *config, char **config_ret) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_config_get(WT_SESSION_IMPL *session, const char **cfg_arg, WT_CONFIG_ITEM *key,
   WT_CONFIG_ITEM *value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_config_getone(WT_SESSION_IMPL *session, const char *config, WT_CONFIG_ITEM *key,
@@ -1161,10 +1159,10 @@ extern int __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_row_leaf(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref,
   WT_SALVAGE_COOKIE *salvage) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
+extern int __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool forced)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len,
+  bool forced) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_split_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page,
@@ -1968,8 +1966,6 @@ static inline int __wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *k
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static inline int __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit,
-  int64_t *resolved_update_countp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_txn_search_check(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)

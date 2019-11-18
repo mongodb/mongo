@@ -912,8 +912,7 @@ __wt_split_page_size(int split_pct, uint32_t maxpagesize, uint32_t allocsize)
  *     Initialize a single chunk structure.
  */
 static int
-__rec_split_chunk_init(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk, size_t memsize)
+__rec_split_chunk_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk)
 {
     chunk->recno = WT_RECNO_OOB;
     /* Don't touch the key item memory, that memory is reused. */
@@ -940,8 +939,9 @@ __rec_split_chunk_init(
      * In the case of fixed-length column-store, clear the entire buffer: fixed-length column-store
      * sets bits in bytes, where the bytes are assumed to initially be 0.
      */
-    WT_RET(__wt_buf_init(session, &chunk->image, memsize));
-    memset(chunk->image.mem, 0, r->page->type == WT_PAGE_COL_FIX ? memsize : WT_PAGE_HEADER_SIZE);
+    WT_RET(__wt_buf_init(session, &chunk->image, r->disk_img_buf_size));
+    memset(chunk->image.mem, 0,
+      r->page->type == WT_PAGE_COL_FIX ? r->disk_img_buf_size : WT_PAGE_HEADER_SIZE);
 
     return (0);
 }
@@ -958,7 +958,7 @@ __wt_rec_split_init(
     WT_BTREE *btree;
     WT_REC_CHUNK *chunk;
     WT_REF *ref;
-    size_t corrected_page_size, disk_img_buf_size;
+    size_t corrected_page_size;
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -1030,10 +1030,10 @@ __wt_rec_split_init(
      */
     corrected_page_size = r->page_size;
     WT_RET(bm->write_size(bm, session, &corrected_page_size));
-    disk_img_buf_size = WT_ALIGN(WT_MAX(corrected_page_size, r->split_size), btree->allocsize);
+    r->disk_img_buf_size = WT_ALIGN(WT_MAX(corrected_page_size, r->split_size), btree->allocsize);
 
     /* Initialize the first split chunk. */
-    WT_RET(__rec_split_chunk_init(session, r, &r->chunkA, disk_img_buf_size));
+    WT_RET(__rec_split_chunk_init(session, r, &r->chunkA));
     r->cur_ptr = &r->chunkA;
     r->prev_ptr = NULL;
 
@@ -1226,16 +1226,13 @@ __rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
  *     in a row? Sweet-tooth does, too.)
  */
 int
-__wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
+__wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool forced)
 {
     WT_BTREE *btree;
     WT_REC_CHUNK *tmp;
     size_t inuse;
 
     btree = S2BT(session);
-
-    /* Fixed length col store can call with next_len 0 */
-    WT_ASSERT(session, next_len == 0 || __wt_rec_need_split(r, next_len));
 
     /*
      * We should never split during salvage, and we're about to drop core because there's no parent
@@ -1245,14 +1242,12 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
         WT_PANIC_RET(session, WT_PANIC, "%s page too large, attempted split during salvage",
           __wt_page_type_string(r->page->type));
 
-    inuse = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-
     /*
-     * We can get here if the first key/value pair won't fit. Additionally, grow the buffer to
-     * contain the current item if we haven't already consumed a reasonable portion of a split
-     * chunk.
+     * We can get here if the first key/value pair won't fit. Grow the buffer to contain the current
+     * item if we haven't already consumed a reasonable portion of a split chunk.
      */
-    if (inuse < r->split_size / 2 && !__wt_rec_need_split(r, 0))
+    inuse = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
+    if (!forced && inuse < r->split_size / 2 && !__wt_rec_need_split(r, 0))
         goto done;
 
     /* All page boundaries reset the dictionary. */
@@ -1263,27 +1258,33 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
     r->cur_ptr->image.size = inuse;
 
     /*
-     * In case of bulk load, write out chunks as we get them. Otherwise we keep two chunks in memory
-     * at a given time. So, if there is a previous chunk, write it out, making space in the buffer
-     * for the next chunk to be written.
+     * Normally we keep two chunks in memory at a given time, and we write the previous chunk at
+     * each boundary, switching the previous and current check references. The exception is when
+     * doing a bulk load or a forced split, where we write out the chunks as we get them.
      */
     if (r->is_bulk_load)
         WT_RET(__rec_split_write(session, r, r->cur_ptr, NULL, false));
     else {
-        if (r->prev_ptr == NULL) {
-            WT_RET(__rec_split_chunk_init(session, r, &r->chunkB, r->cur_ptr->image.memsize));
-            r->prev_ptr = &r->chunkB;
-        } else
+        if (r->prev_ptr != NULL)
             WT_RET(__rec_split_write(session, r, r->prev_ptr, NULL, false));
 
-        /* Switch chunks. */
-        tmp = r->prev_ptr;
-        r->prev_ptr = r->cur_ptr;
-        r->cur_ptr = tmp;
+        if (forced) {
+            WT_RET(__rec_split_write(session, r, r->cur_ptr, NULL, false));
+            r->prev_ptr = NULL;
+            r->cur_ptr = &r->chunkA;
+        } else {
+            if (r->prev_ptr == NULL) {
+                WT_RET(__rec_split_chunk_init(session, r, &r->chunkB));
+                r->prev_ptr = &r->chunkB;
+            }
+            tmp = r->prev_ptr;
+            r->prev_ptr = r->cur_ptr;
+            r->cur_ptr = tmp;
+        }
     }
 
     /* Initialize the next chunk, including the key. */
-    WT_RET(__rec_split_chunk_init(session, r, r->cur_ptr, 0));
+    WT_RET(__rec_split_chunk_init(session, r, r->cur_ptr));
     r->cur_ptr->recno = r->recno;
     if (btree->type == BTREE_ROW)
         WT_RET(__rec_split_row_promote(session, r, &r->cur_ptr->key, r->page->type));
@@ -1321,16 +1322,14 @@ done:
  *     Save the details for the minimum split size boundary or call for a split.
  */
 int
-__wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
+__wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool forced)
 {
-    WT_ASSERT(session, __wt_rec_need_split(r, next_len));
-
     /*
      * If crossing the minimum split size boundary, store the boundary details at the current
      * location in the buffer. If we are crossing the split boundary at the same time, possible when
      * the next record is large enough, just split at this point.
      */
-    if (WT_CROSSING_MIN_BND(r, next_len) && !WT_CROSSING_SPLIT_BND(r, next_len) &&
+    if (!forced && WT_CROSSING_MIN_BND(r, next_len) && !WT_CROSSING_SPLIT_BND(r, next_len) &&
       !__wt_rec_need_split(r, 0)) {
         /*
          * If the first record doesn't fit into the minimum split size, we end up here. Write the
@@ -1361,7 +1360,7 @@ __wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t ne
     }
 
     /* We are crossing a split boundary */
-    return (__wt_rec_split(session, r, next_len));
+    return (__wt_rec_split(session, r, next_len, forced));
 }
 
 /*
@@ -1417,7 +1416,7 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         tmp = r->prev_ptr;
         r->prev_ptr = r->cur_ptr;
         r->cur_ptr = tmp;
-        return (__rec_split_chunk_init(session, r, r->prev_ptr, 0));
+        return (__rec_split_chunk_init(session, r, r->prev_ptr));
     }
 
     if (prev_ptr->min_offset != 0 && cur_ptr->image.size < r->min_split_size) {

@@ -1351,8 +1351,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * overflow item, because the split into the parent frees the backing blocks for any
      * no-longer-used overflow keys, which will corrupt the checkpoint's block management.
      */
-    if (!__wt_btree_can_evict_dirty(session) && F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
+    if (!__wt_btree_can_evict_dirty(session) && F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_fail_parent_has_overflow_items);
         return (false);
+    }
 
     /*
      * Check for in-memory splits before other eviction tests. If the page should split in-memory,
@@ -1394,8 +1396,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     /*
      * If the page is clean but has modifications that appear too new to evict, skip it.
      */
-    if (!modified && !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp))
+    if (!modified && !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_fail_with_newer_modifications_on_a_clean_page);
         return (false);
+    }
 
     return (true);
 }
