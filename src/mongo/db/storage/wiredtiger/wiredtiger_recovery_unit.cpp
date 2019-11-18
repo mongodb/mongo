@@ -246,6 +246,7 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 
 bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     invariant(!_inUnitOfWork(), toString(_getState()));
+    invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
     const bool forceCheckpoint = false;
     const bool stableCheckpoint = false;
     _sessionCache->waitUntilDurable(opCtx, forceCheckpoint, stableCheckpoint);
@@ -255,6 +256,7 @@ bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
 bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
                                                                bool stableCheckpoint) {
     invariant(!_inUnitOfWork(), toString(_getState()));
+    invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
     const bool forceCheckpoint = true;
     // Calling `waitUntilDurable` with `forceCheckpoint` set to false only performs a log
     // (journal) flush, and thus has no effect on unjournaled writes. Setting `forceCheckpoint` to

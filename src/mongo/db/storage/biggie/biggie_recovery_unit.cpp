@@ -93,6 +93,7 @@ void RecoveryUnit::doAbortUnitOfWork() {
 
 bool RecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     invariant(!_inUnitOfWork(), toString(_getState()));
+    invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
     return true;  // This is an in-memory storage engine.
 }
 
