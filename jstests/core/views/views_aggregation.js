@@ -1,7 +1,15 @@
 /**
  * Tests aggregation on views for proper pipeline concatenation and semantics.
- * @tags: [requires_find_command, does_not_support_stepdowns, requires_getmore,
- * requires_non_retryable_commands]
+ *
+ * The conditions under which sorts are pushed down were changed between 4.2 and 4.4. This test
+ * expects the 4.4 version output of explain().
+ * @tags: [requires_find_command,
+ *         does_not_support_stepdowns,
+ *         requires_getmore,
+ *         requires_non_retryable_commands,
+ *         # Requires FCV 4.4 because the test checks explain() output, and in 4.4 the conditions
+ *         # under which sorts are pushed down were changed.
+ *         requires_fcv_44]
  */
 (function() {
 "use strict";

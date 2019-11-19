@@ -1,6 +1,15 @@
-// Cannot implicitly shard accessed collections because the explain output from a mongod when run
-// against a sharded collection is wrapped in a "shards" object with keys for each shard.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns, requires_fastcount]
+/**
+ * Cannot implicitly shard accessed collections because the explain output from a mongod when run
+ * against a sharded collection is wrapped in a "shards" object with keys for each shard.
+ *
+ * @tags: [assumes_unsharded_collection,
+ *         does_not_support_stepdowns,
+ *         requires_fastcount,
+ *         # Projection push down works differently between 4.2 and 4.4. explain() provides a
+ *         # different output between the two versions. This test expects only the 4.4 version
+ *         # output.
+ *         requires_fcv_44]
+ */
 
 // Tests for the .explain() shell helper, which provides syntactic sugar for the explain command.
 

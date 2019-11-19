@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands,
+//         # This test attempts to call createCollection on a namespace with '$' which is not
+//         # supported until v4.4.
+//         requires_fcv_44]
 
 (function() {
 "use strict";
