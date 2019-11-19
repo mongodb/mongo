@@ -43,11 +43,12 @@ enums:
 structs:
     awsKMSError:
         description: "AWS KMS error"
+        strict: false
         fields:
           __type:
             type: string
             cpp_name: type
-          message: string
+          Message: string
 
     # Options passed to Mongo() javascript constructor
     awsKMS:
@@ -97,6 +98,7 @@ structs:
 
     awsEncryptResponse:
         description: "Response from AWS KMS Encrypt request, i.e. TrentService.Encrypt"
+        strict: false
         fields:
           CiphertextBlob:
             type: string
@@ -105,6 +107,8 @@ structs:
 
     awsDecryptResponse:
         description: "Response from AWS KMS Decrypt request, i.e. TrentService.Decrypt"
+        # Nov 13, 2019 they added EncryptionAlgorithm but it is not documented
+        strict: false
         fields:
           Plaintext:
             type: string

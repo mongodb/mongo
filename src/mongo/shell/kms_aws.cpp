@@ -219,14 +219,21 @@ std::vector<uint8_t> AWSKMSService::encrypt(ConstDataRange cdr, StringData kmsKe
     auto field = obj["__type"];
 
     if (!field.eoo()) {
-        auto awsResponse = AwsKMSError::parse(IDLParserErrorContext("root"), obj);
+        AwsKMSError awsResponse;
+        try {
+            awsResponse = AwsKMSError::parse(IDLParserErrorContext("awsEncryptError"), obj);
+        } catch (DBException& dbe) {
+            uasserted(51274,
+                      str::stream() << "AWS KMS failed to parse error message: " << dbe.toString()
+                                    << ", Response : " << obj);
+        }
 
         uasserted(51224,
                   str::stream() << "AWS KMS failed to encrypt: " << awsResponse.getType() << " : "
                                 << awsResponse.getMessage());
     }
 
-    auto awsResponse = AwsEncryptResponse::parse(IDLParserErrorContext("root"), obj);
+    auto awsResponse = AwsEncryptResponse::parse(IDLParserErrorContext("awsEncryptResponse"), obj);
 
     auto blobStr = base64::decode(awsResponse.getCiphertextBlob().toString());
 
@@ -249,7 +256,7 @@ BSONObj AWSKMSService::encryptDataKey(ConstDataRange cdr, StringData keyId) {
 }
 
 SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
-    auto awsMasterKey = AwsMasterKey::parse(IDLParserErrorContext("root"), masterKey);
+    auto awsMasterKey = AwsMasterKey::parse(IDLParserErrorContext("awsMasterKey"), masterKey);
 
     auto request = UniqueKmsRequest(kms_decrypt_request_new(
         reinterpret_cast<const uint8_t*>(cdr.data()), cdr.length(), nullptr));
@@ -272,14 +279,21 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
     auto field = obj["__type"];
 
     if (!field.eoo()) {
-        auto awsResponse = AwsKMSError::parse(IDLParserErrorContext("root"), obj);
+        AwsKMSError awsResponse;
+        try {
+            awsResponse = AwsKMSError::parse(IDLParserErrorContext("awsDecryptError"), obj);
+        } catch (DBException& dbe) {
+            uasserted(51275,
+                      str::stream() << "AWS KMS failed to parse error message: " << dbe.toString()
+                                    << ", Response : " << obj);
+        }
 
         uasserted(51225,
                   str::stream() << "AWS KMS failed to decrypt: " << awsResponse.getType() << " : "
                                 << awsResponse.getMessage());
     }
 
-    auto awsResponse = AwsDecryptResponse::parse(IDLParserErrorContext("root"), obj);
+    auto awsResponse = AwsDecryptResponse::parse(IDLParserErrorContext("awsDecryptResponse"), obj);
 
     auto blobStr = base64::decode(awsResponse.getPlaintext().toString());
 
