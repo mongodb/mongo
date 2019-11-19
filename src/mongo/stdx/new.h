@@ -37,7 +37,9 @@
 namespace mongo {
 namespace stdx {
 
-#if __cplusplus < 201703L || !defined(__cpp_lib_hardware_interference_size)
+// libc++ 8.0 and later define __cpp_lib_hardware_interference_size but don't actually implement it
+#if __cplusplus < 201703L || \
+    !(defined(__cpp_lib_hardware_interference_size) && !defined(_LIBCPP_VERSION))
 
 #if defined(MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT)
 static_assert(MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT >= sizeof(uint64_t), "Bad extended alignment");
