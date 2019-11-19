@@ -1,5 +1,5 @@
 // Test that $geoNear requires a geospatial index.
-// TODO: Reenable test on passthroughs with sharded collections as part of SERVER-38995.
+// TODO SERVER-29159: Enable test on passthroughs with sharded collections.
 // @tags: [assumes_unsharded_collection]
 (function() {
 "use strict";
