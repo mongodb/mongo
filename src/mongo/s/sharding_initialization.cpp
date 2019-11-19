@@ -66,11 +66,11 @@
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/pre_warm_connection_pool_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/s/sharding_task_executor_pool_gen.h"
+#include "mongo/s/warmup_server_parameters.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -271,9 +271,14 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
 }
 
 Status preCacheMongosRoutingInfo(OperationContext* opCtx) {
+    if (!gLoadRoutingTableOnStartup) {
+        return Status::OK();
+    }
+
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
+
     auto grid = Grid::get(opCtx);
 
     auto shardingCatalogClient = grid->catalogClient();
@@ -306,9 +311,6 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
         log() << "Pre-warming pooled connections for config server is disabled";
         return Status::OK();
     }
-
-    // Should not be called by mongod
-    invariant(serverGlobalParams.clusterRole != ClusterRole::ShardServer);
 
     Timer timer;
     std::vector<HostAndPort> allHosts;

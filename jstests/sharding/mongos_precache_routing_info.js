@@ -31,5 +31,16 @@ db = s.getDB("test");
 ss = db.serverStatus();
 assert.eq(1, ss.shardingStatistics.catalogCache.countFullRefreshesStarted);
 
+// does not pre cache when set parameter is disabled
+s.restartMongos(0, {
+    restart: true,
+    setParameter: {loadRoutingTableOnStartup: false},
+});
+db = s.getDB("test");
+
+// check for # refreshes started
+ss = db.serverStatus();
+assert.eq(0, ss.shardingStatistics.catalogCache.countFullRefreshesStarted);
+
 s.stop();
 })();

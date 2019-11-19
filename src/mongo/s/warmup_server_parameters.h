@@ -27,11 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/s/pre_warm_connection_pool_impl.h"
+#pragma once
 
 namespace mongo {
+/**
+ * Set parameter used to control whether or not the mongos attempts to precache the routing table on
+ * startup.
+ */
 
-bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup = true;
-int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS = 2000;
+extern bool gLoadRoutingTableOnStartup;
+
+/**
+ * Set parameters used to control whether or not the mongos attempts to warm up the connection
+ * pool on start up and for how long it should try.
+ */
+
+extern bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup;
+extern int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS;
 
 }  // namespace mongo

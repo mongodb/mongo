@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/s/warmup_server_parameters.h"
 
 namespace mongo {
-/**
- * Set parameters used to control whether or not the mongos attempts to warm up the connection
- * pool on start up and for how long it should try.
- */
 
-extern bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup;
-extern int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS;
+bool gLoadRoutingTableOnStartup = true;
+bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup = true;
+int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS = 2000;
 
 }  // namespace mongo

@@ -31,12 +31,19 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/s/mongos_options.h"
-    - "mongo/s/pre_warm_connection_pool_impl.h"
+    - "mongo/s/warmup_server_parameters.h"
   configs:
     section: "Sharding options"
     source: [ yaml, cli, ini ]
 
 server_parameters: 
+  loadRoutingTableOnStartup:
+    description: <-
+        Enables precaching of the mongos routing table on startup.
+    set_at: [ startup ]
+    cpp_varname: "gLoadRoutingTableOnStartup"
+    default: true
+
   warmMinConnectionsInShardingTaskExecutorPoolOnStartup:
     description: <-
         Enables prewarming of the connection pool.
