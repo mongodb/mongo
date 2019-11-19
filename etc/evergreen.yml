@@ -4040,6 +4040,20 @@ tasks:
           --install-mode=hygienic
           --separate-debug
 
+- name: compile_ninja
+  commands:
+    - func: "scons compile"
+      vars:
+        task_compile_flags: >-
+          --ninja
+        targets:
+          all.build.ninja
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: ninja -f all.build.ninja
+
 ## compile_all - build all scons targets ##
 - name: compile_all
   commands:
@@ -9099,6 +9113,22 @@ task_groups:
   tasks:
   - compile_core_tools
 - <<: *compile_task_group_template
+  name: compile_ninja_TG
+  tasks:
+  - compile_ninja
+  teardown_task:
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/all.build.ninja
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/all.${build_id}.build.ninja
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/plain
+        display_name: build.ninja
+- <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
   - dbtest
@@ -9409,6 +9439,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1804-build
+  - name: compile_ninja_TG
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough

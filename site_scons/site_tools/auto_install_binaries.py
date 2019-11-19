@@ -582,6 +582,16 @@ def auto_install_emitter(target, source, env):
         suffix = entry.get_suffix()
         if env.get("AIB_IGNORE", False):
             continue
+
+        # There is no API for determining if an Entry is operating in
+        # a SConf context. We obviously do not want to auto tag, and
+        # install conftest Programs. So we filter them out the only
+        # way available to us.
+        #
+        # We're working with upstream to expose this information.
+        if 'conftest' in str(entry):
+            continue
+
         auto_install_mapping = env[SUFFIX_MAP].get(suffix)
         if auto_install_mapping is not None:
             env.AutoInstall(
@@ -592,6 +602,7 @@ def auto_install_emitter(target, source, env):
                 AIB_ROLES=auto_install_mapping.default_roles,
                 AIB_COMPONENTS_EXTRA=env.get(COMPONENTS),
             )
+
     return (target, source)
 
 

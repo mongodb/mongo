@@ -355,6 +355,9 @@ env.Library(
     ]
 )
 
+if env["BUILDERS"].get("Ninja", None) is not None:
+    Return()
+
 readtest = env.Program(
     target='intel_decimal128_readtest',
     source=[
@@ -367,9 +370,10 @@ readtest = env.Program(
 )
 
 readtest_input = env.Install(
-    '.',
+    target='.',
     source=['TESTS/readtest.in'],
 )
+env.Depends(readtest_input, readtest)
 
 readtest_dict = {
     '@readtest_python_interpreter@' : sys.executable.replace('\\', r'\\'),
@@ -378,14 +382,16 @@ readtest_dict = {
 }
 
 readtest_wrapper = env.Substfile(
-    'intel_decimal128_readtest_wrapper.py.in',
+    target='intel_decimal128_readtest_wrapper.py',
+    source=['intel_decimal128_readtest_wrapper.py.in'],
     SUBST_DICT=readtest_dict,
 )
-env.Depends(readtest_wrapper, [readtest, readtest_input])
+env.Depends(readtest_wrapper, readtest_input)
 
 if env.TargetOSIs('windows'):
     readtest_wrapper_bat = env.Substfile(
-        'intel_decimal128_readtest_wrapper.bat.in',
+        target='intel_decimal128_readtest_wrapper.bat',
+        source=['intel_decimal128_readtest_wrapper.bat.in'],
         SUBST_DICT=readtest_dict,
     )
     env.Depends(readtest_wrapper_bat, readtest_wrapper)

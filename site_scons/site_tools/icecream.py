@@ -22,7 +22,6 @@ from pkg_resources import parse_version
 
 icecream_version_min = '1.1rc2'
 
-
 def generate(env):
 
     if not exists(env):
@@ -61,7 +60,19 @@ def generate(env):
     else:
         # Make a predictable name for the toolchain
         icecc_version_target_filename = env.subst('$CC$CXX').replace('/', '_')
-        icecc_version = env.Dir('$BUILD_ROOT/scons/icecc').File(icecc_version_target_filename)
+        icecc_version_dir = env.Dir('$BUILD_ROOT/scons/icecc')
+        icecc_version = icecc_version_dir.File(icecc_version_target_filename)
+
+        # There is a weird ordering problem that occurs when the ninja generator
+        # is enabled with icecream. Because the modules system runs configure
+        # checks after the environment is setup and configure checks ignore our
+        # --no-exec from the Ninja tool they try to create the icecc_env file.
+        # But since the Ninja tool has reached into the internals of SCons to
+        # disabled as much of it as possible SCons never creates this directory,
+        # causing the icecc_create_env call to fail. So we explicitly
+        # force creation of the directory now so it exists in all
+        # circumstances.
+        env.Execute(SCons.Defaults.Mkdir(icecc_version_dir))
 
         # Make an isolated environment so that our setting of ICECC_VERSION in the environment
         # doesn't appear when executing icecc_create_env

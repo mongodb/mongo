@@ -845,6 +845,11 @@ Will generate the files (respectively):
     install-all-meta.build.ninja.tsan
 """)
 
+env_vars.Add('__NINJA_NO',
+    help="Disable the Ninja tool unconditionally. Not intended for human use.",
+    default=0)
+
+
 env_vars.Add('OBJCOPY',
     help='Sets the path to objcopy',
     default=WhereIs('objcopy'))
@@ -1052,6 +1057,9 @@ envDict = dict(BUILD_ROOT=buildDir,
 
 env = Environment(variables=env_vars, **envDict)
 
+# Only print the spinner if stdout is a tty
+if sys.stdout.isatty():
+    Progress(['-\r', '\\\r', '|\r', '/\r'], interval=5)
 
 del envDict
 
@@ -1579,10 +1587,26 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
             fake_lib.write(str(uuid.uuid4()))
             fake_lib.write('\n')
 
-    env['ARCOM'] = write_uuid_to_file
-    env['ARCOMSTR'] = 'Generating placeholder library $TARGET'
-    env['RANLIBCOM'] = ''
-    env['RANLIBCOMSTR'] = 'Skipping ranlib for $TARGET'
+    # We originally did this by setting ARCOM to write_uuid_to_file,
+    # this worked more or less by accident. It works when SCons is
+    # doing the action execution because when it would subst the
+    # command line subst would execute the function as part of string
+    # resolution which would have the side effect of writing the
+    # file. Since it returned None subst would do some special
+    # handling to make sure it never made it to the command line. This
+    # breaks Ninja however because we are taking that return value and
+    # trying to pass it to the command executor (/bin/sh or
+    # cmd.exe) and end up with the function name as a command. The
+    # resulting command looks something like `/bin/sh -c
+    # 'write_uuid_to_file(env, target, source)`. If we instead
+    # actually do what we want and that is make the StaticLibrary
+    # builder's action a FunctionAction the Ninja generator will
+    # correctly dispatch it and not generate an invalid command
+    # line. This also has the side benefit of being more clear that
+    # we're expecting a Python function to execute here instead of
+    # pretending to be a CommandAction that just happens to not run a
+    # command but instead runs a function.
+    env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
 libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
 
@@ -3729,64 +3753,84 @@ env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 env.Tool('icecream')
 
 if get_option('ninja') == 'true':
-    env.Tool("ninja")
-    def test_txt_writer(alias_name):
-        """Find all the tests registered to alias_name and write them to a file via ninja."""
-        rule_written = False
+    ninja_builder = Tool("ninja")
+    if ninja_builder.exists(env):
+        ninja_builder.generate(env)
 
-        def wrapper(env, ninja, node, dependencies):
-            """Make a Ninja-able version of the test files."""
-            rule = alias_name.upper() + "_GENERATOR"
-            if not rule_written:
-                ninja.rule(
-                    rule,
-                    description="Generate test list text file",
-                    command="echo $in > $out",
-                )
-                rule_written = True
+        # Explicitly add all generated sources to the DAG so NinjaBuilder can
+        # generate rules for them. SCons if the files don't exist will not wire up
+        # the dependencies in the DAG because it cannot scan them. The Ninja builder
+        # does not care about the actual edge here as all generated sources will be
+        # pushed to the "bottom" of it's DAG via the order_only dependency on
+        # _generated_sources (an internal phony target)
+        if get_option('install-mode') == 'hygienic':
+            env.Alias("install-common-base", env.Alias("generated-sources"))
+        else:
+            env.Alias("all", env.Alias("generated-sources"))
+            env.Alias("core", env.Alias("generated-sources"))
 
-            alias = env.Alias(alias_name)
-            paths = []
-            children = alias.children()
-            for child in children:
-                paths.append('\t' + str(child))
-
-            ninja.build(
-                str(node),
-                rule,
-                inputs='\n'.join(paths),
-                implicit=dependencies,
+        if get_option("install-mode") == "hygienic":
+            ninja_build = env.Ninja(
+                target="install-all-meta.build.ninja",
+                source=env.Alias("install-all-meta"),
+            )
+        else:
+            ninja_build = env.Ninja(
+                target="all.build.ninja",
+                source=env.Alias("all"),
             )
 
-        return wrapper
-    env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", test_txt_writer('$UNITTEST_ALIAS'))
-    env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", test_txt_writer('$INTEGRATION_TEST_ALIAS'))
-    env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", test_txt_writer('$BENCHMARK_ALIAS'))
+        from glob import glob
+        sconscripts = [env.File(g) for g in glob("**/SConscript", recursive=True)]
+        sconscripts += [env.File("#SConstruct")]
+        env.Depends(ninja_build, sconscripts)
 
-    def fakelib_in_ninja():
-        """Generates empty .a files"""
-        rule_written = False
 
-        def wrapper(env, ninja, node, dependencies):
-            if not rule_written:
-                cmd = "touch $out"
-                if not env.TargetOSIs("posix"):
-                    cmd = "cmd /c copy NUL $out"
-                ninja.rule(
-                    "FAKELIB",
-                    command=cmd,
-                )
-                rule_written = True
+        def skip(env, node):
+            """
+            Write an empty test text file.
+            
+            Instead of calling SCONS to generate a *test.txt that most
+            users aren't using (and the current generator skips) we
+            simply teach Ninja how to make an empty file on the given
+            platform so as not to break dependency trees.
+            """
+            cmd = "touch {}".format(str(node))
+            if env["PLATFORM"] == "win32":
+                cmd = "copy NUL {}".format(str(node))
+            return {
+                "outputs": [str(node)],
+                "rule": "CMD",
+                "variables": {
+                    "cmd": cmd,
+                }
+            }
 
-            ninja.build(node.get_path(), rule='FAKELIB', implicit=dependencies)
+        env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", skip)
+        env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", skip)
+        env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", skip)
 
-        return wrapper
+        # We can create empty files for FAKELIB in Ninja because it
+        # does not care about content signatures. We have to
+        # write_uuid_to_file for FAKELIB in SCons because SCons does.
+        env.NinjaRule(
+            rule="FAKELIB",
+            command="cmd /c copy NUL $out" if env["PLATFORM"] == "win32" else "touch $out",
+        )
 
-    env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja())
+        def fakelib_in_ninja(env, node):
+            """Generates empty .a files"""
+            return {
+                "outputs": [node.get_path()],
+                "rule": "FAKELIB",
+                "implicit": [str(s) for s in node.sources],
+            }
 
-    # Load ccache after icecream since order matters when we're both changing CCCOM
-    if get_option('ccache') == 'true':
-        env.Tool('ccache')
+        env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja)
+
+        # Load ccache after icecream since order matters when we're both changing CCCOM
+        if get_option('ccache') == 'true':
+            env.Tool('ccache')
 
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
@@ -3879,7 +3923,6 @@ if get_option('install-mode') == 'hygienic':
                 "debug"
             ]
         ),
-
     })
 
     env.AddPackageNameAlias(
