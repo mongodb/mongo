@@ -31,6 +31,13 @@
 
 namespace mongo {
 /**
+ * Set parameter used to control whether or not the mongos attempts to precache the routing table on
+ * startup.
+ */
+
+extern bool gLoadRoutingTableOnStartup;
+
+/**
  * Set parameters used to control whether or not the mongos attempts to warm up the connection
  * pool on start up and for how long it should try.
  */

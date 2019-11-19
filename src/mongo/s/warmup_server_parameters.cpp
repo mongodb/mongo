@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/s/pre_warm_connection_pool_impl.h"
+#include "mongo/s/warmup_server_parameters.h"
 
 
 namespace mongo {
 
+bool gLoadRoutingTableOnStartup = true;
 bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup = true;
 int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS = 2000;
 
