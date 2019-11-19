@@ -212,7 +212,7 @@ class AwsKmsHandler(http.server.BaseHTTPRequestHandler):
         elif fault_type == FAULT_ENCRYPT_CORRECT_FORMAT:
             response = {
                 "__type" : "NotFoundException",
-                "message" : "Error encrypting message",
+                "Message" : "Error encrypting message",
             }
 
             self._send_reply(json.dumps(response).encode('utf-8'))
@@ -259,7 +259,7 @@ class AwsKmsHandler(http.server.BaseHTTPRequestHandler):
         elif fault_type == FAULT_DECRYPT_CORRECT_FORMAT:
             response = {
                 "__type" : "NotFoundException",
-                "message" : "Error decrypting message",
+                "Message" : "Error decrypting message",
             }
 
             self._send_reply(json.dumps(response).encode('utf-8'))
