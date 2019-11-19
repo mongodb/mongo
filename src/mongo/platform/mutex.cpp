@@ -33,16 +33,16 @@ namespace mongo {
 
 void Mutex::lock() {
     if (_mutex.try_lock()) {
-        _onQuickLock(_name);
+        _onQuickLock(_id);
         return;
     }
 
-    _onContendedLock(_name);
+    _onContendedLock(_id);
     _mutex.lock();
-    _onSlowLock(_name);
+    _onSlowLock(_id);
 }
 void Mutex::unlock() {
-    _onUnlock(_name);
+    _onUnlock(_id);
     _mutex.unlock();
 }
 bool Mutex::try_lock() {
@@ -50,7 +50,7 @@ bool Mutex::try_lock() {
         return false;
     }
 
-    _onQuickLock(_name);
+    _onQuickLock(_id);
     return true;
 }
 
@@ -60,31 +60,31 @@ void Mutex::addLockListener(LockListener* listener) {
     state.list.push_back(listener);
 }
 
-void Mutex::_onContendedLock(const StringData& name) noexcept {
+void Mutex::_onContendedLock(const Identity& id) noexcept {
     auto& state = _getListenerState();
     for (auto listener : state.list) {
-        listener->onContendedLock(name);
+        listener->onContendedLock(id);
     }
 }
 
-void Mutex::_onQuickLock(const StringData& name) noexcept {
+void Mutex::_onQuickLock(const Identity& id) noexcept {
     auto& state = _getListenerState();
     for (auto listener : state.list) {
-        listener->onQuickLock(name);
+        listener->onQuickLock(id);
     }
 }
 
-void Mutex::_onSlowLock(const StringData& name) noexcept {
+void Mutex::_onSlowLock(const Identity& id) noexcept {
     auto& state = _getListenerState();
     for (auto listener : state.list) {
-        listener->onSlowLock(name);
+        listener->onSlowLock(id);
     }
 }
 
-void Mutex::_onUnlock(const StringData& name) noexcept {
+void Mutex::_onUnlock(const Identity& id) noexcept {
     auto& state = _getListenerState();
     for (auto listener : state.list) {
-        listener->onUnlock(name);
+        listener->onUnlock(id);
     }
 }
 

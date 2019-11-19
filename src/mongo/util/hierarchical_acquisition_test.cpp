@@ -39,7 +39,7 @@
 namespace mongo {
 namespace {
 
-using namespace hierachical_acquisition_detail;
+using namespace hierarchical_acquisition_detail;
 
 struct Context {
     friend std::string toString(Context context) {

@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-namespace hierachical_acquisition_detail {
+namespace hierarchical_acquisition_detail {
 
 /**
  * Hierarchical acquisition types are light-weight wrappers around bitwise math
@@ -254,9 +254,9 @@ private:
     ValueType _value = 0;
 };
 
-}  // namespace hierachical_acquisition_detail
+}  // namespace hierarchical_acquisition_detail
 
-using HierarchicalAcquisitionSet = hierachical_acquisition_detail::Set;
-using HierarchicalAcquisitionLevel = hierachical_acquisition_detail::Level;
+using HierarchicalAcquisitionSet = hierarchical_acquisition_detail::Set;
+using HierarchicalAcquisitionLevel = hierarchical_acquisition_detail::Level;
 
 }  // namespace mongo

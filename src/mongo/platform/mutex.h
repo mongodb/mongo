@@ -34,8 +34,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/source_location.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -60,17 +62,39 @@ public:
 
     static constexpr auto kAnonymousMutexStr = "AnonymousMutex"_sd;
 
-    Mutex() : Mutex(kAnonymousMutexStr) {}
-    // Note that StringData is a view type, thus the underlying string for _name must outlive any
-    // given Mutex
-    explicit Mutex(const StringData& name) : _name(name) {}
-
     void lock() override;
     void unlock() override;
     bool try_lock() override;
     StringData getName() const override {
-        return _name;
+        return StringData(_id.name);
     }
+
+    struct Identity {
+        Identity(StringData name = kAnonymousMutexStr) : Identity(boost::none, boost::none, name) {}
+
+        Identity(SourceLocationHolder sourceLocation, StringData name = kAnonymousMutexStr)
+            : Identity(boost::none, sourceLocation, name) {}
+
+        Identity(hierarchical_acquisition_detail::Level level, StringData name = kAnonymousMutexStr)
+            : Identity(level, boost::none, name) {}
+
+        Identity(boost::optional<hierarchical_acquisition_detail::Level> level,
+                 boost::optional<SourceLocationHolder> sourceLocation,
+                 StringData name = kAnonymousMutexStr)
+            : level(level), sourceLocation(sourceLocation), name(name.toString()) {}
+
+        boost::optional<hierarchical_acquisition_detail::Level> level;
+        boost::optional<SourceLocationHolder> sourceLocation;
+        std::string name;
+    };
+
+    Mutex() : Mutex(Identity()) {}
+
+    Mutex(const Identity& id) : _id(id) {}
+
+    struct LatchSetState {
+        hierarchical_acquisition_detail::Set levelsHeld;
+    };
 
     /**
      * This function adds a LockListener subclass to the triggers for certain actions.
@@ -93,12 +117,13 @@ private:
         return state;
     }
 
-    static void _onContendedLock(const StringData& name) noexcept;
-    static void _onQuickLock(const StringData& name) noexcept;
-    static void _onSlowLock(const StringData& name) noexcept;
-    static void _onUnlock(const StringData& name) noexcept;
+    static void _onContendedLock(const Identity& id) noexcept;
+    static void _onQuickLock(const Identity& id) noexcept;
+    static void _onSlowLock(const Identity& id) noexcept;
+    static void _onUnlock(const Identity& id) noexcept;
 
-    const StringData _name;
+    const Identity _id;
+
     stdx::mutex _mutex;  // NOLINT
 };
 
@@ -114,22 +139,22 @@ public:
     /**
      * Action to do when a lock cannot be immediately acquired
      */
-    virtual void onContendedLock(const StringData& name) = 0;
+    virtual void onContendedLock(const Identity& id) = 0;
 
     /**
      * Action to do when a lock was acquired without blocking
      */
-    virtual void onQuickLock(const StringData& name) = 0;
+    virtual void onQuickLock(const Identity& id) = 0;
 
     /**
      * Action to do when a lock was acquired after blocking
      */
-    virtual void onSlowLock(const StringData& name) = 0;
+    virtual void onSlowLock(const Identity& id) = 0;
 
     /**
      * Action to do when a lock is unlocked
      */
-    virtual void onUnlock(const StringData& name) = 0;
+    virtual void onUnlock(const Identity& id) = 0;
 };
 
 }  // namespace mongo
@@ -137,7 +162,7 @@ public:
 /**
  * Define a mongo::Mutex with all arguments passed through to the ctor
  */
-#define MONGO_MAKE_LATCH(...) \
-    mongo::Mutex {            \
-        __VA_ARGS__           \
+#define MONGO_MAKE_LATCH(...)               \
+    mongo::Mutex {                          \
+        mongo::Mutex::Identity(__VA_ARGS__) \
     }

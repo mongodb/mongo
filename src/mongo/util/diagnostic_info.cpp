@@ -174,24 +174,24 @@ const auto getDiagnosticInfoHandle = Client::declareDecoration<DiagnosticInfoHan
 
 MONGO_INITIALIZER(LockListener)(InitializerContext* context) {
     class LockListener : public Mutex::LockListener {
-        void onContendedLock(const StringData& name) override {
+        void onContendedLock(const Mutex::Identity& id) override {
             if (auto client = Client::getCurrent()) {
                 auto& handle = getDiagnosticInfoHandle(client);
                 stdx::lock_guard<stdx::mutex> lk(handle.mutex);
-                handle.list.emplace_front(DiagnosticInfo::capture(name));
+                handle.list.emplace_front(DiagnosticInfo::capture(id.name));
 
                 if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
-                    (name == kBlockedOpMutexName)) {
+                    (id.name == kBlockedOpMutexName)) {
                     gBlockedOp.setIsContended(true);
                 }
             }
         }
 
-        void onQuickLock(const StringData&) override {
+        void onQuickLock(const Mutex::Identity&) override {
             // Do nothing
         }
 
-        void onSlowLock(const StringData& name) override {
+        void onSlowLock(const Mutex::Identity& id) override {
             if (auto client = Client::getCurrent()) {
                 auto& handle = getDiagnosticInfoHandle(client);
                 stdx::lock_guard<stdx::mutex> lk(handle.mutex);
@@ -201,7 +201,7 @@ MONGO_INITIALIZER(LockListener)(InitializerContext* context) {
             }
         }
 
-        void onUnlock(const StringData&) override {
+        void onUnlock(const Mutex::Identity&) override {
             // Do nothing
         }
     };

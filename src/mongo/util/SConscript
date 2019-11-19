@@ -284,6 +284,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='latch_analyzer',
+    source= [
+        'latch_analyzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
 env.Benchmark(
     target='clock_source_bm',
     source=[
@@ -552,6 +563,7 @@ icuEnv.CppUnitTest(
         'icu_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
+        'latch_analyzer_test.cpp',
         'lockable_adapter_test.cpp',
         'lru_cache_test.cpp',
         'md5_test.cpp',
@@ -584,6 +596,7 @@ icuEnv.CppUnitTest(
         'clock_source_mock',
         'clock_sources',
         'diagnostic_info',
+        'latch_analyzer',
         'dns_query',
         'fail_point',
         'icu',
