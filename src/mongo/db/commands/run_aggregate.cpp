@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -552,6 +553,7 @@ Status runAggregate(OperationContext* opCtx,
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
+        explain_common::generateServerInfo(&result);
         result << "stages" << Value(unownedPipeline->writeExplainOps(*expCtx->explain));
     } else {
         // Cursor must be specified, if explain is not.

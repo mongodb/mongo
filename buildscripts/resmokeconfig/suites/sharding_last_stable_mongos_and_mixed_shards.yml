@@ -117,6 +117,8 @@ selector:
   # Assumes shard doesn't refresh after a successful splitChunk (which it does
   # in 3.4)
   - jstests/sharding/major_version_check.js
+  # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.
+  - jstests/sharding/explain_cmd.js
 
 executor:
   config:

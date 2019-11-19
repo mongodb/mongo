@@ -171,14 +171,6 @@ private:
                                   ExplainOptions::Verbosity verbosity,
                                   BSONObjBuilder* out,
                                   boost::optional<long long> totalTimeMillis);
-
-    /**
-     * Adds the 'serverInfo' explain section to the BSON object being build
-     * by 'out'.
-     *
-     * This is a helper for generating explain BSON. It is used by explainStages(...).
-     */
-    static void generateServerInfo(BSONObjBuilder* out);
 };
 
 }  // namespace

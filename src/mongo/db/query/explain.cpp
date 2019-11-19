@@ -45,6 +45,7 @@
 #include "mongo/db/exec/text.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -686,17 +687,6 @@ void Explain::generateExecStats(PlanStageStats* stats,
 }
 
 // static
-void Explain::generateServerInfo(BSONObjBuilder* out) {
-    BSONObjBuilder serverBob(out->subobjStart("serverInfo"));
-    out->append("host", getHostNameCached());
-    out->appendNumber("port", serverGlobalParams.port);
-    auto&& vii = VersionInfoInterface::instance();
-    out->append("version", vii.version());
-    out->append("gitVersion", vii.gitVersion());
-    serverBob.doneFast();
-}
-
-// static
 void Explain::explainStages(PlanExecutor* exec,
                             const Collection* collection,
                             ExplainOptions::Verbosity verbosity,
@@ -797,7 +787,7 @@ void Explain::explainStages(PlanExecutor* exec,
         execBob.doneFast();
     }
 
-    generateServerInfo(out);
+    explain_common::generateServerInfo(out);
 }
 
 // static
