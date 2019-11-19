@@ -172,12 +172,6 @@ functions:
           evergreen_api_user=${evergreen_api_user}
           source ./buildscripts/signal_processing_setup.sh
           detect-changes --evergreen-api-config .evergreen.yml
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -v
-          ./dsi/run-dsi detect-changes --evergreen-api-config .evergreen.yml
     - command: json.get_history
       params:
         task: ${task_name}
