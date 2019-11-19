@@ -29,34 +29,20 @@
 
 #pragma once
 
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/core/record_view.hpp>
-#include <boost/log/expressions/message.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-
-#include "mongo/logv2/attribute_argument_set.h"
-#include "mongo/logv2/attributes.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_tag.h"
-#include "mongo/util/time_support.h"
-
-#include <fmt/format.h>
+#include "mongo/logv2/plain_formatter.h"
 
 namespace mongo {
 namespace logv2 {
 
-class TextFormatter {
+class TextFormatter : protected PlainFormatter {
 public:
     static bool binary() {
         return false;
     };
 
-    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) {
+    void operator()(boost::log::record_view const& rec,
+                    boost::log::formatting_ostream& strm) const {
         using namespace boost::log;
-
-        StringData message = extract<StringData>(attributes::message(), rec).get();
-        const auto& attrs = extract<AttributeArgumentSet>(attributes::attributes(), rec).get();
 
         fmt::memory_buffer buffer;
         fmt::format_to(
@@ -72,9 +58,7 @@ public:
             strm << "** WARNING: ";
         }
 
-        buffer.clear();
-        fmt::internal::vformat_to(buffer, to_string_view(message), attrs._values);
-        strm.write(buffer.data(), buffer.size());
+        PlainFormatter::operator()(rec, strm);
     }
 };
 

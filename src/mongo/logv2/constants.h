@@ -29,20 +29,10 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <fmt/format.h>
+namespace mongo::logv2::constants {
 
-#include "mongo/base/string_data.h"
+// Used in data structures to indicate number of attributes to store without having to allocate
+// memory.
+constexpr size_t kNumStaticAttrs = 16;
 
-namespace mongo {
-namespace logv2 {
-
-// Type erased set of provided libfmt named arguments. Index match between names and values.
-struct AttributeArgumentSet {
-    boost::container::small_vector<StringData, fmt::internal::max_packed_args> _names;
-    fmt::format_args _values;
-};
-
-
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2::constants

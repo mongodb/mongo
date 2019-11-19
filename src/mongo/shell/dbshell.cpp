@@ -57,7 +57,6 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/logv2/attribute_argument_set.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/console.h"
@@ -198,14 +197,9 @@ public:
         using boost::log::extract;
 
         if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kJavascript)) {
-            StringData message = extract<StringData>(attributes::message(), rec).get();
-            const auto& attrs = extract<AttributeArgumentSet>(attributes::attributes(), rec).get();
-
-            fmt::memory_buffer buffer;
-            fmt::internal::vformat_to(buffer, to_string_view(message), attrs._values);
-            strm.write(buffer.data(), buffer.size());
+            PlainFormatter::operator()(rec, strm);
         } else {
-            logv2::TextFormatter::operator()(rec, strm);
+            TextFormatter::operator()(rec, strm);
         }
     }
 };

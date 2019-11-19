@@ -46,7 +46,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/logv2/attribute_argument_set.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_severity.h"

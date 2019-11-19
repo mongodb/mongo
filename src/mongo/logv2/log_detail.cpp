@@ -46,7 +46,7 @@ void doLogImpl(LogSeverity const& severity,
                StringData stable_id,
                LogOptions const& options,
                StringData message,
-               AttributeArgumentSet const& attrs) {
+               TypeErasedAttributeStorage const& attrs) {
     auto& source = options.domain().internal().source();
     auto record = source.open_record(severity, options.component(), options.tags(), stable_id);
     if (record) {
@@ -58,7 +58,8 @@ void doLogImpl(LogSeverity const& severity,
         record.attribute_values().insert(
             attributes::attributes(),
             boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<AttributeArgumentSet>(attrs)));
+                new boost::log::attributes::attribute_value_impl<TypeErasedAttributeStorage>(
+                    attrs)));
 
         source.push_record(std::move(record));
     }

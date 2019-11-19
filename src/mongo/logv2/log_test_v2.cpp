@@ -34,26 +34,35 @@
 #include "mongo/logv2/log_test_v2.h"
 
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/formatter_base.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/plain_formatter.h"
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 
 #include <boost/log/attributes/constant.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 
+namespace mongo {
+namespace logv2 {
 namespace {
-struct TypeWithCustomFormatting {
-    TypeWithCustomFormatting() {}
-    TypeWithCustomFormatting(double x, double y) : _x(x), _y(y) {}
+
+struct TypeWithoutBSON {
+    TypeWithoutBSON() {}
+    TypeWithoutBSON(double x, double y) : _x(x), _y(y) {}
 
     double _x{0.0};
     double _y{0.0};
@@ -61,37 +70,19 @@ struct TypeWithCustomFormatting {
     std::string toString() const {
         return fmt::format("(x: {}, y: {})", _x, _y);
     }
+};
 
-    std::string toJson() const {
-        return fmt::format("{{\"x\": {}, \"y\": {}}}", _x, _y);
+struct TypeWithBSON : public TypeWithoutBSON {
+    using TypeWithoutBSON::TypeWithoutBSON;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("x"_sd, _x);
+        builder.append("y"_sd, _y);
+        return builder.obj();
     }
 };
-}  // namespace
 
-
-namespace fmt {
-template <>
-struct formatter<TypeWithCustomFormatting> : public mongo::logv2::FormatterBase {
-    template <typename FormatContext>
-    auto format(const TypeWithCustomFormatting& obj, FormatContext& ctx) {
-        switch (output_format()) {
-            case OutputFormat::kJson:
-                return format_to(ctx.out(), "{}", obj.toJson());
-
-            case OutputFormat::kBson:
-                return format_to(ctx.out(), "{}", "bson impl here");
-
-            case OutputFormat::kText:
-            default:
-                return format_to(ctx.out(), "{}", obj.toString());
-        }
-    }
-};
-}  // namespace fmt
-
-namespace mongo {
-namespace logv2 {
-namespace {
 class LogTestBackend
     : public boost::log::sinks::
           basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
@@ -111,21 +102,6 @@ public:
 
 private:
     std::vector<std::string>& _logLines;
-};
-
-class PlainFormatter {
-public:
-    static bool binary() {
-        return false;
-    };
-
-    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) {
-        StringData message = boost::log::extract<StringData>(attributes::message(), rec).get();
-        const auto& attrs =
-            boost::log::extract<AttributeArgumentSet>(attributes::attributes(), rec).get();
-
-        strm << fmt::internal::vformat(to_string_view(message), attrs._values);
-    }
 };
 
 class LogDuringInitTester {
@@ -179,12 +155,192 @@ TEST_F(LogTestV2, Basic) {
     LOGV2_OPTIONS({LogTag::kStartupWarnings}, "test");
     ASSERT(lines.back() == "test");
 
-    TypeWithCustomFormatting t(1.0, 2.0);
+    TypeWithBSON t(1.0, 2.0);
     LOGV2("{} custom formatting", "name"_attr = t);
     ASSERT(lines.back() == t.toString() + " custom formatting");
 
-    LOGV2("{:j} custom formatting, force json", "name"_attr = t);
-    ASSERT(lines.back() == t.toJson() + " custom formatting, force json");
+    TypeWithoutBSON t2(1.0, 2.0);
+    LOGV2("{} custom formatting, no bson", "name"_attr = t2);
+    ASSERT(lines.back() == t.toString() + " custom formatting, no bson");
+}
+
+TEST_F(LogTestV2, Types) {
+    std::vector<std::string> text;
+    auto text_sink = LogTestBackend::create(text);
+    text_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
+    text_sink->set_formatter(PlainFormatter());
+    attach(text_sink);
+
+    std::vector<std::string> json;
+    auto json_sink = LogTestBackend::create(json);
+    json_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
+    json_sink->set_formatter(JsonFormatter());
+    attach(json_sink);
+
+    // The JSON formatter should make the types round-trippable without data loss
+    auto validateJSON = [&](auto expected) {
+        namespace pt = boost::property_tree;
+
+        std::istringstream json_stream(json.back());
+        pt::ptree ptree;
+        pt::json_parser::read_json(json_stream, ptree);
+        ASSERT(ptree.get<decltype(expected)>("attr.name") == expected);
+    };
+
+    // bool
+    bool b = true;
+    LOGV2("bool {}", "name"_attr = b);
+    ASSERT(text.back() == "bool true");
+    validateJSON(b);
+
+    // char gets promoted to int
+    char c = 1;
+    LOGV2("char {}", "name"_attr = c);
+    ASSERT(text.back() == "char 1");
+    validateJSON(static_cast<uint8_t>(
+        c));  // cast, boost property_tree will try and parse as ascii otherwise
+
+    // signed char gets promoted to int
+    signed char sc = -1;
+    LOGV2("signed char {}", "name"_attr = sc);
+    ASSERT(text.back() == "signed char -1");
+    validateJSON(sc);
+
+    // unsigned char gets promoted to unsigned int
+    unsigned char uc = -1;
+    LOGV2("unsigned char {}", "name"_attr = uc);
+    ASSERT(text.back() == "unsigned char 255");
+    validateJSON(uc);
+
+    // short gets promoted to int
+    short s = 1;
+    LOGV2("short {}", "name"_attr = s);
+    ASSERT(text.back() == "short 1");
+    validateJSON(s);
+
+    // signed short gets promoted to int
+    signed short ss = -1;
+    LOGV2("signed short {}", "name"_attr = ss);
+    ASSERT(text.back() == "signed short -1");
+    validateJSON(ss);
+
+    // unsigned short gets promoted to unsigned int
+    unsigned short us = -1;
+    LOGV2("unsigned short {}", "name"_attr = us);
+    ASSERT(text.back() == "unsigned short 65535");
+    validateJSON(us);
+
+    // int types are preserved
+    int i = 1;
+    LOGV2("int {}", "name"_attr = i);
+    ASSERT(text.back() == "int 1");
+    validateJSON(i);
+
+    signed int si = -1;
+    LOGV2("signed int {}", "name"_attr = si);
+    ASSERT(text.back() == "signed int -1");
+    validateJSON(si);
+
+    unsigned int ui = -1;
+    LOGV2("unsigned int {}", "name"_attr = ui);
+    ASSERT(text.back() == "unsigned int 4294967295");
+    validateJSON(ui);
+
+    // int is treated as long long
+    long l = 1;
+    LOGV2("long {}", "name"_attr = l);
+    ASSERT(text.back() == "long 1");
+    validateJSON(l);
+
+    signed long sl = -1;
+    LOGV2("signed long {}", "name"_attr = sl);
+    ASSERT(text.back() == "signed long -1");
+    validateJSON(sl);
+
+    unsigned long ul = -1;
+    LOGV2("unsigned long {}", "name"_attr = ul);
+    ASSERT(text.back() == fmt::format("unsigned long {}", ul));
+    validateJSON(ul);
+
+    // long long types are preserved
+    long long ll = std::numeric_limits<unsigned int>::max();
+    ll += 1;
+    LOGV2("long long {}", "name"_attr = ll);
+    ASSERT(text.back() == std::string("long long ") + std::to_string(ll));
+    validateJSON(ll);
+
+    signed long long sll = -1;
+    LOGV2("signed long long {}", "name"_attr = sll);
+    ASSERT(text.back() == "signed long long -1");
+    validateJSON(sll);
+
+    unsigned long long ull = -1;
+    LOGV2("unsigned long long {}", "name"_attr = ull);
+    ASSERT(text.back() == "unsigned long long 18446744073709551615");
+    validateJSON(ull);
+
+    // int64_t, uint64_t, size_t are fine
+    int64_t int64 = 1;
+    LOGV2("int64_t {}", "name"_attr = int64);
+    ASSERT(text.back() == "int64_t 1");
+    validateJSON(int64);
+
+    uint64_t uint64 = -1;
+    LOGV2("uint64_t {}", "name"_attr = uint64);
+    ASSERT(text.back() == "uint64_t 18446744073709551615");
+    validateJSON(uint64);
+
+    size_t size = 1;
+    LOGV2("size_t {}", "name"_attr = size);
+    ASSERT(text.back() == "size_t 1");
+    validateJSON(size);
+
+    // floating point types
+    float f = 1.0;
+    LOGV2("float {}", "name"_attr = f);
+    ASSERT(text.back() == "float 1.0");
+    validateJSON(f);
+
+    double d = 1.0;
+    LOGV2("double {}", "name"_attr = d);
+    ASSERT(text.back() == "double 1.0");
+    validateJSON(d);
+
+    // long double is prohibited, we don't use this type and favors Decimal128 instead.
+
+    // string types
+    const char* c_str = "a c string";
+    LOGV2("c string {}", "name"_attr = c_str);
+    ASSERT(text.back() == "c string a c string");
+    validateJSON(std::string(c_str));
+
+    std::string str = "a std::string";
+    LOGV2("std::string {}", "name"_attr = str);
+    ASSERT(text.back() == "std::string a std::string");
+    validateJSON(str);
+
+    StringData str_data = "a StringData"_sd;
+    LOGV2("StringData {}", "name"_attr = str_data);
+    ASSERT(text.back() == "StringData a StringData");
+    validateJSON(str_data.toString());
+
+    // BSONObj
+    BSONObjBuilder builder;
+    builder.append("int32"_sd, i);
+    builder.append("int64"_sd, ll);
+    builder.append("double"_sd, d);
+    builder.append("str"_sd, str_data);
+    BSONObj bson = builder.obj();
+    LOGV2("bson {}", "name"_attr = bson);
+    ASSERT(text.back() == std::string("bson ") + bson.jsonString());
+    ASSERT(mongo::fromjson(json.back())
+               .getField("attr"_sd)
+               .Obj()
+               .getField("name")
+               .Obj()
+               .woCompare(bson) == 0);
 }
 
 TEST_F(LogTestV2, TextFormat) {
@@ -205,9 +361,16 @@ TEST_F(LogTestV2, TextFormat) {
                   "warning");
     ASSERT(lines.back().rfind("** WARNING: warning") != std::string::npos);
 
-    TypeWithCustomFormatting t(1.0, 2.0);
+    TypeWithBSON t(1.0, 2.0);
     LOGV2("{} custom formatting", "name"_attr = t);
     ASSERT(lines.back().rfind(t.toString() + " custom formatting") != std::string::npos);
+
+    LOGV2("{} bson", "name"_attr = t.toBSON());
+    ASSERT(lines.back().rfind(t.toBSON().jsonString() + " bson") != std::string::npos);
+
+    TypeWithoutBSON t2(1.0, 2.0);
+    LOGV2("{} custom formatting, no bson", "name"_attr = t2);
+    ASSERT(lines.back().rfind(t.toString() + " custom formatting, no bson") != std::string::npos);
 }
 
 TEST_F(LogTestV2, JSONFormat) {
@@ -255,13 +418,27 @@ TEST_F(LogTestV2, JSONFormat) {
     ASSERT(log.getField("c"_sd).String() == LogComponent(LogComponent::kControl).getNameForLog());
     ASSERT(log.getField("msg"_sd).String() == "different component");
 
-    TypeWithCustomFormatting t(1.0, 2.0);
+    TypeWithBSON t(1.0, 2.0);
     LOGV2("{} custom formatting", "name"_attr = t);
     log = mongo::fromjson(lines.back());
     ASSERT(log.getField("msg"_sd).String() == "{name} custom formatting");
     ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
     ASSERT(log.getField("attr"_sd).Obj().getField("name").Obj().woCompare(
-               mongo::fromjson(t.toJson())) == 0);
+               mongo::fromjson(t.toBSON().jsonString())) == 0);
+
+    LOGV2("{} bson", "name"_attr = t.toBSON());
+    log = mongo::fromjson(lines.back());
+    ASSERT(log.getField("msg"_sd).String() == "{name} bson");
+    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
+    ASSERT(log.getField("attr"_sd).Obj().getField("name").Obj().woCompare(
+               mongo::fromjson(t.toBSON().jsonString())) == 0);
+
+    TypeWithoutBSON t2(1.0, 2.0);
+    LOGV2("{} custom formatting", "name"_attr = t2);
+    log = mongo::fromjson(lines.back());
+    ASSERT(log.getField("msg"_sd).String() == "{name} custom formatting");
+    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
+    ASSERT(log.getField("attr"_sd).Obj().getField("name").String() == t.toString());
 }
 
 TEST_F(LogTestV2, Threads) {

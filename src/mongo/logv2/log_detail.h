@@ -29,7 +29,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/logv2/attribute_argument_set.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_options.h"
@@ -39,11 +39,12 @@
 namespace mongo {
 namespace logv2 {
 namespace detail {
+
 void doLogImpl(LogSeverity const& severity,
                StringData stable_id,
                LogOptions const& options,
                StringData message,
-               AttributeArgumentSet const& attrs);
+               TypeErasedAttributeStorage const& attrs);
 
 
 template <typename S, typename... Args>
@@ -51,13 +52,11 @@ void doLog(LogSeverity const& severity,
            StringData stable_id,
            LogOptions const& options,
            S const& message,
-           fmt::internal::named_arg<Args, char>&&... args) {
-    AttributeArgumentSet attr_set;
-    auto arg_store = fmt::internal::make_args_checked(message, (args.value)...);
-    attr_set._values = arg_store;
-    (attr_set._names.push_back(::mongo::StringData(args.name.data(), args.name.size())), ...);
+           const fmt::internal::named_arg<Args, char>&... args) {
+    auto attributes = makeAttributeStorage(args...);
+
     auto msg = static_cast<fmt::string_view>(message);
-    doLogImpl(severity, stable_id, options, ::mongo::StringData(msg.data(), msg.size()), attr_set);
+    doLogImpl(severity, stable_id, options, StringData(msg.data(), msg.size()), attributes);
 }
 
 }  // namespace detail

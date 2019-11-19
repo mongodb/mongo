@@ -32,7 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/log_version_util.h"
-#include "mongo/logv2/attribute_argument_set.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
