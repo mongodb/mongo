@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/stacktrace.h"
 
-namespace mongo::stack_trace {
+namespace mongo::stack_trace_detail {
 
 /**
  * A utility for uint64_t <=> uppercase hex string conversions. It
@@ -49,13 +49,15 @@ namespace mongo::stack_trace {
  */
 class Hex {
 public:
-    using Buf = std::array<char, 16>;
+    using Buf = std::array<char, 18>;  // 64/4 hex digits plus potential "0x"
 
-    static StringData toHex(uint64_t x, Buf& buf);
+    static StringData toHex(uint64_t x, Buf& buf, bool showBase = false);
 
     static uint64_t fromHex(StringData s);
 
-    explicit Hex(uint64_t x) : _str(toHex(x, _buf)) {}
+    explicit Hex(uint64_t x, bool showBase = false) : _str{toHex(x, _buf, showBase)} {}
+    explicit Hex(const void* x, bool showBase = false)
+        : Hex{reinterpret_cast<uintptr_t>(x), showBase} {}
 
     operator StringData() const {
         return _str;
@@ -90,7 +92,7 @@ class CheapJson {
 public:
     class Value;
 
-    explicit CheapJson(Sink& sink);
+    explicit CheapJson(StackTraceSink& sink);
 
     // Create an empty JSON document.
     Value doc();
@@ -109,7 +111,7 @@ private:
 
     bool _pretty = false;
     int _indent = 0;
-    Sink& _sink;
+    StackTraceSink& _sink;
 };
 
 /**
@@ -174,4 +176,4 @@ private:
     StringData _sep;  // Emitted upon append. Starts empty, then set to ",".
 };
 
-}  // namespace mongo::stack_trace
+}  // namespace mongo::stack_trace_detail

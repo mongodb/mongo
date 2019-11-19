@@ -34,11 +34,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::stack_trace {
+namespace mongo::stack_trace_detail {
 namespace {
 
 /**
- * Wrapper that streams a string-like object to a Sink, surrounded by double
+ * Wrapper that streams a string-like object to a StackTraceSink, surrounded by double
  * quotes.
  */
 template <typename T>
@@ -46,7 +46,7 @@ class Quoted {
 public:
     explicit Quoted(const T& v) : _v(v) {}
 
-    friend Sink& operator<<(Sink& sink, const Quoted& q) {
+    friend StackTraceSink& operator<<(StackTraceSink& sink, const Quoted& q) {
         return sink << kQuote << q._v << kQuote;
     }
 
@@ -63,29 +63,34 @@ template <>
 constexpr StringData kDigits<10> = "0123456789"_sd;
 
 template <size_t base, typename Buf>
-StringData toNumericBase(uint64_t x, Buf& buf) {
+StringData toNumericBase(uint64_t x, Buf& buf, bool showBase) {
     auto it = buf.rbegin();
     if (!x) {
         *it++ = '0';
     } else {
-        for (; x && it != buf.rend(); ++it) {
+        for (; x; ++it) {
             *it = kDigits<base>[x % base];
             x /= base;
         }
+        // base is prepended only when x is nonzero (matching printf)
+        if (base == 16 && showBase) {
+            static const auto kPrefix = "0x"_sd;
+            it = std::reverse_copy(kPrefix.begin(), kPrefix.end(), it);
+        }
     }
-    const char* p = buf.data() + (it.base() - buf.begin());
-    size_t n = it - buf.rbegin();
+    size_t n = std::distance(it.base(), buf.end());
+    const char* p = buf.data() + buf.size() - n;
     return StringData(p, n);
 }
 
 }  // namespace
 
 StringData Dec::toDec(uint64_t x, Buf& buf) {
-    return toNumericBase<10>(x, buf);
+    return toNumericBase<10>(x, buf, false);
 }
 
-StringData Hex::toHex(uint64_t x, Buf& buf) {
-    return toNumericBase<16>(x, buf);
+StringData Hex::toHex(uint64_t x, Buf& buf, bool showBase) {
+    return toNumericBase<16>(x, buf, showBase);
 }
 
 uint64_t Hex::fromHex(StringData s) {
@@ -195,6 +200,6 @@ auto CheapJson::doc() -> Value {
     return Value(this);
 }
 
-CheapJson::CheapJson(Sink& sink) : _sink(sink) {}
+CheapJson::CheapJson(StackTraceSink& sink) : _sink(sink) {}
 
-}  // namespace mongo::stack_trace
+}  // namespace mongo::stack_trace_detail

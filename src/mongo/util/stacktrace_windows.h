@@ -34,11 +34,13 @@
 #include <iosfwd>
 
 #include "mongo/platform/windows_basic.h"  // for CONTEXT
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
-// Print stack trace (using a specified stack context) to "os", default to the
-// LogComponent::kControl stream.
+// Print a stack trace (using a specified stack context) to a sink.
+// If sink is unspecified, it defaults to the `LogComponent::kControl` stream.
+void printWindowsStackTrace(CONTEXT& context, StackTraceSink& sink);
 void printWindowsStackTrace(CONTEXT& context, std::ostream& os);
 void printWindowsStackTrace(CONTEXT& context);
 

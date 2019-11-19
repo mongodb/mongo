@@ -46,6 +46,13 @@
 
 namespace mongo {
 
+namespace stack_trace_test_detail {
+/** Needs to have linkage so we can test metadata. */
+void testFunctionWithLinkage() {
+    printf("...");
+}
+}  // namespace stack_trace_test_detail
+
 namespace {
 
 using namespace fmt::literals;
@@ -306,7 +313,6 @@ TEST(StackTrace, PosixFormat) {
             if (!hf.soFileName.empty()) {
                 uintptr_t btBase = fromHex(bt["b"].String());
                 auto soEntryIter = soMap.find(btBase);
-                // TODO: (SERVER-43420) fails on RHEL6 when looking up `__libc_start_main`.
                 // ASSERT_TRUE(soEntryIter != soMap.end()) << "not in soMap: 0x{:X}"_format(btBase);
                 if (soEntryIter == soMap.end())
                     continue;
@@ -394,36 +400,92 @@ TEST(StackTrace, EarlyTraceSanity) {
     }
 }
 
-class StringSink : public stack_trace::Sink {
-public:
-    StringSink(std::string& s) : _s{s} {}
+#ifndef _WIN32
+// `MetadataGenerator::load` should fill its meta member with something reasonable.
+// Only testing with functions which we expect the dynamic linker to know about, so
+// they must have external linkage.
+TEST(StackTrace, MetadataGenerator) {
+    StackTraceAddressMetadataGenerator gen;
+    struct {
+        void* ptr;
+        std::string fileSub;
+        std::string symbolSub;
+    } const tests[] = {
+        {
+            reinterpret_cast<void*>(&stack_trace_test_detail::testFunctionWithLinkage),
+            "stacktrace_test",
+            "testFunctionWithLinkage",
+        },
+        {
+            // printf's file tricky (surprises under ASAN, Mac, ...),
+            // but we should at least get a symbol name containing "printf" out of it.
+            reinterpret_cast<void*>(&std::printf),
+            {},
+            "printf",
+        },
+    };
 
-private:
-    void doWrite(StringData v) override {
-        format_to(std::back_inserter(_s), FMT_STRING("{}"), v);
+    for (const auto& test : tests) {
+        const auto& meta = gen.load(test.ptr);
+        if (kSuperVerbose) {
+            OstreamStackTraceSink sink{std::cout};
+            meta.printTo(sink);
+        }
+        ASSERT_EQUALS(meta.address(), reinterpret_cast<uintptr_t>(test.ptr));
+        if (!test.fileSub.empty()) {
+            ASSERT_TRUE(meta.file());
+            ASSERT_STRING_CONTAINS(meta.file().name(), test.fileSub);
+        }
+
+        if (!test.symbolSub.empty()) {
+            ASSERT_TRUE(meta.symbol());
+            ASSERT_STRING_CONTAINS(meta.symbol().name(), test.symbolSub);
+        }
     }
+}
 
-    std::string& _s;
-};
+TEST(StackTrace, MetadataGeneratorFunctionMeasure) {
+    // Measure the size of a C++ function as a test of metadata retrieval.
+    // Load increasing addresses until the metadata's symbol name changes.
+    StackTraceAddressMetadataGenerator gen;
+    void* fp = reinterpret_cast<void*>(&stack_trace_test_detail::testFunctionWithLinkage);
+    const auto& meta = gen.load(fp);
+    if (!meta.symbol())
+        return;  // No symbol for `fp`. forget it.
+    std::string savedSymbol{meta.symbol().name()};
+    uintptr_t fBase = meta.symbol().base();
+    ASSERT_EQ(fBase, reinterpret_cast<uintptr_t>(fp))
+        << "function pointer should match its symbol base";
+    size_t fSize = 0;
+    for (; true; ++fSize) {
+        auto& m = gen.load(reinterpret_cast<void*>(fBase + fSize));
+        if (!m.symbol() || m.symbol().name() != savedSymbol)
+            break;
+    }
+    // Place some reasonable expectation on the size of the tiny test function.
+    ASSERT_GT(fSize, 0);
+    ASSERT_LT(fSize, 512);
+}
+#endif  // _WIN32
 
 class CheapJsonTest : public unittest::Test {
 public:
     using unittest::Test::Test;
+    using CheapJson = stack_trace_detail::CheapJson;
+    using Hex = stack_trace_detail::Hex;
+    using Dec = stack_trace_detail::Dec;
 };
 
 TEST_F(CheapJsonTest, Appender) {
-    using Dec = stack_trace::Dec;
-    using Hex = stack_trace::Hex;
     std::string s;
-    StringSink sink{s};
+    StringStackTraceSink sink{s};
     sink << "Hello"
          << ":" << Dec(0) << ":" << Hex(255) << ":" << Dec(1234567890);
     ASSERT_EQ(s, "Hello:0:FF:1234567890");
 }
 
 TEST_F(CheapJsonTest, Hex) {
-    using Hex = stack_trace::Hex;
-    ASSERT_EQ(StringData(Hex(0)), "0");
+    ASSERT_EQ(StringData(Hex(static_cast<void*>(0))), "0");
     ASSERT_EQ(StringData(Hex(0xffff)), "FFFF");
     ASSERT_EQ(Hex(0xfff0), "FFF0");
     ASSERT_EQ(Hex(0x8000'0000'0000'0000), "8000000000000000");
@@ -432,15 +494,15 @@ TEST_F(CheapJsonTest, Hex) {
     ASSERT_EQ(Hex::fromHex("FFFFFFFFFFFFFFFF"), 0xffff'ffff'ffff'ffff);
 
     std::string s;
-    StringSink sink{s};
+    StringStackTraceSink sink{s};
     sink << Hex(0xffff);
     ASSERT_EQ(s, R"(FFFF)");
 }
 
 TEST_F(CheapJsonTest, DocumentObject) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     auto doc = env.doc();
     ASSERT_EQ(s, "");
     {
@@ -452,8 +514,8 @@ TEST_F(CheapJsonTest, DocumentObject) {
 
 TEST_F(CheapJsonTest, ScalarStringData) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     auto doc = env.doc();
     doc.append(123);
     ASSERT_EQ(s, R"(123)");
@@ -461,8 +523,8 @@ TEST_F(CheapJsonTest, ScalarStringData) {
 
 TEST_F(CheapJsonTest, ScalarInt) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     auto doc = env.doc();
     doc.append("hello");
     ASSERT_EQ(s, R"("hello")");
@@ -470,8 +532,8 @@ TEST_F(CheapJsonTest, ScalarInt) {
 
 TEST_F(CheapJsonTest, ObjectNesting) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     auto doc = env.doc();
     {
         auto obj = doc.appendObj();
@@ -486,8 +548,8 @@ TEST_F(CheapJsonTest, ObjectNesting) {
 
 TEST_F(CheapJsonTest, Arrays) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     auto doc = env.doc();
     {
         auto obj = doc.appendObj();
@@ -505,8 +567,8 @@ TEST_F(CheapJsonTest, Arrays) {
 
 TEST_F(CheapJsonTest, AppendBSONElement) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     {
         auto obj = env.doc().appendObj();
         for (auto& e : fromjson(R"({"a":1,"arr":[2,123],"emptyO":{},"emptyA":[]})"))
@@ -517,8 +579,8 @@ TEST_F(CheapJsonTest, AppendBSONElement) {
 
 TEST_F(CheapJsonTest, Pretty) {
     std::string s;
-    StringSink sink{s};
-    stack_trace::CheapJson env{sink};
+    StringStackTraceSink sink{s};
+    CheapJson env{sink};
     env.pretty();
     auto doc = env.doc();
     {
