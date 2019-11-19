@@ -77,6 +77,7 @@ private:
      * geoHaystack indexes don't support tracking path-level multikey information.
      */
     void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
                    KeyStringSet* keys,
                    KeyStringSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths,

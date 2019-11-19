@@ -50,6 +50,7 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
 }
 
 void HashAccessMethod::doGetKeys(const BSONObj& obj,
+                                 GetKeysContext context,
                                  KeyStringSet* keys,
                                  KeyStringSet* multikeyMetadataKeys,
                                  MultikeyPaths* multikeyPaths,
@@ -63,6 +64,7 @@ void HashAccessMethod::doGetKeys(const BSONObj& obj,
                                        keys,
                                        getSortedDataInterface()->getKeyStringVersion(),
                                        getSortedDataInterface()->getOrdering(),
+                                       (context == GetKeysContext::kRemovingKeys),
                                        id);
 }
 

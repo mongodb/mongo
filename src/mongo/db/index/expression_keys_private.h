@@ -94,6 +94,7 @@ public:
                             KeyStringSet* keys,
                             KeyString::Version keyStringVersion,
                             Ordering ordering,
+                            bool ignoreArraysAlongPath,
                             boost::optional<RecordId> id = boost::none);
 
     /**

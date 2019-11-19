@@ -65,6 +65,7 @@ HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
 }
 
 void HaystackAccessMethod::doGetKeys(const BSONObj& obj,
+                                     GetKeysContext context,
                                      KeyStringSet* keys,
                                      KeyStringSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths,

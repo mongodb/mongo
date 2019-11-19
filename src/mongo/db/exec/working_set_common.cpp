@@ -80,6 +80,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId);
             iam->getKeys(member->doc.value().toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          multikeyMetadataKeys,
                          multikeyPaths,

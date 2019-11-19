@@ -94,6 +94,7 @@ public:
 
 private:
     void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
                    KeyStringSet* keys,
                    KeyStringSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths,

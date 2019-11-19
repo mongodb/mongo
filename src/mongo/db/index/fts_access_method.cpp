@@ -40,6 +40,7 @@ FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState,
       _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
 void FTSAccessMethod::doGetKeys(const BSONObj& obj,
+                                GetKeysContext context,
                                 KeyStringSet* keys,
                                 KeyStringSet* multikeyMetadataKeys,
                                 MultikeyPaths* multikeyPaths,

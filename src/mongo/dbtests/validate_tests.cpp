@@ -891,6 +891,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1287,6 +1288,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1486,6 +1488,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1520,6 +1523,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr,
