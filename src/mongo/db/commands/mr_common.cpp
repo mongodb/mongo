@@ -176,18 +176,31 @@ auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx, Namespace
 
 auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                         NamespaceString targetNss,
-                        std::string code) {
+                        std::string reduceCode,
+                        boost::optional<MapReduceJavascriptCode> finalizeCode) {
     // Because of communication for sharding, $merge must hold on to a serializable BSON object
     // at the moment so we reparse here. Note that the reduce function signature expects 2
     // arguments, the first being the key and the second being the array of values to reduce.
     auto reduceObj = BSON("args" << BSON_ARRAY("$_id" << BSON_ARRAY("$value"
                                                                     << "$$new.value"))
-                                 << "eval" << code);
+                                 << "eval" << reduceCode);
 
-    auto finalProjectSpec =
+    auto reduceSpec =
         BSON(DocumentSourceProject::kStageName
              << BSON("value" << BSON(ExpressionInternalJs::kExpressionName << reduceObj)));
-    auto pipelineSpec = boost::make_optional(std::vector<BSONObj>{finalProjectSpec});
+    auto pipelineSpec = boost::make_optional(std::vector<BSONObj>{reduceSpec});
+
+    // Build finalize $project stage if given.
+    if (finalizeCode) {
+        auto finalizeObj = BSON("args" << BSON_ARRAY("$_id"
+                                                     << "$value")
+                                       << "eval" << finalizeCode->getCode());
+        auto finalizeSpec =
+            BSON(DocumentSourceProject::kStageName
+                 << BSON("value" << BSON(ExpressionInternalJs::kExpressionName << finalizeObj)));
+        pipelineSpec->emplace_back(std::move(finalizeSpec));
+    }
+
     return DocumentSourceMerge::create(targetNss,
                                        expCtx,
                                        MergeWhenMatchedModeEnum::kPipeline,
@@ -201,14 +214,16 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
 auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
                   const OutputType outputType,
                   NamespaceString targetNss,
-                  std::string reduceCode) {
+                  std::string reduceCode,
+                  boost::optional<MapReduceJavascriptCode> finalizeCode) {
     switch (outputType) {
         case OutputType::Replace:
             return boost::make_optional(translateOutReplace(expCtx, targetNss));
         case OutputType::Merge:
             return boost::make_optional(translateOutMerge(expCtx, targetNss));
         case OutputType::Reduce:
-            return boost::make_optional(translateOutReduce(expCtx, targetNss, reduceCode));
+            return boost::make_optional(translateOutReduce(
+                expCtx, targetNss, std::move(reduceCode), std::move(finalizeCode)));
         case OutputType::InMemory:;
     }
     return boost::optional<boost::intrusive_ptr<mongo::DocumentSource>>{};
@@ -382,7 +397,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 parsedMr.getFinalize().map([&](auto&& finalize) {
                     return translateFinalize(expCtx, parsedMr.getFinalize()->getCode());
                 }),
-                translateOut(expCtx, outType, std::move(outNss), parsedMr.getReduce().getCode())),
+                translateOut(expCtx,
+                             outType,
+                             std::move(outNss),
+                             parsedMr.getReduce().getCode(),
+                             parsedMr.getFinalize())),
             expCtx));
         pipeline->optimizePipeline();
         return pipeline;

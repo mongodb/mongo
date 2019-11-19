@@ -68,10 +68,11 @@ function runValidMrTests(coll) {
     }
 
     function assertResultsValid(results, expectedCount) {
-        assert.gt(results.length, 0);
-        assert.lte(results.length, expectedCount);
+        assert.gt(results.length, 0, tojson(results));
+        assert.lte(results.length, expectedCount, tojson(results));
         results.map(resultDoc => assert.eq(resultDoc.value.avgAge,
-                                           resultDoc.value.total / resultDoc.value.count));
+                                           resultDoc.value.total / resultDoc.value.count,
+                                           tojson(results)));
     }
 
     // Inline output.
@@ -102,18 +103,14 @@ function runValidMrTests(coll) {
         // Cache a sample result document to ensure that re-reducing actually occurs below.
         let sampleDoc = mergeColl.findOne();
 
-        // TODO SERVER-44150: Enable the following tests once the new implementation is able to
-        // support re-reducing against an existing collection.
-
         // Output mode "reduce" to an existing unsharded collection.
-        // assert.commandWorked(coll.mapReduce(
-        //     map,
-        //     reduce,
-        //     {finalize: fin, out: {reduce: mergeColl.getName(), db:
-        //     mergeColl.getDB().getName()}}));
-        // res = mergeColl.find().toArray();
-        // assertResultsValid(res, states.length);
-        // assert.gte(mergeColl.findOne({_id: sampleDoc._id}).value.avgAge, sampleDoc.value.avgAge);
+        assert.commandWorked(coll.mapReduce(
+            map,
+            reduce,
+            {finalize: fin, out: {reduce: mergeColl.getName(), db: mergeColl.getDB().getName()}}));
+        res = mergeColl.find().toArray();
+        assertResultsValid(res, states.length);
+        assert.gte(mergeColl.findOne({_id: sampleDoc._id}).value.avgAge, sampleDoc.value.avgAge);
 
         // Drop and recreate the target collection as sharded.
         mergeColl.drop();
@@ -142,17 +139,14 @@ function runValidMrTests(coll) {
         // Cache a sample result document to ensure that re-reducing actually occurs below.
         sampleDoc = mergeColl.findOne({_id: {$not: {$in: ["AL", "PA"]}}});
 
-        // TODO SERVER-44150: Enable the following tests once the new implementation is able to
-        // support re-reducing against an existing collection.
-
         // Output mode "reduce" to an existing sharded collection.
-        // assert.commandWorked(coll.mapReduce(map, reduce, {
-        //     finalize: fin,
-        //     out: {reduce: mergeColl.getName(), db: mergeColl.getDB().getName(), sharded: true}
-        // }));
-        // res = mergeColl.find().toArray();
-        // assertResultsValid(res, states.length + 2);
-        // assert.gte(mergeColl.findOne({_id: sampleDoc._id}).value.avgAge, sampleDoc.value.avgAge);
+        assert.commandWorked(coll.mapReduce(map, reduce, {
+            finalize: fin,
+            out: {reduce: mergeColl.getName(), db: mergeColl.getDB().getName(), sharded: true}
+        }));
+        res = mergeColl.find().toArray();
+        assertResultsValid(res, states.length + 2);
+        assert.gte(mergeColl.findOne({_id: sampleDoc._id}).value.avgAge, sampleDoc.value.avgAge);
     }
 
     // Test merge to a collection in the same database as the source collection.

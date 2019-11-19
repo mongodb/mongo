@@ -83,16 +83,13 @@ function runValidMrTests(db, coll) {
     res = mergeColl.find().toArray();
     assertResultsValid(res);
 
-    // TODO SERVER-44150: Enable the following tests once the new implementation is able to
-    // support re-reducing against an existing collection.
-
     // Cache a sample result document to ensure that re-reducing actually occurs below.
-    // const sampleDoc = mergeColl.findOne();
+    const sampleDoc = mergeColl.findOne();
 
-    // // Output mode "reduce" to an existing collection.
-    // assert.commandWorked(
-    //     coll.mapReduce(map, reduce, {finalize: fin, out: {reduce: mergeColl.getName()}}));
-    // assert.gte(mergeColl.findOne({_id: sampleDoc._id}).value.avgAge, sampleDoc.value.avgAge);
+    // Output mode "reduce" to an existing collection.
+    assert.commandWorked(
+        coll.mapReduce(map, reduce, {finalize: fin, out: {reduce: mergeColl.getName()}}));
+    assert.gte(mergeColl.findOne({_id: sampleDoc._id}).value.avgAge, sampleDoc.value.avgAge);
 }
 
 //
