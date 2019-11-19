@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #!@python_interpreter@
 
 # This script downloads the latest version of Compass and installs it on
