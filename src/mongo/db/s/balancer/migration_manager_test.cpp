@@ -31,261 +31,71 @@
 
 #include <memory>
 
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/balancer/migration_manager.h"
-#include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using std::vector;
-using unittest::assertGet;
-
-const auto kShardId0 = ShardId("shard0");
-const auto kShardId1 = ShardId("shard1");
-const auto kShardId2 = ShardId("shard2");
-const auto kShardId3 = ShardId("shard3");
-
-const HostAndPort kShardHost0 = HostAndPort("TestHost0", 12345);
-const HostAndPort kShardHost1 = HostAndPort("TestHost1", 12346);
-const HostAndPort kShardHost2 = HostAndPort("TestHost2", 12347);
-const HostAndPort kShardHost3 = HostAndPort("TestHost3", 12348);
-
 const MigrationSecondaryThrottleOptions kDefaultSecondaryThrottle =
     MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault);
 
-const long long kMaxSizeMB = 100;
-const std::string kPattern = "_id";
-
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
-
-class MigrationManagerTest : public ConfigServerTestFixture {
+class MigrationManagerTest : public MigrationTestFixture {
 protected:
-    /**
-     * Returns the mock targeter for the specified shard. Useful to use like so
-     *
-     *     shardTargeterMock(opCtx, shardId)->setFindHostReturnValue(shardHost);
-     *
-     * Then calls to RemoteCommandTargeterMock::findHost will return HostAndPort "shardHost" for
-     * Shard "shardId".
-     *
-     * Scheduling a command requires a shard host target. The command will be caught by the mock
-     * network, but sending the command requires finding the shard's host.
-     */
-    std::shared_ptr<RemoteCommandTargeterMock> shardTargeterMock(OperationContext* opCtx,
-                                                                 ShardId shardId);
+    void setUp() override {
+        MigrationTestFixture::setUp();
+        _migrationManager = std::make_unique<MigrationManager>(getServiceContext());
+        _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
+        _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
+    }
+
+    void tearDown() override {
+        checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
+        _migrationManager->interruptAndDisableMigrations();
+        _migrationManager->drainActiveMigrations();
+        _migrationManager.reset();
+        ConfigServerTestFixture::tearDown();
+    }
 
     /**
-     * Inserts a document into the config.databases collection to indicate that "dbName" is sharded
-     * with primary "primaryShard".
-     */
-    void setUpDatabase(const std::string& dbName, const ShardId primaryShard);
-
-    /**
-     * Inserts a document into the config.collections collection to indicate that "collName" is
-     * sharded with version "version". The shard key pattern defaults to "_id".
-     */
-    void setUpCollection(const NamespaceString& collName, ChunkVersion version);
-
-    /**
-     * Inserts a document into the config.chunks collection so that the chunk defined by the
-     * parameters exists. Returns a ChunkType defined by the parameters.
-     */
-    ChunkType setUpChunk(const NamespaceString& collName,
-                         const BSONObj& chunkMin,
-                         const BSONObj& chunkMax,
-                         const ShardId& shardId,
-                         const ChunkVersion& version);
-
-    /**
-     * Inserts a document into the config.migrations collection as an active migration.
-     */
-    void setUpMigration(const ChunkType& chunk, const ShardId& toShard);
-
-    /**
-     * Asserts that config.migrations is empty and config.locks contains no locked documents other
-     * than the balancer's, both of which should be true if the MigrationManager is inactive and
-     * behaving properly.
-     */
-    void checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
-
-    /**
-     * Sets up mock network to expect a moveChunk command and return a fixed BSON response or a
+     * Sets up mock network to expect a moveChunk command and returns a fixed BSON response or a
      * "returnStatus".
      */
     void expectMoveChunkCommand(const ChunkType& chunk,
                                 const ShardId& toShardId,
-                                const BSONObj& response);
+                                const BSONObj& response) {
+        onCommand([&chunk, &toShardId, &response](const RemoteCommandRequest& request) {
+            NamespaceString nss(request.cmdObj.firstElement().valueStringData());
+            ASSERT_EQ(chunk.getNS(), nss);
+
+            const StatusWith<MoveChunkRequest> moveChunkRequestWithStatus =
+                MoveChunkRequest::createFromCommand(nss, request.cmdObj);
+            ASSERT_OK(moveChunkRequestWithStatus.getStatus());
+
+            ASSERT_EQ(chunk.getNS(), moveChunkRequestWithStatus.getValue().getNss());
+            ASSERT_BSONOBJ_EQ(chunk.getMin(), moveChunkRequestWithStatus.getValue().getMinKey());
+            ASSERT_BSONOBJ_EQ(chunk.getMax(), moveChunkRequestWithStatus.getValue().getMaxKey());
+            ASSERT_EQ(chunk.getShard(), moveChunkRequestWithStatus.getValue().getFromShardId());
+
+            ASSERT_EQ(toShardId, moveChunkRequestWithStatus.getValue().getToShardId());
+
+            return response;
+        });
+    }
+
     void expectMoveChunkCommand(const ChunkType& chunk,
                                 const ShardId& toShardId,
-                                const Status& returnStatus);
-
-    // Random static initialization order can result in X constructor running before Y constructor
-    // if X and Y are defined in different source files. Defining variables here to enforce order.
-    const BSONObj kShard0 =
-        BSON(ShardType::name(kShardId0.toString())
-             << ShardType::host(kShardHost0.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-    const BSONObj kShard1 =
-        BSON(ShardType::name(kShardId1.toString())
-             << ShardType::host(kShardHost1.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-    const BSONObj kShard2 =
-        BSON(ShardType::name(kShardId2.toString())
-             << ShardType::host(kShardHost2.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-    const BSONObj kShard3 =
-        BSON(ShardType::name(kShardId3.toString())
-             << ShardType::host(kShardHost3.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-
-    const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
+                                const Status& returnStatus) {
+        BSONObjBuilder resultBuilder;
+        CommandHelpers::appendCommandStatusNoThrow(resultBuilder, returnStatus);
+        expectMoveChunkCommand(chunk, toShardId, resultBuilder.obj());
+    }
 
     std::unique_ptr<MigrationManager> _migrationManager;
-
-private:
-    void setUp() override;
-    void tearDown() override;
 };
-
-void MigrationManagerTest::setUp() {
-    setUpAndInitializeConfigDb();
-    _migrationManager = std::make_unique<MigrationManager>(getServiceContext());
-    _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
-}
-
-void MigrationManagerTest::tearDown() {
-    checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
-    _migrationManager->interruptAndDisableMigrations();
-    _migrationManager->drainActiveMigrations();
-    _migrationManager.reset();
-    ConfigServerTestFixture::tearDown();
-}
-
-std::shared_ptr<RemoteCommandTargeterMock> MigrationManagerTest::shardTargeterMock(
-    OperationContext* opCtx, ShardId shardId) {
-    return RemoteCommandTargeterMock::get(
-        uassertStatusOK(shardRegistry()->getShard(opCtx, shardId))->getTargeter());
-}
-
-void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardId primaryShard) {
-    DatabaseType db(dbName, primaryShard, true, databaseVersion::makeNew());
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
-}
-
-void MigrationManagerTest::setUpCollection(const NamespaceString& collName, ChunkVersion version) {
-    CollectionType coll;
-    coll.setNs(collName);
-    coll.setEpoch(version.epoch());
-    coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(version.toLong()));
-    coll.setKeyPattern(kKeyPattern);
-    coll.setUnique(false);
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), CollectionType::ConfigNS, coll.toBSON(), kMajorityWriteConcern));
-}
-
-ChunkType MigrationManagerTest::setUpChunk(const NamespaceString& collName,
-                                           const BSONObj& chunkMin,
-                                           const BSONObj& chunkMax,
-                                           const ShardId& shardId,
-                                           const ChunkVersion& version) {
-    ChunkType chunk;
-    chunk.setNS(collName);
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkMax);
-    chunk.setShard(shardId);
-    chunk.setVersion(version);
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON(), kMajorityWriteConcern));
-    return chunk;
-}
-
-void MigrationManagerTest::setUpMigration(const ChunkType& chunk, const ShardId& toShard) {
-    BSONObjBuilder builder;
-    builder.append(MigrationType::ns(), chunk.getNS().ns());
-    builder.append(MigrationType::min(), chunk.getMin());
-    builder.append(MigrationType::max(), chunk.getMax());
-    builder.append(MigrationType::toShard(), toShard.toString());
-    builder.append(MigrationType::fromShard(), chunk.getShard().toString());
-    chunk.getVersion().appendWithField(&builder, "chunkVersion");
-    builder.append(MigrationType::forceJumbo(), "doNotForceJumbo");
-
-    MigrationType migrationType = assertGet(MigrationType::fromBSON(builder.obj()));
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    MigrationType::ConfigNS,
-                                                    migrationType.toBSON(),
-                                                    kMajorityWriteConcern));
-}
-
-void MigrationManagerTest::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked() {
-    auto statusWithMigrationsQueryResponse =
-        shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            operationContext(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            MigrationType::ConfigNS,
-            BSONObj(),
-            BSONObj(),
-            boost::none);
-    Shard::QueryResponse migrationsQueryResponse =
-        uassertStatusOK(statusWithMigrationsQueryResponse);
-    ASSERT_EQUALS(0U, migrationsQueryResponse.docs.size());
-
-    auto statusWithLocksQueryResponse = shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        operationContext(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kMajorityReadConcern,
-        LocksType::ConfigNS,
-        BSON(LocksType::state(LocksType::LOCKED) << LocksType::name("{ '$ne' : 'balancer'}")),
-        BSONObj(),
-        boost::none);
-    Shard::QueryResponse locksQueryResponse = uassertStatusOK(statusWithLocksQueryResponse);
-    ASSERT_EQUALS(0U, locksQueryResponse.docs.size());
-}
-
-void MigrationManagerTest::expectMoveChunkCommand(const ChunkType& chunk,
-                                                  const ShardId& toShardId,
-                                                  const BSONObj& response) {
-    onCommand([&chunk, &toShardId, &response](const RemoteCommandRequest& request) {
-        NamespaceString nss(request.cmdObj.firstElement().valueStringData());
-        ASSERT_EQ(chunk.getNS(), nss);
-
-        const StatusWith<MoveChunkRequest> moveChunkRequestWithStatus =
-            MoveChunkRequest::createFromCommand(nss, request.cmdObj);
-        ASSERT_OK(moveChunkRequestWithStatus.getStatus());
-
-        ASSERT_EQ(chunk.getNS(), moveChunkRequestWithStatus.getValue().getNss());
-        ASSERT_BSONOBJ_EQ(chunk.getMin(), moveChunkRequestWithStatus.getValue().getMinKey());
-        ASSERT_BSONOBJ_EQ(chunk.getMax(), moveChunkRequestWithStatus.getValue().getMaxKey());
-        ASSERT_EQ(chunk.getShard(), moveChunkRequestWithStatus.getValue().getFromShardId());
-
-        ASSERT_EQ(toShardId, moveChunkRequestWithStatus.getValue().getToShardId());
-
-        return response;
-    });
-}
-
-void MigrationManagerTest::expectMoveChunkCommand(const ChunkType& chunk,
-                                                  const ShardId& toShardId,
-                                                  const Status& returnStatus) {
-    BSONObjBuilder resultBuilder;
-    CommandHelpers::appendCommandStatusNoThrow(resultBuilder, returnStatus);
-    expectMoveChunkCommand(chunk, toShardId, resultBuilder.obj());
-}
 
 TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
     // Set up two shards in the metadata.

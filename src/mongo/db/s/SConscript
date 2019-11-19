@@ -360,9 +360,11 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='db_s_balancer_test',
     source=[
+        'balancer/balancer_chunk_selection_policy_test.cpp',
         'balancer/balancer_policy_test.cpp',
         'balancer/cluster_statistics_test.cpp',
         'balancer/migration_manager_test.cpp',
+        'balancer/migration_test_fixture.cpp',
         'balancer/scoped_migration_request_test.cpp',
         'balancer/type_migration_test.cpp',
     ],

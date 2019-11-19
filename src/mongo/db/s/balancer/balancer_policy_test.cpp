@@ -575,6 +575,63 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
 }
 
+TEST(BalancerPolicy, BalancerTagAlreadyBalanced) {
+    // Chunks are balanced across shards for the tag.
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 3, false, {"a"}, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, {"a"}, emptyShardVersion), 2}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, kMaxBSONKey, "a")));
+    ASSERT(balanceChunks(cluster.first, distribution, false, false).empty());
+}
+
+TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTags) {
+    // shard0 has chunks [MinKey, 1), [1, 2), [2, 3), [3, 4), [4, 5), so two chunks each
+    // for tag "b" and "c". So [1, 2) is expected to be moved to shard1 in round 1.
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a", "b", "c"}, emptyShardVersion), 5},
+         {ShardStatistics(kShardId1, kNoMaxSize, 1, false, {"b"}, emptyShardVersion), 1},
+         {ShardStatistics(kShardId2, kNoMaxSize, 1, false, {"c"}, emptyShardVersion), 1}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 1), "a")));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 3), "b")));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 3), BSON("x" << 5), "c")));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false, false));
+    ASSERT_EQ(1U, migrations.size());
+
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId1, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMax(), migrations[0].maxKey);
+}
+
+TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTagsSkipTagWithShardInUse) {
+    // shard0 has chunks [MinKey, 1), [1, 2), [2, 3), [3, 4), [4, 5), so two chunks each
+    // for tag "b" and "c". So [3, 4) is expected to be moved to shard2 because shard1 is
+    // in use.
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a", "b", "c"}, emptyShardVersion), 5},
+         {ShardStatistics(kShardId1, kNoMaxSize, 1, false, {"b"}, emptyShardVersion), 1},
+         {ShardStatistics(kShardId2, kNoMaxSize, 1, false, {"c"}, emptyShardVersion), 1}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 1), "a")));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 3), "b")));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 3), BSON("x" << 5), "c")));
+
+    std::set<ShardId> usedShards{kShardId1};
+    const auto migrations(BalancerPolicy::balance(cluster.first, distribution, &usedShards, false));
+    ASSERT_EQ(1U, migrations.size());
+
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId2, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][3].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][3].getMax(), migrations[0].maxKey);
+}
+
 TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParallel) {
     // Chunks are balanced across shards, but there are wrong tags, which need to be fixed
     auto cluster = generateCluster(
