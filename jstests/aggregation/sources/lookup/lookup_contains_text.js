@@ -1,6 +1,6 @@
 // Tests that given a $text stage before a $lookup stage, the $lookup's subpipeline cannot
 // reference the text score metadata from that $text search.
-// TODO: Reenable test on passthroughs with sharded collections as part of SERVER-38996.
+// TODO SERVER-29159: Enable test on passthroughs with sharded collections.
 // @tags: [assumes_unsharded_collection]
 (function() {
 "use strict";

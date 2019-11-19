@@ -1,5 +1,5 @@
 // Tests that text search requires a text index.
-// TODO: Reenable test on passthroughs with sharded collections as part of SERVER-38996.
+// TODO SERVER-29159: Enable test on passthroughs with sharded collections.
 // @tags: [assumes_unsharded_collection]
 (function() {
 "use strict";
