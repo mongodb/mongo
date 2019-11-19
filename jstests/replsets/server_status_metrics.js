@@ -8,7 +8,7 @@ load("jstests/libs/write_concern_util.js");
 /**
  * Test replication metrics
  */
-function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
+function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived) {
     var ss = secondary.getDB("test").serverStatus();
     jsTestLog(`Secondary ${secondary.host} metrics: ${tojson(ss.metrics)}`);
 
@@ -40,6 +40,19 @@ function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceive
     assert(ss.metrics.repl.apply.batches.num > 0, "no batches");
     assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time");
     assert.eq(ss.metrics.repl.apply.ops, opCount + baseOpsApplied, "wrong number of applied ops");
+}
+
+// Metrics are racy, e.g. repl.buffer.count could over- or under-reported briefly. Retry on error.
+function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
+    assert.soon(() => {
+        try {
+            _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived);
+            return true;
+        } catch (exc) {
+            jsTestLog(`Caught ${exc}, retrying`);
+            return false;
+        }
+    });
 }
 
 var rt = new ReplSetTest({
