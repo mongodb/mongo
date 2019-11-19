@@ -123,8 +123,6 @@ private:
     SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
 
     Mutex _mutex = MONGO_MAKE_LATCH("LogicalTimeValidator::_mutex");  // protects _lastSeenValidTime
-    Mutex _mutexKeyManager =
-        MONGO_MAKE_LATCH("LogicalTimevalidator::_mutexKeyManager");  // protects _keyManager
     SignedLogicalTime _lastSeenValidTime;
     TimeProofService _timeProofService;
     std::shared_ptr<KeysCollectionManager> _keyManager;

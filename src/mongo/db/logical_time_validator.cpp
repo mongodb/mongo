@@ -173,7 +173,6 @@ void LogicalTimeValidator::init(ServiceContext* service) {
 }
 
 void LogicalTimeValidator::shutDown() {
-    stdx::lock_guard<Latch> lk(_mutexKeyManager);
     if (_keyManager) {
         _keyManager->stopMonitoring();
     }
@@ -197,18 +196,14 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
 
 void LogicalTimeValidator::resetKeyManagerCache() {
     log() << "Resetting key manager cache";
-    {
-        stdx::lock_guard<Latch> keyManagerLock(_mutexKeyManager);
-        invariant(_keyManager);
-        _keyManager->clearCache();
-    }
+    invariant(_keyManager);
+    _keyManager->clearCache();
     stdx::lock_guard<Latch> lk(_mutex);
     _lastSeenValidTime = SignedLogicalTime();
     _timeProofService.resetCache();
 }
 
 void LogicalTimeValidator::stopKeyManager() {
-    stdx::lock_guard<Latch> keyManagerLock(_mutexKeyManager);
     if (_keyManager) {
         log() << "Stopping key manager";
         _keyManager->stopMonitoring();
@@ -223,7 +218,6 @@ void LogicalTimeValidator::stopKeyManager() {
 }
 
 std::shared_ptr<KeysCollectionManager> LogicalTimeValidator::_getKeyManagerCopy() {
-    stdx::lock_guard<Latch> lk(_mutexKeyManager);
     invariant(_keyManager);
     return _keyManager;
 }
