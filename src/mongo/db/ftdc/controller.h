@@ -146,7 +146,7 @@ private:
     /**
      * Do periodic statistics collection, and all other work on the background thread.
      */
-    void doLoop();
+    void doLoop() noexcept;
 
 private:
     /**

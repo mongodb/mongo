@@ -185,82 +185,77 @@ void FTDCController::stop() {
     }
 }
 
-void FTDCController::doLoop() {
-    try {
-        // Update config
+void FTDCController::doLoop() noexcept {
+    // Note: All exceptions thrown in this loop are considered process fatal. The default terminate
+    // is used to provide a good stack trace of the issue.
+    Client::initThread("ftdc");
+    Client* client = &cc();
+
+    // Update config
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        _config = _configTemp;
+    }
+
+    while (true) {
+        // Compute the next interval to run regardless of how we were woken up
+        // Skipping an interval due to a race condition with a config signal is harmless.
+        auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
+
+        // Get next time to run at
+        auto next_time = FTDCUtil::roundTime(now, _config.period);
+
+        // Wait for the next run or signal to shutdown
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::unique_lock<Latch> lock(_mutex);
+            MONGO_IDLE_THREAD_BLOCK;
+
+            // We ignore spurious wakeups by just doing an iteration of the loop
+            auto status = _condvar.wait_until(lock, next_time.toSystemTimePoint());
+
+            // Are we done running?
+            if (_state == State::kStopRequested) {
+                break;
+            }
+
+            // Update the current configuration settings always
+            // In unit tests, we may never get a signal when the timeout is 1ms on Windows since
+            // MSVC 2013 converts wait_until(now() + 1ms) into ~ wait_for(0) which means it will
+            // not wait for the condition variable to be signaled because it uses
+            // GetFileSystemTime for now which has ~10 ms granularity.
             _config = _configTemp;
+
+            // if we hit a timeout on the condvar, we need to do another collection
+            // if we were signalled, then we have a config update only or were asked to stop
+            if (status == stdx::cv_status::no_timeout) {
+                continue;
+            }
         }
 
-        Client::initThread("ftdc");
-        Client* client = &cc();
+        // TODO: consider only running this thread if we are enabled
+        // for now, we just keep an idle thread as it is simpler
+        if (_config.enabled) {
+            // Delay initialization of FTDCFileManager until we are sure the user has enabled
+            // FTDC
+            if (!_mgr) {
+                auto swMgr = FTDCFileManager::create(&_config, _path, &_rotateCollectors, client);
 
-        while (true) {
-            // Compute the next interval to run regardless of how we were woken up
-            // Skipping an interval due to a race condition with a config signal is harmless.
-            auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
+                _mgr = uassertStatusOK(std::move(swMgr));
+            }
 
-            // Get next time to run at
-            auto next_time = FTDCUtil::roundTime(now, _config.period);
+            auto collectSample = _periodicCollectors.collect(client);
 
-            // Wait for the next run or signal to shutdown
+            Status s = _mgr->writeSampleAndRotateIfNeeded(
+                client, std::get<0>(collectSample), std::get<1>(collectSample));
+
+            uassertStatusOK(s);
+
+            // Store a reference to the most recent document from the periodic collectors
             {
-                stdx::unique_lock<Latch> lock(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
-
-                // We ignore spurious wakeups by just doing an iteration of the loop
-                auto status = _condvar.wait_until(lock, next_time.toSystemTimePoint());
-
-                // Are we done running?
-                if (_state == State::kStopRequested) {
-                    break;
-                }
-
-                // Update the current configuration settings always
-                // In unit tests, we may never get a signal when the timeout is 1ms on Windows since
-                // MSVC 2013 converts wait_until(now() + 1ms) into ~ wait_for(0) which means it will
-                // not wait for the condition variable to be signaled because it uses
-                // GetFileSystemTime for now which has ~10 ms granularity.
-                _config = _configTemp;
-
-                // if we hit a timeout on the condvar, we need to do another collection
-                // if we were signalled, then we have a config update only or were asked to stop
-                if (status == stdx::cv_status::no_timeout) {
-                    continue;
-                }
-            }
-
-            // TODO: consider only running this thread if we are enabled
-            // for now, we just keep an idle thread as it is simpler
-            if (_config.enabled) {
-                // Delay initialization of FTDCFileManager until we are sure the user has enabled
-                // FTDC
-                if (!_mgr) {
-                    auto swMgr =
-                        FTDCFileManager::create(&_config, _path, &_rotateCollectors, client);
-
-                    _mgr = uassertStatusOK(std::move(swMgr));
-                }
-
-                auto collectSample = _periodicCollectors.collect(client);
-
-                Status s = _mgr->writeSampleAndRotateIfNeeded(
-                    client, std::get<0>(collectSample), std::get<1>(collectSample));
-
-                uassertStatusOK(s);
-
-                // Store a reference to the most recent document from the periodic collectors
-                {
-                    stdx::lock_guard<Latch> lock(_mutex);
-                    _mostRecentPeriodicDocument = std::get<0>(collectSample);
-                }
+                stdx::lock_guard<Latch> lock(_mutex);
+                _mostRecentPeriodicDocument = std::get<0>(collectSample);
             }
         }
-    } catch (...) {
-        warning() << "Uncaught exception in '" << exceptionToStatus()
-                  << "' in full-time diagnostic data capture subsystem. Shutting down the "
-                     "full-time diagnostic data capture subsystem.";
     }
 }
 
