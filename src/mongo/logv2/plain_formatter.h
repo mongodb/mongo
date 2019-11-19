@@ -29,50 +29,10 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/core/record_view.hpp>
-#include <boost/log/expressions/message.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/attributes.h"
-#include "mongo/logv2/constants.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_tag.h"
-#include "mongo/util/time_support.h"
-
-#include <deque>
-#include <fmt/format.h>
-
-namespace mongo {
-namespace logv2 {
-
-struct TextValueExtractor {
-    void operator()(StringData name, CustomAttributeValue const& val) {
-        _storage.push_back(val.toString());
-        operator()(name, _storage.back());
-    }
-
-    void operator()(StringData name, const BSONObj* val) {
-        _storage.push_back(val->jsonString());
-        operator()(name, _storage.back());
-    }
-
-    template <typename T>
-    void operator()(StringData name, const T& val) {
-        args.push_back(fmt::internal::make_arg<fmt::format_context>(val));
-    }
-
-    boost::container::small_vector<fmt::basic_format_arg<fmt::format_context>,
-                                   constants::kNumStaticAttrs>
-        args;
-
-private:
-    std::deque<std::string> _storage;
-};
+namespace mongo::logv2 {
 
 // Text formatter without metadata. Just contains the formatted message.
 class PlainFormatter {
@@ -81,25 +41,7 @@ public:
         return false;
     };
 
-    void operator()(boost::log::record_view const& rec,
-                    boost::log::formatting_ostream& strm) const {
-        using namespace boost::log;
-
-        StringData message = extract<StringData>(attributes::message(), rec).get();
-        const auto& attrs =
-            extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
-
-        TextValueExtractor extractor;
-        extractor.args.reserve(attrs.size());
-        attrs.apply(extractor);
-        fmt::memory_buffer buffer;
-        fmt::internal::vformat_to(buffer,
-                                  to_string_view(message),
-                                  fmt::basic_format_args<fmt::format_context>(
-                                      extractor.args.data(), extractor.args.size()));
-        strm.write(buffer.data(), buffer.size());
-    }
+    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2
