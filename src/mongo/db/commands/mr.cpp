@@ -96,8 +96,11 @@ namespace mr {
 namespace {
 
 Rarely mapParamsDeprecationSampler;  // Used to occasionally log deprecation messages.
-// Used to log occassional deprecation warnings when CodeWScope is used in MapReduce.
+// Used to log occasional deprecation warnings when CodeWScope is used in MapReduce.
 Rarely mapReduceCodeWScopeSampler;
+// Used to log occasional deprecation warnings when $near or $where are used in MapReduce.
+Rarely mapReduceNearSampler;
+Rarely mapReduceWhereSampler;
 
 
 /**
@@ -224,6 +227,22 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
 
         ShardConnection::forgetNS(incLong.ns());
     }
+}
+/**
+ * Recursive method which verifies that the query option specified to mapReduce does not use the
+ * specified match type.
+ */
+bool queryContainsMatchType(MatchExpression* root, MatchExpression::MatchType match) {
+    if (root->matchType() == match) {
+        return false;
+    } else if (root->numChildren() > 0) {
+        for (auto&& child : *(root->getChildVector())) {
+            if (!queryContainsMatchType(child, match)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 }  // namespace
@@ -1544,6 +1563,15 @@ public:
                                                  extensionsCallback,
                                                  MatchExpressionParser::kAllowAllSpecialFeatures),
                     str::stream() << "Can't canonicalize query " << config.filter);
+
+                if (!queryContainsMatchType(cq->root(), MatchExpression::MatchType::GEO_NEAR) &&
+                    mapReduceNearSampler.tick()) {
+                    warning() << "The use of $near in the query option to MapReduce is deprecated";
+                }
+                if (!queryContainsMatchType(cq->root(), MatchExpression::MatchType::WHERE) &&
+                    mapReduceWhereSampler.tick()) {
+                    warning() << "The use of $where in the query option to MapReduce is deprecated";
+                }
 
                 auto exec = uassertStatusOK(getExecutor(opCtx,
                                                         scopedAutoColl->getCollection(),
