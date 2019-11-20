@@ -1092,6 +1092,7 @@ public:
             MultikeyPaths* multikeyPaths = nullptr;
             iam->getKeys(recordBson,
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &documentKeySet,
                          multikeyPaths);
 

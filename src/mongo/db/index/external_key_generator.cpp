@@ -82,7 +82,7 @@ void getKeysForUpgradeChecking(const BSONObj& infoObj, const BSONObj& doc, BSONO
         // generated will be wrong.
         CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(
-            doc, field, seed, version, infoObj["sparse"].trueValue(), collator, keys);
+            doc, field, seed, version, infoObj["sparse"].trueValue(), collator, keys, false);
     } else {
         invariant(IndexNames::BTREE == type);
 

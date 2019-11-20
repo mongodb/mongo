@@ -120,6 +120,7 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
             MultikeyPaths* multikeyPaths = nullptr;
             member->keyData[i].index->getKeys(member->obj.value(),
                                               IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                                              IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                                               &keys,
                                               multikeyPaths);
             if (!keys.count(member->keyData[i].keyData)) {
