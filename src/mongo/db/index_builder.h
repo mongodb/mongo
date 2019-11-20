@@ -94,8 +94,6 @@ public:
      */
     Status buildInForeground(OperationContext* opCtx, Database* db, Collection* coll) const;
 
-    static bool canBuildInBackground();
-
 private:
     Status _build(OperationContext* opCtx, Collection* coll, MultiIndexBlock& indexer) const;
     const BSONObj _index;

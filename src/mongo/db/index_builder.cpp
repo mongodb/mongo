@@ -72,10 +72,6 @@ IndexBuilder::IndexBuilder(const BSONObj& index,
 
 IndexBuilder::~IndexBuilder() {}
 
-bool IndexBuilder::canBuildInBackground() {
-    return MultiIndexBlock::areHybridIndexBuildsEnabled();
-}
-
 std::string IndexBuilder::name() const {
     return _name;
 }

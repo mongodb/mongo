@@ -55,6 +55,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -141,7 +142,7 @@ bool shouldBuildInForeground(OperationContext* opCtx,
     }
 
     // Without hybrid builds enabled, indexes should build with the behavior of their specs.
-    bool hybrid = IndexBuilder::canBuildInBackground();
+    bool hybrid = MultiIndexBlock::areHybridIndexBuildsEnabled();
     if (!hybrid) {
         return !index["background"].trueValue();
     }
