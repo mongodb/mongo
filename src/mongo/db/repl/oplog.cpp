@@ -66,7 +66,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builder.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -256,24 +255,22 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
     const auto constraints =
         ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss)
-        ? IndexBuilder::IndexConstraints::kRelax
-        : IndexBuilder::IndexConstraints::kEnforce;
+        ? IndexBuildsManager::IndexConstraints::kRelax
+        : IndexBuildsManager::IndexConstraints::kEnforce;
 
-    const auto replicatedWrites = opCtx->writesAreReplicated()
-        ? IndexBuilder::ReplicatedWrites::kReplicated
-        : IndexBuilder::ReplicatedWrites::kUnreplicated;
+    auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
 
     if (shouldBuildInForeground(opCtx, indexSpec, indexNss, mode)) {
-        IndexBuilder builder(indexSpec, constraints, replicatedWrites);
-        Status status = builder.buildInForeground(opCtx, db, indexCollection);
-        uassertStatusOK(status);
+        IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
+        auto fromMigrate = false;
+        indexBuildsCoordinator->createIndexes(
+            opCtx, indexCollection->uuid(), {indexSpec}, constraints, fromMigrate);
     } else {
         Lock::TempRelease release(opCtx->lockState());
         // TempRelease cannot fail because no recursive locks should be taken.
         invariant(!opCtx->lockState()->isLocked());
         auto collUUID = indexCollection->uuid();
         auto indexBuildUUID = UUID::gen();
-        auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
 
         // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of
         // it.
