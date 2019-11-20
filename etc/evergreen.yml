@@ -4312,7 +4312,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-stitch-support install-stitch-support-debug
+        targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
         task_compile_flags: >-
           --install-mode=hygienic
           --dbg=off
