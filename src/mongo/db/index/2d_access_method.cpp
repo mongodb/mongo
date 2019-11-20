@@ -50,6 +50,7 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
 
 /** Finds the key objects to put in an index */
 void TwoDAccessMethod::doGetKeys(const BSONObj& obj,
+                                 GetKeysContext context,
                                  BSONObjSet* keys,
                                  BSONObjSet* multikeyMetadataKeys,
                                  MultikeyPaths* multikeyPaths) const {

@@ -192,7 +192,12 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
     MultikeyPaths multikeyPaths;
 
     // Delegate to the subclass.
-    getKeys(obj, options.getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
+    getKeys(obj,
+            options.getKeysMode,
+            GetKeysContext::kReadOrAddKeys,
+            &keys,
+            &multikeyMetadataKeys,
+            &multikeyPaths);
 
     return insertKeys(opCtx,
                       {keys.begin(), keys.end()},
@@ -310,7 +315,12 @@ Status AbstractIndexAccessMethod::touch(OperationContext* opCtx, const BSONObj& 
     // multikey when paging a document's index entries into memory.
     BSONObjSet* multikeyMetadataKeys = nullptr;
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, GetKeysMode::kEnforceConstraints, &keys, multikeyMetadataKeys, multikeyPaths);
+    getKeys(obj,
+            GetKeysMode::kEnforceConstraints,
+            GetKeysContext::kReadOrAddKeys,
+            &keys,
+            multikeyMetadataKeys,
+            multikeyPaths);
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
     for (const auto& key : keys) {
@@ -336,6 +346,7 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
         MultikeyPaths* multikeyPaths = nullptr;
         getKeys(requestedKey,
                 GetKeysMode::kEnforceConstraints,
+                GetKeysContext::kReadOrAddKeys,
                 &keys,
                 multikeyMetadataKeys,
                 multikeyPaths);
@@ -432,12 +443,14 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
         // There's no need to compute the prefixes of the indexed fields that possibly caused the
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
-        getKeys(from, getKeysMode, &ticket->oldKeys, nullptr, nullptr);
+        getKeys(
+            from, getKeysMode, GetKeysContext::kRemovingKeys, &ticket->oldKeys, nullptr, nullptr);
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
         getKeys(to,
                 options.getKeysMode,
+                GetKeysContext::kReadOrAddKeys,
                 &ticket->newKeys,
                 &ticket->newMultikeyMetadataKeys,
                 &ticket->newMultikeyPaths);
@@ -578,7 +591,12 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
     MultikeyPaths multikeyPaths;
 
     try {
-        _real->getKeys(obj, options.getKeysMode, &keys, &_multikeyMetadataKeys, &multikeyPaths);
+        _real->getKeys(obj,
+                       options.getKeysMode,
+                       GetKeysContext::kReadOrAddKeys,
+                       &keys,
+                       &_multikeyMetadataKeys,
+                       &multikeyPaths);
     } catch (...) {
         return exceptionToStatus();
     }
@@ -738,6 +756,7 @@ void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, Mult
 
 void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
                                         GetKeysMode mode,
+                                        GetKeysContext context,
                                         BSONObjSet* keys,
                                         BSONObjSet* multikeyMetadataKeys,
                                         MultikeyPaths* multikeyPaths) const {
@@ -767,7 +786,7 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
                                               13026,
                                               13027};
     try {
-        doGetKeys(obj, keys, multikeyMetadataKeys, multikeyPaths);
+        doGetKeys(obj, context, keys, multikeyMetadataKeys, multikeyPaths);
     } catch (const AssertionException& ex) {
         // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {

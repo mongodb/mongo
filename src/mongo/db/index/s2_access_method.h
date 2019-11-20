@@ -65,6 +65,7 @@ private:
      * be multikey as a result of inserting 'keys'.
      */
     void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
                    BSONObjSet* keys,
                    BSONObjSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths) const final;

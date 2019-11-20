@@ -80,7 +80,8 @@ public:
                             int hashVersion,
                             bool isSparse,
                             const CollatorInterface* collator,
-                            BSONObjSet* keys);
+                            BSONObjSet* keys,
+                            bool ignoreArraysAlongPath);
 
     /**
      * Hashing function used by both getHashKeys and the cursors we create.

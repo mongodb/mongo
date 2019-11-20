@@ -49,6 +49,7 @@ public:
 
 private:
     void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
                    BSONObjSet* keys,
                    BSONObjSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths) const final;

@@ -832,6 +832,7 @@ public:
             BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr);
@@ -1258,6 +1259,7 @@ public:
             BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr);
@@ -1449,6 +1451,7 @@ public:
             BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr);
@@ -1482,6 +1485,7 @@ public:
             BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                          &keys,
                          nullptr,
                          nullptr);

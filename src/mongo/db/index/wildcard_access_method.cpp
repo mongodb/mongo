@@ -51,6 +51,7 @@ bool WildcardAccessMethod::shouldMarkIndexAsMultikey(
 }
 
 void WildcardAccessMethod::doGetKeys(const BSONObj& obj,
+                                     GetKeysContext context,
                                      BSONObjSet* keys,
                                      BSONObjSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths) const {

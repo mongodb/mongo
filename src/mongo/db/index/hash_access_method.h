@@ -56,6 +56,7 @@ private:
      * indexes don't support tracking path-level multikey information.
      */
     void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
                    BSONObjSet* keys,
                    BSONObjSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths) const final;

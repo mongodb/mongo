@@ -1349,8 +1349,12 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
         BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         MultikeyPaths multikeyPaths;
 
-        index->accessMethod()->getKeys(
-            *bsonRecord.docPtr, options.getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
+        index->accessMethod()->getKeys(*bsonRecord.docPtr,
+                                       options.getKeysMode,
+                                       IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                                       &keys,
+                                       &multikeyMetadataKeys,
+                                       &multikeyPaths);
 
         Status status = _indexKeys(opCtx,
                                    index,
@@ -1504,8 +1508,12 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
     // deleted.
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
-    entry->accessMethod()->getKeys(
-        obj, IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered, &keys, nullptr, nullptr);
+    entry->accessMethod()->getKeys(obj,
+                                   IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                                   IndexAccessMethod::GetKeysContext::kRemovingKeys,
+                                   &keys,
+                                   nullptr,
+                                   nullptr);
 
     _unindexKeys(opCtx, entry, {keys.begin(), keys.end()}, obj, loc, logIfError, keysDeletedOut);
 }

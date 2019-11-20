@@ -60,6 +60,7 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
 }
 
 void BtreeAccessMethod::doGetKeys(const BSONObj& obj,
+                                  GetKeysContext context,
                                   BSONObjSet* keys,
                                   BSONObjSet* multikeyMetadataKeys,
                                   MultikeyPaths* multikeyPaths) const {
