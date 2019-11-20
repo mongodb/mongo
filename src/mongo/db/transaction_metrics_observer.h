@@ -70,9 +70,12 @@ public:
     /**
      * Updates relevant metrics when a transaction commits.
      */
-    void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
+    void onCommit(OperationContext* opCtx,
+                  ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource* tickSource,
-                  Top* top);
+                  Top* top,
+                  size_t operationCount,
+                  size_t oplogOperationBytes);
 
     /**
      * Updates relevant metrics when a transaction aborts.

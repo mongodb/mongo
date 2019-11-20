@@ -92,9 +92,12 @@ void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTran
     serverTransactionsMetrics->decrementCurrentInactive();
 }
 
-void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
+                                          ServerTransactionsMetrics* serverTransactionsMetrics,
                                           TickSource* tickSource,
-                                          Top* top) {
+                                          Top* top,
+                                          size_t operationCount,
+                                          size_t oplogOperationBytes) {
     //
     // Per transaction metrics.
     //
@@ -117,6 +120,11 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
         serverTransactionsMetrics->incrementTotalPreparedThenCommitted();
         serverTransactionsMetrics->decrementCurrentPrepared();
     }
+
+    serverTransactionsMetrics->updateLastTransaction(
+        operationCount,
+        oplogOperationBytes,
+        opCtx->getWriteConcern().usedDefault ? BSONObj() : opCtx->getWriteConcern().toBSON());
 
     auto duration =
         durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));

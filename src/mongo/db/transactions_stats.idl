@@ -39,6 +39,20 @@ imports:
 
 structs:
 
+  LastCommittedTransaction:
+    description: "A struct representing the server status subsection on
+                  the last committed transaction"
+    strict: true
+    fields:
+      operationCount:
+        type: long
+        default: 0
+      oplogOperationBytes:
+        type: long
+        default: 0
+      writeConcern:
+        type: object
+
   TransactionsStats:
     description: "A struct representing the section of the server status
                   command with information about transactions"
@@ -83,3 +97,6 @@ structs:
       currentPrepared:
         type: long
         default: 0
+      lastCommittedTransaction:
+        type: LastCommittedTransaction
+        optional: true
