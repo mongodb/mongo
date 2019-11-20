@@ -1,3 +1,7 @@
+/*
+ * @tags: [requires_fcv_44, multiversion_incompatible]
+ */
+
 (function() {
 'use strict';
 
