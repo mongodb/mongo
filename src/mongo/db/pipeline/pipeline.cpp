@@ -192,20 +192,6 @@ void Pipeline::validateTopLevelPipeline() const {
             }
         }
     }
-    // Make sure we aren't reading from and writing to the same namespace for a $merge.
-    if (auto mergeStage = dynamic_cast<DocumentSourceMerge*>(_sources.back().get())) {
-        const auto& outNss = mergeStage->getOutputNs();
-        stdx::unordered_set<NamespaceString> collectionNames;
-        // In order to gather only the involved namespaces which we are reading from, not the one we
-        // are writing to, skip the final stage as we know it is a $merge stage.
-        for (auto it = _sources.begin(); it != std::prev(_sources.end()); it++) {
-            (*it)->addInvolvedCollections(&collectionNames);
-        }
-        uassert(51079,
-                "Cannot use $merge to write to the same namespace being read from elsewhere in the "
-                "pipeline",
-                collectionNames.find(outNss) == collectionNames.end());
-    }
 }
 
 void Pipeline::validateFacetPipeline() const {

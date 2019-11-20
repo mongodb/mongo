@@ -1,8 +1,6 @@
 /**
  * Tests that the server behaves as expected when an $merge stage is targeting a collection which is
- * involved in the aggregate in some other way, e.g. as the source namespace or via a $lookup. We
- * disallow this combination in an effort to prevent the "halloween problem" of a never-ending
- * query.
+ * involved in the aggregate in some other way, e.g. as the source namespace or via a $lookup.
  *
  * This test issues queries over views, so cannot be run in passthroughs which implicitly shard
  * collections.
@@ -17,28 +15,29 @@ load('jstests/libs/fixture_helpers.js');              // For 'FixtureHelpers'.
 const testDB = db.getSiblingDB("merge_to_referenced_coll");
 const coll = testDB.test;
 
-withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+// Function used to reset state in between tests.
+function reset() {
     coll.drop();
-
     // Seed the collection to ensure each pipeline will actually do something.
-    assert.commandWorked(coll.insert({_id: 0}));
+    assert.commandWorked(coll.insert({_id: 0, y: 0}));
+}
 
-    // Each of the following assertions will somehow use $merge to write to a namespace that is
-    // being read from elsewhere in the pipeline.
-    const assertFailsWithCode = ((fn) => {
-        const error = assert.throws(fn);
-        assert.contains(error.code, [51188, 51079]);
-    });
+withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+    // Skip the combination of merge modes which will fail depending on the contents of the
+    // tested collection.
+    if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
+        return;
 
+    reset();
     // Test $merge to the aggregate command's source collection.
-    assertFailsWithCode(() => coll.aggregate([{
+    assert.doesNotThrow(() => coll.aggregate([{
         $merge:
             {into: coll.getName(), whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}
     }]));
 
     // Test $merge to the same namespace as a $lookup which is the same as the aggregate
     // command's source collection.
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
         {$lookup: {from: coll.getName(), as: "x", localField: "f_id", foreignField: "_id"}},
         {
             $merge: {
@@ -51,13 +50,13 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
 
     // Test $merge to the same namespace as a $lookup which is *not* the same as the aggregate
     // command's source collection.
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
         {$lookup: {from: "bar", as: "x", localField: "f_id", foreignField: "_id"}},
         {$merge: {into: "bar", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}}
     ]));
 
     // Test $merge to the same namespace as a $graphLookup.
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
             {
               $graphLookup: {
                   from: "bar",
@@ -77,12 +76,12 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         ]));
 
     // Test $merge to the same namespace as a $lookup which is nested within another $lookup.
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
             {
               $lookup: {
                   from: "bar",
                   as: "x",
-                  let : {},
+                  let: {},
                   pipeline: [{$lookup: {from: "TARGET", as: "y", pipeline: []}}]
               }
             },
@@ -95,7 +94,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             }
         ]));
     // Test $merge to the same namespace as a $lookup which is nested within a $facet.
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
         {
             $facet: {
                 y: [{$lookup: {from: "TARGET", as: "y", pipeline: []}}],
@@ -103,7 +102,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         },
         {$merge: {into: "TARGET", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}}
     ]));
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
         {
             $facet: {
                 x: [{$lookup: {from: "other", as: "y", pipeline: []}}],
@@ -113,14 +112,14 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         {$merge: {into: "TARGET", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}}
     ]));
 
-    // Test that we use the resolved namespace of a view to detect this sort of halloween
-    // problem.
+    // Test that $merge works when the resolved namespace of a view is the same as the output
+    // collection.
     assert.commandWorked(
         testDB.runCommand({create: "view_on_TARGET", viewOn: "TARGET", pipeline: []}));
-    assertFailsWithCode(() => testDB.view_on_TARGET.aggregate([
+    assert.doesNotThrow(() => testDB.view_on_TARGET.aggregate([
         {$merge: {into: "TARGET", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}}
     ]));
-    assertFailsWithCode(() => coll.aggregate([
+    assert.doesNotThrow(() => coll.aggregate([
             {
               $facet: {
                   x: [{$lookup: {from: "other", as: "y", pipeline: []}}],
@@ -155,7 +154,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     const nestedPipeline = generateNestedPipeline("lookup", 20).concat([
         {$merge: {into: "lookup", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}}
     ]);
-    assertFailsWithCode(() => coll.aggregate(nestedPipeline));
+    assert.doesNotThrow(() => coll.aggregate(nestedPipeline));
 
     testDB.dropDatabase();
 });

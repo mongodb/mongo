@@ -144,6 +144,15 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfWhenMatchedIsStringOrArray) {
     ASSERT(createMergeStage(spec));
 }
 
+TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfTargetAndAggregationNamespacesAreSame) {
+    const auto targetNsSameAsAggregationNs = getExpCtx()->ns;
+    const auto targetColl = targetNsSameAsAggregationNs.coll();
+    const auto targetDb = targetNsSameAsAggregationNs.db();
+
+    auto spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl << "db" << targetDb)));
+    ASSERT(createMergeStage(spec));
+}
+
 TEST_F(DocumentSourceMergeTest, FailsToParseIncorrectMergeSpecType) {
     auto spec = BSON("$merge" << 1);
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51182);
@@ -288,15 +297,6 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenNotMatchedModeIsNotString) {
                                  << "target_collection"
                                  << "whenNotMatched" << BSON("" << kDefaultWhenNotMatchedMode)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
-}
-
-TEST_F(DocumentSourceMergeTest, FailsToParseIfTargetAndAggregationNamespacesAreSame) {
-    const auto targetNsSameAsAggregationNs = getExpCtx()->ns;
-    const auto targetColl = targetNsSameAsAggregationNs.coll();
-    const auto targetDb = targetNsSameAsAggregationNs.db();
-
-    auto spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl << "db" << targetDb)));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51188);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenMatchedModeIsUnsupportedString) {

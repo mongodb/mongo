@@ -365,11 +365,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
                                       MergeWhenNotMatchedMode_serializer(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
 
-    uassert(51188,
-            "{} is not supported when the output collection is the same as "
-            "the aggregation collection"_format(kStageName),
-            expCtx->ns != outputNs);
-
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace: '{}'"_format(kStageName, outputNs.ns()),
             outputNs.isValid());

@@ -233,7 +233,7 @@ TEST(MapReduceAggTest, testOutSameCollection) {
     ASSERT(typeid(DocumentSourceOut) == typeid(**iter));
 }
 
-TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeFail) {
+TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeDoesNotFail) {
     auto nss = NamespaceString{"db", "coll"};
     auto mr = MapReduce{
         nss,
@@ -241,8 +241,7 @@ TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeFail) {
         MapReduceJavascriptCode{reduceJavascript.toString()},
         MapReduceOutOptions{boost::make_optional("db"s), "coll", OutputType::Merge, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    ASSERT_THROWS_CODE(
-        map_reduce_common::translateFromMR(mr, expCtx), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
 }
 
 TEST(MapReduceAggTest, testSourceDestinationCollectionsNotEqualMergeDoesNotFail) {
