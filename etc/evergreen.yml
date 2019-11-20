@@ -8661,6 +8661,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-test
+  stepback: false
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -11848,7 +11849,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-build
-  stepback: true
+  stepback: false
   expansions:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
@@ -11939,7 +11940,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-build
-  stepback: true
+  stepback: false
   expansions:
     # We need llvm-symbolizer in the PATH for UBSAN.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
