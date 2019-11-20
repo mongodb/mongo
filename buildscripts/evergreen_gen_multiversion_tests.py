@@ -186,8 +186,6 @@ class EvergreenConfigGenerator(object):
             # Fetch and download the proper mongod binaries before running multiversion tests.
             CommandDefinition().function("do multiversion setup")
         ]
-        # TODO(SERVER-43306): Remove --dryRun command line option once we start turning on
-        #  multiversion tests.
         run_tests_vars = {
             "resmoke_args":
                 "{0} --suite={1} --mixedBinVersions={2} --excludeWithAnyTags={3} ".format(
