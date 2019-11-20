@@ -280,6 +280,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/catalog/collection_query_info',

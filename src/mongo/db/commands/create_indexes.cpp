@@ -666,6 +666,10 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                      std::string& errmsg,
                                      BSONObjBuilder& result) {
     const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+
+    // Disallows drops and renames on this namespace.
+    BackgroundOperation backgroundOp(ns.ns());
+
     uassertStatusOK(userAllowedWriteNS(ns));
 
     // Disallow users from creating new indexes on config.transactions since the sessions code
