@@ -102,6 +102,13 @@ public:
     static IndexBuildsCoordinator* get(OperationContext* operationContext);
 
     /**
+     * Updates CurOp's 'opDescription' field with the current state of this index build.
+     */
+    static void updateCurOpOpDescription(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const std::vector<BSONObj>& indexSpecs);
+
+    /**
      * Returns true if two phase index builds are supported.
      * This is determined by the current FCV and the server parameter 'enableTwoPhaseIndexBuild'.
      */
@@ -322,6 +329,7 @@ public:
     void createIndexes(OperationContext* opCtx,
                        UUID collectionUUID,
                        const std::vector<BSONObj>& specs,
+                       IndexBuildsManager::IndexConstraints indexConstraints,
                        bool fromMigrate);
 
     /**
@@ -363,13 +371,6 @@ private:
      */
     void _allowIndexBuildsOnDatabase(StringData dbName);
     void _allowIndexBuildsOnCollection(const UUID& collectionUUID);
-
-    /**
-     * Updates CurOp's 'opDescription' field with the current state of this index build.
-     */
-    void _updateCurOpOpDescription(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const std::vector<BSONObj>& indexSpecs) const;
 
     /**
      * Registers an index build so that the rest of the system can discover it.

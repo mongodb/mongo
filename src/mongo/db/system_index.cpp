@@ -109,9 +109,10 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         log() << "No authorization index detected on " << ns
               << " collection. Attempting to recover by creating an index with spec: " << indexSpec;
 
-        auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+        auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
         auto fromMigrate = false;
-        indexBuildsCoord->createIndexes(opCtx, collectionUUID, {indexSpec}, fromMigrate);
+        IndexBuildsCoordinator::get(opCtx)->createIndexes(
+            opCtx, collectionUUID, {indexSpec}, indexConstraints, fromMigrate);
     } catch (const DBException& e) {
         severe() << "Failed to regenerate index for " << ns << ". Exception: " << e.what();
         throw;

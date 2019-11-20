@@ -691,6 +691,7 @@ void IndexBuildsCoordinator::onReplicaSetReconfig() {
 void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
                                            UUID collectionUUID,
                                            const std::vector<BSONObj>& specs,
+                                           IndexBuildsManager::IndexConstraints indexConstraints,
                                            bool fromMigrate) {
     auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
     invariant(collection,
@@ -710,7 +711,7 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
 
     auto onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
     IndexBuildsManager::SetupOptions options;
-    options.indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+    options.indexConstraints = indexConstraints;
     uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
         opCtx, collection, specs, buildUUID, onInitFn, options));
 
@@ -801,10 +802,10 @@ void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() {
     invariant(_collectionIndexBuilds.empty());
 }
 
-void IndexBuildsCoordinator::_updateCurOpOpDescription(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::vector<BSONObj>& indexSpecs) const {
+// static
+void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const std::vector<BSONObj>& indexSpecs) {
     BSONObjBuilder builder;
 
     // If the collection namespace is provided, add a 'createIndexes' field with the collection name
@@ -1372,7 +1373,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
         invariant(opCtx->lockState()->isCollectionLockedForMode(*nss, MODE_X));
 
         // Set up the thread's currentOp information to display createIndexes cmd information.
-        _updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
+        updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
     }
 
     // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
