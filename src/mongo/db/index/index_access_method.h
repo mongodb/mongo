@@ -281,6 +281,12 @@ public:
     };
 
     /**
+     * Specifies whether getKeys is being used in the context of creating new keys or deleting
+     * existing keys.
+     */
+    enum class GetKeysContext { kRemovingKeys, kReadOrAddKeys };
+
+    /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      * Based on 'mode', it will honor or ignore index constraints, e.g. duplicated key, key too
      * long, and geo index parsing errors. The ignoring of constraints is for replication due to
@@ -294,6 +300,7 @@ public:
      */
     void getKeys(const BSONObj& obj,
                  GetKeysMode mode,
+                 GetKeysContext context,
                  BSONObjSet* keys,
                  MultikeyPaths* multikeyPaths) const;
 
@@ -319,6 +326,7 @@ protected:
      * a result of inserting 'keys'.
      */
     virtual void doGetKeys(const BSONObj& obj,
+                           GetKeysContext context,
                            BSONObjSet* keys,
                            MultikeyPaths* multikeyPaths) const = 0;
 

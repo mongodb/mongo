@@ -138,7 +138,7 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
     // Delegate to the subclass.
-    getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
+    getKeys(obj, options.getKeysMode, GetKeysContext::kReadOrAddKeys, &keys, &multikeyPaths);
 
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
@@ -225,7 +225,11 @@ Status IndexAccessMethod::remove(OperationContext* opCtx,
 
     // Relax key constraints on removal when deleting documents with invalid formats, but only
     // those that don't apply to the partialIndex filter.
-    getKeys(obj, GetKeysMode::kRelaxConstraintsUnfiltered, &keys, multikeyPaths);
+    getKeys(obj,
+            GetKeysMode::kRelaxConstraintsUnfiltered,
+            GetKeysContext::kRemovingKeys,
+            &keys,
+            multikeyPaths);
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         removeOneKey(opCtx, *i, loc, options.dupsAllowed);
@@ -244,7 +248,11 @@ Status IndexAccessMethod::touch(OperationContext* opCtx, const BSONObj& obj) {
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when paging a document's index entries into memory.
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, GetKeysMode::kEnforceConstraints, &keys, multikeyPaths);
+    getKeys(obj,
+            GetKeysMode::kEnforceConstraints,
+            GetKeysContext::kReadOrAddKeys,
+            &keys,
+            multikeyPaths);
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
@@ -266,7 +274,11 @@ RecordId IndexAccessMethod::findSingle(OperationContext* opCtx, const BSONObj& r
         // For performance, call get keys only if there is a non-simple collation.
         BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(requestedKey, GetKeysMode::kEnforceConstraints, &keys, multikeyPaths);
+        getKeys(requestedKey,
+                GetKeysMode::kEnforceConstraints,
+                GetKeysContext::kReadOrAddKeys,
+                &keys,
+                multikeyPaths);
         invariant(keys.size() == 1);
         actualKey = *keys.begin();
     } else {
@@ -354,11 +366,19 @@ Status IndexAccessMethod::validateUpdate(OperationContext* opCtx,
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
         MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(from, options.getKeysMode, &ticket->oldKeys, multikeyPaths);
+        getKeys(from,
+                options.getKeysMode,
+                GetKeysContext::kRemovingKeys,
+                &ticket->oldKeys,
+                multikeyPaths);
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
-        getKeys(to, options.getKeysMode, &ticket->newKeys, &ticket->newMultikeyPaths);
+        getKeys(to,
+                options.getKeysMode,
+                GetKeysContext::kReadOrAddKeys,
+                &ticket->newKeys,
+                &ticket->newMultikeyPaths);
     }
 
     ticket->loc = record;
@@ -445,7 +465,7 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* opCtx,
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
 
-    _real->getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
+    _real->getKeys(obj, options.getKeysMode, GetKeysContext::kReadOrAddKeys, &keys, &multikeyPaths);
 
     _everGeneratedMultipleKeys = _everGeneratedMultipleKeys || (keys.size() > 1);
 
@@ -554,6 +574,7 @@ void IndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, MultikeyPath
 
 void IndexAccessMethod::getKeys(const BSONObj& obj,
                                 GetKeysMode mode,
+                                GetKeysContext context,
                                 BSONObjSet* keys,
                                 MultikeyPaths* multikeyPaths) const {
     static stdx::unordered_set<int> whiteList{ErrorCodes::CannotBuildIndexKeys,
@@ -581,7 +602,7 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                               13026,
                                               13027};
     try {
-        doGetKeys(obj, keys, multikeyPaths);
+        doGetKeys(obj, context, keys, multikeyPaths);
     } catch (const AssertionException& ex) {
         // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {

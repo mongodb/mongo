@@ -51,6 +51,7 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
 
 /** Finds the key objects to put in an index */
 void TwoDAccessMethod::doGetKeys(const BSONObj& obj,
+                                 GetKeysContext context,
                                  BSONObjSet* keys,
                                  MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::get2DKeys(obj, _params, keys);

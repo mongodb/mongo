@@ -90,7 +90,7 @@ TEST(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
     BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
-        obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
+        obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys, false);
 
     BSONObj backwardsObj = fromjson("{a: 'gnirts'}");
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -104,7 +104,7 @@ TEST(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
-        obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
+        obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys, false);
 
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(obj["a"]));
@@ -118,7 +118,7 @@ TEST(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
     BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
-        obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
+        obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys, false);
 
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(backwardsObj["a"]));
@@ -130,12 +130,56 @@ TEST(HashKeyGeneratorTest, NoCollation) {
     BSONObj obj = fromjson("{a: 'string'}");
     BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     ExpressionKeysPrivate::getHashKeys(
-        obj, "a", kHashSeed, kHashVersion, false, nullptr, &actualKeys);
+        obj, "a", kHashSeed, kHashVersion, false, nullptr, &actualKeys, false);
 
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(obj["a"]));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
+}
+
+TEST(HashKeyGeneratorTest, ArrayAlongIndexFieldPathFails) {
+    BSONObj obj = fromjson("{a: []}");
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    ASSERT_THROWS_CODE(
+        ExpressionKeysPrivate::getHashKeys(
+            obj, "a.b.c", kHashSeed, kHashVersion, false, nullptr, &actualKeys, false),
+        DBException,
+        16766);
+}
+
+TEST(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIsSet) {
+    BSONObj obj = fromjson("{a: []}");
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    ExpressionKeysPrivate::getHashKeys(obj,
+                                       "a.b.c",
+                                       kHashSeed,
+                                       kHashVersion,
+                                       false,
+                                       nullptr,
+                                       &actualKeys,
+                                       true  // ignoreArraysAlongPath
+                                       );
+
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    expectedKeys.insert(makeHashKey(BSON("" << BSONNULL).firstElement()));
+    ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
+}
+
+TEST(HashKeyGeneratorTest, ArrayAtTerminalPathAlwaysFails) {
+    BSONObj obj = fromjson("{a : {b: {c: [1]}}}");
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(obj,
+                                                          "a.b.c",
+                                                          kHashSeed,
+                                                          kHashVersion,
+                                                          true,  // isSparse
+                                                          nullptr,
+                                                          &actualKeys,
+                                                          true  // ignoreArraysAlongPath
+                                                          ),
+                       DBException,
+                       16766);
 }
 
 }  // namespace

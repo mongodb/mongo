@@ -39,6 +39,7 @@ FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterf
     : IndexAccessMethod(btreeState, btree), _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
 void FTSAccessMethod::doGetKeys(const BSONObj& obj,
+                                GetKeysContext context,
                                 BSONObjSet* keys,
                                 MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getFTSKeys(obj, _ftsSpec, keys);

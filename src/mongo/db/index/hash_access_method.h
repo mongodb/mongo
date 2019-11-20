@@ -56,7 +56,10 @@ private:
      * This function ignores the 'multikeyPaths' pointer because hashed indexes don't support
      * tracking path-level multikey information.
      */
-    void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
+    void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
+                   BSONObjSet* keys,
+                   MultikeyPaths* multikeyPaths) const final;
 
     // Only one of our fields is hashed.  This is the field name for it.
     std::string _hashedField;

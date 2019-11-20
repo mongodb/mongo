@@ -66,6 +66,7 @@ HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
 }
 
 void HaystackAccessMethod::doGetKeys(const BSONObj& obj,
+                                     GetKeysContext context,
                                      BSONObjSet* keys,
                                      MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
