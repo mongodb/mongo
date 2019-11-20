@@ -347,3 +347,66 @@ func TestMongorestoreMIOSOE(t *testing.T) {
 
 	_ = database.Drop(nil)
 }
+
+func TestDeprecatedIndexOptions(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	session, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
+
+	Convey("With a test MongoRestore", t, func() {
+		args := []string{
+			NumParallelCollectionsOption, "1",
+			NumInsertionWorkersOption, "1",
+		}
+
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		session, _ = restore.SessionProvider.GetSession()
+
+		db := session.Database("indextest")
+
+		coll := db.Collection("test_collection")
+		coll.Drop(nil)
+		defer func() {
+			coll.Drop(nil)
+		}()
+		Convey("Creating index with invalid option should throw error", func() {
+			restore.TargetDirectory = "testdata/indextestdump"
+			result := restore.Restore()
+			So(result.Err, ShouldNotBeNil)
+			So(result.Err.Error(), ShouldStartWith, `indextest.test_collection: error creating indexes for indextest.test_collection: createIndex error: (InvalidIndexSpecificationOption)`)
+
+			So(result.Successes, ShouldEqual, 100)
+			So(result.Failures, ShouldEqual, 0)
+			count, err := coll.CountDocuments(nil, bson.M{})
+			So(err, ShouldBeNil)
+			So(count, ShouldEqual, 100)
+		})
+
+		coll.Drop(nil)
+
+		args = []string{
+			NumParallelCollectionsOption, "1",
+			NumInsertionWorkersOption, "1",
+			ConvertLegacyIndexesOption, "true",
+		}
+
+		restore, err = getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		Convey("Creating index with invalid option and --ignoreInvalidIndexOptions should succeed", func() {
+			restore.TargetDirectory = "testdata/indextestdump"
+			result := restore.Restore()
+			So(result.Err, ShouldBeNil)
+
+			So(result.Successes, ShouldEqual, 100)
+			So(result.Failures, ShouldEqual, 0)
+			count, err := coll.CountDocuments(nil, bson.M{})
+			So(err, ShouldBeNil)
+			So(count, ShouldEqual, 100)
+		})
+	})
+}
