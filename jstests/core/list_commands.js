@@ -1,4 +1,5 @@
 // Test for listCommands.
+// @tags: [multiversion_incompatible]
 
 (function() {
 "use strict";
