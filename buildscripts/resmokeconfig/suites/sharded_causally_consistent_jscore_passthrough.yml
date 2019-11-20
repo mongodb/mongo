@@ -64,8 +64,6 @@ selector:
   - jstests/core/mr_correctness.js
   - jstests/core/mr_fail_invalid_js.js
   - jstests/core/mr_scope.js
-  # TODO: SERVER-30052
-  - jstests/core/queryoptimizer3.js
   # Tests that need triaging & remediation | blacklist decision
   # Comments list possible problem point under review.
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
