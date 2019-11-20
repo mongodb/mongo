@@ -66,9 +66,12 @@
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
 const isUnrelated = "is unrelated";
+const wasRemovedInBinaryVersion44 =
+    "must define test coverage for the multiversion passthrough suite";
 
 let viewsCommandTests = {
     _addShard: {skip: isAnInternalCommand},
+    _cloneCatalogData: {skip: wasRemovedInBinaryVersion44},
     _cloneCollectionOptionsFromPrimaryShard: {skip: isAnInternalCommand},
     _configsvrAddShard: {skip: isAnInternalCommand},
     _configsvrAddShardToZone: {skip: isAnInternalCommand},
@@ -103,6 +106,7 @@ let viewsCommandTests = {
     _isSelf: {skip: isAnInternalCommand},
     _mergeAuthzCollections: {skip: isAnInternalCommand},
     _migrateClone: {skip: isAnInternalCommand},
+    _movePrimary: {skip: wasRemovedInBinaryVersion44},
     _recvChunkAbort: {skip: isAnInternalCommand},
     _recvChunkCommit: {skip: isAnInternalCommand},
     _recvChunkStart: {skip: isAnInternalCommand},
@@ -144,6 +148,7 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     clearLog: {skip: isUnrelated},
+    cloneCollection: {skip: wasRemovedInBinaryVersion44},
     cloneCollectionAsCapped: {
         command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
         expectFailure: true,
@@ -300,7 +305,20 @@ let viewsCommandTests = {
     getParameter: {skip: isUnrelated},
     getShardMap: {skip: isUnrelated},
     getShardVersion: {
-        command: {getShardVersion: "test.view"},
+        command: function(conn) {
+            // getShardVersion was updated to be allowed on views in v4.4, but in v4.2 would return
+            // CommandNotSupportedOnView. Ignore a CommandNotSupportedOnView error code so that the
+            // test passes in the mixed-version replica sets passthrough. The v4.2 behavior is
+            // tested in the v4.2 branch.
+            try {
+                assert.commandWorked(conn.adminCommand({getShardVersion: "test.view"}));
+            } catch (e) {
+                if (e.code == ErrorCodes.CommandNotSupportedOnView) {
+                    return;
+                }
+                throw e;
+            }
+        },
         isAdminCommand: true,
         skipSharded: true,  // mongos is tested in views/views_sharded.js
     },
@@ -418,6 +436,7 @@ let viewsCommandTests = {
             skipSharded: true,
         }
     ],
+    repairCursor: {skip: wasRemovedInBinaryVersion44},
     repairDatabase: {skip: isUnrelated},
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},
@@ -510,6 +529,7 @@ let viewsCommandTests = {
     startSession: {skip: isAnInternalCommand},
     stopRecordingTraffic: {skip: isUnrelated},
     top: {skip: "tested in views/views_stats.js"},
+    touch: {skip: wasRemovedInBinaryVersion44},
     unsetSharding: {skip: isAnInternalCommand},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
