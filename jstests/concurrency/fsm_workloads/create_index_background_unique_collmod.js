@@ -45,9 +45,20 @@ var $config = extendWorkload($config, function($config, $super) {
     let newTransitions = {};
 
     // Assign transitions such that each individual state can only transition to other states.
+    // Ensure the "collMod" state has a low probability, since running collMod too frequently can
+    // starve other operation threads.
     states.forEach(function(state) {
-        const otherStates = states.filter(x => x != state);
-        newTransitions[state] = assignEqualProbsToTransitions(otherStates);
+        const otherStates = states.filter(x => x != state && x != "collMod");
+        if (state != "collMod") {
+            newTransitions[state] = assignEqualProbsToTransitionsFromTotal(otherStates, 0.85);
+            // The exact value of the maximum collMod probability is not important, so long as it is
+            // low.
+            const collModProbability = Math.min(0.85 / otherStates.length, 0.15);
+            newTransitions[state] =
+                Object.extend({"collMod": collModProbability}, newTransitions[state]);
+        } else {
+            newTransitions[state] = assignEqualProbsToTransitions(otherStates);
+        }
     });
 
     $config.transitions = newTransitions;

@@ -27,16 +27,26 @@ function extendWorkload($config, callback) {
 }
 
 /**
- * assignEqualProbsToTransitions example usage:
+ * assignEqualProbsToTransitionsFromTotal example usage:
  * $config.transitions = Object.extend({<state>:
- * assignEqualProbsToTransitions(Object.keys($config.states))}, $super.transitions);
+ * assignEqualProbsToTransitionsFromTotal(Object.keys($config.states))}, $super.transitions, 1.0);
+ * `totalProbability` refers to the total probability that is divided amongst the members of
+ * `states`. For example, if `totalProbability` is 0.8 and there are two states, then each gets 0.4
+ * probability.
  */
-function assignEqualProbsToTransitions(states) {
+function assignEqualProbsToTransitionsFromTotal(states, totalProbability) {
     assertAlways.gt(states.length, 0);
     let probs = {};
-    let pr = 1.0 / states.length;
+    let pr = totalProbability / states.length;
     states.forEach(function(s) {
         probs[s] = pr;
     });
     return probs;
+}
+
+/**
+ * Like assignEqualProbsToTransitionsFromTotal, but uses 1.0 as the total probability.
+ */
+function assignEqualProbsToTransitions(states) {
+    return assignEqualProbsToTransitionsFromTotal(states, 1.0);
 }

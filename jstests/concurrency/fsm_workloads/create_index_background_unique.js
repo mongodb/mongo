@@ -82,6 +82,8 @@ var $config = (function() {
         };
     })();
 
+    // Any changes to the relative probabilities of the states in `transitions` should keep in mind
+    // how workloads extending this workload will behave.
     var transitions = {
         buildIndex: {dropIndex: 1.0},
         dropIndex: {buildIndex: 1.0},
