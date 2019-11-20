@@ -148,7 +148,7 @@ protected:
 
         BSONObjBuilder createResponseBuilder;
         CommandHelpers::appendCommandStatusNoThrow(
-            createResponseBuilder, Status(ErrorCodes::ExceededTimeLimit, "operation timed out"));
+            createResponseBuilder, Status(ErrorCodes::Interrupted, "operation interrupted"));
         expectConfigCollectionCreate(
             configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
 

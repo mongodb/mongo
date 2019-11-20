@@ -149,7 +149,8 @@ const retryableCodes = [
     ErrorCodes.HostNotFound,
     ErrorCodes.HostUnreachable,
     ErrorCodes.NetworkTimeout,
-    ErrorCodes.SocketException
+    ErrorCodes.SocketException,
+    ErrorCodes.ExceededTimeLimit
 ];
 
 // Test retryable error codes.

@@ -1129,7 +1129,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     future.default_timed_get();
 }
 
-TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentExceededTimeLimit) {
+TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentNonRetryableError) {
     HostAndPort host1("TestHost1");
     configTargeter()->setFindHostReturnValue(host1);
 
@@ -1143,7 +1143,7 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentExceededTimeLimit) {
                                                   dbt.toBSON(),
                                                   true,
                                                   ShardingCatalogClient::kMajorityWriteConcern);
-        ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
+        ASSERT_EQ(ErrorCodes::Interrupted, status);
     });
 
     onCommand([host1](const RemoteCommandRequest& request) {
@@ -1151,7 +1151,7 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentExceededTimeLimit) {
             ASSERT_EQUALS(host1, request.target);
 
             BatchedCommandResponse response;
-            response.setStatus({ErrorCodes::ExceededTimeLimit, "operation timed out"});
+            response.setStatus({ErrorCodes::Interrupted, "operation interrupted"});
 
             return response.toBSON();
         } catch (const DBException& ex) {
