@@ -83,10 +83,10 @@ DEATH_TEST_F(LatchAnalyzerTest, RemoveInvalidWasPresent, "Fatal assertion 31361"
 TEST_F(LatchAnalyzerTest, AddValidWasAbsent) {
     Mutex higherLevel = MONGO_MAKE_LATCH(
         Level(2), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddValidWasAbsent::higherLevel");
-    higherLevel.lock();
+    stdx::lock_guard<Latch> highLevelLock(higherLevel);
     Mutex lowerLevel = MONGO_MAKE_LATCH(
         Level(1), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddValidWasAbsent::lowerLevel");
-    lowerLevel.lock();
+    stdx::lock_guard<Latch> lowLevelLock(lowerLevel);
 }
 
 TEST_F(LatchAnalyzerTest, RemoveValidWasPresent) {
