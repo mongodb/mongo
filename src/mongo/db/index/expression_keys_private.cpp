@@ -345,20 +345,35 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         int hashVersion,
                                         bool isSparse,
                                         const CollatorInterface* collator,
-                                        BSONObjSet* keys) {
+                                        BSONObjSet* keys,
+                                        bool ignoreArraysAlongPath) {
+    static const BSONObj nullObj = BSON("" << BSONNULL);
     const char* cstr = hashedField.c_str();
     BSONElement fieldVal = dps::extractElementAtPathOrArrayAlongPath(obj, cstr);
 
     // If we hit an array while traversing the path, 'cstr' will point to the path component
-    // immediately following the array, or the null termination byte if the final field in the path
-    // was an array.
-    uassert(
-        16766,
-        str::stream()
-            << "Error: hashed indexes do not currently support array values. Found array at path: "
-            << hashedField.substr(
-                   0, hashedField.size() - StringData(cstr).size() - !StringData(cstr).empty()),
-        fieldVal.type() != BSONType::Array);
+    // immediately following the array, or the null termination byte if the terminal path
+    // component was an array. In the latter case, 'remainingPath' will be empty.
+    auto remainingPath = StringData(cstr);
+
+    // If 'ignoreArraysAlongPath' is set, we want to use the behaviour prior to SERVER-44050,
+    // which is to allow arrays along the field path (except the terminal path). This is done so
+    // that the document keys inserted prior to SERVER-44050 can be deleted or updated after the
+    // upgrade, allowing users to recover from the possible index corruption. The old behaviour
+    // before SERVER-44050 was to store 'null' index key if we encountered an array along the
+    // index field path. We will use the same logic in the context of removing index keys.
+    if (ignoreArraysAlongPath && fieldVal.type() == BSONType::Array && !remainingPath.empty()) {
+        fieldVal = nullObj.firstElement();
+    }
+
+    // Otherwise, throw if an array was encountered at any point along the path.
+    uassert(16766,
+            str::stream() << "Error: hashed indexes do not currently support array values. "
+                             "Found array at path: "
+                          << hashedField.substr(0,
+                                                hashedField.size() - remainingPath.size() -
+                                                    !remainingPath.empty()),
+            fieldVal.type() != BSONType::Array);
 
     // Convert strings to comparison keys.
     BSONObj fieldValObj;
@@ -370,7 +385,6 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
         BSONObj key = BSON("" << makeSingleHashKey(fieldVal, seed, hashVersion));
         keys->insert(key);
     } else if (!isSparse) {
-        BSONObj nullObj = BSON("" << BSONNULL);
         keys->insert(BSON("" << makeSingleHashKey(nullObj.firstElement(), seed, hashVersion)));
     }
 }

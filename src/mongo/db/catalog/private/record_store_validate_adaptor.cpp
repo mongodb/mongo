@@ -89,6 +89,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         MultikeyPaths* multikeyPaths = nullptr;
         iam->getKeys(recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                     IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
                      &documentKeySet,
                      multikeyPaths);
 

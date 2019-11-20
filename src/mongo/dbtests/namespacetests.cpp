@@ -105,7 +105,8 @@ public:
         // Call getKeys on the nullObj.
         BSONObjSet nullFieldKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         const CollatorInterface* collator = nullptr;
-        ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0, 0, false, collator, &nullFieldKeySet);
+        ExpressionKeysPrivate::getHashKeys(
+            nullObj, "a", 0, 0, false, collator, &nullFieldKeySet, false);
         BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
         ASSERT_EQUALS(ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), 0, 0),
@@ -135,7 +136,7 @@ public:
         BSONObjSet nullFieldKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         const CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(
-            nullObj, "a", 0x5eed, 0, false, collator, &nullFieldKeySet);
+            nullObj, "a", 0x5eed, 0, false, collator, &nullFieldKeySet, false);
         BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
         ASSERT_EQUALS(ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), 0x5eed, 0),

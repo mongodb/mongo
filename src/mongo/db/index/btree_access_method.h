@@ -50,7 +50,10 @@ public:
     BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
 private:
-    void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
+    void doGetKeys(const BSONObj& obj,
+                   GetKeysContext context,
+                   BSONObjSet* keys,
+                   MultikeyPaths* multikeyPaths) const final;
 
     // Our keys differ for V0 and V1.
     std::unique_ptr<BtreeKeyGenerator> _keyGenerator;
