@@ -1892,6 +1892,18 @@ elif env.TargetOSIs('windows'):
 if env.ToolchainIs('msvc'):
     env['PDB'] = '${TARGET.base}.pdb'
 
+# Python uses APPDATA to determine the location of user installed
+# site-packages. If we do not pass this variable down to Python
+# subprocesses then anything installed with `pip install --user`
+# will be inaccessible leading to import errors.
+#
+# Use env['PLATFORM'] instead of TargetOSIs since we always want this
+# to run on Windows hosts but not always for Windows targets.
+if env['PLATFORM'] == 'win32':
+    appdata = os.getenv('APPDATA', None)
+    if appdata is not None:
+        env['ENV']['APPDATA'] = appdata
+
 if env.TargetOSIs('posix'):
 
     # On linux, C code compiled with gcc/clang -std=c11 causes
@@ -1980,15 +1992,6 @@ if env.TargetOSIs('posix'):
             env['ENV'][key] = os.environ[key]
         except KeyError:
             pass
-
-    # Python uses APPDATA to determine the location of user installed
-    # site-packages. If we do not pass this variable down to Python
-    # subprocesses then anything installed with `pip install --user`
-    # will be inaccessible leading to import errors.
-    if env.TargetOSIs('windows'):
-        appdata = os.getenv('APPDATA', None)
-        if appdata is not None:
-            env['ENV']['APPDATA'] = appdata
 
     if env.TargetOSIs('linux') and has_option( "gcov" ):
         env.Append( CCFLAGS=["-fprofile-arcs", "-ftest-coverage", "-fprofile-update=single"] )
