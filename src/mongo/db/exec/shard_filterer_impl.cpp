@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 
 #include "mongo/db/matcher/matchable.h"
@@ -42,14 +43,8 @@ ShardFiltererImpl::ShardFiltererImpl(ScopedCollectionMetadata md) : _metadata(st
     }
 }
 
-ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
-    const MatchableDocument& doc) const {
-    if (!_metadata->isSharded()) {
-        return DocumentBelongsResult::kBelongs;
-    }
-
-    BSONObj shardKey = _keyPattern->extractShardKeyFromMatchable(doc);
-
+ShardFilterer::DocumentBelongsResult ShardFiltererImpl::_shardKeyBelongsToMe(
+    const BSONObj shardKey) const {
     if (shardKey.isEmpty()) {
         return DocumentBelongsResult::kNoShardKey;
     }
@@ -58,4 +53,32 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
                                                : DocumentBelongsResult::kDoesNotBelong;
 }
 
+
+ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
+    const WorkingSetMember& wsm) const {
+    if (!_metadata->isSharded()) {
+        return DocumentBelongsResult::kBelongs;
+    }
+
+    if (wsm.hasObj()) {
+        return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromDoc(wsm.doc.value().toBson()));
+    }
+    // Transform 'IndexKeyDatum' provided by 'wsm' into 'IndexKeyData' to call
+    // extractShardKeyFromIndexKeyData().
+    invariant(!wsm.keyData.empty());
+    std::vector<ShardKeyPattern::IndexKeyData> indexKeyDataVector;
+    indexKeyDataVector.resize(wsm.keyData.size());
+    for (auto&& indexKeyData : wsm.keyData) {
+        indexKeyDataVector.push_back({indexKeyData.keyData, indexKeyData.indexKeyPattern});
+    }
+    return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromIndexKeyData(indexKeyDataVector));
+}
+
+ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
+    const Document& doc) const {
+    if (!_metadata->isSharded()) {
+        return DocumentBelongsResult::kBelongs;
+    }
+    return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromDoc(doc.toBson()));
+}
 }  // namespace mongo

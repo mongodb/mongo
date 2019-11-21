@@ -39,7 +39,8 @@ class ShardFiltererImpl : public ShardFilterer {
 public:
     ShardFiltererImpl(ScopedCollectionMetadata md);
 
-    DocumentBelongsResult documentBelongsToMe(const MatchableDocument& doc) const override;
+    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override;
+    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override;
 
     bool isCollectionSharded() const override {
         return _metadata->isSharded();
@@ -51,6 +52,7 @@ public:
     }
 
 private:
+    DocumentBelongsResult _shardKeyBelongsToMe(BSONObj shardKey) const;
     ScopedCollectionMetadata _metadata;
     boost::optional<ShardKeyPattern> _keyPattern;
 };

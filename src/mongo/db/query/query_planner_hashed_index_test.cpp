@@ -395,8 +395,7 @@ TEST_F(QueryPlannerHashedTest, CannotCoverQueryWhenHashedFieldIsPrefix) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: {x : {$eq: 5}}, node: {ixscan: "
-        "{filter: null, pattern: {x: 'hashed', y: 1},"
-        "bounds: {x:[" +
+        "{filter: null, pattern: {x: 'hashed', y: 1}, bounds: {x:[" +
         getHashedBound(5) + "], y: [['MinKey','MaxKey',true,true]] }}}}}}}");
 
     // Verify that queries cannot be covered with hashed field is a prefix, despite query and
@@ -416,28 +415,141 @@ TEST_F(QueryPlannerHashedTest, CanCoverQueryWhenHashedFieldIsNotPrefix) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {_id: 0, z: 1}, node: {ixscan: "
-        "{filter: null, pattern: {x: 1, y: 'hashed', z: -1},"
-        "bounds: {x: [[24,27,false,false]], y: [['MinKey','MaxKey',true,true]], z: "
+        "{proj: {spec: {_id: 0, z: 1}, node: {ixscan: {filter: null, pattern: {x: 1, y: 'hashed', "
+        "z: -1}, bounds: {x: [[24,27,false,false]], y: [['MinKey','MaxKey',true,true]], z: "
         "[['MaxKey','MinKey',true,true]] }}}}}");
 
     // Verify that query doesn't get covered when query is on a hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: 1, y:1}, projection:{_id: 0, z: 1}}"));
+    runQueryAsCommand(fromjson("{filter: {x: 1, y: 1}, projection:{_id: 0, z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, z: 1}, node: {fetch: {filter: {y : {$eq: 1}}, node: {ixscan: "
-        "{filter: null, pattern: {x: 1, y: 'hashed', z: -1},"
-        "bounds: {x: [[1,1,true,true]], y:[" +
+        "{filter: null, pattern: {x: 1, y: 'hashed', z: -1}, bounds: {x: [[1,1,true,true]], y:[" +
         getHashedBound(1) + "] , z: [['MaxKey','MinKey',true,true]]} }} }} }}");
 
     // Verify that the query doesn't get covered when projection is on a hashed field.
     runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: null, node: {ixscan: "
+        "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: null, node: {ixscan: {filter: null, "
+        "pattern: {x: 1, y: 'hashed', z: -1}, bounds: {x: [[1,1,true,true]], y: "
+        "[['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]} }} }} }}");
+}
+
+//
+// Tests with 'INCLUDE_SHARD_FILTER' parameter set.
+//
+TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexAndShardKeyBothProvideHashedField) {
+    addIndex(BSON("x" << 1 << "y"
+                      << "hashed"
+                      << "z" << -1));
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.shardKey = BSON("x" << 1 << "y"
+                               << "hashed");
+
+    // Verify that query gets covered when neither query nor project use hashed field.
+    runQueryAsCommand(fromjson("{filter: {x: {$gt: 24, $lt: 27}}, projection:{_id: 0, z: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, z: 1}, node: {sharding_filter: {node: {ixscan: {filter: null, "
+        "pattern: {x: 1, y: 'hashed', z: -1}, bounds: {x: [[24,27,false,false]], y: "
+        "[['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]} }} }} }}");
+}
+TEST_F(QueryPlannerHashedTest,
+       CompoundHashedShardKeyWhenIndexAndShardKeyBothHashedWithQueryOnHashedField) {
+    addIndex(BSON("x" << 1 << "y"
+                      << "hashed"
+                      << "z" << -1));
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.shardKey = BSON("x" << 1 << "y"
+                               << "hashed");
+
+    // Verify that the query doesn't get covered when projection is on a hashed field.
+    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, y: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: null, node: {sharding_filter: {node: "
+        " {ixscan: {filter: null, pattern: {x: 1, y: 'hashed', z: -1},bounds: {x: "
+        "[[1,1,true,true]], y: [['MinKey','MaxKey',true,true]], z: "
+        "[['MaxKey','MinKey',true,true]]} }} }} }} }}");
+
+    // Verify that query doesn't get covered when query is on a hashed field, even though the
+    // projection does not include the hashed field.
+    runQueryAsCommand(fromjson("{filter: {x: 1, y: 1}, projection:{_id: 0, z: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, z: 1}, node: {sharding_filter: {node: {fetch: {filter: {y : {$eq: "
+        "1}}, node: {ixscan: {filter: null, pattern: {x: 1, y: 'hashed', z: -1},bounds: {x: "
+        "[[1,1,true,true]], y:[" +
+        getHashedBound(1) + "] , z: [['MaxKey','MinKey',true,true]]} }} }} }} }}");
+}
+
+TEST_F(QueryPlannerHashedTest,
+       CompoundHashedShardKeyWhenIndexProvidesNonHashedAndShardKeyIsHashed) {
+    addIndex(BSON("x" << 1 << "y"
+                      << "hashed"
+                      << "z" << -1));
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+
+    // Can cover the query when index provides range value for a field ('z'), but the corresponding
+    // shard key field is hashed.
+    params.shardKey = BSON("x" << 1 << "z"
+                               << "hashed");
+    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, z: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, z: 1}, node: {sharding_filter: {node: {ixscan: {filter: null, "
+        "pattern: {x: 1, y: 'hashed', z: -1}, bounds: {x: [[1,1,true,true]], y: "
+        "[['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]} }} }} }}");
+}
+TEST_F(QueryPlannerHashedTest,
+       CompoundHashedShardKeyWhenIndexProvidesHashedAndShardKeyIsNonHashed) {
+    addIndex(BSON("x" << 1 << "y"
+                      << "hashed"
+                      << "z" << -1));
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+
+    // Cannot cover the query when index provides hashed value for a field ('y'), but the
+    // corresponding shard key field is a range field.
+    params.shardKey = BSON("x" << 1 << "y" << 1);
+    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, x: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, x: 1}, node: {sharding_filter: {node: {fetch: {filter: null, node: "
+        " {ixscan: "
         "{filter: null, pattern: {x: 1, y: 'hashed', z: -1},"
         "bounds: {x: [[1,1,true,true]], y: [['MinKey','MaxKey',true,true]], z: "
-        "[['MaxKey','MinKey',true,true]]} }} }} }}");
+        "[['MaxKey','MinKey',true,true]]} }} }} }} }}");
+}
+
+TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexDoesNotHaveAllShardKeyFields) {
+    addIndex(BSON("x" << 1 << "y"
+                      << "hashed"
+                      << "z" << -1));
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+
+    // Cannot cover the query when one of the shard key field ('newField') is not in the index.
+    params.shardKey = BSON("x" << 1 << "y"
+                               << "hashed"
+                               << "newField" << 1);
+    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, x: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, x: 1}, node: {sharding_filter: {node: {fetch: {filter: null, node: "
+        " {ixscan: {filter: null, pattern: {x: 1, y: 'hashed', z: -1}, bounds: {x: "
+        "[[1,1,true,true]], y: [['MinKey','MaxKey',true,true]], z: "
+        "[['MaxKey','MinKey',true,true]]} }} }} }} }}");
+
+    params.shardKey = BSON("x" << 1 << "newField"
+                               << "hashed");
+    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, x: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, x: 1}, node: {sharding_filter: {node: {fetch: {filter: null, node: "
+        " {ixscan: {filter: null, pattern: {x: 1, y: 'hashed', z: -1}, bounds: {x: "
+        "[[1,1,true,true]], y: [['MinKey','MaxKey',true,true]], z: "
+        "[['MaxKey','MinKey',true,true]]} }} }} }} }}");
 }
 
 //

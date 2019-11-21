@@ -34,6 +34,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -237,6 +238,28 @@ TEST(ShardKeyPattern, ExtractDocShardKeyDeepNested) {
                       BSONObj());
 }
 
+TEST(ShardKeyPattern, ExtractDocShardKeyWithNumericFieldName) {
+    ShardKeyPattern pattern(BSON("a.0.1" << 1));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{'0':{'1':{shardKey:1}}}}")),
+                      fromjson("{'a.0.1':{shardKey:1}}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{'0':[0,1]}}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[{'1':1}]}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{'0':{'1':['array']}}}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[{'0':{'1':'value'}}]}")), BSONObj());
+
+    // 'a.0.1', 'a.0' here should be considered as a different field. Arrays are allowed for non
+    // shard key fields. Note that for all these input objects extractShardKeyFromDoc() should
+    // return 'null' since we consider the shard key to be missing in the input object.
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{'a.0.1':'value'}")), fromjson("{'a.0.1':null}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{'0':{'2':'value'}}}")),
+                      fromjson("{'a.0.1':null}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{'a.0.1':['value']}")), fromjson("{'a.0.1':null}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{'a.0':{'1':['value']}}")),
+                      fromjson("{'a.0.1':null}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{'0':{'2':['value']}}}")),
+                      fromjson("{'a.0.1':null}"));
+}
+
 TEST(ShardKeyPattern, ExtractDocShardKeyHashed) {
     //
     // Hashed ShardKeyPattern
@@ -403,6 +426,27 @@ TEST(ShardKeyPattern, ExtractQueryShardKeyDeepNested) {
                       BSONObj());
 }
 
+TEST(ShardKeyPattern, ExtractQueryShardKeyWithNumericFieldNames) {
+    ShardKeyPattern pattern(BSON("a.0.0" << 1));
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{'0':{'0':10}}}")), fromjson("{'a.0.0':10}"));
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0.0':10}")), fromjson("{'a.0.0':10}"));
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0.0':{$eq:10}}")), fromjson("{'a.0.0':10}"));
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0':{'0':'value'}}")),
+                      fromjson("{'a.0.0':'value'}"));
+
+    // Arrays at any nesting level means we can't extract a shard key
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0.0':[10]}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0':[{'0':10}]}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:[{'0':{'0':10}}]}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{'0':[{'0':10}]}}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0':{'0':['value']}}")), BSONObj());
+
+    // Missing fields.
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{'0':{'2':['value']}}}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.0':{'2':['value']}}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{}")), BSONObj());
+}
+
 TEST(ShardKeyPattern, ExtractQueryShardKeyHashed) {
     //
     // Hashed ShardKeyPattern
@@ -535,6 +579,208 @@ TEST(ShardKeyPattern, IsHashedPattern) {
                                       << "d" << 1))
                .isHashedPattern());
     ASSERT(!ShardKeyPattern(BSON("a.b" << 1 << "d" << 1)).isHashedPattern());
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_WithNumericFieldNames) {
+    ShardKeyPattern pattern(BSON("a.0.1" << 1 << "c.d.0"
+                                         << "hashed"));
+    auto indexPattern = BSON("a.0.1" << 1.0 << "p" << 1 << "c.d.0"
+                                     << "hashed");
+    auto indexData = BSON("" << BSON("field"
+                                     << "subObject")
+                             << "" << 1 << ""
+                             << "c.d.0_value");
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSON("a.0.1" << BSON("field"
+                                           << "subObject")
+                                   << "c.d.0"
+                                   << "c.d.0_value"));
+
+    // If the index provides array value for a field('a.0.1') we should return an empty object.
+    pattern = ShardKeyPattern(BSON("a.0.1" << 1 << "c.d.0"
+                                           << "hashed"));
+    indexPattern = BSON("a.0.1" << 1.0 << "c.d.0"
+                                << "hashed");
+    indexData = BSON("" << BSON_ARRAY("1") << ""
+                        << "c.d.0_value");
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSONObj());
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_NonHashedIndexAndShardKey) {
+    ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d" << 1.0));
+    auto indexPattern = BSON("c.d" << 1.0 << "p"
+                                   << "hashed"
+                                   << "a.b" << 1);
+    auto indexData = BSON("" << BSON("field"
+                                     << "subObject")
+                             << "" << 1 << ""
+                             << "ab_value");
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSON("a.b"
+                           << "ab_value"
+                           << "c.d"
+                           << BSON("field"
+                                   << "subObject")));
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_HashedIndexAndShardKey) {
+    ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
+                                       << "hashed"
+                                       << "p.q" << 1));
+    auto indexPattern = BSON("c.d"
+                             << "hashed"
+                             << "p.q" << 1 << "a.b" << 1);
+    auto indexData = BSON("" << 123 << "" << BSONNULL << ""
+                             << "ab_value");
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSON("a.b"
+                           << "ab_value"
+                           << "c.d" << 123 << "p.q" << BSONNULL));
+}
+
+DEATH_TEST(ShardKeyPattern,
+           ExtractShardKeyFromIndexKeyData_WithMissingFieldsInIndex,
+           "Invariant failure matchEl") {
+    ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
+                                       << "hashed"
+                                       << "p.q.0" << 1));
+    auto indexPattern = BSON("c.d"
+                             << "hashed"
+                             << "p.q" << 1 << "a.b" << 1);
+    auto indexData = BSON("" << 123 << "" << BSON_ARRAY("1") << ""
+                             << "ab_value");
+
+    // The shard key requires 'p.q.0' field from the index but the index cannot provide it. In this
+    // case we cannot extract full shard key and hence we hit an invariant.
+    pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}});
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_WithArrayInIndex) {
+    ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
+                                       << "hashed"
+                                       << "p.q" << 1));
+    auto indexPattern = BSON("c.d"
+                             << "hashed"
+                             << "p" << 1 << "a.b" << 1);
+    auto indexData = BSON("" << 123 << "" << 1 << "" << BSON_ARRAY("ab_value"));
+
+    // A shard key field cannot have array values. When we encounter array value from an index, we
+    // return an empty object.
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSONObj());
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_WithArrayForNonShardKeyFields) {
+    ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
+                                       << "hashed"
+                                       << "p.q" << 1));
+    auto indexPattern = BSON("c.d"
+                             << "hashed"
+                             << "p.q" << 1 << "a.b" << 1 << "arrayField" << 1);
+    auto indexData = BSON("" << 123 << "" << BSONNULL << ""
+                             << "ab_value"
+                             << ""
+                             << BSON_ARRAY("1"
+                                           << "2"));
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSON("a.b"
+                           << "ab_value"
+                           << "c.d" << 123 << "p.q" << BSONNULL));
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_NonHashedIndexAndHashedShardKey) {
+    ShardKeyPattern pattern(BSON("a.b"
+                                 << "hashed"
+                                 << "c.d" << 1.0 << "e.null" << 1));
+    auto indexPattern = BSON("e.null" << 1 << "c.d" << 1.0 << "p"
+                                      << "hashed"
+                                      << "a.b" << 1);
+    auto indexData = BSON("" << BSONNULL << ""
+                             << BSON("field"
+                                     << "subObject")
+                             << "" << 1 << ""
+                             << "ab_value");
+    auto hashedValue = BSONElementHasher::hash64(BSON(""
+                                                      << "ab_value")
+                                                     .firstElement(),
+                                                 BSONElementHasher::DEFAULT_HASH_SEED);
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
+                      BSON("a.b" << hashedValue << "c.d"
+                                 << BSON("field"
+                                         << "subObject")
+                                 << "e.null" << BSONNULL));
+}
+
+DEATH_TEST(ShardKeyPattern,
+           ExtractShardKeyFromIndexKeyData_HashedIndexAndNonHashedShardKey,
+           "Invariant failure isHashedPatternEl") {
+    ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d" << 1.0));
+    auto indexPattern = BSON("c.d"
+                             << "hashed"
+                             << "p" << 1 << "a.b" << 1);
+    auto indexData = BSON("" << 1 << "" << 1 << ""
+                             << "ab_value");
+
+    // The shard key needs raw value of 'c.d' but the index can only provide hashed values. There is
+    // no way to re-construct the raw value from the hashed value. So we hit an invariant.
+    pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}});
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_FromMultipleIndexes) {
+    ShardKeyPattern pattern(BSON("a.firstIndex" << 1 << "a.secondIndex" << 1.0 << "c.secondIndex"
+                                                << "hashed"
+                                                << "null" << 1));
+    auto indexPattern1 = BSON("a.firstIndex" << 1 << "null" << 1);
+    auto indexData1 = BSON(""
+                           << "a_first_val"
+                           << "" << BSONNULL);
+    auto indexPattern2 = BSON("a.secondIndex" << 1 << "c.secondIndex" << 1);
+    auto valueToHash = 23;
+    auto indexData2 = BSON(""
+                           << "a_sec_val"
+                           << "" << valueToHash);
+    auto hashedValue = BSONElementHasher::hash64(BSON("" << valueToHash).firstElement(),
+                                                 BSONElementHasher::DEFAULT_HASH_SEED);
+
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData(
+                          {{indexData1, indexPattern1}, {indexData2, indexPattern2}}),
+                      BSON("a.firstIndex"
+                           << "a_first_val"
+                           << "a.secondIndex"
+                           << "a_sec_val"
+                           << "c.secondIndex" << hashedValue << "null" << BSONNULL));
+}
+
+TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_FromMultipleIndexesProvidingSameField) {
+    ShardKeyPattern pattern(BSON("a.firstIndex" << 1 << "a.secondIndex" << 1.0 << "a.thirdIndex"
+                                                << "hashed"
+                                                << "null" << 1));
+    auto indexPattern1 = BSON("a.firstIndex"
+                              << "hashed"
+                              << "null" << 1 << "a.thirdIndex" << 1);
+    auto valueToHash = 23;
+    auto indexData1 = BSON("" << 1 << "" << BSONNULL << "" << valueToHash);
+    auto indexPattern2 = BSON("a.firstIndex" << 1 << "a.secondIndex" << 1 << "a.thirdIndex"
+                                             << "hashed");
+
+    auto indexData2 = BSON(""
+                           << "non_hashed_value"
+                           << ""
+                           << "a_sec_val"
+                           << "" << 1111);
+    auto hashedValue = BSONElementHasher::hash64(BSON("" << valueToHash).firstElement(),
+                                                 BSONElementHasher::DEFAULT_HASH_SEED);
+
+    // 'a.firstIndex' and 'c.thirdIndex' are provided by both the indexes. For both fields we could
+    // the index value that provides non-hashed value.
+    ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData(
+                          {{indexData1, indexPattern1}, {indexData2, indexPattern2}}),
+                      BSON("a.firstIndex"
+                           << "non_hashed_value"
+                           << "a.secondIndex"
+                           << "a_sec_val"
+                           << "a.thirdIndex" << hashedValue << "null" << BSONNULL));
 }
 
 }  // namespace

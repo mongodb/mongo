@@ -823,10 +823,19 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             // NOTE: Solution nodes only list ordinary, non-transformed index keys for now
 
             bool fetch = false;
-            BSONObjIterator it(params.shardKey);
-            while (it.more()) {
-                BSONElement nextEl = it.next();
-                if (!solnRoot->hasField(nextEl.fieldName())) {
+            for (auto&& shardKeyField : params.shardKey) {
+                auto fieldAvailability = solnRoot->getFieldAvailability(shardKeyField.fieldName());
+                if (fieldAvailability == FieldAvailability::kNotProvided) {
+                    // One of the shard key fields is not provided by an index. We need to fetch the
+                    // full documents prior to shard filtering.
+                    fetch = true;
+                    break;
+                }
+                if (fieldAvailability == FieldAvailability::kHashedValueProvided &&
+                    shardKeyField.valueStringDataSafe() != IndexNames::HASHED) {
+                    // The index scan provides the hash of a field, but the shard key field is _not_
+                    // hashed. We need to fetch prior to shard filtering in order to recover the raw
+                    // value of the field.
                     fetch = true;
                     break;
                 }

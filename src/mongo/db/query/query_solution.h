@@ -45,6 +45,22 @@ namespace mongo {
 class GeoNearExpression;
 
 /**
+ * Represents the granularity at which a field is available in a query solution node. Note that the
+ * order of the fields represents increasing availability.
+ */
+enum class FieldAvailability {
+    // The field is not provided.
+    kNotProvided,
+
+    // The field is provided as a hash of raw data instead of the raw data itself. For example, this
+    // can happen when the field is a hashed field in an index.
+    kHashedValueProvided,
+
+    // The field is completely provided.
+    kFullyProvided,
+};
+
+/**
  * This is an abstract representation of a query plan.  It can be transcribed into a tree of
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
@@ -105,28 +121,34 @@ struct QuerySolutionNode {
     virtual bool fetched() const = 0;
 
     /**
-     * Returns true if the tree rooted at this node provides data with the field name 'field'.
-     * This data can come from any of the types of the WSM.
+     * Returns the granularity at which the tree rooted at this node provides data with the field
+     * name 'field'. This data can come from any of the types of the WSM.
      *
      * Usage: If an index-only plan has all the fields we're interested in, we don't
      * have to fetch to show results with those fields.
-     *
-     * TODO: 'field' is probably more appropriate as a FieldRef or string.
      */
-    virtual bool hasField(const std::string& field) const = 0;
+    virtual FieldAvailability getFieldAvailability(const std::string& field) const = 0;
 
     /**
-     * Returns true if the tree rooted at this node provides data that is sorted by the
-     * its location on disk.
+     * Syntatic sugar on top of getFieldAvailability(). Returns true if the 'field' is fully
+     * provided and false otherwise.
+     */
+    bool hasField(const std::string& field) const {
+        return getFieldAvailability(field) == FieldAvailability::kFullyProvided;
+    }
+
+    /**
+     * Returns true if the tree rooted at this node provides data that is sorted by its location on
+     * disk.
      *
-     * Usage: If all the children of an STAGE_AND_HASH have this property, we can compute the
-     * AND faster by replacing the STAGE_AND_HASH with STAGE_AND_SORTED.
+     * Usage: If all the children of an STAGE_AND_HASH have this property, we can compute the AND
+     * faster by replacing the STAGE_AND_HASH with STAGE_AND_SORTED.
      */
     virtual bool sortedByDiskLoc() const = 0;
 
     /**
-     * Return a BSONObjSet representing the possible sort orders of the data stream from this
-     * node.  If the data is not sorted in any particular fashion, returns an empty set.
+     * Return a BSONObjSet representing the possible sort orders of the data stream from this node.
+     * If the data is not sorted in any particular fashion, returns an empty set.
      *
      * Usage:
      * 1. If our plan gives us a sort order, we don't have to add a sort stage.
@@ -259,8 +281,8 @@ struct TextNode : public QuerySolutionNode {
     bool fetched() const {
         return true;
     }
-    bool hasField(const std::string& field) const {
-        return true;
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -302,8 +324,8 @@ struct CollectionScanNode : public QuerySolutionNode {
     bool fetched() const {
         return true;
     }
-    bool hasField(const std::string& field) const {
-        return true;
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -366,7 +388,7 @@ struct AndHashNode : public QuerySolutionNode {
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const;
-    bool hasField(const std::string& field) const;
+    FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const {
         return false;
     }
@@ -390,7 +412,7 @@ struct AndSortedNode : public QuerySolutionNode {
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const;
-    bool hasField(const std::string& field) const;
+    FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const {
         return true;
     }
@@ -414,7 +436,7 @@ struct OrNode : public QuerySolutionNode {
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const;
-    bool hasField(const std::string& field) const;
+    FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const {
         // Even if our children are sorted by their diskloc or other fields, we don't maintain
         // any order on the output.
@@ -442,7 +464,7 @@ struct MergeSortNode : public QuerySolutionNode {
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const;
-    bool hasField(const std::string& field) const;
+    FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const {
         return false;
     }
@@ -480,8 +502,8 @@ struct FetchNode : public QuerySolutionNode {
     bool fetched() const {
         return true;
     }
-    bool hasField(const std::string& field) const {
-        return true;
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return children[0]->sortedByDiskLoc();
@@ -510,7 +532,7 @@ struct IndexScanNode : public QuerySolutionNode {
     bool fetched() const {
         return false;
     }
-    bool hasField(const std::string& field) const;
+    FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const;
     const BSONObjSet& getSort() const {
         return _sorts;
@@ -564,8 +586,8 @@ struct ReturnKeyNode : public QuerySolutionNode {
     bool fetched() const final {
         return children[0]->fetched();
     }
-    bool hasField(const std::string& field) const final {
-        return false;
+    FieldAvailability getFieldAvailability(const std::string& field) const final {
+        return FieldAvailability::kNotProvided;
     }
     bool sortedByDiskLoc() const final {
         return children[0]->sortedByDiskLoc();
@@ -605,8 +627,14 @@ struct ProjectionNode : QuerySolutionNode {
         return children[0]->fetched();
     }
 
-    bool hasField(const std::string& field) const {
-        return proj.isFieldRetainedExactly(StringData{field});
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        // If we were to construct a plan where the input to the project stage was a hashed value,
+        // and that field was retained exactly, then we would mistakenly return 'kFullyProvided'.
+        // The important point here is that we are careful to construct plans where we fetch before
+        // projecting if there is hashed data, collation keys, etc. So this situation does not
+        // arise.
+        return proj.isFieldRetainedExactly(StringData{field}) ? FieldAvailability::kFullyProvided
+                                                              : FieldAvailability::kNotProvided;
     }
 
     bool sortedByDiskLoc() const {
@@ -709,8 +737,8 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
         return children[0]->fetched();
     }
 
-    bool hasField(const std::string& field) const final {
-        return children[0]->hasField(field);
+    FieldAvailability getFieldAvailability(const std::string& field) const final {
+        return children[0]->getFieldAvailability(field);
     }
 
     bool sortedByDiskLoc() const final {
@@ -743,8 +771,8 @@ struct SortNode : public QuerySolutionNode {
     bool fetched() const {
         return children[0]->fetched();
     }
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -785,8 +813,8 @@ struct LimitNode : public QuerySolutionNode {
     bool fetched() const {
         return children[0]->fetched();
     }
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
     }
     bool sortedByDiskLoc() const {
         return children[0]->sortedByDiskLoc();
@@ -812,8 +840,8 @@ struct SkipNode : public QuerySolutionNode {
     bool fetched() const {
         return children[0]->fetched();
     }
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
     }
     bool sortedByDiskLoc() const {
         return children[0]->sortedByDiskLoc();
@@ -845,8 +873,8 @@ struct GeoNear2DNode : public QuerySolutionNode {
     bool fetched() const {
         return true;
     }
-    bool hasField(const std::string& field) const {
-        return true;
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -886,8 +914,8 @@ struct GeoNear2DSphereNode : public QuerySolutionNode {
     bool fetched() const {
         return true;
     }
-    bool hasField(const std::string& field) const {
-        return true;
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -931,8 +959,8 @@ struct ShardingFilterNode : public QuerySolutionNode {
     bool fetched() const {
         return children[0]->fetched();
     }
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
     }
     bool sortedByDiskLoc() const {
         return children[0]->sortedByDiskLoc();
@@ -964,8 +992,13 @@ struct DistinctNode : public QuerySolutionNode {
     bool fetched() const {
         return false;
     }
-    bool hasField(const std::string& field) const {
-        return !index.keyPattern[field].eoo();
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        // The distinct scan can return collation keys, but we can still consider the field fully
+        // provided. This is because the logic around when the index bounds might incorporate
+        // collation keys does not rely on 'getFieldAvailability()'. As a future improvement, we
+        // could look into using 'getFieldAvailabilty()' for collation covering analysis.
+        return index.keyPattern[field].eoo() ? FieldAvailability::kNotProvided
+                                             : FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -1008,8 +1041,8 @@ struct CountScanNode : public QuerySolutionNode {
     bool fetched() const {
         return false;
     }
-    bool hasField(const std::string& field) const {
-        return true;
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -1047,8 +1080,8 @@ struct EnsureSortedNode : public QuerySolutionNode {
     bool fetched() const {
         return children[0]->fetched();
     }
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
     }
     bool sortedByDiskLoc() const {
         return children[0]->sortedByDiskLoc();

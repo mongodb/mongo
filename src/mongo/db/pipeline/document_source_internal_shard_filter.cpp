@@ -52,8 +52,7 @@ DocumentSource::GetNextResult DocumentSourceInternalShardFilter::doGetNext() {
     auto next = pSource->getNext();
     invariant(_shardFilterer);
     for (; next.isAdvanced(); next = pSource->getNext()) {
-        BSONMatchableDocument matchable(next.getDocument().toBson());
-        const auto belongsRes = _shardFilterer->documentBelongsToMe(matchable);
+        const auto belongsRes = _shardFilterer->documentBelongsToMe(next.getDocument());
         if (belongsRes == ShardFilterer::DocumentBelongsResult::kBelongs) {
             return next;
         }

@@ -292,15 +292,13 @@ bool AndHashNode::fetched() const {
     return false;
 }
 
-bool AndHashNode::hasField(const string& field) const {
-    // Any WSM output from this stage came from all children stages.  Therefore we have all
-    // fields covered in our children.
+FieldAvailability AndHashNode::getFieldAvailability(const string& field) const {
+    // A field can be provided by any of the children.
+    auto result = FieldAvailability::kNotProvided;
     for (size_t i = 0; i < children.size(); ++i) {
-        if (children[i]->hasField(field)) {
-            return true;
-        }
+        result = std::max(result, children[i]->getFieldAvailability(field));
     }
-    return false;
+    return result;
 }
 
 QuerySolutionNode* AndHashNode::clone() const {
@@ -342,15 +340,13 @@ bool AndSortedNode::fetched() const {
     return false;
 }
 
-bool AndSortedNode::hasField(const string& field) const {
-    // Any WSM output from this stage came from all children stages.  Therefore we have all
-    // fields covered in our children.
+FieldAvailability AndSortedNode::getFieldAvailability(const string& field) const {
+    // A field can be provided by any of the children.
+    auto result = FieldAvailability::kNotProvided;
     for (size_t i = 0; i < children.size(); ++i) {
-        if (children[i]->hasField(field)) {
-            return true;
-        }
+        result = std::max(result, children[i]->getFieldAvailability(field));
     }
-    return false;
+    return result;
 }
 
 QuerySolutionNode* AndSortedNode::clone() const {
@@ -403,13 +399,12 @@ bool OrNode::fetched() const {
  * we want to guarantee that any output has a certain field, all of our children must
  * have that field.
  */
-bool OrNode::hasField(const string& field) const {
+FieldAvailability OrNode::getFieldAvailability(const string& field) const {
+    auto result = FieldAvailability::kFullyProvided;
     for (size_t i = 0; i < children.size(); ++i) {
-        if (!children[i]->hasField(field)) {
-            return false;
-        }
+        result = std::min(result, children[i]->getFieldAvailability(field));
     }
-    return true;
+    return result;
 }
 
 QuerySolutionNode* OrNode::clone() const {
@@ -464,13 +459,12 @@ bool MergeSortNode::fetched() const {
  * we want to guarantee that any output has a certain field, all of our children must
  * have that field.
  */
-bool MergeSortNode::hasField(const string& field) const {
+FieldAvailability MergeSortNode::getFieldAvailability(const string& field) const {
+    auto result = FieldAvailability::kFullyProvided;
     for (size_t i = 0; i < children.size(); ++i) {
-        if (!children[i]->hasField(field)) {
-            return false;
-        }
+        result = std::min(result, children[i]->getFieldAvailability(field));
     }
-    return true;
+    return result;
 }
 
 QuerySolutionNode* MergeSortNode::clone() const {
@@ -544,17 +538,17 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     addCommon(ss, indent);
 }
 
-bool IndexScanNode::hasField(const string& field) const {
+FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const {
     // A $** index whose bounds overlap the object type bracket cannot provide covering, since the
     // index only contains the leaf nodes along each of the object's subpaths.
     if (index.type == IndexType::INDEX_WILDCARD && wcp::isWildcardObjectSubpathScan(this)) {
-        return false;
+        return FieldAvailability::kNotProvided;
     }
 
     // The index is multikey but does not have any path-level multikeyness information. Such indexes
     // can never provide covering.
     if (index.multikey && index.multikeyPaths.empty()) {
-        return false;
+        return FieldAvailability::kNotProvided;
     }
 
     // Compound hashed indexes can be covered when the projection is not on the hashed field. Other
@@ -567,7 +561,7 @@ bool IndexScanNode::hasField(const string& field) const {
             break;
         default:
             // All other index types provide no fields.
-            return false;
+            return FieldAvailability::kNotProvided;
     }
 
     // If the index has a non-simple collation and we have collation keys inside 'field', then this
@@ -575,7 +569,7 @@ bool IndexScanNode::hasField(const string& field) const {
     if (index.collator) {
         std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
         if (collatedFields.find(field) != collatedFields.end()) {
-            return false;
+            return FieldAvailability::kNotProvided;
         }
     }
 
@@ -591,16 +585,18 @@ bool IndexScanNode::hasField(const string& field) const {
         // The index can provide this field if the requested path appears in the index key pattern,
         // and that path has no multikey components. We can't cover a field that has multikey
         // components because the index keys contain individual array elements, and we can't
-        // reconstitute the array from the index keys in the right order.
-        // In order for the field to be provided by the scan, it must be ascending (1) or
-        // descending (-1). It cannot be a special index type (e.g. "hashed").
-        if (field == elt.fieldName() && elt.isNumber() &&
+        // reconstitute the array from the index keys in the right order. In order for the field to
+        // be fully provided by the scan, it must be ascending (1) or descending (-1).
+        if (field == elt.fieldName() &&
             (!index.multikey || index.multikeyPaths[keyPatternFieldIndex].empty())) {
-            return true;
+            // We already know that the index is either ascending, descending or hashed. If the
+            // field is hashed, we only provide hashed value.
+            return elt.isNumber() ? FieldAvailability::kFullyProvided
+                                  : FieldAvailability::kHashedValueProvided;
         }
         ++keyPatternFieldIndex;
     }
-    return false;
+    return FieldAvailability::kNotProvided;
 }
 
 bool IndexScanNode::sortedByDiskLoc() const {

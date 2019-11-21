@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/matcher/matchable.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -44,7 +45,8 @@ public:
 
     virtual ~ShardFilterer() = default;
 
-    virtual DocumentBelongsResult documentBelongsToMe(const MatchableDocument&) const = 0;
+    virtual DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const = 0;
+    virtual DocumentBelongsResult documentBelongsToMe(const Document& doc) const = 0;
     virtual bool isCollectionSharded() const = 0;
     virtual const KeyPattern& getKeyPattern() const = 0;
 };

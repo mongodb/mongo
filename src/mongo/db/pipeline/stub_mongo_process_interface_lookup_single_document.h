@@ -43,7 +43,10 @@ namespace mongo {
 
 class StubShardFilterer : public ShardFilterer {
 public:
-    DocumentBelongsResult documentBelongsToMe(const MatchableDocument& doc) const override {
+    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override {
+        MONGO_UNREACHABLE;
+    }
+    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override {
         MONGO_UNREACHABLE;
     }
 
