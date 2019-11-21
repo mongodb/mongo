@@ -46,6 +46,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repair_database.h"
@@ -265,8 +266,6 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 
 void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     auto reconcileResult = fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
-    // TODO (SERVER-44467): Restart two-phase index builds during startup
-    invariant(reconcileResult.indexBuildsToRestart.empty());
 
     if (!reconcileResult.indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
         log() << "note: restart the server with --noIndexBuildRetry "
@@ -315,6 +314,12 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         std::vector<BSONObj> indexSpecs = entry.second.second;
         fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
     }
+
+    // Once all unfinished indexes have been rebuilt, restart any unfinished index builds. This will
+    // not build any indexes to completion, but rather start the background thread to build the
+    // index, and wait for a replicated commit or abort oplog entry.
+    IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
+        opCtx, reconcileResult.indexBuildsToRestart);
 }
 
 /**

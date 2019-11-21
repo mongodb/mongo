@@ -155,16 +155,18 @@ public:
         const UUID& buildUUID);
 
     /**
-     * Waits for the index build identified by 'buildUUID' to complete.
+     * Signals the index build identified by 'buildUUID' to commit, and waits for its thread to
+     * complete. Throws if there were any errors building the index.
      */
-    void joinIndexBuild(OperationContext* opCtx, const UUID& buildUUID);
+    void signalCommitAndWait(OperationContext* opCtx, const UUID& buildUUID);
 
     /**
-     * Commits the index build identified by 'buildUUID'.
+     * Signals the index build identified by 'buildUUID' to abort, and waits for its thread to
+     * complete.
      */
-    void commitIndexBuild(OperationContext* opCtx,
-                          const std::vector<BSONObj>& specs,
-                          const UUID& buildUUID);
+    void signalAbortAndWait(OperationContext* opCtx,
+                            const UUID& buildUUID,
+                            const std::string& reason) noexcept;
 
     /**
      * Waits for all index builds to stop after they have been interrupted during shutdown.
@@ -442,6 +444,24 @@ protected:
     void _runIndexBuildInner(OperationContext* opCtx,
                              std::shared_ptr<ReplIndexBuildState> replState,
                              const IndexBuildOptions& indexBuildOptions);
+
+    /**
+     * Cleans up a single-phase index build after a failure.
+     */
+    void _cleanUpSinglePhaseAfterFailure(OperationContext* opCtx,
+                                         Collection* collection,
+                                         std::shared_ptr<ReplIndexBuildState> replState,
+                                         const IndexBuildOptions& indexBuildOptions,
+                                         const Status& status);
+
+    /**
+     * Cleans up a two-phase index build after a failure.
+     */
+    void _cleanUpTwoPhaseAfterFailure(OperationContext* opCtx,
+                                      Collection* collection,
+                                      std::shared_ptr<ReplIndexBuildState> replState,
+                                      const IndexBuildOptions& indexBuildOptions,
+                                      const Status& status);
 
     /**
      * Modularizes the _indexBuildsManager calls part of _runIndexBuildInner. Throws on error.

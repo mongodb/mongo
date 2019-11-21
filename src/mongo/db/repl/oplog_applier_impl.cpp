@@ -449,9 +449,17 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 
         // Apply the operations in this batch. '_applyOplogBatch' returns the optime of the
         // last op that was applied, which should be the last optime in the batch.
-        auto lastOpTimeAppliedInBatch =
-            fassertNoTrace(34437, _applyOplogBatch(&opCtx, ops.releaseBatch()));
-        invariant(lastOpTimeAppliedInBatch == lastOpTimeInBatch);
+        auto swLastOpTimeAppliedInBatch = _applyOplogBatch(&opCtx, ops.releaseBatch());
+        if (swLastOpTimeAppliedInBatch.getStatus().code() == ErrorCodes::InterruptedAtShutdown) {
+            // If an operation was interrupted at shutdown, fail the batch without advancing
+            // appliedThrough as if this were an unclean shutdown. This ensures the stable timestamp
+            // does not advance, and a checkpoint cannot be taken at a timestamp that includes this
+            // batch. On startup, we will recover from an earlier stable checkpoint and apply the
+            // operations from this batch again.
+            return;
+        }
+        fassertNoTrace(34437, swLastOpTimeAppliedInBatch);
+        invariant(swLastOpTimeAppliedInBatch.getValue() == lastOpTimeInBatch);
 
         // Update various things that care about our last applied optime. Tests rely on 1 happening
         // before 2 even though it isn't strictly necessary.

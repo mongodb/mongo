@@ -3,19 +3,17 @@
  * Kills the secondary once the index build starts with a failpoint.
  * The index build should resume when the secondary is restarted.
  *
- * TODO: (SERVER-44467) Remove two_phase_index_builds_unsupported tag when startup recovery works
- * for two-phase index builds.
- *
  * @tags: [
  *   requires_persistence,
  *   requires_journaling,
  *   requires_replication,
- *   two_phase_index_builds_unsupported,
  * ]
  */
 
 (function() {
 'use strict';
+
+load('jstests/noPassthrough/libs/index_build.js');
 
 // Set up replica set
 var replTest = new ReplSetTest({name: 'bgIndex', nodes: 3});
@@ -57,19 +55,31 @@ replTest.awaitReplication();
 
 assert.commandWorked(secondDB.adminCommand(
     {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'alwaysOn'}));
-try {
-    coll.createIndex({i: 1}, {background: true});
-    masterDB.getLastError(2);
-    assert.eq(2, coll.getIndexes().length);
 
-    // Make sure all writes are durable on the secondary so that we can restart it knowing that
-    // the index build will be found on startup.
-    // Waiting for durable is important for both (A) the record that we started the index build
-    // so it is rebuild on restart, and (B) the update to minvalid to show that we've already
-    // applied the oplog entry so it isn't replayed. If (A) is present without (B), then there
-    // are two ways that the index can be rebuilt on startup and this test is only for the one
-    // triggered by (A).
-    secondDB.adminCommand({fsync: 1});
+try {
+    if (IndexBuildTest.supportsTwoPhaseIndexBuild(master)) {
+        // Pause the index build on the secondary to wait for it to start.
+        IndexBuildTest.pauseIndexBuilds(secondDB);
+        IndexBuildTest.startIndexBuild(master, coll.getFullName(), {i: 1});
+
+        // Wait for build to start on the secondary.
+        jsTestLog("waiting for index build to start on secondary");
+        IndexBuildTest.waitForIndexBuildToStart(secondDB);
+        IndexBuildTest.resumeIndexBuilds(secondDB);
+    } else {
+        coll.createIndex({i: 1}, {background: true});
+        masterDB.getLastError(2);
+        assert.eq(2, coll.getIndexes().length);
+
+        // Make sure all writes are durable on the secondary so that we can restart it knowing that
+        // the index build will be found on startup.
+        // Waiting for durable is important for both (A) the record that we started the index build
+        // so it is rebuild on restart, and (B) the update to minvalid to show that we've already
+        // applied the oplog entry so it isn't replayed. If (A) is present without (B), then there
+        // are two ways that the index can be rebuilt on startup and this test is only for the one
+        // triggered by (A).
+        secondDB.adminCommand({fsync: 1});
+    }
 } finally {
     assert.commandWorked(secondDB.adminCommand(
         {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'off'}));

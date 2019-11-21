@@ -213,8 +213,7 @@ Status commitIndexBuild(OperationContext* opCtx,
         return statusWithIndexes.getStatus();
     }
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoord->commitIndexBuild(opCtx, statusWithIndexes.getValue(), indexBuildUUID);
-    indexBuildsCoord->joinIndexBuild(opCtx, indexBuildUUID);
+    indexBuildsCoord->signalCommitAndWait(opCtx, indexBuildUUID);
     return Status::OK();
 }
 
@@ -223,11 +222,10 @@ Status abortIndexBuild(OperationContext* opCtx,
                        const Status& cause,
                        OplogApplication::Mode mode) {
     // Wait until the index build finishes aborting.
-    IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
+    IndexBuildsCoordinator::get(opCtx)->signalAbortAndWait(
         opCtx,
         indexBuildUUID,
         str::stream() << "abortIndexBuild oplog entry encountered: " << cause);
-    IndexBuildsCoordinator::get(opCtx)->joinIndexBuild(opCtx, indexBuildUUID);
     return Status::OK();
 }
 

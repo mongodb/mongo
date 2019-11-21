@@ -80,6 +80,12 @@ class RollbackIndexBuildsTest {
                         IndexBuildTest.resumeIndexBuilds(primary);
                         IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "a_1");
                         break;
+                    case "abort":
+                        const opId = IndexBuildTest.getIndexBuildOpId(primaryDB, collName, "a_1");
+                        assert.commandWorked(primaryDB.killOp(opId));
+                        IndexBuildTest.resumeIndexBuilds(primary);
+                        IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "a_1");
+                        break;
                     case "drop":
                         collection.dropIndexes(indexSpec);
                         break;

@@ -456,7 +456,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 invariant(collUUID);
                 auto buildUUID = *indexMetaData.buildUUID;
 
-                log() << "Found index from unfinished build. Collection: " << coll << "("
+                log() << "Found index from unfinished build. Collection: " << coll << " ("
                       << *collUUID << "), index: " << indexName << ", build UUID: " << buildUUID;
 
                 // Insert in the map if a build has not already been registered.

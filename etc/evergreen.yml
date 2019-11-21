@@ -10174,14 +10174,14 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel62-large
-  - name: .concurrency !.large !.ubsan !.no_txns !.stepdowns !.kill_terminate !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .jscore .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: replica_sets
+  - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel62-large
-  - name: rollback_fuzzer_gen
+  - name: .rollbackfuzzer
   - name: sharding_gen
 
 - name: enterprise-rhel-62-64-bit-coverage
