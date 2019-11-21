@@ -163,42 +163,73 @@ jsTest.log("Test chunk's zone changes...");
 
 // Find the chunk with the highest bounds in zoneA.
 let originalZoneARange = chunkBoundsUtil.computeRange(zoneChunkBounds["zoneA"]);
-let chunkToMove = findHighestChunkBounds(zoneChunkBounds["zoneA"]);
-assert(chunkBoundsUtil.containsKey(chunkToMove[0], ...originalZoneARange));
-assert(chunkBoundsUtil.eq(chunkToMove[1], originalZoneARange[1]));
+let targetChunkBounds = findHighestChunkBounds(zoneChunkBounds["zoneA"]);
+assert(chunkBoundsUtil.containsKey(targetChunkBounds[0], ...originalZoneARange));
+assert(chunkBoundsUtil.eq(targetChunkBounds[1], originalZoneARange[1]));
+let remainingZoneAChunkBounds = zoneChunkBounds["zoneA"].filter(
+    (chunkBounds) => !chunkBoundsUtil.eq(targetChunkBounds, chunkBounds));
 
-jsTest.log("Make the chunk originally in zoneA belong to zoneB.");
+jsTest.log(
+    "Change the zone ranges so that the chunk that used to belong to zoneA now belongs to zoneB.");
 assert.commandWorked(st.s.adminCommand(
     {updateZoneKeyRange: ns, min: originalZoneARange[0], max: originalZoneARange[1], zone: null}));
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: originalZoneARange[0], max: chunkToMove[0], zone: "zoneA"}));
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: chunkToMove[0], max: originalZoneARange[1], zone: "zoneB"}));
+assert.commandWorked(st.s.adminCommand({
+    updateZoneKeyRange: ns,
+    min: originalZoneARange[0],
+    max: targetChunkBounds[0],
+    zone: "zoneA"
+}));
+assert.commandWorked(st.s.adminCommand({
+    updateZoneKeyRange: ns,
+    min: targetChunkBounds[0],
+    max: originalZoneARange[1],
+    zone: "zoneB"
+}));
 
-jsTest.log("Check that the chunk moves from zoneA to zoneB after the zone range change");
+jsTest.log("Check that the chunk moves from zoneA to zoneB after the zone range change.");
 runBalancer(st, 1);
 shardChunkBounds = {
     [st.shard0.shardName]: zoneChunkBounds["zoneC"],
-    [st.shard1.shardName]: [chunkToMove, ...zoneChunkBounds["zoneB"]],
-    [st.shard2.shardName]: zoneChunkBounds["zoneA"].filter(
-        (chunkBounds) => !chunkBoundsUtil.eq(chunkToMove, chunkBounds))
+    [st.shard1.shardName]: [targetChunkBounds, ...zoneChunkBounds["zoneB"]],
+    [st.shard2.shardName]: remainingZoneAChunkBounds
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
 
-jsTest.log("Make the chunk originally in zoneB belong to zoneC.");
+jsTest.log(
+    "Change the zone ranges so that the chunk that used to belong to zoneB now belongs to zoneC.");
 assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: chunkToMove[0], max: chunkToMove[1], zone: null}));
+    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}));
 assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: chunkToMove[0], max: chunkToMove[1], zone: "zoneC"}));
+    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: "zoneC"}));
 
-jsTest.log("Check that the chunk moves from zoneB to zoneC after the zone range change");
+jsTest.log("Check that the chunk moves from zoneB to zoneC after the zone range change.");
 runBalancer(st, 1);
 shardChunkBounds = {
-    [st.shard0.shardName]: [chunkToMove, ...zoneChunkBounds["zoneC"]],
+    [st.shard0.shardName]: [targetChunkBounds, ...zoneChunkBounds["zoneC"]],
     [st.shard1.shardName]: zoneChunkBounds["zoneB"],
-    [st.shard2.shardName]: zoneChunkBounds["zoneA"].filter(
-        (chunkBounds) => !chunkBoundsUtil.eq(chunkToMove, chunkBounds))
+    [st.shard2.shardName]: remainingZoneAChunkBounds
+};
+assertChunksOnShards(configDB, ns, shardChunkBounds);
+assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
+
+jsTest.log("Make the chunk not aligned with zone ranges.");
+let splitPoint = {x: NumberLong(targetChunkBounds[1].x - 5000)};
+assert(chunkBoundsUtil.containsKey(splitPoint, ...targetChunkBounds));
+assert.commandWorked(st.s.adminCommand(
+    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}));
+assert.commandWorked(st.s.adminCommand(
+    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: splitPoint, zone: "zoneC"}));
+assert.commandWorked(st.s.adminCommand(
+    {updateZoneKeyRange: ns, min: splitPoint, max: targetChunkBounds[1], zone: "zoneA"}));
+
+jsTest.log(
+    "Check that the balancer splits the chunk and that all chunks and docs are on the right shards.");
+runBalancer(st, 1);
+shardChunkBounds = {
+    [st.shard0.shardName]: [[targetChunkBounds[0], splitPoint], ...zoneChunkBounds["zoneC"]],
+    [st.shard1.shardName]: zoneChunkBounds["zoneB"],
+    [st.shard2.shardName]: [[splitPoint, targetChunkBounds[1]], ...remainingZoneAChunkBounds]
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
