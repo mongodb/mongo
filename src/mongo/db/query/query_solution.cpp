@@ -557,10 +557,17 @@ bool IndexScanNode::hasField(const string& field) const {
         return false;
     }
 
-    // Custom index access methods may return non-exact key data - this function is currently
-    // used for covering exact key data only.
-    if (IndexNames::BTREE != IndexNames::findPluginName(index.keyPattern)) {
-        return false;
+    // Compound hashed indexes can be covered when the projection is not on the hashed field. Other
+    // custom index access methods may return non-exact key data - this function is currently used
+    // for covering exact key data only.
+    auto indexPluginName = IndexNames::findPluginName(index.keyPattern);
+    switch (IndexNames::nameToType(indexPluginName)) {
+        case IndexType::INDEX_BTREE:
+        case IndexType::INDEX_HASHED:
+            break;
+        default:
+            // All other index types provide no fields.
+            return false;
     }
 
     // If the index has a non-simple collation and we have collation keys inside 'field', then this
@@ -585,7 +592,9 @@ bool IndexScanNode::hasField(const string& field) const {
         // and that path has no multikey components. We can't cover a field that has multikey
         // components because the index keys contain individual array elements, and we can't
         // reconstitute the array from the index keys in the right order.
-        if (field == elt.fieldName() &&
+        // In order for the field to be provided by the scan, it must be ascending (1) or
+        // descending (-1). It cannot be a special index type (e.g. "hashed").
+        if (field == elt.fieldName() && elt.isNumber() &&
             (!index.multikey || index.multikeyPaths[keyPatternFieldIndex].empty())) {
             return true;
         }

@@ -282,6 +282,7 @@ env.CppUnitTest(
         "query_planner_array_test.cpp",
         "query_planner_collation_test.cpp",
         "query_planner_geo_test.cpp",
+        "query_planner_hashed_index_test.cpp",
         "query_planner_partialidx_test.cpp",
         "query_planner_index_test.cpp",
         "query_planner_operator_test.cpp",
