@@ -45,7 +45,7 @@ OpQueueBatcher::~OpQueueBatcher() {
     invariant(!_thread);
 }
 
-OpQueue OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
+OplogBatch OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
     stdx::unique_lock<Latch> lk(_mutex);
     // _ops can indicate the following cases:
     // 1. A new batch is ready to consume.
@@ -62,8 +62,8 @@ OpQueue OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
         (void)_cv.wait_for(lk, maxWaitTime.toSystemDuration());
     }
 
-    OpQueue ops = std::move(_ops);
-    _ops = OpQueue(0);
+    OplogBatch ops = std::move(_ops);
+    _ops = OplogBatch(0);
     _cv.notify_all();
     return ops;
 }
@@ -244,9 +244,9 @@ boost::optional<Date_t> OpQueueBatcher::_calculateSlaveDelayLatestTimestamp() {
 }
 
 void OpQueueBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
-    // This is just to get the op off the queue; it's been peeked at and queued for application
+    // This is just to get the op off the buffer; it's been peeked at and queued for application
     // already.
-    // If we failed to get an op off the queue, this means that shutdown() was called between the
+    // If we failed to get an op off the buffer, this means that shutdown() was called between the
     // consumer's calls to peek() and consume(). shutdown() cleared the buffer so there is nothing
     // for us to consume here. Since our postcondition is already met, it is safe to return
     // successfully.
@@ -267,8 +267,8 @@ void OpQueueBatcher::_run(StorageInterface* storageInterface) {
         // Check the limits once per batch since users can change them at runtime.
         batchLimits.ops = getBatchLimitOplogEntries();
 
-        // Use the OplogBuffer to populate a local OpQueue. Note that the buffer may be empty.
-        OpQueue ops(batchLimits.ops);
+        // Use the OplogBuffer to populate a local OplogBatch. Note that the buffer may be empty.
+        OplogBatch ops(batchLimits.ops);
         {
             auto opCtx = cc().makeOperationContext();
 
@@ -289,7 +289,7 @@ void OpQueueBatcher::_run(StorageInterface* storageInterface) {
                 ops.emplace_back(oplogEntry);
             }
 
-            // If we don't have anything in the queue, wait a bit for something to appear.
+            // If we don't have anything in the batch, wait a bit for something to appear.
             if (oplogEntries.empty()) {
                 if (_oplogApplier->inShutdown()) {
                     ops.setMustShutdownFlag();

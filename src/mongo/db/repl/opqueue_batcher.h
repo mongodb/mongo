@@ -44,9 +44,9 @@ class OplogApplier;
 /**
  * Stores a batch of oplog entries for oplog application.
  */
-class OpQueue {
+class OplogBatch {
 public:
-    explicit OpQueue(std::size_t batchLimitOps) {
+    explicit OplogBatch(std::size_t batchLimitOps) {
         _batch.reserve(batchLimitOps);
     }
     bool empty() const {
@@ -151,16 +151,16 @@ public:
     /**
      * Returns the batch of oplog entries and clears _ops so the batcher can store a new batch.
      */
-    OpQueue getNextBatch(Seconds maxWaitTime);
+    OplogBatch getNextBatch(Seconds maxWaitTime);
 
     /**
      * Starts up a thread to continuously pull from the OplogBuffer into the OpQueueBatcher's oplog
-     * queue.
+     * batch.
      */
     void startup(StorageInterface* storageInterface);
 
     /**
-     * Shuts down the thread that pulls from the OplogBuffer to the oplog queue.
+     * Shuts down the thread that pulls from the OplogBuffer to the oplog batch.
      */
     void shutdown();
 
@@ -198,7 +198,7 @@ private:
     /**
      * The latest batch of oplog entries ready for the applier.
      */
-    OpQueue _ops;
+    OplogBatch _ops;
 
     std::unique_ptr<stdx::thread> _thread;
 };

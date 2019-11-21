@@ -370,7 +370,7 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     // Start up a thread from the batcher to pull from the oplog buffer into the batcher's oplog
-    // queue.
+    // batch.
     _opQueueBatcher->startup(_storageInterface);
 
     ON_BLOCK_EXIT([this] { _opQueueBatcher->shutdown(); });
@@ -407,7 +407,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
-        OpQueue ops = _opQueueBatcher->getNextBatch(Seconds(1));
+        OplogBatch ops = _opQueueBatcher->getNextBatch(Seconds(1));
         if (ops.empty()) {
             if (ops.mustShutdown()) {
                 // Shut down and exit oplog application loop.
