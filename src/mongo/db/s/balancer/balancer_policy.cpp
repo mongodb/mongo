@@ -349,7 +349,8 @@ MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
 
     return {destShardId,
             chunks[getRandomIndex(chunks.size())],
-            MoveChunkRequest::ForceJumbo::kDoNotForce};
+            MoveChunkRequest::ForceJumbo::kDoNotForce,
+            MigrateInfo::chunksImbalance};
 }
 
 vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
@@ -408,7 +409,8 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 }
 
                 invariant(to != stat.shardId);
-                migrations.emplace_back(to, chunk, MoveChunkRequest::ForceJumbo::kForceBalancer);
+                migrations.emplace_back(
+                    to, chunk, MoveChunkRequest::ForceJumbo::kForceBalancer, MigrateInfo::drain);
                 invariant(usedShards->insert(stat.shardId).second);
                 invariant(usedShards->insert(to).second);
                 break;
@@ -458,7 +460,8 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 migrations.emplace_back(to,
                                         chunk,
                                         forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
-                                                   : MoveChunkRequest::ForceJumbo::kDoNotForce);
+                                                   : MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                        MigrateInfo::zoneViolation);
                 invariant(usedShards->insert(stat.shardId).second);
                 invariant(usedShards->insert(to).second);
                 break;
@@ -525,7 +528,8 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
         return boost::optional<MigrateInfo>();
     }
 
-    return MigrateInfo(newShardId, chunk, MoveChunkRequest::ForceJumbo::kDoNotForce);
+    return MigrateInfo(
+        newShardId, chunk, MoveChunkRequest::ForceJumbo::kDoNotForce, MigrateInfo::chunksImbalance);
 }
 
 bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
@@ -585,7 +589,7 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
             continue;
         }
 
-        migrations->emplace_back(to, chunk, forceJumbo);
+        migrations->emplace_back(to, chunk, forceJumbo, MigrateInfo::chunksImbalance);
         invariant(usedShards->insert(chunk.getShard()).second);
         invariant(usedShards->insert(to).second);
         return true;
@@ -609,7 +613,8 @@ string ZoneRange::toString() const {
 
 MigrateInfo::MigrateInfo(const ShardId& a_to,
                          const ChunkType& a_chunk,
-                         const MoveChunkRequest::ForceJumbo a_forceJumbo) {
+                         const MoveChunkRequest::ForceJumbo a_forceJumbo,
+                         MigrationReason a_reason) {
     invariant(a_chunk.validate());
     invariant(a_to.isValid());
 
@@ -621,6 +626,7 @@ MigrateInfo::MigrateInfo(const ShardId& a_to,
     maxKey = a_chunk.getMax();
     version = a_chunk.getVersion();
     forceJumbo = a_forceJumbo;
+    reason = a_reason;
 }
 
 std::string MigrateInfo::getName() const {

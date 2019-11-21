@@ -51,6 +51,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
@@ -78,6 +79,14 @@ const Seconds kBalanceRoundDefaultInterval(10);
 const Seconds kShortBalanceRoundInterval(1);
 
 const auto getBalancer = ServiceContext::declareDecoration<std::unique_ptr<Balancer>>();
+
+/**
+ * Balancer status response
+ */
+static constexpr StringData kBalancerPolicyStatusBalanced = "balanced"_sd;
+static constexpr StringData kBalancerPolicyStatusDraining = "draining"_sd;
+static constexpr StringData kBalancerPolicyStatusZoneViolation = "zoneViolation"_sd;
+static constexpr StringData kBalancerPolicyStatusChunksImbalance = "chunksImbalance"_sd;
 
 /**
  * Utility class to generate timing and statistics for a single balancer round.
@@ -285,7 +294,8 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
         MigrateInfo(newShardId,
                     chunk,
                     forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
-                               : MoveChunkRequest::ForceJumbo::kDoNotForce),
+                               : MoveChunkRequest::ForceJumbo::kDoNotForce,
+                    MigrateInfo::chunksImbalance),
         maxChunkSizeBytes,
         secondaryThrottle,
         waitForDelete);
@@ -688,6 +698,29 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
 void Balancer::notifyPersistedBalancerSettingsChanged() {
     stdx::unique_lock<Latch> lock(_mutex);
     _condVar.notify_all();
+}
+
+StringData Balancer::getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& ns) {
+    auto splitChunks = uassertStatusOK(_chunkSelectionPolicy->selectChunksToSplit(opCtx, ns));
+    if (!splitChunks.empty()) {
+        return kBalancerPolicyStatusZoneViolation;
+    }
+    auto chunksToMove = uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx, ns));
+    if (chunksToMove.empty()) {
+        return kBalancerPolicyStatusBalanced;
+    }
+    const auto& migrationInfo = chunksToMove.front();
+
+    switch (migrationInfo.reason) {
+        case MigrateInfo::drain:
+            return kBalancerPolicyStatusDraining;
+        case MigrateInfo::zoneViolation:
+            return kBalancerPolicyStatusZoneViolation;
+        case MigrateInfo::chunksImbalance:
+            return kBalancerPolicyStatusChunksImbalance;
+    }
+
+    return kBalancerPolicyStatusBalanced;
 }
 
 }  // namespace mongo

@@ -161,7 +161,10 @@ MigrateInfo MigrationType::toMigrateInfo() const {
     chunk.setMax(_max);
     chunk.setVersion(_chunkVersion);
 
-    return MigrateInfo(_toShard, chunk, MoveChunkRequest::parseForceJumbo(_forceJumbo));
+    return MigrateInfo(_toShard,
+                       chunk,
+                       MoveChunkRequest::parseForceJumbo(_forceJumbo),
+                       MigrateInfo::chunksImbalance);
 }
 
 }  // namespace mongo

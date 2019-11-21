@@ -91,6 +91,9 @@ sh.help = function() {
     print("\tsh.disableAutoSplit()                   disable autoSplit on one collection");
     print("\tsh.enableAutoSplit()                    re-enable autoSplit on one collection");
     print("\tsh.getShouldAutoSplit()                 returns whether autosplit is enabled");
+    print(
+        "\tsh.balancerCollectionStatus(fullName)       " +
+        "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
 };
 
 sh.status = function(verbose, configDB) {
@@ -541,6 +544,10 @@ sh._shardingStatusStr = function(indent, s) {
         indent = (indent - 1) * 8;
     }
     return indentStr(indent, s) + "\n";
+};
+
+sh.balancerCollectionStatus = function(coll) {
+    return sh._adminCommand({balancerCollectionStatus: coll}, true);
 };
 
 function printShardingStatus(configDB, verbose) {

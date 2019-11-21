@@ -61,7 +61,10 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));
     ASSERT_OK(chunkType.validate());
 
-    MigrateInfo migrateInfo(kToShard, chunkType, MoveChunkRequest::ForceJumbo::kDoNotForce);
+    MigrateInfo migrateInfo(kToShard,
+                            chunkType,
+                            MoveChunkRequest::ForceJumbo::kDoNotForce,
+                            MigrateInfo::chunksImbalance);
     MigrationType migrationType(migrateInfo, kWaitForDelete);
 
     BSONObjBuilder builder;

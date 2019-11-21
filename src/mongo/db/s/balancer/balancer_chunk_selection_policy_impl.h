@@ -43,7 +43,13 @@ public:
 
     StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) override;
 
+    StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx,
+                                                    const NamespaceString& ns) override;
+
     StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx) override;
+
+    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
+                                                     const NamespaceString& ns) override;
 
     StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
         OperationContext* opCtx, const ChunkType& chunk) override;

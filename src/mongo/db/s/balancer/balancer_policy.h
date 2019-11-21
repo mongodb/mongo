@@ -42,6 +42,7 @@
 
 namespace mongo {
 
+
 struct ZoneRange {
     ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone);
 
@@ -53,9 +54,12 @@ struct ZoneRange {
 };
 
 struct MigrateInfo {
+    enum MigrationReason { drain, zoneViolation, chunksImbalance };
+
     MigrateInfo(const ShardId& a_to,
                 const ChunkType& a_chunk,
-                MoveChunkRequest::ForceJumbo a_forceJumbo);
+                MoveChunkRequest::ForceJumbo a_forceJumbo,
+                MigrationReason a_reason);
 
     std::string getName() const;
 
@@ -70,6 +74,7 @@ struct MigrateInfo {
     BSONObj maxKey;
     ChunkVersion version;
     MoveChunkRequest::ForceJumbo forceJumbo;
+    MigrationReason reason;
 };
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;

@@ -120,9 +120,14 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const std::vector<MigrateInfo> migrationRequests{
-        {kShardId1, chunk1, MoveChunkRequest::ForceJumbo::kDoNotForce},
-        {kShardId3, chunk2, MoveChunkRequest::ForceJumbo::kDoNotForce}};
+    const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      chunk1,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance},
+                                                     {kShardId3,
+                                                      chunk2,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, migrationRequests] {
         ThreadClient tc("Test", getGlobalServiceContext());
@@ -181,11 +186,22 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
         setUpChunk(collName2, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version2);
 
     // Going to request that these four chunks get migrated.
-    const std::vector<MigrateInfo> migrationRequests{
-        {kShardId1, chunk1coll1, MoveChunkRequest::ForceJumbo::kDoNotForce},
-        {kShardId3, chunk2coll1, MoveChunkRequest::ForceJumbo::kDoNotForce},
-        {kShardId1, chunk1coll2, MoveChunkRequest::ForceJumbo::kDoNotForce},
-        {kShardId3, chunk2coll2, MoveChunkRequest::ForceJumbo::kDoNotForce}};
+    const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      chunk1coll1,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance},
+                                                     {kShardId3,
+                                                      chunk2coll1,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance},
+                                                     {kShardId1,
+                                                      chunk1coll2,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance},
+                                                     {kShardId3,
+                                                      chunk2coll2,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, migrationRequests] {
         ThreadClient tc("Test", getGlobalServiceContext());
@@ -239,9 +255,14 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const std::vector<MigrateInfo> migrationRequests{
-        {kShardId1, chunk1, MoveChunkRequest::ForceJumbo::kDoNotForce},
-        {kShardId3, chunk2, MoveChunkRequest::ForceJumbo::kDoNotForce}};
+    const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      chunk1,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance},
+                                                     {kShardId3,
+                                                      chunk2,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, chunk1, chunk2, migrationRequests] {
         ThreadClient tc("Test", getGlobalServiceContext());
@@ -288,8 +309,10 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
         setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     // Going to request that this chunk gets migrated.
-    const std::vector<MigrateInfo> migrationRequests{
-        {kShardId1, chunk1, MoveChunkRequest::ForceJumbo::kDoNotForce}};
+    const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      chunk1,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, chunk1, migrationRequests] {
         ThreadClient tc("Test", getGlobalServiceContext());
@@ -338,13 +361,16 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
         // up a dummy host for kShardHost0.
         shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
-        ASSERT_EQ(ErrorCodes::BalancerInterrupted,
-                  _migrationManager->executeManualMigration(
-                      opCtx.get(),
-                      {kShardId1, chunk, MoveChunkRequest::ForceJumbo::kDoNotForce},
-                      0,
-                      kDefaultSecondaryThrottle,
-                      false));
+        ASSERT_EQ(
+            ErrorCodes::BalancerInterrupted,
+            _migrationManager->executeManualMigration(opCtx.get(),
+                                                      {kShardId1,
+                                                       chunk,
+                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                       MigrateInfo::chunksImbalance},
+                                                      0,
+                                                      kDefaultSecondaryThrottle,
+                                                      false));
     });
 
     // Wait till the move chunk request gets sent and pretend that it is stuck by never responding
@@ -367,12 +393,14 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
 
     // Ensure that no new migrations can be scheduled
     ASSERT_EQ(ErrorCodes::BalancerInterrupted,
-              _migrationManager->executeManualMigration(
-                  operationContext(),
-                  {kShardId1, chunk, MoveChunkRequest::ForceJumbo::kDoNotForce},
-                  0,
-                  kDefaultSecondaryThrottle,
-                  false));
+              _migrationManager->executeManualMigration(operationContext(),
+                                                        {kShardId1,
+                                                         chunk,
+                                                         MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                         MigrateInfo::chunksImbalance},
+                                                        0,
+                                                        kDefaultSecondaryThrottle,
+                                                        false));
 
     // Ensure that the migration manager is no longer handling any migrations.
     _migrationManager->drainActiveMigrations();
@@ -435,12 +463,15 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
         // up a dummy host for kShardHost0.
         shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
-        ASSERT_OK(_migrationManager->executeManualMigration(
-            opCtx.get(),
-            {kShardId1, chunk1, MoveChunkRequest::ForceJumbo::kDoNotForce},
-            0,
-            kDefaultSecondaryThrottle,
-            false));
+        ASSERT_OK(
+            _migrationManager->executeManualMigration(opCtx.get(),
+                                                      {kShardId1,
+                                                       chunk1,
+                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                       MigrateInfo::chunksImbalance},
+                                                      0,
+                                                      kDefaultSecondaryThrottle,
+                                                      false));
     });
 
     // Expect only one moveChunk command to be called.
@@ -587,9 +618,14 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const std::vector<MigrateInfo> migrationRequests{
-        {kShardId1, chunk1, MoveChunkRequest::ForceJumbo::kDoNotForce},
-        {kShardId3, chunk2, MoveChunkRequest::ForceJumbo::kDoNotForce}};
+    const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      chunk1,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance},
+                                                     {kShardId3,
+                                                      chunk2,
+                                                      MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                                      MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([&] {
         ThreadClient tc("Test", getGlobalServiceContext());

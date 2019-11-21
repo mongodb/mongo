@@ -5664,6 +5664,22 @@ var authCommandsLib = {
               },
           ]
         },
+        {
+          testname: "balancerCollectionStatus",
+          command: {shardCollection: "test.x"},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                    [{resource: {db: "test", collection: "x"}, actions: ["enableSharding"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+		},
     ],
 
     /************* SHARED TEST LOGIC ****************/

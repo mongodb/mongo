@@ -75,6 +75,7 @@ let viewsCommandTests = {
     _cloneCollectionOptionsFromPrimaryShard: {skip: isAnInternalCommand},
     _configsvrAddShard: {skip: isAnInternalCommand},
     _configsvrAddShardToZone: {skip: isAnInternalCommand},
+    _configsvrBalancerCollectionStatus: {skip: isAnInternalCommand},
     _configsvrBalancerStart: {skip: isAnInternalCommand},
     _configsvrBalancerStatus: {skip: isAnInternalCommand},
     _configsvrBalancerStop: {skip: isAnInternalCommand},
@@ -128,6 +129,16 @@ let viewsCommandTests = {
     },
     authenticate: {skip: isUnrelated},
     availableQueryOptions: {skip: isAnInternalCommand},
+    balancerCollectionStatus: {
+        command: {balancerCollectionStatus: "test.view"},
+        setup: function(conn) {
+            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+        },
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true,
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+    },
     balancerStart: {skip: isUnrelated},
     balancerStatus: {skip: isUnrelated},
     balancerStop: {skip: isUnrelated},

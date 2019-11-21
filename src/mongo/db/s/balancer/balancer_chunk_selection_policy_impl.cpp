@@ -189,7 +189,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
         return shardStatsStatus.getStatus();
     }
 
-    const auto shardStats = std::move(shardStatsStatus.getValue());
+    const auto& shardStats = shardStatsStatus.getValue();
 
     auto swCollections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
     if (!swCollections.isOK()) {
@@ -231,6 +231,19 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
     return splitCandidates;
 }
 
+StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSplit(
+    OperationContext* opCtx, const NamespaceString& nss) {
+
+    auto shardStatsStatus = _clusterStats->getStats(opCtx);
+    if (!shardStatsStatus.isOK()) {
+        return shardStatsStatus.getStatus();
+    }
+
+    const auto& shardStats = shardStatsStatus.getValue();
+
+    return _getSplitCandidatesForCollection(opCtx, nss, shardStats);
+}
+
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
     OperationContext* opCtx) {
     auto shardStatsStatus = _clusterStats->getStats(opCtx);
@@ -238,7 +251,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         return shardStatsStatus.getStatus();
     }
 
-    const auto shardStats = std::move(shardStatsStatus.getValue());
+    const auto& shardStats = shardStatsStatus.getValue();
 
     if (shardStats.size() < 2) {
         return MigrateInfoVector{};
@@ -290,6 +303,38 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
     return candidateChunks;
+}
+
+StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    auto shardStatsStatus = _clusterStats->getStats(opCtx);
+    if (!shardStatsStatus.isOK()) {
+        return shardStatsStatus.getStatus();
+    }
+
+    const auto& shardStats = shardStatsStatus.getValue();
+
+    // Validate collection information
+    auto swCollection = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    if (!swCollection.isOK()) {
+        return swCollection.getStatus();
+    }
+
+    const auto& collection = swCollection.getValue().value;
+
+    if (collection.getDropped()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "collection " << nss.ns() << " not found");
+    }
+
+    std::set<ShardId> usedShards;
+
+    auto candidatesStatus = _getMigrateCandidatesForCollection(opCtx, nss, shardStats, &usedShards);
+    if (!candidatesStatus.isOK()) {
+        return candidatesStatus.getStatus();
+    }
+
+    return candidatesStatus;
 }
 
 StatusWith<boost::optional<MigrateInfo>>

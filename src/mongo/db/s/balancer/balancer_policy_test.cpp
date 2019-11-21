@@ -132,6 +132,7 @@ TEST(BalancerPolicy, Basic) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, SmallClusterShouldBePerfectlyBalanced) {
@@ -147,6 +148,7 @@ TEST(BalancerPolicy, SmallClusterShouldBePerfectlyBalanced) {
     ASSERT_EQ(kShardId2, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, SingleChunkShouldNotMove) {
@@ -190,11 +192,13 @@ TEST(BalancerPolicy, ParallelBalancing) {
     ASSERT_EQ(kShardId2, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 
     ASSERT_EQ(kShardId1, migrations[1].from);
     ASSERT_EQ(kShardId3, migrations[1].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[1].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[1].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[1].reason);
 }
 
 TEST(BalancerPolicy, ParallelBalancingDoesNotPutChunksOnShardsAboveTheOptimal) {
@@ -214,11 +218,13 @@ TEST(BalancerPolicy, ParallelBalancingDoesNotPutChunksOnShardsAboveTheOptimal) {
     ASSERT_EQ(kShardId4, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 
     ASSERT_EQ(kShardId1, migrations[1].from);
     ASSERT_EQ(kShardId5, migrations[1].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[1].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[1].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[1].reason);
 }
 
 TEST(BalancerPolicy, ParallelBalancingDoesNotMoveChunksFromShardsBelowOptimal) {
@@ -236,6 +242,7 @@ TEST(BalancerPolicy, ParallelBalancingDoesNotMoveChunksFromShardsBelowOptimal) {
     ASSERT_EQ(kShardId3, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNecessary) {
@@ -255,6 +262,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
     ASSERT_EQ(kShardId2, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNotNecessary) {
@@ -288,6 +296,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
     ASSERT_EQ(kShardId3, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, JumboChunksNotMoved) {
@@ -307,6 +316,7 @@ TEST(BalancerPolicy, JumboChunksNotMoved) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, JumboChunksNotMovedParallel) {
@@ -334,11 +344,13 @@ TEST(BalancerPolicy, JumboChunksNotMovedParallel) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 
     ASSERT_EQ(kShardId2, migrations[1].from);
     ASSERT_EQ(kShardId3, migrations[1].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][2].getMin(), migrations[1].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][2].getMax(), migrations[1].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[1].reason);
 }
 
 TEST(BalancerPolicy, DrainingSingleChunk) {
@@ -354,6 +366,7 @@ TEST(BalancerPolicy, DrainingSingleChunk) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, DrainingSingleChunkPerShard) {
@@ -372,11 +385,13 @@ TEST(BalancerPolicy, DrainingSingleChunkPerShard) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[0].reason);
 
     ASSERT_EQ(kShardId2, migrations[1].from);
     ASSERT_EQ(kShardId3, migrations[1].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[1].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[1].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[1].reason);
 }
 
 TEST(BalancerPolicy, DrainingWithTwoChunksFirstOneSelected) {
@@ -392,6 +407,7 @@ TEST(BalancerPolicy, DrainingWithTwoChunksFirstOneSelected) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, DrainingMultipleShardsFirstOneSelected) {
@@ -409,6 +425,7 @@ TEST(BalancerPolicy, DrainingMultipleShardsFirstOneSelected) {
     ASSERT_EQ(kShardId2, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, DrainingMultipleShardsWontAcceptChunks) {
@@ -439,6 +456,7 @@ TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundDueToTag) {
     ASSERT_EQ(kShardId1, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToTag) {
@@ -516,6 +534,7 @@ TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
     ASSERT_EQ(kShardId0, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::drain, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
@@ -535,6 +554,7 @@ TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
     ASSERT_EQ(kShardId0, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::zoneViolation, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
@@ -555,6 +575,7 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
     ASSERT_EQ(kShardId2, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::zoneViolation, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
@@ -573,6 +594,7 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     ASSERT_EQ(kShardId0, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::zoneViolation, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, BalancerTagAlreadyBalanced) {
@@ -650,11 +672,13 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParalle
     ASSERT_EQ(kShardId0, migrations[0].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::zoneViolation, migrations[0].reason);
 
     ASSERT_EQ(kShardId3, migrations[1].from);
     ASSERT_EQ(kShardId1, migrations[1].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId3][0].getMin(), migrations[1].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId3][0].getMax(), migrations[1].maxKey);
+    ASSERT_EQ(MigrateInfo::zoneViolation, migrations[0].reason);
 }
 
 TEST(BalancerPolicy, BalancerHandlesNoShardsWithTag) {
