@@ -123,7 +123,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/map_reduce_stats',
         '$BUILD_DIR/mongo/db/namespace_string',
     ],
 )

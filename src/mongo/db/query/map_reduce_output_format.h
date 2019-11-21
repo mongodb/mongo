@@ -30,27 +30,23 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/map_reduce_stats.h"
 
 /**
- * A collection of functions responsible for building a mapReduce command response from a result set
- * and pipeline execution statistics.
+ * A collection of functions responsible for building a mapReduce command response from a result
+ * set.
  */
 namespace mongo::map_reduce_output_format {
 
 /**
  * Appends an inline mapReduce command response to 'resultBuilder'.
  */
-void appendInlineResponse(BSONArray&& documents,
-                          const MapReduceStats& mapReduceStats,
-                          BSONObjBuilder* resultBuilder);
+void appendInlineResponse(BSONArray&& documents, BSONObjBuilder* resultBuilder);
 
 /**
  * Appends an output-to-collection mapReduce command response to 'resultBuilder'.
  */
 void appendOutResponse(boost::optional<std::string> outDb,
                        std::string outColl,
-                       const MapReduceStats& mapReduceStats,
                        BSONObjBuilder* resultBuilder);
 
 }  // namespace mongo::map_reduce_output_format

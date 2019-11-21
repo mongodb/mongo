@@ -47,57 +47,27 @@ TEST(MapReduceOutputFormat, FormatInlineMapReduceResponse) {
     documents.append(BSON("b" << 1));
 
     BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(
-        documents.arr(), MapReduceStats::createForTest(), &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}],"
-                               "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, output: 0}}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatVerboseInlineMapReduceResponse) {
-    BSONArrayBuilder documents;
-    documents.append(BSON("a" << 1));
-    documents.append(BSON("b" << 1));
-
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(
-        documents.arr(), MapReduceStats::createForTest(), &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}],"
-                               "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, output: 0}}"),
-                      builder.obj());
+    map_reduce_output_format::appendInlineResponse(documents.arr(), &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}]}"), builder.obj());
 }
 
 TEST(MapReduceOutputFormat, FormatEmptyInlineMapReduceResponse) {
     BSONArrayBuilder documents;
     BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(
-        documents.arr(), MapReduceStats::createForTest(), &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{results: [],"
-                               "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, output: 0}}"),
-                      builder.obj());
+    map_reduce_output_format::appendInlineResponse(documents.arr(), &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{results: []}"), builder.obj());
 }
 
 TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithoutDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(
-        boost::none, "c", MapReduceStats::createForTest(), &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
-                               "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, output: 0}}"),
-                      builder.obj());
+    map_reduce_output_format::appendOutResponse(boost::none, "c", &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\"}"), builder.obj());
 }
 
 TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(
-        "db"s, "c", MapReduceStats::createForTest(), &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
-                               "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, output: 0}}"),
-                      builder.obj());
+    map_reduce_output_format::appendOutResponse("db"s, "c", &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"}}"), builder.obj());
 }
 
 }  // namespace

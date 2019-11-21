@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_javascript_code.h"
-#include "mongo/db/commands/map_reduce_stats.h"
 #include "mongo/db/commands/mr_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -97,16 +96,6 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
     return expCtx;
 }
 
-std::vector<CommonStats> extractStats(const Pipeline& pipeline) {
-    std::vector<CommonStats> pipelineStats;
-
-    for (const auto& stage : pipeline.getSources()) {
-        pipelineStats.push_back(stage->getCommonStats());
-    }
-
-    return pipelineStats;
-}
-
 }  // namespace
 
 bool runAggregationMapReduce(OperationContext* opCtx,
@@ -146,14 +135,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         CurOp::get(opCtx)->debug().setPlanSummaryMetrics(planSummaryStats);
 
 
-        MapReduceStats mapReduceStats(extractStats(*runnablePipeline),
-                                      MapReduceStats::ResponseType::kUnsharded,
-                                      boost::get_optional_value_or(parsedMr.getVerbose(), false),
-                                      cmdTimer.millis());
-
         if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
-            map_reduce_output_format::appendInlineResponse(
-                std::move(resultArray), mapReduceStats, &result);
+            map_reduce_output_format::appendInlineResponse(std::move(resultArray), &result);
         } else {
             // For output to collection, pipeline execution should not return any results.
             invariant(resultArray.isEmpty());
@@ -161,7 +144,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             map_reduce_output_format::appendOutResponse(
                 parsedMr.getOutOptions().getDatabaseName(),
                 parsedMr.getOutOptions().getCollectionName(),
-                mapReduceStats,
                 &result);
         }
 

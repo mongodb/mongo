@@ -217,12 +217,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 bab.append(elem.embeddedObject());
             return bab.arr();
         }();
-        map_reduce_output_format::appendInlineResponse(
-            std::move(exhaustedResults), MapReduceStats::createForTest(), &result);
+        map_reduce_output_format::appendInlineResponse(std::move(exhaustedResults), &result);
     } else {
         map_reduce_output_format::appendOutResponse(parsedMr.getOutOptions().getDatabaseName(),
                                                     parsedMr.getOutOptions().getCollectionName(),
-                                                    MapReduceStats::createForTest(),
                                                     &result);
     }
 

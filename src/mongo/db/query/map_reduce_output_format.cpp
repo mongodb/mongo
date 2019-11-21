@@ -29,28 +29,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/map_reduce_stats.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 
 namespace mongo::map_reduce_output_format {
 
-void appendInlineResponse(BSONArray&& documents,
-                          const MapReduceStats& mapReduceStats,
-                          BSONObjBuilder* resultBuilder) {
+void appendInlineResponse(BSONArray&& documents, BSONObjBuilder* resultBuilder) {
     resultBuilder->appendArray("results", documents);
-    mapReduceStats.appendStats(resultBuilder);
 }
 
 void appendOutResponse(boost::optional<std::string> outDb,
                        std::string outColl,
-                       const MapReduceStats& mapReduceStats,
                        BSONObjBuilder* resultBuilder) {
     if (outDb) {
         resultBuilder->append("result", BSON("db" << *outDb << "collection" << outColl));
     } else {
         resultBuilder->append("result", outColl);
     }
-
-    mapReduceStats.appendStats(resultBuilder);
 }
 }  // namespace mongo::map_reduce_output_format
