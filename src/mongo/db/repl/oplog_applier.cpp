@@ -96,8 +96,8 @@ void OplogApplier::waitForSpace(OperationContext* opCtx, std::size_t size) {
  * Pushes operations read from sync source into oplog buffer.
  */
 void OplogApplier::enqueue(OperationContext* opCtx,
-                           Operations::const_iterator begin,
-                           Operations::const_iterator end) {
+                           std::vector<OplogEntry>::const_iterator begin,
+                           std::vector<OplogEntry>::const_iterator end) {
     OplogBuffer::Batch batch;
     for (auto i = begin; i != end; ++i) {
         batch.push_back(i->getRaw());
@@ -115,7 +115,8 @@ void OplogApplier::enqueue(OperationContext* opCtx,
     _oplogBuffer->push(opCtx, begin, end);
 }
 
-StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx, Operations ops) {
+StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx,
+                                                 std::vector<OplogEntry> ops) {
     _observer->onBatchBegin(ops);
     auto lastApplied = _applyOplogBatch(opCtx, std::move(ops));
     _observer->onBatchEnd(lastApplied, {});

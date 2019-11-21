@@ -89,7 +89,7 @@ public:
 
     // Override to change applyOplogBatch behavior.
     using ApplyOplogBatchFn = std::function<StatusWith<OpTime>(
-        OperationContext*, MultiApplier::Operations, OplogApplier::Observer*)>;
+        OperationContext*, std::vector<OplogEntry>, OplogApplier::Observer*)>;
     ApplyOplogBatchFn applyOplogBatchFn;
 
     StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();

@@ -122,7 +122,6 @@ using namespace executor;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using Event = executor::TaskExecutor::EventHandle;
 using Handle = executor::TaskExecutor::CallbackHandle;
-using Operations = MultiApplier::Operations;
 using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<Latch>;
 using LockGuard = stdx::lock_guard<Latch>;
@@ -1240,7 +1239,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
     if (!ops.empty()) {
         _fetchCount.store(0);
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn = [this](OperationContext* opCtx,
-                                                                     MultiApplier::Operations ops) {
+                                                                     std::vector<OplogEntry> ops) {
             return _oplogApplier->applyOplogBatch(opCtx, std::move(ops));
         };
         OpTime lastApplied = ops.back().getOpTime();
@@ -1688,12 +1687,12 @@ void InitialSyncer::_shutdownComponent_inlock(Component& component) {
     component->shutdown();
 }
 
-StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
+StatusWith<std::vector<OplogEntry>> InitialSyncer::_getNextApplierBatch_inlock() {
     // If the fail-point is active, delay the apply batch by returning an empty batch so that
     // _getNextApplierBatchCallback() will reschedule itself at a later time.
     // See InitialSyncerOptions::getApplierBatchCallbackRetryWait.
     if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
-        return Operations();
+        return std::vector<OplogEntry>();
     }
 
     // Obtain next batch of operations from OplogApplier.

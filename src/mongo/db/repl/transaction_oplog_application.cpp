@@ -59,7 +59,7 @@ MONGO_FAIL_POINT_DEFINE(skipReconstructPreparedTransactions);
 
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
 Status _applyOperationsForTransaction(OperationContext* opCtx,
-                                      const repl::MultiApplier::Operations& ops,
+                                      const std::vector<OplogEntry>& ops,
                                       repl::OplogApplication::Mode oplogApplicationMode) {
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : ops) {
@@ -228,14 +228,14 @@ Status applyAbortTransaction(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
+std::vector<OplogEntry> readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const OplogEntry& lastEntryInTxn,
     const std::vector<OplogEntry*>& cachedOps) noexcept {
     // Traverse the oplog chain with its own snapshot and read timestamp.
     ReadSourceScope readSourceScope(opCtx);
 
-    repl::MultiApplier::Operations ops;
+    std::vector<OplogEntry> ops;
 
     // The cachedOps are the ops for this transaction that are from the same oplog application batch
     // as the commit or prepare, those which have not necessarily been written to the oplog.  These

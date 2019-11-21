@@ -55,7 +55,7 @@ public:
     explicit OplogApplierMock(OplogBuffer* oplogBuffer);
 
     void _run(OplogBuffer* oplogBuffer) final;
-    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, Operations ops) final;
+    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops) final;
 };
 
 OplogApplierMock::OplogApplierMock(OplogBuffer* oplogBuffer)
@@ -66,7 +66,8 @@ OplogApplierMock::OplogApplierMock(OplogBuffer* oplogBuffer)
 
 void OplogApplierMock::_run(OplogBuffer* oplogBuffer) {}
 
-StatusWith<OpTime> OplogApplierMock::_applyOplogBatch(OperationContext* opCtx, Operations ops) {
+StatusWith<OpTime> OplogApplierMock::_applyOplogBatch(OperationContext* opCtx,
+                                                      std::vector<OplogEntry> ops) {
     return OpTime();
 }
 
@@ -185,9 +186,9 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
 }
 
 /**
- * Returns string representation of OplogApplier::Operations.
+ * Returns string representation of std::vector<OplogEntry>.
  */
-std::string toString(const OplogApplier::Operations& ops) {
+std::string toString(const std::vector<OplogEntry>& ops) {
     StringBuilder sb;
     sb << "[";
     for (const auto& op : ops) {
@@ -200,7 +201,7 @@ std::string toString(const OplogApplier::Operations& ops) {
 constexpr auto dbName = "test"_sd;
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOps) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo")));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
@@ -212,7 +213,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOps) {
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedApplyOpsOpInOwnBatch) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeApplyOpsOplogEntry(1, true));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
@@ -223,7 +224,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedApplyOpsOpInOwnBatch)
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherOps) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeApplyOpsOplogEntry(1, false));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
@@ -235,7 +236,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherO
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsSystemDotViewsOpInOwnBatch) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(
         1, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName)));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
@@ -247,7 +248,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsSystemDotViewsOpInOwnBatch) {
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsServerConfigurationOpInOwnBatch) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString::kServerConfigurationNamespace));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
@@ -258,7 +259,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsServerConfigurationOpInOwnBat
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedCommitTransactionOpInOwnBatch) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, true, 3));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
@@ -269,7 +270,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedCommitTransactionOpIn
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpWithOtherOps) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, false, 3));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
@@ -281,7 +282,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpW
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOperations) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
@@ -307,7 +308,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOperatio
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
@@ -330,7 +331,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations
 
 TEST_F(OplogApplierTest,
        GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp1) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeCommitTransactionOplogEntry(2, dbName, false, 3));
     srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));
@@ -353,7 +354,7 @@ TEST_F(OplogApplierTest,
 
 TEST_F(OplogApplierTest,
        GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp2) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeCommitTransactionOplogEntry(3, dbName, false, 3));
@@ -379,7 +380,7 @@ TEST_F(OplogApplierTest,
 
 TEST_F(OplogApplierTest,
        GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp3) {
-    OplogApplier::Operations srcOps;
+    std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
     srcOps.push_back(makeCommitTransactionOplogEntry(2, dbName, false, 5));
     srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")));

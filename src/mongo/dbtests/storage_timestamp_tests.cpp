@@ -145,8 +145,8 @@ BSONCollectionCatalogEntry::IndexMetaData getIndexMetaData(
 
 class DoNothingOplogApplierObserver : public repl::OplogApplier::Observer {
 public:
-    void onBatchBegin(const repl::OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
+    void onBatchBegin(const std::vector<repl::OplogEntry>&) final {}
+    void onBatchEnd(const StatusWith<repl::OpTime>&, const std::vector<repl::OplogEntry>&) final {}
 };
 
 class StorageTimestampTest {
@@ -2513,7 +2513,7 @@ public:
           _taskFuture(taskFuture) {}
 
     Status applyOplogBatchPerWorker(OperationContext* opCtx,
-                                    repl::MultiApplier::OperationPtrs* operationsToApply,
+                                    std::vector<const repl::OplogEntry*>* operationsToApply,
                                     WorkerMultikeyPathInfo* pathInfo) override;
 
 private:
@@ -2530,7 +2530,7 @@ private:
 // and this test case fails without crashing the entire suite.
 Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPerWorker(
     OperationContext* opCtx,
-    repl::MultiApplier::OperationPtrs* operationsToApply,
+    std::vector<const repl::OplogEntry*>* operationsToApply,
     WorkerMultikeyPathInfo* pathInfo) {
     if (!_testOpCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_X)) {
         return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};

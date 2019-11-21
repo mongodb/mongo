@@ -298,14 +298,14 @@ public:
     using OplogApplierImpl::OplogApplierImpl;
 
     Status applyOplogBatchPerWorker(OperationContext* opCtx,
-                                    MultiApplier::OperationPtrs* ops,
+                                    std::vector<const OplogEntry*>* ops,
                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
-    MultiApplier::Operations operationsApplied;
+    std::vector<OplogEntry> operationsApplied;
 };
 
 Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
     OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
+    std::vector<const OplogEntry*>* ops,
     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     for (auto&& opPtr : *ops) {
         operationsApplied.push_back(*opPtr);
@@ -388,7 +388,7 @@ TEST_F(OplogApplierImplTest,
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
-    MultiApplier::OperationPtrs ops = {&op};
+    std::vector<const OplogEntry*> ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
 
     TestApplyOplogGroupApplier oplogApplier(
@@ -1307,7 +1307,7 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
     WorkerMultikeyPathInfo pathInfo;
-    MultiApplier::OperationPtrs ops = {&op};
+    std::vector<const OplogEntry*> ops = {&op};
     ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(opCtx, &ops, &pathInfo));
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
@@ -1365,7 +1365,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
         TestApplyOplogGroupApplier oplogApplier(
             nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
         WorkerMultikeyPathInfo pathInfo;
-        MultiApplier::OperationPtrs ops = {&opA, &opB};
+        std::vector<const OplogEntry*> ops = {&opA, &opB};
         ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
         ASSERT_EQ(pathInfo.size(), 2UL);
     }
@@ -1410,7 +1410,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
 
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
-    MultiApplier::OperationPtrs ops = {&op};
+    std::vector<const OplogEntry*> ops = {&op};
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
                   oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, nullptr));
 }
@@ -1527,7 +1527,7 @@ TEST_F(OplogApplierImplTest,
             docsInserted.push_back(docs);
         };
 
-    MultiApplier::Operations ops = {
+    std::vector<OplogEntry> ops = {
         createOp1, createOp2, insertOp1a, insertOp2a, insertOp1b, insertOp2b};
     ASSERT_OK(runOpsSteadyState(ops));
 
@@ -1559,11 +1559,11 @@ TEST_F(OplogApplierImplTest,
     // Generate operations to apply:
     // {create}, {insert_1}, {insert_2}, .. {insert_(limit)}, {insert_(limit+1)}
     std::size_t limit = 64;
-    MultiApplier::Operations insertOps;
+    std::vector<OplogEntry> insertOps;
     for (std::size_t i = 0; i < limit + 1; ++i) {
         insertOps.push_back(makeOp(nss));
     }
-    MultiApplier::Operations operationsToApply;
+    std::vector<OplogEntry> operationsToApply;
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
 
@@ -1614,13 +1614,13 @@ TEST_F(OplogApplierImplTest,
     int opSize = maxBatchSize / opsPerBatch - 500;  // Leave some room for other oplog fields.
 
     // Create the insert ops.
-    MultiApplier::Operations insertOps;
+    std::vector<OplogEntry> insertOps;
     int numOps = 4;
     for (int i = 0; i < numOps; i++) {
         insertOps.push_back(makeSizedInsertOp(nss, opSize, seconds++));
     }
 
-    MultiApplier::Operations operationsToApply;
+    std::vector<OplogEntry> operationsToApply;
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
 
@@ -1663,7 +1663,7 @@ TEST_F(OplogApplierImplTest,
     auto insertOpLarge = makeSizedInsertOp(nss, maxBatchSize, seconds++);
     auto insertOpSmall = makeSizedInsertOp(nss, 100, seconds++);
 
-    MultiApplier::Operations operationsToApply = {createOp, insertOpLarge, insertOpSmall};
+    std::vector<OplogEntry> operationsToApply = {createOp, insertOpLarge, insertOpSmall};
 
     // Each element in 'docsInserted' is a grouped insert operation.
     std::vector<std::vector<BSONObj>> docsInserted;
@@ -1699,9 +1699,9 @@ TEST_F(OplogApplierImplTest,
 
     // Create a sequence of 3 'insert' ops that can't be grouped because they are from different
     // namespaces.
-    MultiApplier::Operations operationsToApply = {makeOp(NamespaceString(testNs + "_1")),
-                                                  makeOp(NamespaceString(testNs + "_2")),
-                                                  makeOp(NamespaceString(testNs + "_3"))};
+    std::vector<OplogEntry> operationsToApply = {makeOp(NamespaceString(testNs + "_1")),
+                                                 makeOp(NamespaceString(testNs + "_2")),
+                                                 makeOp(NamespaceString(testNs + "_3"))};
 
     for (const auto& oplogEntry : operationsToApply) {
         createCollectionWithUuid(_opCtx.get(), oplogEntry.getNss());
@@ -1740,11 +1740,11 @@ TEST_F(OplogApplierImplTest,
     // Generate operations to apply:
     // {create}, {insert_1}, {insert_2}, .. {insert_(limit)}, {insert_(limit+1)}
     std::size_t limit = 64;
-    MultiApplier::Operations insertOps;
+    std::vector<OplogEntry> insertOps;
     for (std::size_t i = 0; i < limit + 1; ++i) {
         insertOps.push_back(makeOp(nss));
     }
-    MultiApplier::Operations operationsToApply;
+    std::vector<OplogEntry> operationsToApply;
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
 
@@ -1794,7 +1794,7 @@ TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissing
     }
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    MultiApplier::OperationPtrs ops = {&op};
+    std::vector<const OplogEntry*> ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
 
@@ -1817,7 +1817,7 @@ TEST_F(OplogApplierImplTest,
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc1);
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, badNss, doc2);
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
-    MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
+    std::vector<const OplogEntry*> ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
 
@@ -1843,7 +1843,7 @@ TEST_F(OplogApplierImplTest,
     auto op2 = makeCreateIndexOplogEntry(
         {Timestamp(Seconds(3), 0), 1LL}, badNss, "a_1", keyPattern, kUuid);
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
-    MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
+    std::vector<const OplogEntry*> ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
 

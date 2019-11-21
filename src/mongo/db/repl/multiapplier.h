@@ -57,19 +57,12 @@ class MultiApplier {
 
 public:
     /**
-     * Operations sorted by timestamp in ascending order.
-     */
-    using Operations = std::vector<OplogEntry>;
-
-    using OperationPtrs = std::vector<const OplogEntry*>;
-
-    /**
      * Callback function to report final status of applying operations.
      */
     using CallbackFn = unique_function<void(const Status&)>;
 
     using MultiApplyFn =
-        std::function<StatusWith<OpTime>(OperationContext*, MultiApplier::Operations)>;
+        std::function<StatusWith<OpTime>(OperationContext*, std::vector<OplogEntry>)>;
 
     /**
      * Creates MultiApplier in inactive state.
@@ -85,7 +78,7 @@ public:
      * contained in 'operations' are not validated.
      */
     MultiApplier(executor::TaskExecutor* executor,
-                 const Operations& operations,
+                 const std::vector<OplogEntry>& operations,
                  const MultiApplyFn& multiApply,
                  CallbackFn onCompletion);
 
@@ -144,7 +137,7 @@ private:
     // Not owned by us.
     executor::TaskExecutor* _executor;
 
-    Operations _operations;
+    std::vector<OplogEntry> _operations;
     MultiApplyFn _multiApply;
     CallbackFn _onCompletion;
 

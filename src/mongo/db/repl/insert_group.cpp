@@ -56,7 +56,7 @@ constexpr auto kInsertGroupMaxOpCount = 64;
 
 }  // namespace
 
-InsertGroup::InsertGroup(MultiApplier::OperationPtrs* ops,
+InsertGroup::InsertGroup(std::vector<const OplogEntry*>* ops,
                          OperationContext* opCtx,
                          InsertGroup::Mode mode)
     : _doNotGroupBeforePoint(ops->cbegin()), _end(ops->cend()), _opCtx(opCtx), _mode(mode) {}
@@ -86,7 +86,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
 
     // Make sure to include the first op in the group size.
     size_t groupSize = entry.getObject().objsize();
-    auto opCount = MultiApplier::OperationPtrs::size_type(1);
+    auto opCount = std::vector<const OplogEntry*>::size_type(1);
     auto groupNamespace = entry.getNss();
 
     /**

@@ -494,8 +494,8 @@ Status applyOps(OperationContext* opCtx,
 }
 
 // static
-MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsOplogEntry) {
-    MultiApplier::Operations result;
+std::vector<OplogEntry> ApplyOps::extractOperations(const OplogEntry& applyOpsOplogEntry) {
+    std::vector<OplogEntry> result;
     extractOperationsTo(applyOpsOplogEntry, applyOpsOplogEntry.toBSON(), &result);
     return result;
 }
@@ -503,7 +503,7 @@ MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsO
 // static
 void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
                                    const BSONObj& topLevelDoc,
-                                   MultiApplier::Operations* operations) {
+                                   std::vector<OplogEntry>* operations) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "ApplyOps::extractOperations(): not a command: "
                           << redact(applyOpsOplogEntry.toBSON()),

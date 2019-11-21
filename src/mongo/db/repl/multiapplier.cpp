@@ -42,7 +42,7 @@ namespace mongo {
 namespace repl {
 
 MultiApplier::MultiApplier(executor::TaskExecutor* executor,
-                           const Operations& operations,
+                           const std::vector<OplogEntry>& operations,
                            const MultiApplyFn& multiApply,
                            CallbackFn onCompletion)
     : _executor(executor),

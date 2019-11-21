@@ -3712,7 +3712,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
     auto opCtx = makeOpCtx();
 
     getExternalState()->applyOplogBatchFn =
-        [](OperationContext*, const MultiApplier::Operations&, OplogApplier::Observer*) {
+        [](OperationContext*, const std::vector<OplogEntry>&, OplogApplier::Observer*) {
             return Status(ErrorCodes::OperationFailed, "applyOplogBatch failed");
         };
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));

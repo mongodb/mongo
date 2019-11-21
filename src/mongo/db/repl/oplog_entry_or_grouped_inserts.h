@@ -41,8 +41,7 @@ namespace repl {
  */
 class OplogEntryOrGroupedInserts {
 public:
-    using OperationPtrs = std::vector<const OplogEntry*>;
-    using ConstIterator = OperationPtrs::const_iterator;
+    using ConstIterator = std::vector<const OplogEntry*>::const_iterator;
 
     OplogEntryOrGroupedInserts() = delete;
 
@@ -71,7 +70,7 @@ public:
         return _entryOrGroupedInserts.size() > 1;
     }
 
-    const OperationPtrs& getGroupedInserts() const {
+    const std::vector<const OplogEntry*>& getGroupedInserts() const {
         invariant(isGroupedInserts());
         return _entryOrGroupedInserts;
     }
@@ -81,7 +80,7 @@ public:
 
 private:
     // A single oplog entry or a batch of grouped insert oplog entries to be applied.
-    OperationPtrs _entryOrGroupedInserts;
+    std::vector<const OplogEntry*> _entryOrGroupedInserts;
 };
 }  // namespace repl
 }  // namespace mongo

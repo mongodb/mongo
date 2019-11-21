@@ -84,8 +84,6 @@ public:
     // Used to report oplog application progress.
     class Observer;
 
-    using Operations = std::vector<OplogEntry>;
-
     /**
      * OpQueueBatcher is an implementation detail that should be abstracted from all levels above
      * the OplogApplier. Parts of the system that need to modify BatchLimits can do so through the
@@ -134,13 +132,13 @@ public:
 
     /**
      * Pushes operations read into oplog buffer.
-     * Accepts both Operations (OplogEntry) and OplogBuffer::Batch (BSONObj) iterators.
+     * Accepts both std::vector<OplogEntry> and OplogBuffer::Batch (BSONObj) iterators.
      * This supports current implementations of OplogFetcher and OplogBuffer which work in terms of
      * BSONObj.
      */
     void enqueue(OperationContext* opCtx,
-                 Operations::const_iterator begin,
-                 Operations::const_iterator end);
+                 std::vector<OplogEntry>::const_iterator begin,
+                 std::vector<OplogEntry>::const_iterator end);
     void enqueue(OperationContext* opCtx,
                  OplogBuffer::Batch::const_iterator begin,
                  OplogBuffer::Batch::const_iterator end);
@@ -158,7 +156,7 @@ public:
      *
      * TODO: remove when enqueue() is implemented.
      */
-    StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, Operations ops);
+    StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
     /**
      * Calls the OpQueueBatcher's getNextApplierBatch.
@@ -180,7 +178,8 @@ private:
      * Called from applyOplogBatch() to apply a batch of operations in parallel.
      * Implemented in subclasses but not visible otherwise.
      */
-    virtual StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, Operations ops) = 0;
+    virtual StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
+                                                std::vector<OplogEntry> ops) = 0;
 
     // Used to schedule task for oplog application loop.
     // Not owned by us.
@@ -217,7 +216,7 @@ public:
      * Called when the OplogApplier is ready to start applying a batch of operations read from the
      * OplogBuffer.
      **/
-    virtual void onBatchBegin(const OplogApplier::Operations& operations) = 0;
+    virtual void onBatchBegin(const std::vector<OplogEntry>& operations) = 0;
 
     /**
      * When the OplogApplier has completed applying a batch of operations, it will call this
@@ -225,13 +224,13 @@ public:
      * will also be here.
      */
     virtual void onBatchEnd(const StatusWith<OpTime>& lastOpTimeApplied,
-                            const OplogApplier::Operations& operations) = 0;
+                            const std::vector<OplogEntry>& operations) = 0;
 };
 
 class NoopOplogApplierObserver : public repl::OplogApplier::Observer {
 public:
-    void onBatchBegin(const repl::OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
+    void onBatchBegin(const std::vector<OplogEntry>&) final {}
+    void onBatchEnd(const StatusWith<repl::OpTime>&, const std::vector<OplogEntry>&) final {}
 };
 
 extern NoopOplogApplierObserver noopOplogApplierObserver;

@@ -58,7 +58,8 @@ public:
 
 private:
     void _run(OplogBuffer* oplogBuffer) final {}
-    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, Operations ops) final {
+    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
+                                        std::vector<OplogEntry> ops) final {
         return _externalState->applyOplogBatchFn(opCtx, ops, _observer);
     }
 
@@ -70,7 +71,7 @@ private:
 
 DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
     : applyOplogBatchFn([](OperationContext*,
-                           const MultiApplier::Operations& ops,
+                           const std::vector<OplogEntry>& ops,
                            OplogApplier::Observer*) { return ops.back().getOpTime(); }) {}
 
 executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const {

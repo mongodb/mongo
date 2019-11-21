@@ -50,7 +50,7 @@ public:
      * Extracts CRUD operations from an atomic applyOps oplog entry.
      * Throws UserException on error.
      */
-    static MultiApplier::Operations extractOperations(const OplogEntry& applyOpsOplogEntry);
+    static std::vector<OplogEntry> extractOperations(const OplogEntry& applyOpsOplogEntry);
 
     /**
      * This variant allows optimization for extracting multiple applyOps operations.  The entry for
@@ -60,7 +60,7 @@ public:
      */
     static void extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
                                     const BSONObj& topLevelDoc,
-                                    MultiApplier::Operations* operations);
+                                    std::vector<OplogEntry>* operations);
 };
 
 /**

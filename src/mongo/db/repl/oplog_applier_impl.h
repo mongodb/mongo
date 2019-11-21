@@ -96,12 +96,12 @@ private:
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
      */
-    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, MultiApplier::Operations ops);
+    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
     void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
-                                        MultiApplier::Operations* ops,
-                                        std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                                        std::vector<MultiApplier::Operations>* derivedOps,
+                                        std::vector<OplogEntry>* ops,
+                                        std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                        std::vector<std::vector<OplogEntry>>* derivedOps,
                                         SessionUpdateTracker* sessionUpdateTracker) noexcept;
 
     // Not owned by us.
@@ -120,23 +120,22 @@ private:
     OpTime _beginApplyingOpTime = OpTime();
 
     void fillWriterVectors(OperationContext* opCtx,
-                           MultiApplier::Operations* ops,
-                           std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                           std::vector<MultiApplier::Operations>* derivedOps) noexcept;
+                           std::vector<OplogEntry>* ops,
+                           std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                           std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
 protected:
     // Marked as protected for use in unit tests.
     /**
      * This function is used by the thread pool workers to write ops to the db.
-     * This consumes the passed in OperationPtrs and callers should not make any assumptions about
-     * the state of the container after calling. However, this function cannot modify the pointed-to
-     * operations because the OperationPtrs container contains const pointers.
+     * It modifies the passed-in vector, and callers should not make any assumptions about the
+     * state of the vector after calling. The OplogEntry objects themselves are not modified.
      *
      * This function has been marked as virtual to allow certain unit tests to skip oplog
      * application.
      */
     virtual Status applyOplogBatchPerWorker(OperationContext* opCtx,
-                                            MultiApplier::OperationPtrs* ops,
+                                            std::vector<const OplogEntry*>* ops,
                                             WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 };
 

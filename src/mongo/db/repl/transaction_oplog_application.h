@@ -60,7 +60,7 @@ const repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx,
  * Follow an oplog chain and copy the operations to destination.  Operations will be copied in
  * forward oplog order (increasing optimes).
  */
-repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
+std::vector<repl::OplogEntry> readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const repl::OplogEntry& entry,
     const std::vector<repl::OplogEntry*>& cachedOps) noexcept;

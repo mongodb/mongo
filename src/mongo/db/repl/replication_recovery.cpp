@@ -65,7 +65,7 @@ const auto kRecoveryOperationLogLevel = logger::LogSeverity::Debug(3);
  */
 class RecoveryOplogApplierStats : public OplogApplier::Observer {
 public:
-    void onBatchBegin(const OplogApplier::Operations& batch) final {
+    void onBatchBegin(const std::vector<OplogEntry>& batch) final {
         _numBatches++;
         LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
             << "Applying operations in batch: " << _numBatches << "(" << batch.size()
@@ -86,7 +86,7 @@ public:
         }
     }
 
-    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<OpTime>&, const std::vector<OplogEntry>&) final {}
 
     void complete(const OpTime& applyThroughOpTime) const {
         log() << "Applied " << _numOpsApplied << " operations in " << _numBatches
@@ -371,7 +371,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     batchLimits.ops = getBatchLimitOplogEntries();
 
     OpTime applyThroughOpTime;
-    OplogApplier::Operations batch;
+    std::vector<OplogEntry> batch;
     while (
         !(batch = fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits))).empty()) {
         applyThroughOpTime = uassertStatusOK(oplogApplier.applyOplogBatch(opCtx, std::move(batch)));

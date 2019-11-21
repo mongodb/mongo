@@ -209,7 +209,7 @@ void processCrudOp(OperationContext* opCtx,
  * Adds a single oplog entry to the appropriate writer vector.
  */
 void addToWriterVector(OplogEntry* op,
-                       std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                       std::vector<std::vector<const OplogEntry*>>* writerVectors,
                        uint32_t hash) {
     const uint32_t numWriters = writerVectors->size();
     auto& writer = (*writerVectors)[hash % numWriters];
@@ -223,8 +223,8 @@ void addToWriterVector(OplogEntry* op,
  * Adds a set of derivedOps to writerVectors.
  */
 void addDerivedOps(OperationContext* opCtx,
-                   MultiApplier::Operations* derivedOps,
-                   std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                   std::vector<OplogEntry>* derivedOps,
+                   std::vector<std::vector<const OplogEntry*>>* writerVectors,
                    CachedCollectionProperties* collPropertiesCache) {
     for (auto&& op : *derivedOps) {
         auto hashedNs = StringMapHasher().hashed_key(op.getNss().ns());
@@ -236,7 +236,7 @@ void addDerivedOps(OperationContext* opCtx,
     }
 }
 
-void stableSortByNamespace(MultiApplier::OperationPtrs* oplogEntryPointers) {
+void stableSortByNamespace(std::vector<const OplogEntry*>* oplogEntryPointers) {
     auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
         return l->getNss() < r->getNss();
     };
@@ -491,7 +491,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 void scheduleWritesToOplog(OperationContext* opCtx,
                            StorageInterface* storageInterface,
                            ThreadPool* writerPool,
-                           const MultiApplier::Operations& ops) {
+                           const std::vector<OplogEntry>& ops) {
     auto makeOplogWriterForRange = [storageInterface, &ops](size_t begin, size_t end) {
         // The returned function will be run in a separate thread after this returns. Therefore all
         // captures other than 'ops' must be by value since they will not be available. The caller
@@ -554,7 +554,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
 }
 
 StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
-                                                      MultiApplier::Operations ops) {
+                                                      std::vector<OplogEntry> ops) {
     invariant(!ops.empty());
 
     LOG(2) << "replication batch size is " << ops.size();
@@ -595,9 +595,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         // - ops to update config.transactions. Normal writes to config.transactions in the
         //   primary don't create an oplog entry, so extract info from writes with transactions
         //   and create a pseudo oplog.
-        std::vector<MultiApplier::Operations> derivedOps;
+        std::vector<std::vector<OplogEntry>> derivedOps;
 
-        std::vector<MultiApplier::OperationPtrs> writerVectors(_writerPool->getStats().numThreads);
+        std::vector<std::vector<const OplogEntry*>> writerVectors(
+            _writerPool->getStats().numThreads);
         fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
@@ -724,9 +725,9 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
  */
 void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
     OperationContext* opCtx,
-    MultiApplier::Operations* ops,
-    std::vector<MultiApplier::OperationPtrs>* writerVectors,
-    std::vector<MultiApplier::Operations>* derivedOps,
+    std::vector<OplogEntry>* ops,
+    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<OplogEntry>>* derivedOps,
     SessionUpdateTracker* sessionUpdateTracker) noexcept {
 
     LogicalSessionIdMap<std::vector<OplogEntry*>> partialTxnOps;
@@ -827,9 +828,9 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
 
 void OplogApplierImpl::fillWriterVectors(
     OperationContext* opCtx,
-    MultiApplier::Operations* ops,
-    std::vector<MultiApplier::OperationPtrs>* writerVectors,
-    std::vector<MultiApplier::Operations>* derivedOps) noexcept {
+    std::vector<OplogEntry>* ops,
+    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
 
     SessionUpdateTracker sessionUpdateTracker;
     _deriveOpsAndFillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
@@ -950,7 +951,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 }
 
 Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
-                                                  MultiApplier::OperationPtrs* ops,
+                                                  std::vector<const OplogEntry*>* ops,
                                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
