@@ -1441,6 +1441,16 @@ __conn_config_file(
 
 err:
     WT_TRET(__wt_close(session, &fh));
+
+    /**
+     * Encountering an invalid configuration string from the base configuration file suggests
+     * that there is corruption present in the file.
+     */
+    if (!is_user && ret == EINVAL) {
+        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        return (WT_ERROR);
+    }
+
     return (ret);
 }
 
@@ -1641,6 +1651,20 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
         bytelock = false;
         ret = 0;
     }
+
+    /**
+     * The WiredTiger lock file will not be created if the WiredTiger file does not exist in the
+     * directory, suggesting possible corruption if the WiredTiger file was deleted. Suggest running
+     * salvage.
+     */
+    if (ret == ENOENT) {
+        WT_ERR(__wt_fs_exist(session, WT_WIREDTIGER, &exist));
+        if (!exist) {
+            F_SET(conn, WT_CONN_DATA_CORRUPTION);
+            WT_ERR(WT_ERROR);
+        }
+    }
+
     WT_ERR(ret);
     if (bytelock) {
         /*
@@ -1683,6 +1707,10 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
             ret = 0;
         WT_ERR(ret);
     } else {
+        if (ret == ENOENT) {
+            F_SET(conn, WT_CONN_DATA_CORRUPTION);
+            WT_ERR(WT_ERROR);
+        }
         WT_ERR(ret);
         /*
          * Lock the WiredTiger file (for backward compatibility reasons as described above).

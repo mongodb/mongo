@@ -345,8 +345,11 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
      * without some reason to believe they are WiredTiger files. The user may have entered the wrong
      * file name, and is now frantically pounding their interrupt key.
      */
-    if (desc->magic != WT_BLOCK_MAGIC || !checksum_matched)
+    if (desc->magic != WT_BLOCK_MAGIC || !checksum_matched) {
+        if (strcmp(block->name, WT_METAFILE) == 0)
+            WT_ERR_MSG(session, WT_TRY_SALVAGE, "%s is corrupted", block->name);
         WT_ERR_MSG(session, WT_ERROR, "%s does not appear to be a WiredTiger file", block->name);
+    }
 
     if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
       (desc->majorv == WT_BLOCK_MAJOR_VERSION && desc->minorv > WT_BLOCK_MINOR_VERSION))

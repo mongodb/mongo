@@ -494,6 +494,11 @@ err:
     if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
         __wt_evict_file_exclusive_off(session);
 
+    if (ret == ENOENT && F_ISSET(dhandle, WT_DHANDLE_IS_METADATA)) {
+        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        return (WT_ERROR);
+    }
+
     return (ret);
 }
 

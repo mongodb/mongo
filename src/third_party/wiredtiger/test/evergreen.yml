@@ -231,6 +231,13 @@ tasks:
         vars:
           posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python
 
+  - name: compile-wtperf
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-strict --enable-diagnostic
+
   - name: make-check-test
     depends_on:
       - name: compile
@@ -1586,6 +1593,27 @@ tasks:
           display_name: Coverage report
           remote_file: wiredtiger/${build_variant}/${revision}/coverage_report/coverage_report_${build_id}.html
 
+  - name: wtperf-test
+    depends_on:
+      - name: compile-wtperf
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-wtperf
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+            # The test will generate WT_TEST directory automatically
+            dir=../bench/wtperf/stress
+            for file in `ls $dir`
+            do
+              ./bench/wtperf/wtperf -O $dir/$file -o verbose=2
+              cp -rf WT_TEST WT_TEST_$file
+            done
+
 buildvariants:
 - name: ubuntu1804
   display_name: Ubuntu 18.04
@@ -1603,11 +1631,14 @@ buildvariants:
     - name: compile-ubsan
     - name: ubsan-test
     - name: linux-directio
+    - name: syscall-linux
     - name: make-check-asan-test
     - name: configure-combinations
     - name: checkpoint-filetypes-test
     - name: coverage-report
     - name: unit-test-long
+    - name: compile-wtperf
+    - name: wtperf-test
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
@@ -1632,19 +1663,6 @@ buildvariants:
   - ubuntu1804-test
   tasks:
     - name: package
-
-- name: syscall-linux
-  display_name: Syscall Linux
-  batchtime: 10080 # a week
-  run_on:
-  - ubuntu1804-test
-  expansions:
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
-  tasks:
-    - name: compile
-    - name: syscall-linux
 
 - name: linux-no-ftruncate
   display_name: Linux no ftruncate
@@ -1755,6 +1773,7 @@ buildvariants:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
   - name: unit-test
@@ -1767,6 +1786,7 @@ buildvariants:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs:$(pwd)/lang/python top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
   - name: unit-test

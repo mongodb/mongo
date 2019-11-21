@@ -335,7 +335,7 @@ err:
      */
     if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 || F_ISSET(S2C(session), WT_CONN_SALVAGE))
         return (ret);
-    WT_PANIC_RET(session, ret, "%s: fatal turtle file read error", WT_METADATA_TURTLE);
+    WT_PANIC_RET(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error", WT_METADATA_TURTLE);
 }
 
 /*
