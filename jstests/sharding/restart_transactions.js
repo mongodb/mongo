@@ -157,15 +157,12 @@ const shardDB = shardSession.getDatabase(shardDBName);
 
 runTest(st.s.getDB(shardDBName), shardDB);
 
-// TODO SERVER-36632: Consider allowing commands in a transaction to run against the config or
-// admin databases, excluding special collections.
-//
 // Directly connect to the config sever primary to simulate internal retries by mongos.
-// const configDBName = "config";
-// const configSession = st.configRS.getPrimary().startSession({causalConsistency: false});
-// const configDB = configSession.getDatabase(configDBName);
-//
-// runTest(st.s.getDB(configDBName), configDB);
+const configDBName = "config";
+const configSession = st.configRS.getPrimary().startSession({causalConsistency: false});
+const configDB = configSession.getDatabase(configDBName);
+
+runTest(st.s.getDB(configDBName), configDB);
 
 st.stop();
 })();
