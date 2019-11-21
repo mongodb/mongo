@@ -222,6 +222,7 @@ if (typeof _threadInject != "undefined") {
             var requires_find_command = [
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
+                "views/dbref_projection.js",
                 "views/views_aggregation.js",
                 "views/views_change.js",
                 "views/views_drop.js",
