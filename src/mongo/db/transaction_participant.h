@@ -221,10 +221,12 @@ public:
     };
 
     /**
-     *  An RAII object that stashes the recovery unit from the `opCtx` onto the stack and keeps
-     *  using the same locker of `opCtx`. The locker opts out of two-phase locking of the
-     *  current WUOW. At destruction it unstashes the recovery unit back onto the `opCtx` and
-     *  restores the locker state relevant to the original WUOW.
+     *  An RAII object that will allow the current transaction to be set aside so that a separate
+     *  transaction can be created. It stashes the recovery unit from the `opCtx` onto the stack and
+     *  keeps using the same locker of `opCtx`. The locker opts out of two-phase locking of the
+     *  current WUOW. At destruction the original transaction will be restored by unstashing the
+     *  recovery unit back onto the `opCtx` and restoring the locker state relevant to the original
+     *  WUOW.
      */
     class SideTransactionBlock {
     public:
