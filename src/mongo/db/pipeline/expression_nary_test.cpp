@@ -1188,5 +1188,35 @@ TEST_F(ExpressionRoundTwoArgTest, NullArg2) {
     assertEval(BSONNULL, 1, BSONNULL);
 }
 
+/* ------------------------- ExpressionBinarySize -------------------------- */
+
+class ExpressionBinarySizeTest : public ExpressionNaryTestOneArg {
+public:
+    void assertEval(ImplicitValue input, ImplicitValue output) {
+        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        _expr = new ExpressionBinarySize(expCtx);
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+};
+
+TEST_F(ExpressionBinarySizeTest, HandlesStrings) {
+    assertEval("abc"_sd, 3);
+    assertEval(""_sd, 0);
+    assertEval("ab\0c"_sd, 4);
+    assertEval("abc\0"_sd, 4);
+}
+
+TEST_F(ExpressionBinarySizeTest, HandlesBinData) {
+    assertEval(BSONBinData("abc", 3, BinDataGeneral), 3);
+    assertEval(BSONBinData("", 0, BinDataGeneral), 0);
+    assertEval(BSONBinData("ab\0c", 4, BinDataGeneral), 4);
+    assertEval(BSONBinData("abc\0", 4, BinDataGeneral), 4);
+}
+
+TEST_F(ExpressionBinarySizeTest, HandlesNullish) {
+    assertEval(BSONNULL, BSONNULL);
+    assertEval(BSONUndefined, BSONNULL);
+}
+
 }  // anonymous namespace
 }  // namespace ExpressionTests

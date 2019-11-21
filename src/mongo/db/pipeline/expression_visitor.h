@@ -106,6 +106,7 @@ class ExpressionStrcasecmp;
 class ExpressionSubstrBytes;
 class ExpressionSubstrCP;
 class ExpressionStrLenBytes;
+class ExpressionBinarySize;
 class ExpressionStrLenCP;
 class ExpressionSubtract;
 class ExpressionSwitch;
@@ -231,6 +232,7 @@ public:
     virtual void visit(ExpressionSubstrBytes*) = 0;
     virtual void visit(ExpressionSubstrCP*) = 0;
     virtual void visit(ExpressionStrLenBytes*) = 0;
+    virtual void visit(ExpressionBinarySize*) = 0;
     virtual void visit(ExpressionStrLenCP*) = 0;
     virtual void visit(ExpressionSubtract*) = 0;
     virtual void visit(ExpressionSwitch*) = 0;

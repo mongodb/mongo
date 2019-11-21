@@ -4416,25 +4416,57 @@ const char* ExpressionSubstrCP::getOpName() const {
 
 /* ----------------------- ExpressionStrLenBytes ------------------------- */
 
-Value ExpressionStrLenBytes::evaluate(const Document& root, Variables* variables) const {
-    Value str(_children[0]->evaluate(root, variables));
-
-    uassert(34473,
-            str::stream() << "$strLenBytes requires a string argument, found: "
-                          << typeName(str.getType()),
-            str.getType() == String);
-
-    size_t strLen = str.getString().size();
+namespace {
+Value strLenBytes(StringData str) {
+    size_t strLen = str.size();
 
     uassert(34470,
             "string length could not be represented as an int.",
             strLen <= std::numeric_limits<int>::max());
     return Value(static_cast<int>(strLen));
 }
+}  // namespace
+
+Value ExpressionStrLenBytes::evaluate(const Document& root, Variables* variables) const {
+    Value str(_children[0]->evaluate(root, variables));
+
+    uassert(34473,
+            str::stream() << "$strLenBytes requires a string argument, found: "
+                          << typeName(str.getType()),
+            str.getType() == BSONType::String);
+
+    return strLenBytes(str.getStringData());
+}
 
 REGISTER_EXPRESSION(strLenBytes, ExpressionStrLenBytes::parse);
 const char* ExpressionStrLenBytes::getOpName() const {
     return "$strLenBytes";
+}
+
+/* -------------------------- ExpressionBinarySize ------------------------------ */
+
+Value ExpressionBinarySize::evaluate(const Document& root, Variables* variables) const {
+    Value arg = _children[0]->evaluate(root, variables);
+    if (arg.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(51276,
+            str::stream() << "$binarySize requires a string or BinData argument, found: "
+                          << typeName(arg.getType()),
+            arg.getType() == BSONType::BinData || arg.getType() == BSONType::String);
+
+    if (arg.getType() == BSONType::String) {
+        return strLenBytes(arg.getStringData());
+    }
+
+    BSONBinData binData = arg.getBinData();
+    return Value(binData.length);
+}
+
+REGISTER_EXPRESSION(binarySize, ExpressionBinarySize::parse);
+const char* ExpressionBinarySize::getOpName() const {
+    return "$binarySize";
 }
 
 /* ----------------------- ExpressionStrLenCP ------------------------- */

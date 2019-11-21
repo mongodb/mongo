@@ -2202,6 +2202,20 @@ public:
 };
 
 
+class ExpressionBinarySize final : public ExpressionFixedArity<ExpressionBinarySize, 1> {
+public:
+    ExpressionBinarySize(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionBinarySize, 1>(expCtx) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+};
+
+
 class ExpressionStrLenCP final : public ExpressionFixedArity<ExpressionStrLenCP, 1> {
 public:
     explicit ExpressionStrLenCP(const boost::intrusive_ptr<ExpressionContext>& expCtx)
