@@ -371,64 +371,34 @@ Status IdempotencyTest::resetState() {
 void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, SequenceType sequenceType) {
     ASSERT_OK(resetState());
 
-    // Write oplog entries to oplog collection.
-    for (auto&& entry : ops) {
-        ASSERT_OK(getStorageInterface()->insertDocument(
-            _opCtx.get(),
-            NamespaceString::kRsOplogNamespace,
-            {entry.toBSON(), entry.getOpTime().getTimestamp()},
-            entry.getOpTime().getTerm()));
-    }
+    ASSERT_OK(runOpsInitialSync(ops));
 
-    SyncTail syncTail(nullptr,  // observer
-                      nullptr,  // consistency markers
-                      nullptr,  // storage interface
-                      SyncTail::MultiSyncApplyFunc(),
-                      nullptr,  // writer pool
-                      SyncTailTest::makeInitialSyncOptions());
-    std::vector<MultiApplier::OperationPtrs> writerVectors(1);
-    std::vector<MultiApplier::Operations> derivedOps;
-
-    // Keeps all operations in scope for the lifetime of this function.
-    std::vector<MultiApplier::Operations> singleOpVectors;
-    for (auto&& entry : ops) {
-        // Derive ops for transactions if necessary.
-        std::vector<OplogEntry> op;
-        op.push_back(entry);
-        singleOpVectors.emplace_back(op);
-        syncTail.fillWriterVectors(
-            _opCtx.get(), &singleOpVectors.back(), &writerVectors, &derivedOps);
-    }
-
-    const auto& opPtrs = writerVectors[0];
-    ASSERT_OK(runOpPtrsInitialSync(opPtrs));
     auto state1 = validateAllCollections();
     auto iterations = sequenceType == SequenceType::kEntireSequence ? 1 : ops.size();
-
     for (std::size_t i = 0; i < iterations; i++) {
         // Since the end state after each iteration is expected to be the same as the start state,
         // we don't drop and re-create the collections. Dropping and re-creating the collections
         // won't work either because we don't have ways to wait until second-phase drop to
         // completely finish.
-        MultiApplier::OperationPtrs fullSequence;
+        std::vector<OplogEntry> fullSequence;
 
         if (sequenceType == SequenceType::kEntireSequence) {
-            ASSERT_OK(runOpPtrsInitialSync(opPtrs));
-            fullSequence.insert(fullSequence.end(), opPtrs.begin(), opPtrs.end());
+            ASSERT_OK(runOpsInitialSync(ops));
+            fullSequence.insert(fullSequence.end(), ops.begin(), ops.end());
         } else if (sequenceType == SequenceType::kAnyPrefix ||
                    sequenceType == SequenceType::kAnyPrefixOrSuffix) {
-            MultiApplier::OperationPtrs prefix(opPtrs.begin(), opPtrs.begin() + i + 1);
-            ASSERT_OK(runOpPtrsInitialSync(prefix));
+            std::vector<OplogEntry> prefix(ops.begin(), ops.begin() + i + 1);
+            ASSERT_OK(runOpsInitialSync(prefix));
             fullSequence.insert(fullSequence.end(), prefix.begin(), prefix.end());
         }
 
-        ASSERT_OK(runOpPtrsInitialSync(opPtrs));
-        fullSequence.insert(fullSequence.end(), opPtrs.begin(), opPtrs.end());
+        ASSERT_OK(runOpsInitialSync(ops));
+        fullSequence.insert(fullSequence.end(), ops.begin(), ops.end());
 
         if (sequenceType == SequenceType::kAnySuffix ||
             sequenceType == SequenceType::kAnyPrefixOrSuffix) {
-            MultiApplier::OperationPtrs suffix(opPtrs.begin() + i, opPtrs.end());
-            ASSERT_OK(runOpPtrsInitialSync(suffix));
+            std::vector<OplogEntry> suffix(ops.begin() + i, ops.end());
+            ASSERT_OK(runOpsInitialSync(suffix));
             fullSequence.insert(fullSequence.end(), suffix.begin(), suffix.end());
         }
 
@@ -645,7 +615,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
 
 std::string IdempotencyTest::getStatesString(const std::vector<CollectionState>& state1,
                                              const std::vector<CollectionState>& state2,
-                                             const MultiApplier::OperationPtrs& opPtrs) {
+                                             const std::vector<OplogEntry>& ops) {
     StringBuilder sb;
     sb << "The states:\n";
     for (const auto& s : state1) {
@@ -657,8 +627,8 @@ std::string IdempotencyTest::getStatesString(const std::vector<CollectionState>&
     }
     sb << "found after applying the operations a second time, therefore breaking idempotency.\n";
     sb << "Applied ops:\n";
-    for (auto op : opPtrs) {
-        sb << op->toString() << "\n";
+    for (const auto& op : ops) {
+        sb << op.toString() << "\n";
     }
     return sb.str();
 }
