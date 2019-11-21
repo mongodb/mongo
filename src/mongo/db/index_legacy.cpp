@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index_legacy.h"
 
 #include <string>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
@@ -55,34 +53,6 @@ StatusWith<BSONObj> IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
     }
 
     return obj;
-}
-
-// static
-BSONObj IndexLegacy::getMissingField(Collection* collection, const BSONObj& infoObj) {
-    BSONObj keyPattern = infoObj.getObjectField("key");
-    std::string accessMethodName;
-    if (collection)
-        accessMethodName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
-    else
-        accessMethodName = IndexNames::findPluginName(keyPattern);
-
-    if (IndexNames::HASHED == accessMethodName) {
-        int hashVersion = infoObj["hashVersion"].numberInt();
-        HashSeed seed = infoObj["seed"].numberInt();
-
-        // Explicit null valued fields and missing fields are both represented in hashed indexes
-        // using the hash value of the null BSONElement.  This is partly for historical reasons
-        // (hash of null was used in the initial release of hashed indexes and changing would
-        // alter the data format).  Additionally, in certain places the hashed index code and
-        // the index bound calculation code assume null and missing are indexed identically.
-        BSONObj nullObj = BSON("" << BSONNULL);
-        return BSON("" << ExpressionKeysPrivate::makeSingleHashKey(
-                        nullObj.firstElement(), seed, hashVersion));
-    } else {
-        BSONObjBuilder b;
-        b.appendNull("");
-        return b.obj();
-    }
 }
 
 }  // namespace mongo

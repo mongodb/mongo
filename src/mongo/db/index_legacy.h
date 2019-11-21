@@ -34,10 +34,6 @@
 
 namespace mongo {
 
-class Collection;
-class IndexDescriptor;
-class OperationContext;
-
 /**
  * There has been some behavior concerning indexed access patterns -- both pre and post-index
  * construction -- that does not quite fit in the access pattern model implemented in
@@ -56,19 +52,6 @@ public:
      * object to conform to their expected format.
      */
     static StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj);
-
-    /**
-     * Returns the BSONObj that is inserted into an index when the object is missing the keys
-     * the index is over.
-     *
-     * For every index *except hash*, this is the BSON equivalent of jstNULL.
-     * For the hash index, it's the hash of BSON("" << BSONNULL).
-     *
-     * s/d_split.cpp needs to know this.
-     *
-     * This is a significant leak of index functionality out of the index layer.
-     */
-    static BSONObj getMissingField(Collection* collection, const BSONObj& infoObj);
 };
 
 }  // namespace mongo
