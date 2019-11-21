@@ -923,53 +923,6 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
     return ChunkType::fromConfigBSON(origChunks.front());
 }
 
-StatusWith<ChunkVersion> ShardingCatalogManager::_findCollectionVersion(
-    OperationContext* opCtx, const NamespaceString& nss, const OID& collectionEpoch) {
-    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-    // Must use local read concern because we will perform subsequent writes.
-    auto findResponse =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
-                                            BSON("ns" << nss.ns()),
-                                            BSON(ChunkType::lastmod << -1),
-                                            1);
-    if (!findResponse.isOK()) {
-        return findResponse.getStatus();
-    }
-
-    const auto chunksVector = std::move(findResponse.getValue().docs);
-    if (chunksVector.empty()) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
-                              << ", but found no chunks"};
-    }
-
-    const auto swChunk = ChunkType::fromConfigBSON(chunksVector.front());
-    if (!swChunk.isOK()) {
-        return swChunk.getStatus();
-    }
-
-    const auto currentCollectionVersion = swChunk.getValue().getVersion();
-
-    // It is possible for a migration to end up running partly without the protection of the
-    // distributed lock if the config primary stepped down since the start of the migration and
-    // failed to recover the migration. Check that the collection has not been dropped and recreated
-    // since the migration began, unbeknown to the shard when the command was sent.
-    if (currentCollectionVersion.epoch() != collectionEpoch) {
-        return {ErrorCodes::StaleEpoch,
-                str::stream() << "The collection '" << nss.ns()
-                              << "' has been dropped and recreated since the migration began."
-                                 " The config server's collection version epoch is now '"
-                              << currentCollectionVersion.epoch().toString()
-                              << "', but the shard's is " << collectionEpoch.toString() << "'."};
-    }
-
-    return currentCollectionVersion;
-}
-
 void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const OID& collectionEpoch,

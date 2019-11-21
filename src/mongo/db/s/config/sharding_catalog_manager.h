@@ -533,13 +533,6 @@ private:
                                              const NamespaceString& nss,
                                              const BSONObj& key);
 
-    /**
-     * Retrieve the the latest collection version from the config.
-     */
-    StatusWith<ChunkVersion> _findCollectionVersion(OperationContext* opCtx,
-                                                    const NamespaceString& nss,
-                                                    const OID& collectionEpoch);
-
     // The owning service context
     ServiceContext* const _serviceContext;
 
