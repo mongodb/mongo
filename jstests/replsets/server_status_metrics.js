@@ -1,7 +1,7 @@
 /**
  * Test replication metrics
  */
-function testSecondaryMetrics(secondary, opCount, offset) {
+function _testSecondaryMetricsHelper(secondary, opCount, offset) {
     var ss = secondary.getDB("test").serverStatus();
     printjson(ss.metrics);
 
@@ -29,6 +29,19 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert(ss.metrics.repl.apply.batches.num > 0, "no batches");
     assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time");
     assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops");
+}
+
+// Metrics are racy, e.g. repl.buffer.count could over- or under-reported briefly. Retry on error.
+function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
+    assert.soon(() => {
+        try {
+            _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived);
+            return true;
+        } catch (exc) {
+            jsTestLog(`Caught ${exc}, retrying`);
+            return false;
+        }
+    });
 }
 
 var rt = new ReplSetTest({name: "server_status_metrics", nodes: 2, oplogSize: 100});
