@@ -6,6 +6,7 @@
  *  requires_fastcount,
  *  requires_collstats,
  *  requires_capped,
+ *  requires_fcv_44,
  * ]
  */
 
