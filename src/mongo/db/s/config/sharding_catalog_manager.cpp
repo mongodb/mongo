@@ -539,4 +539,61 @@ void ShardingCatalogManager::upgradeOrDowngradeChunksAndTags(OperationContext* o
     }
 }
 
+StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const std::string& shardName,
+    const std::string& zoneName) {
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto findShardStatus =
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            readPref,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ShardType::ConfigNS,
+                                            BSON(ShardType::tags() << zoneName),
+                                            BSONObj(),
+                                            2);
+
+    if (!findShardStatus.isOK()) {
+        return findShardStatus.getStatus();
+    }
+
+    const auto shardDocs = findShardStatus.getValue().docs;
+
+    if (shardDocs.size() == 0) {
+        // The zone doesn't exists.
+        return false;
+    }
+
+    if (shardDocs.size() == 1) {
+        auto shardDocStatus = ShardType::fromBSON(shardDocs.front());
+        if (!shardDocStatus.isOK()) {
+            return shardDocStatus.getStatus();
+        }
+
+        auto shardDoc = shardDocStatus.getValue();
+        if (shardDoc.getName() != shardName) {
+            // The last shard that belongs to this zone is a different shard.
+            return false;
+        }
+
+        auto findChunkRangeStatus =
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                readPref,
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                TagsType::ConfigNS,
+                                                BSON(TagsType::tag() << zoneName),
+                                                BSONObj(),
+                                                1);
+
+        if (!findChunkRangeStatus.isOK()) {
+            return findChunkRangeStatus.getStatus();
+        }
+
+        return findChunkRangeStatus.getValue().docs.size() > 0;
+    }
+
+    return false;
+}
+
 }  // namespace mongo

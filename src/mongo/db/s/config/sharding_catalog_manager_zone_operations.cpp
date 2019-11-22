@@ -226,59 +226,19 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
     }
 
     //
-    // Check how many shards belongs to this zone.
+    // Ensure the shard is not only shard that the zone belongs to. Otherwise, the zone must
+    // not have any chunk ranges associated with it.
     //
+    auto isRequiredByZone =
+        _isShardRequiredByZoneStillInUse(opCtx, kConfigPrimarySelector, shardName, zoneName);
 
-    auto findShardStatus =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            kConfigPrimarySelector,
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            shardNS,
-                                            BSON(ShardType::tags() << zoneName),
-                                            BSONObj(),
-                                            2);
-
-    if (!findShardStatus.isOK()) {
-        return findShardStatus.getStatus();
+    if (!isRequiredByZone.isOK()) {
+        return isRequiredByZone.getStatus();
     }
 
-    const auto shardDocs = findShardStatus.getValue().docs;
-
-    if (shardDocs.size() == 0) {
-        // The zone doesn't exists, this could be a retry.
-        return Status::OK();
-    }
-
-    if (shardDocs.size() == 1) {
-        auto shardDocStatus = ShardType::fromBSON(shardDocs.front());
-        if (!shardDocStatus.isOK()) {
-            return shardDocStatus.getStatus();
-        }
-
-        auto shardDoc = shardDocStatus.getValue();
-        if (shardDoc.getName() != shardName) {
-            // The last shard that belongs to this zone is a different shard.
-            // This could be a retry, so return OK.
-            return Status::OK();
-        }
-
-        auto findChunkRangeStatus =
-            configShard->exhaustiveFindOnConfig(opCtx,
-                                                kConfigPrimarySelector,
-                                                repl::ReadConcernLevel::kLocalReadConcern,
-                                                TagsType::ConfigNS,
-                                                BSON(TagsType::tag() << zoneName),
-                                                BSONObj(),
-                                                1);
-
-        if (!findChunkRangeStatus.isOK()) {
-            return findChunkRangeStatus.getStatus();
-        }
-
-        if (findChunkRangeStatus.getValue().docs.size() > 0) {
-            return {ErrorCodes::ZoneStillInUse,
-                    "cannot remove a shard from zone if a chunk range is associated with it"};
-        }
+    if (isRequiredByZone.getValue()) {
+        return {ErrorCodes::ZoneStillInUse,
+                "cannot remove a shard from zone if a chunk range is associated with it"};
     }
 
     //

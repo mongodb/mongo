@@ -754,6 +754,29 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             "Operation not allowed because it would remove the last shard",
             countOtherNotDrainingShards > 0);
 
+    // Ensure there are no non-empty zones that only belong to this shard.
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    auto findShardResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            kConfigReadSelector,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ShardType::ConfigNS,
+                                            BSON(ShardType::name() << name),
+                                            BSONObj(),
+                                            1));
+    const auto shard = uassertStatusOK(ShardType::fromBSON(findShardResponse.docs[0]));
+
+    for (auto& zoneName : shard.getTags()) {
+        auto isRequiredByZone = uassertStatusOK(
+            _isShardRequiredByZoneStillInUse(opCtx, kConfigReadSelector, name, zoneName));
+        uassert(ErrorCodes::ZoneStillInUse,
+                str::stream()
+                    << "Operation not allowed because it would remove the only shard for zone "
+                    << zoneName << " which has a chunk range is associated with it",
+                !isRequiredByZone);
+    }
+
     // Figure out if shard is already draining
     const bool isShardCurrentlyDraining =
         uassertStatusOK(_runCountCommandOnConfig(

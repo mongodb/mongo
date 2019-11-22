@@ -549,6 +549,15 @@ private:
                                              const NamespaceString& nss,
                                              const BSONObj& key);
 
+    /**
+     * Returns true if the zone with the given name has chunk ranges associated with it and the
+     * shard with the given name is the only shard that it belongs to.
+     */
+    StatusWith<bool> _isShardRequiredByZoneStillInUse(OperationContext* opCtx,
+                                                      const ReadPreferenceSetting& readPref,
+                                                      const std::string& shardName,
+                                                      const std::string& zoneName);
+
     // The owning service context
     ServiceContext* const _serviceContext;
 
