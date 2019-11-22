@@ -136,7 +136,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
                 sb = []  # String builder.
                 self._suite.summarize_latest(sb)
-                self.logger.info("Summary: %s", "\n    ".join(sb))
+                self.logger.info("Summary of latest execution: %s", "\n    ".join(sb))
 
                 if not report.wasSuccessful():
                     return_code = 1

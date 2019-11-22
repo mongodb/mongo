@@ -220,8 +220,6 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         else:
             summary = self._summarize_repeated(sb)
 
-        summarized_group = "    %ss: %s" % (self.test_kind, "\n        ".join(sb))
-
         if summary.num_run == 0:
             sb.append("Suite did not run any tests.")
             return
@@ -231,11 +229,6 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         if self._suite_start_time is not None and self._suite_end_time is not None:
             time_taken = self._suite_end_time - self._suite_start_time
             summary = summary._replace(time_taken=time_taken)
-
-        sb.append("%d test(s) ran in %0.2f seconds"
-                  " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
-
-        sb.append(summarized_group)
 
     @synchronized
     def summarize_latest(self, sb):
@@ -328,16 +321,28 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         sb.append("%d test(s) ran in %0.2f seconds"
                   " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
 
+        test_names = []
+
         if num_failed > 0:
             sb.append("The following tests failed (with exit code):")
             for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
+                test_names.append(test_info.test_file)
                 sb.append("    %s (%d %s)" % (test_info.test_file, test_info.return_code,
                                               translate_exit_code(test_info.return_code)))
 
         if report.num_errored > 0:
             sb.append("The following tests had errors:")
             for test_info in report.get_errored():
+                test_names.append(test_info.test_file)
                 sb.append("    %s" % (test_info.test_file))
+
+        test_names.sort(key=_report.test_order)
+
+        sb.append("If you're unsure where to begin investigating these errors, \
+                  consider looking at tests in the following order:")
+
+        for test_name in test_names:
+            sb.append("    %s" % (test_name))
 
         return summary
 

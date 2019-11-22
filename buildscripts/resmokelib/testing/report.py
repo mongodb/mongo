@@ -361,3 +361,20 @@ class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
         self.evergreen_status = None
         self.return_code = None
         self.url_endpoint = None
+
+
+def test_order(test_name):
+    """
+    A key function used for sorting _TestInfo objects by recommended order of investigation.
+
+    Investigate setup/teardown errors, then hooks, then test files.
+    """
+
+    if 'fixture_setup' in test_name:
+        return 1
+    elif 'fixture_teardown' in test_name:
+        return 2
+    elif ':' in test_name:
+        return 3
+    else:
+        return 4
