@@ -183,8 +183,9 @@ class IndexBuildTest {
      * Returns true if two phase index builds are supported.
      */
     static supportsTwoPhaseIndexBuild(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
-            .enableTwoPhaseIndexBuild;
+        const adminDB = conn.getDB('admin');
+        const serverStatus = assert.commandWorked(adminDB.serverStatus());
+        const storageEngineSection = serverStatus.storageEngine;
+        return storageEngineSection.supportsTwoPhaseIndexBuild;
     }
 }

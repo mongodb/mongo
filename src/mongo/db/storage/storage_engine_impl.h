@@ -161,6 +161,8 @@ public:
 
     void clearDropPendingState() final;
 
+    bool supportsTwoPhaseIndexBuild() const final;
+
     void triggerJournalFlush() const final;
 
     SnapshotManager* getSnapshotManager() const final;

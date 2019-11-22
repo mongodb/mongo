@@ -43,7 +43,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/enable_two_phase_index_build_gen.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -298,20 +297,8 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
 }
 
 bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() const {
-    if (!enableTwoPhaseIndexBuild) {
-        return false;
-    }
-
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return false;
-    }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return false;
-    }
-
-    return true;
+    auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+    return storageEngine->supportsTwoPhaseIndexBuild();
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndexesForRecovery(

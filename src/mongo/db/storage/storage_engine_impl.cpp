@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/durable_catalog_feature_tracker.h"
+#include "mongo/db/storage/enable_two_phase_index_build_gen.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -849,6 +850,23 @@ bool StorageEngineImpl::supportsPendingDrops() const {
 
 void StorageEngineImpl::clearDropPendingState() {
     _dropPendingIdentReaper.clearDropPendingState();
+}
+
+bool StorageEngineImpl::supportsTwoPhaseIndexBuild() const {
+    if (!enableTwoPhaseIndexBuild) {
+        return false;
+    }
+
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return false;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return false;
+    }
+
+    return true;
 }
 
 void StorageEngineImpl::triggerJournalFlush() const {

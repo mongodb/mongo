@@ -66,6 +66,7 @@ public:
                            << "supportsPendingDrops" << engine->supportsPendingDrops()
                            << "dropPendingIdents"
                            << static_cast<long long>(engine->getDropPendingIdents().size())
+                           << "supportsTwoPhaseIndexBuild" << engine->supportsTwoPhaseIndexBuild()
                            << "supportsSnapshotReadConcern" << engine->supportsReadConcernSnapshot()
                            << "supportsCheckpointCursors" << engine->supportsCheckpoints()
                            << "readOnly" << storageGlobalParams.readOnly << "persistent"
