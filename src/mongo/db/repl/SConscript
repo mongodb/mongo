@@ -630,7 +630,6 @@ env.Library('topology_coordinator',
                 'member_data.cpp',
                 'topology_coordinator.cpp',
                 env.Idlc('topology_coordinator.idl')[0],
-                env.Idlc('topology_version.idl')[0],
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/audit',
@@ -741,6 +740,7 @@ env.Library(
         'storage_interface_mock.cpp',
     ],
     LIBDEPS=[
+        'isself',
         'oplog_buffer_blocking_queue',
         'repl_coordinator_interface',
         'repl_settings',
@@ -784,6 +784,7 @@ env.Library('replica_set_messages',
                 'update_position_args.cpp',
                 'last_vote.cpp',
                 env.Idlc('repl_set_config.idl')[0],
+                env.Idlc('topology_version.idl')[0],
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',

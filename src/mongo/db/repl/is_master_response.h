@@ -35,6 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/topology_version_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -217,6 +218,8 @@ public:
 
     void setShouldBuildIndexes(bool buildIndexes);
 
+    void setTopologyVersion(TopologyVersion topologyVersion);
+
     void setSlaveDelay(Seconds slaveDelay);
 
     void addTag(const std::string& tagKey, const std::string& tagValue);
@@ -278,6 +281,7 @@ private:
     OID _electionId;
     boost::optional<OpTimeWith<time_t>> _lastWrite;
     boost::optional<OpTimeWith<time_t>> _lastMajorityWrite;
+    boost::optional<TopologyVersion> _topologyVersion;
 
     // If _configSet is false this means we don't have a valid repl set config, so toBSON
     // will return a set of hardcoded values that indicate this.

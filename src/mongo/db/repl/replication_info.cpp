@@ -33,6 +33,7 @@
 #include <list>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -289,6 +290,30 @@ public:
         if (!seenIsMaster) {
             auto sniName = opCtx->getClient()->getSniNameForSession();
             SplitHorizon::setParameters(opCtx->getClient(), std::move(sniName));
+        }
+
+        // If a client is following the awaitable isMaster protocol, maxAwaitTimeMS should be
+        // present if and only if topologyVersion is present in the request.
+        auto topologyVersionElement = cmdObj["topologyVersion"];
+        auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        if (topologyVersionElement && maxAwaitTimeMSField) {
+            auto topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+                                                          topologyVersionElement.Obj());
+            uassert(31372,
+                    "topologyVersion must have a non-negative counter",
+                    topologyVersion.getCounter() >= 0);
+
+            long long maxAwaitTimeMSValue;
+            uassertStatusOK(
+                bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMSValue));
+            uassert(
+                31373, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMSValue >= 0);
+        } else {
+            uassert(31368,
+                    (topologyVersionElement
+                         ? "A request with a 'topologyVersion' must include 'maxAwaitTimeMS'"
+                         : "A request with 'maxAwaitTimeMS' must include a 'topologyVersion'"),
+                    !topologyVersionElement && !maxAwaitTimeMSField);
         }
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from

@@ -47,6 +47,7 @@ const std::string kIsMasterFieldName = "ismaster";
 const std::string kSecondaryFieldName = "secondary";
 const std::string kSetNameFieldName = "setName";
 const std::string kSetVersionFieldName = "setVersion";
+const std::string kTopologyVersionFieldName = "topologyVersion";
 const std::string kHostsFieldName = "hosts";
 const std::string kPassivesFieldName = "passives";
 const std::string kArbitersFieldName = "arbiters";
@@ -102,6 +103,11 @@ IsMasterResponse::IsMasterResponse()
       _shutdownInProgress(false) {}
 
 void IsMasterResponse::addToBSON(BSONObjBuilder* builder) const {
+    if (_topologyVersion) {
+        BSONObjBuilder topologyVersionBuilder(builder->subobjStart(kTopologyVersionFieldName));
+        _topologyVersion->serialize(&topologyVersionBuilder);
+    }
+
     if (_hostsSet) {
         std::vector<std::string> hosts;
         for (size_t i = 0; i < _hosts.size(); ++i) {
@@ -536,6 +542,10 @@ void IsMasterResponse::setIsHidden(bool hidden) {
 void IsMasterResponse::setShouldBuildIndexes(bool buildIndexes) {
     _buildIndexesSet = true;
     _buildIndexes = buildIndexes;
+}
+
+void IsMasterResponse::setTopologyVersion(TopologyVersion topologyVersion) {
+    _topologyVersion = topologyVersion;
 }
 
 void IsMasterResponse::setSlaveDelay(Seconds slaveDelay) {
