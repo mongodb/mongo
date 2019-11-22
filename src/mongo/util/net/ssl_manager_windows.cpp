@@ -681,6 +681,73 @@ StatusWith<std::vector<BYTE>> decodeObject(const char* structType,
     return std::move(binaryBlobBuf);
 }
 
+StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
+    std::vector<UniqueCertificate> certs;
+
+    // Search the buffer for the various strings that make up a PEM file
+    size_t pos = 0;
+    bool found_one = false;
+
+    while (pos < buffer.size()) {
+        auto swBlob = findPEMBlob(buffer, "CERTIFICATE"_sd, pos, pos != 0);
+
+        // We expect to find at least one certificate
+        if (!swBlob.isOK()) {
+            if (found_one) {
+                return Status::OK();
+            }
+
+            return swBlob.getStatus();
+        }
+
+        found_one = true;
+
+        auto blobBuf = swBlob.getValue();
+
+        if (blobBuf.empty()) {
+            return {std::move(certs)};
+        }
+
+        pos = (blobBuf.rawData() + blobBuf.size()) - buffer.rawData();
+
+        auto swCert = decodePEMBlob(blobBuf);
+        if (!swCert.isOK()) {
+            return swCert.getStatus();
+        }
+
+        auto certBuf = swCert.getValue();
+
+        PCCERT_CONTEXT cert =
+            CertCreateCertificateContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
+        if (cert == NULL) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertCreateCertificateContext failed to decode cert: "
+                                        << errnoWithDescription(gle));
+        }
+
+        certs.emplace_back(cert);
+    }
+
+    return {std::move(certs)};
+}
+
+Status addCertificatesToStore(HCERTSTORE certStore, std::vector<UniqueCertificate>& certificates) {
+    for (auto& cert : certificates) {
+        BOOL ret =
+            CertAddCertificateContextToStore(certStore, cert.get(), CERT_STORE_ADD_NEW, NULL);
+
+        if (!ret) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertAddCertificateContextToStore Failed  "
+                                        << errnoWithDescription(gle));
+        }
+    }
+
+    return Status::OK();
+}
+
 // Read a Certificate PEM file with a private key from disk
 StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                                                             StringData password) {
@@ -711,10 +778,18 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     // file.
     auto secondPublicKeyBlobPosition =
         buf.find("CERTIFICATE", (publicKeyBlob.rawData() + publicKeyBlob.size()) - buf.data());
+    std::vector<UniqueCertificate> extraCertificates;
     if (secondPublicKeyBlobPosition != std::string::npos) {
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Certificate PEM files should only have one certificate, "
-                                       "intermediate CA certificates belong in the CA file.");
+        // Read in extra certificates
+        StringData extraCertificatesBuffer =
+            StringData(buf).substr(secondPublicKeyBlobPosition - ("-----BEGIN "_sd).size());
+
+        auto swExtraCertificates = readCAPEMBuffer(extraCertificatesBuffer);
+        if (!swExtraCertificates.isOK()) {
+            return swExtraCertificates.getStatus();
+        }
+
+        extraCertificates = std::move(swExtraCertificates.getValue());
     }
 
     auto swCert = decodePEMBlob(publicKeyBlob);
@@ -733,6 +808,32 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                       str::stream() << "CertCreateCertificateContext failed to decode cert: "
                                     << errnoWithDescription(gle));
     }
+
+    UniqueCertificate tempCertHolder(cert);
+
+    HCERTSTORE store = CertOpenStore(
+        CERT_STORE_PROV_MEMORY, 0, NULL, CERT_STORE_DEFER_CLOSE_UNTIL_LAST_FREE_FLAG, NULL);
+    if (store == NULL) {
+        DWORD gle = GetLastError();
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "CertOpenStore failed to create memory store: "
+                                    << errnoWithDescription(gle));
+    }
+
+    UniqueCertStore storeHolder(store);
+
+    // Add the newly created certificate to the memory store, this makes a copy
+    BOOL ret = CertAddCertificateContextToStore(store, cert, CERT_STORE_ADD_NEW, NULL);
+
+    if (!ret) {
+        DWORD gle = GetLastError();
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "CertAddCertificateContextToStore Memory Failed  "
+                                    << errnoWithDescription(gle));
+    }
+
+    // Get the certificate from the store so we attach the private key to the cert in the store
+    cert = CertEnumCertificatesInStore(store, NULL);
 
     UniqueCertificate certHolder(cert);
 
@@ -803,7 +904,6 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
     HCRYPTPROV hProv;
     std::wstring wstr;
-    BOOL ret;
 
     // Create the right Crypto context depending on whether we running in a server or outside.
     // See https://msdn.microsoft.com/en-us/library/windows/desktop/aa375195(v=vs.85).aspx
@@ -898,7 +998,10 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                                     << errnoWithDescription(gle));
     }
 
-    return UniqueCertificateWithPrivateKey(std::move(certHolder), std::move(cryptProvider));
+    // Add the extra certificates into the same certificate store as the certificate
+    addCertificatesToStore(certHolder->hCertStore, extraCertificates);
+
+    return UniqueCertificateWithPrivateKey{std::move(certHolder), std::move(cryptProvider)};
 }
 
 Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
@@ -910,53 +1013,15 @@ Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
 
     std::string buf = std::move(swBuf.getValue());
 
-    // Search the buffer for the various strings that make up a PEM file
-    size_t pos = 0;
 
-    while (pos < buf.size()) {
-        auto swBlob = findPEMBlob(buf, "CERTIFICATE"_sd, pos, pos != 0);
-
-        // We expect to find at least one certificate
-        if (!swBlob.isOK()) {
-            return swBlob.getStatus();
-        }
-
-        auto blobBuf = swBlob.getValue();
-
-        if (blobBuf.empty()) {
-            return Status::OK();
-        }
-
-        pos = (blobBuf.rawData() + blobBuf.size()) - buf.data();
-
-        auto swCert = decodePEMBlob(blobBuf);
-        if (!swCert.isOK()) {
-            return swCert.getStatus();
-        }
-
-        auto certBuf = swCert.getValue();
-
-        PCCERT_CONTEXT cert =
-            CertCreateCertificateContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
-        if (cert == NULL) {
-            DWORD gle = GetLastError();
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertCreateCertificateContext failed to decode cert: "
-                                        << errnoWithDescription(gle));
-        }
-        UniqueCertificate certHolder(cert);
-
-        BOOL ret = CertAddCertificateContextToStore(certStore, cert, CERT_STORE_ADD_NEW, NULL);
-
-        if (!ret) {
-            DWORD gle = GetLastError();
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertAddCertificateContextToStore Failed  "
-                                        << errnoWithDescription(gle));
-        }
+    auto swCerts = readCAPEMBuffer(buf);
+    if (!swCerts.isOK()) {
+        return swCerts.getStatus();
     }
 
-    return Status::OK();
+    auto certs = std::move(swCerts.getValue());
+
+    return addCertificatesToStore(certStore, certs);
 }
 
 Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
@@ -970,14 +1035,21 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
 
     // Search the buffer for the various strings that make up a PEM file
     size_t pos = 0;
+    bool found_one = false;
 
     while (pos < buf.size()) {
         auto swBlob = findPEMBlob(buf, "X509 CRL"_sd, pos, pos != 0);
 
         // We expect to find at least one CRL
         if (!swBlob.isOK()) {
+            if (found_one) {
+                return Status::OK();
+            }
+
             return swBlob.getStatus();
         }
+
+        found_one = true;
 
         auto blobBuf = swBlob.getValue();
 
@@ -1296,6 +1368,8 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
             | SCH_CRED_REVOCATION_CHECK_CHAIN   // Check certificate revocation
             | SCH_CRED_NO_SERVERNAME_CHECK      // Do not validate server name against cert
             | SCH_CRED_NO_DEFAULT_CREDS         // No Default Certificate
+            | SCH_CRED_MEMORY_STORE_CERT        // Read intermediate certificates from memory store
+                                                // associated with client certificate.
             | SCH_CRED_MANUAL_CRED_VALIDATION;  // Validate Certificate Manually
     }
 
@@ -1576,7 +1650,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
     BOOL ret = CertGetCertificateChain(certChainEngine,
                                        cert,
                                        NULL,
-                                       NULL,
+                                       cert->hCertStore,
                                        &certChainPara,
                                        CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT,
                                        NULL,
