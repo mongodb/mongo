@@ -29,7 +29,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
-#include "mongo/db/repl/opqueue_batcher.h"
+#include "mongo/db/repl/oplog_batcher.h"
 
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -39,13 +39,13 @@
 namespace mongo {
 namespace repl {
 
-OpQueueBatcher::OpQueueBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
+OplogBatcher::OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
     : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops(0) {}
-OpQueueBatcher::~OpQueueBatcher() {
+OplogBatcher::~OplogBatcher() {
     invariant(!_thread);
 }
 
-OplogBatch OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
+OplogBatch OplogBatcher::getNextBatch(Seconds maxWaitTime) {
     stdx::unique_lock<Latch> lk(_mutex);
     // _ops can indicate the following cases:
     // 1. A new batch is ready to consume.
@@ -68,11 +68,11 @@ OplogBatch OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
     return ops;
 }
 
-void OpQueueBatcher::startup(StorageInterface* storageInterface) {
+void OplogBatcher::startup(StorageInterface* storageInterface) {
     _thread = std::make_unique<stdx::thread>([this, storageInterface] { _run(storageInterface); });
 }
 
-void OpQueueBatcher::shutdown() {
+void OplogBatcher::shutdown() {
     if (_thread) {
         _thread->join();
         _thread.reset();
@@ -158,7 +158,7 @@ std::size_t getOpCount(const OplogEntry& entry) {
 }
 }  // namespace
 
-StatusWith<std::vector<OplogEntry>> OpQueueBatcher::getNextApplierBatch(
+StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
     OperationContext* opCtx, const BatchLimits& batchLimits) {
     if (batchLimits.ops == 0) {
         return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
@@ -232,7 +232,7 @@ StatusWith<std::vector<OplogEntry>> OpQueueBatcher::getNextApplierBatch(
  * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog
  * entries that can be be returned in a batch.
  */
-boost::optional<Date_t> OpQueueBatcher::_calculateSlaveDelayLatestTimestamp() {
+boost::optional<Date_t> OplogBatcher::_calculateSlaveDelayLatestTimestamp() {
     auto service = cc().getServiceContext();
     auto replCoord = ReplicationCoordinator::get(service);
     auto slaveDelay = replCoord->getSlaveDelaySecs();
@@ -243,7 +243,7 @@ boost::optional<Date_t> OpQueueBatcher::_calculateSlaveDelayLatestTimestamp() {
     return fastClockSource->now() - slaveDelay;
 }
 
-void OpQueueBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
+void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     // This is just to get the op off the buffer; it's been peeked at and queued for application
     // already.
     // If we failed to get an op off the buffer, this means that shutdown() was called between the
@@ -254,7 +254,7 @@ void OpQueueBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer)
     invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || _oplogApplier->inShutdown());
 }
 
-void OpQueueBatcher::_run(StorageInterface* storageInterface) {
+void OplogBatcher::_run(StorageInterface* storageInterface) {
     Client::initThread("ReplBatcher");
 
     BatchLimits batchLimits;
@@ -300,7 +300,7 @@ void OpQueueBatcher::_run(StorageInterface* storageInterface) {
             }
         }
 
-        // The applier may be in its 'Draining' state. Determines if the OpQueueBatcher has finished
+        // The applier may be in its 'Draining' state. Determines if the OplogBatcher has finished
         // draining the OplogBuffer and should notify the OplogApplier to signal draining is
         // complete.
         if (ops.empty() && !ops.mustShutdown()) {

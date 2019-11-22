@@ -170,7 +170,7 @@ private:
 
     // The OplogBuffer is used to hold operations read from the sync source. During oplog
     // application, Backgrounds Sync adds operations to the OplogBuffer while the applier's
-    // OpQueueBatcher consumes these operations from the buffer in batches.
+    // OplogBatcher consumes these operations from the buffer in batches.
     std::unique_ptr<OplogBuffer> _oplogBuffer;
 
     // The BackgroundSync class is responsible for pulling ops off the network from the sync source

@@ -506,7 +506,7 @@ env.Library(
     target='oplog_application_interface',
     source=[
         'oplog_applier.cpp',
-        'opqueue_batcher.cpp',
+        'oplog_batcher.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -117,9 +117,9 @@ private:
  * Consumes batches of oplog entries from the OplogBuffer to give to the oplog applier, freeing
  * up space for more operations to be fetched from a sync source and allocated onto the OplogBuffer.
  */
-class OpQueueBatcher {
-    OpQueueBatcher(const OpQueueBatcher&) = delete;
-    OpQueueBatcher& operator=(const OpQueueBatcher&) = delete;
+class OplogBatcher {
+    OplogBatcher(const OplogBatcher&) = delete;
+    OplogBatcher& operator=(const OplogBatcher&) = delete;
 
 public:
     /**
@@ -142,11 +142,11 @@ public:
     };
 
     /**
-     * Constructs an OpQueueBatcher
+     * Constructs an OplogBatcher
      */
-    OpQueueBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer);
+    OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer);
 
-    virtual ~OpQueueBatcher();
+    virtual ~OplogBatcher();
 
     /**
      * Returns the batch of oplog entries and clears _ops so the batcher can store a new batch.
@@ -154,7 +154,7 @@ public:
     OplogBatch getNextBatch(Seconds maxWaitTime);
 
     /**
-     * Starts up a thread to continuously pull from the OplogBuffer into the OpQueueBatcher's oplog
+     * Starts up a thread to continuously pull from the OplogBuffer into the OplogBatcher's oplog
      * batch.
      */
     void startup(StorageInterface* storageInterface);
@@ -192,7 +192,7 @@ private:
     OplogApplier* _oplogApplier;
     OplogBuffer* const _oplogBuffer;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("OpQueueBatcher::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("OplogBatcher::_mutex");
     stdx::condition_variable _cv;
 
     /**

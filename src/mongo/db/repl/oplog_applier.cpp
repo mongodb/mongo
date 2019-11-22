@@ -51,7 +51,7 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            Observer* observer,
                            const Options& options)
     : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {
-    _opQueueBatcher = std::make_unique<OpQueueBatcher>(this, oplogBuffer);
+    _oplogBatcher = std::make_unique<OplogBatcher>(this, oplogBuffer);
 }
 
 OplogBuffer* OplogApplier::getBuffer() const {
@@ -125,7 +125,7 @@ StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx,
 
 StatusWith<std::vector<OplogEntry>> OplogApplier::getNextApplierBatch(
     OperationContext* opCtx, const BatchLimits& batchLimits) {
-    return _opQueueBatcher->getNextApplierBatch(opCtx, batchLimits);
+    return _oplogBatcher->getNextApplierBatch(opCtx, batchLimits);
 }
 
 const OplogApplier::Options& OplogApplier::getOptions() const {
