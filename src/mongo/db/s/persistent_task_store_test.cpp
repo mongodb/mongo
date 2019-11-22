@@ -165,6 +165,49 @@ TEST_F(PersistentTaskStoreTest, TestRemoveMultiple) {
     ASSERT_EQ(store.count(opCtx), 1);
 }
 
+TEST_F(PersistentTaskStoreTest, TestUpdate) {
+    auto opCtx = operationContext();
+
+    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    int originalMin = 0;
+    int expectedUpdatedMin = 1;
+    store.add(opCtx, TestTask{"one", originalMin, 10});
+    store.add(opCtx, TestTask{"two", 10, 20});
+    store.add(opCtx, TestTask{"three", 40, 50});
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    store.update(opCtx,
+                 QUERY("key"
+                       << "one"),
+                 BSON("$inc" << BSON("min" << 1)));
+
+    store.forEach(opCtx,
+                  QUERY("key"
+                        << "one"),
+                  [&](const TestTask& task) {
+                      ASSERT_EQ(task.min, expectedUpdatedMin);
+                      return false;
+                  });
+}
+
+TEST_F(PersistentTaskStoreTest, TestUpdateOnlyUpdatesOneMatchingDocument) {
+    auto opCtx = operationContext();
+
+    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    int originalMin = 0;
+    int expectedUpdatedMin = 1;
+    std::string keyToMatch = "one";
+    store.add(opCtx, TestTask{keyToMatch, originalMin, 10});
+    store.add(opCtx, TestTask{keyToMatch, originalMin, 20});
+    store.add(opCtx, TestTask{"three", 40, 50});
+
+    // Update query will match two documents but should only update one of them.
+    store.update(opCtx, QUERY("key" << keyToMatch), BSON("$inc" << BSON("min" << 1)));
+
+    ASSERT_EQ(store.count(opCtx, QUERY("key" << keyToMatch << "min" << expectedUpdatedMin)), 1);
+}
+
 TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
     auto opCtx = operationContext();
 

@@ -53,6 +53,9 @@ public:
     PersistentTaskStore(OperationContext* opCtx, NamespaceString storageNss)
         : _storageNss(std::move(storageNss)) {}
 
+    /**
+     * Adds a task to the store.
+     */
     void add(OperationContext* opCtx,
              const T& task,
              const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
@@ -72,6 +75,38 @@ public:
         uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
     }
 
+    /**
+     * Updates a document that matches the given query using the update modifier specified. Even if
+     * multiple documents match, at most one document will be updated.
+     */
+    void update(OperationContext* opCtx,
+                Query query,
+                const BSONObj& update,
+                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+        DBDirectClient dbClient(opCtx);
+
+        auto commandResponse = dbClient.runCommand([&] {
+            write_ops::Update updateOp(_storageNss);
+            write_ops::UpdateModification updateModification(update);
+            write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
+            updateEntry.setMulti(false);
+            updateEntry.setUpsert(false);
+            updateOp.setUpdates({updateEntry});
+
+            return updateOp.serialize({});
+        }());
+
+        const auto commandReply = commandResponse->getCommandReply();
+        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+        WriteConcernResult ignoreResult;
+        auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
+    }
+
+    /**
+     * Removes all documents which match the given query.
+     */
     void remove(OperationContext* opCtx,
                 Query query,
                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
@@ -100,9 +135,11 @@ public:
         uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
     }
 
-    // Executes the specified query on the collection and calls the callback for each element.
-    // Iteration can be stopped early if the callback returns false indicating that it doesn't want
-    // to continue.
+    /**
+     * Executes the specified query on the collection and calls the callback for each element.
+     * Iteration can be stopped early if the callback returns false indicating that it doesn't want
+     * to continue.
+     */
     void forEach(OperationContext* opCtx, Query query, std::function<bool(const T&)> handler) {
         DBDirectClient dbClient(opCtx);
 
@@ -118,6 +155,9 @@ public:
         }
     }
 
+    /**
+     * Returns the number of documents in the store matching the given query.
+     */
     size_t count(OperationContext* opCtx, Query query = Query()) {
         DBDirectClient client(opCtx);
 
