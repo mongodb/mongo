@@ -62,6 +62,13 @@ public:
         return FindCommon::kInitReplyBufferSize;
     }
 
+    void _explainImpl(OperationContext* opCtx,
+                      const BSONObj& cmd,
+                      BSONObjBuilder& result,
+                      boost::optional<ExplainOptions::Verbosity> verbosity) const override {
+        map_reduce_agg::runAggregationMapReduce(opCtx, cmd, result, verbosity);
+    }
+
 private:
     bool _runImpl(OperationContext* opCtx,
                   const std::string& dbname,
@@ -74,7 +81,7 @@ private:
         if (internalQueryUseAggMapReduce.load() &&
             serverGlobalParams.featureCompatibility.getVersion() ==
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            return map_reduce_agg::runAggregationMapReduce(opCtx, dbname, cmd, errmsg, result);
+            return map_reduce_agg::runAggregationMapReduce(opCtx, cmd, result, boost::none);
         }
         return mr::runMapReduce(opCtx, dbname, cmd, errmsg, result);
     }

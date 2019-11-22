@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/s/catalog_cache.h"
@@ -55,7 +56,8 @@ namespace {
 
 auto makeExpressionContext(OperationContext* opCtx,
                            const MapReduce& parsedMr,
-                           boost::optional<CachedCollectionRoutingInfo> routingInfo) {
+                           boost::optional<CachedCollectionRoutingInfo> routingInfo,
+                           boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collection UUID and the appropriate collation to use.
     auto nss = parsedMr.getNamespace();
     auto [collationObj, uuid] = sharded_agg_helpers::getCollationAndUUID(
@@ -84,10 +86,10 @@ auto makeExpressionContext(OperationContext* opCtx,
     }
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
-        boost::none,  // explain
-        false,        // fromMongos
-        false,        // needsmerge
-        true,         // allowDiskUse
+        verbosity,
+        false,  // fromMongos
+        false,  // needsmerge
+        true,   // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         nss,
         runtimeConstants,
@@ -121,10 +123,9 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
 }  // namespace
 
 bool runAggregationMapReduce(OperationContext* opCtx,
-                             const std::string& dbname,
                              const BSONObj& cmd,
-                             std::string& errmsg,
-                             BSONObjBuilder& result) {
+                             BSONObjBuilder& result,
+                             boost::optional<ExplainOptions::Verbosity> verbosity) {
     auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
@@ -137,7 +138,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     auto routingInfo = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
-    auto expCtx = makeExpressionContext(opCtx, parsedMr, routingInfo);
+    auto expCtx = makeExpressionContext(opCtx, parsedMr, routingInfo, verbosity);
 
     const auto pipelineBuilder = [&]() {
         return map_reduce_common::translateFromMR(parsedMr, expCtx);
@@ -171,7 +172,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 sharded_agg_helpers::runPipelineOnPrimaryShard(expCtx,
                                                                namespaces,
                                                                targeter.routingInfo->db(),
-                                                               boost::none,  // explain
+                                                               verbosity,
                                                                std::move(serialized),
                                                                privileges,
                                                                &tempResults));
@@ -185,7 +186,13 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         }
 
         case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kAnyShard: {
+            if (verbosity) {
+                explain_common::generateServerInfo(&result);
+            }
             auto serialized = serializeToCommand(cmd, parsedMr, targeter.pipeline.get());
+            // When running explain, we don't explicitly pass the specified verbosity here because
+            // each stage of the constructed pipeline is aware of said verbosity through a pointer
+            // to the constructed ExpressionContext.
             uassertStatusOK(
                 sharded_agg_helpers::dispatchPipelineAndMerge(opCtx,
                                                               std::move(targeter),
@@ -200,8 +207,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     }
 
     auto aggResults = tempResults.done();
-    // TODO SERVER-43290: Add support for cluster MapReduce statistics.
-    if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
+
+    // If explain() was run, we simply append the output to result.
+    if (verbosity) {
+        map_reduce_output_format::appendExplainResponse(result, aggResults);
+    } else if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
+        // TODO SERVER-43290: Add support for cluster MapReduce statistics.
         // If the inline results could not fit into a single batch, then kill the remote
         // operation(s) and return an error since mapReduce does not support a cursor-style
         // response.

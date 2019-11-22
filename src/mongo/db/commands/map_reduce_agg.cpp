@@ -49,13 +49,16 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 
 namespace mongo::map_reduce_agg {
 
 namespace {
 
-auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
+auto makeExpressionContext(OperationContext* opCtx,
+                           const MapReduce& parsedMr,
+                           boost::optional<ExplainOptions::Verbosity> verbosity) {
     // AutoGetCollectionForReadCommand will throw if the sharding version for this connection is
     // out of date.
     AutoGetCollectionForReadCommand ctx(
@@ -81,10 +84,10 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
     // the $group stage of the translated pipeline to spill to disk.
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
-        boost::none,  // explain
-        false,        // fromMongos
-        false,        // needsmerge
-        true,         // allowDiskUse
+        verbosity,
+        false,  // fromMongos
+        false,  // needsmerge
+        true,   // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         parsedMr.getNamespace(),
         runtimeConstants,
@@ -99,10 +102,9 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
 }  // namespace
 
 bool runAggregationMapReduce(OperationContext* opCtx,
-                             const std::string& dbname,
                              const BSONObj& cmd,
-                             std::string& errmsg,
-                             BSONObjBuilder& result) {
+                             BSONObjBuilder& result,
+                             boost::optional<ExplainOptions::Verbosity> verbosity) {
     auto exhaustPipelineIntoBSONArray = [](auto&& pipeline) {
         BSONArrayBuilder bab;
         while (auto&& doc = pipeline->getNext())
@@ -113,7 +115,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     Timer cmdTimer;
 
     auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
-    auto expCtx = makeExpressionContext(opCtx, parsedMr);
+    auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
@@ -130,21 +132,27 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     try {
         auto resultArray = exhaustPipelineIntoBSONArray(runnablePipeline);
 
+        if (expCtx->explain) {
+            result << "stages" << Value(runnablePipeline->writeExplainOps(*(expCtx->explain)));
+            explain_common::generateServerInfo(&result);
+        }
+
         PlanSummaryStats planSummaryStats;
         PipelineD::getPlanSummaryStats(runnablePipeline.get(), &planSummaryStats);
         CurOp::get(opCtx)->debug().setPlanSummaryMetrics(planSummaryStats);
 
+        if (!expCtx->explain) {
+            if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
+                map_reduce_output_format::appendInlineResponse(std::move(resultArray), &result);
+            } else {
+                // For output to collection, pipeline execution should not return any results.
+                invariant(resultArray.isEmpty());
 
-        if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
-            map_reduce_output_format::appendInlineResponse(std::move(resultArray), &result);
-        } else {
-            // For output to collection, pipeline execution should not return any results.
-            invariant(resultArray.isEmpty());
-
-            map_reduce_output_format::appendOutResponse(
-                parsedMr.getOutOptions().getDatabaseName(),
-                parsedMr.getOutOptions().getCollectionName(),
-                &result);
+                map_reduce_output_format::appendOutResponse(
+                    parsedMr.getOutOptions().getDatabaseName(),
+                    parsedMr.getOutOptions().getCollectionName(),
+                    &result);
+            }
         }
 
         // The aggregation pipeline may change the namespace of the curop and we need to set it back

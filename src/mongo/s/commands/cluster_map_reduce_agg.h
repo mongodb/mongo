@@ -34,9 +34,8 @@
 namespace mongo {
 
 bool runAggregationMapReduce(OperationContext* opCtx,
-                             const std::string& dbname,
                              const BSONObj& cmd,
-                             std::string& errmsg,
-                             BSONObjBuilder& result);
+                             BSONObjBuilder& result,
+                             boost::optional<ExplainOptions::Verbosity> verbosity);
 
 }  // namespace mongo

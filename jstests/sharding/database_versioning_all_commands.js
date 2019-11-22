@@ -548,7 +548,48 @@ let testCases = {
     logApplicationMessage: {skip: "not on a user database", conditional: true},
     logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},
     logout: {skip: "not on a user database"},
-    mapReduce: {skip: "TODO (SERVER-41953)"},
+    mapReduce: {
+        run: {
+            sendsDbVersion: true,
+            setUp: function(mongosConn, dbName, collName) {
+                assert.commandWorked(
+                    mongosConn.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
+            },
+            command: function(dbName, collName) {
+                return {
+                    mapReduce: collName,
+                    map: function mapFunc() {
+                        emit(this.x, 1);
+                    },
+                    reduce: function reduceFunc(key, values) {
+                        return Array.sum(values);
+                    },
+                    out: "inline"
+                };
+            }
+        },
+        explain: {
+            sendsDbVersion: true,
+            setUp: function(mongosConn, dbName, collName) {
+                assert.commandWorked(
+                    mongosConn.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
+            },
+            command: function(dbName, collName) {
+                return {
+                    explain: {
+                        mapReduce: collName,
+                        map: function mapFunc() {
+                            emit(this.x, 1);
+                        },
+                        reduce: function reduceFunc(key, values) {
+                            return Array.sum(values);
+                        },
+                        out: "inline"
+                    }
+                };
+            }
+        }
+    },
     mergeChunks: {skip: "does not forward command to primary shard"},
     moveChunk: {skip: "does not forward command to primary shard"},
     movePrimary: {skip: "reads primary shard from sharding catalog with readConcern: local"},

@@ -67,6 +67,7 @@ var Explainable = (function() {
             print("\t.distinct(...) - explain a distinct operation");
             print("\t.find(...) - get an explainable query");
             print("\t.findAndModify(...) - explain a findAndModify operation");
+            print("\t.mapReduce(...) - explain a mapReduce operation");
             print("\t.remove(...) - explain a remove operation");
             print("\t.update(...) - explain an update operation");
             print("Explainable collection methods");
@@ -220,6 +221,12 @@ var Explainable = (function() {
             }
 
             var explainCmd = bulk.convertToExplainCmd(this._verbosity);
+            var explainResult = this._collection.runCommand(explainCmd);
+            return throwOrReturn(explainResult);
+        };
+
+        this.mapReduce = function(mr) {
+            var explainCmd = {"explain": mr, "verbosity": this._verbosity};
             var explainResult = this._collection.runCommand(explainCmd);
             return throwOrReturn(explainResult);
         };

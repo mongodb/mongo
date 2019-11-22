@@ -49,4 +49,9 @@ void appendOutResponse(boost::optional<std::string> outDb,
                        std::string outColl,
                        BSONObjBuilder* resultBuilder);
 
+/**
+ * Appends a mapReduce explain command response to 'resultBuilder'.
+ */
+void appendExplainResponse(BSONObjBuilder& resultBuilder, BSONObj& aggResults);
+
 }  // namespace mongo::map_reduce_output_format

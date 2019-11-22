@@ -46,4 +46,11 @@ void appendOutResponse(boost::optional<std::string> outDb,
         resultBuilder->append("result", outColl);
     }
 }
+
+void appendExplainResponse(BSONObjBuilder& resultBuilder, BSONObj& aggResults) {
+    for (const auto& elem : aggResults) {
+        resultBuilder << elem.fieldNameStringData() << elem;
+    }
+}
+
 }  // namespace mongo::map_reduce_output_format

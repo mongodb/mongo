@@ -65,12 +65,39 @@ public:
         map_reduce_common::addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
     }
 
+    virtual void _explainImpl(OperationContext* opCtx,
+                              const BSONObj& cmd,
+                              BSONObjBuilder& result,
+                              boost::optional<ExplainOptions::Verbosity> verbosity) const = 0;
+
+    Status explain(OperationContext* opCtx,
+                   const OpMsgRequest& request,
+                   ExplainOptions::Verbosity verbosity,
+                   rpc::ReplyBuilderInterface* result) const override {
+        if (internalQueryUseAggMapReduce.load() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            auto builder = result->getBodyBuilder();
+            auto explain = boost::make_optional(verbosity);
+            try {
+                _explainImpl(opCtx, request.body, builder, explain);
+            } catch (...) {
+                return exceptionToStatus();
+            }
+            return Status::OK();
+        } else {
+            return Status(
+                ErrorCodes::IllegalOperation,
+                "explain for mapReduce is not available prior to featureCompatibilityVersion 4.4");
+        }
+        MONGO_UNREACHABLE;
+    }
+
     bool errmsgRun(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmd,
                    std::string& errmsg,
                    BSONObjBuilder& result) {
-
         return _runImpl(opCtx, dbname, cmd, errmsg, result);
     }
 
