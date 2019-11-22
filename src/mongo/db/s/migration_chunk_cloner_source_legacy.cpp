@@ -278,6 +278,9 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
     BSONObjBuilder cmdBuilder;
     StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
                                             _args.getNss(),
+                                            // TODO (SERVER-44161): Replace with UUID provided by
+                                            // migration donor.
+                                            UUID::gen(),
                                             _sessionId,
                                             _donorConnStr,
                                             _args.getFromShardId(),

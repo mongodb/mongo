@@ -45,11 +45,13 @@ namespace {
 
 TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     MigrationSessionId sessionId = MigrationSessionId::generate("shard0001", "shard0002");
+    UUID migrationId = UUID::gen();
 
     BSONObjBuilder builder;
     StartChunkCloneRequest::appendAsCommand(
         &builder,
         NamespaceString("TestDB.TestColl"),
+        migrationId,
         sessionId,
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")),
         ShardId("shard0001"),
@@ -66,6 +68,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
 
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
     ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
+    ASSERT(migrationId == request.getMigrationId());
     ASSERT(sessionId.matches(request.getSessionId()));
     ASSERT_EQ(
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345"))

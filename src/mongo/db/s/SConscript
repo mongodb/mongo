@@ -48,6 +48,7 @@ env.Library(
         'migration_chunk_cloner_source_legacy.cpp',
         'migration_chunk_cloner_source.cpp',
         'migration_destination_manager.cpp',
+        'migration_session_id.cpp',
         'migration_source_manager.cpp',
         'migration_util.cpp',
         'move_primary_source_manager.cpp',
@@ -70,6 +71,7 @@ env.Library(
         'sharding_statistics.cpp',
         'split_chunk.cpp',
         'split_vector.cpp',
+        'start_chunk_clone_request.cpp',
         env.Idlc('sharding_runtime_d_params.idl')[0],
         env.Idlc('range_deletion_task.idl')[0],
 
@@ -90,7 +92,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         'chunk_splitter',
-        'migration_types',
         'sharding_api_d',
         'sharding_catalog_manager',
         'sharding_logging',
@@ -165,19 +166,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/chunk_writes_tracker'
-    ],
-)
-
-env.Library(
-    target='migration_types',
-    source=[
-        'migration_session_id.cpp',
-        'start_chunk_clone_request.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/s/common_s',
     ],
 )
 
@@ -349,7 +337,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'chunk_splitter',
-        'migration_types',
         'sharding_logging',
         'sharding_runtime_d',
         'sharding_runtime_d',
