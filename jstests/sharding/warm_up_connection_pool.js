@@ -2,6 +2,9 @@
  * @tags: [requires_fcv_44, multiversion_incompatible]
  */
 
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
 'use strict';
 
@@ -49,7 +52,8 @@ function getShardHostName(shardlist, shard) {
 var testWarmUpParams = {};
 var testWarmUpAssertCheck = function(connPoolStats, currentShard) {
     assert.soon(() => connPoolStats["hosts"][currentShard]["inUse"] +
-                        connPoolStats["hosts"][currentShard]["available"] >=
+                        connPoolStats["hosts"][currentShard]["available"] +
+                        connPoolStats["hosts"][currentShard]["refreshing"] >=
                     1);
 };
 
@@ -65,11 +69,19 @@ var warmUpDisabledAssertCheck = function(connPoolStats, currentShard) {
 
 runTest(warmUpDisabledParams, warmUpDisabledAssertCheck);
 
-// Tests establishes more connections when parameter is set
-var biggerPoolSizeParams = {setParameter: {ShardingTaskExecutorPoolMinSize: 3}};
+// Tests establishes more connections when parameter is set. Increase the amount
+// of time to establish more connections to avoid timing out before establishing
+// the expected number of connections.
+var biggerPoolSizeParams = {
+    setParameter: {
+        ShardingTaskExecutorPoolMinSize: 3,
+        warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS: 60000
+    }
+};
 var biggerPoolSizeAssertCheck = function(connPoolStats, currentShard) {
     assert.soon(() => connPoolStats["hosts"][currentShard]["inUse"] +
-                        connPoolStats["hosts"][currentShard]["available"] >=
+                        connPoolStats["hosts"][currentShard]["available"] +
+                        connPoolStats["hosts"][currentShard]["refreshing"] >=
                     3);
 };
 
@@ -80,11 +92,13 @@ var shutdownNodeParams = {};
 var shutdownNodeAssertCheck = function(connPoolStats, currentShard, primary) {
     if (currentShard == primary) {
         assert.soon(() => connPoolStats["hosts"][currentShard]["inUse"] +
-                            connPoolStats["hosts"][currentShard]["available"] ===
+                            connPoolStats["hosts"][currentShard]["available"] +
+                            connPoolStats["hosts"][currentShard]["refreshing"] ===
                         0);
     } else {
         assert.soon(() => connPoolStats["hosts"][currentShard]["inUse"] +
-                            connPoolStats["hosts"][currentShard]["available"] ===
+                            connPoolStats["hosts"][currentShard]["available"] +
+                            connPoolStats["hosts"][currentShard]["refreshing"] ===
                         1);
     }
 };
