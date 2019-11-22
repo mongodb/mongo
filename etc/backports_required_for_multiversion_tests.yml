@@ -27,6 +27,8 @@ concurrency_replication_multiversion:
 concurrency_sharded_replication_multiversion:
 
 replica_sets_jscore_multiversion_passthrough:
+- ticket: SERVER-35921
+  test_file: jstests/core/min_max_key.js
 
 replica_sets_multiversion:
 
@@ -37,3 +39,5 @@ sharding_multiversion:
 sharding_jscore_multiversion_passthrough:
 
 sharded_collections_jscore_multiversion_passthrough:
+- ticket: SERVER-35921
+  test_file: jstests/core/min_max_key.js
