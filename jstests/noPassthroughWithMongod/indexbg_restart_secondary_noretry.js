@@ -7,11 +7,12 @@
  *   requires_persistence,
  *   requires_journaling,
  *   requires_replication,
- *   two_phase_index_builds_unsupported,
  * ]
  */
 (function() {
 'use strict';
+
+load('jstests/noPassthrough/libs/index_build.js');
 
 // Assert that running `mongod` with `--noIndexBuildRetry` and `--replSet` does not startup.
 {
@@ -48,6 +49,14 @@ replTest.initiate({
 
 var master = replTest.getPrimary();
 var second = replTest.getSecondary();
+
+// This test requires index builds to start on the createIndexes oplog entry and expects
+// index builds to be interrupted when the primary steps down.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(master)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
+    replTest.stopSet();
+    return;
+}
 
 var masterDB = master.getDB('bgIndexNoRetrySec');
 var secondDB = second.getDB('bgIndexNoRetrySec');

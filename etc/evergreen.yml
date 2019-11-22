@@ -10157,7 +10157,6 @@ buildvariants:
   expansions: &enterprise-rhel-62-64-bit-two-phase-index-builds
     test_flags: >-
       --mongodSetParameters="{enableTwoPhaseIndexBuild: true}"
-      --excludeWithAnyTags=two_phase_index_builds_unsupported
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl

@@ -3,7 +3,6 @@
  * index builds replicated from the new primary with the same index names.
  * @tags: [
  *     requires_replication,
- *     two_phase_index_builds_unsupported,
  * ]
  */
 (function() {
@@ -20,6 +19,15 @@ const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
+
+// This test requires index builds to start on the createIndexes oplog entry and expects
+// index builds to be interrupted when the primary steps down.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
+    rst.stopSet();
+    return;
+}
+
 let coll = primary.getCollection('test.test');
 
 assert.commandWorked(coll.insert({a: 1}));

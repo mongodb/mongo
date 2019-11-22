@@ -12,16 +12,13 @@
  * 5) 'abortTransaction' cmd attempts to acquire the RSTL lock in MODE_IX but blocked
  *    behind the step down thread.
  *
- * TODO(SERVER-44190): Update this test to work with two phase index builds. Under two phase index
- * builds, index builds are no longer aborted on stepdown.
- *
  * @tags: [
  *     uses_transactions,
  *     uses_prepare_transaction,
- *     two_phase_index_builds_unsupported,
  * ]
  */
 load("jstests/libs/check_log.js");
+load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 
@@ -37,6 +34,15 @@ rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
+
+// TODO(SERVER-44190): Update this test to work with two phase index builds. Under two phase index
+// builds, index builds are no longer aborted on stepdown.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
+    rst.stopSet();
+    return;
+}
+
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
 const collNss = primaryColl.getFullName();

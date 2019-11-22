@@ -2,13 +2,10 @@
  * Characterizes the actions (rebuilds or drops the index) taken upon unfinished indexes when
  * restarting mongod from (standalone -> standalone) and (replica set member -> standalone).
  *
- * TODO(SERVER-44468): Remove two_phase_index_builds_unsupported tag when standalone startup works
- * with two-phase builds
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   two_phase_index_builds_unsupported,
  * ]
  */
 (function() {
@@ -177,6 +174,14 @@ function standaloneToStandaloneTest() {
     let mongod = startStandalone();
     let collDB = mongod.getDB(dbName);
 
+    // TODO(SERVER-44468): Re-enable when standalone startup works with two-phase builds.
+    if (IndexBuildTest.supportsTwoPhaseIndexBuild(mongod)) {
+        jsTestLog(
+            '[standaloneToStandaloneTest] Two phase index builds not supported, skipping test.');
+        shutdownStandalone(mongod);
+        return;
+    }
+
     addTestDocuments(collDB);
 
     jsTest.log("Starting an index build on a standalone and leaving it unfinished.");
@@ -205,6 +210,14 @@ function secondaryToStandaloneTest() {
     let replSet = startReplSet();
     let primary = replSet.getPrimary();
     let secondary = replSet.getSecondary();
+
+    // TODO(SERVER-44468): Re-enable when standalone startup works with two-phase builds.
+    if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+        jsTestLog(
+            '[secondaryToStandaloneTest] Two phase index builds not supported, skipping test.');
+        replSet.stopSet();
+        return;
+    }
 
     let primaryDB = primary.getDB(dbName);
     let secondaryDB = secondary.getDB(dbName);
