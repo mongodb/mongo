@@ -153,8 +153,6 @@ public:
      * To provide crash resilience, this function will advance the persistent value of 'minValid'
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
-     *
-     * TODO: remove when enqueue() is implemented.
      */
     StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 

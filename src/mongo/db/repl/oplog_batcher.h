@@ -77,8 +77,6 @@ public:
      * no more batches will be coming.
      *
      * This can only happen with empty batches.
-     *
-     * TODO replace the empty object used to signal draining with this.
      */
     bool mustShutdown() const {
         return _mustShutdown;
