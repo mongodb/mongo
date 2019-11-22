@@ -1,5 +1,6 @@
 /**
  * Tests that $** indexes works with returnKey option.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

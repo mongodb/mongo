@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, requires_fcv_44]
 
 // Tests where the QueryOptimizerCursor enters takeover mode during a query rather than a get more.
 
