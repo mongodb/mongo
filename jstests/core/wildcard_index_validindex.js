@@ -3,6 +3,7 @@
  * @tags: [
  *  # Uses index building in background
  *  requires_background_index,
+ *  requires_fcv_44
  * ]
  */
 (function() {

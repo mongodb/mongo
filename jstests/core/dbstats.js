@@ -1,6 +1,6 @@
 // Confirms that the dbStats command returns expected content.
 //
-// @tags: [requires_dbstats]
+// @tags: [requires_dbstats, requires_fcv_44]
 
 (function() {
 "use strict";

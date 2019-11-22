@@ -3,7 +3,7 @@
  * and profiler.
  *  @tags: [assumes_against_mongod_not_mongos, assumes_unsharded_collection,
  * does_not_support_stepdowns, requires_profiling, assumes_read_concern_unchanged,
- * assumes_write_concern_unchanged]
+ * assumes_write_concern_unchanged, requires_fcv_44]
  */
 
 (function() {

@@ -1,3 +1,5 @@
+// @tags: [requires_fcv_44]
+
 t = db.distinct_array1;
 t.drop();
 

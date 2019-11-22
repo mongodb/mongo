@@ -9,6 +9,7 @@
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 //   requires_capped,
+//   requires_fcv_44,
 // ]
 
 t = db.test_notablescan_capped;
