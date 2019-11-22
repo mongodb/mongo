@@ -66,10 +66,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
-#ifndef _WIN32
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#endif
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/dh.h>
@@ -80,11 +78,6 @@
 #include <openssl/x509v3.h>
 #ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
 #include <openssl/ec.h>
-#endif
-#if defined(_WIN32)
-#include <wincrypt.h>
-#elif defined(__APPLE__)
-#include <Security/Security.h>
 #endif
 
 namespace mongo {
@@ -373,15 +366,6 @@ private:
     UniqueSSLContext _serverContext;  // SSL context for incoming connections
     UniqueSSLContext _clientContext;  // SSL context for outgoing connections
 
-// On OSX, it's not safe to copy the system CA certificates after a fork(), which we need to
-// do the deathtest unittests. So on __APPLE__ platforms, we copy the certificates into a vector
-// of OpenSSL X509 objects once at startup in _getSystemCerts() and then append them into
-// X509_STORE's when initializing SSL_CTX's.
-//
-// On other platforms it's safe to load the certificate each time we initialize an SSL_CTX.
-#if defined(__APPLE__)
-    std::vector<UniqueX509> _systemCACertificates;
-#endif
     bool _weakValidation;
     bool _allowInvalidCertificates;
     bool _allowInvalidHostnames;
@@ -493,13 +477,6 @@ private:
      * Set up an SSL context for certificate validation by loading the system's CA store
      */
     Status _setupSystemCA(SSL_CTX* context);
-
-#if defined(__APPLE__)
-    /*
-     * Loads the system-trusted CA certificates from a native source into a vector of X509 objects
-     */
-    std::vector<UniqueX509> _getSystemCerts();
-#endif
 
     /*
      * Import a certificate revocation list into an SSL context
@@ -671,9 +648,6 @@ SSLConnectionOpenSSL::~SSLConnectionOpenSSL() {
 SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
     : _serverContext(nullptr),
       _clientContext(nullptr),
-#if defined(__APPLE__)
-      _systemCACertificates(_getSystemCerts()),
-#endif
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
@@ -1105,118 +1079,8 @@ inline Status checkX509_STORE_error() {
     return Status::OK();
 }
 
-#if defined(_WIN32)
-// This imports the certificates in a given Windows certificate store into an X509_STORE for
-// openssl to use during certificate validation.
-Status importCertStoreToX509_STORE(const wchar_t* storeName,
-                                   DWORD storeLocation,
-                                   X509_STORE* verifyStore) {
-    // Use NULL for argument 3, nullptr is not convertible to HCRYPTPROV_LEGACY type.
-    HCERTSTORE systemStore = CertOpenStore(CERT_STORE_PROV_SYSTEM_W,
-                                           0,
-                                           NULL,
-                                           storeLocation | CERT_STORE_READONLY_FLAG,
-                                           const_cast<LPWSTR>(storeName));
-    if (systemStore == nullptr) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "error opening system CA store: " << errnoWithDescription()};
-    }
-    auto systemStoreGuard = makeGuard([systemStore]() { CertCloseStore(systemStore, 0); });
-
-    PCCERT_CONTEXT certCtx = nullptr;
-    while ((certCtx = CertEnumCertificatesInStore(systemStore, certCtx)) != nullptr) {
-        auto certBytes = static_cast<const unsigned char*>(certCtx->pbCertEncoded);
-        X509* x509Obj = d2i_X509(nullptr, &certBytes, certCtx->cbCertEncoded);
-        if (x509Obj == nullptr) {
-            return {ErrorCodes::InvalidSSLConfiguration,
-                    str::stream() << "Error parsing X509 object from Windows certificate store"
-                                  << SSLManagerInterface::getSSLErrorMessage(ERR_get_error())};
-        }
-        const auto x509ObjGuard = makeGuard([&x509Obj]() { X509_free(x509Obj); });
-
-        if (X509_STORE_add_cert(verifyStore, x509Obj) != 1) {
-            auto status = checkX509_STORE_error();
-            if (!status.isOK())
-                return status;
-        }
-    }
-    int lastError = GetLastError();
-    if (lastError != CRYPT_E_NOT_FOUND) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "Error enumerating certificates: "
-                              << errnoWithDescription(lastError)};
-    }
-
-    return Status::OK();
-}
-
-#elif defined(__APPLE__)
-
-template <typename T>
-class CFTypeRefHolder {
-public:
-    explicit CFTypeRefHolder(T ptr) : ref(static_cast<CFTypeRef>(ptr)) {}
-    ~CFTypeRefHolder() {
-        CFRelease(ref);
-    }
-    operator T() {
-        return static_cast<T>(ref);
-    }
-
-private:
-    CFTypeRef ref = nullptr;
-};
-template <typename T>
-CFTypeRefHolder<T> makeCFTypeRefHolder(T ptr) {
-    return CFTypeRefHolder<T>(ptr);
-}
-
-std::string OSStatusToString(OSStatus status) {
-    auto errMsg = makeCFTypeRefHolder(SecCopyErrorMessageString(status, NULL));
-    return std::string{CFStringGetCStringPtr(errMsg, kCFStringEncodingUTF8)};
-}
-
-std::vector<UniqueX509> SSLManagerOpenSSL::_getSystemCerts() {
-    // Copy the system CA certs into a CFArray for us to iterate and convert into X509*
-    auto anchorCerts = makeCFTypeRefHolder([] {
-        CFArrayRef ret;
-        auto status = SecTrustCopyAnchorCertificates(&ret);
-        uassert(50928,
-                str::stream() << "Error enumerating certificates: " << OSStatusToString(status),
-                status == ::errSecSuccess);
-        return ret;
-    }());
-
-    std::vector<UniqueX509> ret;
-    for (CFIndex i = 0; i < CFArrayGetCount(anchorCerts); i++) {
-        SecCertificateRef cert = static_cast<SecCertificateRef>(
-            const_cast<void*>(CFArrayGetValueAtIndex(anchorCerts, i)));
-
-        uassert(50929,
-                "Certificate array had something other than a certificate in it",
-                ::CFGetTypeID(cert) == ::SecCertificateGetTypeID());
-
-        // Get the raw X509 bytes out of the certificate
-        auto rawData = makeCFTypeRefHolder(SecCertificateCopyData(cert));
-        uassert(50930, str::stream() << "Error converting certificate to raw bytes", rawData);
-        const uint8_t* rawDataPtr = CFDataGetBytePtr(rawData);
-
-        // Parse an openssl X509 object from each returned certificate
-        UniqueX509 x509Cert(d2i_X509(nullptr, &rawDataPtr, CFDataGetLength(rawData)));
-        uassert(50931,
-                str::stream() << "Error parsing X509 certificate from system keychain: "
-                              << ERR_reason_error_string(ERR_peek_last_error()),
-                x509Cert);
-        ret.push_back(std::move(x509Cert));
-    }
-
-    return ret;
-}
-#endif
-
 Status SSLManagerOpenSSL::_setupSystemCA(SSL_CTX* context) {
-#if !defined(_WIN32) && !defined(__APPLE__)
-    // On non-Windows/non-Apple platforms, the OpenSSL libraries should have been configured
+    // The OpenSSL libraries should have been configured
     // with default locations for CA certificates.
     if (SSL_CTX_set_default_verify_paths(context) != 1) {
         return {
@@ -1225,24 +1089,6 @@ Status SSLManagerOpenSSL::_setupSystemCA(SSL_CTX* context) {
                           << "(default certificate file: " << X509_get_default_cert_file() << ", "
                           << "default certificate path: " << X509_get_default_cert_dir() << ")"};
     }
-#else
-
-    X509_STORE* verifyStore = SSL_CTX_get_cert_store(context);
-    if (!verifyStore) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                "no X509 store found for SSL context while loading system certificates"};
-    }
-#if defined(_WIN32)
-    auto status = importCertStoreToX509_STORE(L"root", CERT_SYSTEM_STORE_CURRENT_USER, verifyStore);
-    if (!status.isOK())
-        return status;
-    return importCertStoreToX509_STORE(L"CA", CERT_SYSTEM_STORE_CURRENT_USER, verifyStore);
-#elif defined(__APPLE__)
-    for (const auto& cert : _systemCACertificates) {
-        X509_STORE_add_cert(verifyStore, cert.get());
-    }
-#endif
-#endif
 
     return Status::OK();
 }

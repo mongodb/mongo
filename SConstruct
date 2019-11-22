@@ -185,14 +185,6 @@ add_option('ssl',
     type='choice',
 )
 
-add_option('ssl-provider',
-    choices=['auto', 'openssl', 'native'],
-    default='auto',
-    help='Select the SSL engine to use',
-    nargs=1,
-    type='choice',
-)
-
 add_option('wiredtiger',
     choices=['on', 'off'],
     const='on',
@@ -3109,7 +3101,7 @@ def doConfigure(myenv):
 
     libdeps.setup_conftests(conf)
 
-    ### --ssl and --ssl-provider checks
+    ### --ssl checks
     def checkOpenSSL(conf):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
@@ -3270,41 +3262,38 @@ def doConfigure(myenv):
         if conf.CheckOpenSSL_EC_KEY_new():
             conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW')
 
-    ssl_provider = get_option("ssl-provider")
-    if ssl_provider == 'auto':
-        if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
-            ssl_provider = 'native'
-        else:
-            ssl_provider = 'openssl'
-
-    if ssl_provider == 'native':
-        if conf.env.TargetOSIs('windows'):
-            ssl_provider = 'windows'
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_WINDOWS")
-            conf.env.Append( MONGO_CRYPTO=["windows"] )
-
-        elif conf.env.TargetOSIs('darwin', 'macOS'):
-            ssl_provider = 'apple'
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_APPLE")
-            conf.env.Append( MONGO_CRYPTO=["apple"] )
-            conf.env.AppendUnique(FRAMEWORKS=[
-                'CoreFoundation',
-                'Security',
-            ])
-
     # We require ssl by default unless the user has specified --ssl=off
     require_ssl = get_option("ssl") != "off"
 
-    if ssl_provider == 'openssl':
-        if require_ssl:
-            checkOpenSSL(conf)
-            # Working OpenSSL available, use it.
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
+    # The following platform checks setup both
+    # ssl_provider for TLS implementation
+    # and MONGO_CRYPTO for hashing support.
+    #
+    # MONGO_CRYPTO is always enabled regardless of --ssl=on/off
+    # However, ssl_provider will be rewritten to 'none' if --ssl=off
+    if conf.env.TargetOSIs('windows'):
+        # SChannel on Windows
+        ssl_provider = 'windows'
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_WINDOWS")
+        conf.env.Append( MONGO_CRYPTO=["windows"] )
 
-            conf.env.Append( MONGO_CRYPTO=["openssl"] )
-        else:
-            # If we don't need an SSL build, we can get by with TomCrypt.
-            conf.env.Append( MONGO_CRYPTO=["tom"] )
+    elif conf.env.TargetOSIs('darwin', 'macOS'):
+        # SecureTransport on macOS
+        ssl_provider = 'apple'
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_APPLE")
+        conf.env.Append( MONGO_CRYPTO=["apple"] )
+        conf.env.AppendUnique(FRAMEWORKS=['CoreFoundation', 'Security'])
+
+    elif require_ssl:
+        checkOpenSSL(conf)
+        # Working OpenSSL available, use it.
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
+        conf.env.Append( MONGO_CRYPTO=["openssl"] )
+        ssl_provider = 'openssl'
+
+    else:
+        # If we don't need an SSL build, we can get by with TomCrypt.
+        conf.env.Append( MONGO_CRYPTO=["tom"] )
 
     if require_ssl:
         # Either crypto engine is native,
@@ -3313,26 +3302,6 @@ def doConfigure(myenv):
         print("Using SSL Provider: {0}".format(ssl_provider))
     else:
         ssl_provider = "none"
-
-    # The Windows build needs the openssl binaries if it targets openssl
-    if conf.env.TargetOSIs('windows') and ssl_provider == "openssl":
-        # Add the SSL binaries to the zip file distribution
-        def addOpenSslLibraryToDistArchive(file_name):
-            openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
-            full_file_name = os.path.join(openssl_bin_path, file_name)
-            if os.path.exists(full_file_name):
-                env.Append(ARCHIVE_ADDITIONS=[full_file_name])
-                env.Append(ARCHIVE_ADDITION_DIR_MAP={
-                        openssl_bin_path: "bin"
-                        })
-                return True
-            else:
-                return False
-
-        files = ['ssleay32.dll', 'libeay32.dll']
-        for extra_file in files:
-            if not addOpenSslLibraryToDistArchive(extra_file):
-                print("WARNING: Cannot find SSL library '%s'" % extra_file)
 
     def checkHTTPLib(required=False):
         # WinHTTP available on Windows
