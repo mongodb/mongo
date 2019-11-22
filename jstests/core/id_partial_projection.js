@@ -1,6 +1,7 @@
 /**
  * Tests partial inclusion/exclusion of _id.
  * See SERVER-7502 for details.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

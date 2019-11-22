@@ -1,5 +1,5 @@
 // Basic tests for errors when parsing the $meta projection.
-
+// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 
