@@ -857,16 +857,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_d",
-    source=[
-        "index_legacy.cpp",
-    ],
-    LIBDEPS=[
-        'index/index_access_methods',
-    ],
-)
-
-env.Library(
     target="introspect",
     source=[
         "introspect.cpp",
@@ -1590,6 +1580,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'catalog/catalog_impl',
         'commands/mongod',
+        'index/index_access_methods',
         'index_builds_coordinator_mongod',
         'service_context_d',
         'storage/devnull/storage_devnull',

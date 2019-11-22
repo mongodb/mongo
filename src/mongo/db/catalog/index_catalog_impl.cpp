@@ -49,9 +49,10 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_legacy.h"
+#include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
@@ -466,6 +467,28 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
                                         << expression->debugString());
     }
 }
+
+/**
+ * Adjust the provided index spec BSONObj depending on the type of index obj describes.
+ *
+ * This is a no-op unless the object describes a TEXT or a GEO_2DSPHERE index.  TEXT and
+ * GEO_2DSPHERE provide additional validation on the index spec, and tweak the index spec
+ * object to conform to their expected format.
+ */
+StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
+    std::string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
+
+    if (IndexNames::TEXT == pluginName) {
+        return fts::FTSSpec::fixSpec(obj);
+    }
+
+    if (IndexNames::GEO_2DSPHERE == pluginName) {
+        return S2AccessMethod::fixSpec(obj);
+    }
+
+    return obj;
+}
+
 }  // namespace
 
 Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec) const {
@@ -1594,7 +1617,7 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEn
 StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
                                                     Collection* collection,
                                                     const BSONObj& spec) const {
-    auto statusWithSpec = IndexLegacy::adjustIndexSpecObject(spec);
+    auto statusWithSpec = adjustIndexSpecObject(spec);
     if (!statusWithSpec.isOK()) {
         return statusWithSpec;
     }

@@ -44,7 +44,6 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
-#include "mongo/db/index_legacy.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_ixselect.h"

@@ -466,6 +466,9 @@ mongod = env.Program(
         'util/version_impl',
         'watchdog/watchdog_mongod',
     ],
+    LIBDEPS_PRIVATE=[
+        'db/index/index_access_methods',
+    ],
     AIB_COMPONENT="servers",
     AIB_COMPONENTS_EXTRA=[
         "dist",
