@@ -866,6 +866,12 @@ bool StorageEngineImpl::supportsTwoPhaseIndexBuild() const {
         return false;
     }
 
+    // TODO(SERVER-39452): remove this condition when rollback via refetch supports two phase index
+    // builds.
+    if (!supportsReadConcernMajority()) {
+        return false;
+    }
+
     return true;
 }
 
