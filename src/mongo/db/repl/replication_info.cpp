@@ -292,30 +292,6 @@ public:
             SplitHorizon::setParameters(opCtx->getClient(), std::move(sniName));
         }
 
-        // If a client is following the awaitable isMaster protocol, maxAwaitTimeMS should be
-        // present if and only if topologyVersion is present in the request.
-        auto topologyVersionElement = cmdObj["topologyVersion"];
-        auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
-        if (topologyVersionElement && maxAwaitTimeMSField) {
-            auto topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                                                          topologyVersionElement.Obj());
-            uassert(31372,
-                    "topologyVersion must have a non-negative counter",
-                    topologyVersion.getCounter() >= 0);
-
-            long long maxAwaitTimeMSValue;
-            uassertStatusOK(
-                bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMSValue));
-            uassert(
-                31373, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMSValue >= 0);
-        } else {
-            uassert(31368,
-                    (topologyVersionElement
-                         ? "A request with a 'topologyVersion' must include 'maxAwaitTimeMS'"
-                         : "A request with 'maxAwaitTimeMS' must include a 'topologyVersion'"),
-                    !topologyVersionElement && !maxAwaitTimeMSField);
-        }
-
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
         // mongod and mongos.
         auto internalClientElement = cmdObj["internalClient"];
@@ -383,6 +359,35 @@ public:
                         return originalTags;
                     }
                 });
+        }
+
+        // If a client is following the awaitable isMaster protocol, maxAwaitTimeMS should be
+        // present if and only if topologyVersion is present in the request.
+        auto topologyVersionElement = cmdObj["topologyVersion"];
+        auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        if (topologyVersionElement && maxAwaitTimeMSField) {
+            auto topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+                                                          topologyVersionElement.Obj());
+            uassert(31372,
+                    "topologyVersion must have a non-negative counter",
+                    topologyVersion.getCounter() >= 0);
+
+            long long maxAwaitTimeMS;
+            uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
+            uassert(31373, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMS >= 0);
+
+            LOG(3) << "Using maxAwaitTimeMS for awaitable isMaster protocol.";
+
+            // Wait for maxAwaitTimeMS.
+            if (maxAwaitTimeMS > 0) {
+                opCtx->sleepFor(Milliseconds(maxAwaitTimeMS));
+            }
+        } else {
+            uassert(31368,
+                    (topologyVersionElement
+                         ? "A request with a 'topologyVersion' must include 'maxAwaitTimeMS'"
+                         : "A request with 'maxAwaitTimeMS' must include a 'topologyVersion'"),
+                    !topologyVersionElement && !maxAwaitTimeMSField);
         }
 
         appendReplicationInfo(opCtx, result, 0);
