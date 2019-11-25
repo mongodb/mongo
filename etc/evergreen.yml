@@ -4869,7 +4869,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: 10
-      num_tasks: 15
+      num_tasks: 5
       npm_command: initsync-fuzzer
       suite: initial_sync_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
