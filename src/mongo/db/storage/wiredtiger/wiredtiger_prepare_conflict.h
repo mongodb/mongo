@@ -79,6 +79,13 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
 
     PrepareConflictTracker::get(opCtx).beginPrepareConflict();
 
+    auto client = opCtx->getClient();
+    if (client->isFromSystemConnection()) {
+        // System (internal) connections that hit a prepare conflict should be killable to prevent
+        // deadlocks with prepared transactions on replica set step up and step down.
+        stdx::lock_guard<Client> lk(*client);
+        dassert(client->shouldKillSystemOperation(lk));
+    }
     // It is contradictory to be running into a prepare conflict when we are ignoring interruptions,
     // particularly when running code inside an
     // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown block. Operations executed in
