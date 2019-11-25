@@ -26,17 +26,22 @@ function addTestDocuments(db) {
     assert.commandWorked(bulk.execute());
 }
 
-let replSet = new ReplSetTest({name: "indexBuilds", nodes: 2, useBridge: true});
-let nodes = replSet.nodeList();
-
-replSet.startSet({startClean: true});
-replSet.initiate({
-    _id: "indexBuilds",
-    members: [
-        {_id: 0, host: nodes[0]},
-        {_id: 1, host: nodes[1], votes: 0, priority: 0},
-    ]
+const replSet = new ReplSetTest({
+    nodes: [
+        {},
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+                votes: 0,
+            },
+            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+        },
+    ],
+    useBridge: true,
 });
+const nodes = replSet.startSet();
+replSet.initiate();
 
 let primary = replSet.getPrimary();
 let primaryDB = primary.getDB(dbName);
@@ -72,7 +77,14 @@ if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
 }
 
 jsTest.log("Adding a new node to the replica set");
-let newNode = replSet.add({rsConfig: {votes: 0, priority: 0}});
+let newNode = replSet.add({
+    // Disallow elections on secondary.
+    rsConfig: {
+        priority: 0,
+        votes: 0,
+    },
+    slowms: 30000,  // Don't log slow operations on secondary.
+});
 
 // Ensure that the new node and primary cannot communicate to each other.
 newNode.disconnect(primary);

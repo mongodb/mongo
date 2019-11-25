@@ -16,6 +16,7 @@ const rst = new ReplSetTest({
                 priority: 0,
                 votes: 0,
             },
+            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
         },
     ]
 });

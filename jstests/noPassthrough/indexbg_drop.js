@@ -12,22 +12,21 @@ var dbname = 'dropbgindex';
 var collection = 'jstests_feh';
 var size = 100;
 
-// Setup the replica set.
-var replTest = new ReplSetTest({name: 'bgIndex', nodes: 3});
-var nodes = replTest.nodeList();
-printjson(nodes);
-
-// We need an arbiter to ensure that the primary doesn't step down when we restart the
-// secondary.
-replTest.startSet();
-replTest.initiate({
-    "_id": "bgIndex",
-    "members": [
-        {"_id": 0, "host": nodes[0]},
-        {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], "arbiterOnly": true}
+const replTest = new ReplSetTest({
+    nodes: [
+        {},
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+                votes: 0,
+            },
+            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+        },
     ]
 });
+const nodes = replTest.startSet();
+replTest.initiate();
 
 var master = replTest.getPrimary();
 var second = replTest.getSecondary();

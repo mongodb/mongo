@@ -24,17 +24,21 @@ function addTestDocuments(db) {
     assert.commandWorked(bulk.execute());
 }
 
-let replSet = new ReplSetTest({name: "indexBuilds", nodes: 2});
-let nodes = replSet.nodeList();
-
-replSet.startSet({startClean: true});
-replSet.initiate({
-    _id: "indexBuilds",
-    members: [
-        {_id: 0, host: nodes[0]},
-        {_id: 1, host: nodes[1], votes: 0, priority: 0},
+const replSet = new ReplSetTest({
+    nodes: [
+        {},
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+                votes: 0,
+            },
+            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+        },
     ]
 });
+const nodes = replSet.startSet();
+replSet.initiate();
 
 let primary = replSet.getPrimary();
 let primaryDB = primary.getDB(dbName);
