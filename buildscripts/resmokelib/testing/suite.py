@@ -336,13 +336,12 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
                 test_names.append(test_info.test_file)
                 sb.append("    %s" % (test_info.test_file))
 
-        test_names.sort(key=_report.test_order)
-
-        sb.append("If you're unsure where to begin investigating these errors, \
-                  consider looking at tests in the following order:")
-
-        for test_name in test_names:
-            sb.append("    %s" % (test_name))
+        if num_failed > 0 or report.num_errored > 0:
+            test_names.sort(key=_report.test_order)
+            sb.append("If you're unsure where to begin investigating these errors, "
+                      "consider looking at tests in the following order:")
+            for test_name in test_names:
+                sb.append("    %s" % (test_name))
 
         return summary
 
