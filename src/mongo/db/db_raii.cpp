@@ -193,7 +193,18 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             // shouldNotConflictWithSecondaryBatchApplicationBlock outside of this function), this
             // does not take the PBWM lock.
             _shouldNotConflictWithSecondaryBatchApplicationBlock = boost::none;
-            invariant(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
+
+            // As alluded to above, if we are AutoGetting multiple collections, it
+            // is possible that our "reaquire the PBWM" trick doesn't work, since we've already done
+            // some reads and locked in our snapshot.  At this point, the only way out is to fail
+            // the operation. The client application will need to retry.
+            uassert(
+                ErrorCodes::SnapshotUnavailable,
+                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
+                                 "changes; please retry the operation. Snapshot timestamp is "
+                              << (mySnapshot ? mySnapshot->toString() : "(none)")
+                              << ". Collection minimum is " << minSnapshot->toString(),
+                opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
 
             // Cannot change ReadSource while a RecoveryUnit is active, which may result from
             // calling getPointInTimeReadTimestamp().
