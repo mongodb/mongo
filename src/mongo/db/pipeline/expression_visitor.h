@@ -45,6 +45,8 @@ class ExpressionAnd;
 class ExpressionAnyElementTrue;
 class ExpressionArray;
 class ExpressionArrayElemAt;
+class ExpressionFirst;
+class ExpressionLast;
 class ExpressionObjectToArray;
 class ExpressionArrayToObject;
 class ExpressionCeil;
@@ -179,6 +181,8 @@ public:
     virtual void visit(ExpressionAnyElementTrue*) = 0;
     virtual void visit(ExpressionArray*) = 0;
     virtual void visit(ExpressionArrayElemAt*) = 0;
+    virtual void visit(ExpressionFirst*) = 0;
+    virtual void visit(ExpressionLast*) = 0;
     virtual void visit(ExpressionObjectToArray*) = 0;
     virtual void visit(ExpressionArrayToObject*) = 0;
     virtual void visit(ExpressionCeil*) = 0;

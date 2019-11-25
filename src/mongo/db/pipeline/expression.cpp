@@ -510,24 +510,24 @@ const char* ExpressionArray::getOpName() const {
 
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
-Value ExpressionArrayElemAt::evaluate(const Document& root, Variables* variables) const {
-    const Value array = _children[0]->evaluate(root, variables);
-    const Value indexArg = _children[1]->evaluate(root, variables);
-
+namespace {
+Value arrayElemAt(const ExpressionNary* self, Value array, Value indexArg) {
     if (array.nullish() || indexArg.nullish()) {
         return Value(BSONNULL);
     }
 
+    size_t arity = self->getOperandList().size();
     uassert(28689,
-            str::stream() << getOpName() << "'s first argument must be an array, but is "
-                          << typeName(array.getType()),
+            str::stream() << self->getOpName() << "'s "
+                          << (arity == 1 ? "argument" : "first argument")
+                          << " must be an array, but is " << typeName(array.getType()),
             array.isArray());
     uassert(28690,
-            str::stream() << getOpName() << "'s second argument must be a numeric value,"
+            str::stream() << self->getOpName() << "'s second argument must be a numeric value,"
                           << " but is " << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
-            str::stream() << getOpName() << "'s second argument must be representable as"
+            str::stream() << self->getOpName() << "'s second argument must be representable as"
                           << " a 32-bit integer: " << indexArg.coerceToDouble(),
             indexArg.integral());
 
@@ -542,10 +542,41 @@ Value ExpressionArrayElemAt::evaluate(const Document& root, Variables* variables
     const size_t index = static_cast<size_t>(i);
     return array[index];
 }
+}  // namespace
+
+Value ExpressionArrayElemAt::evaluate(const Document& root, Variables* variables) const {
+    const Value array = _children[0]->evaluate(root, variables);
+    const Value indexArg = _children[1]->evaluate(root, variables);
+    return arrayElemAt(this, array, indexArg);
+}
 
 REGISTER_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
 const char* ExpressionArrayElemAt::getOpName() const {
     return "$arrayElemAt";
+}
+
+/* ------------------------- ExpressionFirst -------------------------- */
+
+Value ExpressionFirst::evaluate(const Document& root, Variables* variables) const {
+    const Value array = _children[0]->evaluate(root, variables);
+    return arrayElemAt(this, array, Value(0));
+}
+
+REGISTER_EXPRESSION(first, ExpressionFirst::parse);
+const char* ExpressionFirst::getOpName() const {
+    return "$first";
+}
+
+/* ------------------------- ExpressionLast -------------------------- */
+
+Value ExpressionLast::evaluate(const Document& root, Variables* variables) const {
+    const Value array = _children[0]->evaluate(root, variables);
+    return arrayElemAt(this, array, Value(-1));
+}
+
+REGISTER_EXPRESSION(last, ExpressionLast::parse);
+const char* ExpressionLast::getOpName() const {
+    return "$last";
 }
 
 /* ------------------------- ExpressionObjectToArray -------------------------- */

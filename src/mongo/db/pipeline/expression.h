@@ -864,6 +864,32 @@ public:
     }
 };
 
+class ExpressionFirst final : public ExpressionFixedArity<ExpressionFirst, 1> {
+public:
+    explicit ExpressionFirst(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+};
+
+class ExpressionLast final : public ExpressionFixedArity<ExpressionLast, 1> {
+public:
+    explicit ExpressionLast(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionLast, 1>(expCtx) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+};
+
 class ExpressionObjectToArray final : public ExpressionFixedArity<ExpressionObjectToArray, 1> {
 public:
     explicit ExpressionObjectToArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
