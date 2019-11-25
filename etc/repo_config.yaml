@@ -336,7 +336,7 @@ repos:
     architectures:
       - amd64
     repos:
-      - apt/debian/dists/stretch/mongodb-enterprise
+      - apt/debian/dists/buster/mongodb-enterprise
 
   - name: debian92
     type: deb
