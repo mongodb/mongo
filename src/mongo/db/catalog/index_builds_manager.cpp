@@ -179,6 +179,11 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                 }
                 record = cursor->next();
             }
+
+            // Time to yield; make a safe copy of the current record before releasing our cursor.
+            if (record)
+                record->data.makeOwned();
+
             cursor->save();  // Can't fail per API definition
             // When this exits via success or WCE, we need to restore the cursor
             ON_BLOCK_EXIT([opCtx, ns, &cursor]() {
