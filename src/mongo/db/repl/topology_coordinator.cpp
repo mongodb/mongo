@@ -756,8 +756,8 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
             } else {
                 LOG(2) << "Config from heartbeat response was same as ours.";
             }
-            if (logger::globalLogDomain()->shouldLog(MongoLogDefaultComponent_component,
-                                                     ::mongo::LogstreamBuilder::severityCast(2))) {
+            if (shouldLog(MongoLogDefaultComponent_component,
+                          ::mongo::LogstreamBuilder::severityCast(2))) {
                 LogstreamBuilder lsb = log();
                 if (_rsConfig.isInitialized()) {
                     lsb << "Current config: " << _rsConfig.toBSON() << "; ";

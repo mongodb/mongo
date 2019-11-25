@@ -48,6 +48,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/log_global_settings.h"
 
 namespace mongo {
 namespace {
@@ -253,11 +254,9 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 
     // To diagnose any intermittent failures, maximize logging from WiredTigerKVEngine and friends.
     const auto kStorage = logger::LogComponent::kStorage;
-    auto originalVerbosity = logger::globalLogDomain()->getMinimumLogSeverity(kStorage);
-    logger::globalLogDomain()->setMinimumLoggedSeverity(kStorage, logger::LogSeverity::Debug(3));
-    ON_BLOCK_EXIT([&]() {
-        logger::globalLogDomain()->setMinimumLoggedSeverity(kStorage, originalVerbosity);
-    });
+    auto originalVerbosity = getMinimumLogSeverity(kStorage);
+    setMinimumLoggedSeverity(kStorage, logger::LogSeverity::Debug(3));
+    ON_BLOCK_EXIT([&]() { setMinimumLoggedSeverity(kStorage, originalVerbosity); });
 
     // Simulate the callback that queries config.transactions for the oldest active transaction.
     boost::optional<Timestamp> oldestActiveTxnTimestamp;

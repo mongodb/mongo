@@ -90,7 +90,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     }
 
     if (params.count("debug") || params.count("verbose")) {
-        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+        setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
     }
 
     boost::filesystem::path p(frameworkGlobalParams.dbpathSpec);

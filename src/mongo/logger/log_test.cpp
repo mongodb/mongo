@@ -150,7 +150,7 @@ const LogComponent componentE = LogComponent::kJournal;
 // Component severity configuration:
 //     LogComponent::kDefault: 2
 TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
-    globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(2));
+    setMinimumLoggedSeverity(LogSeverity::Debug(2));
 
     LOG(2) << "This is logged";
     LOG(3) << "This is not logged";
@@ -161,20 +161,6 @@ TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
     _logLines.clear();
     MONGO_LOG_COMPONENT(2, componentA) << "This is logged";
     MONGO_LOG_COMPONENT(3, componentA) << "This is not logged";
-    ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-    // MONGO_LOG_COMPONENT2
-    _logLines.clear();
-    MONGO_LOG_COMPONENT2(2, componentA, componentB) << "This is logged";
-    MONGO_LOG_COMPONENT2(3, componentA, componentB) << "This is not logged";
-    ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-    // MONGO_LOG_COMPONENT3
-    _logLines.clear();
-    MONGO_LOG_COMPONENT3(2, componentA, componentB, componentC) << "This is logged";
-    MONGO_LOG_COMPONENT3(3, componentA, componentB, componentC) << "This is not logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
 }
@@ -239,8 +225,7 @@ TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogDefaultLogComponent
 
     // Set minimum logged severity so that Debug(1) messages are written to log domain.
     settings.setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
-    logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
-                                                        LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
 
     ASSERT_TRUE(shouldLog(LogSeverity::Info()));
     ASSERT_TRUE(shouldLog(LogSeverity::Log()));
@@ -248,7 +233,7 @@ TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogDefaultLogComponent
     ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
 
     // Revert back.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Log());
+    setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Log());
 
     // Same results when components are supplied to shouldLog().
     ASSERT_TRUE(settings.shouldLog(componentA, LogSeverity::Debug(1)));
@@ -277,14 +262,13 @@ TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogSingleComponent) {
     ASSERT_FALSE(settings.shouldLog(componentA, LogSeverity::Debug(2)));
 
     // Test shouldLog() with global settings.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
-                                                        LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
 
     // Components for log message: LogComponent::kDefault only.
     ASSERT_TRUE(shouldLog(LogSeverity::Debug(1)));
     ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
 
-    logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Log());
+    setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Log());
 }
 
 // Test for shouldLog() when we have configured multiple components.
@@ -314,15 +298,14 @@ TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogMultipleComponentsC
     ASSERT_FALSE(settings.shouldLog(componentC, LogSeverity::Debug(2)));
 
     // Test shouldLog() with global settings.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
-                                                        LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
 
 
     // Components for log message: LogComponent::kDefault only.
     ASSERT_TRUE(shouldLog(LogSeverity::Debug(1)));
     ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
 
-    logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Log());
+    setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Log());
 }
 
 // Log component hierarchy.
@@ -424,7 +407,7 @@ TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogComponent) {
 // Tests pass through of log component:
 //     log macros -> LogStreamBuilder -> MessageEventEphemeral -> MessageEventDetailsEncoder
 TEST_F(LogTestDetailsEncoder, ) {
-    globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Log());
+    setMinimumLoggedSeverity(LogSeverity::Log());
 
     // Default log component short name should not appear in detailed log line.
     MONGO_LOG_COMPONENT(0, componentDefault) << "This is logged";
@@ -437,21 +420,6 @@ TEST_F(LogTestDetailsEncoder, ) {
     MONGO_LOG_COMPONENT(0, componentA) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()), std::string::npos);
-
-    // MONGO_LOG_COMPONENT2 - only the first component is sent to LogStreamBuilder.
-    _logLines.clear();
-    MONGO_LOG_COMPONENT2(0, componentA, componentB) << "This is logged";
-    ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()), std::string::npos);
-    ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);
-
-    // MONGO_LOG_COMPONENT3 - only the first component is sent to LogStreamBuilder.
-    _logLines.clear();
-    MONGO_LOG_COMPONENT3(0, componentA, componentB, componentC) << "This is logged";
-    ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()), std::string::npos);
-    ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);
-    ASSERT_EQUALS(_logLines[0].find(componentC.getNameForLog().toString()), std::string::npos);
 }
 
 // Tests pass through of log component:

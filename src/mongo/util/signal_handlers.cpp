@@ -187,8 +187,7 @@ void signalProcessingThread(LogFileStatus rotate) {
                 }
 
                 lastSignalTimeSeconds = signalTimeSeconds;
-                fassert(16782,
-                        rotateLogs(serverGlobalParams.logRenameOnRotate, serverGlobalParams.logV2));
+                fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate, logV2Enabled()));
                 if (rotate == LogFileStatus::kNeedToRotateLogFile) {
                     logProcessDetailsForLogRotate(getGlobalServiceContext());
                 }

@@ -72,7 +72,7 @@ TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
     // severe() - with component.
     _logLines.clear();
     severe(componentA) << "This is logged";
-    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Severe()));
+    ASSERT_TRUE(shouldLog(componentA, LogSeverity::Severe()));
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F  " << componentA.getNameForLog()),
                       std::string::npos);
@@ -88,7 +88,7 @@ TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
     // error() - with component.
     _logLines.clear();
     error(componentA) << "This is logged";
-    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Error()));
+    ASSERT_TRUE(shouldLog(componentA, LogSeverity::Error()));
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E  " << componentA.getNameForLog()),
                       std::string::npos);
@@ -104,7 +104,7 @@ TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
     // warning() - with component.
     _logLines.clear();
     warning(componentA) << "This is logged";
-    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Warning()));
+    ASSERT_TRUE(shouldLog(componentA, LogSeverity::Warning()));
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W  " << componentA.getNameForLog()),
                       std::string::npos);
@@ -120,7 +120,7 @@ TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
     // log() - with component.
     _logLines.clear();
     log(componentA) << "This is logged";
-    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Log()));
+    ASSERT_TRUE(shouldLog(componentA, LogSeverity::Log()));
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I  " << componentA.getNameForLog()),
                       std::string::npos);

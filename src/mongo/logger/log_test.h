@@ -39,6 +39,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log_global_settings.h"
 
 namespace mongo {
 namespace logger {
@@ -51,7 +52,7 @@ class LogTest : public unittest::Test {
     friend class LogTestAppender;
 
 public:
-    LogTest() : _severityOld(globalLogDomain()->getMinimumLogSeverity()) {
+    LogTest() : _severityOld(getMinimumLogSeverity()) {
         globalLogDomain()->clearAppenders();
         _appenderHandle =
             globalLogDomain()->attachAppender(std::make_unique<LogTestAppender>(this));
@@ -59,7 +60,7 @@ public:
 
     virtual ~LogTest() {
         globalLogDomain()->detachAppender(_appenderHandle);
-        globalLogDomain()->setMinimumLoggedSeverity(_severityOld);
+        setMinimumLoggedSeverity(_severityOld);
     }
 
 protected:

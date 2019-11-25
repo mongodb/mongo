@@ -49,6 +49,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/logger.h"
+#include "mongo/util/log_global_settings.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -109,8 +110,8 @@ void RollbackTest::setUp() {
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
 
     // Increase rollback log component verbosity for unit tests.
-    mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        logger::LogComponent::kReplicationRollback, logger::LogSeverity::Debug(2));
+    setMinimumLoggedSeverity(logger::LogComponent::kReplicationRollback,
+                             logger::LogSeverity::Debug(2));
 
     auto observerRegistry = checked_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
     observerRegistry->addObserver(std::make_unique<RollbackTestOpObserver>());

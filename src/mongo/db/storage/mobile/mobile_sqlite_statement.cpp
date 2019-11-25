@@ -42,10 +42,9 @@
 #include "mongo/util/scopeguard.h"
 
 #define SQLITE_STMT_TRACE() LOG(MOBILE_TRACE_LEVEL) << "MobileSE: SQLite Stmt ID:" << _id << " "
-#define SQLITE_STMT_TRACE_ENABLED()                 \
-    (::mongo::logger::globalLogDomain()->shouldLog( \
-        MongoLogDefaultComponent_component,         \
-        ::mongo::LogstreamBuilder::severityCast(MOBILE_TRACE_LEVEL)))
+#define SQLITE_STMT_TRACE_ENABLED()                \
+    (shouldLog(MongoLogDefaultComponent_component, \
+               ::mongo::LogstreamBuilder::severityCast(MOBILE_TRACE_LEVEL)))
 
 namespace mongo {
 

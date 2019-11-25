@@ -85,7 +85,7 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(const ReplSetCo
 
 TEST_F(ReplCoordHBV1Test,
        NodeJoinsExistingReplSetWhenReceivingAConfigContainingTheNodeViaHeartbeat) {
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplSetConfig rsConfig = assertMakeRSConfig(BSON("_id"
                                                      << "mySet"
                                                      << "version" << 3 << "members"
@@ -154,7 +154,7 @@ TEST_F(ReplCoordHBV1Test,
 
 TEST_F(ReplCoordHBV1Test,
        ArbiterJoinsExistingReplSetWhenReceivingAConfigContainingTheArbiterViaHeartbeat) {
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "mySet"
@@ -227,7 +227,7 @@ TEST_F(ReplCoordHBV1Test,
        NodeDoesNotJoinExistingReplSetWhenReceivingAConfigNotContainingTheNodeViaHeartbeat) {
     // Tests that a node in RS_STARTUP will not transition to RS_REMOVED if it receives a
     // configuration that does not contain it.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplSetConfig rsConfig = assertMakeRSConfig(BSON("_id"
                                                      << "mySet"
                                                      << "version" << 3 << "members"
@@ -309,7 +309,7 @@ TEST_F(ReplCoordHBV1Test,
 TEST_F(ReplCoordHBV1Test,
        NodeChangesToRecoveringStateWhenAllNodesRespondToHeartbeatsWithUnauthorized) {
     // Tests that a node that only has auth error heartbeats is recovering
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 1 << "members"

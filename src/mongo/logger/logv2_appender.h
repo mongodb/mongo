@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/log_version_util.h"
+#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
@@ -73,6 +74,27 @@ public:
     Status append(const Event& event) override {
 
         auto logTagValue = findTeeTag(event.getTeeName());
+        auto message = event.getMessage();
+        if (message.endsWith("\n")) {
+            message = message.substr(0, message.size() - 1);
+        }
+        size_t maxSizeKB = MessageEventDetailsEncoder::getMaxLogSizeKB();
+
+        if (event.isTruncatable() && message.size() > maxSizeKB * 1024) {
+            logv2::detail::doLog(
+                logv2::LogSeverity::cast(event.getSeverity().toInt()),
+                StringData{},
+                logv2::LogOptions{
+                    logComponentV1toV2(event.getComponent()),
+                    _domain,
+                    logv2::LogTag{static_cast<logv2::LogTag::Value>(
+                        static_cast<std::underlying_type_t<logv2::LogTag::Value>>(logTagValue) |
+                        static_cast<std::underlying_type_t<logv2::LogTag::Value>>(_tag))}},
+
+                "warning: log line attempted ({}kB) over max size ({}kB)",
+                "size"_attr = message.size() / 1024,
+                "maxSize"_attr = maxSizeKB);
+        }
 
         logv2::detail::doLog(
 
@@ -92,7 +114,7 @@ public:
                     static_cast<std::underlying_type_t<logv2::LogTag::Value>>(_tag))}},
 
             "{}",
-            "message"_attr = event.getMessage());
+            "message"_attr = message);
         return Status::OK();
     }
 

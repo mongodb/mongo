@@ -749,7 +749,7 @@ int _main(int argc, char* argv[], char** envp) {
     if (!mongo::serverGlobalParams.quiet.load())
         std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
 
-    if (!shellGlobalParams.logV2) {
+    if (!logV2Enabled()) {
         logger::globalLogManager()
             ->getNamedDomain("javascriptOutput")
             ->attachAppender(std::make_unique<ShellConsoleAppender>(

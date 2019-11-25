@@ -196,7 +196,7 @@ public:
                      const std::string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate, serverGlobalParams.logV2);
+        bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate, logV2Enabled());
         if (didRotate)
             logProcessDetailsForLogRotate(opCtx->getServiceContext());
         return didRotate;
@@ -233,7 +233,7 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        if (serverGlobalParams.logV2) {
+        if (logV2Enabled()) {
             return errmsgRunImpl<logv2::RamLog>(opCtx, dbname, cmdObj, errmsg, result);
         }
         return errmsgRunImpl<RamLog>(opCtx, dbname, cmdObj, errmsg, result);
@@ -322,7 +322,7 @@ public:
             invariant(ramlog);
             ramlog->clear();
         };
-        if (serverGlobalParams.logV2) {
+        if (logV2Enabled()) {
             clearRamlog(logv2::RamLog::getIfExists(logName));
         } else {
             clearRamlog(RamLog::getIfExists(logName));

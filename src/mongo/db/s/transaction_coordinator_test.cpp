@@ -2109,15 +2109,13 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionAtLogLevelOne) {
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1));
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
     ASSERT_EQUALS(1, countLogLinesContaining("two-phase commit parameters:"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionAtLogLevelZero) {
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Log());
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
@@ -2125,8 +2123,7 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionAtLogLevelZero) {
 TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold) {
     // Set the log level to 0 so that the slow logging is only done if the transaction exceeds the
     // slowMS setting.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Log());
     serverGlobalParams.slowMS = 100;
     startCapturingLogMessages();
 
@@ -2157,8 +2154,7 @@ TEST_F(
     DoesNotLogTransactionsUnderSlowMSThresholdEvenIfCoordinatorHasExistedForLongerThanSlowThreshold) {
     // Set the log level to 0 so that the slow logging is only done if the transaction exceeds the
     // slowMS setting.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Log());
     serverGlobalParams.slowMS = 100;
     startCapturingLogMessages();
 
@@ -2187,8 +2183,7 @@ TEST_F(
 TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
     // Set the log level to 0 so that the slow logging is only done if the transaction exceeds the
     // slowMS setting.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Log());
     serverGlobalParams.slowMS = 100;
     startCapturingLogMessages();
 

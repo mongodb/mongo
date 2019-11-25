@@ -35,6 +35,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/util/log_global_settings.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -52,31 +53,28 @@ TEST(SERVER25981Test, SetSeverityShouldLogAndClear) {
     stdx::thread shouldLogThread([&]() {
         startupBarrier.countDownAndWait();
         while (running.load()) {
-            logger::globalLogDomain()->shouldLog(LogComponent::kDefault,
-                                                 logger::LogSeverity::Debug(3));
+            shouldLog(LogComponent::kDefault, logger::LogSeverity::Debug(3));
         }
     });
 
     stdx::thread setMinimumLoggedSeverityThreadA([&]() {
         startupBarrier.countDownAndWait();
         while (running.load()) {
-            logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
-                                                                logger::LogSeverity::Debug(1));
+            setMinimumLoggedSeverity(LogComponent::kDefault, logger::LogSeverity::Debug(1));
         }
     });
 
     stdx::thread setMinimumLoggedSeverityThreadB([&]() {
         startupBarrier.countDownAndWait();
         while (running.load()) {
-            logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
-                                                                logger::LogSeverity::Log());
+            setMinimumLoggedSeverity(LogComponent::kDefault, logger::LogSeverity::Log());
         }
     });
 
     stdx::thread clearMinimumLoggedSeverityThread([&]() {
         startupBarrier.countDownAndWait();
         while (running.load()) {
-            logger::globalLogDomain()->clearMinimumLoggedSeverity(LogComponent::kDefault);
+            clearMinimumLoggedSeverity(LogComponent::kDefault);
         }
     });
 

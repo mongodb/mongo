@@ -3132,16 +3132,14 @@ TEST_F(TransactionRouterMetricsTest, OnlyLogSlowTransactionsOnce) {
 
 TEST_F(TransactionRouterMetricsTest, NoTransactionsLoggedAtDefaultTransactionLogLevel) {
     // Set verbosity level of transaction components to the default, i.e. debug level 0.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Log());
     beginTxnWithDefaultTxnNumber();
     runSingleShardCommit();
     assertDidNotPrintSlowLogLine();
 }
 
 TEST_F(TransactionRouterMetricsTest, AllTransactionsLoggedAtTransactionLogLevelOne) {
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1));
     beginTxnWithDefaultTxnNumber();
     runSingleShardCommit();
     assertPrintedExactlyOneSlowLogLine();

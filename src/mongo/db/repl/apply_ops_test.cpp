@@ -42,6 +42,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/log_global_settings.h"
 
 namespace mongo {
 namespace repl {
@@ -115,8 +116,7 @@ void ApplyOpsTest::tearDown() {
     _opObserver = nullptr;
 
     // Reset default log level in case it was changed.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,
-                                                        logger::LogSeverity::Debug(0));
+    setMinimumLoggedSeverity(logger::LogComponent::kReplication, logger::LogSeverity::Debug(0));
 
     ServiceContextMongoDTest::tearDown();
 }
@@ -290,8 +290,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     auto opCtx = cc().makeOperationContext();
 
     // Increase log component verbosity to check for op application messages.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,
-                                                        logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logger::LogComponent::kReplication, logger::LogSeverity::Debug(3));
 
     // Test that the 'applyOps' function passes the oplog application mode through correctly to the
     // underlying op application functions.

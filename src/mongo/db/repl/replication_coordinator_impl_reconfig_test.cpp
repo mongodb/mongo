@@ -564,7 +564,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     hbResp.addToBSON(&respObj2);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj2.obj()));
 
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
     startCapturingLogMessages();
     // execute hb reconfig, which should fail with a log message; confirmed at end of test
     net->runReadyNetworkOperations();
@@ -575,7 +575,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
         1, countLogLinesContaining("because already in the midst of a configuration process"));
     shutdown(opCtx.get());
     reconfigThread.join();
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logger::LogSeverity::Log());
 }
 
 TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary) {

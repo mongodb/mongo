@@ -58,6 +58,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log_global_settings.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -3515,8 +3516,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityInfo) {
     serverGlobalParams.slowMS = 10000;
 
     // Set verbosity level of transaction components to info.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Info());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Info());
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -3537,8 +3537,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
     serverGlobalParams.slowMS = 10000;
 
     // Set verbosity level of transaction components to debug.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1));
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -3547,8 +3546,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
     stopCapturingLogMessages();
 
     // Reset verbosity level of transaction components.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kTransaction,
-                                                        logger::LogSeverity::Info());
+    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Info());
 
     // Test that the transaction is still logged.
     ASSERT_EQUALS(1, countLogLinesContaining("transaction parameters"));

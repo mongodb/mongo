@@ -978,8 +978,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         command->incrementCommandsExecuted();
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogComponent::kTracking,
-                                                 logger::LogSeverity::Debug(1)) &&
+        if (shouldLog(logger::LogComponent::kTracking, logger::LogSeverity::Debug(1)) &&
             rpc::TrackingMetadata::get(opCtx).getParentOperId()) {
             MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
                 << rpc::TrackingMetadata::get(opCtx).toString();

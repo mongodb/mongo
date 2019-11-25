@@ -101,8 +101,8 @@ void getLogComponentVerbosity(BSONObj* output) {
         LogComponent component = static_cast<LogComponent::Value>(i);
 
         int severity = -1;
-        if (globalLogDomain()->hasMinimumLogSeverity(component)) {
-            severity = globalLogDomain()->getMinimumLogSeverity(component).toInt();
+        if (hasMinimumLogSeverity(component)) {
+            severity = getMinimumLogSeverity(component).toInt();
         }
 
         // Save LogComponent::kDefault LogSeverity at root
@@ -172,13 +172,13 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
 
         // Negative value means to clear log level of component.
         if (newSetting.level < 0) {
-            globalLogDomain()->clearMinimumLoggedSeverity(newSetting.component);
+            clearMinimumLoggedSeverity(newSetting.component);
             continue;
         }
         // Convert non-negative value to Log()/Debug(N).
         LogSeverity newSeverity =
             (newSetting.level > 0) ? LogSeverity::Debug(newSetting.level) : LogSeverity::Log();
-        globalLogDomain()->setMinimumLoggedSeverity(newSetting.component, newSeverity);
+        setMinimumLoggedSeverity(newSetting.component, newSeverity);
     }
 
     return Status::OK();
@@ -384,7 +384,7 @@ public:
 void LogLevelServerParameter::append(OperationContext*,
                                      BSONObjBuilder& builder,
                                      const std::string& name) {
-    builder.append(name, globalLogDomain()->getMinimumLogSeverity().toInt());
+    builder.append(name, getMinimumLogSeverity().toInt());
 }
 
 Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
@@ -393,7 +393,7 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid value for logLevel: " << newValueElement);
     LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
-    globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+    setMinimumLoggedSeverity(newSeverity);
     return Status::OK();
 }
 
@@ -406,7 +406,7 @@ Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid value for logLevel: " << newValue);
     LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
-    globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+    setMinimumLoggedSeverity(newSeverity);
     return Status::OK();
 }
 

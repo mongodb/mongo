@@ -46,6 +46,7 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log_global_settings.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
@@ -5778,12 +5779,12 @@ public:
     virtual void setUp() {
         HeartbeatResponseTestV1::setUp();
         // set verbosity as high as the highest verbosity log message we'd like to check for
-        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     }
 
     virtual void tearDown() {
         HeartbeatResponseTestV1::tearDown();
-        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+        setMinimumLoggedSeverity(logger::LogSeverity::Log());
     }
 };
 
