@@ -18,7 +18,6 @@ import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
 
 CONFIG_DIRECTORY = "generated_resmoke_config"
-TEST_SUITE_DIR = generate_resmoke.DEFAULT_TEST_SUITE_DIR
 
 ConfigOptions = namedtuple("ConfigOptions", [
     "num_files",
@@ -95,15 +94,6 @@ def _name_task(parent_name, task_index, total_tasks):
     return "{0}_{1}".format(parent_name, str(task_index).zfill(index_width))
 
 
-def _write_fuzzer_yaml(options):
-    """Write the fuzzer yaml to CONFIG_DIRECTORY."""
-    suite_file = options.suite + ".yml"
-    source_config = generate_resmoke.read_yaml(TEST_SUITE_DIR, suite_file)
-    gen_yml = generate_resmoke.generate_resmoke_suite_config(source_config, suite_file)
-    file_dict = {f"{options.suite}.yml": gen_yml}
-    generate_resmoke.write_file_dict(CONFIG_DIRECTORY, file_dict)
-
-
 def generate_evg_tasks(options, evg_config, task_name_suffix=None, display_task=None):
     """
     Generate an evergreen configuration for fuzzers based on the options given.
@@ -138,7 +128,7 @@ def generate_evg_tasks(options, evg_config, task_name_suffix=None, display_task=
         }))
         # Unix path separators are used because Evergreen only runs this script in unix shells,
         # even on Windows.
-        suite_arg = f"--suites={CONFIG_DIRECTORY}/{options.suite}.yml"
+        suite_arg = f"--suites={options.suite}"
         run_tests_vars = {
             "continue_on_failure": options.continue_on_failure,
             "resmoke_args": f"{suite_arg} {options.resmoke_args}",
@@ -195,7 +185,6 @@ def main():
 
     config_options = _get_config_options(options, options.expansion_file)
     evg_config = Configuration()
-    _write_fuzzer_yaml(config_options)
     generate_evg_tasks(config_options, evg_config)
 
     if not os.path.exists(CONFIG_DIRECTORY):

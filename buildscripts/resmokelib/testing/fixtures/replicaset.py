@@ -34,7 +34,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         self.mongod_options = utils.default_if_none(mongod_options, {})
         self.preserve_dbpath = preserve_dbpath
-        self.num_nodes = num_nodes
         self.start_initial_sync_node = start_initial_sync_node
         self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
@@ -42,9 +41,15 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.voting_secondaries = voting_secondaries
         self.all_nodes_electable = all_nodes_electable
         self.use_replica_set_connection_string = use_replica_set_connection_string
-        self.linear_chain = linear_chain
         self.mixed_bin_versions = utils.default_if_none(mixed_bin_versions,
                                                         config.MIXED_BIN_VERSIONS)
+
+        # Use the values given from the command line if they exist for linear_chain and num_nodes.
+        linear_chain_option = utils.default_if_none(config.LINEAR_CHAIN, linear_chain)
+        self.linear_chain = linear_chain_option if linear_chain_option else linear_chain
+        num_replset_nodes = config.NUM_REPLSET_NODES
+        self.num_nodes = num_replset_nodes if num_replset_nodes else num_nodes
+
         if self.mixed_bin_versions is not None:
             mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE,
                                                       config.DEFAULT_MONGOD_EXECUTABLE)
@@ -63,9 +68,9 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 # server nodes will always be fully upgraded before shard nodes.
                 self.mixed_bin_versions = [latest_mongod, latest_mongod]
             num_versions = len(self.mixed_bin_versions)
-            if num_versions != num_nodes and not is_config_svr:
+            if num_versions != self.num_nodes and not is_config_svr:
                 msg = (("The number of binary versions specified: {} do not match the number of"\
-                        " nodes in the replica set: {}.")).format(num_versions, num_nodes)
+                        " nodes in the replica set: {}.")).format(num_versions, self.num_nodes)
                 raise errors.ServerFailure(msg)
 
         # By default, we only use a replica set connection string if all nodes are capable of being

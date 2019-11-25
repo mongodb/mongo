@@ -267,6 +267,15 @@ def _make_parser():  # pylint: disable=too-many-statements
         help="Sets the storage engine cache size configuration"
         " setting for all mongod's.")
 
+    parser.add_option(
+        "--numReplSetNodes", type="int", dest="num_replset_nodes", metavar="N",
+        help="The number of nodes to initialize per ReplicaSetFixture. This is also "
+        "used to indicate the number of replica set members per shard in a "
+        "ShardedClusterFixture.")
+
+    parser.add_option("--numShards", type="int", dest="num_shards", metavar="N",
+                      help="The number of shards to use in a ShardedClusterFixture.")
+
     parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
                       help="A YAML file that associates tests and tags.")
 
@@ -290,6 +299,11 @@ def _make_parser():  # pylint: disable=too-many-statements
         " binary version configuration. Specify 'old-new' to configure a replica set with a"
         " 'last-stable' version primary and 'latest' version secondary. For a sharded cluster"
         " with two shards and two replica set nodes each, specify 'old-new-old-new'.")
+
+    parser.add_option(
+        "--linearChain", type="choice", action="store", dest="linear_chain", choices=("on", "off"),
+        metavar="ON|OFF", help="Enable or disable linear chaining for tests using "
+        "ReplicaSetFixture.")
 
     evergreen_options = optparse.OptionGroup(
         parser, title=_EVERGREEN_OPTIONS_TITLE,
@@ -594,6 +608,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")
+    _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
     _config.MIXED_BIN_VERSIONS = config.pop("mixed_bin_versions")
     if _config.MIXED_BIN_VERSIONS is not None:
@@ -606,6 +621,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
+    _config.NUM_REPLSET_NODES = config.pop("num_replset_nodes")
+    _config.NUM_SHARDS = config.pop("num_shards")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT_SUITES = config.pop("repeat_suites")

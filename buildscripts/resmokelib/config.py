@@ -95,6 +95,9 @@ DEFAULTS = {
     "tag_file": None,
     "transport_layer": None,
     "mixed_bin_versions": None,
+    "linear_chain": None,
+    "num_replset_nodes": None,
+    "num_shards": None,
 
     # Evergreen options.
     "build_id": None,
@@ -385,6 +388,15 @@ MAJORITY_READ_CONCERN = None
 
 # Specifies the binary versions of each node we should run for a replica set.
 MIXED_BIN_VERSIONS = None
+
+# Specifies the number of replica set members in a ReplicaSetFixture.
+NUM_REPLSET_NODES = None
+
+# Specifies the number of shards in a ShardedClusterFixture.
+NUM_SHARDS = None
+
+# If true, run ReplicaSetFixture with linear chaining.
+LINEAR_CHAIN = None
 
 # If set to "on", it enables flow control. If set to "off", it disables flow control. If left as
 # None, the server's default will determine whether flow control is enabled.

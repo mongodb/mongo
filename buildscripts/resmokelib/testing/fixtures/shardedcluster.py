@@ -41,8 +41,11 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = \
                 mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
         self.preserve_dbpath = preserve_dbpath
-        self.num_shards = num_shards
-        self.num_rs_nodes_per_shard = num_rs_nodes_per_shard
+        # Use 'num_shards' and 'num_rs_nodes_per_shard' values from the command line if they exist.
+        num_shards_option = config.NUM_SHARDS
+        self.num_shards = num_shards if not num_shards_option else num_shards_option
+        num_rs_nodes_per_shard_option = config.NUM_REPLSET_NODES
+        self.num_rs_nodes_per_shard = num_rs_nodes_per_shard if not num_rs_nodes_per_shard_option else num_rs_nodes_per_shard_option
         self.num_mongos = num_mongos
         self.enable_sharding = utils.default_if_none(enable_sharding, [])
         self.enable_balancer = enable_balancer
