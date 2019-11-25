@@ -36,9 +36,9 @@
 // figure out if we're on a 64 or 32 bit system
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_WIN64) || defined(__aarch64__) || \
-    defined(__powerpc64__) || defined(__s390x__) || defined(__sparcv9)
+    defined(__powerpc64__) || defined(__s390x__) || defined(__sparcv9) || defined(__mips64)
 #define MONGO_PLATFORM_64
-#elif defined(__i386__) || defined(_WIN32) || defined(__arm__) || defined(__sparc__)
+#elif defined(__i386__) || defined(_WIN32) || defined(__arm__) || defined(__sparc__) || defined(__mips__)
 #define MONGO_PLATFORM_32
 #else
 #error "unknown platform"

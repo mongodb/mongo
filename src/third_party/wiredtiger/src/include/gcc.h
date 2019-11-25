@@ -202,6 +202,20 @@ __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 	__asm__ volatile ("dsb st" ::: "memory");			\
 } while (0)
 
+#elif defined(__mips64)
+#define	WT_PAUSE()	__asm__ volatile("sync" ::: "memory")
+#define	WT_FULL_BARRIER() do {						\
+	__asm__ volatile ("sync" ::: "memory");			\
+} while (0)
+#define	WT_READ_BARRIER() do {						\
+	__asm__ volatile ("sync" ::: "memory");			\
+} while (0)
+#define	WT_WRITE_BARRIER() do {						\
+	__asm__ volatile ("sync" ::: "memory");			\
+} while (0)
+
+
+
 #elif defined(__s390x__)
 #define	WT_PAUSE()	__asm__ volatile("lr 0,0" ::: "memory")
 #define	WT_FULL_BARRIER() do {						\

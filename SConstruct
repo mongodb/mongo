@@ -998,6 +998,7 @@ processor_macros = {
     's390x'   : { 'endian': 'big',    'defines': ('__s390x__',)},
     'sparc'   : { 'endian': 'big',    'defines': ('__sparc',)},
     'x86_64'  : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
+    'mips64el'  : { 'endian': 'little', 'defines': ('__mips64', '__mips64')},
 }
 
 def CheckForProcessor(context, which_arch):

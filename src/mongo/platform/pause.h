@@ -59,6 +59,10 @@
 
 #define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("yield" ::: "memory")
 
+#elif defined(__mips64)
+
+#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("sync" ::: "memory")
+
 #elif defined(__s390x__)
 
 #define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("lr 0,0" ::: "memory")
