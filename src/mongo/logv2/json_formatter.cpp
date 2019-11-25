@@ -35,6 +35,7 @@
 #include <boost/log/utility/formatting_ostream.hpp>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
@@ -49,36 +50,33 @@ namespace mongo::logv2 {
 namespace {
 struct JsonValueExtractor {
     void operator()(StringData name, CustomAttributeValue const& val) {
-        if (val.toBSON) {
-            // This is a JSON subobject, select overload that does not surround value with quotes
-            operator()(name, val.toBSON().jsonString());
+        if (val.BSONAppend) {
+            BSONObjBuilder builder;
+            val.BSONAppend(builder, name);
+            // This is a JSON subobject, no quotes needed
+            storeUnquoted(name,
+                          builder.obj().getField(name).jsonString(JsonStringFormat::Strict, false));
+        } else if (val.toBSON) {
+            // This is a JSON subobject, no quotes needed
+            storeUnquoted(name, val.toBSON().jsonString());
         } else {
-            // This is a string, select overload that surrounds value with quotes
-            operator()(name, StringData(val.toString()));
+            // This is a string, surround value with quotes
+            storeQuoted(name, val.toString());
         }
     }
 
     void operator()(StringData name, const BSONObj* val) {
-        // This is a JSON subobject, select overload that does not surround value with quotes
-        operator()(name, val->jsonString());
+        // This is a JSON subobject, no quotes needed
+        storeUnquoted(name, val->jsonString());
     }
 
     void operator()(StringData name, StringData value) {
-        // The first {} is for the member separator, added by store()
-        store(R"({}"{}":"{}")", name, value);
+        storeQuoted(name, value);
     }
 
     template <typename T>
     void operator()(StringData name, const T& value) {
-        // The first {} is for the member separator, added by store()
-        store(R"({}"{}":{})", name, value);
-    }
-
-    template <typename T>
-    void store(const char* fmt_str, StringData name, const T& value) {
-        nameArgs.push_back(fmt::internal::make_arg<fmt::format_context>(name));
-        fmt::format_to(buffer, fmt_str, _separator, name, value);
-        _separator = ","_sd;
+        storeUnquoted(name, value);
     }
 
     fmt::memory_buffer buffer;
@@ -87,6 +85,26 @@ struct JsonValueExtractor {
         nameArgs;
 
 private:
+    template <typename T>
+    void storeUnquoted(StringData name, const T& value) {
+        // The first {} is for the member separator, added by storeImpl()
+        storeImpl(R"({}"{}":{})", name, value);
+    }
+
+
+    template <typename T>
+    void storeQuoted(StringData name, const T& value) {
+        // The first {} is for the member separator, added by storeImpl()
+        storeImpl(R"({}"{}":"{}")", name, value);
+    }
+
+    template <typename T>
+    void storeImpl(const char* fmt_str, StringData name, const T& value) {
+        nameArgs.push_back(fmt::internal::make_arg<fmt::format_context>(name));
+        fmt::format_to(buffer, fmt_str, _separator, name, value);
+        _separator = ","_sd;
+    }
+
     StringData _separator = ""_sd;
 };
 

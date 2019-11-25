@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/formatter_base.h"
 #include "mongo/logv2/json_formatter.h"
@@ -49,8 +50,10 @@
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/text_formatter.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/uuid.h"
 
 #include <boost/log/attributes/constant.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -189,158 +192,126 @@ TEST_F(LogTestV2, Types) {
         ASSERT(ptree.get<decltype(expected)>("attr.name") == expected);
     };
 
-    // bool
+    auto testNumeric = [&](auto dummy) {
+        using T = decltype(dummy);
+
+        auto test = [&](auto value) {
+            text.clear();
+            LOGV2("{}", "name"_attr = value);
+            ASSERT_EQUALS(text.back(), fmt::format("{}", value));
+            validateJSON(value);
+        };
+
+        test(std::numeric_limits<T>::max());
+        test(std::numeric_limits<T>::min());
+        test(std::numeric_limits<T>::lowest());
+        test(static_cast<T>(-10));
+        test(static_cast<T>(-2));
+        test(static_cast<T>(-1));
+        test(static_cast<T>(0));
+        test(static_cast<T>(1));
+        test(static_cast<T>(2));
+        test(static_cast<T>(10));
+    };
+
     bool b = true;
     LOGV2("bool {}", "name"_attr = b);
-    ASSERT(text.back() == "bool true");
+    ASSERT_EQUALS(text.back(), "bool true");
     validateJSON(b);
 
-    // char gets promoted to int
     char c = 1;
     LOGV2("char {}", "name"_attr = c);
-    ASSERT(text.back() == "char 1");
+    ASSERT_EQUALS(text.back(), "char 1");
     validateJSON(static_cast<uint8_t>(
         c));  // cast, boost property_tree will try and parse as ascii otherwise
 
-    // signed char gets promoted to int
-    signed char sc = -1;
-    LOGV2("signed char {}", "name"_attr = sc);
-    ASSERT(text.back() == "signed char -1");
-    validateJSON(sc);
-
-    // unsigned char gets promoted to unsigned int
-    unsigned char uc = -1;
-    LOGV2("unsigned char {}", "name"_attr = uc);
-    ASSERT(text.back() == "unsigned char 255");
-    validateJSON(uc);
-
-    // short gets promoted to int
-    short s = 1;
-    LOGV2("short {}", "name"_attr = s);
-    ASSERT(text.back() == "short 1");
-    validateJSON(s);
-
-    // signed short gets promoted to int
-    signed short ss = -1;
-    LOGV2("signed short {}", "name"_attr = ss);
-    ASSERT(text.back() == "signed short -1");
-    validateJSON(ss);
-
-    // unsigned short gets promoted to unsigned int
-    unsigned short us = -1;
-    LOGV2("unsigned short {}", "name"_attr = us);
-    ASSERT(text.back() == "unsigned short 65535");
-    validateJSON(us);
-
-    // int types are preserved
-    int i = 1;
-    LOGV2("int {}", "name"_attr = i);
-    ASSERT(text.back() == "int 1");
-    validateJSON(i);
-
-    signed int si = -1;
-    LOGV2("signed int {}", "name"_attr = si);
-    ASSERT(text.back() == "signed int -1");
-    validateJSON(si);
-
-    unsigned int ui = -1;
-    LOGV2("unsigned int {}", "name"_attr = ui);
-    ASSERT(text.back() == "unsigned int 4294967295");
-    validateJSON(ui);
-
-    // int is treated as long long
-    long l = 1;
-    LOGV2("long {}", "name"_attr = l);
-    ASSERT(text.back() == "long 1");
-    validateJSON(l);
-
-    signed long sl = -1;
-    LOGV2("signed long {}", "name"_attr = sl);
-    ASSERT(text.back() == "signed long -1");
-    validateJSON(sl);
-
-    unsigned long ul = -1;
-    LOGV2("unsigned long {}", "name"_attr = ul);
-    ASSERT(text.back() == fmt::format("unsigned long {}", ul));
-    validateJSON(ul);
-
-    // long long types are preserved
-    long long ll = std::numeric_limits<unsigned int>::max();
-    ll += 1;
-    LOGV2("long long {}", "name"_attr = ll);
-    ASSERT(text.back() == std::string("long long ") + std::to_string(ll));
-    validateJSON(ll);
-
-    signed long long sll = -1;
-    LOGV2("signed long long {}", "name"_attr = sll);
-    ASSERT(text.back() == "signed long long -1");
-    validateJSON(sll);
-
-    unsigned long long ull = -1;
-    LOGV2("unsigned long long {}", "name"_attr = ull);
-    ASSERT(text.back() == "unsigned long long 18446744073709551615");
-    validateJSON(ull);
-
-    // int64_t, uint64_t, size_t are fine
-    int64_t int64 = 1;
-    LOGV2("int64_t {}", "name"_attr = int64);
-    ASSERT(text.back() == "int64_t 1");
-    validateJSON(int64);
-
-    uint64_t uint64 = -1;
-    LOGV2("uint64_t {}", "name"_attr = uint64);
-    ASSERT(text.back() == "uint64_t 18446744073709551615");
-    validateJSON(uint64);
-
-    size_t size = 1;
-    LOGV2("size_t {}", "name"_attr = size);
-    ASSERT(text.back() == "size_t 1");
-    validateJSON(size);
-
-    // floating point types
-    float f = 1.0;
-    LOGV2("float {}", "name"_attr = f);
-    ASSERT(text.back() == "float 1.0");
-    validateJSON(f);
-
-    double d = 1.0;
-    LOGV2("double {}", "name"_attr = d);
-    ASSERT(text.back() == "double 1.0");
-    validateJSON(d);
+    testNumeric(static_cast<signed char>(0));
+    testNumeric(static_cast<unsigned char>(0));
+    testNumeric(static_cast<short>(0));
+    testNumeric(static_cast<unsigned short>(0));
+    testNumeric(0);
+    testNumeric(0u);
+    testNumeric(0l);
+    testNumeric(0ul);
+    testNumeric(0ll);
+    testNumeric(0ull);
+    testNumeric(static_cast<int64_t>(0));
+    testNumeric(static_cast<uint64_t>(0));
+    testNumeric(static_cast<size_t>(0));
+    testNumeric(0.0f);
+    testNumeric(0.0);
 
     // long double is prohibited, we don't use this type and favors Decimal128 instead.
 
     // string types
     const char* c_str = "a c string";
     LOGV2("c string {}", "name"_attr = c_str);
-    ASSERT(text.back() == "c string a c string");
+    ASSERT_EQUALS(text.back(), "c string a c string");
     validateJSON(std::string(c_str));
 
     std::string str = "a std::string";
     LOGV2("std::string {}", "name"_attr = str);
-    ASSERT(text.back() == "std::string a std::string");
+    ASSERT_EQUALS(text.back(), "std::string a std::string");
     validateJSON(str);
 
     StringData str_data = "a StringData"_sd;
     LOGV2("StringData {}", "name"_attr = str_data);
-    ASSERT(text.back() == "StringData a StringData");
+    ASSERT_EQUALS(text.back(), "StringData a StringData");
     validateJSON(str_data.toString());
 
     // BSONObj
     BSONObjBuilder builder;
-    builder.append("int32"_sd, i);
-    builder.append("int64"_sd, ll);
-    builder.append("double"_sd, d);
+    builder.append("int32"_sd, 0);
+    builder.append("int64"_sd, std::numeric_limits<int64_t>::max());
+    builder.append("double"_sd, 0.0);
     builder.append("str"_sd, str_data);
     BSONObj bson = builder.obj();
     LOGV2("bson {}", "name"_attr = bson);
-    ASSERT(text.back() == std::string("bson ") + bson.jsonString());
+    ASSERT_EQUALS(text.back(), std::string("bson ") + bson.jsonString());
     ASSERT(mongo::fromjson(json.back())
                .getField("attr"_sd)
                .Obj()
                .getField("name")
                .Obj()
                .woCompare(bson) == 0);
+
+    // Date_t
+    Date_t date = Date_t::now();
+    LOGV2("Date_t {}", "name"_attr = date);
+    ASSERT_EQUALS(text.back(), std::string("Date_t ") + date.toString());
+    ASSERT_EQUALS(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").Date(),
+                  date);
+
+    // Decimal128
+    LOGV2("Decimal128 {}", "name"_attr = Decimal128::kPi);
+    ASSERT_EQUALS(text.back(), std::string("Decimal128 ") + Decimal128::kPi.toString());
+    ASSERT(mongo::fromjson(json.back())
+               .getField("attr")
+               .Obj()
+               .getField("name")
+               .Decimal()
+               .isEqual(Decimal128::kPi));
+
+    // OID
+    OID oid = OID::gen();
+    LOGV2("OID {}", "name"_attr = oid);
+    ASSERT_EQUALS(text.back(), std::string("OID ") + oid.toString());
+    ASSERT_EQUALS(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").OID(), oid);
+
+    // Timestamp
+    Timestamp ts = Timestamp::max();
+    LOGV2("Timestamp {}", "name"_attr = ts);
+    ASSERT_EQUALS(text.back(), std::string("Timestamp ") + ts.toString());
+    ASSERT_EQUALS(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").timestamp(),
+                  ts);
+
+    // UUID
+    UUID uuid = UUID::gen();
+    LOGV2("UUID {}", "name"_attr = uuid);
+    ASSERT_EQUALS(text.back(), std::string("UUID ") + uuid.toString());
+    ASSERT_EQUALS(
+        UUID::parse(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").Obj()),
+        uuid);
 }
 
 TEST_F(LogTestV2, TextFormat) {

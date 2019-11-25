@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/variant.h"
 
 #include <functional>
@@ -42,6 +43,7 @@ class TypeErasedAttributeStorage;
 // Custom type, storage for how to call its formatters
 struct CustomAttributeValue {
     std::function<BSONObj()> toBSON;
+    std::function<void(BSONObjBuilder&, StringData)> BSONAppend;
     std::function<std::string()> toString;
 };
 
@@ -54,6 +56,17 @@ struct HasToBSON : std::false_type {};
 
 template <class T>
 struct HasToBSON<T, std::void_t<decltype(std::declval<T>().toBSON())>> : std::true_type {};
+
+
+template <class T, class = void>
+struct HasBSONBuilderAppend : std::false_type {};
+
+template <class T>
+struct HasBSONBuilderAppend<T,
+                            std::void_t<decltype(std::declval<BSONObjBuilder>().append(
+                                std::declval<StringData>(), std::declval<T>()))>> : std::true_type {
+};
+
 
 template <class T, class = void>
 struct HasToString : std::false_type {};
@@ -91,11 +104,16 @@ public:
         static_assert(HasToString<T>::value, "custom type needs toString() implementation");
 
         CustomAttributeValue custom;
+        if constexpr (HasBSONBuilderAppend<T>::value) {
+            custom.BSONAppend = [&val](BSONObjBuilder& builder, StringData fieldName) {
+                builder.append(fieldName, val);
+            };
+        }
         if constexpr (HasToBSON<T>::value) {
-            custom.toBSON = std::bind(&T::toBSON, val);
+            custom.toBSON = [&val]() { return val.toBSON(); };
         }
         if constexpr (HasToString<T>::value) {
-            custom.toString = std::bind(&T::toString, val);
+            custom.toString = [&val]() { return val.toString(); };
         }
 
         value = std::move(custom);
