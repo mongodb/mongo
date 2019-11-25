@@ -179,7 +179,7 @@ public:
      */
     static boost::optional<Date_t> cleanUpNextRange(OperationContext*,
                                                     NamespaceString const& nss,
-                                                    OID const& epoch,
+                                                    UUID collectionUuid,
                                                     int maxToDelete = 0,
                                                     CollectionRangeDeleter* forTestOnly = nullptr);
 
@@ -195,7 +195,7 @@ private:
      */
     static bool _checkCollectionMetadataStillValid(
         const NamespaceString& nss,
-        OID const& epoch,
+        UUID collectionUuid,
         CollectionRangeDeleter* forTestOnly,
         Collection* collection,
         std::shared_ptr<MetadataManager> metadataManager);

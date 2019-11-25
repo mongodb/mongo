@@ -154,7 +154,11 @@ public:
 
 private:
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
-        OperationContext*, NamespaceString const&, OID const&, int, CollectionRangeDeleter*);
+        OperationContext*,
+        NamespaceString const&,
+        UUID collectionUuid,
+        int,
+        CollectionRangeDeleter*);
 
     // Namespace this state belongs to.
     const NamespaceString _nss;

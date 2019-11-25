@@ -61,26 +61,29 @@ const NamespaceString kAdminSysVer = NamespaceString("admin", "system.version");
 
 class CollectionRangeDeleterTest : public ShardServerTestFixture {
 protected:
+    // Required because default constructor of UUID is private.
+    CollectionRangeDeleterTest() : _uuid(UUID::gen()) {}
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        // Make every test run with a separate epoch
-        _epoch = OID::gen();
+        // Reset for each test.
+        _uuid = UUID::gen();
 
         DBDirectClient client(operationContext());
         client.createCollection(kNss.ns());
+        auto epoch = OID::gen();
 
         const KeyPattern keyPattern(kShardKeyPattern);
         auto rt = RoutingTableHistory::makeNew(
             kNss,
-            UUID::gen(),
+            _uuid,
             keyPattern,
             nullptr,
             false,
-            epoch(),
+            epoch,
             {ChunkType(kNss,
                        ChunkRange{keyPattern.globalMin(), keyPattern.globalMax()},
-                       ChunkVersion(1, 0, epoch()),
+                       ChunkVersion(1, 0, epoch),
                        ShardId("otherShard"))});
         std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
 
@@ -101,15 +104,15 @@ protected:
 
     boost::optional<Date_t> next(CollectionRangeDeleter& rangeDeleter, int maxToDelete) {
         return CollectionRangeDeleter::cleanUpNextRange(
-            operationContext(), kNss, epoch(), maxToDelete, &rangeDeleter);
+            operationContext(), kNss, uuid(), maxToDelete, &rangeDeleter);
     }
 
     std::shared_ptr<RemoteCommandTargeterMock> configTargeter() const {
         return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
     }
 
-    OID const& epoch() const {
-        return _epoch;
+    UUID uuid() const {
+        return _uuid;
     }
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
@@ -117,7 +120,7 @@ protected:
     }
 
 private:
-    OID _epoch;
+    UUID _uuid;
 };
 
 // Tests the case that there is nothing in the database.
@@ -334,7 +337,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // clang-format off
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
-          << "epoch" << epoch() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 3)),
+          << "uuid" << uuid() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 3)),
         dbclient.findOne(kAdminSysVer.ns(), QUERY("_id" << "startRangeDeletion")));
     // clang-format on
 
@@ -350,7 +353,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // clang-format off
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
-          << "epoch" << epoch() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 3)),
+          << "uuid" << uuid() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 3)),
         dbclient.findOne(kAdminSysVer.ns(), QUERY("_id" << "startRangeDeletion")));
     // clang-format on
 
@@ -367,7 +370,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // clang-format off
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
-          << "epoch" << epoch() << "min" << BSON("_id" << 4) << "max" << BSON("_id" << 7)),
+          << "uuid" << uuid() << "min" << BSON("_id" << 4) << "max" << BSON("_id" << 7)),
         dbclient.findOne(kAdminSysVer.ns(), QUERY("_id" << "startRangeDeletion")));
     // clang-format on
 

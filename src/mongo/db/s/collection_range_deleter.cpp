@@ -101,7 +101,7 @@ CollectionRangeDeleter::~CollectionRangeDeleter() {
 boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     OperationContext* opCtx,
     NamespaceString const& nss,
-    OID const& epoch,
+    UUID collectionUuid,
     int maxToDelete,
     CollectionRangeDeleter* forTestOnly) {
 
@@ -125,7 +125,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto& metadataManager = csr->_metadataManager;
 
         if (!_checkCollectionMetadataStillValid(
-                nss, epoch, forTestOnly, collection, metadataManager)) {
+                nss, collectionUuid, forTestOnly, collection, metadataManager)) {
             return boost::none;
         }
 
@@ -178,7 +178,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                                 NamespaceString::kServerConfigurationNamespace.ns(),
                                 BSON("_id"
                                      << "startRangeDeletion"
-                                     << "ns" << nss.ns() << "epoch" << epoch << "min"
+                                     << "ns" << nss.ns() << "uuid" << collectionUuid << "min"
                                      << range->getMin() << "max" << range->getMax()));
             } catch (const DBException& e) {
                 stdx::lock_guard<Latch> scopedLock(csr->_metadataManager->_managerLock);
@@ -251,7 +251,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto& metadataManager = csr->_metadataManager;
 
         if (!_checkCollectionMetadataStillValid(
-                nss, epoch, forTestOnly, collection, metadataManager)) {
+                nss, collectionUuid, forTestOnly, collection, metadataManager)) {
             return boost::none;
         }
 
@@ -296,7 +296,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
 
 bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
     const NamespaceString& nss,
-    OID const& epoch,
+    UUID collectionUuid,
     CollectionRangeDeleter* forTestOnly,
     Collection* collection,
     std::shared_ptr<MetadataManager> metadataManager) {
@@ -327,9 +327,10 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
         return false;
     }
 
-    if (!forTestOnly && metadata->getCollVersion().epoch() != epoch) {
-        LOG(1) << "Range deletion task for " << nss.ns() << " epoch " << epoch << " woke;"
-               << " (current is " << metadata->getCollVersion() << ")";
+    if (!forTestOnly && collection->uuid() != collectionUuid) {
+        LOG(1) << "Abandoning range deletion task for " << nss.ns() << " with UUID "
+               << collectionUuid << " because UUID of " << nss.ns() << "has changed (current is "
+               << collection->uuid() << ")";
         return false;
     }
 

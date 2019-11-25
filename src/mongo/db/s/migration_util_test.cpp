@@ -180,6 +180,7 @@ protected:
             coll.setEpoch(epoch);
             coll.setKeyPattern(shardKeyPattern.getKeyPattern());
             coll.setUnique(true);
+            coll.setUUID(UUID::gen());
 
             return coll.toBSON();
         }();

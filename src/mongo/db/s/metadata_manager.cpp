@@ -126,11 +126,11 @@ MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
  */
 void scheduleCleanup(executor::TaskExecutor* executor,
                      NamespaceString nss,
-                     OID epoch,
+                     UUID collectionUuid,
                      Date_t when) {
     LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
     auto swCallbackHandle = executor->scheduleWorkAt(
-        when, [executor, nss = std::move(nss), epoch = std::move(epoch)](auto& args) {
+        when, [executor, nss = std::move(nss), uuid = collectionUuid](auto& args) {
             auto& status = args.status;
             if (ErrorCodes::isCancelationError(status.code())) {
                 return;
@@ -147,9 +147,9 @@ void scheduleCleanup(executor::TaskExecutor* executor,
 
             suspendRangeDeletion.pauseWhileSet();
 
-            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, epoch);
+            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, uuid);
             if (next) {
-                scheduleCleanup(executor, std::move(nss), std::move(epoch), *next);
+                scheduleCleanup(executor, std::move(nss), std::move(uuid), *next);
             }
         });
 
@@ -304,12 +304,16 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
 
     const auto& activeMetadata = _metadata.back()->metadata;
 
-    // If the metadata being installed has a different epoch from ours, this means the collection
-    // was dropped and recreated, so we must entirely reset the metadata state
-    if (activeMetadata->getCollVersion().epoch() != remoteMetadata.getCollVersion().epoch()) {
+    // If the metadata being installed is unsharded or is sharded and has a different UUID from
+    // ours, this means the collection was dropped and recreated, so we must entirely reset the
+    // metadata state.
+    if (!remoteMetadata.isSharded() ||
+        (activeMetadata->isSharded() &&
+         *activeMetadata->getChunkManager()->getUUID() !=
+             remoteMetadata.getChunkManager()->getUUID())) {
         LOG(0) << "Updating metadata for collection " << _nss.ns() << " from "
                << activeMetadata->toStringBasic() << " to " << remoteMetadata.toStringBasic()
-               << " due to epoch change";
+               << " due to UUID change";
 
         _receivingChunks.clear();
         _clearAllCleanups(lg);
@@ -320,7 +324,8 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     }
 
     // We already have the same or newer version
-    if (activeMetadata->getCollVersion() >= remoteMetadata.getCollVersion()) {
+    if (activeMetadata->getCollVersion().epoch() == remoteMetadata.getCollVersion().epoch() &&
+        activeMetadata->getCollVersion() >= remoteMetadata.getCollVersion()) {
         LOG(1) << "Ignoring update of active metadata " << activeMetadata->toStringBasic()
                << " with an older " << remoteMetadata.toStringBasic();
         return;
@@ -444,8 +449,9 @@ auto MetadataManager::_pushRangeToClean(WithLock lock, ChunkRange const& range, 
 void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
     auto when = _rangesToClean.add(std::move(ranges));
     if (when) {
-        scheduleCleanup(
-            _executor, _nss, _metadata.back()->metadata->getCollVersion().epoch(), *when);
+        auto collectionUuid = _metadata.front()->metadata->getChunkManager()->getUUID();
+        invariant(collectionUuid);
+        scheduleCleanup(_executor, _nss, *collectionUuid, *when);
     }
 }
 
