@@ -6,7 +6,7 @@
 and semantics are as close as possible to those of the Perl 5 language.
 
                        Written by Philip Hazel
-           Copyright (c) 1997-2014 University of Cambridge
+           Copyright (c) 1997-2018 University of Cambridge
 
 -----------------------------------------------------------------------------
 Redistribution and use in source and binary forms, with or without
@@ -2305,7 +2305,7 @@ for (;;)
     case OP_ANY:
     if (IS_NEWLINE(eptr)) RRETURN(MATCH_NOMATCH);
     if (md->partial != 0 &&
-        eptr + 1 >= md->end_subject &&
+        eptr == md->end_subject - 1 &&
         NLBLOCK->nltype == NLTYPE_FIXED &&
         NLBLOCK->nllen == 2 &&
         UCHAR21TEST(eptr) == NLBLOCK->nl[0])
@@ -3053,7 +3053,7 @@ for (;;)
             {
             RMATCH(eptr, ecode, offset_top, md, eptrb, RM18);
             if (rrc != MATCH_NOMATCH) RRETURN(rrc);
-            if (eptr-- == pp) break;        /* Stop if tried at original pos */
+            if (eptr-- <= pp) break;        /* Stop if tried at original pos */
             BACKCHAR(eptr);
             }
           }
@@ -3210,7 +3210,7 @@ for (;;)
           {
           RMATCH(eptr, ecode, offset_top, md, eptrb, RM21);
           if (rrc != MATCH_NOMATCH) RRETURN(rrc);
-          if (eptr-- == pp) break;        /* Stop if tried at original pos */
+          if (eptr-- <= pp) break;        /* Stop if tried at original pos */
 #ifdef SUPPORT_UTF
           if (utf) BACKCHAR(eptr);
 #endif

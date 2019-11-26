@@ -16,13 +16,17 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-VERSION=8.41
+
+VERSION=8.42
 NAME=pcre
 TARBALL=$NAME-$VERSION.tar.gz
 TARBALL_DIR=$NAME-$VERSION
 TEMP_DIR=$(mktemp -d /tmp/pcre.XXXXXX)
 trap "rm -rf $TEMP_DIR" EXIT
+OLD_DIR=$(find $(git rev-parse --show-toplevel)/src/third_party -name 'pcre-*' -type d)
+OLD_PATCH_DIR="$OLD_DIR/patches"
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
+PATCH_DIR="$DEST_DIR/patches"
 UNAME=$(uname | tr A-Z a-z)
 
 if [ $UNAME == "sunos" ]; then
@@ -98,3 +102,9 @@ fi
 # Copy over config.h
 mkdir $DEST_DIR/build_$TARGET_UNAME || true
 cp $TEMP_DIR/config.h $DEST_DIR/build_$TARGET_UNAME
+cp -R $OLD_PATCH_DIR $PATCH_DIR
+
+cd $DEST_DIR
+for patchfile in $PATCH_DIR/*; do
+    patch -p4 < $patchfile
+done
