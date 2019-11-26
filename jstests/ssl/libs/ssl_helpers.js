@@ -276,7 +276,8 @@ function isRHEL8() {
 
 function sslProviderSupportsTLS1_0() {
     if (isRHEL8()) {
-        return false;
+        const cryptoPolicy = cat("/etc/crypto-policies/config");
+        return cryptoPolicy.includes("LEGACY");
     }
 
     return true;
@@ -284,7 +285,8 @@ function sslProviderSupportsTLS1_0() {
 
 function sslProviderSupportsTLS1_1() {
     if (isRHEL8()) {
-        return false;
+        const cryptoPolicy = cat("/etc/crypto-policies/config");
+        return cryptoPolicy.includes("LEGACY");
     }
 
     return true;
