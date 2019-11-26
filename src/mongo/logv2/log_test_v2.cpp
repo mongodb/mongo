@@ -412,6 +412,53 @@ TEST_F(LogTestV2, JSONFormat) {
     ASSERT(log.getField("attr"_sd).Obj().getField("name").String() == t.toString());
 }
 
+TEST_F(LogTestV2, Unicode) {
+    std::vector<std::string> lines;
+    auto sink = LogTestBackend::create(lines);
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
+    sink->set_formatter(PlainFormatter());
+    attach(sink);
+
+    std::pair<StringData, StringData> strs[] = {
+        // Single byte characters that needs to be escaped
+        {"\a\b\f\n\r\t\v\\\0\x7f\x1b"_sd, "\\a\\b\\f\\n\\r\\t\\v\\\\\\0\\x7f\\e"_sd},
+        // multi byte characters that needs to be escaped (unicode control characters)
+        {"\u0080\u009f"_sd, "\\xc2\\x80\\xc2\\x9f"_sd},
+        // Valid 2 Octet sequence, LATIN SMALL LETTER N WITH TILDE
+        {"\u00f1"_sd, "\u00f1"_sd},
+        // Invalid 2 Octet Sequence, result is escaped
+        {"\xc3\x28"_sd, "\\xc3\x28"_sd},
+        // Invalid Sequence Identifier, result is escaped
+        {"\xa0\xa1"_sd, "\\xa0\\xa1"_sd},
+        // Valid 3 Octet sequence, RUNIC LETTER TIWAZ TIR TYR T
+        {"\u16cf"_sd, "\u16cf"_sd},
+        // Invalid 3 Octet Sequence (in 2nd Octet), result is escaped
+        {"\xe2\x28\xa1"_sd, "\\xe2\x28\\xa1"_sd},
+        // Invalid 3 Octet Sequence (in 3rd Octet), result is escaped
+        {"\xe2\x82\x28"_sd, "\\xe2\\x82\x28"_sd},
+        // Valid 4 Octet sequence, GOTHIC LETTER MANNA
+        {"\U0001033c"_sd, "\U0001033c"_sd},
+        // Invalid 4 Octet Sequence (in 2nd Octet), result is escaped
+        {"\xf0\x28\x8c\xbc"_sd, "\\xf0\x28\\x8c\\xbc"_sd},
+        // Invalid 4 Octet Sequence (in 3rd Octet), result is escaped
+        {"\xf0\x90\x28\xbc"_sd, "\\xf0\\x90\x28\\xbc"_sd},
+        // Invalid 4 Octet Sequence (in 4th Octet), result is escaped
+        {"\xf0\x28\x8c\x28"_sd, "\\xf0\x28\\x8c\x28"_sd},
+        // Valid 5 Octet Sequence (but not Unicode!), result is escaped
+        {"\xf8\xa1\xa1\xa1\xa1"_sd, "\\xf8\\xa1\\xa1\\xa1\\xa1"_sd},
+        // Valid 6 Octet Sequence (but not Unicode!), result is escaped
+        {"\xfc\xa1\xa1\xa1\xa1\xa1"_sd, "\\xfc\\xa1\\xa1\\xa1\\xa1\\xa1"_sd},
+        // Invalid 3 Octet sequence, buffer ends prematurely, result is escaped
+        {"\xe2\x82"_sd, "\\xe2\\x82"_sd},
+    };
+
+    for (const auto& pair : strs) {
+        LOGV2("{}", "name"_attr = pair.first);
+        ASSERT_EQUALS(lines.back(), pair.second);
+    }
+}
+
 TEST_F(LogTestV2, Threads) {
     std::vector<std::string> linesPlain;
     auto plainSink = LogTestBackend::create(linesPlain);

@@ -123,6 +123,7 @@ baseEnv.Library(
         'logv2/log_tag.cpp',
         'logv2/plain_formatter.cpp',
         'logv2/ramlog.cpp',
+        'logv2/string_escape.cpp',
         'logv2/text_formatter.cpp',
         'platform/decimal128.cpp',
         'platform/mutex.cpp',

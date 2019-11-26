@@ -29,13 +29,11 @@
 
 #pragma once
 
-namespace mongo::logv2::constants {
+#include "mongo/base/string_data.h"
 
-// Used in data structures to indicate number of attributes to store without having to allocate
-// memory.
-constexpr size_t kNumStaticAttrs = 16;
+#include <string>
 
-// Allocate extra space to fit some escape sequences
-constexpr size_t kReservedSpaceForEscaping = 16;
-
-}  // namespace mongo::logv2::constants
+namespace mongo::logv2 {
+std::string escapeForText(StringData str);
+std::string escapeForJSON(StringData str);
+}  // namespace mongo::logv2
