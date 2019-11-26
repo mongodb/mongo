@@ -237,7 +237,7 @@ std::pair<const ASTNode*, size_t> findCommonPoint(const ASTNode* astNode,
 }
 }  // namespace
 
-bool Projection::isFieldRetainedExactly(StringData path) {
+bool Projection::isFieldRetainedExactly(StringData path) const {
     FieldPath fieldPath(path);
 
     const auto [node, pathIndex] = findCommonPoint(&_root, fieldPath, 0);

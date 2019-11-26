@@ -390,6 +390,89 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
         *query.root(),
         *query.getProj());
 }
+
+/**
+ * Given the solution tree 'root', attempts to push a projection at the root of the tree beneath a
+ * SORT node. Returns the tree with this optimization applied, or the unmodified tree if the
+ * optimization was not legal.
+ *
+ * Applying the projection before the sort is beneficial when it reduces the amount of data that
+ * needs to be sorted.
+ */
+std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
+    std::unique_ptr<QuerySolutionNode> root) {
+    if (StageType::STAGE_PROJECTION_DEFAULT != root->getType() &&
+        StageType::STAGE_PROJECTION_COVERED != root->getType() &&
+        StageType::STAGE_PROJECTION_SIMPLE != root->getType()) {
+        // There's no projection to push down.
+        return root;
+    }
+
+    auto projectNode = static_cast<ProjectionNode*>(root.get());
+    if (projectNode->proj.hasExpressions()) {
+        // If the projection has any expressions, then we refrain from moving it underneath the
+        // sort. It's possible that the addition of computed fields increases the size of the data
+        // to sort, in which case it would be better to sort first and then project.
+        return root;
+    }
+
+    if (projectNode->children[0]->getType() != StageType::STAGE_SORT) {
+        return root;
+    }
+
+    auto sortNode = static_cast<SortNode*>(root->children[0]);
+
+    // Don't perform this optimization if the sort is a top-k sort. We would be wasting work
+    // computing projections for documents that are discarded since they are not in the top-k set.
+    if (sortNode->limit > 0) {
+        return root;
+    }
+
+    if (sortNode->children[0]->getType() != StageType::STAGE_SORT_KEY_GENERATOR) {
+        return root;
+    }
+
+    auto sortKeyGenerator = static_cast<SortKeyGeneratorNode*>(sortNode->children[0]);
+
+    // It is only legal to push down the projection it if preserves all of the fields on which we
+    // need to sort.
+    for (auto&& sortComponent : sortNode->pattern) {
+        if (!projectNode->hasField(sortComponent.fieldNameStringData().toString())) {
+            return root;
+        }
+    }
+
+    // Perform the swap. We are starting with the following structure:
+    //   PROJECT => SORT => SORT_KEY_GENERATOR => CHILD
+    //
+    // This needs to be transformed to the following:
+    //   SORT => SORT_KEY_GENERATOR => PROJECT => CHILD
+    //
+    // First, detach the sort key generator node from the tree by clearing its
+    // child vector.
+    std::unique_ptr<QuerySolutionNode> restOfTree{sortKeyGenerator->children[0]};
+    invariant(sortKeyGenerator->children.size() == 1u);
+    sortKeyGenerator->children.clear();
+
+    // Next, detach the sort from the projection and assume ownership of it.
+    std::unique_ptr<QuerySolutionNode> ownedSortNode{sortNode};
+    sortNode = nullptr;
+    invariant(projectNode->children.size() == 1u);
+    projectNode->children.clear();
+
+    // Attach the lower part of the tree as the child of the projection.
+    std::unique_ptr<QuerySolutionNode> ownedProjectionNode = std::move(root);
+    ownedProjectionNode->children.push_back(restOfTree.release());
+
+    // Attach the projection as the child of the sort key generator.
+    sortKeyGenerator->children.push_back(ownedProjectionNode.release());
+
+    // Re-compute properties so that they reflect the new structure of the tree.
+    ownedSortNode->computeProperties();
+
+    return ownedSortNode;
+}
+
 }  // namespace
 
 // static
@@ -827,6 +910,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             solnRoot.reset(limit);
         }
     }
+
+    solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
 
     soln->root = std::move(solnRoot);
     return soln;

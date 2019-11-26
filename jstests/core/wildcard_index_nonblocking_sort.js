@@ -7,6 +7,7 @@ load("jstests/libs/analyze_plan.js");         // For getPlanStages().
 load("jstests/libs/fixture_helpers.js");      // For numberOfShardsForCollection().
 
 const coll = db.wildcard_nonblocking_sort;
+coll.drop();
 
 assert.commandWorked(coll.createIndex({"$**": 1}, {wildcardProjection: {"excludedField": 0}}));
 
@@ -28,14 +29,14 @@ function checkQueryUsesSortType(query, sort, projection, isBlocking) {
     const sorts = getPlanStages(plan, "SORT");
 
     if (isBlocking) {
-        assert.eq(sorts.length, FixtureHelpers.numberOfShardsForCollection(coll));
-        assert.eq(sorts[0].sortPattern, sort);
+        assert.eq(sorts.length, FixtureHelpers.numberOfShardsForCollection(coll), explain);
+        assert.eq(sorts[0].sortPattern, sort, explain);
 
         // A blocking sort may or may not use the index, so we don't check the length of
         // 'ixScans'.
     } else {
-        assert.eq(sorts.length, 0);
-        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
+        assert.eq(sorts.length, 0, explain);
+        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll), explain);
 
         const sortKey = Object.keys(sort)[0];
         assert.docEq(ixScans[0].keyPattern, {$_path: 1, [sortKey]: 1});

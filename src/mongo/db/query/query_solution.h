@@ -596,12 +596,7 @@ struct ProjectionNode : QuerySolutionNode {
     }
 
     bool hasField(const std::string& field) const {
-        // TODO: Returning false isn't always the right answer -- we may either be including
-        // certain fields, or we may be dropping fields (in which case hasField returns true).
-        //
-        // Given that projection sits on top of everything else in .find() it doesn't matter
-        // what we do here.
-        return false;
+        return proj.isFieldRetainedExactly(StringData{field});
     }
 
     bool sortedByDiskLoc() const {

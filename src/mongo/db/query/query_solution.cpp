@@ -700,29 +700,51 @@ std::set<StringData> getMultikeyFields(const BSONObj& keyPattern,
     return multikeyFields;
 }
 
-/**
- * Computes sort orders for index scans, including DISTINCT_SCAN. The 'sortsOut' set gets populated
- * with all the sort orders that will be provided by the index scan, and the 'multikeyFieldsOut'
- * field gets populated with the names of all fields that the index indicates are multikey.
- */
-void computeSortsAndMultikeyPathsForScan(const IndexEntry& index,
-                                         int direction,
-                                         const IndexBounds& bounds,
-                                         const CollatorInterface* queryCollator,
-                                         BSONObjSet* sortsOut,
-                                         std::set<StringData>* multikeyFieldsOut) {
-    sortsOut->clear();
-    multikeyFieldsOut->clear();
 
-    // If the index is multikey but does not have path-level multikey metadata, then this index
-    // cannot provide any sorts.
-    if (index.multikey && index.multikeyPaths.empty()) {
-        return;
-    }
+/**
+ * Populates 'sortsOut' with the sort orders provided by an index scan over 'index', with the given
+ * 'bounds' and 'direction'.
+ *
+ * The caller must ensure that the set pointed to by 'sortsOut' is empty before calling this
+ * function.
+ */
+void computeSortsForScan(const IndexEntry& index,
+                         int direction,
+                         const IndexBounds& bounds,
+                         const CollatorInterface* queryCollator,
+                         const std::set<StringData>& multikeyFields,
+                         BSONObjSet* sortsOut) {
+    invariant(sortsOut->empty());
 
     BSONObj sortPattern = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
     if (direction == -1) {
         sortPattern = QueryPlannerCommon::reverseSortObj(sortPattern);
+    }
+
+    // If 'index' is the result of expanding a wildcard index, then its key pattern should look like
+    // {$_path: 1, <field>: 1}. The "$_path" prefix stores the value of the path associated with the
+    // key as opposed to real user data. We shouldn't report any sort orders including "$_path". In
+    // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
+    // this as a path in user-data could trigger subsequent assertions.
+    if (index.type == IndexType::INDEX_WILDCARD) {
+        invariant(bounds.fields.size() == 2u);
+        // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
+        // happen for existence queries. For example, {a: {$exists: true}} results in bounds
+        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
+        // object are in bounds.
+        if (bounds.fields[0].intervals.size() != 1u) {
+            return;
+        }
+
+        // Strip '$_path' out of 'sortPattern' and then proceed with regular sort analysis.
+        BSONObjIterator it{sortPattern};
+        invariant(it.more());
+        auto pathElement = it.next();
+        invariant(pathElement.fieldNameStringData() == "$_path"_sd);
+        invariant(it.more());
+        auto secondElement = it.next();
+        invariant(!it.more());
+        sortPattern = BSONObjBuilder{}.append(secondElement).obj();
     }
 
     sortsOut->insert(sortPattern);
@@ -801,12 +823,10 @@ void computeSortsAndMultikeyPathsForScan(const IndexEntry& index,
     // We cannot provide a sort which involves a multikey field. Prune such sort orders, if the
     // index is multikey.
     if (index.multikey) {
-        *multikeyFieldsOut = getMultikeyFields(index.keyPattern, index.multikeyPaths);
         for (auto sortsIt = sortsOut->begin(); sortsIt != sortsOut->end();) {
             bool foundMultikeyField = false;
             for (auto&& elt : *sortsIt) {
-                if (multikeyFieldsOut->find(elt.fieldNameStringData()) !=
-                    multikeyFieldsOut->end()) {
+                if (multikeyFields.find(elt.fieldNameStringData()) != multikeyFields.end()) {
                     foundMultikeyField = true;
                     break;
                 }
@@ -820,6 +840,34 @@ void computeSortsAndMultikeyPathsForScan(const IndexEntry& index,
         }
     }
 }
+
+/**
+ * Computes sort orders for index scans, including DISTINCT_SCAN. The 'sortsOut' set gets populated
+ * with all the sort orders that will be provided by the index scan, and the 'multikeyFieldsOut'
+ * field gets populated with the names of all fields that the index indicates are multikey.
+ */
+void computeSortsAndMultikeyPathsForScan(const IndexEntry& index,
+                                         int direction,
+                                         const IndexBounds& bounds,
+                                         const CollatorInterface* queryCollator,
+                                         BSONObjSet* sortsOut,
+                                         std::set<StringData>* multikeyFieldsOut) {
+    sortsOut->clear();
+    multikeyFieldsOut->clear();
+
+    // If the index is multikey but does not have path-level multikey metadata, then this index
+    // cannot provide any sorts and we need not populate 'multikeyFieldsOut'.
+    if (index.multikey && index.multikeyPaths.empty()) {
+        return;
+    }
+
+    if (index.multikey) {
+        *multikeyFieldsOut = getMultikeyFields(index.keyPattern, index.multikeyPaths);
+    }
+
+    computeSortsForScan(index, direction, bounds, queryCollator, *multikeyFieldsOut, sortsOut);
+}
+
 }  // namespace
 
 void IndexScanNode::computeProperties() {

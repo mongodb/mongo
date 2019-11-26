@@ -125,8 +125,9 @@ TEST_F(QueryPlannerTest, CoveredWhenQueryOnNonMultikeyDottedPath) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, 'b.c': 1, _id: 0}, node: {sort: {pattern: {'b.c': 1}, limit: 0, "
-        "node: {sortKeyGen:{node: {ixscan: {pattern: {a: 1, 'b.c': 1}}}}}}}}}}}");
+        "{sort: {pattern: {'b.c': 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{proj: {spec: {a: 1, 'b.c': 1, _id: 0}, node: "
+        "{ixscan: {pattern: {a: 1, 'b.c': 1}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenFilterNonEmptyButMissingLeadingField) {
@@ -191,8 +192,8 @@ TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenSortOrderDifferentThanInde
     assertNumSolutions(1U);
 
     assertSolutionExists(
-        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {b: 1, a: 1}, limit: 0, node: "
-        "{sortKeyGen:{node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{sort: {pattern: {b: 1, a: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
 }
 
 // $eq can use a hashed index because it looks for values of type regex;
@@ -1483,8 +1484,8 @@ TEST_F(QueryPlannerTest, NENullWithSortAndProjection) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{proj: {spec: {_id: 0, a: 1}, node: {sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}}}}}");
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: {"
         "  ixscan: {pattern: {a:1}, bounds: {"
@@ -1544,6 +1545,70 @@ TEST_F(QueryPlannerTest, FetchAfterSortWhenOnlyProjectNeedsDocuments) {
         "1}, limit: 0, node: "
         "{sortKeyGen:{node: {ixscan: "
         "{pattern: {a: 1, b: 1}}}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExclusionProjectionCanSwapBeneathSort) {
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {a: 0, b: 0}, sort: {c: 1, d: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {c: 1, d: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{proj: {spec: {a: 0, b: 0}, node: {cscan: {dir: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ProjectionWithExpressionDoesNotSwapBeneathSort) {
+    runQueryAsCommand(
+        fromjson("{find: 'testns', "
+                 "projection: {_id: 0, a: 1, b: 1, c: {$add: ['$c', '$e']}}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1, c: {$add: ['$c', '$e']}}, node:"
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ProjectionWithConstantExpressionDoesNotSwapBeneathSort) {
+    runQueryAsCommand(
+        fromjson("{find: 'testns', "
+                 "projection: {_id: 0, a: 1, b: 1, c: 'constant'}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1, c: 'constant'}, node:"
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, InclusionProjectionCannotSwapBeneathSortIfItExcludesSortedOnField) {
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node:"
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExclusionProjectionCannotSwapBeneathSortIfItExcludesSortedOnField) {
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {b: 0}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {b: 0}, node:"
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ProjectionDoesNotSwapBeforeSortWithLimit) {
+    runQueryAsCommand(
+        fromjson("{find: 'testns', projection: {_id: 0, a: 1, b: 1}, sort: {a: 1}, limit: 3}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node:"
+        "{sort: {pattern: {a: 1}, limit: 3, node: {sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}}}");
 }
 
 }  // namespace

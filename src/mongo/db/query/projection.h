@@ -108,7 +108,7 @@ public:
      * and false otherwise. For example, the projection {a: 1} will preserve the element located at
      * 'a.b', and the projection {'a.b': 0} will not preserve the element located at 'a'.
      */
-    bool isFieldRetainedExactly(StringData path);
+    bool isFieldRetainedExactly(StringData path) const;
 
     /**
      * A projection is considered "simple" if it doesn't require the full document, operates only
@@ -118,6 +118,14 @@ public:
     bool isSimple() const {
         return !_deps.hasDottedPath && !_deps.requiresMatchDetails &&
             !_deps.metadataRequested.any() && !_deps.requiresDocument && !_deps.hasExpressions;
+    }
+
+    /**
+     * Returns true if this projection has any fields which are the result of computing an
+     * expression.
+     */
+    bool hasExpressions() const {
+        return _deps.hasExpressions;
     }
 
 private:

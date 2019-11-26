@@ -581,8 +581,8 @@ TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenQueryHasCollationButIndexD
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: "
-        "{sortKeyGen:{node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasNoCollationButIndexHasNonSimpleCollation) {
@@ -594,8 +594,8 @@ TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasNoCollationButIndexHasNonSimp
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: "
-        "{sortKeyGen:{node: {cscan: {dir: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {cscan: {dir: 1}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasDifferentNonSimpleCollationThanIndex) {
@@ -608,8 +608,8 @@ TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasDifferentNonSimpleCollationTh
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: "
-        "{sortKeyGen:{node: {cscan: {dir: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {cscan: {dir: 1}}}}}}}}");
 }
 
 /**
@@ -625,14 +625,14 @@ TEST_F(QueryPlannerTest, MustFetchBeforeSortWhenQueryHasSameNonSimpleCollationAs
 
     runQueryAsCommand(
         fromjson("{find: 'testns', filter: {a: {$gt: 0}}, projection: {a: 1, b:1, _id: 0}, "
-                 "collation: {locale: "
-                 "'reverse'}, sort: {b: 1, a: 1}}"));
+                 "collation: {locale: 'reverse'}, sort: {b: 1, a: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {b: 1, a: 1}, limit: 0, node: "
-        "{sortKeyGen:{node: {fetch: {filter: null, collation: {locale: 'reverse'}, node: {ixscan: "
-        "{pattern: {a: 1, b: 1}}}}}}}}}}}}}");
+        "{sort: {pattern: {b: 1, a: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node:"
+        "{fetch: {filter: null, collation: {locale: 'reverse'}, node:"
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBoundsContainNoStrings) {
