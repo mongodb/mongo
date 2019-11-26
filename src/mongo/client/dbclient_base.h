@@ -173,9 +173,9 @@ public:
                      std::string* actualServer = nullptr) = 0;
 
     /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-    virtual bool recv(Message& m, int lastRequestId) {
+    virtual Status recv(Message& m, int lastRequestId) {
         verify(false);
-        return false;
+        return {ErrorCodes::NotImplemented, "recv() not implemented"};
     }
 
     // In general, for lazy queries, we'll need to say, recv, then checkResponse

@@ -587,8 +587,8 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
     }
 
     // command failed
-
-    uasserted(18630, str::stream() << "listCollections failed: " << res);
+    uassertStatusOKWithContext(getStatusFromCommandResult(res), "'listCollections' failed: ");
+    MONGO_UNREACHABLE;
 }
 
 vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
@@ -648,6 +648,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
     unique_ptr<DBClientCursor> c =
         this->query(NamespaceString(ns), query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
 
+    // query() throws on network error so OK to uassert with numeric code here.
     uassert(10276,
             str::stream() << "DBClientBase::findN: transport error: " << getServerAddress()
                           << " ns: " << ns << " query: " << query.toString(),
@@ -769,6 +770,7 @@ unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIte
 
     unique_ptr<DBClientCursor> c(
         this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize));
+    // query() throws on network error so OK to uassert with numeric code here.
     uassert(16090, "socket error for mapping query", c.get());
 
     unsigned long long n = 0;

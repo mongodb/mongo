@@ -71,9 +71,9 @@ public:
         return true;
     }
 
-    bool recv(Message& m, int lastRequestId) override {
+    Status recv(Message& m, int lastRequestId) override {
         m = _mockRecvResponse;
-        return true;
+        return Status::OK();
     }
 
     // No-op.

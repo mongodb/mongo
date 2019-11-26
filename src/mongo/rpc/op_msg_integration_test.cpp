@@ -350,7 +350,7 @@ void exhaustTest(bool enableChecksum) {
     ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 1));
 
     // Receive next exhaust batch.
-    conn->recv(reply, lastRequestId);
+    ASSERT_OK(conn->recv(reply, lastRequestId));
     lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
@@ -363,7 +363,7 @@ void exhaustTest(bool enableChecksum) {
     ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 3));
 
     // Receive terminal batch.
-    ASSERT(conn->recv(reply, lastRequestId));
+    ASSERT_OK(conn->recv(reply, lastRequestId));
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
     res = OpMsg::parse(reply).body;

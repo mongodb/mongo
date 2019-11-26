@@ -228,7 +228,7 @@ public:
     }
 
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
-    bool recv(Message& m, int lastRequestId) override;
+    Status recv(Message& m, int lastRequestId) override;
     void checkResponse(const std::vector<BSONObj>& batch,
                        bool networkError,
                        bool* retry = nullptr,

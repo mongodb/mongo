@@ -182,10 +182,13 @@ bool DBClientCursor::init() {
     Message toSend = _assembleInit();
     verify(_client);
     Message reply;
-    if (!_client->call(toSend, reply, false, &_originalHost)) {
+    try {
+        _client->call(toSend, reply, true, &_originalHost);
+    } catch (const DBException&) {
         // log msg temp?
         log() << "DBClientCursor::init call() failed" << endl;
-        return false;
+        // We always want to throw on network exceptions.
+        throw;
     }
     if (reply.empty()) {
         // log msg temp?
@@ -209,13 +212,13 @@ void DBClientCursor::initLazy(bool isRetry) {
 bool DBClientCursor::initLazyFinish(bool& retry) {
     invariant(_connectionHasPendingReplies);
     Message reply;
-    bool recvd = _client->recv(reply, _lastRequestId);
+    Status recvStatus = _client->recv(reply, _lastRequestId);
     _connectionHasPendingReplies = false;
 
     // If we get a bad response, return false
-    if (!recvd || reply.empty()) {
-        if (!recvd)
-            log() << "DBClientCursor::init lazy say() failed" << endl;
+    if (!recvStatus.isOK() || reply.empty()) {
+        if (!recvStatus.isOK())
+            log() << "DBClientCursor::init lazy say() failed: " << redact(recvStatus) << endl;
         if (reply.empty())
             log() << "DBClientCursor::init message from say() was empty" << endl;
 
@@ -272,9 +275,8 @@ void DBClientCursor::exhaustReceiveMore() {
     uassert(40675, "Cannot have limit for exhaust query", !haveLimit);
     Message response;
     verify(_client);
-    if (!_client->recv(response, _lastRequestId)) {
-        uasserted(16465, "recv failed while exhausting cursor");
-    }
+    uassertStatusOK(
+        _client->recv(response, _lastRequestId).withContext("recv failed while exhausting cursor"));
     dataReceived(response);
 }
 

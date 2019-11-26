@@ -832,16 +832,15 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
     return;
 }
 
-bool DBClientReplicaSet::recv(Message& m, int lastRequestId) {
+Status DBClientReplicaSet::recv(Message& m, int lastRequestId) {
     verify(_lazyState._lastClient);
 
-    // TODO: It would be nice if we could easily wrap a conn error as a result error
     try {
         return _lazyState._lastClient->recv(m, lastRequestId);
     } catch (DBException& e) {
         log() << "could not receive data from " << _lazyState._lastClient->toString()
               << causedBy(redact(e));
-        return false;
+        return e.toStatus();
     }
 }
 

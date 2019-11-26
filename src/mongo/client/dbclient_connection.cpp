@@ -537,6 +537,8 @@ unsigned long long DBClientConnection::query(std::function<void(DBClientCursorBa
 
     unique_ptr<DBClientCursor> c(
         this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize));
+    // Note that this->query will throw for network errors, so it is OK to return a numeric
+    // error code here.
     uassert(13386, "socket error for mapping query", c.get());
 
     unsigned long long n = 0;
@@ -594,11 +596,11 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
     killSessionOnError.dismiss();
 }
 
-bool DBClientConnection::recv(Message& m, int lastRequestId) {
+Status DBClientConnection::recv(Message& m, int lastRequestId) {
     auto killSessionOnError = makeGuard([this] { _markFailed(kEndSession); });
     auto swm = _session->sourceMessage();
     if (!swm.isOK()) {
-        return false;
+        return swm.getStatus();
     }
 
     m = std::move(swm.getValue());
@@ -611,7 +613,7 @@ bool DBClientConnection::recv(Message& m, int lastRequestId) {
     }
 
     killSessionOnError.dismiss();
-    return true;
+    return Status::OK();
 }
 
 bool DBClientConnection::call(Message& toSend,
@@ -622,9 +624,9 @@ bool DBClientConnection::call(Message& toSend,
     auto killSessionOnError = makeGuard([this] { _markFailed(kEndSession); });
     auto maybeThrow = [&](const auto& errStatus) {
         if (assertOk)
-            uasserted(10278,
-                      str::stream() << "dbclient error communicating with server "
-                                    << getServerAddress() << ": " << redact(errStatus));
+            uassertStatusOKWithContext(errStatus,
+                                       str::stream() << "dbclient error communicating with server "
+                                                     << getServerAddress());
         return false;
     };
 
