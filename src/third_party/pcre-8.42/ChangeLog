@@ -4,6 +4,59 @@ ChangeLog for PCRE
 Note that the PCRE 8.xx series (PCRE1) is now in a bugfix-only state. All
 development is happening in the PCRE2 10.xx series.
 
+
+Version 8.42 20-March-2018
+--------------------------
+
+1.  Fixed a MIPS issue in the JIT compiler reported by Joshua Kinard.
+
+2.  Fixed outdated real_pcre definitions in pcre.h.in (patch by Evgeny Kotkov).
+
+3.  pcregrep was truncating components of file names to 128 characters when
+processing files with the -r option, and also (some very odd code) truncating
+path names to 512 characters. There is now a check on the absolute length of
+full path file names, which may be up to 2047 characters long.
+
+4.  Using pcre_dfa_exec(), in UTF mode when UCP support was not defined, there
+was the possibility of a false positive match when caselessly matching a "not
+this character" item such as [^\x{1234}] (with a code point greater than 127)
+because the "other case" variable was not being initialized.
+
+5. Although pcre_jit_exec checks whether the pattern is compiled
+in a given mode, it was also expected that at least one mode is available.
+This is fixed and pcre_jit_exec returns with PCRE_ERROR_JIT_BADOPTION
+when the pattern is not optimized by JIT at all.
+
+6. The line number and related variables such as match counts in pcregrep
+were all int variables, causing overflow when files with more than 2147483647
+lines were processed (assuming 32-bit ints). They have all been changed to
+unsigned long ints.
+
+7. If a backreference with a minimum repeat count of zero was first in a
+pattern, apart from assertions, an incorrect first matching character could be
+recorded. For example, for the pattern /(?=(a))\1?b/, "b" was incorrectly set
+as the first character of a match.
+
+8. Fix out-of-bounds read for partial matching of /./ against an empty string
+when the newline type is CRLF.
+
+9. When matching using the the REG_STARTEND feature of the POSIX API with a
+non-zero starting offset, unset capturing groups with lower numbers than a
+group that did capture something were not being correctly returned as "unset"
+(that is, with offset values of -1).
+
+10. Matching the pattern /(*UTF)\C[^\v]+\x80/ against an 8-bit string
+containing multi-code-unit characters caused bad behaviour and possibly a
+crash. This issue was fixed for other kinds of repeat in release 8.37 by change
+38, but repeating character classes were overlooked.
+
+11. A small fix to pcregrep to avoid compiler warnings for -Wformat-overflow=2.
+
+12. Added --enable-jit=auto support to configure.ac.
+
+13. Fix misleading error message in configure.ac.
+
+
 Version 8.41 05-July-2017
 -------------------------
 
