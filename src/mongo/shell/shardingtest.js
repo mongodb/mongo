@@ -1049,6 +1049,21 @@ var ShardingTest = function(params) {
         return true;
     }
 
+    /**
+     * Returns the total number of mongod nodes across all shards, excluding config server nodes.
+     * Used only for diagnostic logging.
+     */
+    function totalNumShardNodes(shardsAsReplSets) {
+        // Standalone mongod shards.
+        if (!shardsAsReplSets) {
+            return self._connections.length;
+        }
+
+        // Replica set shards.
+        const numNodesPerReplSet = self._rs.map(r => r.test.nodes.length);
+        return numNodesPerReplSet.reduce((a, b) => a + b, 0);
+    }
+
     // ShardingTest initialization
 
     assert(isObject(params), 'ShardingTest configuration must be a JSON object');
@@ -1207,6 +1222,9 @@ var ShardingTest = function(params) {
         Random.setRandomSeed(jsTest.options().seed);
         randomSeedAlreadySet = true;
     }
+
+    // Should we start up shards as replica sets.
+    const shardsAsReplSets = (otherParams.rs || otherParams["rs" + i] || startShardsAsRS);
 
     // Start the MongoD servers (shards)
     let startTime = new Date();  // Measure the execution time of startup and initiate.
@@ -1449,7 +1467,8 @@ var ShardingTest = function(params) {
 
     rstOptions.nodes = nodeOptions;
 
-    startTime = new Date();  // Measure the execution time of config server startup and initiate.
+    const configServerStartTime =
+        new Date();  // Measure the execution time of config server startup and initiate.
 
     // Start the config server's replica set
     this.configRS = new ReplSetTest(rstOptions);
@@ -1467,7 +1486,12 @@ var ShardingTest = function(params) {
     var csrsPrimary = this.configRS.getPrimary();
 
     print("ShardingTest startup and initiation for the config server took " +
-          (new Date() - startTime) + "ms with " + this.configRS.nodeList().length + " nodes.");
+          (new Date() - configServerStartTime) + "ms with " + this.configRS.nodeList().length +
+          " nodes.");
+
+    print("ShardingTest startup and initiation for all nodes took " + (new Date() - startTime) +
+          "ms with " + this.configRS.nodeList().length + " config server nodes and " +
+          totalNumShardNodes(shardsAsReplSets) + " total shard nodes.");
 
     // If 'otherParams.mongosOptions.binVersion' is an array value, then we'll end up constructing a
     // version iterator.
