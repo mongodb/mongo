@@ -138,10 +138,9 @@ function CollectionValidator() {
                 checkFCV(adminDB, originalFCV.targetVersion);
             }
 
-            if (originalFCV.version !== requiredFCV && originalFCV.targetVersion !== requiredFCV) {
-                assert.commandWorked(
-                    adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
-            }
+            // Now that we are certain that an upgrade or downgrade of the FCV is not in progress,
+            // ensure the 'requiredFCV' is set.
+            assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
         }
 
         try {
