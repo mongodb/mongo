@@ -161,51 +161,58 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                                    involvedNamespaces,
                                                                    false,  // hasChangeStream
                                                                    true);  // allowedToPassthrough
-
-    switch (targeter.policy) {
-        case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
-            // For the passthrough case, the targeter will not build a pipeline since its not needed
-            // in the normal aggregation path. For this translation, though, we need to build the
-            // pipeline to serialize and send to the primary shard.
-            auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
-            uassertStatusOK(
-                sharded_agg_helpers::runPipelineOnPrimaryShard(expCtx,
-                                                               namespaces,
-                                                               targeter.routingInfo->db(),
-                                                               verbosity,
-                                                               std::move(serialized),
-                                                               privileges,
-                                                               &tempResults));
-            break;
-        }
-
-        case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kMongosRequired: {
-            // Pipelines generated from mapReduce should never be required to run on mongos.
-            uasserted(31291, "Internal error during mapReduce translation");
-            break;
-        }
-
-        case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kAnyShard: {
-            if (verbosity) {
-                explain_common::generateServerInfo(&result);
+    try {
+        switch (targeter.policy) {
+            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
+                // For the passthrough case, the targeter will not build a pipeline since its not
+                // needed in the normal aggregation path. For this translation, though, we need to
+                // build the pipeline to serialize and send to the primary shard.
+                auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
+                uassertStatusOK(
+                    sharded_agg_helpers::runPipelineOnPrimaryShard(expCtx,
+                                                                   namespaces,
+                                                                   targeter.routingInfo->db(),
+                                                                   verbosity,
+                                                                   std::move(serialized),
+                                                                   privileges,
+                                                                   &tempResults));
+                break;
             }
-            auto serialized = serializeToCommand(cmd, parsedMr, targeter.pipeline.get());
-            // When running explain, we don't explicitly pass the specified verbosity here because
-            // each stage of the constructed pipeline is aware of said verbosity through a pointer
-            // to the constructed ExpressionContext.
-            uassertStatusOK(
-                sharded_agg_helpers::dispatchPipelineAndMerge(opCtx,
-                                                              std::move(targeter),
-                                                              std::move(serialized),
-                                                              std::numeric_limits<long long>::max(),
-                                                              namespaces,
-                                                              privileges,
-                                                              &tempResults,
-                                                              false));  // hasChangeStream
-            break;
-        }
-    }
 
+            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kMongosRequired: {
+                // Pipelines generated from mapReduce should never be required to run on mongos.
+                uasserted(31291, "Internal error during mapReduce translation");
+                break;
+            }
+
+            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kAnyShard: {
+                if (verbosity) {
+                    explain_common::generateServerInfo(&result);
+                }
+                auto serialized = serializeToCommand(cmd, parsedMr, targeter.pipeline.get());
+                // When running explain, we don't explicitly pass the specified verbosity here
+                // because each stage of the constructed pipeline is aware of said verbosity through
+                // a pointer to the constructed ExpressionContext.
+                uassertStatusOK(sharded_agg_helpers::dispatchPipelineAndMerge(
+                    opCtx,
+                    std::move(targeter),
+                    std::move(serialized),
+                    std::numeric_limits<long long>::max(),
+                    namespaces,
+                    privileges,
+                    &tempResults,
+                    false));  // hasChangeStream
+                break;
+            }
+        }
+    } catch (DBException& e) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                "mapReduce on a view is not supported",
+                e.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+
+        e.addContext("MapReduce internal error");
+        throw;
+    }
     auto aggResults = tempResults.done();
 
     // If explain() was run, we simply append the output to result.
