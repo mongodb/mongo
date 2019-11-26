@@ -33,11 +33,10 @@ for (let i = 0; i < docsToInsert.length; i++) {
     assert.commandWorked(st.s.getDB(kDbName).coll.insert(docsToInsert[i]));
 }
 
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: 100, y: 50, z: 3}, to: st.shard1.shardName}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: 100, y: 500, z: 3}, to: st.shard2.shardName}));
-cleanupOrphanedDocs(st, ns);
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {x: 100, y: 50, z: 3}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {x: 100, y: 500, z: 3}, to: st.shard2.shardName, _waitForDelete: true}));
 
 function assertUpdateWorked(query, update, isUpsert, _id) {
     const res = sessionDB.coll.update(query, update, {upsert: isUpsert});
