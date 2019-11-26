@@ -149,11 +149,15 @@ public:
      */
     void notifyPersistedBalancerSettingsChanged();
 
+    struct BalancerStatus {
+        bool balancerCompliant;
+        boost::optional<std::string> firstComplianceViolation;
+    };
     /**
      * Returns if a given collection is draining due to a removed shard, has chunks on an invalid
      * zone or the number of chunks is imbalanced across the cluster
      */
-    StringData getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& nss);
+    BalancerStatus getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     /**

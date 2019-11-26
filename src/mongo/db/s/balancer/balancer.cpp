@@ -83,7 +83,6 @@ const auto getBalancer = ServiceContext::declareDecoration<std::unique_ptr<Balan
 /**
  * Balancer status response
  */
-static constexpr StringData kBalancerPolicyStatusBalanced = "balanced"_sd;
 static constexpr StringData kBalancerPolicyStatusDraining = "draining"_sd;
 static constexpr StringData kBalancerPolicyStatusZoneViolation = "zoneViolation"_sd;
 static constexpr StringData kBalancerPolicyStatusChunksImbalance = "chunksImbalance"_sd;
@@ -700,27 +699,28 @@ void Balancer::notifyPersistedBalancerSettingsChanged() {
     _condVar.notify_all();
 }
 
-StringData Balancer::getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& ns) {
+Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
+                                                          const NamespaceString& ns) {
     auto splitChunks = uassertStatusOK(_chunkSelectionPolicy->selectChunksToSplit(opCtx, ns));
     if (!splitChunks.empty()) {
-        return kBalancerPolicyStatusZoneViolation;
+        return {false, kBalancerPolicyStatusZoneViolation.toString()};
     }
     auto chunksToMove = uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx, ns));
     if (chunksToMove.empty()) {
-        return kBalancerPolicyStatusBalanced;
+        return {true, boost::none};
     }
     const auto& migrationInfo = chunksToMove.front();
 
     switch (migrationInfo.reason) {
         case MigrateInfo::drain:
-            return kBalancerPolicyStatusDraining;
+            return {false, kBalancerPolicyStatusDraining.toString()};
         case MigrateInfo::zoneViolation:
-            return kBalancerPolicyStatusZoneViolation;
+            return {false, kBalancerPolicyStatusZoneViolation.toString()};
         case MigrateInfo::chunksImbalance:
-            return kBalancerPolicyStatusChunksImbalance;
+            return {false, kBalancerPolicyStatusChunksImbalance.toString()};
     }
 
-    return kBalancerPolicyStatusBalanced;
+    return {true, boost::none};
 }
 
 }  // namespace mongo

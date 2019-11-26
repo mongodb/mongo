@@ -39,9 +39,13 @@ structs:
         description: "Response of the config server command"
         strict: false
         fields:
-            status:
+            balancerCompliant:
+                type: bool
+                description: "true if there are no actions needed, if false, then firstComplianceViolation will contain the violation with the highest priority which will be addressed next"
+            firstComplianceViolation:
                 type: string
-                description: "One of the following: balanced, draining, zoneViolation or chunksImbalance"
+                optional: true
+                description: "One of the following: draining, zoneViolation or chunksImbalance"
 
 commands:
     balancerCollectionStatus:

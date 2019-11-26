@@ -44,7 +44,7 @@ assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: 'db.c
 var result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
 
 // new collections must be balanced
-assert.eq(result.status, 'balanced');
+assert.eq(result.balancerCompliant, true);
 
 // get shardIds
 var shards = st.s0.getDB('config').shards.find().toArray();
@@ -60,7 +60,8 @@ assert.commandWorked(st.s0.adminCommand({moveChunk: 'db.col', find: {key: 20}, t
 result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
 
 // chunksImbalanced expected
-assert.eq(result.status, 'chunksImbalance');
+assert.eq(result.balancerCompliant, false);
+assert.eq(result.firstComplianceViolation, 'chunksImbalance');
 
 // run balancer with 3 rounds
 runBalancer(3);
@@ -68,7 +69,7 @@ runBalancer(3);
 // the chunks must be balanced now
 result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
 
-assert.eq(result.status, 'balanced');
+assert.eq(result.balancerCompliant, true);
 
 // manually move a chunk to a shard before creating zones (this will help
 // testing the zone violation)
@@ -86,7 +87,8 @@ assert.commandWorked(st.s0.adminCommand(
 result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
 
 // having a chunk on a different zone will cause a zone violation
-assert.eq(result.status, 'zoneViolation');
+assert.eq(result.balancerCompliant, false);
+assert.eq(result.firstComplianceViolation, 'zoneViolation');
 
 // run balancer, we don't know exactly where the first run moved the chunks
 // so lets run 3 rounds just in case
@@ -95,8 +97,8 @@ runBalancer(3);
 // the chunks must be balanced now
 result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
 
-// final check: all chunks are balanced and in the correct zone
-assert.eq(result.status, 'balanced');
+// All chunks are balanced and in the correct zone
+assert.eq(result.balancerCompliant, true);
 
 st.stop();
 })();
