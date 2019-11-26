@@ -145,6 +145,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const AggregationRequest& request,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
+    return runAggregate(opCtx, namespaces, request, {request}, privileges, result);
+}
+
+Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      const Namespaces& namespaces,
+                                      const AggregationRequest& request,
+                                      const LiteParsedPipeline& liteParsedPipeline,
+                                      const PrivilegeVector& privileges,
+                                      BSONObjBuilder* result) {
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
     uassert(51143,
             "Cannot specify runtime constants option to a mongos",
@@ -161,11 +170,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return resolvedNsRoutingInfo.cm().get();
     };
 
-    LiteParsedPipeline litePipe(request);
-    litePipe.verifyIsSupported(
+    liteParsedPipeline.verifyIsSupported(
         opCtx, isSharded, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
-    auto hasChangeStream = litePipe.hasChangeStream();
-    auto involvedNamespaces = litePipe.getInvolvedNamespaces();
+    auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
     // If the routing table is valid, we obtain a reference to it. If the table is not valid, then
     // either the database does not exist, or there are no shards in the cluster. In the latter
@@ -214,14 +222,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return pipeline;
     };
 
-    auto targeter =
-        sharded_agg_helpers::AggregationTargeter::make(opCtx,
-                                                       namespaces.executionNss,
-                                                       pipelineBuilder,
-                                                       routingInfo,
-                                                       involvedNamespaces,
-                                                       hasChangeStream,
-                                                       litePipe.allowedToPassthroughFromMongos());
+    auto targeter = sharded_agg_helpers::AggregationTargeter::make(
+        opCtx,
+        namespaces.executionNss,
+        pipelineBuilder,
+        routingInfo,
+        involvedNamespaces,
+        hasChangeStream,
+        liteParsedPipeline.allowedToPassthroughFromMongos());
 
     if (!expCtx) {
         // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
@@ -308,8 +316,8 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     nsStruct.requestedNss = requestedNss;
     nsStruct.executionNss = resolvedView.getNamespace();
 
-    auto status =
-        ClusterAggregate::runAggregate(opCtx, nsStruct, resolvedAggRequest, privileges, result);
+    auto status = ClusterAggregate::runAggregate(
+        opCtx, nsStruct, resolvedAggRequest, {resolvedAggRequest}, privileges, result);
 
     // If the underlying namespace was changed to a view during retry, then re-run the aggregation
     // on the new resolved namespace.

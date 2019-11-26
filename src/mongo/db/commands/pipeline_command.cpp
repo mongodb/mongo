@@ -33,42 +33,62 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
 namespace {
 
-bool isMergePipeline(const std::vector<BSONObj>& pipeline) {
-    if (pipeline.empty()) {
-        return false;
-    }
-    return pipeline[0].hasField("$mergeCursors");
-}
-
 class PipelineCommand final : public Command {
 public:
     PipelineCommand() : Command("aggregate") {}
 
+    /**
+     * It's not known until after parsing whether or not an aggregation command is an explain
+     * request, because it might include the `explain: true` field (ie. aggregation explains do not
+     * need to arrive via the `explain` command). Therefore even parsing of regular aggregation
+     * commands needs to be able to handle the explain case.
+     *
+     * As a result, aggregation command parsing is done in parseForExplain():
+     *
+     * - To parse a regular aggregation command, call parseForExplain() with `explainVerbosity` of
+     *   boost::none.
+     *
+     * - To parse an aggregation command as the sub-command in an `explain` command, call
+     *   parseForExplain() with `explainVerbosity` set to the desired verbosity.
+     */
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
-        // TODO: Parsing to a Pipeline and/or AggregationRequest here.
+        return parseForExplain(opCtx, opMsgRequest, boost::none);
+    }
 
-        auto privileges =
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->getPrivilegesForAggregate(
-                                    AggregationRequest::parseNs(
-                                        opMsgRequest.getDatabase().toString(), opMsgRequest.body),
-                                    opMsgRequest.body,
-                                    false));
-        return std::make_unique<Invocation>(this, opMsgRequest, std::move(privileges));
+    std::unique_ptr<CommandInvocation> parseForExplain(
+        OperationContext* opCtx,
+        const OpMsgRequest& opMsgRequest,
+        boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
+        const auto aggregationRequest = uassertStatusOK(AggregationRequest::parseFromBSON(
+            opMsgRequest.getDatabase().toString(), opMsgRequest.body, explainVerbosity));
+
+        auto privileges = uassertStatusOK(
+            AuthorizationSession::get(opCtx->getClient())
+                ->getPrivilegesForAggregate(
+                    aggregationRequest.getNamespaceString(), opMsgRequest.body, false));
+
+        return std::make_unique<Invocation>(
+            this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
     }
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(Command* cmd, const OpMsgRequest& request, PrivilegeVector privileges)
+        Invocation(Command* cmd,
+                   const OpMsgRequest& request,
+                   const AggregationRequest aggregationRequest,
+                   PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
               _dbName(request.getDatabase().toString()),
+              _aggregationRequest(std::move(aggregationRequest)),
+              _liteParsedPipeline(_aggregationRequest),
               _privileges(std::move(privileges)) {}
 
     private:
@@ -83,16 +103,10 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const override {
-            // Aggregations that are run directly against a collection allow any read concern.
-            // Otherwise, if the aggregate is collectionless then the read concern must be 'local'
-            // (e.g. $currentOp). The exception to this is a $changeStream on a whole database,
-            // which is considered collectionless but must be read concern 'majority'. Further read
-            // concern validation is done one the pipeline is parsed.
-            return {level == repl::ReadConcernLevel::kLocalReadConcern ||
-                        level == repl::ReadConcernLevel::kMajorityReadConcern ||
-                        !AggregationRequest::parseNs(_dbName, _request.body)
-                             .isCollectionlessAggregateNS(),
-                    ReadConcernSupportResult::DefaultReadConcern::kPermitted};
+            return _liteParsedPipeline.supportsReadConcern(
+                level,
+                _aggregationRequest.getExplain(),
+                serverGlobalParams.enableMajorityReadConcern);
         }
 
         bool allowsSpeculativeMajorityReads() const override {
@@ -106,29 +120,27 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
-            const auto aggregationRequest = uassertStatusOK(
-                AggregationRequest::parseFromBSON(_dbName, _request.body, boost::none));
             uassertStatusOK(runAggregate(opCtx,
-                                         aggregationRequest.getNamespaceString(),
-                                         aggregationRequest,
+                                         _aggregationRequest.getNamespaceString(),
+                                         _aggregationRequest,
+                                         _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
                                          reply));
         }
 
         NamespaceString ns() const override {
-            return AggregationRequest::parseNs(_dbName, _request.body);
+            return _aggregationRequest.getNamespaceString();
         }
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-            const auto aggregationRequest = uassertStatusOK(
-                AggregationRequest::parseFromBSON(_dbName, _request.body, verbosity));
 
             uassertStatusOK(runAggregate(opCtx,
-                                         aggregationRequest.getNamespaceString(),
-                                         aggregationRequest,
+                                         _aggregationRequest.getNamespaceString(),
+                                         _aggregationRequest,
+                                         _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
                                          result));
@@ -143,6 +155,8 @@ public:
 
         const OpMsgRequest& _request;
         const std::string _dbName;
+        const AggregationRequest _aggregationRequest;
+        const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
     };
 

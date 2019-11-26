@@ -63,7 +63,7 @@ function tryCommands({testDB, message}) {
     assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 
     jsTestLog("Verify that aggregate cannot use readConcern snapshot " + message);
-    cmd = {aggregate: collName, pipeline: [], readConcern: {level: "snapshot"}};
+    cmd = {aggregate: collName, pipeline: [], cursor: {}, readConcern: {level: "snapshot"}};
     assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 }
 tryCommands({testDB: sessionDb, message: "in session."});

@@ -480,8 +480,18 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExe
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    const AggregationRequest& request,
+                    const BSONObj& cmdObj,
+                    const PrivilegeVector& privileges,
+                    rpc::ReplyBuilderInterface* result) {
+    return runAggregate(opCtx, nss, request, {request}, cmdObj, privileges, result);
+}
+
+Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& origNss,
                     const AggregationRequest& request,
+                    const LiteParsedPipeline& liteParsedPipeline,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
@@ -504,17 +514,11 @@ Status runAggregate(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
     {
-        const LiteParsedPipeline liteParsedPipeline(request);
-
         // If we are in a transaction, check whether the parsed pipeline supports
         // being in a transaction.
         if (opCtx->inMultiDocumentTransaction()) {
             liteParsedPipeline.assertSupportsMultiDocumentTransaction(request.getExplain());
         }
-
-        // Check whether the parsed pipeline supports the given read concern.
-        liteParsedPipeline.assertSupportsReadConcern(
-            opCtx, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 

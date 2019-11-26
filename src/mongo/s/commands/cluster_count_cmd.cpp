@@ -65,6 +65,12 @@ public:
         return false;
     }
 
+    ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
+                                                 const BSONObj& cmdObj,
+                                                 repl::ReadConcernLevel level) const override {
+        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+    }
+
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {

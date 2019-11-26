@@ -37,6 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -130,10 +131,11 @@ public:
     }
 
     /**
-     * Verifies that this stage is allowed to run with the specified read concern. Throws a
-     * UserException if not compatible.
+     * Verifies that this stage is allowed to run with the specified read concern level.
      */
-    virtual void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {}
+    virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
+        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+    }
 
     /**
      * Verifies that this stage is allowed to run in a multi-document transaction. Throws a
@@ -150,14 +152,26 @@ protected:
                                 << "multi-document transaction.");
     }
 
-    void onlyReadConcernLocalSupported(StringData stageName,
-                                       const repl::ReadConcernArgs& readConcern) const {
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream()
-                    << "Aggregation stage " << stageName
-                    << " cannot run with a readConcern other than 'local'. Current readConcern: "
-                    << readConcern.toString(),
-                readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
+    ReadConcernSupportResult onlySingleReadConcernSupported(
+        StringData stageName,
+        repl::ReadConcernLevel supportedLevel,
+        repl::ReadConcernLevel candidateLevel) const {
+        return {{candidateLevel != supportedLevel,
+                 {ErrorCodes::InvalidOptions,
+                  str::stream() << "Aggregation stage " << stageName
+                                << " cannot run with a readConcern other than '"
+                                << repl::readConcernLevels::toString(supportedLevel)
+                                << "'. Current readConcern: "
+                                << repl::readConcernLevels::toString(candidateLevel)}},
+                {{ErrorCodes::InvalidOptions,
+                  str::stream() << "Aggregation stage " << stageName
+                                << " does not permit default readConcern to be applied."}}};
+    }
+
+    ReadConcernSupportResult onlyReadConcernLocalSupported(StringData stageName,
+                                                           repl::ReadConcernLevel level) const {
+        return onlySingleReadConcernSupported(
+            stageName, repl::ReadConcernLevel::kLocalReadConcern, level);
     }
 };
 

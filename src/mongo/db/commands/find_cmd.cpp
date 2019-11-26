@@ -178,8 +178,7 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
-            return {ReadConcernSupportResult::ReadConcern::kSupported,
-                    ReadConcernSupportResult::DefaultReadConcern::kPermitted};
+            return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 
         bool canIgnorePrepareConflicts() const override {

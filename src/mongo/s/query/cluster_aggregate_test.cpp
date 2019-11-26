@@ -103,6 +103,7 @@ protected:
         return ClusterAggregate::runAggregate(opCtx.get(),
                                               ClusterAggregate::Namespaces{nss, nss},
                                               request.getValue(),
+                                              {request.getValue()},
                                               PrivilegeVector(),
                                               &result);
     }

@@ -80,15 +80,13 @@ public:
             }
         }
 
-        void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
-            // Only "majority" is allowed for change streams.
-            uassert(
-                ErrorCodes::InvalidOptions,
-                str::stream()
-                    << "$changeStream cannot run with a readConcern other than 'majority'. Current "
-                    << "readConcern: " << readConcern.toString(),
-                !readConcern.hasLevel() ||
-                    readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
+            // Change streams require "majority" readConcern. If the client did not specify an
+            // explicit readConcern, change streams will internally upconvert the readConcern to
+            // majority (so clients can always send aggregations without readConcern). We therefore
+            // do not permit the cluster-wide default to be applied.
+            return onlySingleReadConcernSupported(
+                kStageName, repl::ReadConcernLevel::kMajorityReadConcern, level);
         }
 
         void assertSupportsMultiDocumentTransaction() const {

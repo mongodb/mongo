@@ -80,6 +80,7 @@ private:
             opCtx,
             ClusterAggregate::Namespaces{nss, nss},
             request,
+            {request},
             {Privilege(ResourcePattern::forClusterResource(), ActionType::inprog)},
             &responseBuilder);
 

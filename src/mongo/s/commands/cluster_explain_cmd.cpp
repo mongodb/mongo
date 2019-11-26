@@ -189,7 +189,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
             str::stream() << "Explain failed due to unknown command: " << cmdName,
             explainedCommand);
     auto innerRequest = std::make_unique<OpMsgRequest>(OpMsg{explainedObj});
-    auto innerInvocation = explainedCommand->parse(opCtx, *innerRequest);
+    auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
     return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
 }

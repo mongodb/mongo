@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/read_concern_support_result.h"
 
 namespace mongo {
 
@@ -122,12 +123,11 @@ public:
     }
 
     /**
-     * Verifies that this pipeline is allowed to run with the specified read concern. This ensures
-     * that each stage is compatible, and throws a UserException if not.
+     * Verifies that this pipeline is allowed to run with the specified read concern level.
      */
-    void assertSupportsReadConcern(OperationContext* opCtx,
-                                   boost::optional<ExplainOptions::Verbosity> explain,
-                                   bool enableMajorityReadConcern) const;
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 boost::optional<ExplainOptions::Verbosity> explain,
+                                                 bool enableMajorityReadConcern) const;
 
     /**
      * Verifies that this pipeline is allowed to run in a multi-document transaction. This ensures

@@ -62,7 +62,7 @@ nonLocalReadConcerns.forEach(function(readConcernLevel) {
 
     cmdRes = sessionDB.runCommand(explainCmd);
     assert.commandFailedWithCode(cmdRes, ErrorCodes.InvalidOptions, tojson(cmdRes));
-    expectedErrStr = "Command does not support read concern";
+    expectedErrStr = "read concern not supported";
     assert.neq(cmdRes.errmsg.indexOf(expectedErrStr), -1, tojson(cmdRes));
 });
 

@@ -13,7 +13,7 @@ const sessionDb = session.getDatabase("admin");
 
 const nonRetryableWriteCommands = [
     // Commands that are allowed in transactions.
-    {aggregate: 1},
+    {aggregate: 1, pipeline: [], cursor: {}},
     {commitTransaction: 1},
     {distinct: "c"},
     {find: "c"},

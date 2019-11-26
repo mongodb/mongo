@@ -45,6 +45,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/op_msg.h"
@@ -269,6 +270,13 @@ public:
     virtual std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                                      const OpMsgRequest& request) = 0;
 
+    virtual std::unique_ptr<CommandInvocation> parseForExplain(
+        OperationContext* opCtx,
+        const OpMsgRequest& request,
+        boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+        return parse(opCtx, request);
+    }
+
     /**
      * Returns the command's name. This value never changes for the lifetime of the command.
      */
@@ -433,46 +441,6 @@ private:
 };
 
 /**
- * The result of checking an invocation's support for readConcern.  There are two parts:
- * - Whether or not the invocation supports the given readConcern.
- * - Whether or not the invocation permits having the default readConcern applied to it.
- */
-struct ReadConcernSupportResult {
-    /**
-     * Whether this command invocation supports the requested readConcern level. This only
-     * applies when running outside transactions because all commands that are allowed to run
-     * in a transaction must support all the read concerns that can be used in a transaction.
-     */
-    enum class ReadConcern { kSupported, kNotSupported } readConcern;
-
-    /**
-     * Whether this command invocation supports applying the default readConcern to it.
-     */
-    enum class DefaultReadConcern { kPermitted, kNotPermitted } defaultReadConcern;
-
-    /**
-     * Construct with either the enum value or a bool, where true indicates
-     * ReadConcern::kSupported or DefaultReadConcern::kPermitted (as appropriate).
-     */
-    ReadConcernSupportResult(ReadConcern supported, DefaultReadConcern defaultPermitted)
-        : readConcern(supported), defaultReadConcern(defaultPermitted) {}
-
-    ReadConcernSupportResult(bool supported, DefaultReadConcern defaultPermitted)
-        : readConcern(supported ? ReadConcern::kSupported : ReadConcern::kNotSupported),
-          defaultReadConcern(defaultPermitted) {}
-
-    ReadConcernSupportResult(ReadConcern supported, bool defaultPermitted)
-        : readConcern(supported),
-          defaultReadConcern(defaultPermitted ? DefaultReadConcern::kPermitted
-                                              : DefaultReadConcern::kNotPermitted) {}
-
-    ReadConcernSupportResult(bool supported, bool defaultPermitted)
-        : readConcern(supported ? ReadConcern::kSupported : ReadConcern::kNotSupported),
-          defaultReadConcern(defaultPermitted ? DefaultReadConcern::kPermitted
-                                              : DefaultReadConcern::kNotPermitted) {}
-};
-
-/**
  * Represents a single invocation of a given command.
  */
 class CommandInvocation {
@@ -516,8 +484,9 @@ public:
      * Returns this invocation's support for readConcern.
      */
     virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
-        return {level == repl::ReadConcernLevel::kLocalReadConcern,
-                ReadConcernSupportResult::DefaultReadConcern::kNotPermitted};
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern,
+                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
+                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
     }
 
     /**
@@ -667,8 +636,9 @@ public:
     virtual ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
                                                          const BSONObj& cmdObj,
                                                          repl::ReadConcernLevel level) const {
-        return {level == repl::ReadConcernLevel::kLocalReadConcern,
-                ReadConcernSupportResult::DefaultReadConcern::kNotPermitted};
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern,
+                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
+                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
     }
 
     virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {

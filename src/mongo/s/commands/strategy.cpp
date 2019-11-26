@@ -394,9 +394,12 @@ void runCommand(OperationContext* opCtx,
                 !readConcernArgs.getArgsAtClusterTime());
     }
 
+    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+
     boost::optional<RouterOperationContextSession> routerSession;
     try {
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName, invocation->ns());
+        bool startTransaction = false;
         if (osi.getAutocommit()) {
             routerSession.emplace(opCtx);
 
@@ -419,6 +422,7 @@ void runCommand(OperationContext* opCtx,
                 return TransactionRouter::TransactionActions::kContinue;
             })();
 
+            startTransaction = (transactionAction == TransactionRouter::TransactionActions::kStart);
             txnRouter.beginOrContinueTxn(opCtx, *txnNumber, transactionAction);
         }
 
@@ -453,6 +457,55 @@ void runCommand(OperationContext* opCtx,
 
         if (supportsWriteConcern) {
             opCtx->setWriteConcern(wc);
+        }
+
+        // If we are starting a transaction, we only need to check whether the read concern is
+        // appropriate for running a transaction. There is no need to check whether the specific
+        // command supports the read concern, because all commands that are allowed to run in a
+        // transaction must support all applicable read concerns.
+        if (startTransaction) {
+            switch (readConcernArgs.getLevel()) {
+                case repl::ReadConcernLevel::kLocalReadConcern:
+                case repl::ReadConcernLevel::kMajorityReadConcern:
+                case repl::ReadConcernLevel::kSnapshotReadConcern:
+                    // Acceptable readConcern for a transaction.
+                    break;
+                default:
+                    auto responseBuilder = replyBuilder->getBodyBuilder();
+                    CommandHelpers::appendCommandStatusNoThrow(
+                        responseBuilder,
+                        {ErrorCodes::InvalidOptions,
+                         "The readConcern level must be either 'local' (default), 'majority' or "
+                         "'snapshot' in order to run in a transaction"});
+                    return;
+            }
+            if (readConcernArgs.getArgsOpTime()) {
+                auto responseBuilder = replyBuilder->getBodyBuilder();
+                CommandHelpers::appendCommandStatusNoThrow(
+                    responseBuilder,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream()
+                         << "The readConcern cannot specify '"
+                         << repl::ReadConcernArgs::kAfterOpTimeFieldName << "' in a transaction"});
+                return;
+            }
+        }
+
+        // Otherwise, if there is a read concern present - either user-specified or the default -
+        // then check whether the command supports it. If there is no explicit read concern level,
+        // then it is implicitly "local". There is no need to check whether this is supported,
+        // because all commands either support "local" or upconvert the absent readConcern to a
+        // stronger level that they do support; e.g. $changeStream upconverts to RC "majority".
+        if (!startTransaction && readConcernArgs.hasLevel()) {
+            if (!readConcernSupport.readConcernSupport.isOK()) {
+                auto responseBuilder = replyBuilder->getBodyBuilder();
+                CommandHelpers::appendCommandStatusNoThrow(
+                    responseBuilder,
+                    readConcernSupport.readConcernSupport.withContext(
+                        str::stream() << "Command " << invocation->definition()->getName()
+                                      << " does not support " << readConcernArgs.toString()));
+                return;
+            }
         }
 
         for (int tries = 0;; ++tries) {

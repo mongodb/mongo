@@ -113,8 +113,7 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
-            return {ReadConcernSupportResult::ReadConcern::kSupported,
-                    ReadConcernSupportResult::DefaultReadConcern::kPermitted};
+            return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 
         NamespaceString ns() const override {

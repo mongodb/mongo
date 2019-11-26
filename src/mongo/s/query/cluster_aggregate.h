@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/strategy.h"
@@ -45,7 +46,6 @@
 
 namespace mongo {
 
-class LiteParsedPipeline;
 class OperationContext;
 class ShardId;
 
@@ -81,6 +81,16 @@ public:
      * later for re-checking privileges for GetMore commands.
      *
      * On success, fills out 'result' with the command response.
+     */
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               const AggregationRequest& request,
+                               const LiteParsedPipeline& liteParsedPipeline,
+                               const PrivilegeVector& privileges,
+                               BSONObjBuilder* result);
+
+    /**
+     * Convenience version that internally constructs the LiteParsedPipeline.
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,

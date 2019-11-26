@@ -239,8 +239,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
     }
 
     auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
-    if (readConcernSupport.defaultReadConcern ==
-            ReadConcernSupportResult::DefaultReadConcern::kPermitted &&
+    if (readConcernSupport.defaultReadConcernPermit.isOK() &&
         !opCtx->getClient()->isInDirectClient()) {
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
             serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -270,33 +269,45 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         }
     }
 
-    auto readConcernLevel = readConcernArgs.getLevel();
     // Update the readConcernSupport, in case the default RC was applied.
-    readConcernSupport = invocation->supportsReadConcern(readConcernLevel);
-    if (startTransaction && readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern &&
-        readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
-        readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern) {
-        return Status(
-            ErrorCodes::InvalidOptions,
-            "The readConcern level must be either 'local' (default), 'majority' or 'snapshot' in "
-            "order to run in a transaction");
+    readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+
+    // If we are starting a transaction, we only need to check whether the read concern is
+    // appropriate for running a transaction. There is no need to check whether the specific
+    // command supports the read concern, because all commands that are allowed to run in a
+    // transaction must support all applicable read concerns.
+    if (startTransaction) {
+        switch (readConcernArgs.getLevel()) {
+            case repl::ReadConcernLevel::kLocalReadConcern:
+            case repl::ReadConcernLevel::kMajorityReadConcern:
+            case repl::ReadConcernLevel::kSnapshotReadConcern:
+                // Acceptable readConcern for a transaction.
+                break;
+            default:
+                return {ErrorCodes::InvalidOptions,
+                        "The readConcern level must be either 'local' (default), 'majority' or "
+                        "'snapshot' in "
+                        "order to run in a transaction"};
+        }
+        if (readConcernArgs.getArgsOpTime()) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "The readConcern cannot specify '"
+                                  << repl::ReadConcernArgs::kAfterOpTimeFieldName
+                                  << "' in a transaction"};
+        }
     }
 
-    if (startTransaction && readConcernArgs.getArgsOpTime()) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << "The readConcern cannot specify '"
-                          << repl::ReadConcernArgs::kAfterOpTimeFieldName << "' in a transaction");
-    }
-
-    // There is no need to check if the command supports the read concern while in a transaction
-    // because all commands that are allowed to run in a transaction must support all the read
-    // concerns that can be used with a transaction.
-    if (!startTransaction &&
-        readConcernSupport.readConcern == ReadConcernSupportResult::ReadConcern::kNotSupported) {
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << "Command does not support read concern "
-                              << readConcernArgs.toString()};
+    // Otherwise, if there is a read concern present - either user-specified or from the default -
+    // then check whether the command supports it. If there is no explicit read concern level, then
+    // it is implicitly "local". There is no need to check whether this is supported, because all
+    // commands either support "local" or upconvert the absent readConcern to a stronger level that
+    // they do support; for instance, $changeStream upconverts to RC level "majority".
+    if (!startTransaction && readConcernArgs.hasLevel()) {
+        if (!readConcernSupport.readConcernSupport.isOK()) {
+            return readConcernSupport.readConcernSupport.withContext(
+                str::stream() << "Command " << invocation->definition()->getName()
+                              << " does not support " << readConcernArgs.toString());
+        }
     }
 
     // If this command invocation asked for 'majority' read concern, supports blocking majority

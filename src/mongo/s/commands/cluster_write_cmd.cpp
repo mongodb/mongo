@@ -549,8 +549,7 @@ private:
     }
 
     ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
-        return {ReadConcernSupportResult::ReadConcern::kSupported,
-                ReadConcernSupportResult::DefaultReadConcern::kPermitted};
+        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
     void doCheckAuthorization(OperationContext* opCtx) const final {

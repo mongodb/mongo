@@ -35,30 +35,50 @@
 
 namespace mongo {
 
-void LiteParsedPipeline::assertSupportsReadConcern(
-    OperationContext* opCtx,
+ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(
+    repl::ReadConcernLevel level,
     boost::optional<ExplainOptions::Verbosity> explain,
     bool enableMajorityReadConcern) const {
-    auto readConcern = repl::ReadConcernArgs::get(opCtx);
+    // Start by assuming that we will support both readConcern and cluster-wide default.
+    ReadConcernSupportResult result = ReadConcernSupportResult::allSupportedAndDefaultPermitted();
 
-    // Reject non change stream aggregation queries that try to use "majority" read concern when
-    // enableMajorityReadConcern=false.
+    // 1. Determine whether the given read concern must be rejected for any pipeline-global reasons.
     if (!hasChangeStream() && !enableMajorityReadConcern &&
-        (repl::ReadConcernArgs::get(opCtx).getLevel() ==
-         repl::ReadConcernLevel::kMajorityReadConcern)) {
-        uasserted(ErrorCodes::ReadConcernMajorityNotEnabled,
-                  "Only change stream aggregation queries support 'majority' read concern when "
-                  "enableMajorityReadConcern=false");
-    }
-
-    uassert(ErrorCodes::InvalidOptions,
+        (level == repl::ReadConcernLevel::kMajorityReadConcern)) {
+        // Reject non change stream aggregation queries that try to use "majority" read concern when
+        // enableMajorityReadConcern=false.
+        result.readConcernSupport = {
+            ErrorCodes::ReadConcernMajorityNotEnabled,
+            "Only change stream aggregation queries support 'majority' read concern when "
+            "enableMajorityReadConcern=false"};
+    } else if (explain && level != repl::ReadConcernLevel::kLocalReadConcern) {
+        // Reject non-local read concern when the pipeline is being explained.
+        result.readConcernSupport = {
+            ErrorCodes::InvalidOptions,
             str::stream() << "Explain for the aggregate command cannot run with a readConcern "
-                          << "other than 'local'. Current readConcern: " << readConcern.toString(),
-            !explain || readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
-
-    for (auto&& spec : _stageSpecs) {
-        spec->assertSupportsReadConcern(readConcern);
+                          << "other than 'local'. Current readConcern level: "
+                          << repl::readConcernLevels::toString(level)};
     }
+
+    // 2. Determine whether the default read concern must be denied for any pipeline-global reasons.
+    if (explain) {
+        result.defaultReadConcernPermit = {
+            ErrorCodes::InvalidOptions,
+            "Explain for the aggregate command does not permit default readConcern to be "
+            "applied."};
+    }
+
+    // 3. If either the specified or default readConcern have not already been rejected, determine
+    // whether the pipeline stages support them. If not, we record the first error we encounter.
+    for (auto&& spec : _stageSpecs) {
+        // If both result statuses are already not OK, stop checking further stages.
+        if (!result.readConcernSupport.isOK() && !result.defaultReadConcernPermit.isOK()) {
+            break;
+        }
+        result.merge(spec->supportsReadConcern(level));
+    }
+
+    return result;
 }
 
 void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
@@ -82,8 +102,6 @@ void LiteParsedPipeline::verifyIsSupported(
     if (opCtx->inMultiDocumentTransaction()) {
         assertSupportsMultiDocumentTransaction(explain);
     }
-    // Verify litePipe can be run at the given read concern.
-    assertSupportsReadConcern(opCtx, explain, enableMajorityReadConcern);
     // Verify that no involved namespace is sharded unless allowed by the pipeline.
     for (const auto& nss : getInvolvedNamespaces()) {
         uassert(28769,
