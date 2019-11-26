@@ -1226,10 +1226,12 @@ var ShardingTest = function(params) {
     // Should we start up shards as replica sets.
     const shardsAsReplSets = (otherParams.rs || otherParams["rs" + i] || startShardsAsRS);
 
-    // Start the MongoD servers (shards)
+    //
+    // Start each shard replica set or standalone mongod.
+    //
     let startTime = new Date();  // Measure the execution time of startup and initiate.
     for (var i = 0; i < numShards; i++) {
-        if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
+        if (shardsAsReplSets) {
             var setName = testName + "-rs" + i;
 
             var rsDefaults = {
@@ -1309,24 +1311,11 @@ var ShardingTest = function(params) {
             });
 
             print("ShardingTest starting replica set for shard: " + setName);
+
+            // Start up the replica set but don't wait for it to complete. This allows the startup
+            // of each shard to proceed in parallel.
             this._rs[i] =
-                {setName: setName, test: rs, nodes: rs.startSet(rsDefaults), url: rs.getURL()};
-
-            // ReplSetTest.initiate() requires all nodes to be to be authorized to run
-            // replSetGetStatus.
-            // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
-            print("ShardingTest initiating replica set for shard: " + setName);
-            rs.initiateWithAnyNodeAsPrimary();
-
-            this["rs" + i] = rs;
-            this._rsObjects[i] = rs;
-
-            _alldbpaths.push(null);
-            this._connections.push(null);
-
-            if (otherParams.useBridge) {
-                unbridgedConnections.push(null);
-            }
+                {setName: setName, test: rs, nodes: rs.startSetAsync(rsDefaults), url: rs.getURL()};
         } else {
             var options = {
                 useHostname: otherParams.useHostname,
@@ -1400,34 +1389,9 @@ var ShardingTest = function(params) {
         }
     }
 
-    // Do replication on replica sets if required
-    for (var i = 0; i < numShards; i++) {
-        if (!otherParams.rs && !otherParams["rs" + i] && !startShardsAsRS) {
-            continue;
-        }
-
-        var rs = this._rs[i].test;
-        rs.getPrimary().getDB("admin").foo.save({x: 1});
-
-        if (keyFile) {
-            authutil.asCluster(rs.nodes, keyFile, function() {
-                rs.awaitReplication();
-            });
-        }
-
-        rs.awaitSecondaryNodes();
-
-        var rsConn = new Mongo(rs.getURL());
-        rsConn.name = rs.getURL();
-
-        this._connections[i] = rsConn;
-        this["shard" + i] = rsConn;
-        rsConn.rs = rs;
-    }
-
-    print("ShardingTest startup and initiation for all shards took " + (new Date() - startTime) +
-          "ms for " + numShards + " shards.");
-
+    //
+    // Start up the config server replica set.
+    //
     this._configServers = [];
 
     // Using replica set for config servers
@@ -1467,16 +1431,82 @@ var ShardingTest = function(params) {
 
     rstOptions.nodes = nodeOptions;
 
-    const configServerStartTime =
-        new Date();  // Measure the execution time of config server startup and initiate.
-
-    // Start the config server's replica set
+    // Start the config server's replica set without waiting for it to complete. This allows it
+    // to proceed in parallel with the startup of each shard.
     this.configRS = new ReplSetTest(rstOptions);
-    this.configRS.startSet(startOptions);
+    this.configRS.startSetAsync(startOptions);
 
+    //
+    // Wait for each shard replica set to finish starting up.
+    //
+    if (shardsAsReplSets) {
+        for (let i = 0; i < numShards; i++) {
+            print("Waiting for shard " + this._rs[i].setName + " to finish starting up.");
+            this._rs[i].test.startSetAwait();
+        }
+    }
+
+    //
+    // Wait for the config server to finish starting up.
+    //
+    print("Waiting for the config server to finish starting up.");
+    this.configRS.startSetAwait();
     var config = this.configRS.getReplSetConfig();
     config.configsvr = true;
     config.settings = config.settings || {};
+
+    print("ShardingTest startup for all nodes took " + (new Date() - startTime) + "ms with " +
+          this.configRS.nodeList().length + " config server nodes and " +
+          totalNumShardNodes(shardsAsReplSets) + " total shard nodes.");
+
+    //
+    // Initiate each shard replica set.
+    //
+    if (shardsAsReplSets) {
+        for (var i = 0; i < numShards; i++) {
+            print("ShardingTest initiating replica set for shard: " + this._rs[i].setName);
+
+            // ReplSetTest.initiate() requires all nodes to be to be authorized to run
+            // replSetGetStatus.
+            // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
+            this._rs[i].test.initiateWithAnyNodeAsPrimary();
+
+            this["rs" + i] = this._rs[i].test;
+            this._rsObjects[i] = this._rs[i].test;
+
+            _alldbpaths.push(null);
+            this._connections.push(null);
+
+            if (otherParams.useBridge) {
+                unbridgedConnections.push(null);
+            }
+        }
+    }
+
+    // Do replication on replica sets if required
+    for (var i = 0; i < numShards; i++) {
+        if (!shardsAsReplSets) {
+            continue;
+        }
+
+        var rs = this._rs[i].test;
+        rs.getPrimary().getDB("admin").foo.save({x: 1});
+
+        if (keyFile) {
+            authutil.asCluster(rs.nodes, keyFile, function() {
+                rs.awaitReplication();
+            });
+        }
+
+        rs.awaitSecondaryNodes();
+
+        var rsConn = new Mongo(rs.getURL());
+        rsConn.name = rs.getURL();
+
+        this._connections[i] = rsConn;
+        this["shard" + i] = rsConn;
+        rsConn.rs = rs;
+    }
 
     // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
     // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
@@ -1484,10 +1514,6 @@ var ShardingTest = function(params) {
 
     // Wait for master to be elected before starting mongos
     var csrsPrimary = this.configRS.getPrimary();
-
-    print("ShardingTest startup and initiation for the config server took " +
-          (new Date() - configServerStartTime) + "ms with " + this.configRS.nodeList().length +
-          " nodes.");
 
     print("ShardingTest startup and initiation for all nodes took " + (new Date() - startTime) +
           "ms with " + this.configRS.nodeList().length + " config server nodes and " +
