@@ -428,13 +428,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
-    Status migrationCommitStatus = commitChunkMigrationResponse.getStatus();
-    if (migrationCommitStatus.isOK()) {
-        migrationCommitStatus = commitChunkMigrationResponse.getValue().commandStatus;
-        if (migrationCommitStatus.isOK()) {
-            migrationCommitStatus = commitChunkMigrationResponse.getValue().writeConcernStatus;
-        }
-    }
+    Status migrationCommitStatus =
+        Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
     if (!migrationCommitStatus.isOK()) {
         // Need to get the latest optime in case the refresh request goes to a secondary --
@@ -492,16 +487,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
     // section. It is okay if the refresh fails because that will cause the metadata to be cleared
     // and subsequent callers will try to do a full refresh.
-    const auto refreshStatus = [&] {
-        try {
-            forceShardFilteringMetadataRefresh(opCtx, getNss(), true);
-            return Status::OK();
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }();
-
-    if (!refreshStatus.isOK()) {
+    try {
+        forceShardFilteringMetadataRefresh(opCtx, getNss(), true);
+    } catch (const DBException& ex) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX);
 
@@ -510,7 +498,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         log() << "Failed to refresh metadata after a "
               << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
               << ". Metadata was cleared so it will get a full refresh when accessed again."
-              << causedBy(redact(refreshStatus));
+              << causedBy(redact(ex.toStatus()));
 
         // migrationCommitStatus may be OK or an error. The migration is considered a success at
         // this point if the commit succeeded. The metadata refresh either occurred or the metadata
@@ -518,7 +506,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         return migrationCommitStatus.withContext(
             str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
                              " migration commit due to '"
-                          << refreshStatus.toString() << "' after commit failed");
+                          << ex.toString() << "' after commit failed");
     }
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch(opCtx);
