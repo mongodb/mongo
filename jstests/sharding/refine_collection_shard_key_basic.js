@@ -285,7 +285,7 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: -1}}), ErrorCodes.BadValue);
 assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 'hashed'}}),
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 'hashed', aKey: 'hashed'}}),
     ErrorCodes.BadValue);
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {aKey: 'hahashed'}}),
@@ -303,6 +303,9 @@ assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key
 dropAndReshardColl({aKey: 'hashed'});
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {aKey: 'hashed'}}));
+dropAndReshardColl({_id: 1, aKey: 'hashed'});
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 'hashed'}}));
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
@@ -421,6 +424,24 @@ assert.commandWorked(mongos.getCollection(kNsName).insert({_id: 12345}));
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 
+// Should work because an index with missing or incomplete shard key entries exists for new shard
+// key {_id: "hashed", aKey: 1} and these entries are treated as null values.
+dropAndReshardColl({_id: "hashed"});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: "hashed", aKey: 1}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({_id: 12345}));
+
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: "hashed", aKey: 1}}));
+
+// Should work because an index with missing or incomplete shard key entries exists for new shard
+// key {_id: 1, aKey: "hashed"} and these entries are treated as null values.
+dropAndReshardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: "hashed"}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({_id: 12345}));
+
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: "hashed"}}));
+
 // Should fail because new shard key {aKey: 1} is not a prefix of current shard key {_id: 1,
 // aKey: 1}.
 dropAndReshardColl({_id: 1, aKey: 1});
@@ -465,7 +486,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
-validateConfigChangelog(3);
+validateConfigChangelog(5);
 
 // Should work because a 'useful' index exists for new shard key {a: 1, b.c: 1}. NOTE: We are
 // explicitly verifying that refineCollectionShardKey works with a dotted field.
@@ -476,7 +497,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
 validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
-validateConfigChangelog(4);
+validateConfigChangelog(6);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 

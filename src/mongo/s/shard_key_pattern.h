@@ -88,7 +88,22 @@ public:
      */
     static bool isHashedPatternEl(const BSONElement& el);
 
+    /**
+     * Returns the BSONElement pointing to the hashed field. Returns empty BSONElement if not found.
+     */
+    static BSONElement extractHashedField(BSONObj keyPattern);
+
+    /**
+     * Check if the given BSONElement is of type 'MinKey', 'MaxKey' or 'NumberLong', which are the
+     * only acceptable values for hashed fields.
+     */
+    static bool isValidHashedValue(const BSONElement& el);
+
     bool isHashedPattern() const;
+
+    bool hasHashedPrefix() const;
+
+    BSONElement getHashedField() const;
 
     const KeyPattern& getKeyPattern() const;
 
@@ -255,6 +270,7 @@ private:
     std::vector<std::unique_ptr<FieldRef>> _keyPatternPaths;
 
     bool _hasId;
+    BSONElement _hashedField;
 };
 
 }  // namespace mongo

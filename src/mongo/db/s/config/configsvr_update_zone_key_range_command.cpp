@@ -106,17 +106,15 @@ public:
         auto parsedRequest =
             uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromConfigCommand(cmdObj));
 
-        std::string zoneName;
-        if (!parsedRequest.isRemove()) {
-            zoneName = parsedRequest.getZoneName();
-        }
-
         if (parsedRequest.isRemove()) {
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(
                 opCtx, parsedRequest.getNS(), parsedRequest.getRange()));
         } else {
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->assignKeyRangeToZone(
-                opCtx, parsedRequest.getNS(), parsedRequest.getRange(), zoneName));
+                opCtx,
+                parsedRequest.getNS(),
+                parsedRequest.getRange(),
+                parsedRequest.getZoneName()));
         }
 
         return true;

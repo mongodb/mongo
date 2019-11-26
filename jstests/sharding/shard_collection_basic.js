@@ -143,8 +143,12 @@ testAndClenaupWithKeyNoIndexFailed({x: 1, y: 1});
 assert.commandWorked(mongos.getDB(kDbName).foo.insert({x: 1, y: 1}));
 testAndClenaupWithKeyOK({x: 1, y: 1});
 
-testAndClenaupWithKeyNoIndexFailed({x: 'hashed', y: 1});
+// Multiple hashed fields are not allowed.
+testAndClenaupWithKeyNoIndexFailed({x: 'hashed', a: 1, y: 'hashed'});
 testAndClenaupWithKeyNoIndexFailed({x: 'hashed', y: 'hashed'});
+
+// Negative numbers are not allowed.
+testAndClenaupWithKeyNoIndexFailed({x: 'hashed', a: -1});
 
 // Shard by a key component.
 testAndClenaupWithKeyOK({'z.x': 1});

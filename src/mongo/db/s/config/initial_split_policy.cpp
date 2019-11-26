@@ -108,10 +108,12 @@ void InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
     int numInitialChunks,
     std::vector<BSONObj>* initialSplitPoints,
     std::vector<BSONObj>* finalSplitPoints) {
-    if (!shardKeyPattern.isHashedPattern() || !isEmpty) {
+    if (!shardKeyPattern.isHashedPattern() || !shardKeyPattern.hasHashedPrefix() || !isEmpty) {
+        // TODO SERVER-43917: Fix the error message when pre-splitting is enabled for non-hashed
+        // prefixes.
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "numInitialChunks is not supported when the collection is not "
-                              << (!shardKeyPattern.isHashedPattern() ? "hashed" : "empty"),
+                str::stream() << "numInitialChunks is only supported when the collection is empty "
+                                 "and has a hashed field as shard key prefix",
                 !numInitialChunks);
         return;
     }
@@ -137,16 +139,21 @@ void InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
 
     const auto proposedKey(shardKeyPattern.getKeyPattern().toBSON());
 
+    auto buildSplitPoint = [&](long long value) {
+        return shardKeyPattern.getKeyPattern().extendRangeBound(
+            BSON(proposedKey.firstElementFieldName() << value), false);
+    };
+
     if (numInitialChunks % 2 == 0) {
-        finalSplitPoints->push_back(BSON(proposedKey.firstElementFieldName() << current));
+        finalSplitPoints->push_back(buildSplitPoint(current));
         current += intervalSize;
     } else {
         current += intervalSize / 2;
     }
 
     for (int i = 0; i < (numInitialChunks - 1) / 2; i++) {
-        finalSplitPoints->push_back(BSON(proposedKey.firstElementFieldName() << current));
-        finalSplitPoints->push_back(BSON(proposedKey.firstElementFieldName() << -current));
+        finalSplitPoints->push_back(buildSplitPoint(current));
+        finalSplitPoints->push_back(buildSplitPoint(-current));
         current += intervalSize;
     }
 

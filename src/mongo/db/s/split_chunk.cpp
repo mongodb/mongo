@@ -147,21 +147,18 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                           << " to split chunk " << chunkRange.toString());
     }
 
-    // If the shard key is hashed, then we must make sure that the split points are of type
-    // NumberLong.
-    if (KeyPattern::isHashedKeyPattern(keyPatternObj)) {
+    // If the shard key is hashed, then we must make sure that the split points are of supported
+    // data types.
+    const auto hashedField = ShardKeyPattern::extractHashedField(keyPatternObj);
+    if (hashedField) {
         for (BSONObj splitKey : splitKeys) {
-            BSONObjIterator it(splitKey);
-            while (it.more()) {
-                BSONElement splitKeyElement = it.next();
-                if (splitKeyElement.type() != NumberLong) {
-                    return {ErrorCodes::CannotSplit,
-                            str::stream()
-                                << "splitChunk cannot split chunk " << chunkRange.toString()
-                                << ", split point " << splitKeyElement.toString()
-                                << " must be of type "
-                                   "NumberLong for hashed shard key patterns"};
-                }
+            auto hashedSplitElement = splitKey[hashedField.fieldName()];
+            if (!ShardKeyPattern::isValidHashedValue(hashedSplitElement)) {
+                return {ErrorCodes::CannotSplit,
+                        str::stream() << "splitChunk cannot split chunk " << chunkRange.toString()
+                                      << ", split point " << hashedSplitElement.toString()
+                                      << "Value of type '" << hashedSplitElement.type()
+                                      << "' is not allowed for hashed fields"};
             }
         }
     }

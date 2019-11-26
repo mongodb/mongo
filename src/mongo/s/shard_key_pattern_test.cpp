@@ -433,6 +433,19 @@ TEST(ShardKeyPattern, ExtractQueryShardKeyHashed) {
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a" << BSON("c" << value))), BSONObj());
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a" << BSON("b" << BSON_ARRAY(value)))), BSONObj());
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a" << BSON_ARRAY(BSON("b" << value)))), BSONObj());
+
+    pattern = ShardKeyPattern(BSON("a.b"
+                                   << "hashed"
+                                   << "c.d" << 1));
+
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a.b" << value << "c.d" << value)),
+                      BSON("a.b" << hashValue << "c.d" << value));
+    ASSERT_BSONOBJ_EQ(
+        queryKey(pattern, fromjson("{a : {b: '12345', p : 1}, c : {d : '12345', q: 2}}")),
+        BSON("a.b" << hashValue << "c.d" << value));
+
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a.b" << value)), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{'a.b': [10], 'c.d': 1}")), BSONObj());
 }
 
 static bool indexComp(const ShardKeyPattern& pattern, const BSONObj& indexPattern) {
@@ -511,6 +524,17 @@ TEST(ShardKeyPattern, UniqueIndexCompatibleHashed) {
 
     ASSERT(!indexComp(pattern, BSON("c" << 1)));
     ASSERT(!indexComp(pattern, BSON("c" << -1 << "a.b" << 1)));
+}
+
+TEST(ShardKeyPattern, IsHashedPattern) {
+    ASSERT(ShardKeyPattern(BSON("a.b"
+                                << "hashed"))
+               .isHashedPattern());
+    ASSERT(ShardKeyPattern(BSON("a.b" << 1 << "c"
+                                      << "hashed"
+                                      << "d" << 1))
+               .isHashedPattern());
+    ASSERT(!ShardKeyPattern(BSON("a.b" << 1 << "d" << 1)).isHashedPattern());
 }
 
 }  // namespace

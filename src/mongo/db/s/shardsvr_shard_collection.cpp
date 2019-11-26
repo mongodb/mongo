@@ -348,15 +348,16 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
                                   << tag.getMinKey() << " -->> " << tag.getMaxKey(),
                     match);
 
-            if (ShardKeyPattern::isHashedPatternEl(proposedKeyElement) &&
-                (tagMinKeyElement.type() != NumberLong || tagMaxKeyElement.type() != NumberLong)) {
-                uasserted(ErrorCodes::InvalidOptions,
-                          str::stream() << "cannot do hash sharding with the proposed key "
-                                        << proposedKey.toString() << " because there exists a zone "
-                                        << tag.getMinKey() << " -->> " << tag.getMaxKey()
-                                        << " whose boundaries are not "
-                                           "of type NumberLong");
-            }
+            // If the field is hashed, make sure that the min and max values are of supported type.
+            uassert(
+                ErrorCodes::InvalidOptions,
+                str::stream() << "cannot do hash sharding with the proposed key "
+                              << proposedKey.toString() << " because there exists a zone "
+                              << tag.getMinKey() << " -->> " << tag.getMaxKey()
+                              << " whose boundaries are not of type NumberLong, MinKey or MaxKey",
+                !ShardKeyPattern::isHashedPatternEl(proposedKeyElement) ||
+                    (ShardKeyPattern::isValidHashedValue(tagMinKeyElement) &&
+                     ShardKeyPattern::isValidHashedValue(tagMaxKeyElement)));
         }
     }
 }

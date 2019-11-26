@@ -66,6 +66,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
 
     std::vector<std::unique_ptr<FieldRef>> parsedPaths;
 
+    auto numHashedFields = 0;
     for (const auto& patternEl : keyPattern) {
         auto newFieldRef(std::make_unique<FieldRef>(patternEl.fieldNameStringData()));
 
@@ -88,7 +89,9 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
                     !newFieldRef->getPart(i).empty());
         }
 
-        // Numeric and ascending (1.0), or "hashed" and single field
+        // Numeric and ascending (1.0), or "hashed" with exactly hashed field.
+        auto isHashedPattern = ShardKeyPattern::isHashedPatternEl(patternEl);
+        numHashedFields += isHashedPattern ? 1 : 0;
         uassert(ErrorCodes::BadValue,
                 str::stream()
                     << "Shard key " << keyPattern.toString()
@@ -96,7 +99,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
                     << " or multiple numerical fields set to a value of 1. Failed to parse field "
                     << patternEl.fieldNameStringData(),
                 (patternEl.isNumber() && patternEl.numberInt() == 1) ||
-                    (keyPattern.nFields() == 1 && ShardKeyPattern::isHashedPatternEl(patternEl)));
+                    (isHashedPattern && numHashedFields == 1));
 
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
@@ -173,10 +176,19 @@ Status ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(const BSONObj& sh
     return Status::OK();
 }
 
+BSONElement ShardKeyPattern::extractHashedField(BSONObj keyPattern) {
+    for (auto&& element : keyPattern) {
+        if (isHashedPatternEl(element)) {
+            return element;
+        }
+    }
+    return BSONElement();
+}
 ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
     : _keyPattern(keyPattern),
       _keyPatternPaths(parseShardKeyPattern(keyPattern)),
-      _hasId(keyPattern.hasField("_id"_sd)) {}
+      _hasId(keyPattern.hasField("_id"_sd)),
+      _hashedField(extractHashedField(keyPattern)) {}
 
 ShardKeyPattern::ShardKeyPattern(const KeyPattern& keyPattern)
     : ShardKeyPattern(keyPattern.toBSON()) {}
@@ -186,7 +198,28 @@ bool ShardKeyPattern::isHashedPatternEl(const BSONElement& el) {
 }
 
 bool ShardKeyPattern::isHashedPattern() const {
+    return !_hashedField.eoo();
+}
+
+bool ShardKeyPattern::isValidHashedValue(const BSONElement& el) {
+    switch (el.type()) {
+        case MinKey:
+        case MaxKey:
+        case NumberLong:
+            return true;
+        default:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
+
+bool ShardKeyPattern::hasHashedPrefix() const {
     return isHashedPatternEl(_keyPattern.toBSON().firstElement());
+}
+
+BSONElement ShardKeyPattern::getHashedField() const {
+    return _hashedField;
 }
 
 const KeyPattern& ShardKeyPattern::getKeyPattern() const {
@@ -345,7 +378,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
         if (!isValidShardKeyElementForStorage(equalEl))
             return BSONObj();
 
-        if (isHashedPattern()) {
+        if (_hashedField && _hashedField.fieldNameStringData() == patternPath.dottedField()) {
             keyBuilder.append(
                 patternPath.dottedField(),
                 BSONElementHasher::hash64(equalEl, BSONElementHasher::DEFAULT_HASH_SEED));
