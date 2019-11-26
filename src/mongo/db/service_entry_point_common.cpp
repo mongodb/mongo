@@ -240,6 +240,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
 
     auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
     if (readConcernSupport.defaultReadConcernPermit.isOK() &&
+        (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
         !opCtx->getClient()->isInDirectClient()) {
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
             serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

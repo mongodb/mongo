@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -39,7 +42,10 @@ namespace {
 class SetDefaultRWConcernCommand : public TypedCommand<SetDefaultRWConcernCommand> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        // TODO SERVER-43126: Once CWRWC persistence and propagation have been implemented, this
+        // should change to AllowedOnSecondary::kNever to only allow setting the default on
+        // primaries.
+        return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {
         return true;
@@ -66,7 +72,9 @@ public:
                     rc || wc);
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            return rwcDefaults.setConcerns(opCtx, rc, wc);
+            auto newDefaults = rwcDefaults.setConcerns(opCtx, rc, wc);
+            log() << "successfully set RWC defaults to " << newDefaults.toBSON();
+            return newDefaults;
         }
 
     private:

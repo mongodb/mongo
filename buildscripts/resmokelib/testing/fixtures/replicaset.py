@@ -27,7 +27,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             num_nodes=2, start_initial_sync_node=False, write_concern_majority_journal_default=None,
             auth_options=None, replset_config_options=None, voting_secondaries=True,
             all_nodes_electable=False, use_replica_set_connection_string=None, linear_chain=False,
-            mixed_bin_versions=None):
+            mixed_bin_versions=None, default_read_concern=None, default_write_concern=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
@@ -41,6 +41,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.voting_secondaries = voting_secondaries
         self.all_nodes_electable = all_nodes_electable
         self.use_replica_set_connection_string = use_replica_set_connection_string
+        self.default_read_concern = default_read_concern
+        self.default_write_concern = default_write_concern
         self.mixed_bin_versions = utils.default_if_none(mixed_bin_versions,
                                                         config.MIXED_BIN_VERSIONS)
 
@@ -77,6 +79,14 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         # elected primary.
         if self.use_replica_set_connection_string is None:
             self.use_replica_set_connection_string = self.all_nodes_electable
+
+        if self.default_write_concern is True:
+            self.default_write_concern = {
+                "w": "majority",
+                # Use a "signature" value that won't typically match a value assigned in normal use.
+                # This way the wtimeout set by this override is distinguishable in the server logs.
+                "wtimeout": 5 * 60 * 1000 + 321,  # 300321ms
+            }
 
         # Set the default oplogSize to 511MB.
         self.mongod_options.setdefault("oplogSize", 511)
@@ -278,6 +288,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self._await_secondaries()
         self._await_stable_recovery_timestamp()
         self._setup_sessions_collection()
+        self._setup_cwrwc_defaults()
 
     def _await_primary(self):
         # Wait for the primary to be elected.
@@ -389,6 +400,18 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         """Set up the sessions collection so that it will not attempt to set up during a test."""
         primary = self.nodes[0]
         primary.mongo_client().admin.command({"refreshLogicalSessionCacheNow": 1})
+
+    def _setup_cwrwc_defaults(self):
+        """Set up the cluster-wide read/write concern defaults."""
+        if self.default_read_concern is None and self.default_write_concern is None:
+            return
+        cmd = {"setDefaultRWConcern": 1}
+        if self.default_read_concern is not None:
+            cmd["defaultReadConcern"] = self.default_read_concern
+        if self.default_write_concern is not None:
+            cmd["defaultWriteConcern"] = self.default_write_concern
+        for node in self.nodes:
+            node.mongo_client().admin.command(cmd)
 
     def _do_teardown(self):
         self.logger.info("Stopping all members of the replica set...")

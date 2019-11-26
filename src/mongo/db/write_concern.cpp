@@ -93,6 +93,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                      .getDefaultWriteConcern();
                 if (wcDefault) {
+                    LOG(2) << "Applying default writeConcern on " << cmdObj.firstElementFieldName()
+                           << " of " << wcDefault->toBSON();
                     return *wcDefault;
                 }
             }

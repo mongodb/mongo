@@ -6959,6 +6959,40 @@ tasks:
     vars:
       resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
 
+- <<: *task_template
+  name: cwrwc_passthrough
+  tags: ["read_write_concern", "large", "write"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=cwrwc_passthrough --storageEngine=wiredTiger
+
+- name: cwrwc_rc_majority_passthrough_gen
+  tags: ["read_write_concern"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      depends_on: jsCore
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 10
+
+- <<: *task_template
+  name: cwrwc_wc_majority_passthrough
+  tags: ["read_write_concern", "large", "write"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=cwrwc_wc_majority_passthrough --storageEngine=wiredTiger
+
 - name: secondary_reads_passthrough_gen
   depends_on:
   - name: jsCore
