@@ -119,6 +119,10 @@ add_option('ccache',
     help='Enable ccache support',
 )
 
+add_option('prefix',
+    help='installation prefix (conficts with DESTDIR, PREFIX, and --install-mode=hygienic)',
+)
+
 add_option('legacy-tarball',
     choices=['true', 'false'],
     default='false',
@@ -650,6 +654,27 @@ def variable_distsrc_converter(val):
 variables_files = variable_shlex_converter(get_option('variables-files'))
 for file in variables_files:
     print("Using variable customization file {}".format(file))
+
+# Attempt to prevent confusion between the different ways of
+# specifying file placement between hygienic and non-hygienic
+# modes. Re-interpret a value provided for the legacy '--prefix' flag
+# as setting `DESTDIR` instead. Note that we can't validate things
+# passed in via variables_files, so this is imperfect. However, it is
+# also temporary.
+if get_option('install-mode') == 'hygienic':
+    if has_option('prefix'):
+        print("Cannot use the '--prefix' option with '--install-mode=hygienic'. Use the DESTDIR and PREFIX Variables instead")
+        Exit(1)
+else:
+    if 'PREFIX' in ARGUMENTS:
+        print("Cannot use the 'PREFIX' Variable without '--install-mode=hygienic'")
+        Exit(1)
+    if 'DESTDIR' in ARGUMENTS:
+        print("Cannot use the 'DESTDIR' Variable without '--install-mode=hygienic', use the '--prefix' flag instead")
+        Exit(1)
+
+    if has_option('prefix'):
+        ARGUMENTS['DESTDIR'] = get_option('prefix')
 
 env_vars = Variables(
     files=variables_files,
