@@ -121,6 +121,10 @@ public:
         return (opts & QueryOption_CursorTailable) != 0;
     }
 
+    bool tailableAwaitData() const {
+        return tailable() && (opts & QueryOption_AwaitData);
+    }
+
     /** see ResultFlagType (constants.h) for flag values
         mostly these flags are for internal purposes -
         ResultFlag_ErrSet is the possible exception to that
@@ -221,6 +225,16 @@ public:
         return _connectionHasPendingReplies;
     }
 
+    Milliseconds getAwaitDataTimeoutMS() const {
+        return _awaitDataTimeout;
+    }
+
+    void setAwaitDataTimeoutMS(Milliseconds timeout) {
+        // It only makes sense to set awaitData timeout if the cursor is in tailable awaitData mode.
+        invariant(tailableAwaitData());
+        _awaitDataTimeout = timeout;
+    }
+
 protected:
     struct Batch {
         // TODO remove constructors after c++17 toolchain upgrade
@@ -273,6 +287,7 @@ private:
     bool _useFindCommand = true;
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;
+    Milliseconds _awaitDataTimeout = Milliseconds{0};
 
     void dataReceived(const Message& reply) {
         bool retry;

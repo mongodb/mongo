@@ -162,8 +162,9 @@ Message DBClientCursor::_assembleGetMore() {
         auto gmr = GetMoreRequest(ns,
                                   cursorId,
                                   boost::make_optional(batchSize != 0, batchSize),
-                                  boost::none,   // awaitDataTimeout
-                                  boost::none,   // term
+                                  boost::make_optional(tailableAwaitData(),
+                                                       _awaitDataTimeout),  // awaitDataTimeout
+                                  boost::none,                              // term
                                   boost::none);  // lastKnownCommittedOptime
         auto msg = assembleCommandRequest(_client, ns.db(), opts, gmr.toBSON());
         // Set the exhaust flag if needed.
