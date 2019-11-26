@@ -43,7 +43,7 @@ server_parameters:
     cpp_varname: "internalQueryPlanEvaluationWorks"
     cpp_vartype: AtomicWord<int>
     default: 10000
-    validator: 
+    validator:
       gt: 0
 
   internalQueryPlanEvaluationCollFraction:
@@ -52,7 +52,7 @@ server_parameters:
     cpp_varname: "internalQueryPlanEvaluationCollFraction"
     cpp_vartype: AtomicDouble
     default: 0.3
-    validator: 
+    validator:
       gte: 0.0
       lte: 1.0
 
@@ -62,16 +62,16 @@ server_parameters:
     cpp_varname: "internalQueryPlanEvaluationMaxResults"
     cpp_vartype: AtomicWord<int>
     default: 101
-    validator: 
+    validator:
       gte: 0
-  
+
   internalQueryForceIntersectionPlans:
     description: "Do we give a big ranking bonus to intersection plans?"
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryForceIntersectionPlans"
     cpp_vartype: AtomicWord<bool>
     default: false
-  
+
   internalQueryPlannerEnableIndexIntersection:
     description: "Do we have ixisect on at all?"
     set_at: [ startup, runtime ]
@@ -85,7 +85,7 @@ server_parameters:
     cpp_varname: "internalQueryPlannerEnableHashIntersection"
     cpp_vartype: AtomicWord<bool>
     default: false
-      
+
   #
   # Plan cache
   #
@@ -95,7 +95,7 @@ server_parameters:
     cpp_varname: "internalQueryCacheSize"
     cpp_vartype: AtomicWord<int>
     default: 5000
-    validator: 
+    validator:
       gte: 0
 
   internalQueryCacheFeedbacksStored:
@@ -104,7 +104,7 @@ server_parameters:
     cpp_varname: "internalQueryCacheFeedbacksStored"
     cpp_vartype: AtomicWord<int>
     default: 20
-    validator: 
+    validator:
       gte: 0
 
   internalQueryCacheEvictionRatio:
@@ -113,7 +113,7 @@ server_parameters:
     cpp_varname: "internalQueryCacheEvictionRatio"
     cpp_vartype: AtomicDouble
     default: 10.0
-    validator: 
+    validator:
       gte: 0.0
 
   internalQueryCacheWorksGrowthCoefficient:
@@ -122,20 +122,13 @@ server_parameters:
     cpp_varname: "internalQueryCacheWorksGrowthCoefficient"
     cpp_vartype: AtomicDouble
     default: 2.0
-    validator: 
+    validator:
       gt: 1.0
-  
+
   internalQueryCacheDisableInactiveEntries:
     description: "Whether or not cache entries can be marked as 'inactive'."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryCacheDisableInactiveEntries"
-    cpp_vartype: AtomicWord<bool>
-    default: false
-
-  internalQueryCacheListPlansNewOutput:
-    description: "Whether or not planCacheListPlans uses the new output format."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryCacheListPlansNewOutput"
     cpp_vartype: AtomicWord<bool>
     default: false
 
@@ -148,7 +141,7 @@ server_parameters:
     cpp_varname: "internalQueryPlannerMaxIndexedSolutions"
     cpp_vartype: AtomicWord<int>
     default: 64
-    validator: 
+    validator:
       gte: 0
 
   internalQueryEnumerationMaxOrSolutions:
@@ -157,7 +150,7 @@ server_parameters:
     cpp_varname: "internalQueryEnumerationMaxOrSolutions"
     cpp_vartype: AtomicWord<int>
     default: 10
-    validator: 
+    validator:
       gte: 0
 
   internalQueryEnumerationMaxIntersectPerAnd:
@@ -166,7 +159,7 @@ server_parameters:
     cpp_varname: "internalQueryEnumerationMaxIntersectPerAnd"
     cpp_vartype: AtomicWord<int>
     default: 3
-    validator: 
+    validator:
       gte: 0
 
   internalQueryPlanOrChildrenIndependently:
@@ -182,7 +175,7 @@ server_parameters:
     cpp_varname: "internalQueryMaxScansToExplode"
     cpp_vartype: AtomicWord<int>
     default: 200
-    validator: 
+    validator:
       gte: 0
 
   internalQueryPlannerGenerateCoveredWholeIndexScans:
@@ -209,9 +202,9 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxBlockingSortMemoryUsageBytes"
     cpp_vartype: AtomicWord<int>
-    default: 
+    default:
       expr: 100 * 1024 * 1024
-    validator: 
+    validator:
       gte: 0
 
   internalQueryExecYieldIterations:
@@ -227,7 +220,7 @@ server_parameters:
     cpp_varname: "internalQueryExecYieldPeriodMS"
     cpp_vartype: AtomicWord<int>
     default: 10
-    validator: 
+    validator:
       gte: 0
 
   internalQueryFacetBufferSizeBytes:
@@ -235,9 +228,9 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryFacetBufferSizeBytes"
     cpp_vartype: AtomicWord<int>
-    default: 
+    default:
       expr: 100 * 1024 * 1024
-    validator: 
+    validator:
       gt: 0
 
   internalLookupStageIntermediateDocumentMaxSizeBytes:
@@ -245,9 +238,9 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalLookupStageIntermediateDocumentMaxSizeBytes"
     cpp_vartype: AtomicWord<long long>
-    default: 
+    default:
       expr: 100 * 1024 * 1024
-    validator: 
+    validator:
       gte: { expr: BSONObjMaxInternalSize}
 
   internalDocumentSourceGroupMaxMemoryBytes:
@@ -255,9 +248,9 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceGroupMaxMemoryBytes"
     cpp_vartype: AtomicWord<long long>
-    default: 
+    default:
       expr: 100 * 1024 * 1024
-    validator: 
+    validator:
       gt: 0
 
   internalInsertMaxBatchSize:
@@ -265,10 +258,10 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalInsertMaxBatchSize"
     cpp_vartype: AtomicWord<int>
-    default: 
+    default:
       expr: internalQueryExecYieldIterations.load() / 2
       is_constexpr: false
-    validator: 
+    validator:
       gt: 0
 
   internalDocumentSourceCursorBatchSizeBytes:
@@ -276,9 +269,9 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceCursorBatchSizeBytes"
     cpp_vartype: AtomicWord<int>
-    default: 
+    default:
       expr: 4 * 1024 * 1024
-    validator: 
+    validator:
       gte: 0
 
   internalDocumentSourceLookupCacheSizeBytes:
@@ -286,9 +279,9 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
     cpp_vartype: AtomicWord<int>
-    default: 
+    default:
       expr: 100 * 1024 * 1024
-    validator: 
+    validator:
       gte: 0
 
   internalQueryProhibitBlockingMergeOnMongoS:

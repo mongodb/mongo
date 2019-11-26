@@ -1,5 +1,5 @@
-// Test the planCacheListQueryShapes command, which returns a list of query shapes
-// for the queries currently cached in the collection.
+// Test using the $planCacheStats aggregation metadata source to list all of the query shapes cached
+// for a particular collection.
 //
 // @tags: [
 //   # This test attempts to perform queries with plan cache filters set up. The former operation
@@ -7,63 +7,47 @@
 //   # primary.
 //   # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
 //   assumes_read_preference_unchanged,
+//   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,
 //   assumes_balancer_off,
+//   assumes_against_mongod_not_mongos,
 // ]
 (function() {
-const t = db.jstests_plan_cache_list_shapes;
-t.drop();
+const coll = db.jstests_plan_cache_list_shapes;
+coll.drop();
 
-// Utility function to list query shapes in cache.
-function getShapes(collection) {
-    if (collection === undefined) {
-        collection = t;
-    }
-    const res = collection.runCommand('planCacheListQueryShapes');
-    print('planCacheListQueryShapes() = ' + tojson(res));
-    assert.commandWorked(res, 'planCacheListQueryShapes failed');
-    assert(res.hasOwnProperty('shapes'), 'shapes missing from planCacheListQueryShapes result');
-    return res.shapes;
+function dumpPlanCacheState() {
+    return coll.aggregate([{$planCacheStats: {}}]).toArray();
 }
 
-// Attempting to retrieve cache information on non-existent collection is not an error and
-// should return an empty array of query shapes.
-const missingCollection = db.jstests_query_cache_missing;
-missingCollection.drop();
-assert.eq(0,
-          getShapes(missingCollection).length,
-          'planCacheListQueryShapes should return empty array on non-existent collection');
+// Utility function to list query shapes in cache.
+function getCachedQueryShapes() {
+    return coll.aggregate([{$planCacheStats: {}}, {$replaceWith: '$createdFromQuery'}]).toArray();
+}
 
-assert.commandWorked(t.save({a: 1, b: 1}));
-assert.commandWorked(t.save({a: 1, b: 2}));
-assert.commandWorked(t.save({a: 1, b: 2}));
-assert.commandWorked(t.save({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
 
 // We need two indices so that the MultiPlanRunner is executed.
-assert.commandWorked(t.ensureIndex({a: 1}));
-assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 // Run a query.
-assert.eq(
-    1, t.find({a: 1, b: 1}, {_id: 1, a: 1}).sort({a: -1}).itcount(), 'unexpected document count');
+assert.eq(1, coll.find({a: 1, b: 1}, {_id: 1, a: 1}).sort({a: -1}).itcount());
 
 // We now expect the two indices to be compared and a cache entry to exist.  Retrieve query
 // shapes from the test collection Number of shapes should match queries executed by multi-plan
 // runner.
-let shapes = getShapes();
-assert.eq(1, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
-// Since the queryHash is computed in the server, we filter it out when matching query shapes
-// here.
-let filteredShape0 = shapes[0];
-delete filteredShape0.queryHash;
-assert.eq({query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 1, a: 1}},
-          filteredShape0,
-          'unexpected query shape returned from planCacheListQueryShapes');
+let shapes = getCachedQueryShapes();
+assert.eq(1, shapes.length, dumpPlanCacheState());
+assert.eq({query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 1, a: 1}}, shapes[0]);
 
 // Running a different query shape should cause another entry to be cached.
-assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
-shapes = getShapes();
-assert.eq(2, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
+assert.eq(1, coll.find({a: 1, b: 1}).itcount());
+shapes = dumpPlanCacheState();
+assert.eq(2, shapes.length, shapes);
 
 // Check that each shape has a unique queryHash.
 assert.neq(shapes[0]["queryHash"], shapes[1]["queryHash"]);
@@ -72,9 +56,9 @@ assert.neq(shapes[0]["queryHash"], shapes[1]["queryHash"]);
 
 // Insert some documents with strings so we have something to search for.
 for (let i = 0; i < 5; i++) {
-    assert.commandWorked(t.insert({a: 3, s: 'hello world'}));
+    assert.commandWorked(coll.insert({a: 3, s: 'hello world'}));
 }
-assert.commandWorked(t.insert({a: 3, s: 'hElLo wOrLd'}));
+assert.commandWorked(coll.insert({a: 3, s: 'hElLo wOrLd'}));
 
 // Run a query with a regex. Also must include 'a' so that the query may use more than one
 // index, and thus, must use the MultiPlanner.
@@ -82,14 +66,16 @@ const regexQuery = {
     s: {$regex: 'hello world', $options: 'm'},
     a: 3
 };
-assert.eq(5, t.find(regexQuery).itcount());
+assert.eq(5, coll.find(regexQuery).itcount());
 
-assert.eq(3, getShapes().length, 'unexpected number of shapes in planCacheListQueryShapes result ');
+shapes = getCachedQueryShapes();
+assert.eq(3, shapes.length, shapes);
 
 // Run the same query, but with different regex options. We expect that this should cause a
 // shape to get added.
 regexQuery.s.$options = 'mi';
 // There is one more result since the query is now case sensitive.
-assert.eq(6, t.find(regexQuery).itcount());
-assert.eq(4, getShapes().length, 'unexpected number of shapes in planCacheListQueryShapes result');
+assert.eq(6, coll.find(regexQuery).itcount());
+shapes = getCachedQueryShapes();
+assert.eq(4, shapes.length, shapes);
 })();

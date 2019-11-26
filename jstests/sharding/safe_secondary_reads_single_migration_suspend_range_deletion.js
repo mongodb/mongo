@@ -20,6 +20,15 @@
  *                                     results for the command run with read concern 'available'.
  * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
  * "versioned". Determines what system profiler checks are performed.
+ *
+ * Tagged as 'requires_fcv_44', since this test cannot run against versions less then 4.4. This is
+ * because 'planCacheListPlans' and 'planCacheListQueryShapes' were deleted in 4.4, and thus not
+ * tested here. But this test asserts that all commands are covered, so will fail against a version
+ * of the server which implements these commands.
+ *
+ * @tags: [
+ *   requires_fcv_44,
+ * ]
  */
 (function() {
 "use strict";
@@ -275,8 +284,6 @@ let testCases = {
     planCacheClear: {skip: "does not return user data"},
     planCacheClearFilters: {skip: "does not return user data"},
     planCacheListFilters: {skip: "does not return user data"},
-    planCacheListPlans: {skip: "does not return user data"},
-    planCacheListQueryShapes: {skip: "does not return user data"},
     planCacheSetFilter: {skip: "does not return user data"},
     profile: {skip: "primary only"},
     reapLogicalSessionCacheNow: {skip: "does not return user data"},

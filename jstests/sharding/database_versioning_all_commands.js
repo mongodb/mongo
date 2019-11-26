@@ -620,29 +620,6 @@ let testCases = {
             }
         }
     },
-    planCacheListPlans: {
-        run: {
-            sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
-            command: function(dbName, collName) {
-                return {planCacheListPlans: collName, query: {_id: "A"}};
-            },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
-        }
-    },
-    planCacheListQueryShapes: {
-        run: {
-            sendsDbVersion: true,
-            command: function(dbName, collName) {
-                return {planCacheListQueryShapes: collName};
-            }
-        }
-    },
     planCacheSetFilter: {
         run: {
             sendsDbVersion: true,

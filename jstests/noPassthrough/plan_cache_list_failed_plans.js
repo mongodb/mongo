@@ -1,4 +1,4 @@
-// Confirms the planCacheListPlans output format includes information about failed plans.
+// Confirms the $planCacheStats output format includes information about failed plans.
 (function() {
 "use strict";
 
@@ -22,20 +22,24 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({d: 1}));
 
 // Assert that the find command found documents.
-const key = {
-    query: {a: 1},
-    sort: {d: 1},
-    projection: {}
-};
-assert.eq(smallNumber, coll.find(key.query).sort(key.sort).itcount());
-let res = assert.commandWorked(coll.runCommand("planCacheListPlans", key));
+assert.eq(smallNumber, coll.find({a: 1}).sort({d: 1}).itcount());
 
-// There should have been two plans generated.
-assert.eq(res["plans"].length, 2);
-// The second plan should fail.
-assert.eq(res["plans"][1]["reason"]["failed"], true);
+// We expect just one plan cache entry.
+const planCacheContents = coll.getPlanCache().list();
+assert.eq(planCacheContents.length, 1, planCacheContents);
+const planCacheEntry = planCacheContents[0];
+
+// There should have been two candidate plans evaluated when the plan cache entry was created.
+const creationExecStats = planCacheEntry.creationExecStats;
+assert.eq(creationExecStats.length, 2, planCacheEntry);
+// We expect that the first plan succeed, and the second failed.
+assert(!creationExecStats[0].hasOwnProperty("failed"), planCacheEntry);
+assert.eq(creationExecStats[1].failed, true, planCacheEntry);
 
 // The failing plan should have a score of 0.
-assert.eq(res["plans"][1]["reason"]["score"], 0);
+const candidatePlanScores = planCacheEntry.candidatePlanScores;
+assert.eq(candidatePlanScores.length, 2, planCacheEntry);
+assert.eq(candidatePlanScores[1], 0, planCacheEntry);
+
 MongoRunner.stopMongod(conn);
 })();

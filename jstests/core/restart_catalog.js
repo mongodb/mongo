@@ -86,8 +86,6 @@ assert.commandWorked(db.adminCommand({restartCatalog: 1}));
 // Access the query plan cache. (This makes no assumptions about the state of the plan cache
 // after restart; however, the database definitely should not crash.)
 [songsColl, artistsColl].forEach(coll => {
-    assert.commandWorked(coll.runCommand("planCacheListPlans", {query: {_id: 1}}));
-    assert.commandWorked(coll.runCommand("planCacheListQueryShapes"));
     assert.commandWorked(coll.runCommand("planCacheClear"));
 });
 

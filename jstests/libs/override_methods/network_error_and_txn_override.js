@@ -156,8 +156,6 @@ const kNonFailoverTolerantCommands = new Set([
     "planCacheClear",  // The plan cache isn't replicated.
     "planCacheClearFilters",
     "planCacheListFilters",
-    "planCacheListPlans",
-    "planCacheListQueryShapes",
     "planCacheSetFilter",
     "profile",       // Not replicated, so can't tolerate failovers.
     "setParameter",  // Not replicated, so can't tolerate failovers.

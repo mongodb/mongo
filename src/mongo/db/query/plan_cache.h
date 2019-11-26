@@ -554,8 +554,7 @@ public:
     PlanCacheKey computeKey(const CanonicalQuery&) const;
 
     /**
-     * Returns a copy of a cache entry.
-     * Used by planCacheListPlans to display plan details.
+     * Returns a copy of a cache entry, looked up by CanonicalQuery.
      *
      * If there is no entry in the cache for the 'query', returns an error Status.
      */

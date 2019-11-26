@@ -46,16 +46,16 @@ using std::stringstream;
 using std::vector;
 
 /**
- * Base class for mongos plan cache commands.
- * Cluster plan cache commands don't do much more than
- * forwarding the commands to all shards and combining the results.
+ * Mongos implementation of the 'planCacheClear' command. Forwards the command to one node in each
+ * targeted shard. For example, with the default read preference ("primary"), clears plan cache
+ * entries on the primary node of each shard.
  */
-class ClusterPlanCacheCmd : public BasicCommand {
-    ClusterPlanCacheCmd(const ClusterPlanCacheCmd&) = delete;
-    ClusterPlanCacheCmd& operator=(const ClusterPlanCacheCmd&) = delete;
+class ClusterPlanCacheClearCmd final : public BasicCommand {
+    ClusterPlanCacheClearCmd(const ClusterPlanCacheClearCmd&) = delete;
+    ClusterPlanCacheClearCmd& operator=(const ClusterPlanCacheClearCmd&) = delete;
 
 public:
-    virtual ~ClusterPlanCacheCmd() {}
+    ClusterPlanCacheClearCmd() : BasicCommand("planCacheClear") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
@@ -66,7 +66,7 @@ public:
     }
 
     std::string help() const override {
-        return _helpText;
+        return "Drops one or all plan cache entries for a collection.";
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
@@ -79,40 +79,23 @@ public:
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, _actionType)) {
+        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheWrite)) {
             return Status::OK();
         }
 
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
-    // Cluster plan cache command entry point.
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result);
+} clusterPlanCacheClearCmd;
 
-public:
-    /**
-     * Instantiates a command that can be invoked by "name", which will be described by
-     * "helpText", and will require privilege "actionType" to run.
-     */
-    ClusterPlanCacheCmd(const std::string& name, const std::string& helpText, ActionType actionType)
-        : BasicCommand(name), _helpText(helpText), _actionType(actionType) {}
-
-private:
-    std::string _helpText;
-    ActionType _actionType;
-};
-
-//
-// Cluster plan cache command implementation(s) below
-//
-
-bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
-                              const std::string& dbName,
-                              const BSONObj& cmdObj,
-                              BSONObjBuilder& result) {
+bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
+                                   const std::string& dbName,
+                                   const BSONObj& cmdObj,
+                                   BSONObjBuilder& result) {
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     const BSONObj query;
     const auto routingInfo =
@@ -146,42 +129,18 @@ bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
         uassertStatusOK(status.withContext(str::stream() << "failed on: " << response.shardId));
         const auto& cmdResult = response.swResponse.getValue().data;
 
-        // XXX: In absence of sensible aggregation strategy,
-        //      promote first shard's result to top level.
+        // In absence of sensible aggregation strategy, promote first shard's result to top level.
         if (i == shardResponses.begin()) {
             CommandHelpers::filterCommandReplyForPassthrough(cmdResult, &result);
             status = getStatusFromCommandResult(cmdResult);
             clusterCmdResult = status.isOK();
         }
 
-        // Append shard result as a sub object.
-        // Name the field after the shard.
+        // Append shard result as a sub object. Name the field after the shard.
         result.append(response.shardId, cmdResult);
     }
 
     return clusterCmdResult;
-}
-
-//
-// Register plan cache commands at startup
-//
-
-MONGO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
-    // Leaked intentionally: a Command registers itself when constructed.
-
-    new ClusterPlanCacheCmd("planCacheListQueryShapes",
-                            "Displays all query shapes in a collection.",
-                            ActionType::planCacheRead);
-
-    new ClusterPlanCacheCmd("planCacheClear",
-                            "Drops one or all cached queries in a collection.",
-                            ActionType::planCacheWrite);
-
-    new ClusterPlanCacheCmd("planCacheListPlans",
-                            "Displays the cached plans for a query shape.",
-                            ActionType::planCacheRead);
-
-    return Status::OK();
 }
 
 }  // namespace

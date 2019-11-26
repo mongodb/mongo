@@ -604,8 +604,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "planCacheClear",
                                           "planCacheClearFilters",
                                           "planCacheListFilters",
-                                          "planCacheListPlans",
-                                          "planCacheListQueryShapes",
                                           "planCacheSetFilter",
                                           "reIndex",
                                           "refreshLogicalSessionCacheNow",

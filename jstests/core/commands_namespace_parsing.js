@@ -200,18 +200,6 @@ assertFailsWithInvalidNamespacesForField("planCacheSetFilter",
 assertFailsWithInvalidNamespacesForField(
     "planCacheClearFilters", {planCacheClearFilters: ""}, isNotFullyQualified, isNotAdminCommand);
 
-// Test planCacheListQueryShapes fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("planCacheListQueryShapes",
-                                         {planCacheListQueryShapes: ""},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
-
-// Test planCacheListPlans fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("planCacheListPlans",
-                                         {planCacheListPlans: "", query: {}},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
-
 // Test planCacheClear fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
     "planCacheClear", {planCacheClear: ""}, isNotFullyQualified, isNotAdminCommand);

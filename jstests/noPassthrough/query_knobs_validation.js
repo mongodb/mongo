@@ -19,7 +19,6 @@ const expectedParamDefaults = {
     internalQueryCacheEvictionRatio: 10.0,
     internalQueryCacheWorksGrowthCoefficient: 2.0,
     internalQueryCacheDisableInactiveEntries: false,
-    internalQueryCacheListPlansNewOutput: false,
     internalQueryPlannerMaxIndexedSolutions: 64,
     internalQueryEnumerationMaxOrSolutions: 10,
     internalQueryEnumerationMaxIntersectPerAnd: 3,

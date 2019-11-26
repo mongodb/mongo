@@ -23,17 +23,19 @@ function indexBuildIsRunning(testDB, indexName) {
 
 // Returns whether a cached plan exists for 'query'.
 function assertDoesNotHaveCachedPlan(coll, query) {
-    const key = {query: query};
-    const cmdRes = assert.commandWorked(coll.runCommand('planCacheListPlans', key));
-    assert(cmdRes.hasOwnProperty('plans') && cmdRes.plans.length == 0, tojson(cmdRes));
+    const match = {"createdFromQuery.query": query};
+    assert.eq([], coll.getPlanCache().list([{$match: match}]), coll.getPlanCache().list());
 }
 
 // Returns the cached plan for 'query'.
 function getIndexNameForCachedPlan(coll, query) {
-    const key = {query: query};
-    const cmdRes = assert.commandWorked(coll.runCommand('planCacheListPlans', key));
-    assert(Array.isArray(cmdRes.plans) && cmdRes.plans.length > 0, tojson(cmdRes));
-    return cmdRes.plans[0].reason.stats.inputStage.indexName;
+    const match = {"createdFromQuery.query": query};
+    const plans = coll.getPlanCache().list([{$match: match}]);
+    assert.eq(plans.length, 1, coll.getPlanCache().list());
+    assert(plans[0].hasOwnProperty("cachedPlan"), plans);
+    assert(plans[0].cachedPlan.hasOwnProperty("inputStage"), plans);
+    assert(plans[0].cachedPlan.inputStage.hasOwnProperty("indexName"), plans);
+    return plans[0].cachedPlan.inputStage.indexName;
 }
 
 function runTest({rst, readDB, writeDB}) {

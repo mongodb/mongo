@@ -167,7 +167,7 @@ testColl.dataSize();
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
 // PlanCache
-testColl.getPlanCache().listQueryShapes();
+testColl.getPlanCache().clear();
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
 // Commands which occur on the database only should not effect the collection stats.

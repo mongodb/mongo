@@ -269,6 +269,7 @@ env.Library(
         "list_databases.cpp",
         "list_indexes.cpp",
         "pipeline_command.cpp",
+        "plan_cache_clear_command.cpp",
         "plan_cache_commands.cpp",
         "rename_collection_cmd.cpp",
         "run_aggregate.cpp",

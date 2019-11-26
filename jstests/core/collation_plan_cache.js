@@ -5,13 +5,23 @@
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
+//   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,
+//   assumes_against_mongod_not_mongos,
 // ]
 (function() {
 'use strict';
 
 var coll = db.collation_plan_cache;
 coll.drop();
+
+function dumpPlanCacheState() {
+    return coll.aggregate([{$planCacheStats: {}}]).toArray();
+}
+
+function getPlansByQuery(match) {
+    return coll.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();
+}
 
 assert.commandWorked(coll.insert({a: 'foo', b: 5}));
 
@@ -23,96 +33,65 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}, {collation: {locale: 'en_US'
 // shape.
 assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: 'fr_CA'}}));
 
-// listQueryShapes().
-
 // Run a query so that an entry is inserted into the cache.
 assert.commandWorked(
     coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}),
     'find command failed');
 
 // The query shape should have been added.
-var shapes = coll.getPlanCache().listQueryShapes();
+var shapes = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(1, shapes.length, 'unexpected cache size after running query');
-let filteredShape0 = shapes[0];
-delete filteredShape0.queryHash;
-assert.eq(filteredShape0,
+assert.eq(shapes[0].createdFromQuery.query, {a: 'foo', b: 5}, shapes);
+assert.eq(shapes[0].createdFromQuery.sort, {}, shapes);
+assert.eq(shapes[0].createdFromQuery.projection, {}, shapes);
+assert.eq(shapes[0].createdFromQuery.collation,
           {
-              query: {a: 'foo', b: 5},
-              sort: {},
-              projection: {},
-              collation: {
-                  locale: 'en_US',
-                  caseLevel: false,
-                  caseFirst: 'off',
-                  strength: 3,
-                  numericOrdering: false,
-                  alternate: 'non-ignorable',
-                  maxVariable: 'punct',
-                  normalization: false,
-                  backwards: false,
-                  version: '57.1'
-              }
+              locale: 'en_US',
+              caseLevel: false,
+              caseFirst: 'off',
+              strength: 3,
+              numericOrdering: false,
+              alternate: 'non-ignorable',
+              maxVariable: 'punct',
+              normalization: false,
+              backwards: false,
+              version: '57.1'
           },
-          'unexpected query shape returned from listQueryShapes()');
+          shapes);
 
 coll.getPlanCache().clear();
 
-// getPlansByQuery().
-
-// Passing a query with an empty collation object should throw.
-assert.throws(function() {
-    coll.getPlanCache().getPlansByQuery(
-        {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {}});
-}, [], 'empty collation object should throw');
-
-// Passing a query with an invalid collation object should throw.
-assert.throws(function() {
-    coll.getPlanCache().getPlansByQuery(
-        {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {bad: "value"}});
-}, [], 'invalid collation object should throw');
-
 // Run a query so that an entry is inserted into the cache.
 assert.commandWorked(
-    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}),
-    'find command failed');
+    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}));
 
 // The query should have cached plans.
 assert.lt(0,
-          coll.getPlanCache()
-              .getPlansByQuery(
-                  {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'en_US'}})
-              .plans.length,
-          'unexpected number of cached plans for query');
-
-// Test passing the query, sort, projection, and collation to getPlansByQuery() as  separate
-// arguments.
-assert.lt(
-    0,
-    coll.getPlanCache().getPlansByQuery({a: 'foo', b: 5}, {}, {}, {locale: 'en_US'}).plans.length,
-    'unexpected number of cached plans for query');
-
-// Test passing the query, sort, projection, and collation to getPlansByQuery() as separate
-// arguments.
-assert.eq(0,
-          coll.getPlanCache().getPlansByQuery({a: 'foo', b: 5}).plans.length,
-          'unexpected number of cached plans for query');
+          getPlansByQuery({
+              'createdFromQuery.query': {a: 'foo', b: 5},
+              'createdFromQuery.collation.locale': 'en_US'
+          }).length,
+          dumpPlanCacheState());
 
 // A query with a different collation should have no cached plans.
 assert.eq(0,
-          coll.getPlanCache()
-              .getPlansByQuery(
-                  {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'fr_CA'}})
-              .plans.length,
-          'unexpected number of cached plans for query');
+          getPlansByQuery({
+              'createdFromQuery.query': {a: 'foo', b: 5},
+              'createdFromQuery.sort': {},
+              'createdFromQuery.projection': {},
+              'createdFromQuery.collation.locale': 'fr_CA'
+          }).length,
+          dumpPlanCacheState());
 
 // A query with different string locations should have no cached plans.
-assert.eq(
-    0,
-    coll.getPlanCache()
-        .getPlansByQuery(
-            {query: {a: 'foo', b: 'bar'}, sort: {}, projection: {}, collation: {locale: 'en_US'}})
-        .plans.length,
-    'unexpected number of cached plans for query');
+assert.eq(0,
+          getPlansByQuery({
+              'createdFromQuery.query': {a: 'foo', b: 'bar'},
+              'createdFromQuery.sort': {},
+              'createdFromQuery.projection': {},
+              'createdFromQuery.collation': {locale: 'en_US'}
+          }).length,
+          dumpPlanCacheState());
 
 coll.getPlanCache().clear();
 
@@ -134,29 +113,26 @@ assert.throws(function() {
 assert.commandWorked(
     coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}),
     'find command failed');
-assert.eq(
-    1, coll.getPlanCache().listQueryShapes().length, 'unexpected cache size after running query');
+assert.eq(1, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
 // Dropping a query shape with a different collation should have no effect.
 coll.getPlanCache().clearPlansByQuery(
     {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'fr_CA'}});
-assert.eq(1,
-          coll.getPlanCache().listQueryShapes().length,
-          'unexpected cache size after dropping uncached query shape');
+assert.eq(1, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
 // Dropping a query shape with different string locations should have no effect.
 coll.getPlanCache().clearPlansByQuery(
     {query: {a: 'foo', b: 'bar'}, sort: {}, projection: {}, collation: {locale: 'en_US'}});
-assert.eq(1,
-          coll.getPlanCache().listQueryShapes().length,
-          'unexpected cache size after dropping uncached query shape');
+assert.eq(1, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
 // Dropping query shape.
 coll.getPlanCache().clearPlansByQuery(
     {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'en_US'}});
-assert.eq(0,
-          coll.getPlanCache().listQueryShapes().length,
-          'unexpected cache size after dropping query shapes');
+assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
+
+// 'collation' parameter is not allowed with 'query' parameter for 'planCacheClear'.
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {collation: {locale: "en_US"}}),
+                             ErrorCodes.BadValue);
 
 // Index filter commands.
 

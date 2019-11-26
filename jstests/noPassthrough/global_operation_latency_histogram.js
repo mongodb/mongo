@@ -149,8 +149,8 @@ testColl.dataSize();
 lastHistogram = checkHistogramDiff(0, 0, 1);
 
 // PlanCache
-testColl.getPlanCache().listQueryShapes();
-lastHistogram = checkHistogramDiff(0, 0, 1);
+testColl.getPlanCache().list();
+lastHistogram = checkHistogramDiff(1, 0, 0);
 
 // ServerStatus
 assert.commandWorked(testDB.serverStatus());

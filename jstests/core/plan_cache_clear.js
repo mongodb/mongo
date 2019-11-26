@@ -7,67 +7,92 @@
 //   # latter must be routed to the primary.
 //   # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
 //   assumes_read_preference_unchanged,
+//   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,
 //   assumes_balancer_off,
+//   assumes_against_mongod_not_mongos,
 // ]
 
 (function() {
-var t = db.jstests_plan_cache_clear;
-t.drop();
+const coll = db.jstests_plan_cache_clear;
+coll.drop();
 
-// Utility function to list query shapes in cache.
-function getShapes(collection) {
-    if (collection == undefined) {
-        collection = t;
-    }
-    var res = collection.runCommand('planCacheListQueryShapes');
-    print('planCacheListQueryShapes() = ' + tojson(res));
-    assert.commandWorked(res, 'planCacheListQueryShapes failed');
-    assert(res.hasOwnProperty('shapes'), 'shapes missing from planCacheListQueryShapes result');
-    return res.shapes;
+function numPlanCacheEntries() {
+    return coll.aggregate([{$planCacheStats: {}}]).itcount();
 }
 
-t.save({a: 1, b: 1});
-t.save({a: 1, b: 2});
-t.save({a: 1, b: 2});
-t.save({a: 2, b: 2});
+function dumpPlanCacheState() {
+    return coll.aggregate([{$planCacheStats: {}}]).toArray();
+}
+
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
 
 // We need two indices so that the MultiPlanRunner is executed.
-t.ensureIndex({a: 1});
-t.ensureIndex({a: 1, b: 1});
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 // Run a query so that an entry is inserted into the cache.
-assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
+assert.eq(1, coll.find({a: 1, b: 1}).itcount());
 
 // Invalid key should be a no-op.
-assert.commandWorked(t.runCommand('planCacheClear', {query: {unknownfield: 1}}));
-assert.eq(1, getShapes().length, 'removing unknown query should not affecting exisiting entries');
+assert.commandWorked(coll.runCommand('planCacheClear', {query: {unknownfield: 1}}));
+assert.eq(1, numPlanCacheEntries(), dumpPlanCacheState());
 
-// Run a new query shape and drop it from the cache
-assert.eq(1, getShapes().length, 'unexpected cache size after running 2nd query');
-assert.commandWorked(t.runCommand('planCacheClear', {query: {a: 1, b: 1}}));
-assert.eq(0, getShapes().length, 'unexpected cache size after dropping 2nd query from cache');
+// Introduce a second plan cache entry.
+assert.eq(0, coll.find({a: 1, b: 1, c: 1}).itcount());
+assert.eq(2, numPlanCacheEntries(), dumpPlanCacheState());
+
+// Drop one of the two shapes from the cache.
+assert.commandWorked(coll.runCommand('planCacheClear', {query: {a: 1, b: 1}}),
+                     dumpPlanCacheState());
+assert.eq(1, numPlanCacheEntries(), dumpPlanCacheState());
+
+// Drop the second shape from the cache.
+assert.commandWorked(coll.runCommand('planCacheClear', {query: {a: 1, b: 1, c: 1}}),
+                     dumpPlanCacheState());
+assert.eq(0, numPlanCacheEntries(), dumpPlanCacheState());
 
 // planCacheClear can clear $expr queries.
-assert.eq(1, t.find({a: 1, b: 1, $expr: {$eq: ['$a', 1]}}).itcount(), 'unexpected document count');
-assert.eq(1, getShapes().length, 'unexpected cache size after running 2nd query');
+assert.eq(1, coll.find({a: 1, b: 1, $expr: {$eq: ['$a', 1]}}).itcount());
+assert.eq(1, numPlanCacheEntries(), dumpPlanCacheState());
 assert.commandWorked(
-    t.runCommand('planCacheClear', {query: {a: 1, b: 1, $expr: {$eq: ['$a', 1]}}}));
-assert.eq(0, getShapes().length, 'unexpected cache size after dropping 2nd query from cache');
+    coll.runCommand('planCacheClear', {query: {a: 1, b: 1, $expr: {$eq: ['$a', 1]}}}));
+assert.eq(0, numPlanCacheEntries(), dumpPlanCacheState());
 
 // planCacheClear fails with an $expr query with an unbound variable.
 assert.commandFailed(
-    t.runCommand('planCacheClear', {query: {a: 1, b: 1, $expr: {$eq: ['$a', '$$unbound']}}}));
+    coll.runCommand('planCacheClear', {query: {a: 1, b: 1, $expr: {$eq: ['$a', '$$unbound']}}}));
 
 // Insert two more shapes into the cache.
-assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
-assert.eq(1, t.find({a: 1, b: 1}, {_id: 0, a: 1}).itcount(), 'unexpected document count');
+assert.eq(1, coll.find({a: 1, b: 1}).itcount());
+assert.eq(1, coll.find({a: 1, b: 1}, {_id: 0, a: 1}).itcount());
+assert.eq(2, numPlanCacheEntries(), dumpPlanCacheState());
+
+// Error cases.
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {query: 12345}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {query: /regex/}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {query: {a: {$no_such_op: 1}}}),
+                             ErrorCodes.BadValue);
+// 'sort' parameter is not allowed without 'query' parameter.
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {sort: {a: 1}}),
+                             ErrorCodes.BadValue);
+// 'projection' parameter is not allowed with 'query' parameter.
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {projection: {_id: 0, a: 1}}),
+                             ErrorCodes.BadValue);
 
 // Drop query cache. This clears all cached queries in the collection.
-res = t.runCommand('planCacheClear');
-print('planCacheClear() = ' + tojson(res));
-assert.commandWorked(res, 'planCacheClear failed');
-assert.eq(0, getShapes().length, 'plan cache should be empty after successful planCacheClear()');
+assert.commandWorked(coll.runCommand('planCacheClear'));
+assert.eq(0, numPlanCacheEntries(), dumpPlanCacheState());
+
+// Clearing the plan cache for a non-existent collection should succeed.
+const nonExistentColl = db.plan_cache_clear_nonexistent;
+nonExistentColl.drop();
+assert.commandWorked(nonExistentColl.runCommand('planCacheClear'));
 
 //
 // Query Plan Revision
@@ -86,11 +111,10 @@ assert.eq(0, getShapes().length, 'plan cache should be empty after successful pl
 //     Confirm that cache is empty.
 const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
 if (!isMongos) {
-    assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
-    assert.eq(1, getShapes().length, 'plan cache should not be empty after query');
-    res = t.reIndex();
-    print('reIndex result = ' + tojson(res));
-    assert.eq(0, getShapes().length, 'plan cache should be empty after reIndex operation');
+    assert.eq(1, coll.find({a: 1, b: 1}).itcount());
+    assert.eq(1, numPlanCacheEntries(), dumpPlanCacheState());
+    assert.commandWorked(coll.reIndex());
+    assert.eq(0, numPlanCacheEntries(), dumpPlanCacheState());
 }
 
 // Case 2: You add or drop an index.
@@ -98,10 +122,10 @@ if (!isMongos) {
 //     Populate the cache with 1 entry.
 //     Add an index.
 //     Confirm that cache is empty.
-assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
-assert.eq(1, getShapes().length, 'plan cache should not be empty after query');
-t.ensureIndex({b: 1});
-assert.eq(0, getShapes().length, 'plan cache should be empty after adding index');
+assert.eq(1, coll.find({a: 1, b: 1}).itcount());
+assert.eq(1, numPlanCacheEntries(), dumpPlanCacheState());
+assert.commandWorked(coll.createIndex({b: 1}));
+assert.eq(0, numPlanCacheEntries(), dumpPlanCacheState());
 
 // Case 3: The mongod process restarts
 // Not applicable.

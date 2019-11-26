@@ -259,21 +259,6 @@ let testCases = {
             return {planCacheListFilters: collName};
         },
     },
-    planCacheListPlans: {
-        // Uses connection versioning.
-        whenNamespaceDoesNotExistFailsWith: ErrorCodes.BadValue,
-        whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
-        command: collName => {
-            return {planCacheListPlans: collName, query: {_id: "A"}};
-        },
-    },
-    planCacheListQueryShapes: {
-        // Uses connection versioning.
-        whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
-        command: collName => {
-            return {planCacheListQueryShapes: collName};
-        },
-    },
     planCacheSetFilter: {
         // Uses connection versioning.
         whenNamespaceDoesNotExistFailsWith: ErrorCodes.BadValue,

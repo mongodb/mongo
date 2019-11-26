@@ -11,14 +11,10 @@ load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Col
 
 const coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 
-function getPlansForCacheEntry(query) {
-    let key = {query: query, sort: {}, projection: {}};
-    let res = coll.runCommand("planCacheListPlans", key);
-    assert.commandWorked(res, `planCacheListPlans(${tojson(key)}) failed`);
-    assert(res.hasOwnProperty("plans"),
-           `plans missing from planCacheListPlans(${tojson(key)}) failed`);
-
-    return res;
+function getPlansForCacheEntry(match) {
+    const matchingCacheEntries = coll.getPlanCache().list([{$match: match}]);
+    assert.eq(matchingCacheEntries.length, 1, coll.getPlanCache().list());
+    return matchingCacheEntries[0];
 }
 
 function planHasIxScanStageForKey(planStats, keyPattern) {
@@ -29,11 +25,6 @@ function planHasIxScanStageForKey(planStats, keyPattern) {
 
     return bsonWoCompare(keyPattern, stage.keyPattern) == 0;
 }
-
-const queryShape = {
-    a: 1,
-    b: 1
-};
 
 // Carefully construct a collection so that some queries will do well with an {a: 1} index
 // and others with a {b: 1} index.
@@ -66,17 +57,21 @@ assert.commandWorked(coll.createIndex({b: 1}));
 assert.eq(1, coll.find(bIndexQuery).itcount());
 
 // The plan cache should now hold an inactive entry.
-let entry = getPlansForCacheEntry(queryShape);
+let entry = getPlansForCacheEntry({"createdFromQuery.query": bIndexQuery});
 let entryWorks = entry.works;
 assert.eq(entry.isActive, false);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {b: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
+
+// Get the hash of the query shape so that we keep looking up entries associated with the same shape
+// going forward.
+const queryHash = entry.queryHash;
 
 // Re-run the query. The inactive cache entry should be promoted to an active entry.
 assert.eq(1, coll.find(bIndexQuery).itcount());
-entry = getPlansForCacheEntry(queryShape);
+entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
 assert.eq(entry.works, entryWorks);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {b: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
 
 // Now we will attempt to oscillate the cache entry by interleaving queries which should use
 // the {a:1} and {b:1} index. When the plan using the {b: 1} index is in the cache, running a
@@ -87,30 +82,30 @@ assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {b: 1}), true);
 // index. The current cache entry will be deactivated, and then the cache entry for the {a: 1}
 // will overwrite it (as active).
 assert.eq(1, coll.find(aIndexQuery).itcount());
-entry = getPlansForCacheEntry(queryShape);
+entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {a: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {a: 1}), true, entry);
 
 // Run the query which should use the {b: 1} index.
 assert.eq(1, coll.find(bIndexQuery).itcount());
-entry = getPlansForCacheEntry(queryShape);
+entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {b: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
 
 // The {b: 1} plan is again in the cache. Run the query which should use the {a: 1}
 // index.
 assert.eq(1, coll.find(aIndexQuery).itcount());
-entry = getPlansForCacheEntry(queryShape);
+entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {a: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {a: 1}), true, entry);
 
 // The {a: 1} plan is back in the cache. Run the query which would perform better on the plan
 // using the {b: 1} index, and ensure that plan gets written to the cache.
 assert.eq(1, coll.find(bIndexQuery).itcount());
-entry = getPlansForCacheEntry(queryShape);
+entry = getPlansForCacheEntry({queryHash: queryHash});
 entryWorks = entry.works;
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {b: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
 
 // Now run a plan that will perform poorly with both indices (it will be required to scan 500
 // documents). This will result in replanning (and the cache entry being deactivated). However,
@@ -122,9 +117,9 @@ for (let i = 0; i < 500; i++) {
 assert.eq(500, coll.find({a: 3, b: 3}).itcount());
 
 // The cache entry should have been deactivated.
-entry = getPlansForCacheEntry(queryShape);
+entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, false);
-assert.eq(planHasIxScanStageForKey(entry.plans[0].reason.stats, {b: 1}), true);
+assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
 
 // The works value should have doubled.
 assert.eq(entry.works, entryWorks * 2);

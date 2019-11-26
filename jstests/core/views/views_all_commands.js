@@ -2,11 +2,17 @@
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
+//   requires_fcv_44,
 //   requires_getmore,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   uses_map_reduce_with_temp_collections,
 // ]
+//
+// Tagged as 'requires_fcv_44', since this test cannot run against versions less then 4.4. This is
+// because 'planCacheListPlans' and 'planCacheListQueryShapes' were deleted in 4.4, and thus not
+// tested here. But this test asserts that all commands are covered, so will fail against a version
+// of the server which implements these commands.
 
 /*
  * Declaratively-defined tests for views for all database commands. This file contains a map of test
@@ -419,8 +425,6 @@ let viewsCommandTests = {
     planCacheClear: {command: {planCacheClear: "view"}, expectFailure: true},
     planCacheClearFilters: {command: {planCacheClearFilters: "view"}, expectFailure: true},
     planCacheListFilters: {command: {planCacheListFilters: "view"}, expectFailure: true},
-    planCacheListPlans: {command: {planCacheListPlans: "view"}, expectFailure: true},
-    planCacheListQueryShapes: {command: {planCacheListQueryShapes: "view"}, expectFailure: true},
     planCacheSetFilter: {command: {planCacheSetFilter: "view"}, expectFailure: true},
     prepareTransaction: {skip: isUnrelated},
     profile: {skip: isUnrelated},

@@ -4,44 +4,32 @@
 var name = "plan_cache_slaveok";
 
 function assertPlanCacheCommandsSucceed(db) {
-    // .listQueryShapes()
-    assert.commandWorked(db.runCommand({planCacheListQueryShapes: name}));
-
-    // .getPlansByQuery()
-    assert.commandWorked(db.runCommand({planCacheListPlans: name, query: {a: 1}}));
-
-    // .clear()
     assert.commandWorked(db.runCommand({planCacheClear: name, query: {a: 1}}));
 
-    // setFilter
+    // Using aggregate to list the contents of the plan cache.
+    assert.commandWorked(
+        db.runCommand({aggregate: name, pipeline: [{$planCacheStats: {}}], cursor: {}}));
+
     assert.commandWorked(
         db.runCommand({planCacheSetFilter: name, query: {a: 1}, indexes: [{a: 1}]}));
 
-    // listFilters
     assert.commandWorked(db.runCommand({planCacheListFilters: name}));
 
-    // clearFilters
     assert.commandWorked(db.runCommand({planCacheClearFilters: name, query: {a: 1}}));
 }
 
 function assertPlanCacheCommandsFail(db) {
-    // .listQueryShapes()
-    assert.commandFailed(db.runCommand({planCacheListQueryShapes: name}));
-
-    // .getPlansByQuery()
-    assert.commandFailed(db.runCommand({planCacheListPlans: name, query: {a: 1}}));
-
-    // .clear()
     assert.commandFailed(db.runCommand({planCacheClear: name, query: {a: 1}}));
 
-    // setFilter
+    // Using aggregate to list the contents of the plan cache.
+    assert.commandFailed(
+        db.runCommand({aggregate: name, pipeline: [{$planCacheStats: {}}], cursor: {}}));
+
     assert.commandFailed(
         db.runCommand({planCacheSetFilter: name, query: {a: 1}, indexes: [{a: 1}]}));
 
-    // listFilters
     assert.commandFailed(db.runCommand({planCacheListFilters: name}));
 
-    // clearFilters
     assert.commandFailed(db.runCommand({planCacheClearFilters: name, query: {a: 1}}));
 }
 
