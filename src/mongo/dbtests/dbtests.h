@@ -80,7 +80,7 @@ public:
     }
 
     Collection* getCollection() const {
-        return CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_nss);
+        return CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_opCtx, _nss);
     }
 
 private:

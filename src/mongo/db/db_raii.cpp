@@ -364,7 +364,7 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
                     ->checkShardVersionOrThrow(
                         _opCtx,
                         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                            NamespaceString(ns)));
+                            opCtx, NamespaceString(ns)));
                 break;
         }
     }

@@ -82,9 +82,6 @@ CollectionQueryInfo::CollectionQueryInfo()
       _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
 
 const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
-    const Collection* coll = get.owner(this);
-    // This requires "some" lock, and MODE_IS is an expression for that, for now.
-    dassert(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
     invariant(_keysComputed);
     return _indexedPaths;
 }
@@ -172,7 +169,7 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
         // index was dropped (and we would not get here).
-        dassert(nullptr != coll->getIndexCatalog()->findIndexByName(opCtx, *it));
+        invariant(nullptr != coll->getIndexCatalog()->findIndexByName(opCtx, *it));
 
         _indexUsageTracker.recordIndexAccess(*it);
     }
@@ -213,8 +210,6 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx) {
 
 void CollectionQueryInfo::init(OperationContext* opCtx) {
     const Collection* coll = get.owner(this);
-    // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
 
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
@@ -228,21 +223,13 @@ void CollectionQueryInfo::init(OperationContext* opCtx) {
 }
 
 void CollectionQueryInfo::addedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
-    const Collection* coll = get.owner(this);
-    // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
     invariant(desc);
 
     rebuildIndexData(opCtx);
-
     _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
 }
 
 void CollectionQueryInfo::droppedIndex(OperationContext* opCtx, StringData indexName) {
-    const Collection* coll = get.owner(this);
-    // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
-
     rebuildIndexData(opCtx);
     _indexUsageTracker.unregisterIndex(indexName);
 }

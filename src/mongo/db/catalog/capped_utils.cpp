@@ -72,7 +72,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     uassert(ErrorCodes::NamespaceNotFound, "no such database", db);
 
     Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collectionName);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()));
@@ -118,7 +118,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     NamespaceString fromNss(db->name(), shortFrom);
     NamespaceString toNss(db->name(), shortTo);
 
-    Collection* fromCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(fromNss);
+    Collection* fromCollection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
@@ -136,7 +137,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection " << toNss
                           << " already exists. source collection: " << fromNss,
-            !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss));
+            !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss));
 
     // create new collection
     {
@@ -156,7 +157,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
     }
 
-    Collection* toCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss);
+    Collection* toCollection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
     invariant(toCollection);  // we created above
 
     // how much data to ignore because it won't fit anyway

@@ -226,7 +226,7 @@ public:
             // Views do not require a shard version check. We do not care about invalid system views
             // for this check, only to validate if a view already exists for this namespace.
             if (autoDb->getDb() &&
-                !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) &&
+                !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) &&
                 ViewCatalog::get(autoDb->getDb())
                     ->lookupWithoutValidatingDurableViews(opCtx, nss.ns())) {
                 return true;

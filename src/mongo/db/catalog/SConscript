@@ -225,10 +225,6 @@ env.Library(
         env.Idlc('multi_index_block.idl')[0],
     ],
     LIBDEPS=[
-        'collection',
-        'index_build_block',
-        'index_timestamp_helper',
-        'index_build_block',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/background',
@@ -239,11 +235,15 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'collection',
+        'index_build_block',
+        'index_timestamp_helper',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'collection_catalog',
     ]
 )
 
@@ -251,14 +251,16 @@ env.Library(
     target='collection_catalog',
     source=[
         'collection_catalog.cpp',
+        'uncommitted_collections.cpp',
     ],
     LIBDEPS=[
-        'collection',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
+        'collection',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ]
 )
@@ -343,9 +345,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
-        'index_build_block',
-        'throttle_cursor',
-        'validate_state',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
@@ -354,6 +354,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/transaction',
+        'index_build_block',
+        'throttle_cursor',
+        'validate_state',
     ],
 )
 

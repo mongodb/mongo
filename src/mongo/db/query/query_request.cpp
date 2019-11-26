@@ -122,7 +122,7 @@ QueryRequest::QueryRequest(NamespaceStringOrUUID nssOrUuid)
 void QueryRequest::refreshNSS(OperationContext* opCtx) {
     if (_uuid) {
         const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-        auto foundColl = catalog.lookupCollectionByUUID(_uuid.get());
+        auto foundColl = catalog.lookupCollectionByUUID(opCtx, _uuid.get());
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "UUID " << _uuid.get() << " specified in query request not found",
                 foundColl);

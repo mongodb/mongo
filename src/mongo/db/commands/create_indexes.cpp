@@ -370,7 +370,7 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
                                   const BSONObj& cmdObj,
                                   std::string* errmsg,
                                   BSONObjBuilder* result) {
-    if (auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns)) {
+    if (auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns)) {
         result->appendBool(kCreateCollectionAutomaticallyFieldName, false);
         return collection;
     }
@@ -549,7 +549,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
         Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_IS);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
         invariant(collection);
 
         // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
@@ -570,7 +570,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
         Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_IS);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
         invariant(collection);
 
         // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
@@ -594,7 +594,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
         Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_S);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
         invariant(collection);
 
         // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
@@ -619,7 +619,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
             opCtx, NamespaceStringOrUUID(dbName, collectionUUID), MODE_X);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
         invariant(collection);
 
         // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
@@ -629,7 +629,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     db = databaseHolder->getDb(opCtx, ns.db());
-    invariant(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns));
+    invariant(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns));
 
     // Perform the third and final drain while holding the exclusive collection lock.
     uassertStatusOK(

@@ -62,7 +62,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             auto incomingRequest = request();
             auto sourceCollUUID = request().getUuid();
-            auto nssFromUUID = CollectionCatalog::get(opCtx).lookupNSSByUUID(sourceCollUUID);
+            auto nssFromUUID = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, sourceCollUUID);
             if (nssFromUUID == incomingRequest.getTo()) {
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);

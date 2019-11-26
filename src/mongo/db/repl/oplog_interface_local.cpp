@@ -64,7 +64,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
           InternalPlanner::collectionScan(opCtx,
                                           NamespaceString::kRsOplogNamespace.ns(),
                                           CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                                              NamespaceString::kRsOplogNamespace),
+                                              opCtx, NamespaceString::kRsOplogNamespace),
                                           PlanExecutor::NO_YIELD,
                                           InternalPlanner::BACKWARD)) {}
 

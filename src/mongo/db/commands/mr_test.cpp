@@ -586,8 +586,9 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
         << BSON("indexesCreated" << _opObserver->indexesCreated);
     ASSERT_BSONOBJ_EQ(indexSpec, _opObserver->indexesCreated[0]);
 
-    ASSERT_NOT_EQUALS(*options.uuid,
-                      *CollectionCatalog::get(_opCtx.get()).lookupUUIDByNSS(outputNss))
+    ASSERT_NOT_EQUALS(
+        *options.uuid,
+        *CollectionCatalog::get(_opCtx.get()).lookupUUIDByNSS(_opCtx.get(), outputNss))
         << "Output collection " << outputNss << " was not replaced";
 
     _assertTemporaryCollectionsAreDropped();

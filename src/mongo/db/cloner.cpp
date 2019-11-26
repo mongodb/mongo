@@ -117,7 +117,8 @@ struct Cloner::Fun {
         bool createdCollection = false;
         Collection* collection = nullptr;
 
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(to_collection);
+        collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, to_collection);
         if (!collection) {
             massert(17321,
                     str::stream() << "collection dropped during clone [" << to_collection.ns()
@@ -139,7 +140,7 @@ struct Cloner::Fun {
                                         << to_collection.ns() << "]");
                 wunit.commit();
                 collection =
-                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(to_collection);
+                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, to_collection);
                 invariant(collection,
                           str::stream()
                               << "Missing collection during clone [" << to_collection.ns() << "]");
@@ -181,7 +182,7 @@ struct Cloner::Fun {
                         db != nullptr);
 
                 collection =
-                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(to_collection);
+                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, to_collection);
                 uassert(28594,
                         str::stream()
                             << "Collection " << to_collection.ns() << " dropped while cloning",
@@ -329,7 +330,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     auto db = databaseHolder->openDb(opCtx, toDBName);
 
     Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(to_collection);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, to_collection);
     if (!collection) {
         writeConflictRetry(opCtx, "createCollection", to_collection.ns(), [&] {
             opCtx->checkForInterrupt();
@@ -347,7 +348,8 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                           << "Collection creation failed while copying indexes from "
                           << from_collection.ns() << " to " << to_collection.ns() << " (Cloner)");
             wunit.commit();
-            collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(to_collection);
+            collection =
+                CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, to_collection);
             invariant(collection,
                       str::stream() << "Missing collection " << to_collection.ns() << " (Cloner)");
         });
@@ -586,7 +588,8 @@ Status Cloner::createCollectionsForDb(
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
-            Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+            Collection* collection =
+                CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
             if (collection) {
                 if (!params.shardedColl) {
                     // If the collection is unsharded then we want to fail when a collection

@@ -145,7 +145,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -210,7 +211,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -274,7 +276,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -339,7 +342,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -408,7 +412,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -471,7 +476,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -523,7 +529,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -640,7 +647,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -742,7 +750,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -808,7 +817,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());

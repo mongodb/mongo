@@ -388,8 +388,9 @@ AutoGetCollectionForDbCheck::AutoGetCollectionForDbCheck(OperationContext* opCtx
     : _agd(opCtx, nss), _collLock(opCtx, nss, MODE_S) {
     std::string msg;
 
-    _collection =
-        _agd.getDb() ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) : nullptr;
+    _collection = _agd.getDb()
+        ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)
+        : nullptr;
 
     // If the collection gets deleted after the check is launched, record that in the health log.
     if (!_collection) {
@@ -464,7 +465,7 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
                                   const DbCheckOplogCollection& entry) {
     // dbCheckCollectionResult-specific stuff.
     auto uuid = uassertStatusOK(UUID::parse(entry.getUuid().toString()));
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
 
     if (!collection) {
         Status status(ErrorCodes::NamespaceNotFound, "Could not find collection for dbCheck");

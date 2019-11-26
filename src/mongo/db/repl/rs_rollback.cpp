@@ -713,10 +713,11 @@ void dropIndex(OperationContext* opCtx,
  */
 void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::string> indexNames) {
 
-    boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    boost::optional<NamespaceString> nss =
+        CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
-    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
 
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
@@ -753,11 +754,12 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
 void rollbackDropIndexes(OperationContext* opCtx,
                          UUID uuid,
                          std::map<std::string, BSONObj> indexNames) {
-    boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    boost::optional<NamespaceString> nss =
+        CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->db(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, *nss, MODE_X);
-    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(*nss);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, *nss);
 
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
@@ -850,7 +852,8 @@ void dropCollection(OperationContext* opCtx,
 void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Database* db) {
 
     // Finds the UUID of the collection that we are renaming out of the way.
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(info.renameTo);
+    auto collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, info.renameTo);
     invariant(collection);
 
     // The generated unique collection name is only guaranteed to exist if the database is
@@ -1049,7 +1052,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!doc._id.eoo());  // This is checked when we insert to the set.
 
         UUID uuid = doc.uuid;
-        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(opCtx, uuid);
 
         try {
             if (nss) {
@@ -1164,7 +1167,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!fixUpInfo.collectionsToRename.count(uuid));
         invariant(!fixUpInfo.collectionsToResyncMetadata.count(uuid));
 
-        boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss =
+            CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
         // Do not attempt to acquire the database lock with an empty namespace. We should survive
         // an attempt to drop a non-existent collection.
         if (!nss) {
@@ -1175,7 +1179,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             Database* db = dbLock.getDb();
             if (db) {
-                Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+                Collection* collection =
+                    CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
                 dropCollection(opCtx, *nss, collection, db);
                 LOG(1) << "Dropped collection: " << *nss << ", UUID: " << uuid;
             }
@@ -1223,7 +1228,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // collection, we will not be able to retrieve the collection's catalog entries.
         for (auto uuid : fixUpInfo.collectionsToResyncMetadata) {
             boost::optional<NamespaceString> nss =
-                CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
+                CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
             invariant(nss);
 
             log() << "Resyncing collection metadata for collection: " << *nss << ", UUID: " << uuid;
@@ -1234,7 +1239,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             auto db = databaseHolder->openDb(opCtx, nss->db().toString());
             invariant(db);
 
-            Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+            Collection* collection =
+                CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
             invariant(collection);
 
             auto infoResult = rollbackSource.getCollectionInfoByUUID(nss->db().toString(), uuid);
@@ -1333,7 +1339,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         unique_ptr<RemoveSaver> removeSaver;
         invariant(!fixUpInfo.collectionsToDrop.count(uuid));
 
-        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(uuid);
+        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(opCtx, uuid);
         if (!nss) {
             nss = NamespaceString();
         }
@@ -1362,7 +1368,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                 const NamespaceString docNss(doc.ns);
                 Lock::DBLock docDbLock(opCtx, docNss.db(), MODE_X);
                 OldClientContext ctx(opCtx, doc.ns.toString());
-                Collection* collection = catalog.lookupCollectionByUUID(uuid);
+                Collection* collection = catalog.lookupCollectionByUUID(opCtx, uuid);
 
                 // Adds the doc to our rollback file if the collection was not dropped while
                 // rolling back createCollection operations. Does not log an error when
@@ -1530,7 +1536,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
         OldClientContext ctx(opCtx, oplogNss.ns());
         Collection* oplogCollection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(oplogNss);
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogNss);
         if (!oplogCollection) {
             fassertFailedWithStatusNoTrace(
                 40495,

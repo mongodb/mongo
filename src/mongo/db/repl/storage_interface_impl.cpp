@@ -223,8 +223,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         UnreplicatedWritesBlock uwb(opCtx.get());
 
         // Get locks and create the collection.
-        AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_X);
-        AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+        AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_IX);
+        AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
 
         if (coll.getCollection()) {
             return Status(ErrorCodes::NamespaceExists,
@@ -438,13 +438,14 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const CollectionOptions& options) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
-        AutoGetOrCreateDb databaseWriteGuard(opCtx, nss.db(), MODE_X);
+        AutoGetOrCreateDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
         auto db = databaseWriteGuard.getDb();
         invariant(db);
-        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)) {
+        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection " << nss.ns() << " already exists.");
         }
+        Lock::CollectionLock lk(opCtx, nss, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         try {
             auto coll = db->createCollection(opCtx, nss, options);
@@ -1111,12 +1112,12 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     }
 
     Collection* const usersCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-        AuthorizationManager::usersCollectionNamespace);
+        opCtx, AuthorizationManager::usersCollectionNamespace);
     const bool hasUsers =
         usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
     Collection* const adminVersionCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-            AuthorizationManager::versionCollectionNamespace);
+            opCtx, AuthorizationManager::versionCollectionNamespace);
     BSONObj authSchemaVersionDocument;
     if (!adminVersionCollection ||
         !Helpers::findOne(opCtx,

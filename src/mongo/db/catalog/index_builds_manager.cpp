@@ -135,7 +135,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     OperationContext* opCtx, NamespaceString ns, const UUID& buildUUID) {
     auto builder = _getBuilder(buildUUID);
 
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
     auto rs = coll ? coll->getRecordStore() : nullptr;
 
     // Iterate all records in the collection. Delete them if they aren't valid BSON. Index them

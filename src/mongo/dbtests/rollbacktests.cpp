@@ -62,10 +62,7 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const string& ns) {
-    auto nss = NamespaceString(ns);
-    std::vector<NamespaceString> collections = CollectionCatalog::get(getGlobalServiceContext())
-                                                   .getAllCollectionNamesFromDb(opCtx, nss.db());
-    return std::count(collections.begin(), collections.end(), nss) > 0;
+    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString(ns));
 }
 
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -87,17 +84,17 @@ Status renameCollection(OperationContext* opCtx,
     return renameCollection(opCtx, source, target, {});
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     return coll->truncate(opCtx);
 }
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(data), nullOpDebug, false));
 }
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     auto cursor = coll->getCursor(opCtx);
 
     auto record = cursor->next();
@@ -107,15 +104,15 @@ void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const
     ASSERT(!cursor->next());
 }
 void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     ASSERT(!coll->getCursor(opCtx)->next());
 }
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != nullptr;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != nullptr;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
@@ -123,7 +120,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
                           const string& idxName) {
     size_t numEntries = 0;
 
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     IndexCatalog* catalog = coll->getIndexCatalog();
     auto desc = catalog->findIndexByName(opCtx, idxName, false);
 
@@ -145,7 +142,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 }
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
     ASSERT_OK(coll->getIndexCatalog()->dropIndex(opCtx, desc));
@@ -429,49 +426,6 @@ public:
 };
 
 template <bool rollback, bool defaultIndexes>
-class CreateDropCollection {
-public:
-    void run() {
-        NamespaceString nss("unittests.rollback_create_drop_collection");
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        dropDatabase(&opCtx, nss);
-
-        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
-        OldClientContext ctx(&opCtx, nss.ns());
-
-        BSONObj doc = BSON("_id"
-                           << "example string");
-
-        ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
-        {
-            WriteUnitOfWork uow(&opCtx);
-
-            CollectionOptions collectionOptions =
-                assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
-            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
-            ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
-            insertRecord(&opCtx, nss, doc);
-            assertOnlyRecord(&opCtx, nss, doc);
-
-            BSONObjBuilder result;
-            ASSERT_OK(
-                dropCollection(&opCtx,
-                               nss,
-                               result,
-                               {},
-                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
-
-            if (!rollback) {
-                uow.commit();
-            }
-        }
-        ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
-    }
-};
-
-template <bool rollback, bool defaultIndexes>
 class TruncateCollection {
 public:
     void run() {
@@ -535,7 +489,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
+        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -576,7 +530,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
+        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -629,7 +583,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
+        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -692,7 +646,8 @@ public:
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, false));
             ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
-            Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
+            Collection* coll =
+                CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             ASSERT_OK(catalog->createIndexOnEmptyCollection(&opCtx, specA));
@@ -750,7 +705,6 @@ public:
         addAll<DropCollection>();
         addAll<RenameDropTargetCollection>();
         addAll<ReplaceCollection>();
-        addAll<CreateDropCollection>();
         addAll<TruncateCollection>();
         addAll<CreateIndex>();
         addAll<DropIndex>();

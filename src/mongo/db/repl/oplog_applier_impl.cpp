@@ -79,7 +79,7 @@ NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEn
 
     const auto& uuid = optionalUuid.get();
     auto& catalog = CollectionCatalog::get(opCtx);
-    auto nss = catalog.lookupNSSByUUID(uuid);
+    auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "No namespace with UUID " << uuid.toString(),
             nss);
@@ -159,7 +159,7 @@ private:
                                                      const NamespaceString& nss) {
         CollectionProperties collProperties;
 
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
 
         if (!collection) {
             return collProperties;

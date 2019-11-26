@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
@@ -134,7 +135,7 @@ TEST_F(CreateCollectionTest,
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
 
     // Create existing collection using StorageInterface.
     {
@@ -160,7 +161,7 @@ TEST_F(CreateCollectionTest,
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
 
     // Create existing collection with same name but different UUID using StorageInterface.
     auto existingCollectionUuid = UUID::gen();
@@ -181,7 +182,7 @@ TEST_F(CreateCollectionTest,
 
     // Check that old collection that was renamed out of the way still exists.
     auto& catalog = CollectionCatalog::get(opCtx.get());
-    auto renamedCollectionNss = catalog.lookupNSSByUUID(existingCollectionUuid);
+    auto renamedCollectionNss = catalog.lookupNSSByUUID(opCtx.get(), existingCollectionUuid);
     ASSERT(renamedCollectionNss);
     ASSERT_TRUE(collectionExists(opCtx.get(), *renamedCollectionNss))
         << "old renamed collection with UUID " << existingCollectionUuid
@@ -217,5 +218,4 @@ TEST_F(CreateCollectionTest,
     ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 }
-
 }  // namespace

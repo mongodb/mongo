@@ -267,7 +267,7 @@ Status _collModInternal(OperationContext* opCtx,
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
     Collection* coll =
-        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) : nullptr;
+        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) : nullptr;
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, false, nss);

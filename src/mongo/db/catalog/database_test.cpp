@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -175,21 +176,29 @@ void _testDropCollection(OperationContext* opCtx,
                          bool createCollectionBeforeDrop,
                          const repl::OpTime& dropOpTime = {},
                          const CollectionOptions& collOpts = {}) {
+    if (createCollectionBeforeDrop) {
+        writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
+            WriteUnitOfWork wuow(opCtx);
+            AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+            auto db = autoDb.getDb();
+            ASSERT_TRUE(db);
+            ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
+            wuow.commit();
+        });
+    }
+
     writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
         auto db = autoDb.getDb();
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);
-        if (createCollectionBeforeDrop) {
-            ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
-        } else {
-            ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss));
+        if (!createCollectionBeforeDrop) {
+            ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss));
         }
 
         ASSERT_OK(db->dropCollection(opCtx, nss, dropOpTime));
-
-        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss));
+        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss));
         wuow.commit();
     });
 }
@@ -244,17 +253,19 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
 
     auto opCtx = _opCtx.get();
     auto nss = _nss;
-    writeConflictRetry(opCtx, "testDropOpTimeWithReplicated", nss.ns(), [opCtx, nss] {
-        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
-        auto db = autoDb.getDb();
+    AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+    auto db = autoDb.getDb();
+    writeConflictRetry(opCtx, "testDropOpTimeWithReplicated", nss.ns(), [&] {
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);
         ASSERT_TRUE(db->createCollection(opCtx, nss));
-
-        repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-        ASSERT_EQUALS(ErrorCodes::BadValue, db->dropCollection(opCtx, nss, dropOpTime));
+        wuow.commit();
     });
+
+    WriteUnitOfWork wuow(opCtx);
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    ASSERT_EQUALS(ErrorCodes::BadValue, db->dropCollection(opCtx, nss, dropOpTime));
 }
 
 TEST_F(
@@ -345,27 +356,30 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
     auto toNss = NamespaceString(fromNss.getSisterNS("bar"));
     ASSERT_NOT_EQUALS(fromNss, toNss);
 
-    writeConflictRetry(opCtx, "testRenameCollection", fromNss.ns(), [=] {
-        AutoGetOrCreateDb autoDb(opCtx, fromNss.db(), MODE_X);
-        auto db = autoDb.getDb();
-        ASSERT_TRUE(db);
+    AutoGetOrCreateDb autoDb(opCtx, fromNss.db(), MODE_X);
+    auto db = autoDb.getDb();
+    ASSERT_TRUE(db);
 
-        auto fromUuid = UUID::gen();
-
-        auto&& catalog = CollectionCatalog::get(opCtx);
-        ASSERT_EQUALS(boost::none, catalog.lookupNSSByUUID(fromUuid));
+    auto fromUuid = UUID::gen();
+    auto& catalog = CollectionCatalog::get(opCtx);
+    writeConflictRetry(opCtx, "create", fromNss.ns(), [&] {
+        ASSERT_EQUALS(boost::none, catalog.lookupNSSByUUID(opCtx, fromUuid));
 
         WriteUnitOfWork wuow(opCtx);
         CollectionOptions fromCollectionOptions;
         fromCollectionOptions.uuid = fromUuid;
         ASSERT_TRUE(db->createCollection(opCtx, fromNss, fromCollectionOptions));
-        ASSERT_EQUALS(fromNss, *catalog.lookupNSSByUUID(fromUuid));
+        ASSERT_EQUALS(fromNss, *catalog.lookupNSSByUUID(opCtx, fromUuid));
+        wuow.commit();
+    });
 
+    writeConflictRetry(opCtx, "rename", fromNss.ns(), [&] {
+        WriteUnitOfWork wuow(opCtx);
         auto stayTemp = false;
         ASSERT_OK(db->renameCollection(opCtx, fromNss, toNss, stayTemp));
 
-        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(fromNss));
-        auto toCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss);
+        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss));
+        auto toCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
         ASSERT_TRUE(toCollection);
 
         auto toCollectionOptions =
@@ -375,7 +389,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         ASSERT_TRUE(toUuid);
         ASSERT_EQUALS(fromUuid, *toUuid);
 
-        ASSERT_EQUALS(toNss, *catalog.lookupNSSByUUID(*toUuid));
+        ASSERT_EQUALS(toNss, *catalog.lookupNSSByUUID(opCtx, *toUuid));
 
         wuow.commit();
     });
@@ -390,9 +404,6 @@ TEST_F(DatabaseTest,
         ASSERT_EQUALS(
             ErrorCodes::FailedToParse,
             db->makeUniqueCollectionNamespace(_opCtx.get(), "CollectionModelWithoutPercentSign"));
-
-        std::string longCollModel(8192, '%');
-        ASSERT_OK(db->makeUniqueCollectionNamespace(_opCtx.get(), StringData(longCollModel)));
     });
 }
 

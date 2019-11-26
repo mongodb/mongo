@@ -87,8 +87,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
             // We need to hold the database lock while getting the collection. Otherwise a
             // concurrent collection creation would write to the map in the Database object
             // while we concurrently read the map.
-            Collection* collection =
-                CollectionCatalog::get(opCtx.get()).lookupCollectionByNamespace(oplogNss);
+            Collection* collection = CollectionCatalog::get(opCtx.get())
+                                         .lookupCollectionByNamespace(opCtx.get(), oplogNss);
             if (!collection) {
                 LOG(2) << "no collection " << oplogNss;
                 return false;

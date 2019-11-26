@@ -176,8 +176,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             // not allowed while performing writes, so temporarily enforce prepare conflicts.
             EnforcePrepareConflictsBlock enforcePrepare(opCtx);
 
-            Collection* const coll =
-                CollectionCatalog::get(opCtx).lookupCollectionByNamespace(db->getProfilingNS());
+            Collection* const coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                opCtx, db->getProfilingNS());
 
             if (coll) {
                 invariant(!opCtx->shouldParticipateInFlowControl());
@@ -220,7 +220,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
 
     auto& dbProfilingNS = db->getProfilingNS();
     Collection* const collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(dbProfilingNS);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
     if (collection) {
         if (!collection->isCapped()) {
             return Status(ErrorCodes::NamespaceExists,

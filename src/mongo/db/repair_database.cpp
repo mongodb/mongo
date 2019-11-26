@@ -147,7 +147,7 @@ Status repairCollections(OperationContext* opCtx,
 
         log() << "Repairing collection " << nss;
 
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
         if (!status.isOK())
             return status;
@@ -155,7 +155,7 @@ Status repairCollections(OperationContext* opCtx,
 
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         auto swIndexNameObjs = getIndexNameObjs(opCtx, collection->getCatalogId());
         if (!swIndexNameObjs.isOK())
             return swIndexNameObjs.getStatus();

@@ -52,7 +52,7 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     dassert(getOpCtx()->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
 
     const CollectionCatalog& catalog = CollectionCatalog::get(getOpCtx());
-    auto newNss = catalog.lookupNSSByUUID(_collectionUUID);
+    auto newNss = catalog.lookupNSSByUUID(getOpCtx(), _collectionUUID);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "collection dropped. UUID " << _collectionUUID,
             newNss);
@@ -68,7 +68,7 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     // restored locks on the correct name. It is now safe to restore the Collection pointer. The
     // collection must exist, since we already successfully looked up the namespace string by UUID
     // under the correct lock manager locks.
-    _collection = catalog.lookupCollectionByUUID(_collectionUUID);
+    _collection = catalog.lookupCollectionByUUID(getOpCtx(), _collectionUUID);
     invariant(_collection);
 
     uassert(ErrorCodes::QueryPlanKilled,

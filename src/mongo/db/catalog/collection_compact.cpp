@@ -56,7 +56,7 @@ Collection* getCollectionForCompact(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_IX));
 
     CollectionCatalog& collectionCatalog = CollectionCatalog::get(opCtx);
-    Collection* collection = collectionCatalog.lookupCollectionByNamespace(collectionNss);
+    Collection* collection = collectionCatalog.lookupCollectionByNamespace(opCtx, collectionNss);
 
     if (!collection) {
         std::shared_ptr<ViewDefinition> view =

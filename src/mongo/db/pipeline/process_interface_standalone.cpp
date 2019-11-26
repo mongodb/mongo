@@ -575,7 +575,8 @@ bool MongoInterfaceStandalone::fieldsHaveSupportingUniqueIndex(
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, nss.db());
-    auto collection = db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) : nullptr;
+    auto collection =
+        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) : nullptr;
     if (!collection) {
         return fieldPaths == std::set<FieldPath>{"_id"};
     }

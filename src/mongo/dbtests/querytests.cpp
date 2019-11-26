@@ -68,7 +68,8 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
-            _collection = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+            _collection =
+                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
             if (_collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
@@ -224,7 +225,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
-            if (CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss())) {
+            if (CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss())) {
                 _collection = nullptr;
                 db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }

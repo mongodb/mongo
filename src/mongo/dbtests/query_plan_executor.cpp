@@ -148,7 +148,8 @@ public:
         ixparams.bounds.endKey = BSON("" << end);
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
-        const Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
+        const Collection* coll =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
 
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
@@ -175,7 +176,8 @@ protected:
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        Collection* collection = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
+        Collection* collection =
+            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         ASSERT_LTE(indexes.size(), 1U);

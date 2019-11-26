@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -116,8 +117,8 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx,
     }
 
     auto nss = collection->ns();
-
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), nss.toString());
+    invariant(UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, nss),
+              nss.toString());
 
     while (true) {
         try {

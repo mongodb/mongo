@@ -112,7 +112,7 @@ public:
         const auto hasTerm = false;
         return authSession->checkAuthForFind(
             CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(
-                CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
+                opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
             hasTerm);
     }
 

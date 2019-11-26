@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/index_timestamp_helper.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -314,7 +315,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
     }
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    Collection* collection = collectionCatalog.lookupCollectionByNamespace(nss);
+    Collection* collection = collectionCatalog.lookupCollectionByNamespace(opCtx, nss);
 
     // Complete the index build.
     return _runIndexRebuildForRecovery(opCtx, collection, buildUUID);
@@ -340,7 +341,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
     }
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    Collection* collection = collectionCatalog.lookupCollectionByNamespace(nss);
+    Collection* collection = collectionCatalog.lookupCollectionByNamespace(opCtx, nss);
     auto indexCatalog = collection->getIndexCatalog();
     {
         // These steps are combined into a single WUOW to ensure there are no commits without
@@ -567,7 +568,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
     const std::map<UUID, StorageEngine::IndexBuildToRestart>& buildsToRestart) {
     for (auto& [buildUUID, build] : buildsToRestart) {
         boost::optional<NamespaceString> nss =
-            CollectionCatalog::get(opCtx).lookupNSSByUUID(build.collUUID);
+            CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, build.collUUID);
         invariant(nss);
 
         log() << "Restarting index build for collection: " << *nss
@@ -693,7 +694,7 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
                                            const std::vector<BSONObj>& specs,
                                            IndexBuildsManager::IndexConstraints indexConstraints,
                                            bool fromMigrate) {
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
     invariant(collection,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
     auto nss = collection->ns();
@@ -744,14 +745,14 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
                                                             UUID collectionUUID,
                                                             const std::vector<BSONObj>& specs,
                                                             bool fromMigrate) {
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
+
     invariant(collection, str::stream() << collectionUUID);
     invariant(0U == collection->numRecords(opCtx), str::stream() << collectionUUID);
 
     auto nss = collection->ns();
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
-              str::stream() << collectionUUID);
-
+    invariant(
+        UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
 
     // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
@@ -933,7 +934,7 @@ Status IndexBuildsCoordinator::_registerAndSetUpIndexBuildForTwoPhaseRecovery(
     // case when an index builds is restarted during recovery.
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
     invariant(collection);
     const auto& nss = collection->ns();
     const auto protocol = IndexBuildProtocol::kTwoPhase;
@@ -1270,7 +1271,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         // If _buildIndex returned normally, then we should have the collection X lock. It is not
         // required to safely access the collection, though, because an index build is registerd.
         auto collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+            CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
         invariant(collection);
         replState->stats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
     } catch (const DBException& ex) {
@@ -1282,7 +1283,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     // tearDownIndexBuild is called. The collection can be renamed, but it is OK for the name to
     // be stale just for logging purposes.
     auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+        CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
     invariant(collection,
               str::stream() << "Collection with UUID " << replState->collectionUUID
                             << " should exist because an index build is in progress: "
@@ -1352,7 +1353,7 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
-    auto nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
+    auto nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
     auto preAbortStatus = Status::OK();
     try {
         _scanCollectionAndInsertKeysIntoSorter(
@@ -1394,7 +1395,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
     {
-        auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
+        auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
         invariant(nss);
         invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_IX));
         invariant(opCtx->lockState()->isCollectionLockedForMode(*nss, MODE_X));
@@ -1423,7 +1424,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
 
         // The collection object should always exist while an index build is registered.
         auto collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+            CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
         invariant(collection);
 
         uassertStatusOK(
@@ -1475,7 +1476,7 @@ NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlocking
             RecoveryUnit::ReadSource::kUnset,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
-        nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
+        nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
@@ -1550,7 +1551,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
 
     // The collection object should always exist while an index build is registered.
     auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+        CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
     invariant(collection,
               str::stream() << "Collection not found after relocking. Index build: "
                             << replState->buildUUID

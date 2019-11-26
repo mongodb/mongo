@@ -549,7 +549,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
     const auto& catalog = CollectionCatalog::get(opCtx);
     for (const auto& uiCount : _newCounts) {
         const auto uuid = uiCount.first;
-        const auto coll = catalog.lookupCollectionByUUID(uuid);
+        const auto coll = catalog.lookupCollectionByUUID(opCtx, uuid);
         invariant(coll,
                   str::stream() << "The collection with UUID " << uuid
                                 << " is unexpectedly missing in the CollectionCatalog");
@@ -629,7 +629,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
             continue;
         }
 
-        auto nss = catalog.lookupNSSByUUID(uuid);
+        auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
         StorageInterface::CollectionCount oldCount = 0;
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
@@ -1056,7 +1056,7 @@ Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     for (auto&& entry : _observerInfo.rollbackDeletedIdsMap) {
         const auto& uuid = entry.first;
-        const auto nss = catalog.lookupNSSByUUID(uuid);
+        const auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().

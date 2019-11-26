@@ -104,7 +104,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
 
                            // Create the collection if it doesn't exist.
                            if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                                   NamespaceString::kIndexBuildEntryNamespace)) {
+                                   opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
                                WriteUnitOfWork wuow(opCtx);
                                CollectionOptions defaultCollectionOptions;
                                Collection* collection =

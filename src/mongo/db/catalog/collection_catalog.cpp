@@ -33,7 +33,9 @@
 #include "collection_catalog.h"
 
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -56,7 +58,7 @@ public:
     }
 
     void rollback() override {
-        _catalog->registerCollection(_uuid, std::move(_coll));
+        _catalog->registerCollection(_uuid, std::move(&_coll));
     }
 
 private:
@@ -233,7 +235,12 @@ void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
     _shadowCatalog.reset();
 }
 
-Collection* CollectionCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
+Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
+                                                      CollectionUUID uuid) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
+        return coll;
+    }
+
     stdx::lock_guard<Latch> lock(_catalogLock);
     return _lookupCollectionByUUID(lock, uuid);
 }
@@ -243,13 +250,23 @@ Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID 
     return foundIt == _catalog.end() ? nullptr : foundIt->second.get();
 }
 
-Collection* CollectionCatalog::lookupCollectionByNamespace(const NamespaceString& nss) const {
+Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
+                                                           const NamespaceString& nss) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
+        return coll;
+    }
+
     stdx::lock_guard<Latch> lock(_catalogLock);
     auto it = _collections.find(nss);
     return it == _collections.end() ? nullptr : it->second;
 }
 
-boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
+boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
+                                                                    CollectionUUID uuid) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
+        return coll->ns();
+    }
+
     stdx::lock_guard<Latch> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
     if (foundIt != _catalog.end()) {
@@ -270,7 +287,11 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(CollectionUU
 }
 
 boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
-    const NamespaceString& nss) const {
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
+        return coll->uuid();
+    }
+
     stdx::lock_guard<Latch> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto it = _orderedCollections.lower_bound(std::make_pair(nss.db().toString(), minUuid));
@@ -286,7 +307,8 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
     return boost::none;
 }
 
-NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(NamespaceStringOrUUID nsOrUUID) {
+NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(OperationContext* opCtx,
+                                                                NamespaceStringOrUUID nsOrUUID) {
     if (auto& nss = nsOrUUID.nss()) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Namespace " << *nss << " is not a valid collection name",
@@ -294,7 +316,7 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(NamespaceStringO
         return std::move(*nss);
     }
 
-    auto resolvedNss = lookupNSSByUUID(*nsOrUUID.uuid());
+    auto resolvedNss = lookupNSSByUUID(opCtx, *nsOrUUID.uuid());
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Unable to resolve " << nsOrUUID.toString(),
@@ -365,21 +387,25 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     return ret;
 }
 
-void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection> coll) {
+void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection>* coll) {
+    auto ns = (*coll)->ns();
     stdx::lock_guard<Latch> lock(_catalogLock);
+    if (_collections.find(ns) != _collections.end()) {
+        log() << "Conflicted creating a collection. ns: " << (*coll)->ns() << " ("
+              << (*coll)->uuid() << ").";
+        throw WriteConflictException();
+    }
 
-    LOG(1) << "Registering collection " << coll->ns() << " with UUID " << uuid;
+    LOG(1) << "Registering collection " << ns << " with UUID " << uuid;
 
-    auto ns = coll->ns();
     auto dbName = ns.db().toString();
     auto dbIdPair = std::make_pair(dbName, uuid);
 
     // Make sure no entry related to this uuid.
     invariant(_catalog.find(uuid) == _catalog.end());
-    invariant(_collections.find(ns) == _collections.end());
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
-    _catalog[uuid] = std::move(coll);
+    _catalog[uuid] = std::move(*coll);
     _collections[ns] = _catalog[uuid].get();
     _orderedCollections[dbIdPair] = _catalog[uuid].get();
 

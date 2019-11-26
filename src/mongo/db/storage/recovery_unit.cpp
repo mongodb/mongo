@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -50,12 +51,26 @@ void RecoveryUnit::assignNextSnapshotId() {
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
 }
 
+void RecoveryUnit::registerPreCommitHook(std::function<void(OperationContext*)> callback) {
+    _preCommitHooks.push_back(std::move(callback));
+}
+
+void RecoveryUnit::runPreCommitHooks(OperationContext* opCtx) {
+    ON_BLOCK_EXIT([&] { _preCommitHooks.clear(); });
+    for (auto& hook : _preCommitHooks) {
+        hook(opCtx);
+    }
+}
+
 void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
     invariant(_inUnitOfWork(), toString(_getState()));
     _changes.push_back(std::move(change));
 }
 
 void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp) {
+    // Getting to this method implies `runPreCommitHooks` completed successfully, resulting in
+    // having its contents cleared.
+    invariant(_preCommitHooks.empty());
     for (auto& change : _changes) {
         try {
             LOG(2) << "CUSTOM COMMIT " << redact(demangleName(typeid(*change)));
@@ -68,6 +83,7 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
 }
 
 void RecoveryUnit::abortRegisteredChanges() {
+    _preCommitHooks.clear();
     try {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;

@@ -139,7 +139,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
         }
 
         Collection* collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(systemUsers);
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, systemUsers);
         if (collection) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
@@ -169,7 +169,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
         }
 
         // Ensure that system indexes exist for the roles collection, if it exists.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(systemRoles);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, systemRoles);
         if (collection) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);

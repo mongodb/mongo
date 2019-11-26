@@ -107,12 +107,6 @@ private:
     std::unique_ptr<DurableCatalogImpl::FeatureTracker> _featureTracker;
 };
 
-TEST_F(DurableCatalogFeatureTrackerTest, FeatureDocumentIsNotEagerlyCreated) {
-    auto opCtx = newOperationContext();
-    auto cursor = getRecordStore()->getCursor(opCtx.get());
-    ASSERT_FALSE(static_cast<bool>(cursor->next()));
-}
-
 TEST_F(DurableCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsInUse) {
     {
         auto opCtx = newOperationContext();

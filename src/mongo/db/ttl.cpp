@@ -144,7 +144,7 @@ private:
             auto uuid = ttlInfo.first;
             auto indexName = ttlInfo.second;
 
-            auto nss = CollectionCatalog::get(opCtxPtr.get()).lookupNSSByUUID(uuid);
+            auto nss = CollectionCatalog::get(opCtxPtr.get()).lookupNSSByUUID(&opCtx, uuid);
             if (!nss) {
                 ttlCollectionCache.deregisterTTLInfo(ttlInfo);
                 continue;

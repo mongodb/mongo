@@ -333,13 +333,21 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCt
     log() << "The size storer reports that the oplog contains " << numRecords
           << " records totaling to " << dataSize << " bytes";
 
+    // Don't calculate stones if this is a new collection. This is to prevent standalones from
+    // attempting to get a forward scanning oplog cursor on an explicit create of the oplog
+    // collection. These values can be wrong. The assumption is that if they are both observed to be
+    // zero, there must be very little data in the oplog; the cost of being wrong is imperceptible.
+    if (numRecords == 0 && dataSize == 0) {
+        return;
+    }
+
     // Only use sampling to estimate where to place the oplog stones if the number of samples drawn
     // is less than 5% of the collection.
     const uint64_t kMinSampleRatioForRandCursor = 20;
 
     // If the oplog doesn't contain enough records to make sampling more efficient, then scan the
     // oplog to determine where to put down stones.
-    if (numRecords <= 0 || dataSize <= 0 ||
+    if (numRecords < 0 || dataSize < 0 ||
         uint64_t(numRecords) <
             kMinSampleRatioForRandCursor * kRandomSamplesPerStone * numStonesToKeep) {
         _calculateStonesByScanning(opCtx);

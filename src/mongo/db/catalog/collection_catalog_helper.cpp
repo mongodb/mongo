@@ -54,14 +54,14 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         boost::optional<Lock::CollectionLock> clk;
         Collection* collection = nullptr;
 
-        while (auto nss = catalog.lookupNSSByUUID(uuid)) {
+        while (auto nss = catalog.lookupNSSByUUID(opCtx, uuid)) {
             // Get a fresh snapshot for each locked collection to see any catalog changes.
             clk.emplace(opCtx, *nss, collLockMode);
             opCtx->recoveryUnit()->abandonSnapshot();
 
-            if (catalog.lookupNSSByUUID(uuid) == nss) {
+            if (catalog.lookupNSSByUUID(opCtx, uuid) == nss) {
                 // Success: locked the namespace and the UUID still maps to it.
-                collection = catalog.lookupCollectionByUUID(uuid);
+                collection = catalog.lookupCollectionByUUID(opCtx, uuid);
                 invariant(collection);
                 break;
             }

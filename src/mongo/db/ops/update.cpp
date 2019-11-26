@@ -62,7 +62,8 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     invariant(!request.isExplain());
 
     const NamespaceString& nsString = request.getNamespaceString();
-    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nsString);
+    Collection* collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
 
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
@@ -71,7 +72,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
         // Callers should either get an X or create the collection.
         const Locker* locker = opCtx->lockState();
         invariant(locker->isW() ||
-                  locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_X));
+                  locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_IX));
 
         writeConflictRetry(opCtx, "createCollection", nsString.ns(), [&] {
             Lock::DBLock lk(opCtx, nsString.db(), MODE_X);

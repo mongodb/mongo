@@ -57,8 +57,9 @@ public:
         std::unique_ptr<RecordStore> rs;
         std::tie(catalogId, rs) = unittest::assertGet(
             _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
-        CollectionCatalog::get(opCtx).registerCollection(
-            options.uuid.get(), std::make_unique<CollectionMock>(ns, catalogId));
+
+        std::unique_ptr<Collection> coll = std::make_unique<CollectionMock>(ns, catalogId);
+        CollectionCatalog::get(opCtx).registerCollection(options.uuid.get(), &coll);
 
         return {{_storageEngine->getCatalog()->getEntry(catalogId)}};
     }
@@ -78,7 +79,7 @@ public:
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, std::string indexName) {
         RecordId catalogId =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)->getCatalogId();
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)->getCatalogId();
         std::string indexIdent =
             _storageEngine->getCatalog()->getIndexIdent(opCtx, catalogId, indexName);
         return dropIdent(opCtx, indexIdent);
@@ -138,7 +139,8 @@ public:
         }
         BSONObj spec = builder.append("name", key).append("v", 2).done();
 
-        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNs);
+        Collection* collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNs);
         auto descriptor =
             std::make_unique<IndexDescriptor>(collection, IndexNames::findPluginName(spec), spec);
 
@@ -151,13 +153,14 @@ public:
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNs);
+        Collection* collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNs);
         DurableCatalog::get(opCtx)->indexBuildSuccess(opCtx, collection->getCatalogId(), key);
     }
 
     Status removeEntry(OperationContext* opCtx, StringData collNs, DurableCatalog* catalog) {
-        Collection* collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(NamespaceString(collNs));
+        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+            opCtx, NamespaceString(collNs));
         return dynamic_cast<DurableCatalogImpl*>(catalog)->_removeEntry(opCtx,
                                                                         collection->getCatalogId());
     }

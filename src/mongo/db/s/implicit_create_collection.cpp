@@ -96,7 +96,7 @@ public:
             auto db = databaseHolder->getDb(opCtx, _ns.db());
             if (db) {
                 Lock::CollectionLock collLock(opCtx, _ns, MODE_IS);
-                if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_ns)) {
+                if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _ns)) {
                     // Collection already created, no more work needs to be done.
                     return Status::OK();
                 }

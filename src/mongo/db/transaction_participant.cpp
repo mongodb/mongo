@@ -347,7 +347,8 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
             return boost::none;
         }
 
-        auto collection = CollectionCatalog::get(opCtx.get()).lookupCollectionByNamespace(nss);
+        auto collection =
+            CollectionCatalog::get(opCtx.get()).lookupCollectionByNamespace(opCtx.get(), nss);
         if (!collection) {
             return boost::none;
         }
@@ -1081,7 +1082,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         transactionOperationUuids.insert(transactionOp.getUuid().get());
     }
     for (const auto& uuid : transactionOperationUuids) {
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "prepareTransaction failed because one of the transaction "
                                  "operations was done against a temporary collection '"

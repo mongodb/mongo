@@ -424,7 +424,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
     Collection* oplogCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(oplogNss);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogNss);
     if (!oplogCollection) {
         fassertFailedWithStatusNoTrace(
             34418,

@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/logger/redaction.h"
 #include "mongo/util/log.h"
 
@@ -82,7 +83,7 @@ Status _createView(OperationContext* opCtx,
         // Create 'system.views' in a separate WUOW if it does not exist.
         WriteUnitOfWork wuow(opCtx);
         Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-            NamespaceString(db->getSystemViewsName()));
+            opCtx, NamespaceString(db->getSystemViewsName()));
         if (!coll) {
             coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
         }
@@ -106,7 +107,18 @@ Status _createCollection(OperationContext* opCtx,
                          const BSONObj& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        // This is a top-level handler for collection creation name conflicts. New commands coming
+        // in, or commands that generated a WriteConflict must return a NamespaceExists error here
+        // on conflict.
+        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) != nullptr) {
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << "Collection already exists. NS: " << nss);
+        }
+        if (ViewCatalog::get(autoDb.getDb())->lookup(opCtx, nss.ns())) {
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << "A view already exists. NS: " << nss);
+        }
 
         AutoStatsTracker statsTracker(opCtx,
                                       nss,
@@ -229,7 +241,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                         uuid.isRFC4122v4());
 
                 auto& catalog = CollectionCatalog::get(opCtx);
-                const auto currentName = catalog.lookupNSSByUUID(uuid);
+                const auto currentName = catalog.lookupNSSByUUID(opCtx, uuid);
                 auto serviceContext = opCtx->getServiceContext();
                 auto opObserver = serviceContext->getOpObserver();
                 if (currentName && *currentName == newCollName)
@@ -256,7 +268,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // node.
                 const bool stayTemp = true;
                 auto futureColl = db
-                    ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(newCollName)
+                    ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, newCollName)
                     : nullptr;
                 bool needsRenaming = static_cast<bool>(futureColl);
                 for (int tries = 0; needsRenaming && tries < 10; ++tries) {
@@ -304,7 +316,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
 
                 // If the collection with the requested UUID already exists, but with a different
                 // name, just rename it to 'newCollName'.
-                if (catalog.lookupCollectionByUUID(uuid)) {
+                if (catalog.lookupCollectionByUUID(opCtx, uuid)) {
                     invariant(currentName);
                     uassert(40655,
                             str::stream() << "Invalid name " << newCollName << " for UUID " << uuid,

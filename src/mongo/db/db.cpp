@@ -231,7 +231,7 @@ void logStartup(OperationContext* opCtx) {
     AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
     Database* db = autoDb.getDb();
     Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(startupLogCollectionName);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
@@ -239,8 +239,8 @@ void logStartup(OperationContext* opCtx) {
         CollectionOptions collectionOptions = uassertStatusOK(
             CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
         uassertStatusOK(db->userCreateNS(opCtx, startupLogCollectionName, collectionOptions));
-        collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(startupLogCollectionName);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+            opCtx, startupLogCollectionName);
     }
     invariant(collection);
 

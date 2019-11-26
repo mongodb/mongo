@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/write_unit_of_work.h"
 
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
@@ -105,6 +106,7 @@ void WriteUnitOfWork::commit() {
             sleepFor(Milliseconds(100));
         }
 
+        _opCtx->recoveryUnit()->runPreCommitHooks(_opCtx);
         _opCtx->recoveryUnit()->commitUnitOfWork();
         _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
     }

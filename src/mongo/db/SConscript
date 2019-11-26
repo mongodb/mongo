@@ -510,8 +510,8 @@ env.Library(
         'stats/top',
     ],
     LIBDEPS_PRIVATE=[
-        "catalog/database_holder",
-        "$BUILD_DIR/mongo/idl/server_parameter",
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        'catalog/database_holder',
     ],
 )
 

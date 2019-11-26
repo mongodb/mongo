@@ -272,7 +272,7 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
     // 'nsOrUUID' must be a UUID and dbName.
 
     auto& collectionCatalog = CollectionCatalog::get(opCtx);
-    auto nss = collectionCatalog.resolveNamespaceStringOrUUID(nssOrUUID);
+    auto nss = collectionCatalog.resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
 
     // The UUID cannot move between databases so this one dassert is sufficient.
     dassert(_opCtx->lockState()->isDbLockedForMode(nss.db(),
@@ -295,7 +295,7 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
         // We looked up UUID without a collection lock so it's possible that the
         // collection name changed now. Look it up again.
         prevResolvedNss = nss;
-        nss = collectionCatalog.resolveNamespaceStringOrUUID(nssOrUUID);
+        nss = collectionCatalog.resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
     } while (nss != prevResolvedNss);
 }
 

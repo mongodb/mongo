@@ -70,7 +70,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     }
 
     _collLock.emplace(opCtx, nsOrUUID, modeColl, deadline);
-    _resolvedNss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(nsOrUUID);
+    _resolvedNss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     setAutoGetCollectionWait.execute(
@@ -95,7 +95,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     if (!db)
         return;
 
-    _coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_resolvedNss);
+    _coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _resolvedNss);
     invariant(!nsOrUUID.uuid() || _coll,
               str::stream() << "Collection for " << _resolvedNss.ns()
                             << " disappeared after successufully resolving "

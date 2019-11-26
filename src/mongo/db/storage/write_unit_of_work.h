@@ -31,7 +31,6 @@
 
 #include <memory>
 
-
 namespace mongo {
 
 class OperationContext;

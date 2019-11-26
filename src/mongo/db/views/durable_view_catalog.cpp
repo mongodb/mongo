@@ -112,7 +112,7 @@ void DurableViewCatalogImpl::_iterate(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(_db->getSystemViewsName(), MODE_IS));
 
     Collection* systemViews =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_db->getSystemViewsName());
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _db->getSystemViewsName());
     if (!systemViews) {
         return;
     }
@@ -187,7 +187,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     dassert(opCtx->lockState()->isCollectionLockedForMode(systemViewsNs, MODE_X));
 
     Collection* systemViews =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(systemViewsNs);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, systemViewsNs);
     invariant(systemViews);
 
     const bool requireIndex = false;
@@ -215,7 +215,7 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
     dassert(opCtx->lockState()->isCollectionLockedForMode(name, MODE_IX));
 
     Collection* systemViews =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_db->getSystemViewsName());
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _db->getSystemViewsName());
     dassert(opCtx->lockState()->isCollectionLockedForMode(systemViews->ns(), MODE_X));
 
     if (!systemViews)

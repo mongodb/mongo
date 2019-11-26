@@ -462,10 +462,10 @@ public:
                     assertCanWrite(
                         opCtx,
                         nsString,
-                        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nsString));
+                        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString));
 
                     collection =
-                        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nsString);
+                        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
                     ;
 
                     // If someone else beat us to creating the collection, do nothing
@@ -478,8 +478,8 @@ public:
                             db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
                         wuow.commit();
 
-                        collection =
-                            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nsString);
+                        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                            opCtx, nsString);
                     }
 
                     invariant(collection);

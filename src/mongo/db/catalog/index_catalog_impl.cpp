@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -394,7 +395,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
 StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationContext* opCtx,
                                                                    BSONObj spec) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
+    invariant(UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx,
+                                                                                _collection->ns()));
     invariant(_collection->numRecords(opCtx) == 0,
               str::stream() << "Collection must be empty. Collection: " << _collection->ns()
                             << " UUID: " << _collection->uuid()

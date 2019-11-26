@@ -96,7 +96,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     // If the server configuration collection, which contains the FCV document, does not exist, then
     // create it.
     if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-            NamespaceString::kServerConfigurationNamespace)) {
+            opCtx, NamespaceString::kServerConfigurationNamespace)) {
         log() << "Re-creating the server configuration collection (admin.system.version) that was "
                  "dropped.";
         uassertStatusOK(
@@ -104,7 +104,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     }
 
     Collection* fcvColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-        NamespaceString::kServerConfigurationNamespace);
+        opCtx, NamespaceString::kServerConfigurationNamespace);
     invariant(fcvColl);
 
     // Restore the featureCompatibilityVersion document if it is missing.
@@ -256,7 +256,7 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
     Collection* oplogCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(oplogNss);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
         severe() << "The oplog collection " << oplogNss
                  << " is not capped; a capped oplog is a requirement for replication to function.";
@@ -306,7 +306,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNss);
         for (const auto& indexName : entry.second.first) {
             log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
         }
@@ -338,7 +338,7 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx) {
 
     invariant(opCtx->lockState()->isW());
     Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-        NamespaceString::kSystemReplSetNamespace);
+        opCtx, NamespaceString::kSystemReplSetNamespace);
     if (collection && collection->numRecords(opCtx) > 0) {
         setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
         return;
@@ -410,7 +410,8 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         Collection* versionColl;
         BSONObj featureCompatibilityVersion;
         if (!db ||
-            !(versionColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(fcvNSS)) ||
+            !(versionColl =
+                  CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fcvNSS)) ||
             !Helpers::findOne(opCtx,
                               versionColl,
                               BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
@@ -517,7 +518,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // featureCompatibilityVersion document, cache it in-memory as a server parameter.
         if (dbName == "admin") {
             if (Collection* versionColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                    NamespaceString::kServerConfigurationNamespace)) {
+                    opCtx, NamespaceString::kServerConfigurationNamespace)) {
                 BSONObj featureCompatibilityVersion;
                 if (Helpers::findOne(
                         opCtx,

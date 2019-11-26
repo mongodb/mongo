@@ -39,6 +39,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -459,9 +460,13 @@ void DurableCatalogImpl::init(OperationContext* opCtx) {
     }
 
     if (!_featureTracker) {
-        // If there wasn't a feature document, then just an initialize a feature tracker that
-        // doesn't manage a feature document yet.
+        // If there wasn't a feature document, commit a default one to disk. All deployments will
+        // end up with `kPathLevelMultikeyTracking` as every `_id` index build sets this.
+        WriteUnitOfWork wuow(opCtx);
         _featureTracker = DurableCatalogImpl::FeatureTracker::create(opCtx, this);
+        _featureTracker->markRepairableFeatureAsInUse(
+            opCtx, FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking);
+        wuow.commit();
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
@@ -777,12 +782,11 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     const NamespaceString& nss,
     const CollectionOptions& options,
     bool allocateDefaultSpace) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
     invariant(nss.coll().size() > 0);
 
-    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)) {
-        return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "collection already exists " << nss);
+    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
+        throw WriteConflictException();
     }
 
     KVPrefix prefix = KVPrefix::getNextPrefix(nss);

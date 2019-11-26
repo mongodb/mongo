@@ -236,7 +236,7 @@ public:
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) {
         auto& catalog = CollectionCatalog::get(opCtx);
         for (auto& nss : _namespaces) {
-            auto optUUID = catalog.lookupUUIDByNSS(nss);
+            auto optUUID = catalog.lookupUUIDByNSS(opCtx, nss);
             if (optUUID) {
                 builder << nss.toString() << optUUID.get();
             }

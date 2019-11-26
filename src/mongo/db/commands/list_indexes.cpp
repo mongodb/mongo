@@ -118,7 +118,7 @@ public:
 
         // Check for the listIndexes ActionType on the database.
         const auto nss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(
-            CommandHelpers::parseNsOrUUID(dbname, cmdObj));
+            opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj));
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
                                                            ActionType::listIndexes)) {
             return Status::OK();

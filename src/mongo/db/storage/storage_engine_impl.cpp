@@ -262,7 +262,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, nss, catalogId, uuid, std::move(rs));
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    collectionCatalog.registerCollection(uuid, std::move(collection));
+    collectionCatalog.registerCollection(uuid, &collection);
 }
 
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
@@ -654,7 +654,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     for (auto& nss : toDrop) {
         invariant(getCatalog());
-        auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         Status result = getCatalog()->dropCollection(opCtx, coll->getCatalogId());
 
         if (!result.isOK() && firstError.isOK()) {
@@ -741,7 +741,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 
     // After repairing, re-initialize the collection with a valid RecordStore.
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    auto uuid = collectionCatalog.lookupUUIDByNSS(nss).get();
+    auto uuid = collectionCatalog.lookupUUIDByNSS(opCtx, nss).get();
     collectionCatalog.deregisterCollection(uuid);
     _initCollection(opCtx, catalogId, nss, false);
     return Status::OK();

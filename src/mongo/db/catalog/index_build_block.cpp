@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -156,7 +157,8 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
+    invariant(
+        UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
 
     if (_indexBuildInterceptor) {
         // An index build should never be completed with writes remaining in the interceptor.

@@ -63,6 +63,7 @@ if not has_option('noshell') and usemozjs:
         target="dbtest",
         source=[
             'basictests.cpp',
+            'catalogtests.cpp',
             'clienttests.cpp',
             'commandtests.cpp',
             'counttests.cpp',

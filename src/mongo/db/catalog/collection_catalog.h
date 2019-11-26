@@ -116,7 +116,7 @@ public:
     /**
      * Register the collection with `uuid`.
      */
-    void registerCollection(CollectionUUID uuid, std::unique_ptr<Collection> collection);
+    void registerCollection(CollectionUUID uuid, std::unique_ptr<Collection>* collection);
 
     /**
      * Deregister the collection.
@@ -141,7 +141,7 @@ public:
      *
      * Returns nullptr if the 'uuid' is not known.
      */
-    Collection* lookupCollectionByUUID(CollectionUUID uuid) const;
+    Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
 
     /**
      * This function gets the Collection pointer that corresponds to the NamespaceString.
@@ -150,27 +150,31 @@ public:
      *
      * Returns nullptr if the namespace is unknown.
      */
-    Collection* lookupCollectionByNamespace(const NamespaceString& nss) const;
+    Collection* lookupCollectionByNamespace(OperationContext* opCtx,
+                                            const NamespaceString& nss) const;
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to CollectionUUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.
      */
-    boost::optional<NamespaceString> lookupNSSByUUID(CollectionUUID uuid) const;
+    boost::optional<NamespaceString> lookupNSSByUUID(OperationContext* opCtx,
+                                                     CollectionUUID uuid) const;
 
     /**
      * Returns the UUID if `nss` exists in CollectionCatalog. The time complexity of
      * this function is linear to the number of collections in `nss.db()`.
      */
-    boost::optional<CollectionUUID> lookupUUIDByNSS(const NamespaceString& nss) const;
+    boost::optional<CollectionUUID> lookupUUIDByNSS(OperationContext* opCtx,
+                                                    const NamespaceString& nss) const;
 
     /**
      * Without acquiring any locks resolves the given NamespaceStringOrUUID to an actual namespace.
      * Throws NamespaceNotFound if the collection UUID cannot be resolved to a name, or if the UUID
      * can be resolved, but the resulting collection is in the wrong database.
      */
-    NamespaceString resolveNamespaceStringOrUUID(NamespaceStringOrUUID nsOrUUID);
+    NamespaceString resolveNamespaceStringOrUUID(OperationContext* opCtx,
+                                                 NamespaceStringOrUUID nsOrUUID);
 
     /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the

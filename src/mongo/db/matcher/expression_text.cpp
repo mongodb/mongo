@@ -66,7 +66,8 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
                               << nss.ns() << "')",
                 db);
 
-        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        Collection* collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
 
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "text index required for $text query (no such collection '"

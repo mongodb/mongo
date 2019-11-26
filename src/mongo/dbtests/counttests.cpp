@@ -51,7 +51,8 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
 
-            _collection = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+            _collection =
+                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
             if (_collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
