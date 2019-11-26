@@ -64,8 +64,10 @@ let testColl = testDB.foo;
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
 
     let deletionTask = {
+        _id: UUID(),
         nss: ns,
         collectionUuid: collectionUuid,
+        donorShardId: "unused",
         pending: true,
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now"
@@ -112,8 +114,10 @@ let testColl = testDB.foo;
     assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
 
     let deletionTask = {
+        _id: UUID(),
         nss: ns,
         collectionUuid: UUID(),
+        donorShardId: "unused",
         pending: true,
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now"

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -37,12 +37,19 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/query.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -55,6 +62,27 @@ const char kDestinationShard[] = "destination";
 const char kIsDonorShard[] = "isDonorShard";
 const char kChunk[] = "chunk";
 const char kCollection[] = "collection";
+
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kNoTimeout);
+
+template <typename Cmd>
+void sendToRecipient(OperationContext* opCtx, const ShardId& recipientId, const Cmd& cmd) {
+    auto recipientShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientId));
+
+    LOG(1) << "Sending request " << cmd.toBSON({}) << " to recipient.";
+
+    auto response = recipientShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "config",
+        cmd.toBSON({}),
+        Shard::RetryPolicy::kIdempotent);
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+}
+
 }  // namespace
 
 BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
@@ -118,7 +146,7 @@ bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& d
         return false;
     }
 
-    auto notification = css->cleanUpRange(*deletionTask.getRange(), whenToClean);
+    auto notification = css->cleanUpRange(deletionTask.getRange(), whenToClean);
 
     if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
         LOG(0) << "Failed to resubmit range for deletion: "
@@ -170,6 +198,80 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     });
 }
 
-}  // namespace migrationutil
+void persistMigrationCoordinatorLocally(OperationContext* opCtx,
+                                        const MigrationCoordinatorDocument& migrationDoc) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+    try {
+        store.add(opCtx, migrationDoc);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {
+        // Convert a DuplicateKey error to an anonymous error.
+        uasserted(
+            31374,
+            str::stream() << "While attempting to write migration information for migration "
+                          << ", found document with the same migration id. Attempted migration: "
+                          << migrationDoc.toBSON());
+    }
+}
 
+void persistRangeDeletionTaskLocally(OperationContext* opCtx,
+                                     const RangeDeletionTask& deletionTask) {
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    try {
+        store.add(opCtx, deletionTask);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {
+        // Convert a DuplicateKey error to an anonymous error.
+        uasserted(31375,
+                  str::stream() << "While attempting to write range deletion task for migration "
+                                << ", found document with the same migration id. Attempted range "
+                                   "deletion task: "
+                                << deletionTask.toBSON());
+    }
+}
+
+void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                        const ShardId& recipientId,
+                                        const UUID& migrationId) {
+    write_ops::Delete deleteOp(NamespaceString::kRangeDeletionNamespace);
+    write_ops::DeleteOpEntry query(BSON(RangeDeletionTask::kIdFieldName << migrationId),
+                                   false /*multi*/);
+    deleteOp.setDeletes({query});
+
+    sendToRecipient(opCtx, recipientId, deleteOp);
+}
+
+void deleteRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& deletionTaskId) {
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.remove(opCtx, QUERY(RangeDeletionTask::kIdFieldName << deletionTaskId));
+}
+
+void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
+                                                  const UUID& collectionUuid) {
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.remove(opCtx, QUERY(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid));
+}
+
+void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                             const ShardId& recipientId,
+                                             const UUID& migrationId) {
+    write_ops::Update updateOp(NamespaceString::kRangeDeletionNamespace);
+    auto queryFilter = BSON(RangeDeletionTask::kIdFieldName << migrationId);
+    auto updateModification = write_ops::UpdateModification(
+        BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << "")));
+    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(false);
+    updateOp.setUpdates({updateEntry});
+
+    sendToRecipient(opCtx, recipientId, updateOp);
+}
+
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    auto query = QUERY(RangeDeletionTask::kIdFieldName << migrationId);
+    auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
+
+    store.update(opCtx, query, update);
+}
+}  // namespace migrationutil
 }  // namespace mongo

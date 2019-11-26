@@ -52,8 +52,10 @@ function setup() {
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
 
     let deletionTask = {
+        _id: UUID(),
         nss: ns,
         collectionUuid: collectionUuid,
+        donorShardId: "unused",
         range: {min: {x: 50}, max: {x: MaxKey}},
         whenToClean: "now"
     };
@@ -117,8 +119,10 @@ function setup() {
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
 
     let deletionTask = {
+        _id: UUID(),
         nss: ns,
         collectionUuid: collectionUuid,
+        donorShardId: "unused",
         pending: true,
         range: {min: {x: 50}, max: {x: MaxKey}},
         whenToClean: "now"

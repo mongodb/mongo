@@ -66,6 +66,9 @@ const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
 const NamespaceString NamespaceString::kTransactionCoordinatorsNamespace(
     NamespaceString::kConfigDb, "transaction_coordinators");
 
+const NamespaceString NamespaceString::kMigrationCoordinatorsNamespace(NamespaceString::kConfigDb,
+                                                                       "migrationCoordinators");
+
 const NamespaceString NamespaceString::kShardConfigCollectionsNamespace(NamespaceString::kConfigDb,
                                                                         "cache.collections");
 const NamespaceString NamespaceString::kShardConfigDatabasesNamespace(NamespaceString::kConfigDb,

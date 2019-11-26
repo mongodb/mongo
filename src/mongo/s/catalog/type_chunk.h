@@ -117,6 +117,13 @@ public:
     ChunkRange unionWith(ChunkRange const& other) const;
 
 private:
+    // For use with IDL parsing - limited to friend access only.
+    ChunkRange() = default;
+
+    // Make the IDL generated parser a friend
+    friend class RangeDeletionTask;
+    friend class MigrationCoordinatorDocument;
+
     BSONObj _minKey;
     BSONObj _maxKey;
 };

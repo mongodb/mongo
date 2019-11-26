@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -81,6 +84,56 @@ void submitPendingDeletions(OperationContext* opCtx);
 // Asynchronously calls submitPendingDeletions using the fixed executor pool.
 void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
 
-}  // namespace migrationutil
+/**
+ * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
+ * write concern.
+ */
+void persistMigrationCoordinatorLocally(OperationContext* opCtx,
+                                        const MigrationCoordinatorDocument& migrationDoc);
 
+/**
+ * Writes the range deletion task document to config.rangeDeletions and waits for majority write
+ * concern.
+ */
+void persistRangeDeletionTaskLocally(OperationContext* opCtx,
+                                     const RangeDeletionTask& deletionTask);
+
+/**
+ * Deletes the range deletion task document with the specified id from config.rangeDeletions and
+ * waits for majority write concern.
+ */
+void deleteRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& deletionTaskId);
+
+/**
+ * Deletes all range deletion task documents with the specified collection UUID from
+ * config.rangeDeletions and waits for majority write concern.
+ */
+void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
+                                                  const UUID& collectionUuid);
+
+/**
+ * Deletes the range deletion task document with the specified id from config.rangeDeletions on the
+ * specified shard and waits for majority write concern.
+ */
+void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                        const ShardId& recipientId,
+                                        const UUID& migrationId);
+
+/**
+ * Removes the 'pending' flag from the range deletion task document with the specified id from
+ * config.rangeDeletions and waits for majority write concern. This marks the range as ready for
+ * deletion.
+ */
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId);
+
+
+/**
+ * Removes the 'pending' flag from the range deletion task document with the specified id from
+ * config.rangeDeletions on the specified shard and waits for majority write concern. This marks the
+ * range as ready for deletion.
+ */
+void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                             const ShardId& recipientId,
+                                             const UUID& migrationId);
+}  // namespace migrationutil
 }  // namespace mongo

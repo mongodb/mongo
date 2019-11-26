@@ -47,6 +47,7 @@ env.Library(
         'metadata_manager.cpp',
         'migration_chunk_cloner_source_legacy.cpp',
         'migration_chunk_cloner_source.cpp',
+        'migration_coordinator.cpp',
         'migration_destination_manager.cpp',
         'migration_session_id.cpp',
         'migration_source_manager.cpp',
@@ -74,7 +75,7 @@ env.Library(
         'start_chunk_clone_request.cpp',
         env.Idlc('sharding_runtime_d_params.idl')[0],
         env.Idlc('range_deletion_task.idl')[0],
-
+        env.Idlc('migration_coordinator_document.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',

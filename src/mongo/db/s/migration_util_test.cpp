@@ -261,11 +261,12 @@ void addRangeToReceivingChunks(OperationContext* opCtx,
 }
 
 RangeDeletionTask createDeletionTask(NamespaceString nss, const UUID& uuid, int min, int max) {
-    RangeDeletionTask task{nss, uuid, CleanWhenEnum::kNow};
-
-    task.setRange(ChunkRange{BSON("_id" << min), BSON("_id" << max)});
-
-    return task;
+    return RangeDeletionTask(UUID::gen(),
+                             nss,
+                             uuid,
+                             ShardId("donorShard"),
+                             ChunkRange{BSON("_id" << min), BSON("_id" << max)},
+                             CleanWhenEnum::kDelayed);
 }
 
 // Test that overlappingRangeQuery() can handle the cases that we expect to encounter.

@@ -24,8 +24,10 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
 
 let deletionTask = {
+    _id: UUID(),
     nss: ns,
     collectionUuid: collectionUuid,
+    donorShardId: "unused",
     pending: true,
     range: {min: {x: 70}, max: {x: 90}},
     whenToClean: "now"
