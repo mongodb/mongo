@@ -204,7 +204,7 @@ void persistMigrationCoordinatorLocally(OperationContext* opCtx,
         opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
     try {
         store.add(opCtx, migrationDoc);
-    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // Convert a DuplicateKey error to an anonymous error.
         uasserted(
             31374,
@@ -219,7 +219,7 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     try {
         store.add(opCtx, deletionTask);
-    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // Convert a DuplicateKey error to an anonymous error.
         uasserted(31375,
                   str::stream() << "While attempting to write range deletion task for migration "
