@@ -63,7 +63,7 @@ public:
         debug << "$expr " << _expression->serialize(false).toString();
     }
 
-    void serialize(BSONObjBuilder* out) const final;
+    void serialize(BSONObjBuilder* out, bool includePath) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 

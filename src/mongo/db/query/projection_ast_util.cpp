@@ -50,7 +50,7 @@ public:
 
     virtual void visit(const MatchExpressionASTNode* node) {
         static_cast<const MatchExpressionASTNode*>(node)->matchExpression()->serialize(
-            &_context->builder());
+            &_context->builder(), true);
         _context->fieldNames.top().pop_front();
     }
 

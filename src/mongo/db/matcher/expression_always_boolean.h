@@ -58,7 +58,7 @@ public:
         debug << name() << ": 1\n";
     }
 
-    void serialize(BSONObjBuilder* out) const final {
+    void serialize(BSONObjBuilder* out, bool includePath) const final {
         out->append(name(), 1);
     }
 

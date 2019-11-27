@@ -32,19 +32,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/schema/assert_serializes_to.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-
-#define ASSERT_SERIALIZES_TO(match, expected)   \
-    do {                                        \
-        BSONObjBuilder bob;                     \
-        match->serialize(&bob);                 \
-        ASSERT_BSONOBJ_EQ(bob.obj(), expected); \
-    } while (false)
 
 TEST(JSONSchemaObjectKeywordTest, FailsToParseIfTypeIsNotAString) {
     BSONObj schema = fromjson("{type: 1}");
@@ -262,11 +256,11 @@ TEST(JSONSchemaObjectKeywordTest, SharedJsonAndBsonTypeAliasesTranslateIdentical
         ASSERT_OK(bsonTypeResult.getStatus());
 
         BSONObjBuilder typeBuilder;
-        MatchExpression::optimize(std::move(typeResult.getValue()))->serialize(&typeBuilder);
+        MatchExpression::optimize(std::move(typeResult.getValue()))->serialize(&typeBuilder, true);
 
         BSONObjBuilder bsonTypeBuilder;
         MatchExpression::optimize(std::move(bsonTypeResult.getValue()))
-            ->serialize(&bsonTypeBuilder);
+            ->serialize(&bsonTypeBuilder, true);
 
         ASSERT_BSONOBJ_EQ(typeBuilder.obj(), bsonTypeBuilder.obj());
     }

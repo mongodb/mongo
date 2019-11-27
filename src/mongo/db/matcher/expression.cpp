@@ -44,7 +44,7 @@ MatchExpression::MatchExpression(MatchType type) : _matchType(type) {}
 
 std::string MatchExpression::toString() const {
     BSONObjBuilder bob;
-    serialize(&bob);
+    serialize(&bob, true);
     return bob.obj().toString();
 }
 
