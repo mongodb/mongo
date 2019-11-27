@@ -212,6 +212,10 @@ functions:
         production: true
         authentication: ${authentication}
         overrides:
+          infrastructure_provisioning:
+            tfvars:
+              # This is currently only used by initialsync-logkeeper. It is empty and not used for other tests.
+              mongod_seeded_ebs_snapshot_id: ${snapshotId}
           workload_setup:
             local_repos:
               workloads: ../src/workloads/workloads
@@ -220,6 +224,8 @@ functions:
               tpcc: ../src/tpcc/tpcc
               genny: ../src/genny/genny
           mongodb_setup:
+            # This is currently only used by initialsync-logkeeper-short. It is empty and not used for other tests.
+            mongodb_dataset: ${dataset}
             mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
         EOF
 
@@ -738,6 +744,8 @@ tasks:
       vars:
         test: "initialsync-logkeeper"
         setup: "initialsync-logkeeper-short"
+        # Logkeeper dataset with FCV set to 4.4
+        dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-4.4.tgz"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -1367,6 +1375,8 @@ buildvariants:
   expansions:
     setup: initialsync-logkeeper
     cluster: initialsync-logkeeper
+    # EBS logkeeper snapshot with FCV set to 4.4
+    snapshotId: snap-0b0b8b2ad16e8f14e
     platform: linux
     # TODO(TIG-1506): enabled authentication on initialsync variants
     authentication: disabled
