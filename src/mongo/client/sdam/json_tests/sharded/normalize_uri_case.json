@@ -1,0 +1,24 @@
+{
+  "description": "Normalize URI case",
+  "uri": "mongodb://A,B",
+  "phases": [
+    {
+      "responses": [],
+      "outcome": {
+        "servers": {
+          "a:27017": {
+            "type": "Unknown",
+            "setName": null
+          },
+          "b:27017": {
+            "type": "Unknown",
+            "setName": null
+          }
+        },
+        "topologyType": "Unknown",
+        "logicalSessionTimeoutMinutes": null,
+        "setName": null
+      }
+    }
+  ]
+}

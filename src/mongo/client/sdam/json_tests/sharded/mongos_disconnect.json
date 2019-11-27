@@ -1,0 +1,97 @@
+{
+  "description": "Mongos disconnect",
+  "uri": "mongodb://a,b",
+  "phases": [
+    {
+      "responses": [
+        [
+          "a:27017",
+          {
+            "ok": 1,
+            "ismaster": true,
+            "msg": "isdbgrid",
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          }
+        ],
+        [
+          "b:27017",
+          {
+            "ok": 1,
+            "ismaster": true,
+            "msg": "isdbgrid",
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          }
+        ]
+      ],
+      "outcome": {
+        "servers": {
+          "a:27017": {
+            "type": "Mongos",
+            "setName": null
+          },
+          "b:27017": {
+            "type": "Mongos",
+            "setName": null
+          }
+        },
+        "topologyType": "Sharded",
+        "logicalSessionTimeoutMinutes": null,
+        "setName": null
+      }
+    },
+    {
+      "responses": [
+        [
+          "a:27017",
+          {}
+        ]
+      ],
+      "outcome": {
+        "servers": {
+          "a:27017": {
+            "type": "Unknown",
+            "setName": null
+          },
+          "b:27017": {
+            "type": "Mongos",
+            "setName": null
+          }
+        },
+        "topologyType": "Sharded",
+        "logicalSessionTimeoutMinutes": null,
+        "setName": null
+      }
+    },
+    {
+      "responses": [
+        [
+          "a:27017",
+          {
+            "ok": 1,
+            "ismaster": true,
+            "msg": "isdbgrid",
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          }
+        ]
+      ],
+      "outcome": {
+        "servers": {
+          "a:27017": {
+            "type": "Mongos",
+            "setName": null
+          },
+          "b:27017": {
+            "type": "Mongos",
+            "setName": null
+          }
+        },
+        "topologyType": "Sharded",
+        "logicalSessionTimeoutMinutes": null,
+        "setName": null
+      }
+    }
+  ]
+}

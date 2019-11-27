@@ -125,6 +125,9 @@ public:
 
     void setType(TopologyType type);
 
+    BSONObj toBSON();
+    std::string toString();
+
 private:
     /**
      * Checks if all server descriptions are compatible with this server's WireVersion. If an
