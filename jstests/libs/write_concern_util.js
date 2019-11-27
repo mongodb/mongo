@@ -2,8 +2,6 @@
  * Utilities for testing writeConcern.
  */
 
-load("jstests/libs/check_log.js");
-
 // Shards a collection with 'numDocs' documents and creates 2 chunks, one on each of two shards.
 function shardCollectionWithChunks(st, coll, numDocs) {
     var _db = coll.getDB();

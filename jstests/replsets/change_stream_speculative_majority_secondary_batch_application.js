@@ -9,7 +9,6 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
-load("jstests/libs/check_log.js");           // for checkLog.
 
 const name = "speculative_majority_secondary";
 const replTest = new ReplSetTest({

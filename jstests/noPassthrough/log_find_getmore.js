@@ -7,7 +7,6 @@
 "use strict";
 
 // For checkLog and getLatestProfilerEntry.
-load("jstests/libs/check_log.js");
 load("jstests/libs/profiler.js");
 
 function assertLogLineContains(conn, parts) {

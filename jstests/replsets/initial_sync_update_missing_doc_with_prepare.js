@@ -14,7 +14,6 @@
 (function() {
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
-load("jstests/libs/check_log.js");
 
 function doTest(doTransactionWork, numDocuments) {
     const replSet = new ReplSetTest({nodes: 1});

@@ -2,7 +2,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
 load("jstests/libs/write_concern_util.js");
 
 /**

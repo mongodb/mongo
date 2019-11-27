@@ -24,7 +24,6 @@ function runWithWait(millis, func) {
     }));
 }
 
-load("jstests/libs/check_log.js");
 load("jstests/libs/profiler.js");
 
 let hangMillis = 200;

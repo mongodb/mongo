@@ -10,7 +10,6 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 const name = "transaction_write_with_snapshot_unavailable";
 const replTest = new ReplSetTest({name: name, nodes: 1});

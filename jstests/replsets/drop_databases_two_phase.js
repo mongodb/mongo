@@ -18,7 +18,6 @@
 "use strict";
 
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
-load('jstests/libs/check_log.js');
 load("jstests/replsets/rslib.js");
 
 // Returns a list of all collections in a given database. Use 'args' as the

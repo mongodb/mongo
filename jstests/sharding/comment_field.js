@@ -8,7 +8,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");        // For checkLog.* helper functions.
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 load("jstests/libs/profiler.js");         // For profilerHas*OrThrow helper functions.
 

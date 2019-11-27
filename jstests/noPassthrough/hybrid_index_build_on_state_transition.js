@@ -17,7 +17,6 @@
  *     uses_prepare_transaction,
  * ]
  */
-load("jstests/libs/check_log.js");
 load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 load("jstests/core/txns/libs/prepare_helpers.js");

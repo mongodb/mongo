@@ -7,7 +7,6 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 const dbName = "restart_catalog_interrupts_background_validation";
 const collName = "test";

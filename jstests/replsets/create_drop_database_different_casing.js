@@ -16,7 +16,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/check_log.js");
 load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});

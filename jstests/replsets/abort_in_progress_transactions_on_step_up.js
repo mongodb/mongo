@@ -6,7 +6,6 @@
 (function() {
 "use strict";
 load("jstests/replsets/rslib.js");  // For reconnect()
-load("jstests/libs/check_log.js");
 load("jstests/libs/fail_point_util.js");
 
 function getTxnTableEntry(db) {

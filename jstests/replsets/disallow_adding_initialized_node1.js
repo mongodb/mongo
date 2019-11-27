@@ -6,7 +6,6 @@
 
 (function() {
 'use strict';
-load("jstests/libs/check_log.js");
 
 var name = 'disallow_adding_initialized_node1';
 var replSetA = new ReplSetTest({

@@ -11,7 +11,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 load("jstests/libs/fail_point_util.js");
 
 var name = 'initial_sync_applier_error';

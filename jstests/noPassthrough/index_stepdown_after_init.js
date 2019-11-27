@@ -6,7 +6,6 @@
 (function() {
 "use strict";
 
-load('jstests/libs/check_log.js');
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({

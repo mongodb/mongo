@@ -7,7 +7,6 @@
 'use strict';
 
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
-load('jstests/libs/check_log.js');                 // For checkLog.contains().
 
 // Return a list of all indexes for a given collection. Use 'args' as the
 // 'listIndexes' command arguments.

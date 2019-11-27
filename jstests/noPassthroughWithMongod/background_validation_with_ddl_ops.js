@@ -13,7 +13,6 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 const dbName = "background_validation_with_ddl_ops";
 const dbNameRename = "background_validation_with_ddl_ops_rename";

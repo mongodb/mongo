@@ -8,8 +8,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");  // For checkLog.
-
 //
 // Start mongo with profiling disabled, create an empty database, and populate it with a
 // collection that has one document.

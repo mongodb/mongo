@@ -5,7 +5,6 @@
  */
 (function() {
 'use strict';
-load('jstests/libs/check_log.js');
 
 const rst = new ReplSetTest({
     nodes: [

@@ -13,7 +13,6 @@
 (function() {
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/check_log.js");
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
 function doTest(commitOrAbort) {

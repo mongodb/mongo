@@ -14,7 +14,6 @@
 
 "use strict";
 
-load("jstests/libs/check_log.js");
 load('jstests/replsets/rslib.js');
 
 /**

@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");  // For formatAsLogLine.
-
 // This test looks for exact matches in log output, which does not account for implicit sessions.
 TestData.disableImplicitSessions = true;
 

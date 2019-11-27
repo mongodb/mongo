@@ -13,7 +13,6 @@
 
 (function() {
 load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
-load("jstests/libs/check_log.js");
 
 const replSet = new ReplSetTest({nodes: 1});
 

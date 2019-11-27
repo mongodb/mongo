@@ -4,7 +4,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 const failpointData = {
     mode: 'alwaysOn',
