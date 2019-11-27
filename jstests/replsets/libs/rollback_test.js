@@ -35,6 +35,11 @@ load("jstests/hooks/validate_collections.js");
  * If the caller does not provide their own replica set, a standard three-node
  * replset will be initialized instead, with all nodes running the latest version.
  *
+ * After the initial fixture setup, nodes may be added to the fixture using RollbackTest.add(),
+ * provided they are non-voting nodes.  These nodes will not be checked for replication state or
+ * progress until kSteadyStateOps, or if consistency checks are skipped in kSteadyStateOps, the end
+ * of the test.  If voting nodes are added directly to the ReplSetTest, the results are undefined.
+ *
  * @param {string} [optional] name the name of the test being run
  * @param {Object} [optional] replSet the ReplSetTest instance to adopt
  */
@@ -208,6 +213,19 @@ function RollbackTest(name = "RollbackTest", replSet) {
     }
 
     /**
+     * Add a node to the ReplSetTest.  It must be a non-voting node.  If reInitiate is true,
+     * also run ReplSetTest.reInitiate to configure the replset to include the new node.
+     */
+    this.add = function({config: config, reInitiate: reInitiate = true}) {
+        assert.eq(config.rsConfig.votes, 0, "Nodes added to a RollbackTest must be non-voting.");
+        let node = rst.add(config);
+        if (reInitiate) {
+            rst.reInitiate();
+        }
+        return node;
+    };
+
+    /**
      * Transition from a rollback state to a steady state. Operations applied in this phase will
      * be replicated to all nodes and should not be rolled back.
      */
@@ -243,8 +261,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // Allow replication temporarily so the following checks succeed.
         restartServerReplication(tiebreakerNode);
 
-        rst.awaitSecondaryNodes();
-        rst.awaitReplication();
+        rst.awaitSecondaryNodes(null, [curSecondary, tiebreakerNode]);
+        rst.awaitReplication(null, null, [curSecondary, tiebreakerNode]);
 
         log(`Rollback on ${curSecondary.host} (if needed) and awaitReplication completed`, true);
 
@@ -280,7 +298,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // Ensure previous operations are replicated to the secondary that will be used as the sync
         // source later on. It must be up-to-date to prevent any previous operations from being
         // rolled back.
-        rst.awaitSecondaryNodes();
+        rst.awaitSecondaryNodes(null, [curSecondary, tiebreakerNode]);
         rst.awaitReplication(null, null, [curSecondary]);
 
         transitionIfAllowed(State.kRollbackOps);
