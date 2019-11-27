@@ -50,14 +50,30 @@ class RemoteCommandTargeter;
 class ServiceContext;
 class UUID;
 
-/**
- * Used to indicate to the caller of the removeShard method whether draining of chunks for
- * a particular shard has started, is ongoing, or has been completed.
- */
-enum ShardDrainingStatus {
-    STARTED,
-    ONGOING,
-    COMPLETED,
+struct RemoveShardProgress {
+
+    /**
+     * Used to indicate to the caller of the removeShard method whether draining of chunks for
+     * a particular shard has started, is ongoing, or has been completed.
+     */
+    enum DrainingShardStatus {
+        STARTED,
+        ONGOING,
+        COMPLETED,
+    };
+
+    /**
+     * Used to indicate to the caller of the removeShard method the remaining amount of chunks,
+     * jumbo chunks and databases within the shard
+     */
+    struct DrainingShardUsage {
+        const long long totalChunks;
+        const long long databases;
+        const long long jumboChunks;
+    };
+
+    DrainingShardStatus status;
+    boost::optional<DrainingShardUsage> remainingCounts;
 };
 
 /**
@@ -355,7 +371,7 @@ public:
      * Because of the asynchronous nature of the draining mechanism, this method returns
      * the current draining status. See ShardDrainingStatus enum definition for more details.
      */
-    ShardDrainingStatus removeShard(OperationContext* opCtx, const ShardId& shardId);
+    RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
     //
     // Cluster Upgrade Operations
