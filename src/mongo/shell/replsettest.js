@@ -572,8 +572,32 @@ var ReplSetTest = function(opts) {
      * @param options - The options passed to {@link MongoRunner.runMongod}
      */
     this.startSet = function(options, restart) {
-        print("ReplSetTest starting set");
-        let startTime = new Date();  // Measure the execution time of this function.
+        // If the caller has explicitly specified 'waitForConnect:false', then we will start up all
+        // replica set nodes and return without waiting to connect to any of them.
+        const skipWaitingForAllConnections = (options && options.waitForConnect === false);
+
+        // Start up without waiting for connections.
+        this.startSetAsync(options, restart);
+
+        // Avoid waiting for connections to each node.
+        if (skipWaitingForAllConnections) {
+            print("ReplSetTest startSet skipping waiting for connections to all nodes in set '" +
+                  this.name + "'");
+            return this.nodes;
+        }
+
+        return this.startSetAwait();
+    };
+
+    /**
+     * Starts each node in the replica set with the given options without waiting for a connection
+     * to any node. Call 'startSetAwait' subsequently to wait for startup of each node to complete.
+     *
+     * @param options - The options passed to {@link MongoRunner.runMongod}
+     */
+    this.startSetAsync = function(options, restart) {
+        print("ReplSetTest starting set '" + this.name + "'");
+        self.startSetStartTime = new Date();  // Measure the execution time of node startup.
 
         if (options && options.keyFile) {
             self.keyFile = options.keyFile;
@@ -591,10 +615,6 @@ var ReplSetTest = function(opts) {
             Random.setRandomSeed(jsTest.options().seed);
         }
 
-        // If the caller has explicitly specified 'waitForConnect:false', then we will start up all
-        // replica set nodes and return without waiting to connect to any of them.
-        const skipWaitingForAllConnections = (options && options.waitForConnect === false);
-
         // If the caller has explicitly set 'waitForConnect', then we prefer that. Otherwise we
         // default to not waiting for a connection. We merge the options object with a new field so
         // as to not modify the original options object that was passed in.
@@ -608,13 +628,14 @@ var ReplSetTest = function(opts) {
         for (let n = 0; n < this.ports.length; n++) {
             this.start(n, options, restart);
         }
+        return this.nodes;
+    };
 
-        // Avoid waiting for connections to each node.
-        if (skipWaitingForAllConnections) {
-            print("ReplSetTest startSet skipping waiting for connections to all nodes.");
-            return this.nodes;
-        }
-
+    /**
+     * Waits for startup of each replica set node to complete by waiting until a connection can be
+     * made to each.
+     */
+    this.startSetAwait = function() {
         // Wait until we can establish a connection to each node before proceeding.
         for (let n = 0; n < this.ports.length; n++) {
             this._waitForInitialConnection(n);
@@ -622,7 +643,7 @@ var ReplSetTest = function(opts) {
 
         print("ReplSetTest startSet, nodes: " + tojson(this.nodes));
 
-        print("ReplSetTest startSet took " + (new Date() - startTime) + "ms for " +
+        print("ReplSetTest startSet took " + (new Date() - self.startSetStartTime) + "ms for " +
               this.nodes.length + " nodes.");
         return this.nodes;
     };
