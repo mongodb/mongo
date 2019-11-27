@@ -267,8 +267,6 @@ connection_stats = [
     CacheStat('cache_eviction_target_strategy_both_clean_and_dirty', 'eviction walk target strategy both clean and dirty pages'),
     CacheStat('cache_eviction_walk', 'pages walked for eviction'),
     CacheStat('cache_eviction_walk_from_root', 'eviction walks started from root of tree'),
-    CacheStat('cache_eviction_walk_internal_yield', 'eviction server waiting for an internal page yields'),
-    CacheStat('cache_eviction_walk_internal_wait', 'eviction server waiting for an internal page sleep (usec)'),
     CacheStat('cache_eviction_walk_leaf_notfound', 'eviction server waiting for a leaf page'),
     CacheStat('cache_eviction_walk_passes', 'eviction passes of a file'),
     CacheStat('cache_eviction_walk_saved_pos', 'eviction walks started from saved location in tree'),

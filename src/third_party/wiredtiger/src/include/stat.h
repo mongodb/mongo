@@ -358,8 +358,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_server_slept;
     int64_t cache_eviction_slow;
     int64_t cache_eviction_walk_leaf_notfound;
-    int64_t cache_eviction_walk_internal_wait;
-    int64_t cache_eviction_walk_internal_yield;
     int64_t cache_eviction_state;
     int64_t cache_eviction_target_page_lt10;
     int64_t cache_eviction_target_page_lt32;

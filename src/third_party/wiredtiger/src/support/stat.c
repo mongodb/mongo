@@ -661,9 +661,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server evicting pages",
   "cache: eviction server slept, because we did not make progress with eviction",
   "cache: eviction server unable to reach eviction goal",
-  "cache: eviction server waiting for a leaf page",
-  "cache: eviction server waiting for an internal page sleep (usec)",
-  "cache: eviction server waiting for an internal page yields", "cache: eviction state",
+  "cache: eviction server waiting for a leaf page", "cache: eviction state",
   "cache: eviction walk target pages histogram - 0-9",
   "cache: eviction walk target pages histogram - 10-31",
   "cache: eviction walk target pages histogram - 128 and higher",
@@ -1007,8 +1005,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_server_slept = 0;
     stats->cache_eviction_slow = 0;
     stats->cache_eviction_walk_leaf_notfound = 0;
-    stats->cache_eviction_walk_internal_wait = 0;
-    stats->cache_eviction_walk_internal_yield = 0;
     /* not clearing cache_eviction_state */
     stats->cache_eviction_target_page_lt10 = 0;
     stats->cache_eviction_target_page_lt32 = 0;
@@ -1436,9 +1432,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_server_slept += WT_STAT_READ(from, cache_eviction_server_slept);
     to->cache_eviction_slow += WT_STAT_READ(from, cache_eviction_slow);
     to->cache_eviction_walk_leaf_notfound += WT_STAT_READ(from, cache_eviction_walk_leaf_notfound);
-    to->cache_eviction_walk_internal_wait += WT_STAT_READ(from, cache_eviction_walk_internal_wait);
-    to->cache_eviction_walk_internal_yield +=
-      WT_STAT_READ(from, cache_eviction_walk_internal_yield);
     to->cache_eviction_state += WT_STAT_READ(from, cache_eviction_state);
     to->cache_eviction_target_page_lt10 += WT_STAT_READ(from, cache_eviction_target_page_lt10);
     to->cache_eviction_target_page_lt32 += WT_STAT_READ(from, cache_eviction_target_page_lt32);

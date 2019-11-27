@@ -1593,6 +1593,30 @@ tasks:
           display_name: Coverage report
           remote_file: wiredtiger/${build_variant}/${revision}/coverage_report/coverage_report_${build_id}.html
 
+  - name: spinlock-gcc-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-python --with-spinlock=gcc --enable-strict
+      - func: "make check all"
+      - func: "test format"
+        vars:
+          times: 3
+      - func: "unit test"
+
+  - name: spinlock-pthread-adaptive-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-python --with-spinlock=pthread_adaptive --enable-strict
+      - func: "make check all"
+      - func: "test format"
+        vars:
+          times: 3
+      - func: "unit test"
+
   - name: wtperf-test
     depends_on:
       - name: compile-wtperf
@@ -1613,6 +1637,24 @@ tasks:
               ./bench/wtperf/wtperf -O $dir/$file -o verbose=2
               cp -rf WT_TEST WT_TEST_$file
             done
+
+  - name: time-shift-sensitivity-test
+    depends_on:
+      - name: compile
+        vars:
+          posix_configure_flags: --enable-strict
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          posix_configure_flags: --enable-strict
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
 
 buildvariants:
 - name: ubuntu1804
@@ -1637,6 +1679,8 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: coverage-report
     - name: unit-test-long
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
     - name: wtperf-test
 
@@ -1692,6 +1736,7 @@ buildvariants:
     - name: make-check-test
     - name: unit-test
     - name: fops
+    - name: time-shift-sensitivity-test
 
 - name: large-scale-test
   display_name: Large scale testing
