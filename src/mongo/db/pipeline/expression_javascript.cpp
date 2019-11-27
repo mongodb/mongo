@@ -173,10 +173,6 @@ boost::intrusive_ptr<Expression> ExpressionInternalJs::parse(
 
 Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables) const {
     auto& expCtx = getExpressionContext();
-    uassert(31264,
-            str::stream() << kExpressionName
-                          << " can't be run on this process. Javascript is disabled.",
-            getGlobalScriptEngine());
 
     auto jsExec = expCtx->getJsExecWithScope();
 

@@ -37,9 +37,6 @@ namespace mongo {
 // it as a JS function.
 ScriptingFunction makeJsFunc(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const std::string& func) {
-    uassert(31241,
-            "Cannot run server-side javascript without the javascript engine enabled",
-            getGlobalScriptEngine());
     auto jsExec = expCtx->getJsExecWithScope();
     ScriptingFunction parsedFunc = jsExec->getScope()->createFunction(func.c_str());
     uassert(

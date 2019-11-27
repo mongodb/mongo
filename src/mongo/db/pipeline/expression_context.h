@@ -240,6 +240,9 @@ public:
      * Returns a JsExec and a boolean indicating whether the Scope was created as part of this call.
      */
     auto getJsExecWithScope() const {
+        uassert(31264,
+                "Cannot run server-side javascript without the javascript engine enabled",
+                getGlobalScriptEngine());
         RuntimeConstants runtimeConstants = getRuntimeConstants();
         const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
         return JsExecution::get(opCtx, scope.get_value_or(BSONObj()), ns.db());
