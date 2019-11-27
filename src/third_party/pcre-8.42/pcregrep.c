@@ -1387,8 +1387,8 @@ Returns:            nothing
 */
 
 static void
-do_after_lines(int lastmatchnumber, char *lastmatchrestart, char *endptr,
-  char *printname)
+do_after_lines(unsigned long int lastmatchnumber, char *lastmatchrestart,
+  char *endptr, char *printname)
 {
 if (after_context > 0 && lastmatchnumber > 0)
   {
@@ -1398,7 +1398,7 @@ if (after_context > 0 && lastmatchnumber > 0)
     int ellength;
     char *pp = lastmatchrestart;
     if (printname != NULL) fprintf(stdout, "%s-", printname);
-    if (number) fprintf(stdout, "%d-", lastmatchnumber++);
+    if (number) fprintf(stdout, "%lu-", lastmatchnumber++);
     pp = end_of_line(pp, endptr, &ellength);
     FWRITE(lastmatchrestart, 1, pp - lastmatchrestart, stdout);
     lastmatchrestart = pp;
@@ -1502,11 +1502,11 @@ static int
 pcregrep(void *handle, int frtype, char *filename, char *printname)
 {
 int rc = 1;
-int linenumber = 1;
-int lastmatchnumber = 0;
-int count = 0;
 int filepos = 0;
 int offsets[OFFSET_SIZE];
+unsigned long int linenumber = 1;
+unsigned long int lastmatchnumber = 0;
+unsigned long int count = 0;
 char *lastmatchrestart = NULL;
 char *ptr = main_buffer;
 char *endptr;
@@ -1609,7 +1609,7 @@ while (ptr < endptr)
 
   if (endlinelength == 0 && t == main_buffer + bufsize)
     {
-    fprintf(stderr, "pcregrep: line %d%s%s is too long for the internal buffer\n"
+    fprintf(stderr, "pcregrep: line %lu%s%s is too long for the internal buffer\n"
                     "pcregrep: check the --buffer-size option\n",
                     linenumber,
                     (filename == NULL)? "" : " of file ",
@@ -1747,7 +1747,7 @@ while (ptr < endptr)
           prevoffsets[1] = offsets[1];
 
           if (printname != NULL) fprintf(stdout, "%s:", printname);
-          if (number) fprintf(stdout, "%d:", linenumber);
+          if (number) fprintf(stdout, "%lu:", linenumber);
 
           /* Handle --line-offsets */
 
@@ -1862,7 +1862,7 @@ while (ptr < endptr)
           {
           char *pp = lastmatchrestart;
           if (printname != NULL) fprintf(stdout, "%s-", printname);
-          if (number) fprintf(stdout, "%d-", lastmatchnumber++);
+          if (number) fprintf(stdout, "%lu-", lastmatchnumber++);
           pp = end_of_line(pp, endptr, &ellength);
           FWRITE(lastmatchrestart, 1, pp - lastmatchrestart, stdout);
           lastmatchrestart = pp;
@@ -1902,7 +1902,7 @@ while (ptr < endptr)
           int ellength;
           char *pp = p;
           if (printname != NULL) fprintf(stdout, "%s-", printname);
-          if (number) fprintf(stdout, "%d-", linenumber - linecount--);
+          if (number) fprintf(stdout, "%lu-", linenumber - linecount--);
           pp = end_of_line(pp, endptr, &ellength);
           FWRITE(p, 1, pp - p, stdout);
           p = pp;
@@ -1916,7 +1916,7 @@ while (ptr < endptr)
         endhyphenpending = TRUE;
 
       if (printname != NULL) fprintf(stdout, "%s:", printname);
-      if (number) fprintf(stdout, "%d:", linenumber);
+      if (number) fprintf(stdout, "%lu:", linenumber);
 
       /* In multiline mode, we want to print to the end of the line in which
       the end of the matched string is found, so we adjust linelength and the
@@ -2112,7 +2112,7 @@ if (count_only && !quiet)
     {
     if (printname != NULL && filenames != FN_NONE)
       fprintf(stdout, "%s:", printname);
-    fprintf(stdout, "%d\n", count);
+    fprintf(stdout, "%lu\n", count);
     }
   }
 
@@ -2234,7 +2234,7 @@ if (isdirectory(pathname))
 
   if (dee_action == dee_RECURSE)
     {
-    char buffer[1024];
+    char buffer[2048];
     char *nextfile;
     directory_type *dir = opendirectory(pathname);
 
@@ -2249,7 +2249,14 @@ if (isdirectory(pathname))
     while ((nextfile = readdirectory(dir)) != NULL)
       {
       int frc;
-      sprintf(buffer, "%.512s%c%.128s", pathname, FILESEP, nextfile);
+      int fnlength = strlen(pathname) + strlen(nextfile) + 2;
+      if (fnlength > 2048)
+        {
+        fprintf(stderr, "pcre2grep: recursive filename is too long\n");
+        rc = 2;
+        break;
+        }
+      sprintf(buffer, "%s%c%s", pathname, FILESEP, nextfile);
       frc = grep_or_recurse(buffer, dir_recurse, FALSE);
       if (frc > 1) rc = frc;
        else if (frc == 0 && rc == 1) rc = 0;
@@ -2520,7 +2527,14 @@ if ((popts & PO_FIXED_STRINGS) != 0)
     }
   }
 
-sprintf(buffer, "%s%.*s%s", prefix[popts], patlen, ps, suffix[popts]);
+if (snprintf(buffer, PATBUFSIZE, "%s%.*s%s", prefix[popts], patlen, ps,
+      suffix[popts]) > PATBUFSIZE)
+  {
+  fprintf(stderr, "pcregrep: Buffer overflow while compiling \"%s\"\n",
+    ps);
+  return FALSE;
+  }
+
 p->compiled = pcre_compile(buffer, options, &error, &errptr, pcretables);
 if (p->compiled != NULL) return TRUE;
 
@@ -2756,8 +2770,15 @@ for (i = 1; i < argc; i++)
         int arglen = (argequals == NULL || equals == NULL)?
           (int)strlen(arg) : (int)(argequals - arg);
 
-        sprintf(buff1, "%.*s", baselen, op->long_name);
-        sprintf(buff2, "%s%.*s", buff1, fulllen - baselen - 2, opbra + 1);
+        if (snprintf(buff1, sizeof(buff1), "%.*s", baselen, op->long_name) >
+              (int)sizeof(buff1) ||
+            snprintf(buff2, sizeof(buff2), "%s%.*s", buff1,
+              fulllen - baselen - 2, opbra + 1) > (int)sizeof(buff2))
+          {
+          fprintf(stderr, "pcregrep: Buffer overflow when parsing %s option\n",
+            op->long_name);
+          pcregrep_exit(2);
+          }
 
         if (strncmp(arg, buff1, arglen) == 0 ||
            strncmp(arg, buff2, arglen) == 0)
