@@ -216,14 +216,16 @@ std::size_t AsyncResultsMerger::getNumRemotes() const {
 
 BSONObj AsyncResultsMerger::getHighWaterMark() {
     stdx::lock_guard<Latch> lk(_mutex);
+    // At this point, the high water mark may be the resume token of the last document we returned.
+    // If no further results are eligible for return, we advance to the minimum promised sort key.
     auto minPromisedSortKey = _getMinPromisedSortKey(lk);
     if (!minPromisedSortKey.isEmpty() && !_ready(lk)) {
-        // When 'minPromisedSortKey' contains the "high watermark" resume token, it's stored in
-        // sort-key format: {"": <high watermark>}. We copy the <high watermark> part of of the
-        // sort key, which looks like {_data: ..., _typeBits: ...}, and return that.
-        _highWaterMark = minPromisedSortKey.firstElement().Obj().getOwned();
+        _highWaterMark = minPromisedSortKey;
     }
-    return _highWaterMark;
+    // The high water mark is stored in sort-key format: {"": <high watermark>}. We only return
+    // the <high watermark> part of of the sort key, which looks like {_data: ..., _typeBits: ...}.
+    invariant(_highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::Object);
+    return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
 BSONObj AsyncResultsMerger::_getMinPromisedSortKey(WithLock) {
