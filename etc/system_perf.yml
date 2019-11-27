@@ -201,6 +201,10 @@ functions:
           production: true
           authentication: ${authentication}
           overrides:
+            infrastructure_provisioning:
+              tfvars:
+                # This is currently only used by initialsync-logkeeper. It is empty and not used for other tests.
+                mongod_seeded_ebs_snapshot_id: ${snapshotId}
             workload_setup:
               local_repos:
                 workloads: ../src/workloads/workloads
@@ -941,6 +945,8 @@ buildvariants:
   expansions:
     setup: initialsync-logkeeper
     cluster: initialsync-logkeeper
+    # EBS logkeeper snapshot with FCV set to 4.0
+    snapshotId: snap-041c3c57a1a4f5bba
     platform: linux
     storageEngine: wiredTiger
     project_dir: *project_dir
