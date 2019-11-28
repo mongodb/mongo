@@ -8,8 +8,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 function assertWriteConcernTimeout(result) {
     assert.writeErrorWithCode(result, ErrorCodes.WriteConcernFailed);
     assert(result.hasWriteConcernError(), tojson(result));

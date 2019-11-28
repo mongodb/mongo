@@ -9,8 +9,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 const name = "mr_nonrepl_coll_in_local_db";
 const replSet = new ReplSetTest({name: name, nodes: 2});
 replSet.startSet();

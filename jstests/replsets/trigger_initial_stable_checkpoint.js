@@ -5,8 +5,6 @@
  */
 (function() {
 
-load("jstests/libs/check_log.js");
-
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {

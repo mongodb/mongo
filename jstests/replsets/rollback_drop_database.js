@@ -11,7 +11,6 @@
 (function() {
 
 load("jstests/replsets/libs/rollback_test.js");
-load("jstests/libs/check_log.js");
 
 const testName = "rollback_drop_database";
 const oldDbName = "oldDatabase";

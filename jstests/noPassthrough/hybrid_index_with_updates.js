@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 let conn = MongoRunner.runMongod();
 let testDB = conn.getDB('test');
 

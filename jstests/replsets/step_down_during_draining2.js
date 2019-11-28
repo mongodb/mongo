@@ -14,7 +14,6 @@
 "use strict";
 
 load("jstests/replsets/rslib.js");
-load("jstests/libs/check_log.js");
 
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replSet.nodeList();

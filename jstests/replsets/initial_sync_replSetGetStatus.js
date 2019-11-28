@@ -5,7 +5,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 var name = 'initial_sync_replSetGetStatus';
 var replSet = new ReplSetTest({

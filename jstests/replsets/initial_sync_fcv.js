@@ -7,7 +7,6 @@
 (function() {
 'use strict';
 
-load('jstests/libs/check_log.js');
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/feature_compatibility_version.js");
 

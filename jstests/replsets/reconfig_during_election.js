@@ -5,7 +5,6 @@
 (function() {
 "use strict";
 load("jstests/replsets/libs/election_handoff.js");
-load("jstests/libs/check_log.js");
 
 const rst = ReplSetTest({nodes: 2});
 const nodes = rst.startSet();

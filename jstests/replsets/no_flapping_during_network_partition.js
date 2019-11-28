@@ -13,8 +13,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 var name = "no_flapping_during_network_partition";
 
 var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});

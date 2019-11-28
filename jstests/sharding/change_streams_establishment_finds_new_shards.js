@@ -44,7 +44,6 @@ assert.commandWorked(mongos.adminCommand(
 
 // While opening the cursor, wait for the failpoint and add the new shard.
 const awaitNewShard = startParallelShell(`
-        load("jstests/libs/check_log.js");
         checkLog.contains(db,
             "clusterAggregateHangBeforeEstablishingShardCursors fail point enabled");
         assert.commandWorked(

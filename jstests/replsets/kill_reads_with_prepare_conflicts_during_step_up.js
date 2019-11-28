@@ -9,7 +9,6 @@
 "use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/check_log.js");
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();

@@ -7,7 +7,6 @@
 (function() {
 'use strict';
 
-load('jstests/libs/check_log.js');
 load("jstests/replsets/rslib.js");
 load('jstests/replsets/libs/rollback_test.js');
 

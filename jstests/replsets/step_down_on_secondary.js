@@ -16,7 +16,6 @@
 load('jstests/libs/parallelTester.js');
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/check_log.js");
 
 const dbName = "test";
 const collName = "coll";

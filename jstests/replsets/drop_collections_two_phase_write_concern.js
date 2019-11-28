@@ -6,7 +6,6 @@
 (function() {
 'use strict';
 
-load('jstests/libs/check_log.js');
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 
 // Alias to logging function in two_phase_drops.js

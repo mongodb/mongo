@@ -5,8 +5,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 function getNotMasterUnackWritesCounter() {
     return assert.commandWorked(primaryDB.adminCommand({serverStatus: 1}))
         .metrics.repl.network.notMasterUnacknowledgedWrites;
@@ -55,7 +53,6 @@ assert.commandWorked(primaryDB.adminCommand({
 
 var command =
     `
-      load("jstests/libs/check_log.js");
       checkLog.contains(db.getMongo(), "hangAfterCollectionInserts fail point enabled");
       db.adminCommand({replSetStepDown: 60, force: true});`;
 

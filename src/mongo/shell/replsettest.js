@@ -601,13 +601,58 @@ var ReplSetTest = function(opts) {
             var ready = true;
 
             for (var i = 0; i < len; i++) {
-                var isMaster = slavesToCheck[i].getDB("admin").runCommand({ismaster: 1});
-                var arbiter = (isMaster.arbiterOnly == undefined ? false : isMaster.arbiterOnly);
+                var isMaster = slavesToCheck[i].adminCommand({ismaster: 1});
+                var arbiter = (isMaster.arbiterOnly === undefined ? false : isMaster.arbiterOnly);
                 ready = ready && (isMaster.secondary || arbiter);
             }
 
             return ready;
         }, "Awaiting secondaries", timeout);
+    };
+
+    /**
+     * A special version of awaitSecondaryNodes() used exclusively by rollback_test.js.
+     * Wraps around awaitSecondaryNodes() itself and checks for an unrecoverable rollback
+     * if it throws.
+     */
+    this.awaitSecondaryNodesForRollbackTest = function(
+        timeout, slaves, connToCheckForUnrecoverableRollback) {
+        try {
+            this.awaitSecondaryNodes(timeout, slaves);
+        } catch (originalEx) {
+            // There is a special case where we expect the (rare) possibility of unrecoverable
+            // rollbacks with EMRC:false in rollback suites with unclean shutdowns.
+            jsTestLog("Exception in 'awaitSecondaryNodes', checking for unrecoverable rollback");
+            if (connToCheckForUnrecoverableRollback) {
+                const conn = connToCheckForUnrecoverableRollback;
+
+                const statusRes = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1}));
+                const isRecovering = (statusRes.myState === ReplSetTest.State.RECOVERING);
+                const hasNoSyncSource = (statusRes.syncSourceId === -1);
+
+                const cmdLineOptsRes = assert.commandWorked(conn.adminCommand("getCmdLineOpts"));
+                const hasEMRCFalse =
+                    (cmdLineOptsRes.parsed.replication.enableMajorityReadConcern === false);
+
+                if (isRecovering && hasNoSyncSource && hasEMRCFalse) {
+                    try {
+                        const n = this.getNodeId(conn);
+                        const connToCheck = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
+                        // Confirm that the node is unable to recover after rolling back.
+                        checkLog.contains(
+                            connToCheck,
+                            "remote oplog does not contain entry with optime matching our required optime ",
+                            60 * 1000);
+                    } catch (checkLogEx) {
+                        throw originalEx;
+                    }
+                    // Add this info to the original exception.
+                    originalEx.unrecoverableRollbackDetected = true;
+                }
+            }
+            // Re-throw the original exception in all cases.
+            throw originalEx;
+        }
     };
 
     /**

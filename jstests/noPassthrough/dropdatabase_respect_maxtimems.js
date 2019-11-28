@@ -39,8 +39,6 @@ const waitForCommand = function(waitingFor, opFilter) {
 })();
 
 (function assertDatabaseDropCanBeInterrupted() {
-    load("jstests/libs/check_log.js");
-
     assert.commandWorked(dropDB.bar.insert({}));
 
     assert.commandWorked(rst.getPrimary().adminCommand(

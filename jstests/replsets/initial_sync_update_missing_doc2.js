@@ -14,7 +14,6 @@
 
 (function() {
 load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
-load("jstests/libs/check_log.js");
 
 var name = 'initial_sync_update_missing_doc2';
 var replSet = new ReplSetTest({

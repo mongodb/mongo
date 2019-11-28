@@ -5,7 +5,6 @@
 (function() {
 'use strict';
 load('jstests/replsets/rslib.js');
-load('jstests/libs/check_log.js');
 
 const name = 'awaitdata_getmore_new_last_committed_optime';
 const replSet = new ReplSetTest({name: name, nodes: 5, settings: {chainingAllowed: false}});

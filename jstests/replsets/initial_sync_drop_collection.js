@@ -6,7 +6,6 @@
 // Skip db hash check because secondary cannot complete initial sync.
 TestData.skipCheckDBHashes = true;
 
-load("jstests/libs/check_log.js");
 load('jstests/replsets/libs/two_phase_drops.js');
 load("jstests/libs/uuid_util.js");
 

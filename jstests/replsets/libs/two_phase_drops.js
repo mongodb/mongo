@@ -16,7 +16,6 @@
  */
 "use strict";
 
-load("jstests/libs/check_log.js");            // For 'checkLog'.
 load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
 load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
 

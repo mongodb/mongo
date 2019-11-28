@@ -12,7 +12,6 @@
 TestData.disableImplicitSessions = true;
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/libs/check_log.js");        // For formatAsLogLine.
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would

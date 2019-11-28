@@ -19,7 +19,6 @@
 "use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/check_log.js");
 load("jstests/libs/parallel_shell_helpers.js");
 load('jstests/libs/test_background_ops.js');
 

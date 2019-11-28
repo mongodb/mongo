@@ -7,7 +7,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 let name = "log_secondary_oplog_application";
 let rst = ReplSetTest({name: name, nodes: 2});

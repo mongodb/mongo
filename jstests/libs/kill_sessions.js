@@ -1,5 +1,4 @@
 load("jstests/libs/parallelTester.js");
-load("jstests/libs/check_log.js");
 
 /**
  * Implements a kill session test helper

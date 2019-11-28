@@ -10,8 +10,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 const replSet = new ReplSetTest({name: "flow_control_logging", nodes: 3});
 replSet.startSet({
     setParameter: {

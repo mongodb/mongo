@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 const dbName = "test";
 const collName = "speculative_snapshot_includes_all_writes_1";
 const collName2 = "speculative_snapshot_includes_all_writes_2";

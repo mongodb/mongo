@@ -6,7 +6,6 @@
 (function() {
 "use strict";
 load("jstests/replsets/rslib.js");  // For reconnect()
-load("jstests/libs/check_log.js");
 
 function getTxnTableEntry(db) {
     let txnTableEntries = db.getSiblingDB("config")["transactions"].find().toArray();

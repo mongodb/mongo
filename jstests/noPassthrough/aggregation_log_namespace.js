@@ -5,7 +5,6 @@
 'use strict';
 
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachKindOfWriteStage.
-load("jstests/libs/check_log.js");                    // For checkLogs.containsWithCount.
 
 // Runs the given 'pipeline' and verifies that the namespace is correctly logged in the global
 // log for the aggregate command. The 'comment' parameter is used to match a log entry against

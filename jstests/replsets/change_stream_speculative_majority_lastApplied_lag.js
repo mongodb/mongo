@@ -9,7 +9,6 @@
 "use strict";
 
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
-load("jstests/libs/check_log.js");           // For checkLog.
 load("jstests/libs/parallelTester.js");      // for ScopedThread.
 
 const name = "change_stream_speculative_majority_lastApplied_lag";

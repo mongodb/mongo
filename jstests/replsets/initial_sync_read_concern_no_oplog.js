@@ -2,7 +2,6 @@
 // created its oplog, the node returns an error rather than crashing.
 (function() {
 'use strict';
-load('jstests/libs/check_log.js');
 
 const replSet = new ReplSetTest({nodes: 1});
 

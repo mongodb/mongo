@@ -11,7 +11,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 var name = 'initial_sync_applier_error';
 var replSet = new ReplSetTest({

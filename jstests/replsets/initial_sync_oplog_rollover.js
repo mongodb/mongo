@@ -9,7 +9,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 var name = 'initial_sync_oplog_rollover';
 var replSet = new ReplSetTest({

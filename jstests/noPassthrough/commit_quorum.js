@@ -5,7 +5,6 @@
  */
 (function() {
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/check_log.js");
 
 const replSet = new ReplSetTest({
     nodes: [

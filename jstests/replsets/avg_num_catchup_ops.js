@@ -5,7 +5,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/election_metrics.js");
 load("jstests/replsets/rslib.js");

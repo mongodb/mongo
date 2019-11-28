@@ -8,7 +8,6 @@
 (function() {
 "use strict";
 load("jstests/replsets/libs/rollback_test.js");
-load("jstests/libs/check_log.js");
 
 const testName = "rollback_remote_cursor_retry";
 const dbName = testName;

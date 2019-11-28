@@ -6,7 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
 load("jstests/replsets/rslib.js");
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.

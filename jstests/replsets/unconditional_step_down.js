@@ -89,8 +89,6 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     }, primary.port);
 
     const joinUnblockStepDown = startSafeParallelShell(() => {
-        load("jstests/libs/check_log.js");
-
         jsTestLog("Wait for step down to start killing operations");
         checkLog.contains(db, "Starting to kill user operations");
 

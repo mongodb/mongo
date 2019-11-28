@@ -38,7 +38,6 @@ TestData.otherDocFilter = {
  * certain reads and that prepare conflicts block other types of reads.
  */
 const readThreadFunc = function(readFunc, _collName, timesEntered) {
-    load("jstests/libs/check_log.js");
     load("jstests/libs/fail_point_util.js");
 
     // Do not start reads until we are blocked in 'prepareTransaction'.

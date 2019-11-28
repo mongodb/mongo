@@ -5,7 +5,6 @@
  */
 
 var ElectionHandoffTest = (function() {
-    load("jstests/libs/check_log.js");
     load("jstests/replsets/rslib.js");
 
     const kStepDownPeriodSecs = 30;

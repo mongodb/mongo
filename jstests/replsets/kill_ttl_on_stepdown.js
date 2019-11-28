@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
-
 const dbName = "kill_ttl_on_stepdown";
 
 const rst = new ReplSetTest({

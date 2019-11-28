@@ -2,7 +2,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
 
 var replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
