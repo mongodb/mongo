@@ -5862,13 +5862,14 @@ int ExpressionRegex::execute(RegexExecutionState* regexState) const {
                                0,  // No need to overwrite the options set during pcre_compile.
                                &(regexState->capturesBuffer.front()),
                                regexState->capturesBuffer.size());
-    // The 'execResult' will be (numCaptures + 1) if there is a match, -1 if there is no match,
-    // negative (other than -1) if there is an error during execution, and zero if capturesBuffer's
-    // capacity is not sufficient to hold all the results. The latter scenario should never occur.
+    // The 'execResult' will be -1 if there is no match, 0 < execResult <= (numCaptures + 1)
+    // depending on how many capture groups match, negative (other than -1) if there is an error
+    // during execution, and zero if capturesBuffer's capacity is not sufficient to hold all the
+    // results. The latter scenario should never occur.
     uassert(51156,
             str::stream() << "Error occurred while executing the regular expression in " << _opName
                           << ". Result code: " << execResult,
-            execResult == -1 || execResult == (regexState->numCaptures + 1));
+            execResult == -1 || (execResult > 0 && execResult <= (regexState->numCaptures + 1)));
     return execResult;
 }
 
@@ -5884,9 +5885,35 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
     // calls.
     StringData input = *(regexState->input);
 
+    auto verifyBounds = [&input, this](auto startPos, auto limitPos, auto isCapture) {
+        // If a capture group was not matched, then the 'startPos' and 'limitPos' will both be -1.
+        // These bounds cannot occur for a match on the full string.
+        if (startPos == -1 || limitPos == -1) {
+            massert(31304,
+                    str::stream() << "Unexpected error occurred while executing " << _opName
+                                  << ". startPos: " << startPos << ", limitPos: " << limitPos,
+                    isCapture && startPos == -1 && limitPos == -1);
+            return;
+        }
+
+        massert(31305,
+                str::stream() << "Unexpected error occurred while executing " << _opName
+                              << ". startPos: " << startPos,
+                (startPos >= 0 && static_cast<size_t>(startPos) <= input.size()));
+        massert(31306,
+                str::stream() << "Unexpected error occurred while executing " << _opName
+                              << ". limitPos: " << limitPos,
+                (limitPos >= 0 && static_cast<size_t>(limitPos) <= input.size()));
+        massert(31307,
+                str::stream() << "Unexpected error occurred while executing " << _opName
+                              << ". startPos: " << startPos << ", limitPos: " << limitPos,
+                startPos <= limitPos);
+    };
+
     // The first and second entries of the 'capturesBuffer' will have the start and (end+1) indices
     // of the matched string, as byte offsets. '(limit - startIndex)' would be the length of the
     // captured string.
+    verifyBounds(regexState->capturesBuffer[0], regexState->capturesBuffer[1], false);
     const int matchStartByteIndex = regexState->capturesBuffer[0];
     StringData matchedStr =
         input.substr(matchStartByteIndex, regexState->capturesBuffer[1] - matchStartByteIndex);
@@ -5911,7 +5938,12 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
     for (int i = 0; i < regexState->numCaptures; ++i) {
         const int start = regexState->capturesBuffer[2 * (i + 1)];
         const int limit = regexState->capturesBuffer[2 * (i + 1) + 1];
-        captures.push_back(Value(input.substr(start, limit - start)));
+        verifyBounds(start, limit, true);
+
+        // The 'start' and 'limit' will be set to -1, if the 'input' didn't match the current
+        // capture group. In this case we put a 'null' placeholder in place of the capture group.
+        captures.push_back(start == -1 && limit == -1 ? Value(BSONNULL)
+                                                      : Value(input.substr(start, limit - start)));
     }
 
     MutableDocument match;
