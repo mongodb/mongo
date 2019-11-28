@@ -54,7 +54,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     let WiredTigerWTFile = dbpath + "WiredTiger.wt";
     jsTestLog("deleting WiredTiger.wt");
     removeFile(WiredTigerWTFile);
-}, "Fatal Assertion 28595");
+}, "Fatal Assertion 50944");
 
 /**
  * Test 4. Delete an index file.
