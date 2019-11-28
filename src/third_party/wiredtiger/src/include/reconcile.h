@@ -141,18 +141,19 @@ struct __wt_reconcile {
         WT_ITEM image; /* disk-image */
     } chunkA, chunkB, *cur_ptr, *prev_ptr;
 
+    size_t disk_img_buf_size; /* Base size needed for a chunk memory image */
+
     /*
      * We track current information about the current record number, the number of entries copied
      * into the disk image buffer, where we are in the buffer, how much memory remains, and the
      * current min/max of the timestamps. Those values are packaged here rather than passing
      * pointers to stack locations around the code.
      */
-    uint64_t recno;      /* Current record number */
-    uint32_t entries;    /* Current number of entries */
-    uint8_t *first_free; /* Current first free byte */
-    size_t space_avail;  /* Remaining space in this chunk */
-    /* Remaining space in this chunk to put a minimum size boundary */
-    size_t min_space_avail;
+    uint64_t recno;         /* Current record number */
+    uint32_t entries;       /* Current number of entries */
+    uint8_t *first_free;    /* Current first free byte */
+    size_t space_avail;     /* Remaining space in this chunk */
+    size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */
 
     /*
      * Saved update list, supporting the WT_REC_UPDATE_RESTORE and WT_REC_LOOKASIDE configurations.

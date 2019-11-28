@@ -161,25 +161,12 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
     uint32_t current_state;
     bool locked;
 
-    /*
-     * If the page is still "deleted", it's as we left it, reset the state to on-disk and we're
-     * done. Otherwise, we expect the page is either instantiated or being instantiated. Loop
-     * because it's possible for the page to return to the deleted state if instantiation fails.
-     */
+    /* Lock the reference. We cannot access ref->page_del except when locked. */
     for (locked = false, sleep_usecs = yield_count = 0;;) {
         switch (current_state = ref->state) {
-        case WT_REF_DELETED:
-            /*
-             * If the page is still "deleted", it's as we left it, reset the state.
-             */
-            if (WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, ref->page_del->previous_state))
-                goto done;
-            break;
         case WT_REF_LOCKED:
-            /*
-             * A possible state, the page is being instantiated.
-             */
             break;
+        case WT_REF_DELETED:
         case WT_REF_MEM:
         case WT_REF_SPLIT:
             if (WT_REF_CAS_STATE(session, ref, current_state, WT_REF_LOCKED))
@@ -205,6 +192,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     /*
+     * If the page is still "deleted", it's as we left it, all we have to do is reset the state.
+     *
      * We can't use the normal read path to get a copy of the page because the session may have
      * closed the cursor, we no longer have the reference to the tree required for a hazard pointer.
      * We're safe because with unresolved transactions, the page isn't going anywhere.
@@ -212,19 +201,16 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
      * The page is in an in-memory state, which means it was instantiated at some point. Walk any
      * list of update structures and abort them.
      */
-    WT_ASSERT(session, locked);
-    if ((updp = ref->page_del->update_list) != NULL)
+    if (current_state == WT_REF_DELETED)
+        current_state = ref->page_del->previous_state;
+    else if ((updp = ref->page_del->update_list) != NULL)
         for (; *updp != NULL; ++updp)
             (*updp)->txnid = WT_TXN_ABORTED;
 
-    WT_REF_SET_STATE(ref, current_state);
+    /* Finally mark the truncate aborted */
+    ref->page_del->txnid = WT_TXN_ABORTED;
 
-done:
-    /*
-     * Now mark the truncate aborted: this must come last because after this point there is nothing
-     * preventing the page from being evicted.
-     */
-    WT_PUBLISH(ref->page_del->txnid, WT_TXN_ABORTED);
+    WT_REF_SET_STATE(ref, current_state);
     return (0);
 }
 

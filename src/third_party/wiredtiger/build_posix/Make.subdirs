@@ -47,3 +47,6 @@ test/thread
 # Benchmark programs.
 bench/workgen PYTHON HAVE_CXX
 bench/wtperf
+
+# Utility programs.
+tools/xray_to_optrack LLVM HAVE_CXX

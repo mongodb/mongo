@@ -138,9 +138,6 @@ pwrite64(wt, ""..., 0x1000, 0x4000);
 #ifdef __linux__
 fdatasync(wt);
 #endif /* __linux__ */
-fd = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
-
-close(fd);
 fd = OPEN("./WiredTiger.turtle.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
 pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 #ifdef __linux__

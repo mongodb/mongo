@@ -625,6 +625,107 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __txn_resolve_prepared_op --
+ *     Resolve a transaction's operations indirect references. In case of prepared transactions, the
+ *     prepared updates could be evicted using cache overflow mechanism. Transaction operations
+ *     referring to these prepared updates would be referring to them using indirect references (i.e
+ *     keys/recnos), which need to be resolved as part of that transaction commit/rollback. If no
+ *     updates are resolved throw an error. Increment resolved update count for each resolved update
+ *     count we locate.
+ */
+static int
+__txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_TXN *txn;
+    WT_UPDATE *upd;
+    const char *open_cursor_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL};
+
+    txn = &session->txn;
+
+    WT_RET(__wt_open_cursor(session, op->btree->dhandle->name, NULL, open_cursor_cfg, &cursor));
+
+    switch (op->type) {
+    case WT_TXN_OP_BASIC_COL:
+    case WT_TXN_OP_INMEM_COL:
+        ((WT_CURSOR_BTREE *)cursor)->iface.recno = op->u.op_col.recno;
+        break;
+    case WT_TXN_OP_BASIC_ROW:
+    case WT_TXN_OP_INMEM_ROW:
+        /*
+         * Transaction prepare is cleared temporarily as cursor functions are not allowed for
+         * prepared transactions.
+         */
+        F_CLR(txn, WT_TXN_PREPARE);
+        __wt_cursor_set_raw_key(cursor, &op->u.op_row.key);
+        F_SET(txn, WT_TXN_PREPARE);
+        break;
+    case WT_TXN_OP_NONE:
+    case WT_TXN_OP_REF_DELETE:
+    case WT_TXN_OP_TRUNCATE_COL:
+    case WT_TXN_OP_TRUNCATE_ROW:
+        WT_ERR_ASSERT(session, false, WT_PANIC, "invalid prepared operation update type");
+        break;
+    }
+
+    WT_WITH_BTREE(
+      session, op->btree, ret = __wt_btcur_search_uncommitted((WT_CURSOR_BTREE *)cursor, &upd));
+    WT_ERR(ret);
+
+    /* If we haven't found anything then there's an error. */
+    WT_ERR_ASSERT(session, upd != NULL, WT_NOTFOUND,
+      "unable to locate update associated with a prepared operation");
+
+    for (; upd != NULL; upd = upd->next) {
+        /*
+         * Aborted updates can exist in the update chain of our txn. Generally this will occur due
+         * to a reserved update. As such we should skip over these updates. If the txn id is then
+         * different and not aborted we know we've reached the end of our update chain and can exit.
+         */
+        if (upd->txnid == WT_TXN_ABORTED)
+            continue;
+        if (upd->txnid != txn->id)
+            break;
+
+        if (!commit) {
+            upd->txnid = WT_TXN_ABORTED;
+            continue;
+        }
+
+        /*
+         * Newer updates are inserted at head of update chain, and transaction operations are added
+         * at the tail of the transaction modify chain.
+         *
+         * For example, a transaction has modified [k,v] as
+         *	[k, v]  -> [k, u1]   (txn_op : txn_op1)
+         *	[k, u1] -> [k, u2]   (txn_op : txn_op2)
+         *	update chain : u2->u1
+         *	txn_mod      : txn_op1->txn_op2.
+         *
+         * Only the key is saved in the transaction operation structure, hence we cannot identify
+         * whether "txn_op1" corresponds to "u2" or "u1" during commit/rollback.
+         *
+         * To make things simpler we will handle all the updates that match the key saved in a
+         * transaction operation in a single go. As a result, multiple updates of a key, if any
+         * will be resolved as part of the first transaction operation resolution of that key,
+         * and subsequent transaction operation resolution of the same key will be effectively a
+         * no-op.
+         *
+         * In the above example, we will resolve "u2" and "u1" as part of resolving "txn_op1" and
+         * will not do any significant thing as part of "txn_op2".
+         *
+         * Resolve the prepared update to be committed update.
+         */
+        __txn_resolve_prepared_update(session, upd);
+    }
+
+err:
+    WT_TRET(cursor->close(cursor));
+    return (ret);
+}
+
+/*
  * __txn_commit_timestamps_assert --
  *     Validate that timestamps provided to commit are legal.
  */
@@ -779,23 +880,19 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_OP *op;
     WT_UPDATE *upd;
     wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp;
-    int64_t resolved_update_count, visited_update_count;
     uint32_t fileid;
     u_int i;
-    bool locked, prepare, readonly, skip_update_assert, update_durable_ts;
+    bool locked, prepare, readonly, update_durable_ts;
 
     txn = &session->txn;
     conn = S2C(session);
     txn_global = &conn->txn_global;
-    locked = skip_update_assert = false;
-    resolved_update_count = visited_update_count = 0;
+    locked = false;
+    prepare = F_ISSET(txn, WT_TXN_PREPARE);
+    readonly = txn->mod_count == 0;
 
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
-
-    readonly = txn->mod_count == 0;
-
-    prepare = F_ISSET(txn, WT_TXN_PREPARE);
 
     /*
      * Clear the prepared round up flag if the transaction is not prepared. There is no rounding up
@@ -809,26 +906,19 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
     if (prepare) {
         if (!F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
-            WT_ERR_MSG(session, EINVAL,
-              "commit_timestamp is required for a prepared "
-              "transaction");
+            WT_ERR_MSG(session, EINVAL, "commit_timestamp is required for a prepared transaction");
 
         if (!F_ISSET(txn, WT_TXN_HAS_TS_DURABLE))
-            WT_ERR_MSG(session, EINVAL,
-              "durable_timestamp is required for a prepared "
-              "transaction");
+            WT_ERR_MSG(session, EINVAL, "durable_timestamp is required for a prepared transaction");
 
         WT_ASSERT(session, txn->prepare_timestamp <= txn->commit_timestamp);
     } else {
         if (F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
-            WT_ERR_MSG(session, EINVAL,
-              "prepare timestamp is set for non-prepared "
-              "transaction");
+            WT_ERR_MSG(session, EINVAL, "prepare timestamp is set for non-prepared transaction");
 
         if (F_ISSET(txn, WT_TXN_HAS_TS_DURABLE))
             WT_ERR_MSG(session, EINVAL,
-              "durable_timestamp should not be specified for "
-              "non-prepared transaction");
+              "durable_timestamp should not be specified for non-prepared transaction");
     }
 
     if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
@@ -919,10 +1009,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         case WT_TXN_OP_INMEM_ROW:
             upd = op->u.op_upd;
 
-            /*
-             * Need to resolve indirect references of transaction operation, in case of prepared
-             * transaction.
-             */
             if (!prepare) {
                 /*
                  * Switch reserved operations to abort to simplify obsolete update list truncation.
@@ -942,26 +1028,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
                 __wt_txn_op_set_timestamp(session, op);
             } else {
-                visited_update_count++;
                 /*
-                 * If we have set the key repeated flag we can skip resolving prepared updates as it
-                 * would have happened on a previous modification in this txn.
+                 * If an operation has the key repeated flag set, skip resolving prepared updates as
+                 * the work will happen on a different modification in this txn.
                  */
-                if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED)) {
-                    skip_update_assert = skip_update_assert || F_ISSET(op, WT_TXN_OP_KEY_RESERVED);
-                    WT_ERR(__wt_txn_resolve_prepared_op(session, op, true, &resolved_update_count));
-                }
-
-                /*
-                 * We should resolve at least one or more
-                 * updates each time we call
-                 * __wt_txn_resolve_prepared_op, as such
-                 * resolved update count should never be less
-                 * than visited update count.
-                 */
-                WT_ASSERT(session, resolved_update_count >= visited_update_count);
+                if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED))
+                    WT_ERR(__txn_resolve_prepared_op(session, op, true));
             }
-
             break;
         case WT_TXN_OP_REF_DELETE:
             __wt_txn_op_set_timestamp(session, op);
@@ -974,12 +1047,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
         __wt_txn_op_free(session, op);
     }
-    WT_ERR_ASSERT(session, skip_update_assert || resolved_update_count == visited_update_count,
-      EINVAL,
-      "Number of resolved prepared updates: %" PRId64 " does not match number visited: %" PRId64,
-      resolved_update_count, visited_update_count);
-    WT_STAT_CONN_INCRV(session, txn_prepared_updates_resolved, resolved_update_count);
-
     txn->mod_count = 0;
 
     /*
@@ -1055,10 +1122,12 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_TXN *txn;
     WT_TXN_OP *op;
-    WT_UPDATE *upd;
+    WT_UPDATE *upd, *tmp;
+    int64_t txn_prepared_updates_count;
     u_int i;
 
     txn = &session->txn;
+    txn_prepared_updates_count = 0;
 
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
@@ -1086,13 +1155,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
         WT_RET(__wt_session_copy_values(session));
     }
 
-    /*
-     * Prepare updates, traverse the modification array in reverse order so that we visit the update
-     * chain in newest to oldest order allowing us to set the key repeated flag with reserved
-     * updates in the chain.
-     */
-    for (i = txn->mod_count; i > 0; i--) {
-        op = &txn->mod[i - 1];
+    for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         /* Assert it's not an update to the lookaside file. */
         WT_ASSERT(
           session, S2C(session)->cache->las_fileid == 0 || !F_ISSET(op->btree, WT_BTREE_LOOKASIDE));
@@ -1102,8 +1165,6 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
         if (WT_IS_METADATA(op->btree->dhandle))
             continue;
 
-        upd = op->u.op_upd;
-
         switch (op->type) {
         case WT_TXN_OP_NONE:
             break;
@@ -1111,10 +1172,12 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
         case WT_TXN_OP_BASIC_ROW:
         case WT_TXN_OP_INMEM_COL:
         case WT_TXN_OP_INMEM_ROW:
+            upd = op->u.op_upd;
+
             /*
              * Switch reserved operation to abort to simplify obsolete update list truncation. The
              * object free function clears the operation type so we don't try to visit this update
-             * again: it can be evicted.
+             * again: it can be discarded.
              */
             if (upd->type == WT_UPDATE_RESERVE) {
                 upd->txnid = WT_TXN_ABORTED;
@@ -1122,28 +1185,25 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
                 break;
             }
 
+            ++txn_prepared_updates_count;
+
             /* Set prepare timestamp. */
             upd->start_ts = txn->prepare_timestamp;
 
             WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
             op->u.op_upd = NULL;
-            WT_STAT_CONN_INCR(session, txn_prepared_updates_count);
+
             /*
-             * Set the key repeated flag which tells us that we've got multiple updates to the same
-             * key by the same txn. This is later used in txn commit.
-             *
-             * When we see a reserved update we set the WT_UPDATE_RESERVED flag instead. We do this
-             * as we cannot know if our current update should specify the key repeated flag as we
-             * don't want to traverse the entire update chain to find out. i.e. if there is an
-             * update with our txnid after the reserved update we should set key repeated, but if
-             * there isn't we shouldn't.
+             * If there are older updates to this key by the same transaction, set the repeated key
+             * flag on this operation. This is later used in txn commit/rollback so we only resolve
+             * each set of prepared updates once. Skip reserved updates, they're ignored as they're
+             * simply discarded when we find them.
              */
-            if (upd->next != NULL && upd->txnid == upd->next->txnid) {
-                if (upd->next->type == WT_UPDATE_RESERVE)
-                    F_SET(op, WT_TXN_OP_KEY_RESERVED);
-                else
+            for (tmp = upd->next; tmp != NULL && tmp->txnid == upd->txnid; tmp = tmp->next)
+                if (tmp->type != WT_UPDATE_RESERVE) {
                     F_SET(op, WT_TXN_OP_KEY_REPEATED);
-            }
+                    break;
+                }
             break;
         case WT_TXN_OP_REF_DELETE:
             __wt_txn_op_apply_prepare_state(session, op->u.ref, false);
@@ -1154,6 +1214,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             break;
         }
     }
+    WT_STAT_CONN_INCR(session, txn_prepared_updates_count);
 
     /* Set transaction state to prepare. */
     F_SET(&session->txn, WT_TXN_PREPARE);
@@ -1182,22 +1243,22 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN *txn;
     WT_TXN_OP *op;
     WT_UPDATE *upd;
-    int64_t resolved_update_count, visited_update_count;
     u_int i;
-    bool readonly, skip_update_assert;
+    bool prepare, readonly;
 
     WT_UNUSED(cfg);
-    resolved_update_count = visited_update_count = 0;
+
     txn = &session->txn;
+    prepare = F_ISSET(txn, WT_TXN_PREPARE);
     readonly = txn->mod_count == 0;
-    skip_update_assert = false;
+
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
     /* Rollback notification. */
     if (txn->notify != NULL)
         WT_TRET(txn->notify->notify(txn->notify, (WT_SESSION *)session, txn->id, 0));
 
-    /* Rollback updates. */
+    /* Rollback and free updates. */
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         /* Assert it's not an update to the lookaside file. */
         WT_ASSERT(
@@ -1208,8 +1269,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
         if (WT_IS_METADATA(op->btree->dhandle))
             continue;
 
-        upd = op->u.op_upd;
-
         switch (op->type) {
         case WT_TXN_OP_NONE:
             break;
@@ -1217,32 +1276,18 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
         case WT_TXN_OP_BASIC_ROW:
         case WT_TXN_OP_INMEM_COL:
         case WT_TXN_OP_INMEM_ROW:
-            /*
-             * Need to resolve indirect references of transaction operation, in case of prepared
-             * transaction.
-             */
-            if (F_ISSET(txn, WT_TXN_PREPARE)) {
-                visited_update_count++;
-                /*
-                 * If we have set the key repeated flag we can skip resolving prepared updates as it
-                 * would have happened on a previous modification in this txn.
-                 */
-                if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED)) {
-                    skip_update_assert = skip_update_assert || F_ISSET(op, WT_TXN_OP_KEY_RESERVED);
-                    WT_RET(
-                      __wt_txn_resolve_prepared_op(session, op, false, &resolved_update_count));
-                }
-                /*
-                 * We should resolve at least one or more
-                 * updates each time we call
-                 * __wt_txn_resolve_prepared_op, as such
-                 * resolved update count should never be less
-                 * than visited update count.
-                 */
-                WT_ASSERT(session, resolved_update_count >= visited_update_count);
-            } else {
+            upd = op->u.op_upd;
+
+            if (!prepare) {
                 WT_ASSERT(session, upd->txnid == txn->id || upd->txnid == WT_TXN_ABORTED);
                 upd->txnid = WT_TXN_ABORTED;
+            } else {
+                /*
+                 * If an operation has the key repeated flag set, skip resolving prepared updates as
+                 * the work will happen on a different modification in this txn.
+                 */
+                if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED))
+                    WT_RET(__txn_resolve_prepared_op(session, op, false));
             }
             break;
         case WT_TXN_OP_REF_DELETE:
@@ -1260,13 +1305,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
         __wt_txn_op_free(session, op);
     }
-    WT_RET_ASSERT(session, skip_update_assert || resolved_update_count == visited_update_count,
-      EINVAL, "Number of resolved prepared updates: %" PRId64
-              " does not match"
-              " number visited: %" PRId64,
-      resolved_update_count, visited_update_count);
-    WT_STAT_CONN_INCRV(session, txn_prepared_updates_resolved, resolved_update_count);
-
     txn->mod_count = 0;
 
     __wt_txn_release(session);

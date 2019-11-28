@@ -69,6 +69,7 @@ struct __wt_data_handle {
     uint64_t name_hash;     /* Hash of name */
     const char *checkpoint; /* Checkpoint name (or NULL) */
     const char **cfg;       /* Configuration information */
+    const char *meta_base;  /* Base metadata configuration */
 
     /*
      * Sessions holding a connection's data handle will have a non-zero reference count; sessions
