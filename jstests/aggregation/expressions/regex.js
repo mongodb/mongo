@@ -77,11 +77,13 @@ function testRegexAggException(inputObj, exceptionCode) {
         {"match": "mp", "idx": 2, "captures": ["mp", "p"]},
         {"match": "mp", "idx": 10, "captures": ["mp", "p"]}
     ]);
+
     // Regex in json syntax, with multiple captures and matches.
     testRegexFindAggForKey(0, {input: "$text", regex: /(m(p))/}, [
         {"match": "mp", "idx": 2, "captures": ["mp", "p"]},
         {"match": "mp", "idx": 10, "captures": ["mp", "p"]}
     ]);
+
     // Verify no overlapping match sub-strings.
     assert.commandWorked(coll.insert({_id: 112, text: "aaaaa aaaa"}));
     testRegexFindAggForKey(112, {input: "$text", regex: /(aa)/}, [
@@ -94,6 +96,7 @@ function testRegexAggException(inputObj, exceptionCode) {
         {"match": "aaaa", "idx": 0, "captures": ["aa"]},
         {"match": "aaaa", "idx": 6, "captures": ["aa"]}
     ]);
+
     // Verify greedy match.
     testRegexFindAggForKey(112, {input: "$text", regex: /(a+)/}, [
         {"match": "aaaaa", "idx": 0, "captures": ["aaaaa"]},
@@ -103,6 +106,7 @@ function testRegexAggException(inputObj, exceptionCode) {
         {"match": "aaaaa", "idx": 0, "captures": ["a"]},
         {"match": "aaaa", "idx": 6, "captures": ["a"]},
     ]);
+
     // Verify lazy match.
     assert.commandWorked(coll.insert({_id: 113, text: "aaa aa"}));
     testRegexFindAggForKey(113, {input: "$text", regex: /(a+?)/}, [
@@ -151,6 +155,69 @@ function testRegexAggException(inputObj, exceptionCode) {
     testRegexFindAggForKey(6,
                            {input: "$text", regex: /^(?:1|a)\,([0-9]+)/},
                            [{"match": "1,2", "idx": 0, "captures": ["2"]}]);
+
+    assert.commandWorked(coll.insert({_id: "capture_group", text: "ABCDXYZABCDXYZABCDXYZ"}));
+
+    // Matching regex with a non-matching capture group.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /((Z)|B)(CD)/}, [
+        {"match": "BCD", "idx": 1, "captures": ["B", null, "CD"]},
+        {"match": "BCD", "idx": 8, "captures": ["B", null, "CD"]},
+        {"match": "BCD", "idx": 15, "captures": ["B", null, "CD"]}
+    ]);
+
+    // Non-matching regex with a matching capture group.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /EFG|(BC)E/}, []);
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /(BC)E/}, []);
+
+    // Matching regex with zero matching capture groups because of optional quantifier.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /BC(P(DE)?)?/}, [
+        {"match": "BC", "idx": 1, "captures": [null, null]},
+        {"match": "BC", "idx": 8, "captures": [null, null]},
+        {"match": "BC", "idx": 15, "captures": [null, null]}
+    ]);
+
+    // Matching regex with non-matching capture groups because of optional quantifier.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /(BC)(P(DE)?)?/}, [
+        {"match": "BC", "idx": 1, "captures": ["BC", null, null]},
+        {"match": "BC", "idx": 8, "captures": ["BC", null, null]},
+        {"match": "BC", "idx": 15, "captures": ["BC", null, null]}
+    ]);
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /(ABC)(D(XY)?)?Z/}, [
+        {"match": "ABCDXYZ", "idx": 0, "captures": ["ABC", "DXY", "XY"]},
+        {"match": "ABCDXYZ", "idx": 7, "captures": ["ABC", "DXY", "XY"]},
+        {"match": "ABCDXYZ", "idx": 14, "captures": ["ABC", "DXY", "XY"]}
+    ]);
+
+    // Greedy optional quantifier inside a lazy optional quantifier.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /(ABC)(D(XY)?)??/}, [
+        {"match": "ABC", "idx": 0, "captures": ["ABC", null, null]},
+        {"match": "ABC", "idx": 7, "captures": ["ABC", null, null]},
+        {"match": "ABC", "idx": 14, "captures": ["ABC", null, null]}
+    ]);
+
+    // Lazy optional quantifier inside a greedy optional quantifier.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /(ABC)(D(XY)??)?/}, [
+        {"match": "ABCD", "idx": 0, "captures": ["ABC", "D", null]},
+        {"match": "ABCD", "idx": 7, "captures": ["ABC", "D", null]},
+        {"match": "ABCD", "idx": 14, "captures": ["ABC", "D", null]}
+    ]);
+
+    // Everything is optional.
+    testRegexFindAggForKey("capture_group", {input: "$text", regex: /(ABC)?(XY)?/}, [
+        {"match": "ABC", "idx": 0, "captures": ["ABC", null]},
+        // Since everything is optional, every index position in the input is a match.
+        {"match": "", "idx": 3, "captures": [null, null]},
+        {"match": "XY", "idx": 4, "captures": [null, "XY"]},
+        {"match": "", "idx": 6, "captures": [null, null]},
+        {"match": "ABC", "idx": 7, "captures": ["ABC", null]},
+        {"match": "", "idx": 10, "captures": [null, null]},
+        {"match": "XY", "idx": 11, "captures": [null, "XY"]},
+        {"match": "", "idx": 13, "captures": [null, null]},
+        {"match": "ABC", "idx": 14, "captures": ["ABC", null]},
+        {"match": "", "idx": 17, "captures": [null, null]},
+        {"match": "XY", "idx": 18, "captures": [null, "XY"]},
+        {"match": "", "idx": 20, "captures": [null, null]},
+    ]);
 
     // Regex quantifier.
     assert.commandWorked(coll.insert({_id: 7, text: "abc12defgh345jklm"}));
@@ -220,15 +287,23 @@ function testRegexAggException(inputObj, exceptionCode) {
                            {input: "$text", regex: "$pattern"},
                            [{"match": "Text", "idx": 5, "captures": ["Te", "e"]}]);
 
+    assert.commandWorked(coll.insert({_id: "Empty input", text: ""}));
+
     // Empty input matches empty regex.
-    testRegexFindAggForKey(0, {input: "", regex: ""}, [{"match": "", "idx": 0, "captures": []}]);
-    // Empty captures groups.
+    testRegexFindAggForKey(
+        "Empty input", {input: "$text", regex: ""}, [{"match": "", "idx": 0, "captures": []}]);
+
+    // Empty capture groups.
+    testRegexFindAggForKey("Empty input",
+                           {input: "$text", regex: "(missing)|()"},
+                           [{"match": "", "idx": 0, "captures": [null, ""]}]);
     testRegexFindAggForKey(0, {input: "bbbb", regex: "()"}, [
         {"match": "", "idx": 0, "captures": [""]},
         {"match": "", "idx": 1, "captures": [""]},
         {"match": "", "idx": 2, "captures": [""]},
         {"match": "", "idx": 3, "captures": [""]}
     ]);
+
     // No matches.
     testRegexFindAggForKey(0, {input: "$text", regex: /foo/}, []);
     // Regex null.
@@ -275,8 +350,9 @@ function testRegexAggException(inputObj, exceptionCode) {
     testRegexFindAggForKey(
         3, {input: "$text", regex: /म/}, [{"match": "म", "idx": 0, "captures": []}]);
     // Unicode with capture group.
-    testRegexFindAggForKey(
-        3, {input: "$text", regex: /(गो )/}, [{"match": "गो ", "idx": 3, "captures": ["गो "]}]);
+    testRegexFindAggForKey(3,
+                           {input: "$text", regex: /(गो )|(missing)/},
+                           [{"match": "गो ", "idx": 3, "captures": ["गो ", null]}]);
     // Test that regexes support Unicode character properties.
     testRegexFindAggForKey(2, {input: "$text", regex: String.raw`\p{Hangul}`}, []);
     testRegexFindAggForKey(2,
