@@ -52,6 +52,15 @@ public:
 
     void reportDependencies(DepsTracker* deps) const final {
         // We have no dependencies on specific fields, since we only know the fields to be removed.
+        // We may have expression dependencies though, as $meta expression can be used with
+        // exclusion.
+        for (auto&& expressionPair : _expressions) {
+            expressionPair.second->addDependencies(deps);
+        }
+
+        for (auto&& childPair : _children) {
+            childPair.second->reportDependencies(deps);
+        }
     }
 
 protected:
@@ -107,6 +116,7 @@ public:
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
+        _root->reportDependencies(deps);
         if (_rootReplacementExpression) {
             _rootReplacementExpression->addDependencies(deps);
         }

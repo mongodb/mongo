@@ -207,7 +207,7 @@ void propagateDocLimitToShards(Pipeline* shardPipe, Pipeline* mergePipe) {
  * Documents.
  */
 void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe) {
-    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::kAllMetadata));
+    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::kNoMetadata));
     if (mergeDeps.needWholeDocument)
         return;  // the merge needs all fields, so nothing we can do.
 
@@ -225,7 +225,7 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
     // 2) Optimization IS NOT applied immediately following a $project or $group since it would
     //    add an unnecessary project (and therefore a deep-copy).
     for (auto&& source : shardPipe->getSources()) {
-        DepsTracker dt(DepsTracker::kAllMetadata);
+        DepsTracker dt(DepsTracker::kNoMetadata);
         if (source->getDependencies(&dt) & DepsTracker::State::EXHAUSTIVE_FIELDS)
             return;
     }

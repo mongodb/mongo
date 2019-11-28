@@ -505,8 +505,8 @@ void DocumentSourceMatch::rebuild(BSONObj filter) {
         _predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
     _isTextQuery = isTextQuery(_predicate);
     _dependencies =
-        DepsTracker(_isTextQuery ? QueryMetadataBitSet().set(DocumentMetadataFields::kTextScore)
-                                 : DepsTracker::kNoMetadata);
+        DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
+                                 : DepsTracker::kAllMetadata);
     getDependencies(&_dependencies);
 }
 

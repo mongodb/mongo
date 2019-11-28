@@ -130,7 +130,7 @@ TEST(DependenciesToProjectionTest, ShouldOutputEmptyObjectIfEntireDocumentNeeded
 
 TEST(DependenciesToProjectionTest, ShouldOnlyRequestTextScoreIfEntireDocumentAndTextScoreNeeded) {
     const char* array[] = {"a"};  // needTextScore with needWholeDocument
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     deps.fields = arrayToSet(array);
     deps.needWholeDocument = true;
     deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
@@ -142,7 +142,7 @@ TEST(DependenciesToProjectionTest, ShouldOnlyRequestTextScoreIfEntireDocumentAnd
 TEST(DependenciesToProjectionTest,
      ShouldRequireFieldsAndTextScoreIfTextScoreNeededWithoutWholeDocument) {
     const char* array[] = {"a"};  // needTextScore without needWholeDocument
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     deps.fields = arrayToSet(array);
     deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 0));
@@ -151,7 +151,7 @@ TEST(DependenciesToProjectionTest,
 }
 
 TEST(DependenciesToProjectionTest, ShouldProduceEmptyObjectIfThereAreNoDependencies) {
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
     deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
@@ -159,7 +159,7 @@ TEST(DependenciesToProjectionTest, ShouldProduceEmptyObjectIfThereAreNoDependenc
 }
 
 TEST(DependenciesToProjectionTest, ShouldReturnEmptyObjectIfOnlyTextScoreIsNeeded) {
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
     deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
@@ -171,7 +171,7 @@ TEST(DependenciesToProjectionTest, ShouldReturnEmptyObjectIfOnlyTextScoreIsNeede
 
 TEST(DependenciesToProjectionTest,
      ShouldRequireTextScoreIfNoFieldsPresentButWholeDocumentIsNeeded) {
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = true;
     deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);

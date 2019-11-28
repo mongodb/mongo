@@ -486,14 +486,14 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_back(source);
 }
 
-DepsTracker Pipeline::getDependencies(QueryMetadataBitSet metadataAvailable) const {
-    DepsTracker deps(metadataAvailable);
+DepsTracker Pipeline::getDependencies(QueryMetadataBitSet unavailableMetadata) const {
+    DepsTracker deps(unavailableMetadata);
     const bool scopeHasVariables = pCtx->variablesParseState.hasDefinedVariables();
     bool skipFieldsAndMetadataDeps = false;
     bool knowAllFields = false;
     bool knowAllMeta = false;
     for (auto&& source : _sources) {
-        DepsTracker localDeps(deps.getMetadataAvailable());
+        DepsTracker localDeps(deps.getUnavailableMetadata());
         DepsTracker::State status = source->getDependencies(&localDeps);
 
         deps.vars.insert(localDeps.vars.begin(), localDeps.vars.end());
@@ -532,7 +532,7 @@ DepsTracker Pipeline::getDependencies(QueryMetadataBitSet metadataAvailable) con
     if (!knowAllFields)
         deps.needWholeDocument = true;  // don't know all fields we need
 
-    if (metadataAvailable[DocumentMetadataFields::kTextScore]) {
+    if (!unavailableMetadata[DocumentMetadataFields::kTextScore]) {
         // If there is a text score, assume we need to keep it if we can't prove we don't. If we are
         // the first half of a pipeline which has been split, future stages might need it.
         if (!knowAllMeta) {

@@ -146,7 +146,7 @@ TEST_F(AddFieldsTest, ShouldAddReferencedFieldsToDependencies) {
     auto addFields = DocumentSourceAddFields::create(
         fromjson("{a: true, x: '$b', y: {$and: ['$c','$d']}, z: {$meta: 'textScore'}}"),
         getExpCtx());
-    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
+    DepsTracker dependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, addFields->getDependencies(&dependencies));
     ASSERT_EQUALS(3U, dependencies.fields.size());
 

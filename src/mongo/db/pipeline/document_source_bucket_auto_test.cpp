@@ -457,7 +457,7 @@ TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromGroupByField) {
     auto bucketAuto =
         createBucketAuto(fromjson("{$bucketAuto : {groupBy : {$meta: 'textScore'}, buckets : 2}}"));
 
-    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
+    DepsTracker dependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(0U, dependencies.fields.size());
 
@@ -470,7 +470,7 @@ TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromOutputField) {
         createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output: {avg : "
                                   "{$avg : {$meta : 'textScore'}}}}}"));
 
-    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
+    DepsTracker dependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(1U, dependencies.fields.size());
 

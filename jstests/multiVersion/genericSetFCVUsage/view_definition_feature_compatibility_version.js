@@ -18,9 +18,8 @@ const dbpath = MongoRunner.dataPath + testName;
 // latest version, and rejects it when the feature compatibility version is the last-stable
 // version.
 const pipelinesWithNewFeatures = [
-    // TODO SERVER-43168: enable once indexKey and recordId $meta works correctly with pipelines.
-    // [{$project: {x: {$meta: "indexKey"}}}],
-    // [{$project: {x: {$meta: "recordId"}}}],
+    [{$project: {x: {$meta: "indexKey"}}}],
+    [{$project: {x: {$meta: "recordId"}}}],
     [{$sort: {a: 1}}, {$project: {x: {$meta: "sortKey"}}}],
     [
         {$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: "loc"}},

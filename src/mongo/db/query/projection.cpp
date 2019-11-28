@@ -43,7 +43,7 @@ namespace {
  * context.
  */
 struct DepsAnalysisData {
-    DepsTracker fieldDependencyTracker{DepsTracker::kAllMetadata};
+    DepsTracker fieldDependencyTracker;
 
     void addRequiredField(const std::string& fieldName) {
         fieldDependencyTracker.fields.insert(fieldName);

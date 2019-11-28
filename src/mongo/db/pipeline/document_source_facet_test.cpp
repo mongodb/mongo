@@ -713,7 +713,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextS
     facets.emplace_back("needsTextScore", std::move(thirdPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_TRUE(deps.needWholeDocument);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
@@ -733,7 +733,7 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
     facets.emplace_back("needsTextScore", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::kNoMetadata);
+    DepsTracker deps(DepsTracker::kAllMetadata);
     ASSERT_THROWS(facetStage->getDependencies(&deps), AssertionException);
 }
 

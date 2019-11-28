@@ -83,16 +83,9 @@ BSONObj DepsTracker::toProjectionWithoutMetadata() const {
 }
 
 void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool required) {
-    // For everything but sortKey/randval metadata, check that it's available. A pipeline can
-    // generate those types of metadata.
-
-    if (type != DocumentMetadataFields::MetaType::kSortKey &&
-        type != DocumentMetadataFields::MetaType::kRandVal) {
-        uassert(40218,
-                str::stream() << "pipeline requires " << type
-                              << " metadata, but it is not available",
-                !required || isMetadataAvailable(type));
-    }
+    uassert(40218,
+            str::stream() << "pipeline requires " << type << " metadata, but it is not available",
+            !required || !_unavailableMetadata[type]);
 
     // If the metadata type is not required, then it should not be recorded as a metadata
     // dependency.

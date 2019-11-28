@@ -296,7 +296,7 @@ bool DocumentSourceFacet::usedDisk() {
 DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
     const bool scopeHasVariables = pExpCtx->variablesParseState.hasDefinedVariables();
     for (auto&& facet : _facets) {
-        auto subDepsTracker = facet.pipeline->getDependencies(deps->getMetadataAvailable());
+        auto subDepsTracker = facet.pipeline->getDependencies(deps->getUnavailableMetadata());
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
         deps->vars.insert(subDepsTracker.vars.begin(), subDepsTracker.vars.end());

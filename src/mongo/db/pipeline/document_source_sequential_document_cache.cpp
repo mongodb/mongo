@@ -111,11 +111,11 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 
     // In the context of this optimization, we are only interested in figuring out
     // which external variables are referenced in the pipeline. We are not attempting
-    // to enforce that any referenced metadata are in fact available, this is done
-    // elsewhere. So without knowledge of what metadata is in fact available, here
+    // to enforce that any referenced metadata are in fact unavailable, this is done
+    // elsewhere. So without knowledge of what metadata is in fact unavailable, here
     // we "lie" and say that all metadata is available to avoid tripping any
     // assertions.
-    DepsTracker deps(DepsTracker::kAllMetadata);
+    DepsTracker deps(DepsTracker::kNoMetadata);
 
     // Iterate through the pipeline stages until we find one which references an external variable.
     for (; prefixSplit != container->end(); ++prefixSplit) {

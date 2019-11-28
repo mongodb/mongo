@@ -86,13 +86,20 @@ struct DepsTracker {
         QueryMetadataBitSet(1 << DocumentMetadataFields::kTextScore);
 
     /**
+     * By default, certain metadata is unavailable to the pipeline, unless explicitly specified
+     * that it is available. This state represents all metadata which is not available by default.
+     */
+    static constexpr auto kDefaultUnavailableMetadata = QueryMetadataBitSet(
+        (1 << DocumentMetadataFields::kTextScore) | (1 << DocumentMetadataFields::kGeoNearDist) |
+        (1 << DocumentMetadataFields::kGeoNearPoint));
+
+    /**
      * Represents a state where no metadata is available.
      */
     static constexpr auto kNoMetadata = QueryMetadataBitSet();
 
-
-    DepsTracker(QueryMetadataBitSet metadataAvailable = kNoMetadata)
-        : _metadataAvailable(metadataAvailable) {}
+    DepsTracker(const QueryMetadataBitSet& unavailableMetadata = kNoMetadata)
+        : _unavailableMetadata{unavailableMetadata} {}
 
     /**
      * Returns a projection object covering the non-metadata dependencies tracked by this class, or
@@ -115,19 +122,11 @@ struct DepsTracker {
     }
 
     /**
-     * Returns a value with bits set indicating the types of metadata available.
+     * Returns a value with bits set indicating the types of metadata not available to the
+     * pipeline.
      */
-    QueryMetadataBitSet getMetadataAvailable() const {
-        return _metadataAvailable;
-    }
-
-    /**
-     * Returns true if the DepsTracker the metadata 'type' is available to the pipeline. It is
-     * illegal to call this with MetadataType::SORT_KEY, since the sort key will always be available
-     * if needed.
-     */
-    bool isMetadataAvailable(DocumentMetadataFields::MetaType type) const {
-        return _metadataAvailable[type];
+    QueryMetadataBitSet getUnavailableMetadata() const {
+        return _unavailableMetadata;
     }
 
     /**
@@ -174,8 +173,8 @@ struct DepsTracker {
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
 
 private:
-    // Represents all metadata available to the pipeline.
-    QueryMetadataBitSet _metadataAvailable;
+    // Represents all metadata not available to the pipeline.
+    QueryMetadataBitSet _unavailableMetadata;
 
     // Represents which metadata is used by the pipeline. This is populated while performing
     // dependency analysis.

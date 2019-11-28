@@ -225,7 +225,7 @@ TEST_F(DocumentSourceMatchTest, ShouldAddDependenciesOfAllBranchesOfOrClause) {
 
 TEST_F(DocumentSourceMatchTest, TextSearchShouldRequireWholeDocumentAndTextScore) {
     auto match = DocumentSourceMatch::create(fromjson("{$text: {$search: 'hello'} }"), getExpCtx());
-    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
+    DepsTracker dependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_FIELDS, match->getDependencies(&dependencies));
     ASSERT_EQUALS(true, dependencies.needWholeDocument);
     ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));

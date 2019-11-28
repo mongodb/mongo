@@ -248,10 +248,10 @@ public:
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const;
 
     /**
-     * Returns the dependencies needed by this pipeline. 'metadataAvailable' should reflect what
-     * metadata is present on documents that are input to the front of the pipeline.
+     * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what
+     * metadata is not present on documents that are input to the front of the pipeline.
      */
-    DepsTracker getDependencies(QueryMetadataBitSet metadataAvailable) const;
+    DepsTracker getDependencies(QueryMetadataBitSet unavailableMetadata) const;
 
     const SourceContainer& getSources() const {
         return _sources;

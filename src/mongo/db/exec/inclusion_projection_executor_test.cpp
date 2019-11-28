@@ -623,6 +623,68 @@ TEST(InclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
 
+TEST(InclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
+    auto inclusion =
+        makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
+                                                            "d: {$meta: 'randVal'}, "
+                                                            "e: {$meta: 'searchScore'}, "
+                                                            "f: {$meta: 'searchHighlights'}, "
+                                                            "g: {$meta: 'geoNearDistance'}, "
+                                                            "h: {$meta: 'geoNearPoint'}, "
+                                                            "i: {$meta: 'recordId'}, "
+                                                            "j: {$meta: 'indexKey'}, "
+                                                            "k: {$meta: 'sortKey'}}"));
+
+    DepsTracker deps;
+    inclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 2UL);
+
+    // We do not add the dependencies for SEARCH_SCORE or SEARCH_HIGHLIGHTS because those values
+    // are not stored in the collection (or in mongod at all).
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldEvalauateMetaExpressions) {
+    auto inclusion =
+        makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
+                                                            "d: {$meta: 'randVal'}, "
+                                                            "e: {$meta: 'searchScore'}, "
+                                                            "f: {$meta: 'searchHighlights'}, "
+                                                            "g: {$meta: 'geoNearDistance'}, "
+                                                            "h: {$meta: 'geoNearPoint'}, "
+                                                            "i: {$meta: 'recordId'}, "
+                                                            "j: {$meta: 'indexKey'}, "
+                                                            "k: {$meta: 'sortKey'}}"));
+
+    MutableDocument inputDocBuilder(Document{{"a", 1}});
+    inputDocBuilder.metadata().setTextScore(0.0);
+    inputDocBuilder.metadata().setRandVal(1.0);
+    inputDocBuilder.metadata().setSearchScore(2.0);
+    inputDocBuilder.metadata().setSearchHighlights(Value{"foo"_sd});
+    inputDocBuilder.metadata().setGeoNearDistance(3.0);
+    inputDocBuilder.metadata().setGeoNearPoint(Value{BSON_ARRAY(4 << 5)});
+    inputDocBuilder.metadata().setRecordId(RecordId{6});
+    inputDocBuilder.metadata().setIndexKey(BSON("foo" << 7));
+    inputDocBuilder.metadata().setSortKey(Value{Document{{"bar", 8}}}, true);
+    Document inputDoc = inputDocBuilder.freeze();
+
+    auto result = inclusion->applyTransformation(inputDoc);
+
+    ASSERT_DOCUMENT_EQ(result,
+                       Document{fromjson("{a: 1, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
+                                         "h: [4, 5], i: 6, j: {foo: 7}, k: {'': {bar: 8}}}")});
+}
+
 //
 // _id inclusion policy.
 //

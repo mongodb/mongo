@@ -362,7 +362,7 @@ PipelineD::buildInnerQueryExecutor(Collection* collection,
                 // Pipeline) and an exception is thrown, an invariant will trigger in the
                 // DocumentSourceCursor. This is a design flaw in DocumentSourceCursor.
 
-                auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
+                auto deps = pipeline->getDependencies(DepsTracker::kAllMetadata);
                 const bool shouldProduceEmptyDocs = deps.hasNoRequirements();
                 auto attachExecutorCallback =
                     [shouldProduceEmptyDocs](
@@ -542,9 +542,9 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
     // layer, but that is handled elsewhere.
     const auto limit = extractLimitForPushdown(pipeline);
 
-    auto metadataAvailable = DocumentSourceMatch::isTextQuery(queryObj)
-        ? DepsTracker::kOnlyTextScore
-        : DepsTracker::kNoMetadata;
+    auto unavailableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
+        ? DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kOnlyTextScore
+        : DepsTracker::kDefaultUnavailableMetadata;
 
     // Create the PlanExecutor.
     bool shouldProduceEmptyDocs = false;
@@ -554,7 +554,7 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
                                                 pipeline,
                                                 sortStage,
                                                 std::move(rewrittenGroupStage),
-                                                metadataAvailable,
+                                                unavailableMetadata,
                                                 queryObj,
                                                 limit,
                                                 aggRequest,
@@ -604,18 +604,19 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
     BSONObj fullQuery = geoNearStage->asNearQuery(nearFieldName);
 
     bool shouldProduceEmptyDocs = false;
-    auto exec = uassertStatusOK(prepareExecutor(expCtx,
-                                                collection,
-                                                nss,
-                                                pipeline,
-                                                nullptr, /* sortStage */
-                                                nullptr, /* rewrittenGroupStage */
-                                                DepsTracker::kAllGeoNearData,
-                                                std::move(fullQuery),
-                                                boost::none, /* limit */
-                                                aggRequest,
-                                                Pipeline::kGeoNearMatcherFeatures,
-                                                &shouldProduceEmptyDocs));
+    auto exec = uassertStatusOK(
+        prepareExecutor(expCtx,
+                        collection,
+                        nss,
+                        pipeline,
+                        nullptr, /* sortStage */
+                        nullptr, /* rewrittenGroupStage */
+                        DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kAllGeoNearData,
+                        std::move(fullQuery),
+                        boost::none, /* limit */
+                        aggRequest,
+                        Pipeline::kGeoNearMatcherFeatures,
+                        &shouldProduceEmptyDocs));
 
     auto attachExecutorCallback = [shouldProduceEmptyDocs,
                                    distanceField = geoNearStage->getDistanceField(),
@@ -645,7 +646,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     Pipeline* pipeline,
     const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
-    QueryMetadataBitSet metadataAvailable,
+    QueryMetadataBitSet unavailableMetadata,
     const BSONObj& queryObj,
     boost::optional<long long> limit,
     const AggregationRequest* aggRequest,
@@ -687,7 +688,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // Perform dependency analysis. In order to minimize the dependency set, we only analyze the
     // stages that remain in the pipeline after pushdown. In particular, any dependencies for a
     // $match or $sort pushed down into the query layer will not be reflected here.
-    auto deps = pipeline->getDependencies(metadataAvailable);
+    auto deps = pipeline->getDependencies(unavailableMetadata);
     *hasNoRequirements = deps.hasNoRequirements();
 
     // If we're pushing down a sort, and a merge will be required later, then we need the query
