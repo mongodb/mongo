@@ -174,7 +174,7 @@ class ClangFormat(object):
 
         # If Windows, try to grab it from Program Files
         # Check both native Program Files and WOW64 version
-        if sys.platform == "win32":
+        if self.path is None and sys.platform == "win32":
             programfiles = [
                 os.environ["ProgramFiles"],
                 os.environ["ProgramFiles(x86)"],

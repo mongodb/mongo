@@ -766,7 +766,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     return shardType.getName();
 }
 
-StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationContext* opCtx,
+StatusWith<RemoveShardProgress> ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                                     const ShardId& shardId) {
     // Check preconditions for removing the shard
     std::string name = shardId.toString();
@@ -827,8 +827,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
                         BSON("shard" << name),
                         ShardingCatalogClient::kLocalWriteConcern)
             .ignore();
-
-        return ShardDrainingStatus::STARTED;
+        RemoveShardProgress progress = {RemoveShardProgress::STARTED, boost::none};
+        return progress;
     }
 
     // Draining has already started, now figure out how many chunks and databases are still on the
@@ -847,11 +847,24 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     }
     const long long databaseCount = countStatus.getValue();
 
+    const auto jumboCountStatus = _runCountCommandOnConfig(
+        opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name) << ChunkType::jumbo(true)));
+
+    if (!jumboCountStatus.isOK()) {
+        return jumboCountStatus.getStatus();
+    }
+    const long long jumboCount = jumboCountStatus.getValue();
+
     if (chunkCount > 0 || databaseCount > 0) {
         // Still more draining to do
         LOG(0) << "chunkCount: " << chunkCount;
         LOG(0) << "databaseCount: " << databaseCount;
-        return ShardDrainingStatus::ONGOING;
+        LOG(0) << "jumboCount: " << jumboCount;
+
+        RemoveShardProgress progress = {RemoveShardProgress::ONGOING,
+                                        boost::optional<RemoveShardProgress::DrainingShardUsage>(
+                                            {chunkCount, databaseCount, jumboCount})};
+        return progress;
     }
 
     // Draining is done, now finish removing the shard.
@@ -883,8 +896,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
                     BSON("shard" << name),
                     ShardingCatalogClient::kLocalWriteConcern)
         .ignore();
-
-    return ShardDrainingStatus::COMPLETED;
+    RemoveShardProgress progress = {RemoveShardProgress::COMPLETED, boost::none};
+    return progress;
 }
 
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {

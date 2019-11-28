@@ -136,12 +136,13 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 
     auto result = assertGet(ShardingCatalogManager::get(operationContext())
                                 ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, result);
+    ASSERT_EQUALS(RemoveShardProgress::STARTED, result.status);
+    ASSERT_EQUALS(false, result.remainingCounts.is_initialized());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
-    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress,
-                  ShardingCatalogManager::get(operationContext())
-                      ->removeShard(operationContext(), shard2.getName()));
+    auto result2 = ShardingCatalogManager::get(operationContext())
+                       ->removeShard(operationContext(), shard2.getName());
+    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, result2.getStatus().code());
     ASSERT_FALSE(isDraining(shard2.getName()));
 }
 
@@ -156,9 +157,10 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
     setupShards(std::vector<ShardType>{shard1});
 
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation,
-                  ShardingCatalogManager::get(operationContext())
-                      ->removeShard(operationContext(), shard1.getName()));
+    auto result = ShardingCatalogManager::get(operationContext())
+                      ->removeShard(operationContext(), shard1.getName());
+
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, result.getStatus().code());
     ASSERT_FALSE(isDraining(shard1.getName()));
 }
 
@@ -179,7 +181,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
 
     auto result = assertGet(ShardingCatalogManager::get(operationContext())
                                 ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, result);
+    ASSERT_EQUALS(RemoveShardProgress::STARTED, result.status);
+    ASSERT_EQUALS(false, result.remainingCounts.is_initialized());
     ASSERT_TRUE(isDraining(shard1.getName()));
 }
 
@@ -211,18 +214,25 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
                      ChunkVersion(1, 3, epoch),
                      shard1.getName());
 
+    chunk3.setJumbo(true);
+
     setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard1.getName(), true);
     setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
     auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, startedResult);
+    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
+    ASSERT_EQUALS(false, startedResult.remainingCounts.is_initialized());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::ONGOING, ongoingResult);
+    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
+    ASSERT_EQUALS(true, ongoingResult.remainingCounts.is_initialized());
+    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
+    ASSERT_EQUALS(1, ongoingResult.remainingCounts->databases);
     ASSERT_TRUE(isDraining(shard1.getName()));
 }
 
@@ -245,12 +255,17 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 
     auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, startedResult);
+    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
+    ASSERT_EQUALS(false, startedResult.remainingCounts.is_initialized());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::ONGOING, ongoingResult);
+    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
+    ASSERT_EQUALS(true, ongoingResult.remainingCounts.is_initialized());
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->jumboChunks);
+    ASSERT_EQUALS(1, ongoingResult.remainingCounts->databases);
     ASSERT_TRUE(isDraining(shard1.getName()));
 }
 
@@ -290,12 +305,17 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, startedResult);
+    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
+    ASSERT_EQUALS(false, startedResult.remainingCounts.is_initialized());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::ONGOING, ongoingResult);
+    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
+    ASSERT_EQUALS(true, ongoingResult.remainingCounts.is_initialized());
+    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->jumboChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->databases);
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     // Mock the operation during which the chunks are moved to the other shard.
@@ -309,7 +329,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     auto completedResult = assertGet(ShardingCatalogManager::get(operationContext())
                                          ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::COMPLETED, completedResult);
+    ASSERT_EQUALS(RemoveShardProgress::COMPLETED, completedResult.status);
+    ASSERT_EQUALS(false, startedResult.remainingCounts.is_initialized());
 
     // Now make sure that the shard no longer exists on config.
     auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(

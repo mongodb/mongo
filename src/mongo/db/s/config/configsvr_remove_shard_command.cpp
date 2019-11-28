@@ -147,33 +147,26 @@ public:
         }();
 
         // TODO: Standardize/separate how we append to the result object
-        switch (shardDrainingStatus) {
-            case ShardDrainingStatus::STARTED:
+        switch (shardDrainingStatus.status) {
+            case RemoveShardProgress::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
                 result.append("shard", shard->getId().toString());
                 result.appendElements(dbInfo);
                 break;
-            case ShardDrainingStatus::ONGOING: {
-                const auto swChunks = Grid::get(opCtx)->catalogClient()->getChunks(
-                    opCtx,
-                    BSON(ChunkType::shard(shard->getId().toString())),
-                    BSONObj(),
-                    boost::none,  // return all
-                    nullptr,
-                    repl::ReadConcernArgs::get(opCtx).getLevel());
-                uassertStatusOK(swChunks.getStatus());
-
-                const auto& chunks = swChunks.getValue();
+            case RemoveShardProgress::ONGOING: {
+                const auto& remainingCounts = shardDrainingStatus.remainingCounts;
                 result.append("msg", "draining ongoing");
                 result.append("state", "ongoing");
                 result.append("remaining",
-                              BSON("chunks" << static_cast<long long>(chunks.size()) << "dbs"
-                                            << static_cast<long long>(databases.size())));
+                              BSON("chunks" << remainingCounts->totalChunks << "dbs"
+                                            << remainingCounts->databases
+                                            << "jumboChunks"
+                                            << remainingCounts->jumboChunks));
                 result.appendElements(dbInfo);
                 break;
             }
-            case ShardDrainingStatus::COMPLETED:
+            case RemoveShardProgress::COMPLETED:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
                 result.append("shard", shard->getId().toString());
