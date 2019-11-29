@@ -484,9 +484,12 @@ public:
      * Returns this invocation's support for readConcern.
      */
     virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
-        return {{level != repl::ReadConcernLevel::kLocalReadConcern,
-                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
-                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
+        static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
+                                                     "read concern not supported"};
+        static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
+                                                            "default read concern not permitted"};
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern, kReadConcernNotSupported},
+                {kDefaultReadConcernNotPermitted}};
     }
 
     /**
@@ -633,12 +636,14 @@ public:
      * the option to the shards as needed. We rely on the shards to fail the commands in the
      * cases where it isn't supported.
      */
-    virtual ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
-                                                         const BSONObj& cmdObj,
+    virtual ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                          repl::ReadConcernLevel level) const {
-        return {{level != repl::ReadConcernLevel::kLocalReadConcern,
-                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
-                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
+        static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
+                                                     "read concern not supported"};
+        static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
+                                                            "default read concern not permitted"};
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern, kReadConcernNotSupported},
+                {kDefaultReadConcernNotPermitted}};
     }
 
     virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {

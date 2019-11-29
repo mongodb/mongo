@@ -41,6 +41,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -267,19 +268,41 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow) {
     return newCmdBuilder.obj();
 }
 
-BSONObj applyReadWriteConcern(OperationContext* opCtx, bool appendWC, const BSONObj& cmdObj) {
-    // Never apply write concern to ordinary operations inside transactions.  Applying writeConcern
-    // to terminal operations such as abortTransaction and commitTransaction is done directly by the
-    // TransactionRouter.
+BSONObj applyReadWriteConcern(OperationContext* opCtx,
+                              bool appendRC,
+                              bool appendWC,
+                              const BSONObj& cmdObj) {
     if (TransactionRouter::get(opCtx)) {
-        return cmdObj;
+        // When running in a transaction, the rules are:
+        // - Never apply writeConcern.  Applying writeConcern to terminal operations such as
+        //   abortTransaction and commitTransaction is done directly by the TransactionRouter.
+        // - Apply readConcern only if this is the first operation in the transaction.
+
+        if (!opCtx->isStartingMultiDocumentTransaction()) {
+            // Cannot apply either read or writeConcern, so short-circuit.
+            return cmdObj;
+        }
+
+        if (!appendRC) {
+            // First operation in transaction, but the caller has not requested readConcern be
+            // applied, so there's nothing to do.
+            return cmdObj;
+        }
+
+        // First operation in transaction, so ensure that writeConcern is not applied, then continue
+        // and apply the readConcern.
+        appendWC = false;
     }
 
     // Append all original fields except the readConcern/writeConcern field to the new command.
     BSONObjBuilder output;
+    bool seenReadConcern = false;
     bool seenWriteConcern = false;
     for (const auto& elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
+        if (appendRC && name == repl::ReadConcernArgs::kReadConcernFieldName) {
+            seenReadConcern = true;
+        }
         if (appendWC && name == WriteConcernOptions::kWriteConcernField) {
             seenWriteConcern = true;
         }
@@ -289,6 +312,10 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx, bool appendWC, const BSON
     }
 
     // Finally, add the new read/write concern.
+    if (appendRC && !seenReadConcern) {
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        output.appendElements(readConcernArgs.toBSON());
+    }
     if (appendWC && !seenWriteConcern) {
         output.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
     }
@@ -299,11 +326,21 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx, bool appendWC, const BSON
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               CommandInvocation* invocation,
                               const BSONObj& cmdObj) {
-    return applyReadWriteConcern(opCtx, invocation->supportsWriteConcern(), cmdObj);
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+    return applyReadWriteConcern(opCtx,
+                                 readConcernSupport.readConcernSupport.isOK(),
+                                 invocation->supportsWriteConcern(),
+                                 cmdObj);
 }
 
 BSONObj applyReadWriteConcern(OperationContext* opCtx, BasicCommand* cmd, const BSONObj& cmdObj) {
-    return applyReadWriteConcern(opCtx, cmd->supportsWriteConcern(cmdObj), cmdObj);
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto readConcernSupport = cmd->supportsReadConcern(cmdObj, readConcernArgs.getLevel());
+    return applyReadWriteConcern(opCtx,
+                                 readConcernSupport.readConcernSupport.isOK(),
+                                 cmd->supportsWriteConcern(cmdObj),
+                                 cmdObj);
 }
 
 BSONObj stripWriteConcern(const BSONObj& cmdObj) {

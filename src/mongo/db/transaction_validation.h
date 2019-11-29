@@ -30,19 +30,26 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
 /**
- * Returns true if the given cmd name is allowed to specify write concern in a transaction.
+ * Returns true if the given cmd name is a transaction control command.  These are also the only
+ * commands allowed to specify write concern in a transaction.
  */
-bool commandSupportsWriteConcernInTransaction(StringData cmdName);
+bool isTransactionCommand(StringData cmdName);
 
 /**
  * Throws if the given write concern is not allowed in a transaction.
  */
 void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName);
+
+/**
+ * Returns true if the given readConcern level is valid for use in a transaction.
+ */
+bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel);
 
 /**
  * Returns true if the given command is one of the commands that does not check out a session

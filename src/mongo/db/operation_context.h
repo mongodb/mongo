@@ -372,6 +372,20 @@ public:
         _inMultiDocumentTransaction = true;
     }
 
+    /**
+     * Returns whether this operation is starting a multi-document transaction.
+     */
+    bool isStartingMultiDocumentTransaction() const {
+        return _isStartingMultiDocumentTransaction;
+    }
+
+    /**
+     * Sets whether this operation is starting a multi-document transaction.
+     */
+    void setIsStartingMultiDocumentTransaction(bool isStartingMultiDocumentTransaction) {
+        _isStartingMultiDocumentTransaction = isStartingMultiDocumentTransaction;
+    }
+
     void setComment(const BSONObj& comment) {
         _comment = comment.getOwned();
     }
@@ -509,6 +523,7 @@ private:
     bool _writesAreReplicated = true;
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
+    bool _isStartingMultiDocumentTransaction = false;
 
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.

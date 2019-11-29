@@ -487,8 +487,8 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
         cmdBuilder->append(kHintField, _hint);
     }
 
-    if (!_readConcern.isEmpty()) {
-        cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
+    if (_readConcern) {
+        cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, *_readConcern);
     }
 
     if (!_collation.isEmpty()) {
@@ -1159,8 +1159,8 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (!_hint.isEmpty()) {
         aggregationBuilder.append("hint", _hint);
     }
-    if (!_readConcern.isEmpty()) {
-        aggregationBuilder.append("readConcern", _readConcern);
+    if (_readConcern) {
+        aggregationBuilder.append("readConcern", *_readConcern);
     }
     if (!_unwrappedReadPref.isEmpty()) {
         aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, _unwrappedReadPref);

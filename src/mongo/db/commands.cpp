@@ -646,7 +646,7 @@ private:
     }
 
     ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const override {
-        return _command->supportsReadConcern(_dbName, cmdObj(), level);
+        return _command->supportsReadConcern(cmdObj(), level);
     }
 
     bool allowsAfterClusterTime() const override {

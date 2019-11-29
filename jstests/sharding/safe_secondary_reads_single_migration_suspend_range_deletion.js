@@ -494,7 +494,10 @@ for (let command of commands) {
             filter: Object.extend({
                 "command.shardVersion": {"$exists": true},
                 "command.$readPreference": {"mode": "secondary"},
-                "command.readConcern": {"$exists": false},
+                "$or": [
+                    {"command.readConcern": {"$exists": false}},
+                    {"command.readConcern": {}},
+                ],
                 "errCode": {"$ne": ErrorCodes.StaleConfig},
             },
                                   commandProfile)

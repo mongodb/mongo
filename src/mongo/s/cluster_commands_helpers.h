@@ -95,7 +95,10 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
  * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the
  * cmdObj explicitly specifies read/writeConcern.
  */
-BSONObj applyReadWriteConcern(OperationContext* opCtx, bool appendWC, const BSONObj& cmdObj);
+BSONObj applyReadWriteConcern(OperationContext* opCtx,
+                              bool appendRC,
+                              bool appendWC,
+                              const BSONObj& cmdObj);
 
 /**
  * Convenience versions of applyReadWriteConcern() for calling from within

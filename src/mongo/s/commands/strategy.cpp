@@ -394,8 +394,6 @@ void runCommand(OperationContext* opCtx,
                 !readConcernArgs.getArgsAtClusterTime());
     }
 
-    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
-
     boost::optional<RouterOperationContextSession> routerSession;
     try {
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName, invocation->ns());
@@ -439,8 +437,7 @@ void runCommand(OperationContext* opCtx,
         }
 
         if (supportsWriteConcern && wc.usedDefault &&
-            (!TransactionRouter::get(opCtx) ||
-             commandSupportsWriteConcernInTransaction(commandName))) {
+            (!TransactionRouter::get(opCtx) || isTransactionCommand(commandName))) {
             // This command supports WC, but wasn't given one - so apply the default, if there is
             // one.
             if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
@@ -459,25 +456,42 @@ void runCommand(OperationContext* opCtx,
             opCtx->setWriteConcern(wc);
         }
 
+        auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+        if (readConcernSupport.defaultReadConcernPermit.isOK() &&
+            (startTransaction || !TransactionRouter::get(opCtx))) {
+            if (readConcernArgs.isEmpty()) {
+                const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                           .getDefaultReadConcern();
+                if (rcDefault) {
+                    {
+                        // We must obtain the client lock to set ReadConcernArgs, because it's an
+                        // in-place reference to the object on the operation context, which may be
+                        // concurrently used elsewhere (eg. read by currentOp).
+                        stdx::lock_guard<Client> lk(*opCtx->getClient());
+                        readConcernArgs = std::move(*rcDefault);
+                    }
+                    LOG(2) << "Applying default readConcern on "
+                           << invocation->definition()->getName() << " of " << *rcDefault;
+                    // Update the readConcernSupport, since the default RC was applied.
+                    readConcernSupport =
+                        invocation->supportsReadConcern(readConcernArgs.getLevel());
+                }
+            }
+        }
+
         // If we are starting a transaction, we only need to check whether the read concern is
         // appropriate for running a transaction. There is no need to check whether the specific
         // command supports the read concern, because all commands that are allowed to run in a
         // transaction must support all applicable read concerns.
         if (startTransaction) {
-            switch (readConcernArgs.getLevel()) {
-                case repl::ReadConcernLevel::kLocalReadConcern:
-                case repl::ReadConcernLevel::kMajorityReadConcern:
-                case repl::ReadConcernLevel::kSnapshotReadConcern:
-                    // Acceptable readConcern for a transaction.
-                    break;
-                default:
-                    auto responseBuilder = replyBuilder->getBodyBuilder();
-                    CommandHelpers::appendCommandStatusNoThrow(
-                        responseBuilder,
-                        {ErrorCodes::InvalidOptions,
-                         "The readConcern level must be either 'local' (default), 'majority' or "
-                         "'snapshot' in order to run in a transaction"});
-                    return;
+            if (!isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel())) {
+                auto responseBuilder = replyBuilder->getBodyBuilder();
+                CommandHelpers::appendCommandStatusNoThrow(
+                    responseBuilder,
+                    {ErrorCodes::InvalidOptions,
+                     "The readConcern level must be either 'local' (default), 'majority' or "
+                     "'snapshot' in order to run in a transaction"});
+                return;
             }
             if (readConcernArgs.getArgsOpTime()) {
                 auto responseBuilder = replyBuilder->getBodyBuilder();
@@ -507,6 +521,10 @@ void runCommand(OperationContext* opCtx,
                 return;
             }
         }
+
+        // Remember whether or not this operation is starting a transaction, in case something later
+        // in the execution needs to adjust its behavior based on this.
+        opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
 
         for (int tries = 0;; ++tries) {
             // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.

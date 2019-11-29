@@ -90,8 +90,7 @@ public:
         return false;
     }
 
-    ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
-                                                 const BSONObj& cmdObj,
+    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const override {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }

@@ -63,6 +63,15 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
                                                            bool isExplain) {
     auto qr = uassertStatusOK(
         QueryRequest::makeFromFindCommand(std::move(nss), std::move(cmdObj), isExplain));
+    if (qr->getReadConcern().isEmpty()) {
+        if (opCtx->isStartingMultiDocumentTransaction() || !opCtx->inMultiDocumentTransaction()) {
+            // If there is no explicit readConcern in the cmdObj, and this is either the first
+            // operation in a transaction, or not running in a transaction, then use the readConcern
+            // from the opCtx (which may be a cluster-wide default).
+            const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            qr->setReadConcern(readConcernArgs.toBSON()["readConcern"].Obj());
+        }
+    }
     uassert(
         51202, "Cannot specify runtime constants option to a mongos", !qr->getRuntimeConstants());
     qr->setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));

@@ -43,6 +43,7 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -146,6 +147,11 @@ public:
 
 } commitTxn;
 
+static const Status kOnlyTransactionsReadConcernsSupported{
+    ErrorCodes::InvalidOptions, "only read concerns valid in transactions are supported"};
+static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
+                                                    "default read concern not permitted"};
+
 class CmdAbortTxn : public BasicCommand {
 public:
     CmdAbortTxn() : BasicCommand("abortTransaction") {}
@@ -160,6 +166,18 @@ public:
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
+    }
+
+    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
+                                                 repl::ReadConcernLevel level) const override {
+        // abortTransaction commences running inside a transaction (even though the transaction will
+        // be ended by the time it completes).  Therefore it needs to accept any readConcern which
+        // is valid within a transaction.  However it is not appropriate to apply the default
+        // readConcern, since the readConcern of the transaction (set by the first operation) is
+        // what must apply.
+        return {{!isReadConcernLevelAllowedInTransaction(level),
+                 kOnlyTransactionsReadConcernsSupported},
+                {kDefaultReadConcernNotPermitted}};
     }
 
     std::string help() const override {

@@ -262,33 +262,27 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                 const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                            .getDefaultReadConcern();
                 if (rcDefault) {
-                    readConcernArgs = *rcDefault;
+                    readConcernArgs = std::move(*rcDefault);
                     LOG(2) << "Applying default readConcern on "
                            << invocation->definition()->getName() << " of " << *rcDefault;
+                    // Update the readConcernSupport, since the default RC was applied.
+                    readConcernSupport =
+                        invocation->supportsReadConcern(readConcernArgs.getLevel());
                 }
             }
         }
     }
-
-    // Update the readConcernSupport, in case the default RC was applied.
-    readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
 
     // If we are starting a transaction, we only need to check whether the read concern is
     // appropriate for running a transaction. There is no need to check whether the specific
     // command supports the read concern, because all commands that are allowed to run in a
     // transaction must support all applicable read concerns.
     if (startTransaction) {
-        switch (readConcernArgs.getLevel()) {
-            case repl::ReadConcernLevel::kLocalReadConcern:
-            case repl::ReadConcernLevel::kMajorityReadConcern:
-            case repl::ReadConcernLevel::kSnapshotReadConcern:
-                // Acceptable readConcern for a transaction.
-                break;
-            default:
-                return {ErrorCodes::InvalidOptions,
-                        "The readConcern level must be either 'local' (default), 'majority' or "
-                        "'snapshot' in "
-                        "order to run in a transaction"};
+        if (!isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel())) {
+            return {ErrorCodes::InvalidOptions,
+                    "The readConcern level must be either 'local' (default), 'majority' or "
+                    "'snapshot' in "
+                    "order to run in a transaction"};
         }
         if (readConcernArgs.getArgsOpTime()) {
             return {ErrorCodes::InvalidOptions,
@@ -954,6 +948,10 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         }
+
+        // Remember whether or not this operation is starting a transaction, in case something later
+        // in the execution needs to adjust its behavior based on this.
+        opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
 
         auto& oss = OperationShardingState::get(opCtx);
 

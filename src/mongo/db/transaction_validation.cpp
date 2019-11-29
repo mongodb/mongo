@@ -51,21 +51,31 @@ const StringMap<int> retryableWriteCommands = {
 // Commands that can be sent with session info but should not check out a session.
 const StringMap<int> skipSessionCheckoutList = {{"coordinateCommitTransaction", 1}};
 
+const StringMap<int> transactionCommands = {{"commitTransaction", 1},
+                                            {"coordinateCommitTransaction", 1},
+                                            {"abortTransaction", 1},
+                                            {"prepareTransaction", 1}};
+
 bool isRetryableWriteCommand(StringData cmdName) {
     return retryableWriteCommands.find(cmdName) != retryableWriteCommands.cend();
 }
 
 }  // namespace
 
-bool commandSupportsWriteConcernInTransaction(StringData cmdName) {
-    return cmdName == "commitTransaction" || cmdName == "coordinateCommitTransaction" ||
-        cmdName == "abortTransaction" || cmdName == "prepareTransaction";
+bool isTransactionCommand(StringData cmdName) {
+    return transactionCommands.find(cmdName) != transactionCommands.cend();
 }
 
 void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName) {
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
-            wcResult.usedDefault || commandSupportsWriteConcernInTransaction(cmdName));
+            wcResult.usedDefault || isTransactionCommand(cmdName));
+}
+
+bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {
+    return readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern ||
+        readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+        readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
 }
 
 bool shouldCommandSkipSessionCheckout(StringData cmdName) {

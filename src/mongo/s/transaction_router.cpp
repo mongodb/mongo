@@ -42,6 +42,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
@@ -65,12 +66,6 @@ const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
 
 const auto getTransactionRouter = Session::declareDecoration<TransactionRouter>();
-
-bool isTransactionCommand(const BSONObj& cmd) {
-    auto cmdName = cmd.firstElement().fieldNameStringData();
-    return cmdName == "abortTransaction" || cmdName == "commitTransaction" ||
-        cmdName == "prepareTransaction" || cmdName == CoordinateCommitTransaction::kCommandName;
-}
 
 /**
  * Attaches the given atClusterTime to the readConcern object in the given command object, removing
@@ -151,12 +146,6 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
 // cursors, but any established during an unsuccessful attempt are best-effort killed.
 const StringMap<int> alwaysRetryableCmds = {
     {"aggregate", 1}, {"distinct", 1}, {"find", 1}, {"getMore", 1}, {"killCursors", 1}};
-
-bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {
-    return readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern ||
-        readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
-        readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
-}
 
 // Returns if a transaction's commit result is unknown based on the given statuses. A result is
 // considered unknown if it would be given the "UnknownTransactionCommitResult" as defined by the
@@ -429,7 +418,8 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     // The first command sent to a participant must start a transaction, unless it is a transaction
     // command, which don't support the options that start transactions, i.e. startTransaction and
     // readConcern. Otherwise the command must not have a read concern.
-    bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmd);
+    auto cmdName = cmd.firstElement().fieldNameStringData();
+    bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmdName);
 
     if (!mustStartTransaction) {
         dassert(!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName));

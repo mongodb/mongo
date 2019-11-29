@@ -153,8 +153,7 @@ public:
         return true;
     }
 
-    ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
-                                                 const BSONObj& cmdObj,
+    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const final {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
@@ -206,7 +205,7 @@ public:
                         chunkMgr->getVersion(shard->getId()),
                         boost::none,
                         nss,
-                        applyReadWriteConcern(opCtx, false, explainCmd),
+                        applyReadWriteConcern(opCtx, false, false, explainCmd),
                         &bob);
         } else {
             _runCommand(opCtx,
@@ -214,7 +213,7 @@ public:
                         ChunkVersion::UNSHARDED(),
                         routingInfo.db().databaseVersion(),
                         nss,
-                        applyReadWriteConcern(opCtx, false, explainCmd),
+                        applyReadWriteConcern(opCtx, false, false, explainCmd),
                         &bob);
         }
 

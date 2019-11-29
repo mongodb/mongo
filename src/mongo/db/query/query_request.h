@@ -180,7 +180,12 @@ public:
     }
 
     const BSONObj& getReadConcern() const {
-        return _readConcern;
+        if (_readConcern) {
+            return *_readConcern;
+        } else {
+            static const auto empty = BSONObj();
+            return empty;
+        }
     }
 
     void setReadConcern(BSONObj readConcern) {
@@ -495,7 +500,7 @@ private:
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
     // The read concern is parsed elsewhere.
-    BSONObj _readConcern;
+    boost::optional<BSONObj> _readConcern;
     // The collation is parsed elsewhere.
     BSONObj _collation;
 

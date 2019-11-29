@@ -40,6 +40,15 @@
 namespace mongo {
 namespace {
 
+// getMore can run with any readConcern, because cursor-creating commands like find can run with any
+// readConcern.  However, since getMore automatically uses the readConcern of the command that
+// created the cursor, it is not appropriate to apply the default readConcern (just as
+// client-specified readConcern isn't appropriate).
+static const ReadConcernSupportResult kSupportsReadConcernResult{
+    Status::OK(),
+    {{ErrorCodes::InvalidOptions,
+      "default read concern not permitted (getMore uses the cursor's read concern)"}}};
+
 /**
  * Implements the getMore command on mongos. Retrieves more from an existing mongos cursor
  * corresponding to the cursor id passed from the application. In order to generate these results,
@@ -68,6 +77,10 @@ public:
 
         bool supportsWriteConcern() const override {
             return false;
+        }
+
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const override {
+            return kSupportsReadConcernResult;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

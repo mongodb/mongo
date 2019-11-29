@@ -73,8 +73,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
-                                                 const BSONObj& cmdObj,
+    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const final {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
