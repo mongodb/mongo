@@ -336,6 +336,9 @@ selector:
   # majority write concern. Note that in sharded deployments even non "replace" output modes may use
   # temporary collections for intermediate results.
   - uses_map_reduce_with_temp_collections
+  # Cannot retry a getMore command if a transient transaction or network error occurs during
+  # it, since we won't know whether the cursor was advanced or not.
+  - requires_getmore
 
 executor:
   archive:
