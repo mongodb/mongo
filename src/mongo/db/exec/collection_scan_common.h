@@ -53,6 +53,9 @@ struct CollectionScanParams {
     // This field cannot be used in conjunction with 'resumeAfterRecordId'.
     boost::optional<Timestamp> maxTs;
 
+    // If true, the collection scan will return a token that can be used to resume the scan.
+    bool requestResumeToken = false;
+
     // If present, the collection scan will seek to the exact RecordId, or return KeyNotFound if it
     // does not exist. Must only be set on forward collection scans.
     // This field cannot be used in conjunction with 'minTs' or 'maxTs'.

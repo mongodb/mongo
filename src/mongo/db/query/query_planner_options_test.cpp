@@ -913,6 +913,18 @@ TEST_F(QueryPlannerTest, NToReturnHackWithSingleBatch) {
         "{cscan: {dir:1, filter: {}}}}}}}");
 }
 
+TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStageBuilder) {
+    BSONObj cmdObj = BSON("find" << nss.ns() << "hint" << BSON("$natural" << 1) << "sort"
+                                 << BSON("$natural" << 1) << "$_requestResumeToken" << true
+                                 << "$_resumeAfter" << BSON("$recordId" << 42LL));
+
+    runQueryAsCommand(cmdObj);
+    assertHasOnlyCollscan();
+
+    const auto* node = solns.front()->root.get();
+    const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(node);
+    ASSERT_EQUALS(RecordId(42LL), csn->resumeAfterRecordId.get());
+}
 
 }  // namespace
 }  // namespace mongo

@@ -288,20 +288,20 @@ TEST(QueryRequestTest, RequestResumeTokenWithSort) {
 TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
     QueryRequest qr(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     qr.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     qr.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(qr.validate());
     resumeAfter = BSON("$recordId" << 1LL);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     ASSERT_OK(qr.validate());
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
     QueryRequest qr(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL << "$extra" << 1);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     qr.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     qr.setHint(fromjson("{$natural: 1}"));
@@ -311,7 +311,7 @@ TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
 TEST(QueryRequestTest, ResumeAfterWithHint) {
     QueryRequest qr(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     qr.setRequestResumeToken(true);
     ASSERT_NOT_OK(qr.validate());
     qr.setHint(fromjson("{a: 1}"));
@@ -323,7 +323,7 @@ TEST(QueryRequestTest, ResumeAfterWithHint) {
 TEST(QueryRequestTest, ResumeAfterWithSort) {
     QueryRequest qr(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     qr.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     qr.setHint(fromjson("{$natural: 1}"));
@@ -337,7 +337,7 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
 TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
     QueryRequest qr(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     // Hint must be explicitly set for the query request to validate.
     qr.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(qr.validate());
@@ -350,7 +350,7 @@ TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
     BSONObj resumeAfter = fromjson("{}");
     // Hint must be explicitly set for the query request to validate.
     qr.setHint(fromjson("{$natural: 1}"));
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     ASSERT_OK(qr.validate());
     qr.setRequestResumeToken(true);
     ASSERT_OK(qr.validate());
@@ -1010,7 +1010,7 @@ TEST(QueryRequestTest, ParseFromCommandResumeToken) {
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
-    ASSERT(!qr->getResumeAfterResumeToken().isEmpty());
+    ASSERT(!qr->getResumeAfter().isEmpty());
     ASSERT(qr->getRequestResumeToken());
 }
 
@@ -1025,7 +1025,7 @@ TEST(QueryRequestTest, ParseFromCommandEmptyResumeToken) {
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
     ASSERT(qr->getRequestResumeToken());
-    ASSERT(qr->getResumeAfterResumeToken().isEmpty());
+    ASSERT(qr->getResumeAfter().isEmpty());
 }
 
 //
@@ -1445,7 +1445,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
 TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
     QueryRequest qr(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
-    qr.setResumeAfterResumeToken(resumeAfter);
+    qr.setResumeAfter(resumeAfter);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 

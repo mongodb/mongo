@@ -73,8 +73,8 @@ public:
         return _latestOplogEntryTimestamp;
     }
 
-    RecordId getLastSeenRecordId() const {
-        return _lastSeenId;
+    BSONObj getResumeToken() const {
+        return _params.requestResumeToken ? BSON("$recordId" << _lastSeenId.repr()) : BSONObj();
     }
 
     std::unique_ptr<PlanStageStats> getStats() final;

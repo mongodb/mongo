@@ -416,11 +416,11 @@ public:
         _requestResumeToken = requestResumeToken;
     }
 
-    const BSONObj& getResumeAfterResumeToken() const {
+    const BSONObj& getResumeAfter() const {
         return _resumeAfter;
     }
 
-    void setResumeAfterResumeToken(BSONObj resumeAfter) {
+    void setResumeAfter(BSONObj resumeAfter) {
         _resumeAfter = resumeAfter;
     }
 

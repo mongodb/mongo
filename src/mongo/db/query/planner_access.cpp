@@ -240,10 +240,21 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         }
     }
 
+    // Extract and assign the 'requestResumeToken' field.
+    csn->requestResumeToken = query.getQueryRequest().getRequestResumeToken();
+
+    // Extract and assign the RecordId from the 'resumeAfter' token, if present.
+    const BSONObj& resumeAfterObj = query.getQueryRequest().getResumeAfter();
+    if (!resumeAfterObj.isEmpty()) {
+        csn->resumeAfterRecordId = RecordId(resumeAfterObj["$recordId"].numberLong());
+    }
+
     if (query.nss().isOplog() && csn->direction == 1) {
         // Optimizes the start and end location parameters for a collection scan for an oplog
-        // collection.
-        std::tie(csn->minTs, csn->maxTs) = extractTsRange(query.root());
+        // collection. Not compatible with $_resumeAfter so we do not optimize in that case.
+        if (resumeAfterObj.isEmpty()) {
+            std::tie(csn->minTs, csn->maxTs) = extractTsRange(query.root());
+        }
 
         // If the query is just a lower bound on "ts" on a forward scan, every document in the
         // collection after the first matching one must also match. To avoid wasting time

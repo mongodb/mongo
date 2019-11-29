@@ -85,6 +85,8 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
             params.minTs = csn->minTs;
             params.maxTs = csn->maxTs;
+            params.requestResumeToken = csn->requestResumeToken;
+            params.resumeAfterRecordId = csn->resumeAfterRecordId;
             params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
             return std::make_unique<CollectionScan>(
                 opCtx, collection, params, ws, csn->filter.get());
