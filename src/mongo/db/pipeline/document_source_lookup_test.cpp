@@ -756,8 +756,8 @@ TEST_F(DocumentSourceLookUpTest,
     auto expectedPipe = fromjson(
         str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
                       << sequentialCacheStageObj()
-                      << ", {$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: {$and: "
-                         "[{_id: {$_internalExprEq: 5}}, {$expr: {$eq: "
+                      << ", {$facet: {facetPipe: [{$teeConsumer: {}},{$group: {_id: '$_id'}}, "
+                         "{$match: {$and: [{_id: {$_internalExprEq: 5}}, {$expr: {$eq: "
                          "['$_id', {$const: 5}]}}]}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));

@@ -64,8 +64,7 @@ void DocumentSourceTeeConsumer::doDispose() {
 
 Value DocumentSourceTeeConsumer::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // This stage will be inserted into the beginning of a pipeline, but should not show up in the
-    // explain output.
-    return Value();
+    // We only serialize this stage in the context of explain.
+    return explain ? Value(DOC(kStageName << Document())) : Value();
 }
 }  // namespace mongo

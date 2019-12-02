@@ -55,6 +55,21 @@
 
 namespace mongo {
 
+namespace {
+
+// Given a serialized document source, appends execution stats 'nReturned' and
+// 'executionTimeMillisEstimate' to it.
+Value appendExecStats(Value docSource, const CommonStats& stats) {
+    invariant(docSource.getType() == BSONType::Object);
+    MutableDocument doc(docSource.getDocument());
+    auto nReturned = static_cast<long long>(stats.advanced);
+    auto executionTimeMillisEstimate = static_cast<long long>(stats.executionTimeMillis);
+    doc.addField("nReturned", Value(nReturned));
+    doc.addField("executionTimeMillisEstimate", Value(executionTimeMillisEstimate));
+    return Value(doc.freeze());
+}
+}  // namespace
+
 /**
  * Enabling the disablePipelineOptimization fail point will stop the aggregate command from
  * attempting to optimize the pipeline or the pipeline stages. Neither DocumentSource::optimizeAt()
@@ -466,8 +481,17 @@ boost::optional<Document> Pipeline::getNext() {
 
 vector<Value> Pipeline::writeExplainOps(ExplainOptions::Verbosity verbosity) const {
     vector<Value> array;
-    for (SourceContainer::const_iterator it = _sources.begin(); it != _sources.end(); ++it) {
-        (*it)->serializeToArray(array, verbosity);
+    for (auto&& stage : _sources) {
+        auto beforeSize = array.size();
+        stage->serializeToArray(array, verbosity);
+        auto afterSize = array.size();
+        // Append execution stats to the serialized stage if the specified verbosity is
+        // 'executionStats' or 'allPlansExecution'.
+        invariant(afterSize - beforeSize == 1u);
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            auto serializedStage = array.back();
+            array.back() = appendExecStats(serializedStage, stage->getCommonStats());
+        }
     }
     return array;
 }

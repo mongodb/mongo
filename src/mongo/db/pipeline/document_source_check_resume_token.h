@@ -78,7 +78,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
@@ -97,7 +97,7 @@ private:
 
     void _assertOplogHasEnoughHistory(const GetNextResult& nextInput);
 
-    ResumeTokenData _tokenFromClient;
+    const ResumeTokenData _tokenFromClient;
     bool _verifiedOplogHasEnoughHistory = false;
     bool _surpassedResumeToken = false;
 };
@@ -145,7 +145,7 @@ public:
         return logic;
     };
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
@@ -167,7 +167,7 @@ private:
         const DocumentSource::GetNextResult& nextInput);
 
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
-    ResumeTokenData _tokenFromClient;
+    const ResumeTokenData _tokenFromClient;
 };
 
 }  // namespace mongo

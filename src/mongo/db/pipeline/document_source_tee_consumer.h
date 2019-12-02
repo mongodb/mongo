@@ -76,7 +76,7 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
 protected:
     GetNextResult doGetNext() final;

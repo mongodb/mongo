@@ -156,7 +156,6 @@ function getAggPlanStages(root, stage) {
         let results = [];
         for (let i = 0; i < docSourceArray.length; i++) {
             let properties = Object.getOwnPropertyNames(docSourceArray[i]);
-            assert.eq(1, properties.length);
             if (properties[0] === stage) {
                 results.push(docSourceArray[i]);
             }

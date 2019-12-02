@@ -173,9 +173,10 @@ const char* DocumentSourceEnsureResumeTokenPresent::getSourceName() const {
 
 Value DocumentSourceEnsureResumeTokenPresent::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
-    // would result in it being created twice.
-    return Value();
+    // We only serialize this stage in the context of explain.
+    return explain
+        ? Value(DOC(kStageName << DOC("resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
+        : Value();
 }
 
 intrusive_ptr<DocumentSourceEnsureResumeTokenPresent>
@@ -259,9 +260,10 @@ const char* DocumentSourceShardCheckResumability::getSourceName() const {
 
 Value DocumentSourceShardCheckResumability::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
-    // would result in it being created twice.
-    return Value();
+    // We only serialize this stage in the context of explain.
+    return explain
+        ? Value(DOC(kStageName << DOC("resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
+        : Value();
 }
 
 intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(

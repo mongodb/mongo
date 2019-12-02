@@ -296,17 +296,22 @@ Status appendExplainResults(sharded_agg_helpers::DispatchShardPipelineResults&& 
         *result << "mergeType" << mergeType;
 
         MutableDocument pipelinesDoc;
+        // We specify "queryPlanner" verbosity when building the output for "shardsPart" because
+        // execution stats are reported by each shard individually.
         pipelinesDoc.addField("shardsPart",
                               Value(dispatchResults.splitPipeline->shardsPipeline->writeExplainOps(
-                                  *mergeCtx->explain)));
+                                  ExplainOptions::Verbosity::kQueryPlanner)));
         if (dispatchResults.exchangeSpec) {
             BSONObjBuilder bob;
             dispatchResults.exchangeSpec->exchangeSpec.serialize(&bob);
             bob.append("consumerShards", dispatchResults.exchangeSpec->consumerShards);
             pipelinesDoc.addField("exchange", Value(bob.obj()));
         }
-        pipelinesDoc.addField("mergerPart",
-                              Value(mergePipeline->writeExplainOps(*mergeCtx->explain)));
+        // We specify "queryPlanner" verbosity because execution stats are not currently
+        // supported when building the output for "mergerPart".
+        pipelinesDoc.addField(
+            "mergerPart",
+            Value(mergePipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)));
 
         *result << "splitPipeline" << pipelinesDoc.freeze();
     } else {

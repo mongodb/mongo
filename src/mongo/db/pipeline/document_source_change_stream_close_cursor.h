@@ -65,10 +65,9 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        // This stage is created by the DocumentSourceChangeStream stage, so serializing it
-        // here would result in it being created twice.
-        return Value();
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        // We only serialize this stage in the context of explain.
+        return explain ? Value(DOC(kStageName << Document())) : Value();
     }
 
     static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
