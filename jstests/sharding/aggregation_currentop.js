@@ -637,7 +637,6 @@ function runIdleSessionsTests(conn, adminDB, txnDB, useLocalOps) {
         assert.commandWorked(sessionDB.runCommand({
             insert: "test",
             documents: [{_id: `txn-insert-${conn}-${userNames[i]}-${i}`}],
-            readConcern: {level: "snapshot"},
             txnNumber: NumberLong(i),
             startTransaction: true,
             autocommit: false
