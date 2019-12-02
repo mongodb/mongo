@@ -414,27 +414,33 @@ error, such as in a `ReplSetConfig` mismatch.
 
 ## Read Concern
 
-MongoDB does not provide snapshot isolation. All reads in MongoDB are executed on snapshots of the
-data taken at some point in time; however if the storage engine yields while executing a read, the
-read may continue on a newer snapshot. Thus, reads are currently never guaranteed to return all data
-from one point in time. This means that some documents can be skipped if they are updated and any
-updates that occurred since the read began may or may not be seen.
+All reads in MongoDB are executed on snapshots of the data taken at some point in time. However, for
+all read concern levels other than 'snapshot', if the storage engine yields while executing a read,
+the read may continue on a newer snapshot. Thus, reads are currently not guaranteed to return all
+data from one point in time. This means that some documents can be skipped if they are updated and
+any updates that occurred since the read began may or may not be seen.
 
 [Read concern](https://docs.mongodb.com/manual/reference/read-concern/) is an option sent with any
-read command to specify at what consistency level the read should be satisfied. There are 3 read
+read command to specify at what consistency level the read should be satisfied. There are 5 read
 concern levels:
 
 * Local
 * Majority
 * Linearizable
+* Snapshot
+* Available
 
-**Local** just returns whatever the most up-to-date data is on the node. It does this by reading
-from the storage engine’s most recent snapshot(s).
+**Local** just returns whatever the most up-to-date data is on the node. On a primary, it does this
+by reading from the storage engine's most recent snapshot. On a secondary, it performs a timestamped
+read at the lastApplied, so that it does not see writes from the batch that is currently being
+applied. For information on how local read concern works within a multi-document transaction, see
+the [Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section.
 
-**Majority** uses the last committed snapshot(s) to do its read. The data read only reflects the
-oplog entries that have been replicated to a majority of nodes in the replica set. Any data seen in
-majority reads cannot roll back in the future. Thus majority reads prevent **dirty reads**, though
-they often are **stale reads**.
+**Majority** does a timestamped read at the stable timestamp (also called the last committed
+snapshot in the code, for legacy reasons). The data read only reflects the oplog entries that have
+been replicated to a majority of nodes in the replica set. Any data seen in majority reads cannot
+roll back in the future. Thus majority reads prevent **dirty reads**, though they often are
+**stale reads**.
 
 Read concern majority reads usually return as fast as local reads, but sometimes will block. Read
 concern majority reads do not wait for anything to be committed; they just use different snapshots
@@ -445,23 +451,8 @@ command, subsequent majority reads will block until that index build is finished
 nodes. Majority reads also block right after startup or rollback when we do not yet have a committed
 snapshot.
 
-MongoDB continuously directs the storage engine to take named snapshots. Reads with read concern
-level local are executed on “unnamed snapshots,” which are ephemeral and exist only long enough to
-satisfy the read transaction. As a node discovers that its writes have been replicated to
-secondaries, it updates its committed OpTime. The newest named snapshot older than the commit point
-becomes the new "committed snapshot" used for read majority reads. Any named snapshots older than
-the "committed snapshot" are then cleaned up (deleted). MongoDB tells WiredTiger to save up to 1000
-named snapshots at a time. If the commit point doesn't move, but writes continue to happen, we will
-keep taking more snapshots and may hit the limit. Afterwards, no further snapshots are created until
-the commit point moves and old snapshots are deleted. The commit level might not move if you are
-doing w:1 writes with an arbiter, for example. If we hit the limit, but continue to take writes, we
-may create a large gap across the oplog entries where there is no associated named snapshot. When
-the commit point begins to move forward again and we start deleting old snapshots again, the next
-snapshots will occur at the most recent OpTime and not be able to fill in the gap. In this case,
-once the commit point moves ahead into the gap, the committed snapshot will remain before the gap,
-and majority reads will read increasingly stale data until the commit point gets to the end of the
-gap. To reduce the chance of hitting the snapshot limit and this happening, we slow down the
-frequency with which we mark snapshots as “named snapshots” as we get closer to the limit.
+For information on how majority read concern works within a multi-document transaction, see the
+[Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section.
 
 **Linearizable** read concern actually does block for some time. Linearizability guarantees that if
 one thread does a write that is acknowledged and tells another thread about that write, then that
@@ -477,12 +468,20 @@ majority of nodes, linearizable reads satisfy all of the same guarantees of read
 and then some. Linearizable read concern reads are only done on the primary, and they only apply to
 single document reads, since linearizability is only defined as a property on single objects.
 
+Linearizable read concern is not allowed within a multi-document transaction.
+
+**Snapshot** read concern can only be run within a multi-document transaction. See the
+[Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section for
+more information.
+
 **afterOpTime** is another read concern option, only used internally, only for config servers as
 replica sets. **Read after optime** means that the read will block until the node has replicated
 writes after a certain OpTime. This means that if read concern local is specified it will wait until
 the local snapshot is beyond the specified OpTime. If read concern majority is specified it will
-wait until the committed snapshot is beyond the specified OpTime. In 3.6 this feature will be
-extended to support a sharded cluster and use a **Lamport Clock** to provide **causal consistency**.
+wait until the committed snapshot is beyond the specified OpTime.
+
+**afterClusterTime** is a read concern option used for supporting **causal consistency**.
+<!-- TODO: link to the Causal Consistency section of the Sharding Architecture Guide -->
 
 # Transactions
 
@@ -608,12 +607,11 @@ Until a `prepareTransaction` command is run for a particular transaction, it fol
 as a single replica set transaction. But once a transaction is in the prepared state, new operations
 cannot be added to it. The only way for a transaction to exit the prepared state is to either
 receive a `commitTransaction` or `abortTransaction` command. This means that prepared transactions
-<!-- TODO SERVER-43783: Link to recovery of transactions section -->
-must survive state transitions and failovers. Additionally, there are many situations that need to
-be prevented to preserve prepared transactions. For example, they cannot be killed or time out
-(nor can their sessions), manual updates to the transactions table are forbidden for transactions in
-the prepared state, and the prepare transaction oplog entry(s) cannot fall off the back of the
-oplog.
+must [survive state transitions and failovers](#state-transitions-and-failovers-with-transactions).
+Additionally, there are many situations that need to be prevented to preserve prepared transactions.
+For example, they cannot be killed or time out (nor can their sessions), manual updates to the
+transactions table are forbidden for transactions in the prepared state, and the prepare transaction
+oplog entry(s) cannot fall off the back of the oplog.
 
 ### Preparing a Transaction on the Primary
 
@@ -758,6 +756,50 @@ over all entries in the transactions table to see which transactions are still i
 state. At that point, the node will find the `prepareTransaction` oplog entry(s) associated with the
 transaction using the `TransactionHistoryIterator`. It will check out the session associated with
 the transaction, apply all the operations from the oplog entry(s) and prepare the transaction.
+
+## Read Concern Behavior Within Transactions
+
+The read concern for all operations within a transaction should be specified when starting the
+transaction. If no read concern was specified, the default read concern is local.
+
+Reads within a transaction behave differently from reads outside of a transaction because of
+**speculative** behavior. This means a transaction speculatively executes without ensuring that
+the data read won't be rolled back until it commits. No matter the read concern, when a node goes to
+commit a transaction, it waits for the data that it read to be majority committed *as long as the
+transaction was run with write concern majority*. Because of speculative behavior, this means that
+the transaction can only provide the guarantees of majority read concern, that data that it read
+won't roll back, if it is run with write concern majority.
+
+If the transaction did a write, then waiting for write concern is enough to ensure that all data
+read will have since become majority committed. However, if the transaction was read-only, the node
+will do a noop write and wait for that to be majority committed to provide the same guarantees.
+
+### Local and Majority Read Concerns
+
+There is currently no functional difference between a transaction with local and majority read
+concern. The node will do untimestamped reads in either case. When the transaction is started, it
+will choose the most recent snapshot to read from, so that it can read the freshest data.
+
+The node does untimestamped reads because reading at the
+[`all_durable`](#replication-timestamp-glossary) timestamp would mean that the node was reading
+potentially stale data. This would also allow for more write conflicts that abort the transaction,
+since there would be a larger window of time between when the read happens and when the transaction
+commits for an outside write to conflict.
+
+In theory, transactions with local read concern should not have to perform a noop write and wait for
+it to be majority committed when the transaction commits. However, we intend to make "majority" the
+default read concern level for transactions, in order to be consistent with the observation that any
+MongoDB command that can write has speculative majority behavior (e.g. findAndModify). Until we
+change transactions to have majority as their default read concern, it's important that local and
+majority behave the same.
+
+### Snapshot Read Concern
+
+Snapshot read concern will choose a snapshot from which the transaction will read. If it is
+specified with an `atClusterTime` argument, then that will be used as the transaction's read
+timestamp. If `atClusterTime` is not specified, then the read timestamp of the transaction will be
+the [`all_durable`](#replication-timestamp-glossary) timestamp when the transaction is started,
+which ensures a snapshot with no oplog holes.
 
 # Concurrency Control
 
