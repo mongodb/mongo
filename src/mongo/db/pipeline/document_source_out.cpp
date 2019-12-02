@@ -207,11 +207,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createAndAllowDifferentD
             "{} cannot be used in a transaction"_format(kStageName),
             !expCtx->inMultiDocumentTransaction);
 
-    auto readConcernLevel = repl::ReadConcernArgs::get(expCtx->opCtx).getLevel();
-    uassert(ErrorCodes::InvalidOptions,
-            "{} cannot be used with a 'linearizable' read concern level"_format(kStageName),
-            readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
-
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, outputNs.ns()),
             outputNs.isValid());

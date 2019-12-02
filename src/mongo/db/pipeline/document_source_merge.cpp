@@ -373,11 +373,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             "{} cannot be used in a transaction"_format(kStageName),
             !expCtx->inMultiDocumentTransaction);
 
-    auto readConcernLevel = repl::ReadConcernArgs::get(expCtx->opCtx).getLevel();
-    uassert(ErrorCodes::InvalidOptions,
-            "{} cannot be used with a 'linearizable' read concern level"_format(kStageName),
-            readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
-
     uassert(31319,
             "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
             !outputNs.isSystem());
