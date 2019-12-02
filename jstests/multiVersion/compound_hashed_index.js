@@ -2,18 +2,17 @@
  * Tests the behaviour of compound hashed indexes with different FCV versions.
  *
  * Compound hashed index creation is enabled in 4.4. In this multi version test, we ensure that
- *  - We cannot create compound hashed index when binary is 4.4 and FCV is 4.2 or when binary
- *    is 4.2.
+ *  - We cannot create compound hashed index on binary 4.4 in FCV 4.2 or when binary is 4.2.
  *  - We can create compound hashed indexes when FCV is 4.4.
+ *  - Compound hashed indexes built on FCV 4.4 continue to work when we downgrade to FCV 4.2.
  *  - We can start the server with FCV 4.2 with existing compound hashed indexes.
  *  - We cannot start the server with 4.2 binary with existing compound hashed indexes.
  *  - A compound hashed index can be dropped while in FCV 4.2.
- *  - TODO SERVER-43913: Verify that a compound hashed index built in FCV 4.4 continues to work when
- *    we downgrade to FCV 4.2.
  */
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");           // For assertStagesForExplainOfCommand.
 load("jstests/multiVersion/libs/multi_rs.js");  // For upgradeSet.
 load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMajority.
 
@@ -83,12 +82,23 @@ jsTestLog("Can create a compound hashed index on binary 4.4 with FCV 4.4.");
 assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 assert.commandWorked(coll.createIndex({c: 1, a: "hashed", b: 1}));
 assert.commandWorked(coll.createIndex({b: "hashed", c: 1}));
-assert.commandWorked(coll.insert([{a: 1, b: 1, c: 1}, {a: 2, b: 2}]));
+assert.commandWorked(coll.insert([{_id: 0, a: 1, b: 1, c: 1}, {_id: 1, a: 2, b: 2}]));
 rst.awaitReplication();
 
 jsTestLog("Can use an existing compound hashed index after downgrading FCV to 4.2.");
-// TODO SERVER-43913: Verify that the queries can use the indexes created above.
 assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+// Insert one doc to be updated, one doc to be deleted, and one doc to remain as-is until queried.
+assert.commandWorked(
+    coll.insert([{_id: 2, b: 10, c: 2}, {_id: 3, a: 1, b: 3, c: 1}, {_id: 4, a: 1, b: 4, c: 1}]));
+assert.commandWorked(coll.update({c: 2}, {$set: {b: 2}}));
+assert.commandWorked(coll.remove({b: 3}));
+assertStagesForExplainOfCommand(
+    {coll: coll, cmdObj: {find: coll.getName(), filter: {b: 2}}, expectedStages: ["IXSCAN"]});
+assert.sameMembers(coll.find({b: 2}).toArray(), [{_id: 1, a: 2, b: 2}, {_id: 2, b: 2, c: 2}]);
+assertStagesForExplainOfCommand(
+    {coll: coll, cmdObj: {find: coll.getName(), filter: {c: 1, a: 1}}, expectedStages: ["IXSCAN"]});
+assert.sameMembers(coll.find({c: 1, a: 1}).toArray(),
+                   [{_id: 0, a: 1, b: 1, c: 1}, {_id: 4, a: 1, b: 4, c: 1}]);
 
 jsTestLog("Cannot create a new compound hashed index after downgrading FCV to 4.2.");
 let coll_other = testDB.coll;
