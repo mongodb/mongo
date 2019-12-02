@@ -75,7 +75,8 @@
 var ReplSetTest = function(opts) {
     'use strict';
 
-    load("jstests/libs/parallelTester.js");  // For Thread.
+    load("jstests/libs/parallelTester.js");   // For Thread.
+    load("jstests/libs/fail_point_util.js");  // For configureFailPoint.
 
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
@@ -924,14 +925,15 @@ var ReplSetTest = function(opts) {
      * pre-defined timeout. If a primary is available it will return a connection to it.
      * Otherwise throws an exception.
      */
-    this.getPrimary = function(timeout) {
+    this.getPrimary = function(timeout, retryIntervalMS) {
         timeout = timeout || self.kDefaultTimeoutMS;
+        retryIntervalMS = retryIntervalMS || 200;
         var primary = null;
 
         assert.soonNoExcept(function() {
             primary = _callIsMaster();
             return primary;
-        }, "Finding primary", timeout);
+        }, "Finding primary", timeout, retryIntervalMS);
 
         return primary;
     };
@@ -1120,27 +1122,55 @@ var ReplSetTest = function(opts) {
 
         cmd[cmdKey] = config;
 
-        // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error if a
-        // heartbeat times out during the quorum check. They may also fail with
-        // NewReplicaSetConfigurationIncompatible on similar timeout during the config validation
-        // stage while deducing isSelf(). This can fail with an InterruptedDueToReplStateChange
-        // error when interrupted. We try several times, to reduce the chance of failing this way.
-        replSetCommandWithRetry(master, cmd);
-        this.getPrimary();  // Blocks until there is a primary.
-
         // Initiating a replica set with a single node will use "latest" FCV. This will
         // cause IncompatibleServerVersion errors if additional "last-stable" binary version
         // nodes are subsequently added to the set, since such nodes cannot set their FCV to
         // "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
         // nodes of different binary versions to the replica set.
         let lastStableBinVersionWasSpecifiedForSomeNode = false;
+        let explicitBinVersionWasSpecifiedForSomeNode = false;
         Object.keys(this.nodeOptions).forEach(function(key, index) {
             let val = self.nodeOptions[key];
-            if (typeof (val) === "object" && val.hasOwnProperty("binVersion") &&
-                MongoRunner.areBinVersionsTheSame(val.binVersion, lastStableFCV)) {
-                lastStableBinVersionWasSpecifiedForSomeNode = true;
+            if (typeof (val) === "object" && val.hasOwnProperty("binVersion")) {
+                lastStableBinVersionWasSpecifiedForSomeNode =
+                    MongoRunner.areBinVersionsTheSame(val.binVersion, lastStableFCV);
+                explicitBinVersionWasSpecifiedForSomeNode = true;
             }
         });
+
+        // If no binVersions have been explicitly set, then we should be using the latest binary
+        // version, which allows us to use the failpoint below.
+        let explicitBinVersion =
+            (self.startOptions !== undefined && self.startOptions.hasOwnProperty("binVersion")) ||
+            explicitBinVersionWasSpecifiedForSomeNode;
+
+        // Skip waiting for new data to appear in the oplog buffer when transitioning to primary.
+        // This makes step up much faster for a node that doesn't need to drain any oplog
+        // operations. If a test has explicitly disabled test commands or if we may be running an
+        // older mongod version then we cannot utilize this failpoint. It is only an optimization so
+        // it's OK if we bypass it in some suites.
+        let skipWaitFp;
+        if (jsTest.options().enableTestCommands && !explicitBinVersion) {
+            skipWaitFp = configureFailPoint(this.nodes[0], "skipOplogBatcherWaitForData");
+        }
+
+        // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error if a
+        // heartbeat times out during the quorum check. They may also fail with
+        // NewReplicaSetConfigurationIncompatible on similar timeout during the config validation
+        // stage while deducing isSelf(). This can fail with an InterruptedDueToReplStateChange
+        // error when interrupted. We try several times, to reduce the chance of failing this way.
+        const initiateStart = new Date();  // Measure the execution time of this section.
+        replSetCommandWithRetry(master, cmd);
+
+        // Blocks until there is a primary. We use a faster retry interval here since we expect the
+        // primary to be ready very soon. We also turn the failpoint off once we have a primary.
+        this.getPrimary(self.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+        if (jsTest.options().enableTestCommands && !explicitBinVersion) {
+            skipWaitFp.off();
+        }
+
+        print("ReplSetTest initiate command took " + (new Date() - initiateStart) + "ms for " +
+              this.nodes.length + " nodes in set '" + this.name + "'");
 
         // Set the FCV to 'last-stable' if we are running a mixed version replica set. If this is a
         // config server, the FCV will be set as part of ShardingTest.

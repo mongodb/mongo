@@ -38,6 +38,7 @@
 
 namespace mongo {
 namespace repl {
+MONGO_FAIL_POINT_DEFINE(skipOplogBatcherWaitForData);
 
 OplogBatcher::OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
     : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops(0) {}
@@ -294,8 +295,12 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
                 if (_oplogApplier->inShutdown()) {
                     ops.setMustShutdownFlag();
                 } else {
-                    // Block up to 1 second.
-                    _oplogBuffer->waitForData(Seconds(1));
+                    // Block up to 1 second. Skip waiting if the failpoint is enabled.
+                    if (MONGO_unlikely(skipOplogBatcherWaitForData.shouldFail())) {
+                        // do no waiting.
+                    } else {
+                        _oplogBuffer->waitForData(Seconds(1));
+                    }
                 }
             }
         }
