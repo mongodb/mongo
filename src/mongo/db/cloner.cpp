@@ -175,7 +175,6 @@ struct Cloner::Fun {
                                 opCtx, to_collection));
                 }
 
-                // TODO: SERVER-16598 abort if original db or collection is gone.
                 db = databaseHolder->getDb(opCtx, _dbName);
                 uassert(28593,
                         str::stream() << "Database " << _dbName << " dropped while cloning",
