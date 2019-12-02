@@ -801,6 +801,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             BSON("shard" << name),
             ShardingCatalogClient::kLocalWriteConcern));
 
+        Lock::ExclusiveLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+
         uassertStatusOKWithContext(
             catalogClient->updateConfigDocument(opCtx,
                                                 ShardType::ConfigNS,

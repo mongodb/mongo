@@ -722,6 +722,26 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+    // Must hold the shard lock until the entire commit finishes to serialize with removeShard.
+    Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+    auto shardResult = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ShardType::ConfigNS,
+                                            BSON(ShardType::name(toShard.toString())),
+                                            {},
+                                            boost::none));
+
+    uassert(ErrorCodes::ShardNotFound,
+            str::stream() << "shard " << toShard << " does not exist",
+            !shardResult.docs.empty());
+
+    auto shard = uassertStatusOK(ShardType::fromBSON(shardResult.docs.front()));
+    uassert(ErrorCodes::ShardNotFound,
+            str::stream() << toShard << " is draining",
+            !shard.getDraining());
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations.
     //

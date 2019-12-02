@@ -586,6 +586,10 @@ private:
     // True if initializeConfigDatabaseIfNeeded() has been called and returned successfully.
     bool _configInitialized{false};  // (M)
 
+    // Resource lock order:
+    // _kShardMembershipLock -> _kChunkOpLock
+    // _kZoneOpLock
+
     /**
      * Lock for shard zoning operations. This should be acquired when doing any operations that
      * can affect the config.tags collection or the tags field of the config.shards collection.
@@ -607,10 +611,6 @@ private:
     /**
      * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
      * requests).
-     * TODO: Currently only taken during addShard requests, this should also be taken in X mode
-     * during removeShard, once removeShard is moved to run on the config server primary instead of
-     * on mongos.  At that point we should also change any operations that expect the shard not to
-     * be removed while they are running (such as removeShardFromZone) to take this in shared mode.
      */
     Lock::ResourceMutex _kShardMembershipLock;
 
