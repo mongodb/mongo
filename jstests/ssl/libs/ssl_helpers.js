@@ -273,13 +273,28 @@ function isRHEL8() {
     return false;
 }
 
+function isDebian10() {
+    if (_isWindows()) {
+        return false;
+    }
+
+    // Debian 10 disables TLS 1.0 and TLS 1.1 as part their default crypto policy
+    // We skip tests on Debian 10 that require these versions as a result.
+    try {
+        // on non-debian systems, cat will throw here (file doesn't exist)
+        const debianVersion = cat("/etc/debian_version").toLowerCase();
+        return debianVersion.includes("10") || debianVersion.includes("buster");
+    } catch (e) {
+        return false;
+    }
+}
+
 function sslProviderSupportsTLS1_0() {
     if (isRHEL8()) {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
-
-    return true;
+    return !isDebian10();
 }
 
 function sslProviderSupportsTLS1_1() {
@@ -287,6 +302,5 @@ function sslProviderSupportsTLS1_1() {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
-
-    return true;
+    return !isDebian10();
 }
