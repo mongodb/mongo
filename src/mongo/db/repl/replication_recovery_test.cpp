@@ -46,6 +46,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -200,6 +201,8 @@ private:
         _consistencyMarkers.reset();
 
         ServiceContextMongoDTest::tearDown();
+        storageGlobalParams.readOnly = false;
+        gTakeUnstableCheckpointOnShutdown = false;
     }
 
     void _createOpCtx() {
@@ -1183,6 +1186,145 @@ TEST_F(ReplicationRecoveryTest,
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogAsStandaloneFailsWithoutStableCheckpoint,
+             "Fatal Assertion 31229") {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogAsStandaloneFailsWithNullStableCheckpoint,
+             "Fatal Assertion 50806") {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(0, 0));
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneRecoversOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+    _assertDocsInTestCollection(opCtx, {5});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+
+    // Test the node is readOnly.
+    ASSERT_THROWS(getStorageInterface()->insertDocument(opCtx, testNs, {_makeInsertDocument(2)}, 1),
+                  AssertionException);
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownRecoversOplog) {
+    gTakeUnstableCheckpointOnShutdown = true;
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+    _assertDocsInTestCollection(opCtx, {5});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownIsIdempotent) {
+    gTakeUnstableCheckpointOnShutdown = true;
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2});
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+    _assertDocsInTestCollection(opCtx, {});
+}
+
+DEATH_TEST_F(
+    ReplicationRecoveryTest,
+    RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithInitialSyncFlag,
+    "Fatal Assertion 31362") {
+    gTakeUnstableCheckpointOnShutdown = true;
+
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setInitialSyncFlag(opCtx);
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+DEATH_TEST_F(
+    ReplicationRecoveryTest,
+    RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithOplogTruncateAfterPoint,
+    "Fatal Assertion 31363") {
+    gTakeUnstableCheckpointOnShutdown = true;
+
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithEmptyOplog,
+             "Fatal Assertion 31364") {
+    gTakeUnstableCheckpointOnShutdown = true;
+
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {});
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+DEATH_TEST_F(
+    ReplicationRecoveryTest,
+    RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithMismatchedAppliedThrough,
+    "Fatal Assertion 31365") {
+    gTakeUnstableCheckpointOnShutdown = true;
+
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithHighMinValid,
+             "Fatal Assertion 31366") {
+    gTakeUnstableCheckpointOnShutdown = true;
+
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+    getConsistencyMarkers()->setMinValid(opCtx, OpTime(Timestamp(20, 20), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx);
 }
 
 }  // namespace

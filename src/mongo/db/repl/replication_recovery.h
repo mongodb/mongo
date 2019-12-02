@@ -55,6 +55,13 @@ public:
      */
     virtual void recoverFromOplog(OperationContext* opCtx,
                                   boost::optional<Timestamp> stableTimestamp) = 0;
+
+    /**
+     *  Recovers the data on disk from the oplog and puts the node in readOnly mode. If
+     *  'takeUnstableCheckpointOnShutdown' is specified and an unstable checkpoint is present,
+     *  ensures that recovery can be skipped safely.
+     */
+    virtual void recoverFromOplogAsStandalone(OperationContext* opCtx) = 0;
 };
 
 class ReplicationRecoveryImpl : public ReplicationRecovery {
@@ -68,7 +75,15 @@ public:
     void recoverFromOplog(OperationContext* opCtx,
                           boost::optional<Timestamp> stableTimestamp) override;
 
+    void recoverFromOplogAsStandalone(OperationContext* opCtx) override;
+
 private:
+    /**
+     * Confirms that the data and oplog all indicate that the nodes has an unstable checkpoint
+     * that is fully up to date.
+     */
+    void _assertNoRecoveryNeededOnUnstableCheckpoint(OperationContext* opCtx);
+
     /**
      * After truncating the oplog, completes recovery if we're recovering from a stable timestamp
      * or a stable checkpoint.

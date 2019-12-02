@@ -787,30 +787,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     if (!isReplEnabled()) {
         if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
-            if (!_storage->supportsRecoveryTimestamp(opCtx->getServiceContext())) {
-                severe() << "Cannot use 'recoverFromOplogAsStandalone' with a storage engine that "
-                            "does not support recover to stable timestamp.";
-                fassertFailedNoTrace(50805);
-            }
-            auto recoveryTS = _storage->getRecoveryTimestamp(opCtx->getServiceContext());
-            if (!recoveryTS || recoveryTS->isNull()) {
-                severe()
-                    << "Cannot use 'recoverFromOplogAsStandalone' without a stable checkpoint.";
-                fassertFailedNoTrace(50806);
-            }
-
-            // Initialize the cached pointer to the oplog collection.
-            acquireOplogCollectionForLogging(opCtx);
-
-            // We pass in "none" for the stable timestamp so that recoverFromOplog asks storage
-            // for the recoveryTimestamp just like on replica set recovery.
-            const auto stableTimestamp = boost::none;
-            _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
-            reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
-
-            warning() << "Setting mongod to readOnly mode as a result of specifying "
-                         "'recoverFromOplogAsStandalone'.";
-            storageGlobalParams.readOnly = true;
+            _replicationProcess->getReplicationRecovery()->recoverFromOplogAsStandalone(opCtx);
         }
 
         stdx::lock_guard<Latch> lk(_mutex);

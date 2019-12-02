@@ -47,6 +47,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
@@ -206,6 +207,92 @@ private:
 ReplicationRecoveryImpl::ReplicationRecoveryImpl(StorageInterface* storageInterface,
                                                  ReplicationConsistencyMarkers* consistencyMarkers)
     : _storageInterface(storageInterface), _consistencyMarkers(consistencyMarkers) {}
+
+void ReplicationRecoveryImpl::_assertNoRecoveryNeededOnUnstableCheckpoint(OperationContext* opCtx) {
+    invariant(_storageInterface->supportsRecoveryTimestamp(opCtx->getServiceContext()));
+    invariant(!_storageInterface->getRecoveryTimestamp(opCtx->getServiceContext()));
+
+    if (_consistencyMarkers->getInitialSyncFlag(opCtx)) {
+        severe() << "Unexpected recovery needed, initial sync flag set.";
+        fassertFailedNoTrace(31362);
+    }
+
+    const auto truncateAfterPoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
+    if (!truncateAfterPoint.isNull()) {
+        severe() << "Unexpected recovery needed, oplog requires truncation. Truncate after point: "
+                 << truncateAfterPoint.toString();
+        fassertFailedNoTrace(31363);
+    }
+
+    auto topOfOplogSW = _getTopOfOplog(opCtx);
+    if (!topOfOplogSW.isOK()) {
+        severe() << "Recovery not possible, no oplog found: " << topOfOplogSW.getStatus();
+        fassertFailedNoTrace(31364);
+    }
+    const auto topOfOplog = topOfOplogSW.getValue();
+
+    const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
+    if (!appliedThrough.isNull() && appliedThrough != topOfOplog) {
+        severe() << "Unexpected recovery needed, appliedThrough is not at top of oplog, indicating "
+                    "oplog has not been fully applied. appliedThrough: "
+                 << appliedThrough.toString();
+        fassertFailedNoTrace(31365);
+    }
+
+    const auto minValid = _consistencyMarkers->getMinValid(opCtx);
+    if (minValid > topOfOplog) {
+        severe() << "Unexpected recovery needed, top of oplog is not consistent. topOfOplog: "
+                 << topOfOplog << ", minValid: " << minValid;
+        fassertFailedNoTrace(31366);
+    }
+}
+
+void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opCtx) {
+    if (!_storageInterface->supportsRecoveryTimestamp(opCtx->getServiceContext())) {
+        severe() << "Cannot use 'recoverFromOplogAsStandalone' with a storage engine that "
+                    "does not support recover to stable timestamp.";
+        fassertFailedNoTrace(50805);
+    }
+
+    // A non-existent recoveryTS means the checkpoint is unstable. If the recoveryTS exists but
+    // is null, that means a stable checkpoint was taken at a null timestamp. This should never
+    // happen.
+    auto recoveryTS = _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
+    if (recoveryTS && recoveryTS->isNull()) {
+        severe() << "Cannot use 'recoverFromOplogAsStandalone' with stable checkpoint at null "
+                 << "timestamp.";
+        fassertFailedNoTrace(50806);
+    }
+
+    // Initialize the cached pointer to the oplog collection.
+    acquireOplogCollectionForLogging(opCtx);
+
+    if (recoveryTS) {
+        // We pass in "none" for the stable timestamp so that recoverFromOplog asks storage
+        // for the recoveryTimestamp just like on replica set recovery.
+        const auto stableTimestamp = boost::none;
+        recoverFromOplog(opCtx, stableTimestamp);
+    } else {
+        if (gTakeUnstableCheckpointOnShutdown) {
+            // Ensure 'recoverFromOplogAsStandalone' with 'takeUnstableCheckpointOnShutdown'
+            // is safely idempotent when it succeeds.
+            log() << "Recovering from unstable checkpoint with 'takeUnstableCheckpointOnShutdown'."
+                  << " Confirming that no oplog recovery is needed.";
+            _assertNoRecoveryNeededOnUnstableCheckpoint(opCtx);
+            log() << "Not doing any oplog recovery since there is an unstable checkpoint that is "
+                  << "up to date.";
+        } else {
+            severe() << "Cannot use 'recoverFromOplogAsStandalone' without a stable checkpoint.";
+            fassertFailedNoTrace(31229);
+        }
+    }
+
+    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
+
+    warning() << "Setting mongod to readOnly mode as a result of specifying "
+                 "'recoverFromOplogAsStandalone'.";
+    storageGlobalParams.readOnly = true;
+}
 
 void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
                                                boost::optional<Timestamp> stableTimestamp) try {
