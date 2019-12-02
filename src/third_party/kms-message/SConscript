@@ -31,6 +31,7 @@ env.Library(
     source=[
         'src/hexlify.c',
         'src/kms_b64.c',
+        'src/kms_caller_identity_request.c',
         'src/kms_decrypt_request.c',
         'src/kms_encrypt_request.c',
         'src/kms_kv_list.c',

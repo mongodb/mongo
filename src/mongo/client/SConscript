@@ -38,6 +38,41 @@ env.Library(
     ],
 )
 
+env.Library(
+    target=[
+        'sasl_iam_common',
+    ],
+    source=[
+        env.Idlc('sasl_iam_protocol_common.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
+    ],
+)
+
+kmsEnv = env.Clone()
+
+kmsEnv.InjectThirdParty(libraries=['kms-message'])
+
+kmsEnv.Library(
+    target=[
+        'sasl_iam_client',
+    ],
+    source=[
+        'sasl_iam_client_protocol.cpp',
+        env.Idlc('sasl_iam_client_protocol.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_kms_message',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
+        'sasl_iam_common',
+    ],
+)
+
 saslClientEnv = env.Clone()
 saslLibs = []
 saslClientSource = [
