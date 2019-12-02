@@ -37,6 +37,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -77,7 +78,8 @@ protected:
                                                 _source,
                                                 _mockClient.get(),
                                                 &_storageInterface,
-                                                _dbWorkThreadPool.get());
+                                                _dbWorkThreadPool.get(),
+                                                &_clock);
     }
 
     BSONObj createListCollectionsResponse(const std::vector<BSONObj>& collections) {
@@ -106,6 +108,7 @@ protected:
     std::map<NamespaceString, CollectionCloneInfo> _collections;
 
     static std::string _dbName;
+    ClockSourceMock _clock;
 };
 
 /* static */
@@ -386,6 +389,110 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
     stats = *collInfo.stats;
     ASSERT_EQUALS(0, stats.insertCount);
     ASSERT(stats.commitCalled);
+}
+
+TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    const BSONObj idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                                         << "_id_");
+    const BSONObj extraIndexSpec = BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
+                                            << "_extra_");
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
+                                              BSON(
+                                                  "name"
+                                                  << "b"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
+    _mockServer->setCommandReply(
+        "listIndexes",
+        {createCursorResponse(_dbName + ".a", BSON_ARRAY(idIndexSpec << extraIndexSpec)),
+         createCursorResponse(_dbName + ".b", BSON_ARRAY(idIndexSpec))});
+    auto cloner = makeDatabaseCloner();
+
+    auto collClonerBeforeFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    auto collClonerAfterFailPoint = globalFailPointRegistry().find("hangAfterClonerStage");
+    auto timesEntered = collClonerBeforeFailPoint->setMode(
+        FailPoint::alwaysOn,
+        0,
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName + ".a'}"));
+    collClonerAfterFailPoint->setMode(
+        FailPoint::alwaysOn,
+        0,
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName + ".a'}"));
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+    });
+    // Wait for the failpoint to be reached
+    collClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
+
+    // Collection stats should be set up with namespace.
+    auto stats = cloner->getStats();
+    ASSERT_EQ(_dbName, stats.dbname);
+    ASSERT_EQ(_clock.now(), stats.start);
+    ASSERT_EQ(2, stats.collections);
+    ASSERT_EQ(0, stats.clonedCollections);
+    ASSERT_EQ(2, stats.collectionStats.size());
+    ASSERT_EQ(_dbName + ".a", stats.collectionStats[0].ns);
+    ASSERT_EQ(_dbName + ".b", stats.collectionStats[1].ns);
+    ASSERT_EQ(_clock.now(), stats.collectionStats[0].start);
+    ASSERT_EQ(Date_t(), stats.collectionStats[0].end);
+    ASSERT_EQ(Date_t(), stats.collectionStats[1].start);
+    ASSERT_EQ(0, stats.collectionStats[0].indexes);
+    ASSERT_EQ(0, stats.collectionStats[1].indexes);
+    _clock.advance(Minutes(1));
+
+    // Move to the next collection
+    timesEntered = collClonerBeforeFailPoint->setMode(
+        FailPoint::alwaysOn,
+        0,
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName + ".b'}"));
+    collClonerAfterFailPoint->setMode(FailPoint::off);
+
+    // Wait for the failpoint to be reached
+    collClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
+
+    stats = cloner->getStats();
+    ASSERT_EQ(2, stats.collections);
+    ASSERT_EQ(1, stats.clonedCollections);
+    ASSERT_EQ(2, stats.collectionStats.size());
+    ASSERT_EQ(_dbName + ".a", stats.collectionStats[0].ns);
+    ASSERT_EQ(_dbName + ".b", stats.collectionStats[1].ns);
+    ASSERT_EQ(2, stats.collectionStats[0].indexes);
+    ASSERT_EQ(0, stats.collectionStats[1].indexes);
+    ASSERT_EQ(_clock.now(), stats.collectionStats[0].end);
+    ASSERT_EQ(_clock.now(), stats.collectionStats[1].start);
+    ASSERT_EQ(Date_t(), stats.collectionStats[1].end);
+    _clock.advance(Minutes(1));
+
+    // Finish
+    collClonerBeforeFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    stats = cloner->getStats();
+    ASSERT_EQ(_dbName, stats.dbname);
+    ASSERT_EQ(_clock.now(), stats.end);
+    ASSERT_EQ(2, stats.collections);
+    ASSERT_EQ(2, stats.clonedCollections);
+    ASSERT_EQ(2, stats.collectionStats.size());
+    ASSERT_EQ(_dbName + ".a", stats.collectionStats[0].ns);
+    ASSERT_EQ(_dbName + ".b", stats.collectionStats[1].ns);
+    ASSERT_EQ(2, stats.collectionStats[0].indexes);
+    ASSERT_EQ(1, stats.collectionStats[1].indexes);
+    ASSERT_EQ(_clock.now(), stats.collectionStats[1].end);
 }
 
 }  // namespace repl

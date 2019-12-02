@@ -133,5 +133,6 @@ private:
     bool _isFailed;
     uint64_t _sockCreationTime;
     bool _autoReconnect;
+    boost::optional<OpMsgRequest> _lastCursorMessage;
 };
 }  // namespace mongo

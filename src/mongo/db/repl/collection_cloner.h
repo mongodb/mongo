@@ -125,6 +125,16 @@ private:
     }
 
     /**
+     * The preStage sets the start time in _stats.
+     */
+    void preStage() final;
+
+    /**
+     * The postStage sets the end time in _stats.
+     */
+    void postStage() final;
+
+    /**
      * Stage function that counts the number of documents in the collection on the source in order
      * to generate progress information.
      */

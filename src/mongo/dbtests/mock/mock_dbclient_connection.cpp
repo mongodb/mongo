@@ -32,6 +32,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 
 #include "mongo/client/dbclient_mockcursor.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/time_support.h"
@@ -56,6 +57,7 @@ bool MockDBClientConnection::connect(const char* hostName,
                                      std::string& errmsg) {
     if (_remoteServer->isRunning()) {
         _remoteServerInstanceID = _remoteServer->getInstanceID();
+        _setServerRPCProtocols(rpc::supports::kAll);
         return true;
     }
 
@@ -69,6 +71,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
     checkConnection();
 
     try {
+        _lastCursorMessage = boost::none;
         auto reply = _remoteServer->runCommand(_remoteServerInstanceID, request);
         auto status = getStatusFromCommandResult(reply->getCommandReply());
         // The real DBClientBase always throws HostUnreachable on network error, so we do the
@@ -77,6 +80,10 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
                 str::stream() << "network error while attempting to run "
                               << "command '" << request.getCommandName() << "' " << status,
                 !ErrorCodes::isNetworkError(status));
+        auto cursorRes = CursorResponse::parseFromBSON(reply->getCommandReply());
+        if (cursorRes.isOK() && cursorRes.getValue().getCursorId() != 0) {
+            _lastCursorMessage = request;
+        }
         return {std::move(reply), this};
     } catch (const mongo::DBException&) {
         _isFailed = true;
@@ -169,7 +176,26 @@ bool MockDBClientConnection::call(mongo::Message& toSend,
                                   mongo::Message& response,
                                   bool assertOk,
                                   string* actualServer) {
-    verify(false);  // unimplemented
+    // Here we check for a getMore command, and if it is that, we respond with the next
+    // reply message from the previous command that returned a cursor response.
+    // This allows us to mock commands with implicit cursors (e.g. listCollections).
+    // It is not used for query() calls.
+    if (_lastCursorMessage && !toSend.empty() && toSend.operation() == dbMsg) {
+        // This might be a getMore.
+        OpMsg parsedMsg;
+        try {
+            parsedMsg = OpMsg::parse(toSend);
+        } catch (...) {
+            // Any exceptions in parsing fall through to unsupported case.
+        }
+        if (!parsedMsg.body.isEmpty() &&
+            parsedMsg.body.firstElement().fieldName() == "getMore"_sd) {
+            auto reply = runCommandWithTarget(*_lastCursorMessage).first;
+            response = reply.releaseMessage();
+            return true;
+        }
+    }
+    verify(false);  // unimplemented otherwise
     return false;
 }
 

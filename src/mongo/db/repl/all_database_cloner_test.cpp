@@ -424,6 +424,7 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
         0,
         fromjson("{cloner: 'DatabaseCloner', stage: 'listCollections', database: 'admin'}"));
 
+    _clock.advance(Minutes(1));
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
         Client::initThread("ClonerRunner");
@@ -440,8 +441,18 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     ASSERT_EQUALS("a", databases[2]);
 
     auto stats = cloner->getStats();
-    ASSERT_EQUALS(3, stats.databaseCount);
     ASSERT_EQUALS(0, stats.databasesCloned);
+    ASSERT_EQUALS(3, stats.databaseStats.size());
+    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
+    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(_clock.now(), stats.databaseStats[0].start);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[0].end);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[1].start);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[1].end);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[2].start);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[2].end);
+    _clock.advance(Minutes(1));
 
     // Allow the cloner to move to the next DB.
     timesEntered = dbClonerBeforeFailPoint->setMode(
@@ -457,9 +468,17 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
 
     stats = cloner->getStats();
-    ASSERT_EQUALS(3, stats.databaseCount);
     ASSERT_EQUALS(1, stats.databasesCloned);
+    ASSERT_EQUALS(3, stats.databaseStats.size());
     ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
+    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(_clock.now(), stats.databaseStats[0].end);
+    ASSERT_EQUALS(_clock.now(), stats.databaseStats[1].start);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[1].end);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[2].start);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[2].end);
+    _clock.advance(Minutes(1));
     ASSERT(isAdminDbValidFnCalled);
 
     // Allow the cloner to move to the last DB.
@@ -476,10 +495,15 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
 
     stats = cloner->getStats();
-    ASSERT_EQUALS(3, stats.databaseCount);
     ASSERT_EQUALS(2, stats.databasesCloned);
+    ASSERT_EQUALS(3, stats.databaseStats.size());
     ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
     ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
+    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(_clock.now(), stats.databaseStats[1].end);
+    ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].start);
+    ASSERT_EQUALS(Date_t(), stats.databaseStats[2].end);
+    _clock.advance(Minutes(1));
 
     // Allow the cloner to finish
     dbClonerBeforeFailPoint->setMode(FailPoint::off, 0);
@@ -487,11 +511,11 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     clonerThread.join();
 
     stats = cloner->getStats();
-    ASSERT_EQUALS(3, stats.databaseCount);
     ASSERT_EQUALS(3, stats.databasesCloned);
     ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
     ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
     ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].end);
 }
 
 TEST_F(AllDatabaseClonerTest, FailsOnListCollectionsOnOnlyDatabase) {

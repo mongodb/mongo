@@ -94,8 +94,12 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
 void AllDatabaseCloner::postStage() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        _stats.databaseCount = _databases.size();
         _stats.databasesCloned = 0;
+        _stats.databaseStats.reserve(_databases.size());
+        for (const auto& dbName : _databases) {
+            _stats.databaseStats.emplace_back();
+            _stats.databaseStats.back().dbname = dbName;
+        }
     }
     for (const auto& dbName : _databases) {
         {
@@ -138,7 +142,7 @@ void AllDatabaseCloner::postStage() {
         }
         {
             stdx::lock_guard<Latch> lk(_mutex);
-            _stats.databaseStats.emplace_back(_currentDatabaseCloner->getStats());
+            _stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
             _currentDatabaseCloner = nullptr;
             _stats.databasesCloned++;
         }
@@ -149,7 +153,7 @@ AllDatabaseCloner::Stats AllDatabaseCloner::getStats() const {
     stdx::lock_guard<Latch> lk(_mutex);
     AllDatabaseCloner::Stats stats = _stats;
     if (_currentDatabaseCloner) {
-        stats.databaseStats.emplace_back(_currentDatabaseCloner->getStats());
+        stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
     }
     return stats;
 }
@@ -159,8 +163,7 @@ std::string AllDatabaseCloner::toString() const {
     return str::stream() << "initial sync --"
                          << " active:" << isActive(lk) << " status:" << getStatus(lk).toString()
                          << " source:" << getSource()
-                         << " db cloners completed:" << _stats.databasesCloned
-                         << " db count:" << _stats.databaseCount;
+                         << " db cloners completed:" << _stats.databasesCloned;
 }
 
 std::string AllDatabaseCloner::Stats::toString() const {
@@ -175,7 +178,6 @@ BSONObj AllDatabaseCloner::Stats::toBSON() const {
 
 void AllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("databasesCloned", databasesCloned);
-    builder->appendNumber("databaseCount", databaseCount);
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));
         db.append(&dbBuilder);

@@ -4188,8 +4188,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
-        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
-                          BSON("databasesCloned" << 0 << "databaseCount" << 0));
+        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
         // Inject the listDatabases failure.
         _mockServer->setCommandReply(
@@ -4246,8 +4245,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
-        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
-                          BSON("databasesCloned" << 0 << "databaseCount" << 0));
+        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
         BSONObj attempts = progress["initialSyncAttempts"].Obj();
         ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
@@ -4444,73 +4442,86 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), 2U));
 
-    const std::size_t numCollections = 20000U;
-    const std::size_t numDatabases = 10;
+    const std::size_t numCollections = 200000U;
 
     auto net = getNet();
     int baseRollbackId = 1;
     {
-
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Set up the cloner data.  This must be done before providing the FCV to avoid races.
-        // listDatabases
-        std::vector<std::string> dbNames;
-        for (std::size_t i = 0; i < numDatabases; i++) {
-            char name[2] = {static_cast<char>('a' + i), 0};
-            dbNames.push_back(name);
-        }
-        NamespaceString nss("a.a");
-        _mockServer->setCommandReply("listDatabases", makeListDatabasesResponse(dbNames));
-
-        // listCollections
-        std::vector<BSONObj> collectionInfos;
-        for (std::size_t i = 0; i < numCollections; ++i) {
-            CollectionOptions options;
-            const std::string collName = str::stream() << "coll-" << i;
-            options.uuid = UUID::gen();
-            collectionInfos.push_back(BSON("name" << collName << "type"
-                                                  << "collection"
-                                                  << "options" << options.toBSON() << "info"
-                                                  << BSON("uuid" << *options.uuid)));
-        }
-        _mockServer->setCommandReply(
-            "listCollections", makeCursorResponse(0LL, nss.getCommandNS(), collectionInfos).data);
-
-        // All document counts are 0.
-        _mockServer->setCommandReply("count", BSON("n" << 0 << "ok" << 1));
-
-        // listIndexes for all collections.
-        _mockServer->setCommandReply(
-            "listIndexes",
-            makeCursorResponse(
-                0LL,
-                NamespaceString(nss.getCommandNS()),
-                {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
-                          << "_id_"
-                          << "ns" << nss.ns())})
-                .data);
+        auto collectionClonerFailPoint = globalFailPointRegistry().find("hangAfterClonerStage");
+        auto timesEntered = collectionClonerFailPoint->setMode(FailPoint::alwaysOn,
+                                                               0,
+                                                               BSON("cloner"
+                                                                    << "CollectionCloner"
+                                                                    << "stage"
+                                                                    << "count"));
+        ON_BLOCK_EXIT(
+            [collectionClonerFailPoint]() { collectionClonerFailPoint->setMode(FailPoint::off); });
 
         {
-            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
-            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
-                                                 kListDatabasesFailPointData);
+
+            executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+            // Base rollback ID.
+            net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+            // Oplog entry associated with the defaultBeginFetchingTimestamp.
+            processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+            // Send an empty optime as the response to the beginFetchingOptime find request, which
+            // will cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
+            auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
+                0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+            assertRemoteCommandNameEquals("find", request);
+            net->runReadyNetworkOperations();
+
+            // Oplog entry associated with the beginApplyingTimestamp.
+            processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+            // Set up the cloner data.  This must be done before providing the FCV to avoid races.
+            // listDatabases
+            NamespaceString nss("a.a");
+            _mockServer->setCommandReply("listDatabases",
+                                         makeListDatabasesResponse({nss.db().toString()}));
+
+            // listCollections for "a"
+            // listCollections data has to be broken up or it will trigger BSONObjTooLarge
+            // spuriously. We want it to be triggered for the stats, not the listCollections.
+            std::vector<BSONObj> collectionInfos[4];
+            for (std::size_t i = 0; i < numCollections; ++i) {
+                CollectionOptions options;
+                const std::string collName = str::stream() << "coll-" << i;
+                options.uuid = UUID::gen();
+                collectionInfos[(i * 4) / numCollections].push_back(
+                    BSON("name" << collName << "type"
+                                << "collection"
+                                << "options" << options.toBSON() << "info"
+                                << BSON("uuid" << *options.uuid)));
+            }
+            const bool notFirstBatch = false;
+            _mockServer->setCommandReply(
+                "listCollections",
+                {makeCursorResponse(1LL, nss.getCommandNS(), collectionInfos[0]).data,
+                 makeCursorResponse(1LL, nss.getCommandNS(), collectionInfos[1], notFirstBatch)
+                     .data,
+                 makeCursorResponse(1LL, nss.getCommandNS(), collectionInfos[2], notFirstBatch)
+                     .data,
+                 makeCursorResponse(0LL, nss.getCommandNS(), collectionInfos[3], notFirstBatch)
+                     .data});
+
+            // All document counts are 0.
+            _mockServer->setCommandReply("count", BSON("n" << 0 << "ok" << 1));
+
+            // listIndexes for all collections.
+            _mockServer->setCommandReply(
+                "listIndexes",
+                makeCursorResponse(
+                    0LL,
+                    NamespaceString(nss.getCommandNS()),
+                    {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
+                              << "_id_"
+                              << "ns" << nss.ns())})
+                    .data);
+
             // Feature Compatibility Version.
             processSuccessfulFCVFetcherResponseLastStable();
 
@@ -4521,18 +4532,20 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
             ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
             net->runReadyNetworkOperations();
         }
+
+        // Wait to reach the CollectionCloner, when stats should be populated;
+        collectionClonerFailPoint->waitForTimesEntered(timesEntered + 1);
+
+        // This returns a valid document because we omit the cloner stats when they do not fit in a
+        // BSON document.
+        auto progress = initialSyncer->getInitialSyncProgress();
+        ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+        ASSERT_FALSE(progress.hasField("databases")) << progress;
+
+        // Initial sync will attempt to log stats again at shutdown in a callback, where it should
+        // not terminate because we now return a valid stats document.
+        ASSERT_OK(initialSyncer->shutdown());
     }
-    getInitialSyncer().waitForCloner_forTest();
-
-    // This returns a valid document because we omit the cloner stats when they do not fit in a
-    // BSON document.
-    auto progress = initialSyncer->getInitialSyncProgress();
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
-    ASSERT_FALSE(progress.hasField("databases")) << progress;
-
-    // Initial sync will attempt to log stats again at shutdown in a callback, where it should not
-    // terminate because we now return a valid stats document.
-    ASSERT_OK(initialSyncer->shutdown());
 
     // Deliver cancellation signal to callbacks.
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();

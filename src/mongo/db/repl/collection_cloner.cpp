@@ -100,6 +100,16 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
 }
 
 
+void CollectionCloner::preStage() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _stats.start = getClock()->now();
+}
+
+void CollectionCloner::postStage() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _stats.end = getClock()->now();
+}
+
 // Collection cloner stages exit normally if the collection is not found.
 BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
     try {
