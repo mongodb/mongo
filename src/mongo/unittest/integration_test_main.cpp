@@ -37,7 +37,10 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/server_options_base.h"
+#include "mongo/db/server_options_helpers.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logger/logger.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -74,15 +77,32 @@ int main(int argc, char** argv, char** envp) {
     quickExit(unittest::Suite::run(std::vector<std::string>(), "", 1));
 }
 
+namespace {
+
 namespace moe = mongo::optionenvironment;
+
+MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+(InitializerContext* context) {
+    // Integration tests do not fork, however the init graph requires a deliberate initializer that
+    // _could_ fork and here choses not to do so.
+    return Status::OK();
+}
+
+MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(IntegrationTestOptions)(InitializerContext*) {
+    uassertStatusOK(addBaseServerOptions(&moe::startupOptions));
+
+    return Status::OK();
+}
 
 MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
     auto& opts = moe::startupOptions;
 
-    auto ret = env.validate();
+    if (auto ret = env.validate(); !ret.isOK()) {
+        return ret;
+    }
 
-    if (!ret.isOK()) {
+    if (auto ret = validateBaseOptions(env); !ret.isOK()) {
         return ret;
     }
 
@@ -95,7 +115,15 @@ MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
 }
 
 MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
-    const auto& env = moe::startupOptionsParsed;
+    auto& env = moe::startupOptionsParsed;
+
+    if (auto ret = canonicalizeBaseOptions(&env); !ret.isOK()) {
+        return ret;
+    }
+
+    if (auto ret = storeBaseOptions(env); !ret.isOK()) {
+        return ret;
+    }
 
     std::string connectionString = env["connectionString"].as<std::string>();
 
@@ -110,3 +138,5 @@ MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
 
     return Status::OK();
 }
+
+}  // namespace

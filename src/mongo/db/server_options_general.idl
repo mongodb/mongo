@@ -69,6 +69,12 @@ configs:
         hidden: true
         default: 30
 
+    'net.port':
+        description:
+            expr: 'ServerGlobalParams::getPortSettingHelpText()'
+            is_constexpr: false
+        short_name: port
+        arg_vartype: Int
     'net.ipv6':
         description: 'Enable IPv6 support (disabled by default)'
         short_name: ipv6

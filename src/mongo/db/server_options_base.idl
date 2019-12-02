@@ -90,12 +90,6 @@ configs:
         description: 'Quieter output'
         short_name: quiet
         arg_vartype: Switch
-    'net.port':
-        description:
-            expr: 'ServerGlobalParams::getPortSettingHelpText()'
-            is_constexpr: false
-        short_name: port
-        arg_vartype: Int
     logpath:
         # Cannot roll into systemLog.path because canonicalization also sets systemLog.destination.
         description: 'Log file to send write to instead of stdout - has to be a file, not directory'

@@ -35,6 +35,7 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/mongod_options_general_gen.h"
 #include "mongo/db/mongod_options_replication_gen.h"
+#include "mongo/db/server_options_general_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
 #include "mongo/embedded/embedded_options.h"
@@ -110,6 +111,7 @@ int mongoedMain(int argc, char* argv[], char** envp) {
         // Adding all options mongod we don't have to maintain a separate set for this executable,
         // some will be unused but that's fine as this is just an executable for testing purposes
         // anyway.
+        uassertStatusOK(addGeneralServerOptionDefinitions(&startupOptions));
         uassertStatusOK(addMongodGeneralOptions(&startupOptions));
         uassertStatusOK(addMongodReplicationOptions(&startupOptions));
         uassertStatusOK(embedded::addOptions(&startupOptions));
