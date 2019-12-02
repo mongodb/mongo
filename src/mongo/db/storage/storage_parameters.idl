@@ -56,3 +56,9 @@ server_parameters:
         validator:
             gte: 1
             lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+    takeUnstableCheckpointOnShutdown:
+        description: 'Take unstable checkpoint on shutdown'
+        cpp_vartype: bool
+        cpp_varname: gTakeUnstableCheckpointOnShutdown
+        set_at: startup
+        default: false

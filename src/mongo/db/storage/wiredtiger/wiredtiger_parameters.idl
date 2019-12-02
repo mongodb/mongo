@@ -71,12 +71,6 @@ server_parameters:
             expr: 'kDebugBuild ? 5 : 300'
         validator:
             gte: 0
-    takeUnstableCheckpointOnShutdown:
-        description: 'Take unstable checkpoint on shutdown'
-        cpp_vartype: bool
-        cpp_varname: gTakeUnstableCheckpointOnShutdown
-        set_at: startup
-        default: false
 
     # The "wiredTigerCursorCacheSize" parameter has the following meaning.
     #
