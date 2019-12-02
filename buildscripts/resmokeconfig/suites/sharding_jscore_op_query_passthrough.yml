@@ -35,7 +35,6 @@ selector:
   - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
-  - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
   - jstests/core/queryoptimizera.js  # "local" database. 
