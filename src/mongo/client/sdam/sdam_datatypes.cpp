@@ -53,31 +53,6 @@ std::string toString(const ServerType serverType) {
     }
 }
 
-StatusWith<ServerType> parseServerType(StringData strServerType) {
-    if (strServerType == "Standalone") {
-        return ServerType::kStandalone;
-    } else if (strServerType == "Mongos") {
-        return ServerType::kMongos;
-    } else if (strServerType == "RSPrimary") {
-        return ServerType::kRSPrimary;
-    } else if (strServerType == "RSSecondary") {
-        return ServerType::kRSSecondary;
-    } else if (strServerType == "RSArbiter") {
-        return ServerType::kRSArbiter;
-    } else if (strServerType == "RSOther") {
-        return ServerType::kRSOther;
-    } else if (strServerType == "RSGhost") {
-        return ServerType::kRSGhost;
-    } else if (strServerType == "PossiblePrimary" || strServerType == "Unknown") {
-        return ServerType::kUnknown;
-    } else {
-        std::stringstream errorMessage;
-        errorMessage << strServerType << " is an invalid ServerType.";
-        return StatusWith<ServerType>(ErrorCodes::InvalidServerType, errorMessage.str());
-    }
-}
-
-
 std::ostream& operator<<(std::ostream& os, const ServerType serverType) {
     os << toString(serverType);
     return os;

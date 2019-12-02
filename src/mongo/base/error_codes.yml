@@ -331,7 +331,6 @@ error_codes:
     - {code: 295,name: InvalidHeartBeatFrequency}
     - {code: 296,name: TopologySetNameRequired}
     - {code: 297,name: HierarchicalAcquisitionLevelViolation}
-    - {code: 298,name: InvalidServerType}
 
     # Error codes 4000-8999 are reserved.
 

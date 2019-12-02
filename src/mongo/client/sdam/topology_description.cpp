@@ -147,7 +147,7 @@ void TopologyDescription::removeServerDescription(const ServerAddress& serverAdd
 }
 
 void TopologyDescription::checkWireCompatibilityVersions() {
-    const WireVersionInfo supportedWireVersion = {BATCH_COMMANDS, LATEST_WIRE_VERSION};
+    const WireVersionInfo supportedWireVersion = WireSpec::instance().outgoing;
     std::ostringstream errorOss;
 
     _compatible = true;
@@ -228,47 +228,6 @@ void TopologyDescription::calculateLogicalSessionTimeout() {
         (foundNone || !hasDataBearingServer) ? boost::none : boost::make_optional(min);
 }
 
-BSONObj TopologyDescription::toBSON() {
-    BSONObjBuilder bson;
-
-    bson << "id" << _id.toString();
-    bson << "topologyType" << mongo::sdam::toString(_type);
-
-    BSONObjBuilder bsonServers;
-    for (auto server : this->getServers()) {
-        bsonServers << server->getAddress() << server->toBson();
-    }
-    bson.append("servers", bsonServers.obj());
-
-    if (_logicalSessionTimeoutMinutes) {
-        bson << "logicalSessionTimeoutMinutes" << *_logicalSessionTimeoutMinutes;
-    }
-
-    if (_setName) {
-        bson << "setName" << *_setName;
-    }
-
-    if (_compatible) {
-        bson << "compatible" << true;
-    } else {
-        bson << "compatible" << false;
-        bson << "compatibleError" << *_compatibleError;
-    }
-
-    if (_maxSetVersion) {
-        bson << "maxSetVersion" << *_maxSetVersion;
-    }
-
-    if (_maxElectionId) {
-        bson << "maxElectionId" << *_maxElectionId;
-    }
-
-    return bson.obj();
-}
-
-std::string TopologyDescription::toString() {
-    return toBSON().toString();
-}
 
 ////////////////////////
 // SdamConfiguration

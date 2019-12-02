@@ -172,15 +172,13 @@ void ServerDescription::parseTypeFromIsMaster(const BSONObj isMaster) {
         t = ServerType::kStandalone;
     } else if (kIsDbGrid == isMaster.getStringField("msg")) {
         t = ServerType::kMongos;
-    } else if (hasSetName && isMaster.getBoolField("hidden")) {
-        t = ServerType::kRSOther;
     } else if (hasSetName && isMaster.getBoolField("ismaster")) {
         t = ServerType::kRSPrimary;
     } else if (hasSetName && isMaster.getBoolField("secondary")) {
         t = ServerType::kRSSecondary;
     } else if (hasSetName && isMaster.getBoolField("arbiterOnly")) {
         t = ServerType::kRSArbiter;
-    } else if (hasSetName) {
+    } else if (hasSetName && isMaster.getBoolField("hidden")) {
         t = ServerType::kRSOther;
     } else if (isMaster.getBoolField("isreplicaset")) {
         t = ServerType::kRSGhost;
@@ -337,11 +335,6 @@ BSONObj ServerDescription::toBson() const {
     if (_logicalSessionTimeoutMinutes) {
         bson.append("logicalSessionTimeoutMinutes", *_logicalSessionTimeoutMinutes);
     }
-
-    bson.append("hosts", _hosts);
-    bson.append("arbiters", _arbiters);
-    bson.append("passives", _passives);
-
     return bson.obj();
 }
 

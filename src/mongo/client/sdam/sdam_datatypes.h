@@ -67,7 +67,6 @@ enum class ServerType {
 };
 const std::vector<ServerType> allServerTypes();
 std::string toString(const ServerType serverType);
-StatusWith<ServerType> parseServerType(StringData strServerType);
 std::ostream& operator<<(std::ostream& os, const ServerType serverType);
 
 using ServerAddress = std::string;

@@ -116,10 +116,6 @@ protected:
             allExceptPrimary.end());
         return allExceptPrimary;
     }
-
-    static constexpr auto getServerDescriptionAddress = [](const auto& serverDescription) {
-        return serverDescription->getAddress();
-    };
 };
 
 TEST_F(TopologyStateMachineTestFixture, ShouldInstallServerDescriptionInSingleTopology) {
@@ -159,70 +155,6 @@ TEST_F(TopologyStateMachineTestFixture, ShouldRemoveServerDescriptionIfNotInHost
     stateMachine.onServerDescription(topologyDescription, serverDescription);
     ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription.getServers().size());
     ASSERT_EQUALS(serverDescription, topologyDescription.getServers().front());
-}
-
-
-TEST_F(TopologyStateMachineTestFixture,
-       ShouldNotRemoveReplicaSetMemberServerWhenTopologyIsReplicaSetNoPrimaryAndMeIsNotPresent) {
-    const auto serverAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
-
-    TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
-    TopologyDescription topologyDescription(kTwoSeedReplicaSetNoPrimaryConfig);
-
-    auto serverDescription = ServerDescriptionBuilder()
-                                 .withAddress(serverAddress)
-                                 .withType(ServerType::kRSSecondary)
-                                 .withSetName(*topologyDescription.getSetName())
-                                 .instance();
-
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
-    auto serversBefore = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
-                                                                  getServerDescriptionAddress);
-
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-
-    auto serversAfter = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
-                                                                 getServerDescriptionAddress);
-    ASSERT_EQUALS(serversBefore, serversAfter);
-}
-
-TEST_F(TopologyStateMachineTestFixture,
-       ShouldNotRemoveNonPrimaryServerWhenTopologyIsReplicaSetWithPrimaryAndMeIsNotPresent) {
-    const auto serverAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
-    const auto primaryAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).back();
-
-    TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
-    TopologyDescription topologyDescription(kTwoSeedReplicaSetNoPrimaryConfig);
-
-    auto primaryDescription = ServerDescriptionBuilder()
-                                  .withAddress(primaryAddress)
-                                  .withMe(primaryAddress)
-                                  .withHost(primaryAddress)
-                                  .withHost(serverAddress)
-                                  .withSetName(*topologyDescription.getSetName())
-                                  .withType(ServerType::kRSPrimary)
-                                  .instance();
-
-    auto serverDescription = ServerDescriptionBuilder()
-                                 .withAddress(serverAddress)
-                                 .withType(ServerType::kRSSecondary)
-                                 .withSetName(*topologyDescription.getSetName())
-                                 .instance();
-
-    // change topology type to ReplicaSetWithPrimary
-    stateMachine.onServerDescription(topologyDescription, primaryDescription);
-    ASSERT_EQUALS(topologyDescription.getType(), TopologyType::kReplicaSetWithPrimary);
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
-
-    auto serversBefore = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
-                                                                  getServerDescriptionAddress);
-
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(topologyDescription.getType(), TopologyType::kReplicaSetWithPrimary);
-
-    auto serversAfter = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
-                                                                 getServerDescriptionAddress);
-    ASSERT_EQUALS(serversBefore, serversAfter);
 }
 
 TEST_F(TopologyStateMachineTestFixture,
