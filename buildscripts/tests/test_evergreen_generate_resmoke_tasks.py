@@ -680,6 +680,14 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         expected_exec_timeout = under_test.calculate_timeout(suites[0].get_runtime(), 3) * 5
         self.assertEqual(expected_exec_timeout, timeout_cmd["params"]["exec_timeout_secs"])
 
+    def test_evg_config_has_fails_if_timeout_too_high(self):
+        options = self.generate_mock_options()
+        options.repeat_suites = under_test.MAX_EXPECTED_TIMEOUT
+        suites = self.generate_mock_suites(3)
+
+        with self.assertRaises(ValueError):
+            under_test.EvergreenConfigGenerator(suites, options, MagicMock()).generate_config()
+
     def test_evg_config_does_not_overwrite_repeatSuites_resmoke_arg_with_repeatSuites_default(self):
         options = self.generate_mock_options()
         options.resmoke_args = "resmoke_args --repeatSuites=5"

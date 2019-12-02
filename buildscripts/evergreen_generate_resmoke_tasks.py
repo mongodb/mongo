@@ -8,6 +8,7 @@ to attempt to keep the task runtime under a specified amount.
 from copy import deepcopy
 import datetime
 from datetime import timedelta
+from inspect import getframeinfo, currentframe
 import logging
 import math
 import os
@@ -46,6 +47,7 @@ LOGGER = structlog.getLogger(__name__)
 DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 CONFIG_FILE = "./.evergreen.yml"
 MIN_TIMEOUT_SECONDS = int(timedelta(minutes=5).total_seconds())
+MAX_EXPECTED_TIMEOUT = int(timedelta(hours=48).total_seconds())
 LOOKBACK_DURATION_DAYS = 14
 GEN_SUFFIX = "_gen"
 
@@ -500,6 +502,17 @@ class EvergreenConfigGenerator(object):
                 exec_timeout = calculate_timeout(expected_suite_runtime, 3) * repeat_factor
                 LOGGER.debug("Setting exec_timeout", exec_timeout=exec_timeout,
                              suite_runtime=expected_suite_runtime, factor=repeat_factor)
+
+            if timeout > MAX_EXPECTED_TIMEOUT or exec_timeout > MAX_EXPECTED_TIMEOUT:
+                frameinfo = getframeinfo(currentframe())
+                LOGGER.error(
+                    "This task looks like it is expected to run far longer than normal. This is "
+                    "likely due to setting the suite 'repeat' value very high. If you are sure "
+                    "this is something you want to do, comment this check out in your patch build "
+                    "and resubmit", repeat_value=repeat_factor, timeout=timeout,
+                    exec_timeout=exec_timeout, code_file=frameinfo.filename,
+                    code_line=frameinfo.lineno, max_timeout=MAX_EXPECTED_TIMEOUT)
+                raise ValueError("Failing due to expected runtime.")
             return TimeoutInfo.overridden(timeout=timeout, exec_timeout=exec_timeout)
 
         return TimeoutInfo.default_timeout()
