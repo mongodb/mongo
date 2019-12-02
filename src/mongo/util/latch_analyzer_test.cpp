@@ -33,6 +33,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/latch_analyzer.h"
 
 namespace mongo {
 namespace {
@@ -45,10 +46,11 @@ DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasAbsent, "Fatal assertion 31360") {
 
     Mutex lowerLevel = MONGO_MAKE_LATCH(
         Level(1), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddInvalidWasAbsent::lowerLevel");
-    lowerLevel.lock();
     Mutex higherLevel = MONGO_MAKE_LATCH(Level(2),
                                          (SourceLocationHolder)MONGO_SOURCE_LOCATION(),
                                          "AddInvalidWasAbsent::higherLevel");
+
+    lowerLevel.lock();
     higherLevel.lock();
 }
 
@@ -57,6 +59,7 @@ DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasPresent, "Fatal assertion 31360") {
         Level(1), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddInvalidWasPresent::m1");
     Mutex m2 = MONGO_MAKE_LATCH(
         Level(1), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddInvalidWasPresent::m2");
+
     m1.lock();
     m2.lock();
 }
@@ -64,7 +67,7 @@ DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasPresent, "Fatal assertion 31360") {
 DEATH_TEST_F(LatchAnalyzerTest, RemoveInvalidWasAbsent, "Fatal assertion 31361") {
     Mutex m = MONGO_MAKE_LATCH(
         Level(1), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "RemoveInvalidWasAbsent::m");
-    m.unlock();
+
     m.unlock();
 }
 
@@ -72,10 +75,11 @@ DEATH_TEST_F(LatchAnalyzerTest, RemoveInvalidWasPresent, "Fatal assertion 31361"
     Mutex higherLevel = MONGO_MAKE_LATCH(Level(2),
                                          (SourceLocationHolder)MONGO_SOURCE_LOCATION(),
                                          "RemoveInvalidWasPresent::higherLevel");
-    higherLevel.lock();
     Mutex lowerLevel = MONGO_MAKE_LATCH(Level(1),
                                         (SourceLocationHolder)MONGO_SOURCE_LOCATION(),
                                         "RemoveInvalidWasPresent::lowerLevel");
+
+    higherLevel.lock();
     lowerLevel.lock();
     higherLevel.unlock();
 }
@@ -83,10 +87,17 @@ DEATH_TEST_F(LatchAnalyzerTest, RemoveInvalidWasPresent, "Fatal assertion 31361"
 TEST_F(LatchAnalyzerTest, AddValidWasAbsent) {
     Mutex higherLevel = MONGO_MAKE_LATCH(
         Level(2), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddValidWasAbsent::higherLevel");
-    higherLevel.lock();
     Mutex lowerLevel = MONGO_MAKE_LATCH(
         Level(1), (SourceLocationHolder)MONGO_SOURCE_LOCATION(), "AddValidWasAbsent::lowerLevel");
+
+    higherLevel.lock();
     lowerLevel.lock();
+
+    {
+        LatchAnalyzerDisabledBlock block;
+        higherLevel.unlock();
+        lowerLevel.unlock();
+    }
 }
 
 TEST_F(LatchAnalyzerTest, RemoveValidWasPresent) {
@@ -94,11 +105,15 @@ TEST_F(LatchAnalyzerTest, RemoveValidWasPresent) {
     Mutex higherLevel = MONGO_MAKE_LATCH(Level(2),
                                          (SourceLocationHolder)MONGO_SOURCE_LOCATION(),
                                          "RemoveValidWasPresent::higherLevel");
-    higherLevel.lock();
     Mutex lowerLevel = MONGO_MAKE_LATCH(Level(1),
                                         (SourceLocationHolder)MONGO_SOURCE_LOCATION(),
                                         "RemoveValidWasPresent::lowerLevel");
-    lowerLevel.lock();
+
+    {
+        LatchAnalyzerDisabledBlock block;
+        higherLevel.lock();
+        lowerLevel.lock();
+    }
 
     lowerLevel.unlock();
     higherLevel.unlock();

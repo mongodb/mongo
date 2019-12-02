@@ -36,6 +36,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
@@ -92,6 +93,8 @@ public:
 
     Mutex(const Identity& id) : _id(id) {}
 
+    ~Mutex();
+
     struct LatchSetState {
         hierarchical_acquisition_detail::Set levelsHeld;
     };
@@ -121,6 +124,8 @@ private:
     static void _onQuickLock(const Identity& id) noexcept;
     static void _onSlowLock(const Identity& id) noexcept;
     static void _onUnlock(const Identity& id) noexcept;
+
+    bool _isLocked = false;
 
     const Identity _id;
 

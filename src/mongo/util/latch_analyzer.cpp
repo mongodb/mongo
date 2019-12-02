@@ -31,10 +31,23 @@
 
 #include "mongo/db/client.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/latch_analyzer.h"
 
 namespace mongo {
 
 using Set = HierarchicalAcquisitionSet;
+
+LatchAnalyzer& LatchAnalyzer::get() {
+    static LatchAnalyzer gLatchAnalyzer;
+    return gLatchAnalyzer;
+}
+
+LatchAnalyzerDisabledBlock::LatchAnalyzerDisabledBlock() {
+    LatchAnalyzer::get().setEnabled(false);
+}
+LatchAnalyzerDisabledBlock::~LatchAnalyzerDisabledBlock() {
+    LatchAnalyzer::get().setEnabled(true);
+}
 
 namespace {
 
@@ -70,7 +83,7 @@ private:
         if (auto client = Client::getCurrent()) {
             auto& handle = getLatchSetState(client);
             auto result = handle.levelsHeld.add(id.level.get());
-            if (result != Set::AddResult::kValidWasAbsent) {
+            if (result != Set::AddResult::kValidWasAbsent && LatchAnalyzer::get().isEnabled()) {
                 // TODO: SERVER-44570 Create a non process-fatal variant of invariant()
                 fassert(31360,
                         Status(ErrorCodes::HierarchicalAcquisitionLevelViolation,
@@ -89,7 +102,7 @@ private:
         if (auto client = Client::getCurrent()) {
             auto& handle = getLatchSetState(client);
             auto result = handle.levelsHeld.remove(id.level.get());
-            if (result != Set::RemoveResult::kValidWasPresent) {
+            if (result != Set::RemoveResult::kValidWasPresent && LatchAnalyzer::get().isEnabled()) {
                 // TODO: SERVER-44570 Create a non process-fatal variant of invariant()
                 fassert(31361,
                         Status(ErrorCodes::HierarchicalAcquisitionLevelViolation,

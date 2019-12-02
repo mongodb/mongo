@@ -291,7 +291,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        "$BUILD_DIR/mongo/db/service_context",
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -563,8 +563,7 @@ icuEnv.CppUnitTest(
         'icu_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
-        # TODO Uncomment after SERVER-44746
-        # 'latch_analyzer_test.cpp',
+        'latch_analyzer_test.cpp',
         'lockable_adapter_test.cpp',
         'lru_cache_test.cpp',
         'md5_test.cpp',

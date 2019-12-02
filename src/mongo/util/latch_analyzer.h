@@ -27,73 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/mutex.h"
+#pragma once
 
 namespace mongo {
 
-Mutex::~Mutex() {
-    invariant(!_isLocked);
-}
+class LatchAnalyzer {
 
-void Mutex::lock() {
-    if (_mutex.try_lock()) {
-        _isLocked = true;
-        _onQuickLock(_id);
-        return;
+public:
+    static LatchAnalyzer& get();
+
+    void setEnabled(bool isEnabled) {
+        enabled.store(isEnabled);
+    }
+    bool isEnabled() {
+        return enabled.load();
     }
 
-    _onContendedLock(_id);
-    _mutex.lock();
-    _isLocked = true;
-    _onSlowLock(_id);
-}
-void Mutex::unlock() {
-    _onUnlock(_id);
-    _isLocked = false;
-    _mutex.unlock();
-}
-bool Mutex::try_lock() {
-    if (!_mutex.try_lock()) {
-        return false;
-    }
+private:
+    AtomicWord<bool> enabled{true};
+};
 
-    _isLocked = true;
-    _onQuickLock(_id);
-    return true;
-}
+class LatchAnalyzerDisabledBlock {
 
-void Mutex::addLockListener(LockListener* listener) {
-    auto& state = _getListenerState();
-
-    state.list.push_back(listener);
-}
-
-void Mutex::_onContendedLock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onContendedLock(id);
-    }
-}
-
-void Mutex::_onQuickLock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onQuickLock(id);
-    }
-}
-
-void Mutex::_onSlowLock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onSlowLock(id);
-    }
-}
-
-void Mutex::_onUnlock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onUnlock(id);
-    }
-}
+public:
+    LatchAnalyzerDisabledBlock();
+    ~LatchAnalyzerDisabledBlock();
+};
 
 }  // namespace mongo
