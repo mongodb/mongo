@@ -89,4 +89,7 @@ constexpr auto saslDefaultServiceName = "mongodb"_sd;
 // be digested.
 constexpr auto saslCommandDigestPasswordFieldName = "digestPassword"_sd;
 
+/// Field containing optional session token information for MONGODB-IAM sasl mechanism.
+constexpr auto saslCommandIamSessionToken = "awsIamSessionToken"_sd;
+
 }  // namespace mongo

@@ -47,7 +47,10 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/sasl_iam_client_options.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -691,7 +694,8 @@ static void edit(const std::string& whatToEdit) {
 namespace {
 bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
-        constexpr std::array<StringData, 2> passwordlessMechanisms{"GSSAPI"_sd, "MONGODB-X509"_sd};
+        constexpr std::array<StringData, 3> passwordlessMechanisms{
+            auth::kMechanismGSSAPI, auth::kMechanismMongoX509, auth::kMechanismMongoIAM};
         const std::string& authMechanism = authMechanisms.get();
         for (const auto& mechanism : passwordlessMechanisms) {
             if (mechanism.toString() == authMechanism) {
@@ -792,6 +796,13 @@ int _main(int argc, char* argv[], char** envp) {
     parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
     parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
     parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
+#ifdef MONGO_CONFIG_SSL
+    if (!iam::saslIamClientGlobalParams.awsSessionToken.empty()) {
+        parsedURI.setOptionIfNecessary("authmechanismproperties"s,
+                                       std::string("AWS_SESSION_TOKEN:") +
+                                           iam::saslIamClientGlobalParams.awsSessionToken);
+    }
+#endif
 
     if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
         std::stringstream ss;

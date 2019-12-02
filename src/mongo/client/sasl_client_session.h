@@ -69,6 +69,7 @@ public:
         parameterMechanism,
         parameterUser,
         parameterPassword,
+        parameterIamSessionToken,
         numParameters  // Must be last
     };
 

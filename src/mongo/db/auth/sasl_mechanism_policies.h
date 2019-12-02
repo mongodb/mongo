@@ -35,6 +35,21 @@
 
 namespace mongo {
 
+struct IAMPolicy {
+    static constexpr StringData getName() {
+        return "MONGODB-IAM"_sd;
+    }
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{SecurityProperty::kNoPlainText};
+    }
+    static int securityLevel() {
+        return 1;
+    }
+    static constexpr bool isInternalAuthMech() {
+        return false;
+    }
+};
+
 struct PLAINPolicy {
     static constexpr StringData getName() {
         return "PLAIN"_sd;
@@ -60,7 +75,7 @@ struct SCRAMSHA1Policy {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
     }
     static int securityLevel() {
-        return 1;
+        return 2;
     }
     static constexpr bool isInternalAuthMech() {
         return true;
@@ -77,7 +92,7 @@ struct SCRAMSHA256Policy {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
     }
     static int securityLevel() {
-        return true;
+        return 2;
     }
     static constexpr bool isInternalAuthMech() {
         return true;

@@ -54,10 +54,12 @@ const char kAuthMechanismPropertiesKey[] = "mechanism_properties";
 // CANONICALIZE_HOST_NAME is currently unsupported
 const char kAuthServiceName[] = "SERVICE_NAME";
 const char kAuthServiceRealm[] = "SERVICE_REALM";
+const char kAuthAwsSessionToken[] = "AWS_SESSION_TOKEN";
 
 const char kAuthMechDefault[] = "DEFAULT";
 
-const char* const kSupportedAuthMechanismProperties[] = {kAuthServiceName, kAuthServiceRealm};
+const char* const kSupportedAuthMechanismProperties[] = {
+    kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken};
 
 BSONObj parseAuthMechanismProperties(const std::string& propStr) {
     BSONObjBuilder bob;
@@ -105,7 +107,7 @@ boost::optional<BSONObj> MongoURI::_makeAuthObjFromOptions(
     it = _options.find("authMechanism");
     if (it != _options.end()) {
         bob.append(saslCommandMechanismFieldName, it->second);
-        if (it->second == auth::kMechanismMongoX509) {
+        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoIAM) {
             usernameRequired = false;
         }
     } else if (!saslMechsForAuth.empty()) {
@@ -154,6 +156,10 @@ boost::optional<BSONObj> MongoURI::_makeAuthObjFromOptions(
                 return boost::none;
             }
             username.append("@").append(parsed[kAuthServiceRealm].String());
+        }
+
+        if (parsed.hasField(kAuthAwsSessionToken)) {
+            bob.append(saslCommandIamSessionToken, parsed[kAuthAwsSessionToken].String());
         }
     }
 

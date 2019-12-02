@@ -144,9 +144,11 @@ Status configureSession(SaslClientSession* session,
     session->setParameter(SaslClientSession::parameterServiceHostAndPort, hostname.toString());
 
     status = bsonExtractStringField(saslParameters, saslCommandUserFieldName, &value);
-    if (!status.isOK())
+    if (status.isOK()) {
+        session->setParameter(SaslClientSession::parameterUser, value);
+    } else if ((targetDatabase != "$external") || (mechanism != "MONGODB-IAM")) {
         return status;
-    session->setParameter(SaslClientSession::parameterUser, value);
+    }
 
     const bool digestPasswordDefault = (mechanism == "SCRAM-SHA-1");
     bool digestPassword;
@@ -161,6 +163,11 @@ Status configureSession(SaslClientSession* session,
     } else if (!(status == ErrorCodes::NoSuchKey && targetDatabase == "$external")) {
         // $external users do not have passwords, hence NoSuchKey is expected
         return status;
+    }
+
+    status = bsonExtractStringField(saslParameters, saslCommandIamSessionToken, &value);
+    if (status.isOK()) {
+        session->setParameter(SaslClientSession::parameterIamSessionToken, value);
     }
 
     return session->initialize();

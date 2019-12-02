@@ -53,7 +53,7 @@ SecureRandom saslIAMClientGen;
 std::vector<char> generateClientNonce() {
 
     std::vector<char> ret;
-    ret.resize(iam::kClientFirstNonceLength);
+    ret.resize(kClientFirstNonceLength);
 
     {
         stdx::lock_guard<Latch> lk(saslIAMClientMutex);
@@ -108,14 +108,14 @@ AWSCredentials parseCredentials(StringData data) {
 }  // namespace
 
 
-std::string iam::generateClientFirst(std::vector<char>* clientNonce) {
+std::string generateClientFirst(std::vector<char>* clientNonce) {
     *clientNonce = generateClientNonce();
 
     IamClientFirst first;
     first.setNonce(*clientNonce);
     first.setGs2_cb_flag(static_cast<int>('n'));
 
-    return iam::convertToByteString(first);
+    return convertToByteString(first);
 }
 
 #define uassertKmsRequest(X) uassertKmsRequestInternal(request.get(), __FILE__, __LINE__, (X));
@@ -128,19 +128,19 @@ std::string generateClientSecond(StringData serverFirstBase64,
 
     uassert(51298,
             "Nonce must be 64 bytes",
-            serverFirst.getServerNonce().length() == iam::kServerFirstNonceLength);
+            serverFirst.getServerNonce().length() == kServerFirstNonceLength);
 
     uassert(51297,
             "First part of nonce must match client",
             std::equal(serverFirst.getServerNonce().data(),
-                       serverFirst.getServerNonce().data() + iam::kClientFirstNonceLength,
+                       serverFirst.getServerNonce().data() + kClientFirstNonceLength,
                        clientNonce.begin(),
                        clientNonce.end()) == true);
 
     uassert(51296,
             "Host name length is incorrect",
             !serverFirst.getStsHost().empty() &&
-                serverFirst.getStsHost().size() < iam::kMaxStsHostNameLength);
+                serverFirst.getStsHost().size() < kMaxStsHostNameLength);
 
     uassert(51295,
             "Host name is not allowed to have a empty DNS name part.",
@@ -157,7 +157,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
         kms_request_set_region(request.get(), getRegionFromHost(serverFirst.getStsHost()).c_str()));
 
     // sts is always the name of the service
-    uassertKmsRequest(kms_request_set_service(request.get(), iam::kAwsServiceName.rawData()));
+    uassertKmsRequest(kms_request_set_service(request.get(), kAwsServiceName.rawData()));
 
     uassertKmsRequest(kms_request_add_header_field(
         request.get(), "Host", serverFirst.getStsHost().toString().c_str()));
@@ -165,11 +165,11 @@ std::string generateClientSecond(StringData serverFirstBase64,
     auto serverNonce = serverFirst.getServerNonce();
     uassertKmsRequest(kms_request_add_header_field(
         request.get(),
-        iam::kMongoServerNonceHeader.rawData(),
+        kMongoServerNonceHeader.rawData(),
         base64::encode(serverNonce.data(), serverNonce.length()).c_str()));
 
     uassertKmsRequest(kms_request_add_header_field(
-        request.get(), iam::kMongoGS2CBHeader.rawData(), iam::kMongoDefaultGS2CBFlag.rawData()));
+        request.get(), kMongoGS2CBHeader.rawData(), kMongoDefaultGS2CBFlag.rawData()));
 
     uassertKmsRequest(
         kms_request_set_access_key_id(request.get(), credentials.accessKeyId.c_str()));
@@ -192,17 +192,17 @@ std::string generateClientSecond(StringData serverFirstBase64,
 
     second.setXAmzDate(kms_request_get_canonical_header(request.get(), kXAmzDateHeader.rawData()));
 
-    return iam::convertToByteString(second);
+    return convertToByteString(second);
 }
 
-std::string iam::getRegionFromHost(StringData host) {
-    if (host == iam::kAwsDefaultStsHost) {
-        return iam::kAwsDefaultRegion.toString();
+std::string getRegionFromHost(StringData host) {
+    if (host == kAwsDefaultStsHost) {
+        return kAwsDefaultRegion.toString();
     }
 
     size_t firstPeriod = host.find('.');
     if (firstPeriod == std::string::npos) {
-        return iam::kAwsDefaultRegion.toString();
+        return kAwsDefaultRegion.toString();
     }
 
     size_t secondPeriod = host.find('.', firstPeriod + 1);
@@ -213,7 +213,7 @@ std::string iam::getRegionFromHost(StringData host) {
     return host.substr(firstPeriod + 1, secondPeriod - firstPeriod - 1).toString();
 }
 
-std::string iam::parseRoleFromEC2IamSecurityCredentials(StringData data) {
+std::string parseRoleFromEC2IamSecurityCredentials(StringData data) {
     size_t pos = data.find('\n');
 
     uassert(
@@ -221,11 +221,11 @@ std::string iam::parseRoleFromEC2IamSecurityCredentials(StringData data) {
     return data.substr(0, pos).toString();
 }
 
-AWSCredentials iam::parseCredentialsFromEC2IamSecurityCredentials(StringData data) {
+AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(StringData data) {
     return parseCredentials<Ec2SecurityCredentials>(data);
 }
 
-AWSCredentials iam::parseCredentialsFromECSTaskIamCredentials(StringData data) {
+AWSCredentials parseCredentialsFromECSTaskIamCredentials(StringData data) {
     return parseCredentials<EcsTaskSecurityCredentials>(data);
 }
 

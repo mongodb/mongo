@@ -1,0 +1,16 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+
+global:
+    cpp_namespace: "mongo::iam"
+    configs:
+        section: 'IAM AWS Options'
+        source: [ cli ]
+    cpp_includes:
+        - mongo/client/sasl_iam_client_options.h
+
+configs:
+    awsIamSessionToken:
+        description: "AWS Session Token for temporary credentials"
+        arg_vartype: String
+        cpp_varname: saslIamClientGlobalParams.awsSessionToken
+

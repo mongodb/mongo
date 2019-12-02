@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import('env')
+Import("get_option")
 
 env = env.Clone()
 
@@ -85,6 +86,12 @@ saslClientSource = [
     'sasl_scram_client_conversation.cpp',
 ]
 
+if get_option('ssl') == 'on':
+    saslClientSource.extend([
+        'sasl_iam_client_conversation.cpp',
+        env.Idlc('sasl_iam_client_options.idl')[0],
+    ])
+
 # Add in actual sasl dependencies if sasl is enabled, otherwise
 # leave library empty so other targets can link to it unconditionally
 # without needing to first test MONGO_BUILD_SASL_CLIENT.
@@ -104,6 +111,7 @@ saslClientEnv.Library(
     target='sasl_client',
     source=saslClientSource,
     LIBDEPS=[
+        "sasl_iam_client" if get_option('ssl') == 'on' else '',
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/executor/remote_command',
@@ -113,6 +121,9 @@ saslClientEnv.Library(
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/net/http_client',
     ],
     SYSLIBDEPS=saslLibs,
 )
