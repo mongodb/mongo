@@ -117,7 +117,7 @@ public:
     ExpressionContext(OperationContext* opCtx,
                       const boost::optional<ExplainOptions::Verbosity>& explain,
                       bool fromMongos,
-                      bool needsmerge,
+                      bool needsMerge,
                       bool allowDiskUse,
                       bool bypassDocumentValidation,
                       const NamespaceString& ns,
@@ -293,6 +293,11 @@ public:
     // True if this ExpressionContext is associated with a Change Stream that should serialize its
     // "$sortKey" using the 4.2 format.
     bool use42ChangeStreamSortKeys = false;
+
+    // True if this context is associated with a pipeline which is permitted to use the new
+    // upsertSupplied mechanism for applicable $merge modes.
+    // TODO SERVER-44884: remove this when we branch for 4.5.
+    bool useNewUpsert = false;
 
     // True if this ExpressionContext is used to parse a view definition pipeline.
     bool isParsingViewDefinition = false;

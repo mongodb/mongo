@@ -212,6 +212,16 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             }
 
             request.setUse44SortKeys(elem.boolean());
+        } else if (fieldName == kUseNewUpsert) {
+            // TODO SERVER-44884: After branching for 4.5, we will continue to accept this option
+            // for upgrade purposes but will ignore it, as any supported version will be capable of
+            // using the new upsert mechanism. In 4.7 we will completely remove this parameter.
+            if (elem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kUseNewUpsert << " must be a boolean, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setUseNewUpsert(elem.boolean());
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -311,6 +321,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize runtime constants if any were specified.
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
         {kUse44SortKeys, _use44SortKeys ? Value(true) : Value()},
+        {kUseNewUpsert, _useNewUpsert ? Value(true) : Value()},
     };
 }
 }  // namespace mongo

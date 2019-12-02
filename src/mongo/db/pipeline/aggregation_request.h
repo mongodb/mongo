@@ -64,6 +64,7 @@ public:
     static constexpr StringData kExchangeName = "exchange"_sd;
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
     static constexpr StringData kUse44SortKeys = "use44SortKeys"_sd;
+    static constexpr StringData kUseNewUpsert = "useNewUpsert"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -221,6 +222,10 @@ public:
         return _use44SortKeys;
     }
 
+    bool getUseNewUpsert() const {
+        return _useNewUpsert;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -289,6 +294,10 @@ public:
         _use44SortKeys = use44SortKeys;
     }
 
+    void setUseNewUpsert(bool useNewUpsert) {
+        _useNewUpsert = useNewUpsert;
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -342,5 +351,9 @@ private:
     // All aggregation requests from mongos-4.4 set this flag, indicating that shard results should
     // use the updated sort key format when returning change stream results.
     bool _use44SortKeys = false;
+
+    // Indicates whether the aggregation may use the new 'upsertSupplied' mechanism when running
+    // $merge stages. All 4.4 mongoS and some versions of 4.2 set this flag.
+    bool _useNewUpsert = false;
 };
 }  // namespace mongo

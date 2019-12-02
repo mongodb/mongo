@@ -62,7 +62,12 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         std::move(collator),
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
-                        std::move(collUUID)) {}
+                        std::move(collUUID)) {
+    // Any request which did not originate from a mongoS, or which did originate from a mongoS but
+    // has the 'useNewUpsert' flag set, can use the new upsertSupplied mechanism for $merge.
+    // TODO SERVER-44884: Remove this flag after we branch for 4.5.
+    useNewUpsert = request.getUseNewUpsert() || !request.isFromMongos();
+}
 
 ExpressionContext::ExpressionContext(
     OperationContext* opCtx,
@@ -100,6 +105,12 @@ ExpressionContext::ExpressionContext(
         variables.setRuntimeConstants(*runtimeConstants);
     else
         variables.setDefaultRuntimeConstants(opCtx);
+
+    // Any request which did not originate from a mongoS can use the new upsertSupplied mechanism.
+    // This is used to set 'useNewUpsert' when constructing a MR context on mongoS or mongoD. The MR
+    // on mongoS will be issued as an aggregation to the shards and will use the other constructor.
+    // TODO SERVER-44884: Remove this flag after we branch for 4.5.
+    useNewUpsert = !fromMongos;
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
@@ -191,6 +202,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
     expCtx->subPipelineDepth = subPipelineDepth;
     expCtx->tempDir = tempDir;
+    expCtx->useNewUpsert = useNewUpsert;
 
     // ExpressionContext is used both universally in Agg and in Find within a $expr. In the case
     // that this context is for use in $expr, the collator will be unowned and we will pass nullptr

@@ -111,6 +111,7 @@ AggregationRequest ResolvedView::asExpandedViewAggregation(
     expandedRequest.setUnwrappedReadPref(request.getUnwrappedReadPref());
     expandedRequest.setBypassDocumentValidation(request.shouldBypassDocumentValidation());
     expandedRequest.setAllowDiskUse(request.shouldAllowDiskUse());
+    expandedRequest.setUseNewUpsert(request.getUseNewUpsert());
 
     // Operations on a view must always use the default collation of the view. We must have already
     // checked that if the user's request specifies a collation, it matches the collation of the
