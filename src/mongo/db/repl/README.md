@@ -801,6 +801,51 @@ timestamp. If `atClusterTime` is not specified, then the read timestamp of the t
 the [`all_durable`](#replication-timestamp-glossary) timestamp when the transaction is started,
 which ensures a snapshot with no oplog holes.
 
+## Transaction Errors
+
+### PreparedTransactionInProgress Errors
+
+Starting a new transaction on a session with an already existing in-progress transaction can cause
+the existing transaction to be **implicitly aborted**. Implicitly aborting a transaction happens if
+the transaction is aborted without an explicit `abortTransaction` command. However, prepared
+transactions cannot be implicitly aborted, since they can only complete after a `commitTransaction`
+or `abortTransaction` command from the `TransactionCoordinator`. As a result, any attempt to start a
+new transaction on a session that already has a prepared trasaction on it will fail with a
+`PreparedTransactionInProgress` error.
+
+Additionally, the only operations that can be run on a prepared transaction are
+`prepareTransaction`, `abortTransaction`, and `commitTransaction`. If any other command is run on
+the transaction, the command will fail with a `PreparedTransactionInProgress` error.
+
+Commands run as a part of a transaction that fail with this error code will always have the
+[`TransientTransactionError`](#transienttransactionerror-label) label attached to its response.
+
+### NoSuchTransaction Errors
+
+`NoSuchTransaction` errors are generated for commands that attempt to continue, prepare, commit, or
+abort a transaction that isn't in progress. Two common reasons why this error is generated are
+because the transaction has since started a new transaction or the transaction has already been
+aborted.
+
+All commands made in a transaction other than `commitTransaction` that fail with this error code
+will always have the [`TransientTransactionError`](#transienttransactionerror-label) label attached
+to its response. If the `commitTransaction` command failed with a `NoSuchTransaction` error without
+a write concern error, then it will have the `TransientTransactionError` label attached to its
+response. If it failed with a write concern error, then it wouldn't be safe to retry the entire
+transaction since it could have committed on one of the nodes.
+
+### TransactionTooOld Errors
+
+If an attempt is made to start a transaction that is older than the current active or the last
+committed transaction, then that operation will fail with `TransactionTooOld`.
+
+### TransientTransactionError Label
+
+A transaction could fail with one of the errors above or a different one. There are some errors that
+will cause a transaction to abort with no persistent side effects. In these cases, the server will
+attach the `TransientTransactionError` label to the response (which will still contain the orignal
+error code), so that the caller knows that they can safely retry the entire transaction.
+
 # Concurrency Control
 
 ## Parallel Batch Writer Mode
