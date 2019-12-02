@@ -133,9 +133,6 @@ selector:
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
 
-  # TODO SERVER-44652: Investigate and remove blacklist
-  - jstests/concurrency/fsm_workloads/agg_out.js
-
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_replication
