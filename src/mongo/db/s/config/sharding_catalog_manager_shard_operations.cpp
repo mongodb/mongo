@@ -745,17 +745,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
     const auto name = shardId.toString();
 
-    // Find how many *other* shards exist, which are *not* currently draining
-    const auto countOtherNotDrainingShards = uassertStatusOK(_runCountCommandOnConfig(
-        opCtx,
-        ShardType::ConfigNS,
-        BSON(ShardType::name() << NE << name << ShardType::draining.ne(true))));
-    uassert(ErrorCodes::IllegalOperation,
-            "Operation not allowed because it would remove the last shard",
-            countOtherNotDrainingShards > 0);
-
-    // Ensure there are no non-empty zones that only belong to this shard.
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     auto findShardResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -765,8 +755,21 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                             BSON(ShardType::name() << name),
                                             BSONObj(),
                                             1));
+    uassert(ErrorCodes::ShardNotFound,
+            str::stream() << "Shard " << shardId << " does not exist",
+            !findShardResponse.docs.empty());
     const auto shard = uassertStatusOK(ShardType::fromBSON(findShardResponse.docs[0]));
 
+    // Find how many *other* shards exist, which are *not* currently draining
+    const auto countOtherNotDrainingShards = uassertStatusOK(_runCountCommandOnConfig(
+        opCtx,
+        ShardType::ConfigNS,
+        BSON(ShardType::name() << NE << name << ShardType::draining.ne(true))));
+    uassert(ErrorCodes::IllegalOperation,
+            "Operation not allowed because it would remove the last shard",
+            countOtherNotDrainingShards > 0);
+
+    // Ensure there are no non-empty zones that only belong to this shard
     for (auto& zoneName : shard.getTags()) {
         auto isRequiredByZone = uassertStatusOK(
             _isShardRequiredByZoneStillInUse(opCtx, kConfigReadSelector, name, zoneName));
