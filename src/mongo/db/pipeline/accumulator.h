@@ -148,9 +148,12 @@ genericParseSingleExpressionAccumulator(boost::intrusive_ptr<ExpressionContext> 
 
 class AccumulatorAddToSet final : public Accumulator {
 public:
-    static constexpr int kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
-    explicit AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 int maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
+    /**
+     * Creates a new $addToSet accumulator. If no memory limit is given, defaults to the value of
+     * the server parameter 'internalQueryMaxAddToSetBytes'.
+     */
+    AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        boost::optional<int> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -285,9 +288,12 @@ public:
 
 class AccumulatorPush final : public Accumulator {
 public:
-    static constexpr int kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
-    explicit AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             int maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
+    /**
+     * Creates a new $push accumulator. If no memory limit is given, defaults to the value of the
+     * server parameter 'internalQueryMaxPushBytes'.
+     */
+    AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    boost::optional<int> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;

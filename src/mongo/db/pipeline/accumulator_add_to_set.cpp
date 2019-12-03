@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
 
@@ -79,10 +80,10 @@ Value AccumulatorAddToSet::getValue(bool toBeMerged) {
 }
 
 AccumulatorAddToSet::AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         int maxMemoryUsageBytes)
+                                         boost::optional<int> maxMemoryUsageBytes)
     : Accumulator(expCtx),
       _set(expCtx->getValueComparator().makeUnorderedValueSet()),
-      _maxMemUsageBytes(maxMemoryUsageBytes) {
+      _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -93,7 +94,7 @@ void AccumulatorAddToSet::reset() {
 
 intrusive_ptr<Accumulator> AccumulatorAddToSet::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new AccumulatorAddToSet(expCtx);
+    return new AccumulatorAddToSet(expCtx, boost::none);
 }
 
 }  // namespace mongo
