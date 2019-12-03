@@ -2400,6 +2400,13 @@ def doConfigure(myenv):
         # constructors and assignment operators for being implicitly deleted, which is not useful.
         AddToCXXFLAGSIfSupported(myenv, "-Wno-defaulted-function-deleted")
 
+        # SERVER-44856: Our windows builds complain about unused
+        # exception parameters, but GCC and clang don't seem to do
+        # that for us automatically. In the interest of making it more
+        # likely to catch these errors early, add the (currently clang
+        # only) flag that turns it on.
+        AddToCXXFLAGSIfSupported(myenv, "-Wunused-exception-parameter")
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.

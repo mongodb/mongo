@@ -322,7 +322,7 @@ public:
                     if (std::string(key).compare("DISTRIB_RELEASE") == 0)
                         version = val;
                 }
-            } catch (const std::out_of_range& e) {
+            } catch (const std::out_of_range&) {
                 // attempted to get invalid substr
             }
             // return with lsb-release data if we found both the name and version
