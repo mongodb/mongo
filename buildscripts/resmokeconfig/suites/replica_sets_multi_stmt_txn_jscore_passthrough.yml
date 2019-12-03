@@ -110,52 +110,27 @@ selector:
   - jstests/core/views/views_coll_stats.js
   - jstests/core/views/views_stats.js
 
-  ##
-  ## SERVER-39175 WriteErrors get converted to WriteCommandErrors if part of a txn.
-  ##
-
-  # The same error code, but with ok:0.
-  - jstests/core/json_schema/additional_items.js
-  - jstests/core/json_schema/additional_properties.js
-  - jstests/core/json_schema/bsontype.js
-  - jstests/core/json_schema/dependencies.js
-  - jstests/core/json_schema/encrypt.js
-  - jstests/core/json_schema/items.js
-  - jstests/core/json_schema/logical_keywords.js
-  - jstests/core/json_schema/min_max_items.js
-  - jstests/core/json_schema/min_max_properties.js
-  - jstests/core/json_schema/pattern_properties.js
-  - jstests/core/json_schema/required.js
-  - jstests/core/json_schema/unique_items.js
-
-  - jstests/core/field_name_validation.js
-  - jstests/core/fts_array.js
-  - jstests/core/inc-SERVER-7446.js
-  - jstests/core/invalid_db_name.js
-  - jstests/core/push_sort.js
-
-  # Checks for "WriteErrors" explicitly from the response of db.runCommand()
-  - jstests/core/max_doc_size.js
-
-  # Calls res.getWriteError() or res.hasWriteError().
+  # Errors expected to happen in tests, which can cause transactions to get aborted.
+  # So when the test tries to inspect the documents it can be out of sync (relative
+  # to test run without multi statement transactions).
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
   - jstests/core/cappeda.js
   - jstests/core/doc_validation.js
   - jstests/core/doc_validation_options.js
-  - jstests/core/geo_multinest0.js
+  - jstests/core/field_name_validation.js
   - jstests/core/insert_illegal_doc.js
-  - jstests/core/push2.js
-  - jstests/core/remove6.js
-  - jstests/core/removeb.js
+  - jstests/core/push_sort.js
   - jstests/core/rename4.js
-  - jstests/core/shell_writeconcern.js
-  - jstests/core/storefunc.js
   - jstests/core/update_arrayFilters.js
   - jstests/core/update_dbref.js
   - jstests/core/updatel.js
   - jstests/core/write_result.js
+
+  # Trick for bypassing mongo shell validation in the test doesn't work because txn_override
+  # retry logic will hit the shell validation.
+  - jstests/core/invalid_db_name.js
 
   # Multiple writes in a txn, some of which fail because the collection doesn't exist.
   # We create the collection and retry the last write, but previous writes would have
