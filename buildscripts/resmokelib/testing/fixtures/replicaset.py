@@ -265,13 +265,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         def check_rcmaj_optime(client, node):
             """Return True if all nodes have caught up with the primary."""
-            # TODO SERVER-40078: The server is reporting invalid
-            # dates in its response to the replSetGetStatus
-            # command
-            try:
-                res = client.admin.command({"replSetGetStatus": 1})
-            except bson.errors.InvalidBSON:
-                return False
+            res = client.admin.command({"replSetGetStatus": 1})
             read_concern_majority_optime = res["optimes"]["readConcernMajorityOpTime"]
 
             if (read_concern_majority_optime["t"] == primary_optime["t"]
@@ -369,14 +363,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             client_admin = client["admin"]
 
             while True:
-                # TODO SERVER-40078: The server is reporting invalid
-                # dates in its response to the replSetGetStatus
-                # command
-                try:
-                    status = client_admin.command("replSetGetStatus")
-                except bson.errors.InvalidBSON:
-                    time.sleep(0.1)
-                    continue
+                status = client_admin.command("replSetGetStatus")
 
                 # The `lastStableRecoveryTimestamp` field contains a stable timestamp guaranteed to
                 # exist on storage engine recovery to a stable timestamp.

@@ -88,15 +88,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
         # should have waited to be in SECONDARY state and the test should be marked as a failure.
         # Otherwise, we just skip the hook and will check again after the next test.
         try:
-            while True:
-                # TODO SERVER-40078: The server is reporting invalid
-                # dates in its response to the replSetGetStatus
-                # command
-                try:
-                    state = sync_node_conn.admin.command("replSetGetStatus").get("myState")
-                    break
-                except bson.errors.InvalidBSON:
-                    continue
+            state = sync_node_conn.admin.command("replSetGetStatus").get("myState")
 
             if state != 2:
                 if self._hook.tests_run == 0:
