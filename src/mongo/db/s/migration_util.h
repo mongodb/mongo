@@ -84,6 +84,8 @@ void submitPendingDeletions(OperationContext* opCtx);
 // Asynchronously calls submitPendingDeletions using the fixed executor pool.
 void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
 
+void dropRangeDeletionsCollection(OperationContext* opCtx);
+
 /**
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
  * write concern.

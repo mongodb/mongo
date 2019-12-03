@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -234,6 +235,9 @@ public:
             }
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                LOG(0) << "Downgrade: dropping config.rangeDeletions collection";
+                migrationutil::dropRangeDeletionsCollection(opCtx);
+
                 // The primary shard sharding a collection will write the initial chunks for a
                 // collection directly to the config server, so wait for all shard collections to
                 // complete to guarantee no chunks are missed by the update on the config server.

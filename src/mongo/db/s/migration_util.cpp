@@ -198,6 +198,12 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     });
 }
 
+void dropRangeDeletionsCollection(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    client.dropCollection(NamespaceString::kRangeDeletionNamespace.toString(),
+                          WriteConcerns::kMajorityWriteConcern);
+}
+
 void persistMigrationCoordinatorLocally(OperationContext* opCtx,
                                         const MigrationCoordinatorDocument& migrationDoc) {
     PersistentTaskStore<MigrationCoordinatorDocument> store(
