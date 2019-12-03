@@ -27,23 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/logv2/log_tag.h"
+#pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
 
 namespace mongo {
 namespace logv2 {
 
-BSONArray LogTag::toBSON() {
-    BSONArrayBuilder builder;
-    if (_value | kStartupWarnings) {
-        builder.append("startupWarnings"_sd);
-    }
-    if (_value | kJavascript) {
-        builder.append("javaScript"_sd);
-    }
+class BSONFormatter {
+public:
+    static bool binary() {
+        return true;
+    };
 
-    return builder.arr();
-}
+    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
+};
+
 }  // namespace logv2
 }  // namespace mongo

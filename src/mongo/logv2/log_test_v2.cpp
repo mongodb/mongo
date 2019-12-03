@@ -42,7 +42,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/formatter_base.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
@@ -168,6 +170,8 @@ TEST_F(LogTestV2, Basic) {
 }
 
 TEST_F(LogTestV2, Types) {
+    using namespace constants;
+
     std::vector<std::string> text;
     auto text_sink = LogTestBackend::create(text);
     text_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
@@ -179,8 +183,15 @@ TEST_F(LogTestV2, Types) {
     auto json_sink = LogTestBackend::create(json);
     json_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
-    json_sink->set_formatter(JsonFormatter());
+    json_sink->set_formatter(JSONFormatter());
     attach(json_sink);
+
+    std::vector<std::string> bson;
+    auto bson_sink = LogTestBackend::create(bson);
+    bson_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
+    bson_sink->set_formatter(BSONFormatter());
+    attach(bson_sink);
 
     // The JSON formatter should make the types round-trippable without data loss
     auto validateJSON = [&](auto expected) {
@@ -189,7 +200,12 @@ TEST_F(LogTestV2, Types) {
         std::istringstream json_stream(json.back());
         pt::ptree ptree;
         pt::json_parser::read_json(json_stream, ptree);
-        ASSERT(ptree.get<decltype(expected)>("attr.name") == expected);
+        ASSERT_EQUALS(ptree.get<decltype(expected)>(std::string(kAttributesFieldName) + ".name"),
+                      expected);
+    };
+
+    auto lastBSONElement = [&]() {
+        return BSONObj(bson.back().data()).getField(kAttributesFieldName).Obj().getField("name"_sd);
     };
 
     auto testNumeric = [&](auto dummy) {
@@ -200,6 +216,17 @@ TEST_F(LogTestV2, Types) {
             LOGV2("{}", "name"_attr = value);
             ASSERT_EQUALS(text.back(), fmt::format("{}", value));
             validateJSON(value);
+
+            // TODO: We should have been able to use std::make_signed here but it is broken on
+            // Visual Studio 2017 and 2019
+            using T = decltype(value);
+            if constexpr (std::is_same_v<T, unsigned long long>) {
+                ASSERT_EQUALS(lastBSONElement().Number(), static_cast<long long>(value));
+            } else if constexpr (std::is_same_v<T, uint64_t>) {
+                ASSERT_EQUALS(lastBSONElement().Number(), static_cast<int64_t>(value));
+            } else {
+                ASSERT_EQUALS(lastBSONElement().Number(), value);
+            }
         };
 
         test(std::numeric_limits<T>::max());
@@ -218,12 +245,14 @@ TEST_F(LogTestV2, Types) {
     LOGV2("bool {}", "name"_attr = b);
     ASSERT_EQUALS(text.back(), "bool true");
     validateJSON(b);
+    ASSERT(lastBSONElement().Bool() == b);
 
     char c = 1;
     LOGV2("char {}", "name"_attr = c);
     ASSERT_EQUALS(text.back(), "char 1");
     validateJSON(static_cast<uint8_t>(
         c));  // cast, boost property_tree will try and parse as ascii otherwise
+    ASSERT(lastBSONElement().Number() == c);
 
     testNumeric(static_cast<signed char>(0));
     testNumeric(static_cast<unsigned char>(0));
@@ -248,16 +277,19 @@ TEST_F(LogTestV2, Types) {
     LOGV2("c string {}", "name"_attr = c_str);
     ASSERT_EQUALS(text.back(), "c string a c string");
     validateJSON(std::string(c_str));
+    ASSERT_EQUALS(lastBSONElement().String(), c_str);
 
     std::string str = "a std::string";
     LOGV2("std::string {}", "name"_attr = str);
     ASSERT_EQUALS(text.back(), "std::string a std::string");
     validateJSON(str);
+    ASSERT_EQUALS(lastBSONElement().String(), str);
 
     StringData str_data = "a StringData"_sd;
     LOGV2("StringData {}", "name"_attr = str_data);
     ASSERT_EQUALS(text.back(), "StringData a StringData");
     validateJSON(str_data.toString());
+    ASSERT_EQUALS(lastBSONElement().String(), str_data);
 
     // BSONObj
     BSONObjBuilder builder;
@@ -265,53 +297,69 @@ TEST_F(LogTestV2, Types) {
     builder.append("int64"_sd, std::numeric_limits<int64_t>::max());
     builder.append("double"_sd, 0.0);
     builder.append("str"_sd, str_data);
-    BSONObj bson = builder.obj();
-    LOGV2("bson {}", "name"_attr = bson);
-    ASSERT_EQUALS(text.back(), std::string("bson ") + bson.jsonString());
+    BSONObj bsonObj = builder.obj();
+    LOGV2("bson {}", "name"_attr = bsonObj);
+    ASSERT(text.back() == std::string("bson ") + bsonObj.jsonString());
     ASSERT(mongo::fromjson(json.back())
-               .getField("attr"_sd)
+               .getField(kAttributesFieldName)
                .Obj()
                .getField("name")
                .Obj()
-               .woCompare(bson) == 0);
+               .woCompare(bsonObj) == 0);
+    ASSERT(lastBSONElement().Obj().woCompare(bsonObj) == 0);
 
     // Date_t
     Date_t date = Date_t::now();
     LOGV2("Date_t {}", "name"_attr = date);
     ASSERT_EQUALS(text.back(), std::string("Date_t ") + date.toString());
-    ASSERT_EQUALS(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").Date(),
-                  date);
+    ASSERT_EQUALS(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").Date(),
+        date);
+    ASSERT_EQUALS(lastBSONElement().Date(), date);
 
     // Decimal128
     LOGV2("Decimal128 {}", "name"_attr = Decimal128::kPi);
     ASSERT_EQUALS(text.back(), std::string("Decimal128 ") + Decimal128::kPi.toString());
     ASSERT(mongo::fromjson(json.back())
-               .getField("attr")
+               .getField(kAttributesFieldName)
                .Obj()
                .getField("name")
                .Decimal()
                .isEqual(Decimal128::kPi));
+    ASSERT(lastBSONElement().Decimal().isEqual(Decimal128::kPi));
 
     // OID
     OID oid = OID::gen();
     LOGV2("OID {}", "name"_attr = oid);
     ASSERT_EQUALS(text.back(), std::string("OID ") + oid.toString());
-    ASSERT_EQUALS(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").OID(), oid);
+    ASSERT_EQUALS(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").OID(),
+        oid);
+    ASSERT_EQUALS(lastBSONElement().OID(), oid);
 
     // Timestamp
     Timestamp ts = Timestamp::max();
     LOGV2("Timestamp {}", "name"_attr = ts);
     ASSERT_EQUALS(text.back(), std::string("Timestamp ") + ts.toString());
-    ASSERT_EQUALS(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").timestamp(),
+    ASSERT_EQUALS(mongo::fromjson(json.back())
+                      .getField(kAttributesFieldName)
+                      .Obj()
+                      .getField("name")
+                      .timestamp(),
                   ts);
+    ASSERT_EQUALS(lastBSONElement().timestamp(), ts);
 
     // UUID
     UUID uuid = UUID::gen();
     LOGV2("UUID {}", "name"_attr = uuid);
     ASSERT_EQUALS(text.back(), std::string("UUID ") + uuid.toString());
-    ASSERT_EQUALS(
-        UUID::parse(mongo::fromjson(json.back()).getField("attr").Obj().getField("name").Obj()),
-        uuid);
+    ASSERT_EQUALS(UUID::parse(mongo::fromjson(json.back())
+                                  .getField(kAttributesFieldName)
+                                  .Obj()
+                                  .getField("name")
+                                  .Obj()),
+                  uuid);
+    ASSERT_EQUALS(UUID::parse(lastBSONElement().Obj()), uuid);
 }
 
 TEST_F(LogTestV2, TextFormat) {
@@ -344,72 +392,116 @@ TEST_F(LogTestV2, TextFormat) {
     ASSERT(lines.back().rfind(t.toString() + " custom formatting, no bson") != std::string::npos);
 }
 
-TEST_F(LogTestV2, JSONFormat) {
+TEST_F(LogTestV2, JsonBsonFormat) {
+    using namespace constants;
+
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
-    sink->set_formatter(JsonFormatter());
+    sink->set_formatter(JSONFormatter());
     attach(sink);
+
+    std::vector<std::string> linesBson;
+    auto sinkBson = LogTestBackend::create(linesBson);
+    sinkBson->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                 LogManager::global().getGlobalSettings()));
+    sinkBson->set_formatter(BSONFormatter());
+    attach(sinkBson);
 
     BSONObj log;
 
     LOGV2("test");
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("t"_sd).String() == dateToISOStringUTC(Date_t::lastNowForTest()));
-    ASSERT(log.getField("s"_sd).String() == LogSeverity::Info().toStringDataCompact());
-    ASSERT(log.getField("c"_sd).String() ==
-           LogComponent(MONGO_LOGV2_DEFAULT_COMPONENT).getNameForLog());
-    ASSERT(log.getField("ctx"_sd).String() == getThreadName());
-    ASSERT(!log.hasField("id"_sd));
-    ASSERT(log.getField("msg"_sd).String() == "test");
-    ASSERT(!log.hasField("attr"_sd));
-    ASSERT(!log.hasField("tags"_sd));
+    auto validateRoot = [](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kTimestampFieldName).Date(), Date_t::lastNowForTest());
+        ASSERT_EQUALS(obj.getField(kSeverityFieldName).String(),
+                      LogSeverity::Info().toStringDataCompact());
+        ASSERT_EQUALS(obj.getField(kComponentFieldName).String(),
+                      LogComponent(MONGO_LOGV2_DEFAULT_COMPONENT).getNameForLog());
+        ASSERT(obj.getField(kContextFieldName).String() == getThreadName());
+        ASSERT(!obj.hasField(kStableIdFieldName));
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "test");
+        ASSERT(!obj.hasField(kAttributesFieldName));
+        ASSERT(!obj.hasField(kTagsFieldName));
+    };
+    validateRoot(mongo::fromjson(lines.back()));
+    validateRoot(BSONObj(linesBson.back().data()));
+
 
     LOGV2("test {}", "name"_attr = 1);
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("msg"_sd).String() == "test {name}");
-    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
-    ASSERT(log.getField("attr"_sd).Obj().getField("name").Int() == 1);
+    auto validateAttr = [](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "test {name}");
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().nFields(), 1);
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().getField("name").Int(), 1);
+    };
+    validateAttr(mongo::fromjson(lines.back()));
+    validateAttr(BSONObj(linesBson.back().data()));
+
 
     LOGV2("test {:d}", "name"_attr = 2);
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("msg"_sd).String() == "test {name:d}");
-    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
-    ASSERT(log.getField("attr"_sd).Obj().getField("name").Int() == 2);
+    auto validateMsgReconstruction = [](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "test {name:d}");
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().nFields(), 1);
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().getField("name").Int(), 2);
+    };
+    validateMsgReconstruction(mongo::fromjson(lines.back()));
+    validateMsgReconstruction(BSONObj(linesBson.back().data()));
+
 
     LOGV2_OPTIONS({LogTag::kStartupWarnings}, "warning");
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("msg"_sd).String() == "warning");
-    ASSERT(log.getField("tags"_sd).Array().front().woCompare(
-               mongo::fromjson(LogTag(LogTag::kStartupWarnings).toJSONArray())[0]) == 0);
+    auto validateTags = [](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "warning");
+        ASSERT_EQUALS(
+            obj.getField("tags"_sd).Obj().woCompare(LogTag(LogTag::kStartupWarnings).toBSON()), 0);
+    };
+    validateTags(mongo::fromjson(lines.back()));
+    validateTags(BSONObj(linesBson.back().data()));
 
     LOGV2_OPTIONS({LogComponent::kControl}, "different component");
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("c"_sd).String() == LogComponent(LogComponent::kControl).getNameForLog());
-    ASSERT(log.getField("msg"_sd).String() == "different component");
+    auto validateComponent = [](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField("c"_sd).String(),
+                      LogComponent(LogComponent::kControl).getNameForLog());
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "different component");
+    };
+    validateComponent(mongo::fromjson(lines.back()));
+    validateComponent(BSONObj(linesBson.back().data()));
+
 
     TypeWithBSON t(1.0, 2.0);
     LOGV2("{} custom formatting", "name"_attr = t);
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("msg"_sd).String() == "{name} custom formatting");
-    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
-    ASSERT(log.getField("attr"_sd).Obj().getField("name").Obj().woCompare(
-               mongo::fromjson(t.toBSON().jsonString())) == 0);
+    auto validateCustomAttr = [&t](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "{name} custom formatting");
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().nFields(), 1);
+        ASSERT(
+            obj.getField(kAttributesFieldName).Obj().getField("name").Obj().woCompare(t.toBSON()) ==
+            0);
+    };
+    validateCustomAttr(mongo::fromjson(lines.back()));
+    validateCustomAttr(BSONObj(linesBson.back().data()));
+
 
     LOGV2("{} bson", "name"_attr = t.toBSON());
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("msg"_sd).String() == "{name} bson");
-    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
-    ASSERT(log.getField("attr"_sd).Obj().getField("name").Obj().woCompare(
-               mongo::fromjson(t.toBSON().jsonString())) == 0);
+    auto validateBsonAttr = [&t](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "{name} bson");
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().nFields(), 1);
+        ASSERT(
+            obj.getField(kAttributesFieldName).Obj().getField("name").Obj().woCompare(t.toBSON()) ==
+            0);
+    };
+    validateBsonAttr(mongo::fromjson(lines.back()));
+    validateBsonAttr(BSONObj(linesBson.back().data()));
+
 
     TypeWithoutBSON t2(1.0, 2.0);
     LOGV2("{} custom formatting", "name"_attr = t2);
-    log = mongo::fromjson(lines.back());
-    ASSERT(log.getField("msg"_sd).String() == "{name} custom formatting");
-    ASSERT(log.getField("attr"_sd).Obj().nFields() == 1);
-    ASSERT(log.getField("attr"_sd).Obj().getField("name").String() == t.toString());
+    auto validateCustomAttrWithoutBSON = [&t2](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "{name} custom formatting");
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().nFields(), 1);
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().getField("name").String(),
+                      t2.toString());
+    };
+    validateCustomAttrWithoutBSON(mongo::fromjson(lines.back()));
+    validateCustomAttrWithoutBSON(BSONObj(linesBson.back().data()));
 }
 
 TEST_F(LogTestV2, Unicode) {
@@ -478,7 +570,7 @@ TEST_F(LogTestV2, Threads) {
     auto jsonSink = LogTestBackend::create(linesJson);
     jsonSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
-    jsonSink->set_formatter(JsonFormatter());
+    jsonSink->set_formatter(JSONFormatter());
     attach(jsonSink);
 
     constexpr int kNumPerThread = 1000;

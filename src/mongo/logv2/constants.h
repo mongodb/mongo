@@ -38,4 +38,14 @@ constexpr size_t kNumStaticAttrs = 16;
 // Allocate extra space to fit some escape sequences
 constexpr size_t kReservedSpaceForEscaping = 16;
 
+// Field names used in the JSON and BSON formatter
+constexpr StringData kTimestampFieldName = "t"_sd;
+constexpr StringData kSeverityFieldName = "s"_sd;
+constexpr StringData kComponentFieldName = "c"_sd;
+constexpr StringData kContextFieldName = "ctx"_sd;
+constexpr StringData kStableIdFieldName = "id"_sd;
+constexpr StringData kMessageFieldName = "msg"_sd;
+constexpr StringData kAttributesFieldName = "attr"_sd;
+constexpr StringData kTagsFieldName = "tags"_sd;
+
 }  // namespace mongo::logv2::constants

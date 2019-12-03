@@ -34,7 +34,7 @@
 
 namespace mongo::logv2 {
 
-class JsonFormatter {
+class JSONFormatter {
 public:
     static bool binary() {
         return false;

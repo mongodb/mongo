@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+
 #include <cstdint>
 #include <string>
 
@@ -62,7 +64,7 @@ public:
         return _value & other._value;
     }
 
-    std::string toJSONArray();
+    BSONArray toBSON();
 
 private:
     uint64_t _value;

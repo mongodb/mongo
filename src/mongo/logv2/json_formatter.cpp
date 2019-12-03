@@ -42,13 +42,14 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/named_arg_formatter.h"
 #include "mongo/util/time_support.h"
 
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
 namespace {
-struct JsonValueExtractor {
+struct JSONValueExtractor {
     void operator()(StringData name, CustomAttributeValue const& val) {
         if (val.BSONAppend) {
             BSONObjBuilder builder;
@@ -107,107 +108,27 @@ private:
 
     StringData _separator = ""_sd;
 };
-
-class NamedArgFormatter : public fmt::arg_formatter<fmt::internal::buffer_range<char>> {
-public:
-    typedef fmt::arg_formatter<fmt::internal::buffer_range<char>> arg_formatter;
-
-    NamedArgFormatter(fmt::format_context& ctx,
-                      fmt::basic_parse_context<char>* parse_ctx = nullptr,
-                      fmt::format_specs* spec = nullptr)
-        : arg_formatter(ctx, parse_ctx, nullptr) {
-        // Pretend that we have no format_specs, but store so we can re-construct the format
-        // specifier
-        if (spec) {
-            spec_ = *spec;
-        }
-    }
-
-
-    using arg_formatter::operator();
-
-    auto operator()(fmt::string_view name) {
-        using namespace fmt;
-
-        write("{");
-        arg_formatter::operator()(name);
-        // If formatting spec was provided, reconstruct the string. Libfmt does not provide this
-        // unfortunately
-        if (spec_) {
-            char str[2] = {'\0', '\0'};
-            write(":");
-            if (spec_->fill() != ' ') {
-                str[0] = static_cast<char>(spec_->fill());
-                write(str);
-            }
-
-            switch (spec_->align()) {
-                case ALIGN_LEFT:
-                    write("<");
-                    break;
-                case ALIGN_RIGHT:
-                    write(">");
-                    break;
-                case ALIGN_CENTER:
-                    write("^");
-                    break;
-                case ALIGN_NUMERIC:
-                    write("=");
-                    break;
-                default:
-                    break;
-            };
-
-            if (spec_->has(PLUS_FLAG))
-                write("+");
-            else if (spec_->has(MINUS_FLAG))
-                write("-");
-            else if (spec_->has(SIGN_FLAG))
-                write(" ");
-            else if (spec_->has(HASH_FLAG))
-                write("#");
-
-            if (spec_->align() == ALIGN_NUMERIC && spec_->fill() == 0)
-                write("0");
-
-            if (spec_->width() > 0)
-                write(std::to_string(spec_->width()).c_str());
-
-            if (spec_->has_precision()) {
-                write(".");
-                write(std::to_string(spec_->precision).c_str());
-            }
-            str[0] = spec_->type;
-            write(str);
-        }
-        write("}");
-        return out();
-    }
-
-private:
-    boost::optional<fmt::format_specs> spec_;
-};
 }  // namespace
 
-void JsonFormatter::operator()(boost::log::record_view const& rec,
+void JSONFormatter::operator()(boost::log::record_view const& rec,
                                boost::log::formatting_ostream& strm) const {
     using namespace boost::log;
 
     // Build a JSON object for the user attributes.
     const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
 
-    JsonValueExtractor extractor;
+    JSONValueExtractor extractor;
     attrs.apply(extractor);
 
     std::string id;
     auto stable_id = extract<StringData>(attributes::stableId(), rec).get();
     if (!stable_id.empty()) {
-        id = fmt::format("\"id\":\"{}\",", stable_id);
+        id = fmt::format("\"{}\":\"{}\",", constants::kStableIdFieldName, stable_id);
     }
 
     std::string message;
     fmt::memory_buffer buffer;
-    fmt::vformat_to<NamedArgFormatter, char>(
+    fmt::vformat_to<detail::NamedArgFormatter, char>(
         buffer,
         extract<StringData>(attributes::message(), rec).get().toString(),
         fmt::basic_format_args<fmt::format_context>(extractor.nameArgs.data(),
@@ -221,37 +142,55 @@ void JsonFormatter::operator()(boost::log::record_view const& rec,
     std::string tag;
     LogTag tags = extract<LogTag>(attributes::tags(), rec).get();
     if (tags != LogTag::kNone) {
-        tag = fmt::format(",\"tags\":{}", tags.toJSONArray());
+        tag = fmt::format(",\"{}\":{}",
+                          constants::kTagsFieldName,
+                          tags.toBSON().jsonString(JsonStringFormat::Strict, 0, true));
     }
 
-    strm << fmt::format(R"({{)"
-                        R"("t":"{}",)"        // timestamp
-                        R"("s":"{}"{: <{}})"  // severity with padding for the comma
-                        R"("c":"{}"{: <{}})"  // component with padding for the comma
-                        R"("ctx":"{}",)"      // context
-                        R"({})"               // optional stable id
-                        R"("msg":"{}")"       // message
-                        R"({})",              // optional attribute key
-                        dateToISOStringUTC(extract<Date_t>(attributes::timeStamp(), rec).get()),
-                        severity,
-                        ",",
-                        3 - severity.size(),
-                        component,
-                        ",",
-                        9 - component.size(),
-                        extract<StringData>(attributes::threadName(), rec).get(),
-                        id,
-                        message,
-                        attrs.empty() ? "" : ",\"attr\":{");
+    strm << fmt::format(
+        R"({{)"
+        R"("{}":{{"$date":"{}"}},)"  // timestamp
+        R"("{}":"{}"{: <{}})"        // severity with padding for the comma
+        R"("{}":"{}"{: <{}})"        // component with padding for the comma
+        R"("{}":"{}",)"              // context
+        R"({})"                      // optional stable id
+        R"("{}":"{}")"               // message
+        R"({})",                     // optional attribute key
+                                     // timestamp
+        constants::kTimestampFieldName,
+        dateToISOStringUTC(extract<Date_t>(attributes::timeStamp(), rec).get()),
+        // severity, left align the comma and add padding to create fixed column width
+        constants::kSeverityFieldName,
+        severity,
+        ",",
+        3 - severity.size(),
+        // component, left align the comma and add padding to create fixed column width
+        constants::kComponentFieldName,
+        component,
+        ",",
+        9 - component.size(),
+        // context
+        constants::kContextFieldName,
+        extract<StringData>(attributes::threadName(), rec).get(),
+        // stable id
+        id,
+        // message
+        constants::kMessageFieldName,
+        message,
+        // attribute field name and opening brace
+        attrs.empty() ? "" : fmt::format(R"(,"{}":{{)", constants::kAttributesFieldName));
 
     if (!attrs.empty()) {
+        // comma separated list of attributes
         strm << fmt::to_string(extractor.buffer);
     }
 
     strm << fmt::format(R"({})"  // optional attribute closing
                         R"({})"  // optional tags
                         R"(}})",
+                        // closing brace
                         attrs.empty() ? "" : "}",
+                        // tags
                         tag);
 }
 

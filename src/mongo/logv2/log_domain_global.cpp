@@ -207,7 +207,7 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
             setFormatters([] { return TextFormatter(); });
             break;
         case LogFormat::kJson:
-            setFormatters([] { return JsonFormatter(); });
+            setFormatters([] { return JSONFormatter(); });
             break;
     }
 
