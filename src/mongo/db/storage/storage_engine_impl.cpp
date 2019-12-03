@@ -451,7 +451,6 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // be associated with multiple indexes.
             if (indexMetaData.buildUUID) {
                 invariant(!indexMetaData.ready);
-                invariant(indexMetaData.runTwoPhaseBuild);
 
                 auto collUUID = metaData.options.uuid;
                 invariant(collUUID);
@@ -469,31 +468,6 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
                 existingIt->second.indexSpecs.emplace_back(indexMetaData.spec);
                 continue;
-            }
-
-            // If this index was draining, do not delete any internal idents that it may have owned.
-            // Instead, the idents can be used later on to resume draining instead of a
-            // performing a full rebuild. This is only done for background secondary builds, because
-            // the index must be rebuilt, and it is dropped otherwise.
-            // TODO: SERVER-37952 Do not drop these idents for background index builds on
-            // primaries once index builds are resumable from draining.
-            if (!indexMetaData.ready && indexMetaData.isBackgroundSecondaryBuild &&
-                indexMetaData.buildPhase ==
-                    BSONCollectionCatalogEntry::kIndexBuildDraining.toString()) {
-
-                if (indexMetaData.constraintViolationsIdent) {
-                    auto it = internalIdentsToDrop.find(*indexMetaData.constraintViolationsIdent);
-                    if (it != internalIdentsToDrop.end()) {
-                        internalIdentsToDrop.erase(it);
-                    }
-                }
-
-                if (indexMetaData.sideWritesIdent) {
-                    auto it = internalIdentsToDrop.find(*indexMetaData.sideWritesIdent);
-                    if (it != internalIdentsToDrop.end()) {
-                        internalIdentsToDrop.erase(it);
-                    }
-                }
             }
 
             // If the index was kicked off as a background secondary index build, replication

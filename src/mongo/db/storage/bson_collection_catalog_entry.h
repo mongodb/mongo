@@ -73,14 +73,9 @@ public:
         bool multikey = false;
         KVPrefix prefix = KVPrefix::kNotPrefixed;
         bool isBackgroundSecondaryBuild = false;
-        boost::optional<UUID> buildUUID;
 
-        long versionOfBuild = kIndexBuildVersion;
-        // If true, a two-phase index build is in progress, false otherwise.
-        bool runTwoPhaseBuild = false;
-        boost::optional<std::string> buildPhase;
-        boost::optional<std::string> constraintViolationsIdent;
-        boost::optional<std::string> sideWritesIdent;
+        // If initialized, a two-phase index build is in progress.
+        boost::optional<UUID> buildUUID;
 
         // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
         // the index key pattern. Each element in the vector is an ordered set of positions

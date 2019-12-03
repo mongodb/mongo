@@ -163,10 +163,6 @@ public:
      */
     virtual void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp) = 0;
 
-    virtual boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
-                                                            RecordId catalogId,
-                                                            StringData indexName) const = 0;
-
     /**
      * Updates the validator for this collection.
      *
@@ -195,51 +191,11 @@ public:
                                         bool isBackgroundSecondaryBuild) = 0;
 
     /**
-     * Returns whether or not the index is being built with the two-phase index build procedure.
+     * Returns a UUID if the index is being built with the two-phase index build procedure.
      */
-    virtual bool isTwoPhaseIndexBuild(OperationContext* opCtx,
-                                      RecordId catalogId,
-                                      StringData indexName) const = 0;
-
-    /**
-     * Indicate that a build index is now in the "scanning" phase of a hybrid index build. The
-     * 'constraintViolationsIdent' is only used for unique indexes.
-     *
-     * It is only valid to call this when the index is using the kTwoPhase IndexBuildProtocol.
-     */
-    virtual void setIndexBuildScanning(OperationContext* opCtx,
-                                       RecordId catalogId,
-                                       StringData indexName,
-                                       std::string sideWritesIdent,
-                                       boost::optional<std::string> constraintViolationsIdent) = 0;
-
-
     virtual boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
                                                     RecordId catalogId,
                                                     StringData indexName) const = 0;
-
-    /**
-     * Returns whether or not this index is building in the "scanning" phase.
-     */
-    virtual bool isIndexBuildScanning(OperationContext* opCtx,
-                                      RecordId catalogId,
-                                      StringData indexName) const = 0;
-
-    /**
-     * Indicate that a build index is now in the "draining" phase of a hybrid index build.
-     *
-     * It is only valid to call this when the index is using the kTwoPhase IndexBuildProtocol.
-     */
-    virtual void setIndexBuildDraining(OperationContext* opCtx,
-                                       RecordId catalogId,
-                                       StringData indexName) = 0;
-
-    /**
-     * Returns whether or not this index is building in the "draining" phase.
-     */
-    virtual bool isIndexBuildDraining(OperationContext* opCtx,
-                                      RecordId catalogId,
-                                      StringData indexName) const = 0;
 
     /**
      * Indicate that an index build is completed and the index is ready to use.
@@ -277,16 +233,6 @@ public:
                                     RecordId catalogId,
                                     StringData indexName,
                                     const MultikeyPaths& multikeyPaths) = 0;
-
-    virtual boost::optional<std::string> getConstraintViolationsIdent(
-        OperationContext* opCtx, RecordId catalogId, StringData indexName) const = 0;
-
-    /**
-     * Returns the server-compatibility version of the index build procedure.
-     */
-    virtual long getIndexBuildVersion(OperationContext* opCtx,
-                                      RecordId catalogId,
-                                      StringData indexName) const = 0;
 
     virtual CollectionOptions getCollectionOptions(OperationContext* opCtx,
                                                    RecordId catalogId) const = 0;

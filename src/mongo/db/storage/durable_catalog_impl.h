@@ -130,10 +130,6 @@ public:
 
     void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp);
 
-    boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
-                                                    RecordId catalogId,
-                                                    StringData indexName) const;
-
     void updateValidator(OperationContext* opCtx,
                          RecordId catalogId,
                          const BSONObj& validator,
@@ -148,30 +144,9 @@ public:
                                 boost::optional<UUID> buildUUID,
                                 bool isBackgroundSecondaryBuild);
 
-    bool isTwoPhaseIndexBuild(OperationContext* opCtx,
-                              RecordId catalogId,
-                              StringData indexName) const;
-
     boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
                                             RecordId catalogId,
                                             StringData indexName) const;
-
-    void setIndexBuildScanning(OperationContext* opCtx,
-                               RecordId catalogId,
-                               StringData indexName,
-                               std::string sideWritesIdent,
-                               boost::optional<std::string> constraintViolationsIdent);
-
-
-    bool isIndexBuildScanning(OperationContext* opCtx,
-                              RecordId catalogId,
-                              StringData indexName) const;
-
-    void setIndexBuildDraining(OperationContext* opCtx, RecordId catalogId, StringData indexName);
-
-    bool isIndexBuildDraining(OperationContext* opCtx,
-                              RecordId catalogId,
-                              StringData indexName) const;
 
     void indexBuildSuccess(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 
@@ -184,14 +159,6 @@ public:
                             RecordId catalogId,
                             StringData indexName,
                             const MultikeyPaths& multikeyPaths);
-
-    boost::optional<std::string> getConstraintViolationsIdent(OperationContext* opCtx,
-                                                              RecordId catalogId,
-                                                              StringData indexName) const;
-
-    long getIndexBuildVersion(OperationContext* opCtx,
-                              RecordId catalogId,
-                              StringData indexName) const;
 
     CollectionOptions getCollectionOptions(OperationContext* opCtx, RecordId catalogId) const;
 

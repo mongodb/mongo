@@ -356,25 +356,13 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
 
-    ASSERT_EQ(kExpectedVersion,
-              catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
 
     catalog->indexBuildSuccess(opCtx.get(), getCatalogId(), indexName);
 
-    ASSERT_EQ(kExpectedVersion,
-              catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
     ASSERT_TRUE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
 }
 
 TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
@@ -383,80 +371,12 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
 
-    ASSERT_EQ(kExpectedVersion,
-              catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
     ASSERT_TRUE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
-
-    catalog->setIndexBuildScanning(opCtx.get(),
-                                   getCatalogId(),
-                                   indexName,
-                                   kSideWritesTableIdent,
-                                   kConstraintViolationsTableIdent);
-
-    ASSERT_EQ(kExpectedVersion,
-              catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_TRUE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_EQ(kSideWritesTableIdent,
-              catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_EQ(kConstraintViolationsTableIdent,
-              catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
-
-    catalog->setIndexBuildDraining(opCtx.get(), getCatalogId(), indexName);
-
-    ASSERT_EQ(kExpectedVersion,
-              catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_TRUE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_EQ(kSideWritesTableIdent,
-              catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_EQ(kConstraintViolationsTableIdent,
-              catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
-
     catalog->indexBuildSuccess(opCtx.get(), getCatalogId(), indexName);
 
-    ASSERT_EQ(kExpectedVersion,
-              catalog->getIndexBuildVersion(opCtx.get(), getCatalogId(), indexName));
-    ASSERT(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_TRUE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
     ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), getCatalogId(), indexName));
-}
-
-DEATH_TEST_F(DurableCatalogTest,
-             SinglePhaseIllegalScanPhase,
-             "Invariant failure md.indexes[offset].runTwoPhaseBuild") {
-    std::string indexName = createIndex(BSON("a" << 1));
-    auto opCtx = newOperationContext();
-    DurableCatalog* catalog = getCatalog();
-
-    catalog->setIndexBuildScanning(opCtx.get(),
-                                   getCatalogId(),
-                                   indexName,
-                                   kSideWritesTableIdent,
-                                   kConstraintViolationsTableIdent);
-}
-
-DEATH_TEST_F(DurableCatalogTest,
-             SinglePhaseIllegalDrainPhase,
-             "Invariant failure md.indexes[offset].runTwoPhaseBuild") {
-    std::string indexName = createIndex(BSON("a" << 1));
-    auto opCtx = newOperationContext();
-    DurableCatalog* catalog = getCatalog();
-    catalog->setIndexBuildDraining(opCtx.get(), getCatalogId(), indexName);
 }
 
 DEATH_TEST_F(DurableCatalogTest,

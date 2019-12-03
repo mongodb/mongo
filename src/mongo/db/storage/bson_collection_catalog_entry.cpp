@@ -199,19 +199,8 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             sub.append("prefix", indexes[i].prefix.toBSONValue());
             sub.append("backgroundSecondary", indexes[i].isBackgroundSecondaryBuild);
 
-            sub.append("runTwoPhaseBuild", indexes[i].runTwoPhaseBuild);
-            sub.append("versionOfBuild", static_cast<long long>(indexes[i].versionOfBuild));
-            if (indexes[i].buildPhase) {
-                sub.append("buildPhase", *indexes[i].buildPhase);
-            }
             if (indexes[i].buildUUID) {
                 indexes[i].buildUUID->appendToBuilder(&sub, "buildUUID");
-            }
-            if (indexes[i].constraintViolationsIdent) {
-                sub.append("constraintViolationsIdent", *indexes[i].constraintViolationsIdent);
-            }
-            if (indexes[i].sideWritesIdent) {
-                sub.append("sideWritesIdent", *indexes[i].sideWritesIdent);
             }
             sub.doneFast();
         }
@@ -248,21 +237,8 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             // Opt-in to rebuilding behavior for old-format index catalog objects.
             imd.isBackgroundSecondaryBuild = bgSecondary.eoo() || bgSecondary.trueValue();
 
-            imd.runTwoPhaseBuild = idx["runTwoPhaseBuild"].trueValue();
-            if (idx.hasField("versionOfBuild")) {
-                imd.versionOfBuild = idx["versionOfBuild"].numberLong();
-            }
-            if (idx["buildPhase"]) {
-                imd.buildPhase = idx["buildPhase"].str();
-            }
             if (idx["buildUUID"]) {
                 imd.buildUUID = fassert(31353, UUID::parse(idx["buildUUID"]));
-            }
-            if (idx["constraintViolationsIdent"]) {
-                imd.constraintViolationsIdent = idx["constraintViolationsIdent"].str();
-            }
-            if (idx["sideWritesIdent"]) {
-                imd.sideWritesIdent = idx["sideWritesIdent"].str();
             }
             indexes.push_back(imd);
         }

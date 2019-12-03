@@ -906,15 +906,6 @@ void DurableCatalogImpl::setIsTemp(OperationContext* opCtx, RecordId catalogId, 
     putMetaData(opCtx, catalogId, md);
 }
 
-boost::optional<std::string> DurableCatalogImpl::getSideWritesIdent(OperationContext* opCtx,
-                                                                    RecordId catalogId,
-                                                                    StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    return md.indexes[offset].sideWritesIdent;
-}
-
 void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
                                          RecordId catalogId,
                                          const BSONObj& validator,
@@ -960,7 +951,6 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
     imd.multikey = false;
     imd.prefix = prefix;
     imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
-    imd.runTwoPhaseBuild = buildUUID.is_initialized();
     imd.buildUUID = buildUUID;
 
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
@@ -995,15 +985,6 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
     return status;
 }
 
-bool DurableCatalogImpl::isTwoPhaseIndexBuild(OperationContext* opCtx,
-                                              RecordId catalogId,
-                                              StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    return md.indexes[offset].runTwoPhaseBuild;
-}
-
 boost::optional<UUID> DurableCatalogImpl::getIndexBuildUUID(OperationContext* opCtx,
                                                             RecordId catalogId,
                                                             StringData indexName) const {
@@ -1013,60 +994,6 @@ boost::optional<UUID> DurableCatalogImpl::getIndexBuildUUID(OperationContext* op
     return md.indexes[offset].buildUUID;
 }
 
-void DurableCatalogImpl::setIndexBuildScanning(
-    OperationContext* opCtx,
-    RecordId catalogId,
-    StringData indexName,
-    std::string sideWritesIdent,
-    boost::optional<std::string> constraintViolationsIdent) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    invariant(!md.indexes[offset].ready);
-    invariant(!md.indexes[offset].buildPhase);
-    invariant(md.indexes[offset].runTwoPhaseBuild);
-
-    md.indexes[offset].buildPhase = BSONCollectionCatalogEntry::kIndexBuildScanning.toString();
-    md.indexes[offset].sideWritesIdent = sideWritesIdent;
-    md.indexes[offset].constraintViolationsIdent = constraintViolationsIdent;
-    putMetaData(opCtx, catalogId, md);
-}
-
-bool DurableCatalogImpl::isIndexBuildScanning(OperationContext* opCtx,
-                                              RecordId catalogId,
-                                              StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    return md.indexes[offset].buildPhase ==
-        BSONCollectionCatalogEntry::kIndexBuildScanning.toString();
-}
-
-void DurableCatalogImpl::setIndexBuildDraining(OperationContext* opCtx,
-                                               RecordId catalogId,
-                                               StringData indexName) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    invariant(!md.indexes[offset].ready);
-    invariant(md.indexes[offset].runTwoPhaseBuild);
-    invariant(md.indexes[offset].buildPhase ==
-              BSONCollectionCatalogEntry::kIndexBuildScanning.toString());
-
-    md.indexes[offset].buildPhase = BSONCollectionCatalogEntry::kIndexBuildDraining.toString();
-    putMetaData(opCtx, catalogId, md);
-}
-
-bool DurableCatalogImpl::isIndexBuildDraining(OperationContext* opCtx,
-                                              RecordId catalogId,
-                                              StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    return md.indexes[offset].buildPhase ==
-        BSONCollectionCatalogEntry::kIndexBuildDraining.toString();
-}
-
 void DurableCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
                                            RecordId catalogId,
                                            StringData indexName) {
@@ -1074,11 +1001,7 @@ void DurableCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     md.indexes[offset].ready = true;
-    md.indexes[offset].runTwoPhaseBuild = false;
-    md.indexes[offset].buildPhase = boost::none;
     md.indexes[offset].buildUUID = boost::none;
-    md.indexes[offset].sideWritesIdent = boost::none;
-    md.indexes[offset].constraintViolationsIdent = boost::none;
     putMetaData(opCtx, catalogId, md);
 }
 
@@ -1151,24 +1074,6 @@ bool DurableCatalogImpl::setIndexIsMultikey(OperationContext* opCtx,
 
     putMetaData(opCtx, catalogId, md);
     return true;
-}
-
-boost::optional<std::string> DurableCatalogImpl::getConstraintViolationsIdent(
-    OperationContext* opCtx, RecordId catalogId, StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    return md.indexes[offset].constraintViolationsIdent;
-}
-
-
-long DurableCatalogImpl::getIndexBuildVersion(OperationContext* opCtx,
-                                              RecordId catalogId,
-                                              StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
-    return md.indexes[offset].versionOfBuild;
 }
 
 CollectionOptions DurableCatalogImpl::getCollectionOptions(OperationContext* opCtx,
