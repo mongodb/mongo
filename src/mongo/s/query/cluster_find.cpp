@@ -458,6 +458,12 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                 << "': " << query.getQueryRequest().getProj());
     }
 
+    // Attempting to establish a resumable query through mongoS is illegal.
+    uassert(ErrorCodes::BadValue,
+            "Queries on mongoS may not request or provide a resume token",
+            !query.getQueryRequest().getRequestResumeToken() &&
+                query.getQueryRequest().getResumeAfter().isEmpty());
+
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
     // Re-target and re-send the initial find command to the shards until we have established the

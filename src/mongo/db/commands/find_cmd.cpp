@@ -504,6 +504,9 @@ public:
                     break;
                 }
 
+                // If this executor produces a postBatchResumeToken, add it to the response.
+                firstBatch.setPostBatchResumeToken(exec->getPostBatchResumeToken());
+
                 // Add result to output buffer.
                 firstBatch.append(obj);
                 numResults++;

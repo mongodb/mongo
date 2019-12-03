@@ -728,16 +728,21 @@ bool PlanExecutorImpl::isDetached() const {
 }
 
 Timestamp PlanExecutorImpl::getLatestOplogTimestamp() const {
-    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY))
+    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY)) {
         return static_cast<ChangeStreamProxyStage*>(changeStreamProxy)->getLatestOplogTimestamp();
-    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN))
+    }
+    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
         return static_cast<CollectionScan*>(collectionScan)->getLatestOplogTimestamp();
+    }
     return Timestamp();
 }
 
 BSONObj PlanExecutorImpl::getPostBatchResumeToken() const {
     if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY))
         return static_cast<ChangeStreamProxyStage*>(changeStreamProxy)->getPostBatchResumeToken();
+    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
+        return static_cast<CollectionScan*>(collectionScan)->getResumeToken();
+    }
     return {};
 }
 

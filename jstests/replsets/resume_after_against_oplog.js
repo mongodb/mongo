@@ -29,14 +29,13 @@ const firstRes = assert.commandWorked(localDb.runCommand({
     filter: {op: "i", "o.ans": 42},
     hint: {$natural: 1},
     batchSize: 1,
-    showRecordId: true
+    $_requestResumeToken: true
 }));
 
 const firstDoc = firstRes.cursor.firstBatch[0];
 assert.eq(firstDoc.o._id, 0);
-
-// TODO SERVER-43271: Use a real resumeToken instead of relying on showRecordId.
-const firstRecordId = firstDoc["$recordId"];
+assert.hasFields(firstRes.cursor, ["postBatchResumeToken"]);
+const resumeToken = firstRes.cursor.postBatchResumeToken;
 
 // Kill the cursor before attempting to resume.
 assert.commandWorked(localDb.runCommand({killCursors: "oplog.rs", cursors: [firstRes.cursor.id]}));
@@ -48,7 +47,7 @@ const secondRes = assert.commandWorked(localDb.runCommand({
     hint: {$natural: 1},
     batchSize: 1,
     $_requestResumeToken: true,
-    $_resumeAfter: {$recordId: firstRecordId}
+    $_resumeAfter: resumeToken
 }));
 
 const secondDoc = secondRes.cursor.firstBatch[0];
