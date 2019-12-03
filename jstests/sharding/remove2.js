@@ -22,8 +22,8 @@ function seedString(replTest) {
 }
 
 function awaitReplicaSetMonitorTimeout() {
-    print("Sleeping for 20 seconds to let the other shard's ReplicaSetMonitor time out");
-    sleep(20000);  // 1 failed check should take 15 seconds, wait a few more seconds.
+    print("Sleeping for 60 seconds to let the other shard's ReplicaSetMonitor time out");
+    sleep(60000);  // 60s should be plenty since the ReplicaSetMonitor refreshes every 30s.
 }
 
 function setupInitialData(st, coll) {
