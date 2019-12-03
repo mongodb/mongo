@@ -142,6 +142,9 @@ public:
 #ifndef SSL_OP_NO_TLSv1_2
 #define SSL_OP_NO_TLSv1_2 0
 #endif
+#ifndef SSL_OP_NO_TLSv1_3
+#define SSL_OP_NO_TLSv1_3 0
+#endif
 
 namespace {
 
@@ -854,6 +857,8 @@ Status SSLManager::initSSLContext(SSL_CTX* context,
                 supportedProtocols |= SSL_OP_NO_TLSv1_1;
             } else if (protocol == SSLParams::Protocols::TLS1_2) {
                 supportedProtocols |= SSL_OP_NO_TLSv1_2;
+            } else if (protocol == SSLParams::Protocols::TLS1_3) {
+                supportedProtocols |= SSL_OP_NO_TLSv1_3;
             }
         }
     }
@@ -1568,9 +1573,18 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
                 versionString = "1.2"_sd;
             }
             break;
+        case TLSVersion::kTLS13:
+            counts.tls13.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_3) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.3"_sd;
+            }
+            break;
         default:
+            counts.tlsUnknown.addAndFetch(1);
             if (!sslGlobalParams.tlsLogVersions.empty()) {
-                versionString = "unkown"_sd;
+                versionString = "unknown"_sd;
             }
             break;
     }

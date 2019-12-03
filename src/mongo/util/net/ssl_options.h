@@ -43,16 +43,18 @@ class Environment;
 namespace moe = mongo::optionenvironment;
 
 struct SSLParams {
-    enum class Protocols { TLS1_0, TLS1_1, TLS1_2 };
-    AtomicInt32 sslMode;             // --sslMode - the SSL operation mode, see enum SSLModes
-    std::string sslPEMKeyFile;       // --sslPEMKeyFile
-    std::string sslPEMKeyPassword;   // --sslPEMKeyPassword
-    std::string sslClusterFile;      // --sslInternalKeyFile
-    std::string sslClusterPassword;  // --sslInternalKeyPassword
-    std::string sslCAFile;           // --sslCAFile
-    std::string sslClusterCAFile;    // --sslClusterCAFile
-    std::string sslCRLFile;          // --sslCRLFile
-    std::string sslCipherConfig;     // --sslCipherConfig
+    enum class Protocols { TLS1_0, TLS1_1, TLS1_2, TLS1_3 };
+    AtomicInt32 sslMode;            // --sslMode - the SSL operation mode, see enum SSLModes
+    std::string sslPEMKeyFile;      // --sslPEMKeyFile
+    std::string sslPEMKeyPassword;  // --sslPEMKeyPassword
+    std::string sslPEMTempDHParam;  // --setParameter OpenSSLDiffieHellmanParameters=file : PEM file
+                                    // with DH parameters.
+    std::string sslClusterFile;     // --sslInternalKeyFile
+    std::string sslClusterPassword;               // --sslInternalKeyPassword
+    std::string sslCAFile;                        // --sslCAFile
+    std::string sslClusterCAFile;                 // --sslClusterCAFile
+    std::string sslCRLFile;                       // --sslCRLFile
+    std::string sslCipherConfig;                  // --sslCipherConfig
     std::vector<Protocols> sslDisabledProtocols;  // --sslDisabledProtocols
     std::vector<Protocols> tlsLogVersions;        // --tlsLogVersion
     bool sslWeakCertificateValidation = false;    // --sslWeakCertificateValidation
