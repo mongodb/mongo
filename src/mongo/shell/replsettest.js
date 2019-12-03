@@ -1142,7 +1142,8 @@ var ReplSetTest = function(opts) {
         // version, which allows us to use the failpoint below.
         let explicitBinVersion =
             (self.startOptions !== undefined && self.startOptions.hasOwnProperty("binVersion")) ||
-            explicitBinVersionWasSpecifiedForSomeNode;
+            explicitBinVersionWasSpecifiedForSomeNode ||
+            jsTest.options().useRandomBinVersionsWithinReplicaSet;
 
         // Skip waiting for new data to appear in the oplog buffer when transitioning to primary.
         // This makes step up much faster for a node that doesn't need to drain any oplog
