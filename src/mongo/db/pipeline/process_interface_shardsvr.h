@@ -78,7 +78,7 @@ public:
                                     const NamespaceString& ns,
                                     BatchedObjects&& batch,
                                     const WriteConcernOptions& wc,
-                                    bool upsert,
+                                    UpsertType upsert,
                                     bool multi,
                                     boost::optional<OID> targetEpoch) final;
 

@@ -190,6 +190,13 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             }
 
             request.setMergeByPBRT(elem.Bool());
+        } else if (fieldName == kUseNewUpsert) {
+            if (elem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kUseNewUpsert << " must be a boolean, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setUseNewUpsert(elem.boolean());
         } else if (kAllowDiskUseName == fieldName) {
             if (storageGlobalParams.readOnly) {
                 return {ErrorCodes::IllegalOperation,
@@ -329,6 +336,7 @@ Document AggregationRequest::serializeToCommandObj() const {
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
         // Only serialize runtime constants if any were specified.
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
+        {kUseNewUpsert, _useNewUpsert ? Value(true) : Value()},
     };
 }
 }  // namespace mongo

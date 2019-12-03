@@ -117,6 +117,10 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
 
+    // We set this flag to indicate that the shards should always use the new upsert mechanism when
+    // executing relevant $merge modes.
+    cmdForShards[AggregationRequest::kUseNewUpsert] = Value(true);
+
     // agg creates temp collection and should handle implicit create separately.
     return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), true);
 }

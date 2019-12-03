@@ -65,6 +65,7 @@ public:
     static constexpr StringData kCommentName = "comment"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
+    static constexpr StringData kUseNewUpsert = "useNewUpsert"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -238,6 +239,10 @@ public:
         return _runtimeConstants;
     }
 
+    bool getUseNewUpsert() const {
+        return _useNewUpsert;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -310,6 +315,10 @@ public:
         _runtimeConstants = std::move(runtimeConstants);
     }
 
+    void setUseNewUpsert(bool useNewUpsert) {
+        _useNewUpsert = useNewUpsert;
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -363,5 +372,9 @@ private:
     // A document containing runtime constants; i.e. values that do not change once computed (e.g.
     // $$NOW).
     boost::optional<RuntimeConstants> _runtimeConstants;
+
+    // Indicates whether the aggregation may use the new 'upsertSupplied' mechanism when running
+    // $merge stages. Versions of mongoS from 4.2.2 onwards always set this flag.
+    bool _useNewUpsert = false;
 };
 }  // namespace mongo

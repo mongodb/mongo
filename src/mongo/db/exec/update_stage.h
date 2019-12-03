@@ -69,14 +69,14 @@ private:
 };
 
 /**
- * Execution stage responsible for updates to documents and upserts. If the prior or
- * newly-updated version of the document was requested to be returned, then ADVANCED is
- * returned after updating or inserting a document. Otherwise, NEED_TIME is returned after
- * updating or inserting a document.
+ * Execution stage responsible for updates to documents. If the prior or newly-updated version of
+ * the document was requested to be returned, then ADVANCED is returned after updating a document.
+ * Otherwise, NEED_TIME is returned after updating a document if further updates are pending,
+ * and IS_EOF is returned if no documents were found or all updates have been performed.
  *
  * Callers of doWork() must be holding a write lock.
  */
-class UpdateStage final : public RequiresMutableCollectionStage {
+class UpdateStage : public RequiresMutableCollectionStage {
     UpdateStage(const UpdateStage&) = delete;
     UpdateStage& operator=(const UpdateStage&) = delete;
 
@@ -87,8 +87,8 @@ public:
                 Collection* collection,
                 PlanStage* child);
 
-    bool isEOF() final;
-    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() override;
+    StageState doWork(WorkingSetID* out) override;
 
     StageType stageType() const final {
         return STAGE_UPDATE;
@@ -119,32 +119,6 @@ public:
     static UpdateResult makeUpdateResult(const UpdateStats* updateStats);
 
     /**
-     * Computes the document to insert if the upsert flag is set to true and no matching
-     * documents are found in the database. The document to upsert is computing using the
-     * query 'cq' and the update mods contained in 'driver'.
-     *
-     * If 'cq' is NULL, which can happen for the idhack update fast path, then 'query' is
-     * used to compute the doc to insert instead of 'cq'.
-     *
-     * 'doc' is the mutable BSON document which you would like the update driver to use
-     * when computing the document to insert.
-     *
-     * Set 'isInternalRequest' to true if the upsert was issued by the replication or
-     * sharding systems.
-     *
-     * Returns the document to insert.
-     */
-    static BSONObj applyUpdateOpsForInsert(OperationContext* opCtx,
-                                           const CanonicalQuery* cq,
-                                           const BSONObj& query,
-                                           UpdateDriver* driver,
-                                           mutablebson::Document* doc,
-                                           bool isInternalRequest,
-                                           const NamespaceString& ns,
-                                           bool enforceOkForStorage,
-                                           UpdateStats* stats);
-
-    /**
      * Returns true if an update failure due to a given DuplicateKey error is eligible for retry.
      * Requires that parsedUpdate.hasParsedQuery() is true.
      */
@@ -152,9 +126,37 @@ public:
                                                  const DuplicateKeyErrorInfo& errorInfo);
 
 protected:
+    UpdateStage(OperationContext* opCtx,
+                const UpdateStageParams& params,
+                WorkingSet* ws,
+                Collection* collection);
+
     void doSaveStateRequiresCollection() final {}
 
     void doRestoreStateRequiresCollection() final;
+
+    void _ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing);
+
+    void _assertRequiredPathsPresent(const mutablebson::Document& document,
+                                     const FieldRefSet& requiredPaths);
+
+    UpdateStageParams _params;
+
+    // Not owned by us.
+    WorkingSet* _ws;
+
+    // Stats
+    UpdateStats _specificStats;
+
+    // True if the request should be checked for an update to the shard key.
+    bool _shouldCheckForShardKeyUpdate;
+
+    // True if updated documents should be validated with storage_validation::storageValid().
+    bool _enforceOkForStorage;
+
+    // These get reused for each update.
+    mutablebson::Document& _doc;
+    mutablebson::DamageVector _damages;
 
 private:
     static const UpdateStats kEmptyUpdateStats;
@@ -171,24 +173,6 @@ private:
      * of the newly-updated version of the document.
      */
     BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId);
-
-    /**
-     * Computes the document to insert and inserts it into the collection. Used if the
-     * user requested an upsert and no matching documents were found.
-     */
-    void doInsert();
-
-    /**
-     * Have we performed all necessary updates? Even if this is true, we might not be EOF,
-     * as we might still have to do an insert.
-     */
-    bool doneUpdating();
-
-    /**
-     * Examines the stats / update request and returns whether there is still an insert left
-     * to do. If so then this stage is not EOF yet.
-     */
-    bool needInsert();
 
     /**
      * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
@@ -210,25 +194,11 @@ private:
     bool checkUpdateChangesShardKeyFields(ScopedCollectionMetadata metadata,
                                           const Snapshotted<BSONObj>& oldObj);
 
-    UpdateStageParams _params;
-
-    // Not owned by us.
-    WorkingSet* _ws;
-
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;
 
     // If not WorkingSet::INVALID_ID, we return this member to our caller.
     WorkingSetID _idReturning;
-
-    // Stats
-    UpdateStats _specificStats;
-
-    // True if updated documents should be validated with storage_validation::storageValid().
-    bool _enforceOkForStorage;
-
-    // True if the request should be checked for an update to the shard key.
-    bool _shouldCheckForShardKeyUpdate;
 
     // If the update was in-place, we may see it again.  This only matters if we're doing
     // a multi-update; if we're not doing a multi-update we stop after one update and we
@@ -244,10 +214,6 @@ private:
     // So, no matter what, we keep track of where the doc wound up.
     typedef stdx::unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
     const std::unique_ptr<RecordIdSet> _updatedRecordIds;
-
-    // These get reused for each update.
-    mutablebson::Document& _doc;
-    mutablebson::DamageVector _damages;
 };
 
 }  // namespace mongo

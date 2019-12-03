@@ -40,6 +40,7 @@
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/stdx/memory.h"
 
@@ -166,9 +167,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     invariant(collection);
     auto ws = stdx::make_unique<WorkingSet>();
 
-    auto idHackStage = stdx::make_unique<IDHackStage>(opCtx, key, ws.get(), descriptor);
-    auto root =
-        stdx::make_unique<UpdateStage>(opCtx, params, ws.get(), collection, idHackStage.release());
+    auto idHackStage = std::make_unique<IDHackStage>(opCtx, key, ws.get(), descriptor);
+
+    const bool isUpsert = params.request->isUpsert();
+    auto root = (isUpsert ? std::make_unique<UpsertStage>(
+                                opCtx, params, ws.get(), collection, idHackStage.release())
+                          : std::make_unique<UpdateStage>(
+                                opCtx, params, ws.get(), collection, idHackStage.release()));
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);

@@ -67,6 +67,10 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     } else {
         variables.setDefaultRuntimeConstants(opCtx);
     }
+
+    // Any request which did not originate from a mongoS, or which did originate from a mongoS but
+    // has the 'useNewUpsert' flag set, can use the new upsertSupplied mechanism for $merge.
+    useNewUpsert = request.getUseNewUpsert() || !request.isFromMongos();
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
@@ -164,6 +168,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->subPipelineDepth = subPipelineDepth;
 
     expCtx->tempDir = tempDir;
+    expCtx->useNewUpsert = useNewUpsert;
 
     expCtx->opCtx = opCtx;
 

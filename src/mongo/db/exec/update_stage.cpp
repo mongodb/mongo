@@ -39,7 +39,6 @@
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
@@ -57,11 +56,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
 MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);
 
 using std::string;
@@ -76,56 +73,10 @@ namespace {
 const char idFieldName[] = "_id";
 const FieldRef idFieldRef(idFieldName);
 
-Status ensureIdFieldIsFirst(mb::Document* doc) {
-    mb::Element idElem = mb::findFirstChildNamed(doc->root(), idFieldName);
-
-    if (!idElem.ok()) {
-        return {ErrorCodes::InvalidIdField, "_id field is missing"};
-    }
-
-    if (idElem.leftSibling().ok()) {
-        // Move '_id' to be the first element
-        Status s = idElem.remove();
-        if (!s.isOK())
-            return s;
-        s = doc->root().pushFront(idElem);
-        if (!s.isOK())
-            return s;
-    }
-
-    return Status::OK();
-}
-
 void addObjectIDIdField(mb::Document* doc) {
     const auto idElem = doc->makeElementNewOID(idFieldName);
-    if (!idElem.ok())
-        uasserted(17268, "Could not create new ObjectId '_id' field.");
-
+    uassert(17268, "Could not create new ObjectId '_id' field.", idElem.ok());
     uassertStatusOK(doc->root().pushFront(idElem));
-}
-
-/**
- * Uasserts if any of the paths in 'requiredPaths' are not present in 'document', or if they are
- * arrays or array descendants.
- */
-void assertRequiredPathsPresent(const mb::Document& document, const FieldRefSet& requiredPaths) {
-    for (const auto& path : requiredPaths) {
-        auto elem = document.root();
-        for (size_t i = 0; i < (*path).numParts(); ++i) {
-            elem = elem[(*path).getPart(i)];
-            uassert(ErrorCodes::NoSuchKey,
-                    str::stream() << "After applying the update, the new document was missing the "
-                                     "required field '"
-                                  << (*path).dottedField() << "'",
-                    elem.ok());
-            uassert(
-                ErrorCodes::NotSingleValueField,
-                str::stream() << "After applying the update to the document, the required field '"
-                              << (*path).dottedField()
-                              << "' was found to be an array or array descendant.",
-                elem.getType() != BSONType::Array);
-        }
-    }
 }
 
 /**
@@ -158,19 +109,30 @@ const char* UpdateStage::kStageType = "UPDATE";
 
 const UpdateStats UpdateStage::kEmptyUpdateStats;
 
+// Public constructor.
 UpdateStage::UpdateStage(OperationContext* opCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
+    : UpdateStage(opCtx, params, ws, collection) {
+    // We should never reach here if the request is an upsert.
+    invariant(!_params.request->isUpsert());
+    _children.emplace_back(child);
+}
+
+// Protected constructor.
+UpdateStage::UpdateStage(OperationContext* opCtx,
+                         const UpdateStageParams& params,
+                         WorkingSet* ws,
+                         Collection* collection)
     : RequiresMutableCollectionStage(kStageType, opCtx, collection),
       _params(params),
       _ws(ws),
+      _doc(params.driver->getDocument()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
-      _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : NULL),
-      _doc(params.driver->getDocument()) {
-    _children.emplace_back(child);
+      _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr) {
 
     // Should the modifiers validate their embedded docs via storage_validation::storageValid()?
     // Only user updates should be checked. Any system or replication stuff should pass through.
@@ -226,9 +188,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
         if (metadata->isSharded() &&
             (!OperationShardingState::isOperationVersioned(getOpCtx()) || !isFCV42)) {
-            auto& immutablePathsVector = metadata->getKeyPatternFields();
-            immutablePaths.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(immutablePathsVector));
+            immutablePaths.fillFrom(metadata->getKeyPatternFields());
         }
         immutablePaths.keepShortest(&idFieldRef);
     }
@@ -270,16 +230,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     // neither grow nor shrink).
     const auto createIdField = !collection()->isCapped();
 
-    // Ensure if _id exists it is first
-    status = ensureIdFieldIsFirst(&_doc);
-    if (status.code() == ErrorCodes::InvalidIdField) {
-        // Create ObjectId _id field if we are doing that
-        if (createIdField) {
-            addObjectIDIdField(&_doc);
-        }
-    } else {
-        uassertStatusOK(status);
-    }
+    // Ensure _id is first if it exists, and generate a new OID if appropriate.
+    _ensureIdFieldIsFirst(&_doc, createIdField);
 
     // See if the changes were applied in place
     const char* source = NULL;
@@ -394,99 +346,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     return newObj;
 }
 
-BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
-                                             const CanonicalQuery* cq,
-                                             const BSONObj& query,
-                                             UpdateDriver* driver,
-                                             mutablebson::Document* doc,
-                                             bool isInternalRequest,
-                                             const NamespaceString& ns,
-                                             bool enforceOkForStorage,
-                                             UpdateStats* stats) {
-    // Since this is an insert (no docs found and upsert:true), we will be logging it
-    // as an insert in the oplog. We don't need the driver's help to build the
-    // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
-    // Some mods may only work in that context (e.g. $setOnInsert).
-    driver->setLogOp(false);
-
-    auto* const css = CollectionShardingState::get(opCtx, ns);
-    auto metadata = css->getCurrentMetadata();
-
-    const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
-
-    FieldRefSet immutablePaths;
-    if (metadata->isSharded() &&
-        (!OperationShardingState::isOperationVersioned(opCtx) || !isFCV42)) {
-        auto& immutablePathsVector = metadata->getKeyPatternFields();
-        immutablePaths.fillFrom(
-            transitional_tools_do_not_use::unspool_vector(immutablePathsVector));
-    }
-    immutablePaths.keepShortest(&idFieldRef);
-
-    if (cq) {
-        FieldRefSet requiredPaths;
-        if (metadata->isSharded()) {
-            const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
-            requiredPaths.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
-        }
-        requiredPaths.keepShortest(&idFieldRef);
-        uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, requiredPaths, *doc));
-    } else {
-        fassert(17354, CanonicalQuery::isSimpleIdQuery(query));
-        BSONElement idElt = query[idFieldName];
-        fassert(17352, doc->root().appendElement(idElt));
-    }
-
-    // Apply the update modifications here. Do not validate for storage, since we will validate the
-    // entire document after the update. However, we ensure that no immutable fields are updated.
-    const bool validateForStorage = false;
-    const bool isInsert = true;
-    if (isInternalRequest) {
-        immutablePaths.clear();
-    }
-    Status updateStatus =
-        driver->update(StringData(), doc, validateForStorage, immutablePaths, isInsert);
-    if (!updateStatus.isOK()) {
-        uasserted(16836, updateStatus.reason());
-    }
-
-    // Ensure _id exists and is first
-    auto idAndFirstStatus = ensureIdFieldIsFirst(doc);
-    if (idAndFirstStatus.code() == ErrorCodes::InvalidIdField) {  // _id field is missing
-        addObjectIDIdField(doc);
-    } else {
-        uassertStatusOK(idAndFirstStatus);
-    }
-
-    // Validate that the object replacement or modifiers resulted in a document
-    // that contains all the required keys and can be stored if it isn't coming
-    // from a migration or via replication.
-    if (!isInternalRequest) {
-        if (enforceOkForStorage) {
-            storage_validation::storageValid(*doc);
-        }
-        FieldRefSet requiredPaths;
-        if (metadata->isSharded()) {
-            const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
-            requiredPaths.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
-        }
-        requiredPaths.keepShortest(&idFieldRef);
-        assertRequiredPathsPresent(*doc, requiredPaths);
-    }
-
-    BSONObj newObj = doc->getObject();
-    if (newObj.objsize() > BSONObjMaxUserSize) {
-        uasserted(17420,
-                  str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize);
-    }
-
-    return newObj;
-}
-
 bool UpdateStage::matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
     if (root.matchType() == MatchExpression::EQ) {
         return true;
@@ -563,128 +422,15 @@ bool UpdateStage::shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpd
     return true;
 }
 
-void UpdateStage::doInsert() {
-    _specificStats.inserted = true;
-
-    const UpdateRequest* request = _params.request;
-    bool isInternalRequest = !getOpCtx()->writesAreReplicated() || request->isFromMigration();
-
-    // Reset the document we will be writing to.
-    _doc.reset();
-
-    BSONObj newObj = applyUpdateOpsForInsert(getOpCtx(),
-                                             _params.canonicalQuery,
-                                             request->getQuery(),
-                                             _params.driver,
-                                             &_doc,
-                                             isInternalRequest,
-                                             request->getNamespaceString(),
-                                             _enforceOkForStorage,
-                                             &_specificStats);
-
-    _specificStats.objInserted = newObj;
-
-    // If this is an explain, bail out now without doing the insert.
-    if (request->isExplain()) {
-        return;
-    }
-
-    // If in FCV 4.2 and this collection is sharded, check if the doc we plan to insert belongs to
-    // this shard. MongoS uses the query field to target a shard, and it is possible the shard key
-    // fields in the 'q' field belong to this shard, but those in the 'u' field do not. In this case
-    // we need to throw so that MongoS can target the insert to the correct shard.
-    if (_shouldCheckForShardKeyUpdate) {
-        const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
-        auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
-        const auto& metadata = css->getCurrentMetadata();
-
-        if (isFCV42 && metadata->isSharded()) {
-            const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
-            auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
-
-            if (!metadata->keyBelongsToMe(newShardKey)) {
-                // An attempt to upsert a document with a shard key value that belongs on another
-                // shard must either be a retryable write or inside a transaction.
-                uassert(ErrorCodes::IllegalOperation,
-                        "The upsert document could not be inserted onto the shard targeted by the "
-                        "query, since its shard key belongs on a different shard. Cross-shard "
-                        "upserts are only allowed when running in a transaction or with "
-                        "retryWrites: true.",
-                        getOpCtx()->getTxnNumber());
-                uasserted(
-                    WouldChangeOwningShardInfo(request->getQuery(), newObj, true /* upsert */),
-                    "The document we are inserting belongs on a different shard");
-            }
-        }
-    }
-
-    if (MONGO_FAIL_POINT(hangBeforeUpsertPerformsInsert)) {
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeUpsertPerformsInsert, getOpCtx(), "hangBeforeUpsertPerformsInsert");
-    }
-
-    writeConflictRetry(getOpCtx(), "upsert", collection()->ns().ns(), [&] {
-        WriteUnitOfWork wunit(getOpCtx());
-        uassertStatusOK(collection()->insertDocument(getOpCtx(),
-                                                     InsertStatement(request->getStmtId(), newObj),
-                                                     _params.opDebug,
-                                                     request->isFromMigration()));
-
-        // Technically, we should save/restore state here, but since we are going to return
-        // immediately after, it would just be wasted work.
-        wunit.commit();
-    });
-}
-
-bool UpdateStage::doneUpdating() {
+bool UpdateStage::isEOF() {
     // We're done updating if either the child has no more results to give us, or we've
     // already gotten a result back and we're not a multi-update.
     return _idRetrying == WorkingSet::INVALID_ID && _idReturning == WorkingSet::INVALID_ID &&
         (child()->isEOF() || (_specificStats.nMatched > 0 && !_params.request->isMulti()));
 }
 
-bool UpdateStage::needInsert() {
-    // We need to insert if
-    //  1) we haven't inserted already,
-    //  2) the child stage returned zero matches, and
-    //  3) the user asked for an upsert.
-    return !_specificStats.inserted && _specificStats.nMatched == 0 && _params.request->isUpsert();
-}
-
-bool UpdateStage::isEOF() {
-    return doneUpdating() && !needInsert();
-}
-
 PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
-        return PlanStage::IS_EOF;
-    }
-
-    if (doneUpdating()) {
-        // Even if we're done updating, we may have some inserting left to do.
-        if (needInsert()) {
-
-            doInsert();
-
-            invariant(isEOF());
-            if (_params.request->shouldReturnNewDocs()) {
-                // Want to return the document we just inserted, create it as a WorkingSetMember
-                // so that we can return it.
-                BSONObj newObj = _specificStats.objInserted;
-                *out = _ws->allocate();
-                WorkingSetMember* member = _ws->get(*out);
-                member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
-                                                   newObj.getOwned());
-                member->transitionToOwnedObj();
-                return PlanStage::ADVANCED;
-            }
-        }
-
-        // At this point either we're done updating and there was no insert to do,
-        // or we're done updating and we're done inserting. Either way, we're EOF.
-        invariant(isEOF());
         return PlanStage::IS_EOF;
     }
 
@@ -834,9 +580,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == status) {
-        // The child is out of results, but we might not be done yet because we still might
-        // have to do an insert.
-        return PlanStage::NEED_TIME;
+        // The child is out of results, and therefore so are we.
+        return PlanStage::IS_EOF;
     } else if (PlanStage::FAILURE == status) {
         *out = id;
         // If a stage fails, it may create a status WSM to indicate why it failed, in which case
@@ -853,6 +598,40 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     }
 
     return status;
+}
+
+void UpdateStage::_assertRequiredPathsPresent(const mb::Document& document,
+                                              const FieldRefSet& requiredPaths) {
+    for (const auto& path : requiredPaths) {
+        auto elem = document.root();
+        for (size_t i = 0; i < (*path).numParts(); ++i) {
+            elem = elem[(*path).getPart(i)];
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "After applying the update, the new document was missing the "
+                                     "required field '"
+                                  << (*path).dottedField() << "'",
+                    elem.ok());
+            uassert(
+                ErrorCodes::NotSingleValueField,
+                str::stream() << "After applying the update to the document, the required field '"
+                              << (*path).dottedField()
+                              << "' was found to be an array or array descendant.",
+                elem.getType() != BSONType::Array);
+        }
+    }
+}
+
+void UpdateStage::_ensureIdFieldIsFirst(mb::Document* doc, bool generateOIDIfMissing) {
+    mb::Element idElem = mb::findFirstChildNamed(doc->root(), idFieldName);
+
+    // If the document has no _id and the caller has requested that we generate one, do so.
+    if (!idElem.ok() && generateOIDIfMissing) {
+        addObjectIDIdField(doc);
+    } else if (idElem.ok() && idElem.leftSibling().ok()) {
+        // If the document does have an _id but it is not the first element, move it to the front.
+        uassertStatusOK(idElem.remove());
+        uassertStatusOK(doc->root().pushFront(idElem));
+    }
 }
 
 void UpdateStage::doRestoreStateRequiresCollection() {
@@ -947,13 +726,11 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
         return false;
     }
 
-    FieldRefSet shardKeyPaths;
-    const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
-    shardKeyPaths.fillFrom(transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
+    FieldRefSet shardKeyPaths(metadata->getKeyPatternFields());
 
     // Assert that the updated doc has all shard key fields and none are arrays or array
     // descendants.
-    assertRequiredPathsPresent(_doc, shardKeyPaths);
+    _assertRequiredPathsPresent(_doc, shardKeyPaths);
 
     // We do not allow modifying shard key value without specifying the full shard key in the query.
     // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
@@ -968,7 +745,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
                 pathsupport::extractFullEqualityMatches(
                     *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
                     .isOK() &&
-                equalities.size() == shardKeyPathsVector.size());
+                equalities.size() == metadata->getKeyPatternFields().size());
 
     // We do not allow updates to the shard key when 'multi' is true.
     uassert(ErrorCodes::InvalidOptions,

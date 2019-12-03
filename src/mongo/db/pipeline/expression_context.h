@@ -247,6 +247,10 @@ public:
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
         maxFeatureCompatibilityVersion;
 
+    // True if this context is associated with a pipeline which is permitted to use the new
+    // upsertSupplied mechanism for applicable $merge modes.
+    bool useNewUpsert = false;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 

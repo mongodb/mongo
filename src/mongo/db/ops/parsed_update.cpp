@@ -32,6 +32,7 @@
 #include "mongo/db/ops/parsed_update.h"
 
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -52,6 +53,22 @@ Status ParsedUpdate::parseRequest() {
     // It is invalid to request that the UpdateStage return the prior or newly-updated version
     // of a document during a multi-update.
     invariant(!(_request->shouldReturnAnyDocs() && _request->isMulti()));
+
+    // It is invalid to specify 'upsertSupplied:true' for a non-upsert operation, or if no upsert
+    // document was supplied with the request.
+    if (_request->shouldUpsertSuppliedDocument()) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "cannot specify '"
+                              << write_ops::UpdateOpEntry::kUpsertSuppliedFieldName
+                              << ": true' for a non-upsert operation",
+                _request->isUpsert());
+        const auto& constants = _request->getUpdateConstants();
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "the parameter '"
+                              << write_ops::UpdateOpEntry::kUpsertSuppliedFieldName
+                              << "' is set to 'true', but no document was supplied",
+                constants && (*constants)["new"_sd].type() == BSONType::Object);
+    }
 
     // It is invalid to request that a ProjectionStage be applied to the UpdateStage if the
     // UpdateStage would not return any document.

@@ -117,8 +117,62 @@ testUpsertDoesInsert({_id: 1, x: 1}, [{$project: {x: 1}}], {_id: 1, x: 1});
 testUpsertDoesInsert({_id: 1, x: 1}, [{$project: {x: "foo"}}], {_id: 1, x: "foo"});
 testUpsertDoesInsert({_id: 1, x: 1, y: 1}, [{$unset: ["x"]}], {_id: 1, y: 1});
 
-// Update fails when invalid stage is specified. This is a sanity check rather than an
-// exhaustive test of all stages.
+// Upsert with 'upsertSupplied' inserts the given document and populates _id from the query.
+assert.commandWorked(db.runCommand({
+    update: coll.getName(),
+    updates: [{
+        q: {_id: "supplied_doc"},
+        u: [{$set: {x: 1}}],
+        upsert: true,
+        upsertSupplied: true,
+        c: {new: {suppliedDoc: true}}
+    }]
+}));
+assert(coll.findOne({_id: "supplied_doc", suppliedDoc: true}));
+
+// Update with 'upsertSupplied:true' fails if 'upsert' is false.
+assert.commandFailedWithCode(db.runCommand({
+    update: coll.getName(),
+    updates: [{
+        q: {_id: "supplied_doc"},
+        u: [{$set: {x: 1}}],
+        upsert: false,
+        upsertSupplied: true,
+        c: {new: {suppliedDoc: true}}
+    }]
+}),
+                             ErrorCodes.FailedToParse);
+
+// Upsert with 'upsertSupplied' fails if no constants are provided.
+assert.commandFailedWithCode(db.runCommand({
+    update: coll.getName(),
+    updates: [{q: {_id: "supplied_doc"}, u: [{$set: {x: 1}}], upsert: true, upsertSupplied: true}]
+}),
+                             ErrorCodes.FailedToParse);
+
+// Upsert with 'upsertSupplied' fails if constants do not include a field called 'new'.
+assert.commandFailedWithCode(db.runCommand({
+    update: coll.getName(),
+    updates:
+        [{q: {_id: "supplied_doc"}, u: [{$set: {x: 1}}], upsert: true, upsertSupplied: true, c: {}}]
+}),
+                             ErrorCodes.FailedToParse);
+
+// Upsert with 'upsertSupplied' fails if c.new is not an object.
+assert.commandFailedWithCode(db.runCommand({
+    update: coll.getName(),
+    updates: [{
+        q: {_id: "supplied_doc"},
+        u: [{$set: {x: 1}}],
+        upsert: true,
+        upsertSupplied: true,
+        c: {new: "string"}
+    }]
+}),
+                             ErrorCodes.FailedToParse);
+
+// Update fails when invalid stage is specified. This is a sanity check rather than an exhaustive
+// test of all stages.
 assert.commandFailedWithCode(coll.update({x: 1}, [{$match: {x: 1}}]), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(coll.update({x: 1}, [{$sort: {x: 1}}]), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(coll.update({x: 1}, [{$facet: {a: [{$match: {x: 1}}]}}]),

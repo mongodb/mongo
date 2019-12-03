@@ -58,6 +58,7 @@ using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 using BatchTransform = std::function<void(DocumentSourceMerge::BatchedObjects&)>;
 using UpdateModification = write_ops::UpdateModification;
+using UpsertType = MongoProcessInterface::UpsertType;
 
 constexpr auto kStageName = DocumentSourceMerge::kStageName;
 constexpr auto kDefaultWhenMatched = WhenMatched::kMerge;
@@ -75,12 +76,15 @@ constexpr auto kPipelineInsertMode = MergeMode{WhenMatched::kPipeline, WhenNotMa
 constexpr auto kPipelineFailMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kFail};
 constexpr auto kPipelineDiscardMode = MergeMode{WhenMatched::kPipeline, WhenNotMatched::kDiscard};
 
+const auto kDefaultPipelineLet = BSON("new"
+                                      << "$$ROOT");
+
 /**
  * Creates a merge strategy which uses update semantics to perform a merge operation. If
  * 'BatchTransform' function is provided, it will be called to transform batched objects before
  * passing them to the 'update'.
  */
-MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
+MergeStrategy makeUpdateStrategy(UpsertType upsert, BatchTransform transform) {
     return [upsert, transform](
                const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
         if (transform) {
@@ -101,7 +105,7 @@ MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
  * error. If 'BatchTransform' function is provided, it will be called to transform batched objects
  * before passing them to the 'update'.
  */
-MergeStrategy makeStrictUpdateStrategy(bool upsert, BatchTransform transform) {
+MergeStrategy makeStrictUpdateStrategy(UpsertType upsert, BatchTransform transform) {
     return [upsert, transform](
                const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
         if (transform) {
@@ -168,44 +172,46 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
         {kReplaceInsertMode,
          {kReplaceInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(true, {})}},
+          makeUpdateStrategy(UpsertType::kGenerateNewDoc, {})}},
         // whenMatched: replace, whenNotMatched: fail
         {kReplaceFailMode,
-         {kReplaceFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+         {kReplaceFailMode, {ActionType::update}, makeStrictUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: replace, whenNotMatched: discard
         {kReplaceDiscardMode,
-         {kReplaceDiscardMode, {ActionType::update}, makeUpdateStrategy(false, {})}},
+         {kReplaceDiscardMode, {ActionType::update}, makeUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: merge, whenNotMatched: insert
         {kMergeInsertMode,
          {kMergeInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(true, makeUpdateTransform("$set"))}},
+          makeUpdateStrategy(UpsertType::kGenerateNewDoc, makeUpdateTransform("$set"))}},
         // whenMatched: merge, whenNotMatched: fail
         {kMergeFailMode,
          {kMergeFailMode,
           {ActionType::update},
-          makeStrictUpdateStrategy(false, makeUpdateTransform("$set"))}},
+          makeStrictUpdateStrategy(UpsertType::kNone, makeUpdateTransform("$set"))}},
         // whenMatched: merge, whenNotMatched: discard
         {kMergeDiscardMode,
          {kMergeDiscardMode,
           {ActionType::update},
-          makeUpdateStrategy(false, makeUpdateTransform("$set"))}},
+          makeUpdateStrategy(UpsertType::kNone, makeUpdateTransform("$set"))}},
         // whenMatched: keepExisting, whenNotMatched: insert
         {kKeepExistingInsertMode,
          {kKeepExistingInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(true, makeUpdateTransform("$setOnInsert"))}},
+          makeUpdateStrategy(UpsertType::kGenerateNewDoc, makeUpdateTransform("$setOnInsert"))}},
         // whenMatched: [pipeline], whenNotMatched: insert
         {kPipelineInsertMode,
          {kPipelineInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(true, {})}},
+          makeUpdateStrategy(UpsertType::kInsertSuppliedDoc, {})}},
         // whenMatched: [pipeline], whenNotMatched: fail
         {kPipelineFailMode,
-         {kPipelineFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+         {kPipelineFailMode,
+          {ActionType::update},
+          makeStrictUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: [pipeline], whenNotMatched: discard
         {kPipelineDiscardMode,
-         {kPipelineDiscardMode, {ActionType::update}, makeUpdateStrategy(false, {})}},
+         {kPipelineDiscardMode, {ActionType::update}, makeUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: fail, whenNotMatched: insert
         {kFailInsertMode, {kFailInsertMode, {ActionType::insert}, makeInsertStrategy()}}};
     return mergeStrategyDescriptors;
@@ -376,11 +382,16 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             !outputNs.isSpecial());
 
     if (whenMatched == WhenMatched::kPipeline) {
-        if (!letVariables) {
-            // For custom pipeline-style updates, default the 'let' variables to {new: "$$ROOT"},
-            // if the user has omitted the 'let' argument.
-            letVariables = BSON("new"
-                                << "$$ROOT");
+        // If unspecified, 'letVariables' defaults to {new: "$$ROOT"}.
+        letVariables = letVariables.value_or(kDefaultPipelineLet);
+        auto newElt = letVariables->getField("new"_sd);
+        uassert(51273,
+                "'let' may not define a value for the reserved 'new' variable other than '$$ROOT'",
+                !newElt || newElt.valueStringDataSafe() == "$$ROOT"_sd);
+        // If the 'new' variable is missing and this is a {whenNotMatched: "insert"} merge, then the
+        // new document *must* be serialized with the update request. Add it to the let variables.
+        if (!newElt && whenNotMatched == WhenNotMatched::kInsert) {
+            letVariables = letVariables->addField(kDefaultPipelineLet.firstElement());
         }
     } else {
         // Ensure the 'let' argument cannot be used with any other merge modes.
