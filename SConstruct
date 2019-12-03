@@ -1647,20 +1647,14 @@ if env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
         env.Tool('thin_archive')
 
 if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
-    env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
-    env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
     # NOTE: The leading and trailing spaces here are important. Do not remove them.
     env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,--whole-archive '
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,--no-whole-archive'
 elif env.TargetOSIs('darwin'):
-    env['LINK_LIBGROUP_START'] = ''
-    env['LINK_LIBGROUP_END'] = ''
     # NOTE: The trailing space here is important. Do not remove it.
     env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-force_load '
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 elif env.TargetOSIs('solaris'):
-    env['LINK_LIBGROUP_START'] = '-Wl,-z,rescan-start'
-    env['LINK_LIBGROUP_END'] = '-Wl,-z,rescan-end'
     # NOTE: The leading and trailing spaces here are important. Do not remove them.
     env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-z,allextract '
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,-z,defaultextract'
