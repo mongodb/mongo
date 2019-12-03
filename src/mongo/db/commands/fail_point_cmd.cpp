@@ -111,6 +111,12 @@ public:
 
 /**
  * Command for waiting for installed fail points.
+ *
+ * For number of additional times entered > 1, this command is only guaranteed to work
+ * correctly if the code that enters the fail point uses the FailPoint API correctly.
+ * That is, the code can only use one of shouldFail, pauseWhileSet, scopedIf, scoped,
+ * executeIf, and execute to enter the fail point (as all of these functions have side
+ * effects on the counter for times entered).
  */
 class WaitForFailPointCommand : public TypedCommand<WaitForFailPointCommand> {
 public:

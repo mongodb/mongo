@@ -318,10 +318,12 @@ public:
 
     /**
      * Take 100msec pauses for as long as the FailPoint is active.
-     * This uses `shouldFail()` and therefore affects FailPoint counters.
+     * This calls `shouldFail()` with kFirstTimeEntered once and with kEnteredAlready thereafter, so
+     * affects FailPoint counters once.
      */
     void pauseWhileSet() {
-        while (MONGO_unlikely(shouldFail(kEnteredAlready))) {
+        for (auto entryMode = kFirstTimeEntered; MONGO_unlikely(shouldFail(entryMode));
+             entryMode = kEnteredAlready) {
             sleepmillis(100);
         }
     }
@@ -332,7 +334,8 @@ public:
      * OperationContext).
      */
     void pauseWhileSet(OperationContext* opCtx) {
-        while (MONGO_unlikely(shouldFail(kEnteredAlready))) {
+        for (auto entryMode = kFirstTimeEntered; MONGO_unlikely(shouldFail(entryMode));
+             entryMode = kEnteredAlready) {
             opCtx->sleepFor(Milliseconds(100));
         }
     }

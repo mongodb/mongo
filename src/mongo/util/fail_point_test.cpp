@@ -432,28 +432,45 @@ TEST(FailPoint, FailPointBlockIfBasicTest) {
 
 namespace mongo {
 
-TEST(FailPoint, WaitForFailPointTimeout) {
-    FailPoint failPoint;
-    failPoint.setMode(FailPoint::alwaysOn);
-
+/**
+ * Runs the given function with an operation context that has a deadline and asserts that
+ * the function is interruptable.
+ */
+void assertFunctionInterruptable(std::function<void(OperationContext* opCtx)> f) {
     const auto service = ServiceContext::make();
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
     service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setTickSource(std::make_unique<TickSourceMock<>>());
 
-    const auto client = service->makeClient("WaitForFailPointTest");
+    const auto client = service->makeClient("FailPointTest");
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(Milliseconds{999}, ErrorCodes::ExceededTimeLimit);
 
-    stdx::thread waitForFailPoint([&] {
-        ASSERT_THROWS_CODE(failPoint.waitForTimesEntered(opCtx.get(), 1),
-                           AssertionException,
-                           ErrorCodes::ExceededTimeLimit);
+    stdx::thread th([&] {
+        ASSERT_THROWS_CODE(f(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
     });
 
     mockClock->advance(Milliseconds{1000});
-    waitForFailPoint.join();
+    th.join();
+}
+
+TEST(FailPoint, PauseWhileSetInterruptibility) {
+    FailPoint failPoint;
+    failPoint.setMode(FailPoint::alwaysOn);
+
+    assertFunctionInterruptable(
+        [&failPoint](OperationContext* opCtx) { failPoint.pauseWhileSet(opCtx); });
+
+    failPoint.setMode(FailPoint::off);
+}
+
+TEST(FailPoint, WaitForFailPointTimeout) {
+    FailPoint failPoint;
+    failPoint.setMode(FailPoint::alwaysOn);
+
+    assertFunctionInterruptable(
+        [&failPoint](OperationContext* opCtx) { failPoint.waitForTimesEntered(opCtx, 1); });
 
     failPoint.setMode(FailPoint::off);
 }
