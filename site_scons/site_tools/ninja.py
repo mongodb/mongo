@@ -738,7 +738,11 @@ def ninja_builder(env, target, source):
     ninja_syntax_mod_name = os.path.basename(ninja_syntax_file)
     ninja_syntax = importlib.import_module(ninja_syntax_mod_name.replace(".py", ""))
 
-    generated_build_ninja = target[0].get_abspath() + env.get("NINJA_SUFFIX", "")
+    suffix = env.get("NINJA_SUFFIX", "")
+    if suffix and not suffix[0] == ".":
+        suffix = "." + suffix
+
+    generated_build_ninja = target[0].get_abspath() + suffix
     ninja_state = NinjaState(env, ninja_syntax.Writer)
 
     for src in source:
