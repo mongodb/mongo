@@ -115,8 +115,11 @@ public:
     bool supportsTwoPhaseIndexBuild() const;
 
     /**
-     * Sets up the in-memory and persisted state of the index build. A Future is returned upon which
-     * the user can await the build result.
+     * Sets up the in-memory and durable state of the index build. When successful, returns after
+     * the index build has started and the first catalog write has been made, and if called on a
+     * primary, when the startIndexBuild oplog entry has been written.
+     *
+     * A Future is returned that will complete when the index build commits or aborts.
      *
      * On a successful index build, calling Future::get(), or Future::getNoThrows(), returns index
      * catalog statistics.
@@ -125,7 +128,7 @@ public:
      */
     virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
-        StringData dbName,
+        std::string dbName,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
@@ -383,7 +386,7 @@ private:
     Status _registerIndexBuild(WithLock, std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
 
     /**
-     * Sets up the in-memory and persisted state of the index build.
+     * Sets up the in-memory and durable state of the index build.
      *
      * This function should only be called when in recovery mode, because we drop and replace
      * existing indexes in a single WriteUnitOfWork.
@@ -402,32 +405,44 @@ protected:
                                std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
 
     /**
-     * Sets up the in-memory and persisted state of the index build.
+     * Sets up the in-memory state of the index build. Validates index specs and filters out
+     * existing indexes from the list of specs.
      *
      * Helper function for startIndexBuild. If the returned boost::optional is set, then the task
      * does not require scheduling and can be immediately returned to the caller of startIndexBuild.
      *
-     * Returns an error status if there are any errors setting up the index build.
+     * Returns an error status if there are any errors registering the index build.
      */
     StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
-    _registerAndSetUpIndexBuild(OperationContext* opCtx,
-                                StringData dbName,
-                                CollectionUUID collectionUUID,
-                                const std::vector<BSONObj>& specs,
-                                const UUID& buildUUID,
-                                IndexBuildProtocol protocol,
-                                boost::optional<CommitQuorumOptions> commitQuorum);
+    _filterSpecsAndRegisterBuild(OperationContext* opCtx,
+                                 StringData dbName,
+                                 CollectionUUID collectionUUID,
+                                 const std::vector<BSONObj>& specs,
+                                 const UUID& buildUUID,
+                                 IndexBuildProtocol protocol,
+                                 boost::optional<CommitQuorumOptions> commitQuorum);
 
     /**
-     * Sets up the in-memory and persisted state of the index build for two-phase recovery.
+     * Sets up the durable state of the index build.
+     *
+     * Returns an error status if there are any errors setting up the index build.
+     */
+    Status _setUpIndexBuild(OperationContext* opCtx,
+                            StringData dbName,
+                            CollectionUUID collectionUUID,
+                            const UUID& buildUUID,
+                            Timestamp startTimestamp);
+
+    /**
+     * Sets up the in-memory and durable state of the index build for two-phase recovery.
      *
      * Helper function for startIndexBuild during the two-phase index build recovery process.
      */
-    Status _registerAndSetUpIndexBuildForTwoPhaseRecovery(OperationContext* opCtx,
-                                                          StringData dbName,
-                                                          CollectionUUID collectionUUID,
-                                                          const std::vector<BSONObj>& specs,
-                                                          const UUID& buildUUID);
+    Status _setUpIndexBuildForTwoPhaseRecovery(OperationContext* opCtx,
+                                               StringData dbName,
+                                               CollectionUUID collectionUUID,
+                                               const std::vector<BSONObj>& specs,
+                                               const UUID& buildUUID);
     /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting
      * the index build's Promise with the outcome of the index build.

@@ -1,6 +1,6 @@
 /**
- * Confirms that background index builds on a primary can be aborted using killop
- * on the client connection operation when the IndexBuildsCoordinator is enabled.
+ * Confirms that background index builds on a primary are aborted when the node steps down between
+ * scheduling on the thread pool and initialization.
  * @tags: [requires_replication]
  */
 (function() {
@@ -31,28 +31,23 @@ const coll = testDB.getCollection('test');
 assert.commandWorked(coll.insert({a: 1}));
 
 const res = assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'alwaysOn'}));
+    {configureFailPoint: 'hangBeforeInitializingIndexBuild', mode: 'alwaysOn'}));
 const failpointTimesEntered = res.count;
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 try {
     assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "hangAfterInitializingIndexBuild",
+        waitForFailPoint: "hangBeforeInitializingIndexBuild",
         timesEntered: failpointTimesEntered + 1,
         maxTimeMS: kDefaultWaitForFailPointTimeout
     }));
 
-    // When the index build starts, find its op id. This will be the op id of the client
-    // connection, not the thread pool task managed by IndexBuildsCoordinatorMongod.
-    const filter = {"desc": {$regex: /conn.*/}};
-    const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1', filter);
-
-    // Kill the index build.
-    assert.commandWorked(testDB.killOp(opId));
+    // Step down the primary.
+    assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
+    assert.commandWorked(primary.adminCommand(
+        {configureFailPoint: 'hangBeforeInitializingIndexBuild', mode: 'off'}));
 }
 
 // Wait for the index build to stop.
@@ -61,11 +56,17 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
-checkLog.contains(primary, 'IndexBuildAborted: Index build aborted: ');
+// With both single-phase and two-phase index builds, a stepdown at this point will abort the index
+// build because the builder thread cannot generate an optime. Wait for the command thread, not the
+// IndexBuildsCoordinator, to report the index build as failed.
+checkLog.contains(primary, 'Index build failed: ');
 
 // Check that no new index has been created.  This verifies that the index build was aborted
 // rather than successfully completed.
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+
+const secondaryColl = rst.getSecondary().getCollection(coll.getFullName());
+IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
 
 rst.stopSet();
 })();

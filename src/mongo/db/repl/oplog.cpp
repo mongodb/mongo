@@ -193,7 +193,7 @@ Status startIndexBuild(OperationContext* opCtx,
     // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of it.
     return IndexBuildsCoordinator::get(opCtx)
         ->startIndexBuild(opCtx,
-                          nss.db(),
+                          nss.db().toString(),
                           collUUID,
                           statusWithIndexes.getValue(),
                           indexBuildUUID,
@@ -279,7 +279,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
         // This spawns a new thread and returns immediately.
         MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
             indexBuildsCoordinator->startIndexBuild(opCtx,
-                                                    indexNss.db(),
+                                                    indexNss.db().toString(),
                                                     collUUID,
                                                     {indexSpec},
                                                     indexBuildUUID,

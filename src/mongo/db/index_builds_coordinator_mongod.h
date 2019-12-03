@@ -71,7 +71,7 @@ public:
      */
     StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
-        StringData dbName,
+        std::string dbName,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
@@ -122,9 +122,6 @@ private:
      * TODO: not yet implemented.
      */
     void _refreshReplStateFromPersisted(OperationContext* opCtx, const UUID& buildUUID);
-
-    // Serializes setting up an index build and scheduling it on the thread pool.
-    mutable Mutex _startBuildMutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_startBuildMutex");
 
     // Thread pool on which index builds are run.
     ThreadPool _threadPool;

@@ -102,7 +102,7 @@ struct ReplIndexBuildState {
 
     // Whether to do a two phase index build or a single phase index build like in v4.0. The FCV
     // at the start of the index build will determine this setting.
-    IndexBuildProtocol protocol;
+    const IndexBuildProtocol protocol;
 
     // Protects the state below.
     mutable Mutex mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::mutex");

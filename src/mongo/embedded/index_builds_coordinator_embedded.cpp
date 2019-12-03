@@ -45,7 +45,7 @@ void IndexBuildsCoordinatorEmbedded::shutdown() {}
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
-                                                StringData dbName,
+                                                std::string dbName,
                                                 CollectionUUID collectionUUID,
                                                 const std::vector<BSONObj>& specs,
                                                 const UUID& buildUUID,
@@ -53,7 +53,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
                                                 IndexBuildOptions indexBuildOptions) {
     invariant(!opCtx->lockState()->isLocked());
 
-    auto statusWithOptionalResult = _registerAndSetUpIndexBuild(
+    auto statusWithOptionalResult = _filterSpecsAndRegisterBuild(
         opCtx, dbName, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
     if (!statusWithOptionalResult.isOK()) {
         return statusWithOptionalResult.getStatus();
@@ -68,11 +68,14 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
         return statusWithOptionalResult.getValue().get();
     }
 
-    auto replState = invariant(_getIndexBuild(buildUUID));
-
+    auto status = _setUpIndexBuild(opCtx, dbName, collectionUUID, buildUUID, Timestamp());
+    if (!status.isOK()) {
+        return status;
+    }
     invariant(!indexBuildOptions.replSetAndNotPrimaryAtStart);
     _runIndexBuild(opCtx, buildUUID, indexBuildOptions);
 
+    auto replState = invariant(_getIndexBuild(buildUUID));
     return replState->sharedPromise.getFuture();
 }
 

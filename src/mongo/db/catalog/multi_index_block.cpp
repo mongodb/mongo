@@ -230,7 +230,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                 str::stream() << "Index build aborted: " << _abortReason
                               << ". Cannot initialize index builder: " << collection->ns() << " ("
                               << collection->uuid() << "): " << indexSpecs.size()
-                              << " provided. First index spec: "
+                              << " index spec(s) provided. First index spec: "
                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
     }
 
@@ -379,10 +379,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     } catch (const WriteConflictException&) {
         throw;
     } catch (...) {
-        return {exceptionToStatus().code(),
+        auto status = exceptionToStatus();
+        return {status.code(),
                 str::stream() << "Caught exception during index builder initialization "
                               << collection->ns() << " (" << collection->uuid()
-                              << "): " << indexSpecs.size() << " provided. First index spec: "
+                              << "): " << status.reason() << ". " << indexSpecs.size()
+                              << " provided. First index spec: "
                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
     }
 }
