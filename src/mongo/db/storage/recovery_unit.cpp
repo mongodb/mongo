@@ -73,7 +73,8 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
     invariant(_preCommitHooks.empty());
     for (auto& change : _changes) {
         try {
-            LOG(2) << "CUSTOM COMMIT " << redact(demangleName(typeid(*change)));
+            // Log at higher level because commits occur far more frequently than rollbacks.
+            LOG(3) << "CUSTOM COMMIT " << redact(demangleName(typeid(*change)));
             change->commit(commitTimestamp);
         } catch (...) {
             std::terminate();
