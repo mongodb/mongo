@@ -38,15 +38,29 @@ extern int __wt_optind;
 extern char *__wt_optarg;
 
 /*
+ * signal_timer --
+ *     Alarm signal handler, report the signal and drop core.
+ */
+static void signal_timer(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void
+signal_timer(int signo)
+{
+    fprintf(stderr, "format caught signal %d, aborting the process\n", signo);
+    fflush(stderr);
+    __wt_abort(NULL);
+}
+
+/*
  * signal_handler --
- *     Handle signals.
+ *     Generic signal handler, report the signal and exit.
  */
 static void signal_handler(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 signal_handler(int signo)
 {
-    fprintf(stderr, "format caught signal %d, aborting the process\n", signo);
-    __wt_abort(NULL);
+    fprintf(stderr, "format caught signal %d, exiting\n", signo);
+    fflush(stderr);
+    exit(0);
 }
 
 int
@@ -64,9 +78,10 @@ main(int argc, char *argv[])
 
 /*
  * Windows and Linux support different sets of signals, be conservative about installing handlers.
+ * If we time out, we want a core dump, otherwise, just exit.
  */
 #ifdef SIGALRM
-    (void)signal(SIGALRM, signal_handler);
+    (void)signal(SIGALRM, signal_timer);
 #endif
 #ifdef SIGHUP
     (void)signal(SIGHUP, signal_handler);
@@ -179,7 +194,8 @@ main(int argc, char *argv[])
     testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
     testutil_check(pthread_rwlock_init(&g.ts_lock, NULL));
 
-    printf("%s: process %" PRIdMAX "\n", progname, (intmax_t)getpid());
+    printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
+    fflush(stdout);
     while (++g.run_cnt <= g.c_runs || g.c_runs == 0) {
         startup(); /* Start a run */
 
@@ -260,6 +276,8 @@ main(int argc, char *argv[])
 
     config_clear();
 
+    printf("%s: successful run completed\n", progname);
+
     return (EXIT_SUCCESS);
 }
 
@@ -314,7 +332,7 @@ format_die(void)
     fclose_and_clear(&g.logfp);
     fclose_and_clear(&g.randfp);
 
-    fprintf(stderr, "\n");
+    fprintf(stderr, "\n%s: run FAILED\n", progname);
 
     /* Display the configuration that failed. */
     if (g.run_cnt)

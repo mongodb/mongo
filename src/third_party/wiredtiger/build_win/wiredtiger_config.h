@@ -79,6 +79,9 @@
 /* Define to 1 if pthread condition variables support monotonic clocks. */
 /* #undef HAVE_PTHREAD_COND_MONOTONIC */
 
+/* Define to 1 if you have the `setrlimit' function. */
+/* #undef HAVE_SETRLIMIT */
+
 /* Define to 1 if you have the `posix_fadvise' function. */
 /* #undef HAVE_POSIX_FADVISE */
 
