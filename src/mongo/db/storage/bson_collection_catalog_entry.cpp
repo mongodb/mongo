@@ -33,6 +33,7 @@
 #include <numeric>
 
 #include "mongo/db/field_ref.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -141,6 +142,28 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
 
 void BSONCollectionCatalogEntry::MetaData::rename(StringData toNS) {
     ns = toNS.toString();
+
+    // In FCV 4.4, the 'ns' field is not present. Only rename the 'ns' field for each index in
+    // FCV 4.2.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return;
+    }
+
+    for (size_t i = 0; i < indexes.size(); i++) {
+        BSONObj spec = indexes[i].spec;
+        BSONObjBuilder b;
+        // Add the fields in the same order they were in the original specification.
+        for (auto&& elem : spec) {
+            if (elem.fieldNameStringData() == "ns") {
+                b.append("ns", toNS);
+            } else {
+                b.append(elem);
+            }
+        }
+        indexes[i].spec = b.obj();
+    }
 }
 
 KVPrefix BSONCollectionCatalogEntry::MetaData::getMaxPrefix() const {

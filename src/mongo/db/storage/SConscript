@@ -80,6 +80,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
         ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_options',
+        ],
     )
 
 env.Library(
