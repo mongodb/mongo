@@ -240,13 +240,19 @@ void ProgramOutputMultiplexer::appendLine(int port,
                                           const std::string& name,
                                           const std::string& line) {
     stdx::lock_guard<Latch> lk(mongoProgramOutputMutex);
-    boost::iostreams::tee_device<std::ostream, std::stringstream> teeDevice(cout, _buffer);
-    boost::iostreams::stream<decltype(teeDevice)> teeStream(teeDevice);
-    if (port > 0) {
-        teeStream << name << port << "| " << line << endl;
-    } else {
-        teeStream << name << pid << "| " << line << endl;
-    }
+    auto sinkProgramOutput = [&](auto& sink) {
+        if (port > 0) {
+            sink << name << port << "| " << line << endl;
+        } else {
+            sink << name << pid << "| " << line << endl;
+        }
+    };
+    auto plainShellOutputDomain = logger::globalLogManager()->getNamedDomain("plainShellOutput");
+    logger::LogstreamBuilder builder(
+        plainShellOutputDomain, getThreadName(), logger::LogSeverity::Log());
+
+    sinkProgramOutput(_buffer);
+    sinkProgramOutput(builder);
 }
 
 string ProgramOutputMultiplexer::str() const {

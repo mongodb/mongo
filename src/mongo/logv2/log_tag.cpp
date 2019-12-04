@@ -39,8 +39,8 @@ BSONArray LogTag::toBSON() {
     if (_value | kStartupWarnings) {
         builder.append("startupWarnings"_sd);
     }
-    if (_value | kJavascript) {
-        builder.append("javaScript"_sd);
+    if (_value | kPlainShell) {
+        builder.append("plainShellOutput"_sd);
     }
 
     return builder.arr();

@@ -61,12 +61,13 @@ const char* const GlobalInfo::className = "Global";
 
 namespace {
 
-logger::MessageLogDomain* jsPrintLogDomain;
+logger::MessageLogDomain* plainShellOutputDomain;
 
 }  // namespace
 
 void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
-    logger::LogstreamBuilder builder(jsPrintLogDomain, getThreadName(), logger::LogSeverity::Log());
+    logger::LogstreamBuilder builder(
+        plainShellOutputDomain, getThreadName(), logger::LogSeverity::Log());
     std::ostream& ss = builder.stream();
 
     bool first = true;
@@ -125,8 +126,8 @@ void GlobalInfo::Functions::sleep::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {
-    jsPrintLogDomain = logger::globalLogManager()->getNamedDomain("javascriptOutput");
+MONGO_INITIALIZER(PlainShellOutputDomain)(InitializerContext*) {
+    plainShellOutputDomain = logger::globalLogManager()->getNamedDomain("plainShellOutput");
     return Status::OK();
 }
 

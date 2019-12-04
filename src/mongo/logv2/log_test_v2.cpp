@@ -376,7 +376,7 @@ TEST_F(LogTestV2, TextFormat) {
     LOGV2_OPTIONS({LogTag::kStartupWarnings}, "warning");
     ASSERT(lines.back().rfind("** WARNING: warning") != std::string::npos);
 
-    LOGV2_OPTIONS({static_cast<LogTag::Value>(LogTag::kStartupWarnings | LogTag::kJavascript)},
+    LOGV2_OPTIONS({static_cast<LogTag::Value>(LogTag::kStartupWarnings | LogTag::kPlainShell)},
                   "warning");
     ASSERT(lines.back().rfind("** WARNING: warning") != std::string::npos);
 

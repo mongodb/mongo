@@ -47,8 +47,8 @@ public:
         // startupWarnings ramlog
         kStartupWarnings = 1 << 1,
 
-        // representing the logv1 javascriptOutput domain
-        kJavascript = 1 << 2,
+        // representing the logv1 plainShellOutput domain
+        kPlainShell = 1 << 2,
     };
 
     LogTag() : _value(kNone) {}

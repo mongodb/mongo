@@ -199,7 +199,7 @@ public:
         using namespace logv2;
         using boost::log::extract;
 
-        if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kJavascript)) {
+        if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kPlainShell)) {
             PlainFormatter::operator()(rec, strm);
         } else {
             TextFormatter::operator()(rec, strm);
@@ -755,7 +755,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!logV2Enabled()) {
         logger::globalLogManager()
-            ->getNamedDomain("javascriptOutput")
+            ->getNamedDomain("plainShellOutput")
             ->attachAppender(std::make_unique<ShellConsoleAppender>(
                 std::make_unique<logger::MessageEventUnadornedEncoder>()));
     } else {
@@ -764,9 +764,9 @@ int _main(int argc, char* argv[], char** envp) {
             std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
                 &(lv2Manager.getGlobalDomain())));
         logger::globalLogManager()
-            ->getNamedDomain("javascriptOutput")
+            ->getNamedDomain("plainShellOutput")
             ->attachAppender(std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &lv2Manager.getGlobalDomain(), logv2::LogTag::kJavascript));
+                &lv2Manager.getGlobalDomain(), logv2::LogTag::kPlainShell));
 
         auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
         consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
