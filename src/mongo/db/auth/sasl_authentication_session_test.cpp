@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
@@ -66,6 +67,7 @@ public:
     void testBadPassword();
     void testWrongClientMechanism();
     void testWrongServerMechanism();
+    void testSCRAMSkipEmptyExchange();
 
     ServiceContext::UniqueOperationContext opCtx;
     AuthzManagerExternalStateMock* authManagerExternalState;
@@ -230,6 +232,54 @@ void SaslConversation::testWrongServerMechanism() {
     assertConversationFailure();
 }
 
+void SaslConversation::testSCRAMSkipEmptyExchange() {
+    if ((mechanism != "SCRAM-SHA-1") && (mechanism != "SCRAM-SHA-256")) {
+        return;
+    }
+
+    for (bool enabled : {true, false}) {
+        client.reset(SaslClientSession::create(mechanism));
+        client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
+        client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
+        client->setParameter(SaslClientSession::parameterMechanism, mechanism);
+        client->setParameter(SaslClientSession::parameterUser, "andy");
+        client->setParameter(SaslClientSession::parameterPassword, "frim");
+        ASSERT_OK(client->initialize());
+
+        auto swServer = registry.getServerMechanism(mechanism, "test");
+        ASSERT_OK(swServer.getStatus());
+        server = std::move(swServer.getValue());
+        ASSERT_OK(server->setOptions(BSON(saslCommandOptionSkipEmptyExchange << enabled)));
+
+        const std::size_t expected = enabled ? 2 : 3;
+        std::size_t step = 0;
+
+        std::string clientMsg = "";
+        StatusWith<std::string> serverMsg = "";
+        for (;;) {
+            ASSERT_OK(client->step(serverMsg.getValue(), &clientMsg));
+            if (client->isSuccess() && server->isSuccess()) {
+                break;
+            }
+
+            if (step > expected) {
+                break;
+            }
+            ++step;
+
+            serverMsg = server->step(opCtx.get(), clientMsg);
+            ASSERT_OK(serverMsg.getStatus());
+            if (client->isSuccess() && server->isSuccess()) {
+                break;
+            }
+        }
+
+        ASSERT_TRUE(client->isSuccess());
+        ASSERT_TRUE(server->isSuccess());
+        ASSERT_EQ(step, expected);
+    }
+}
+
 #define DEFINE_MECHANISM_FIXTURE(CLASS_SUFFIX, MECH_NAME)                   \
     class SaslConversation##CLASS_SUFFIX : public SaslConversation {        \
     public:                                                                 \
@@ -250,7 +300,8 @@ void SaslConversation::testWrongServerMechanism() {
     DEFINE_MECHANISM_TEST(FIXTURE_NAME, NoSuchUser)               \
     DEFINE_MECHANISM_TEST(FIXTURE_NAME, BadPassword)              \
     DEFINE_MECHANISM_TEST(FIXTURE_NAME, WrongClientMechanism)     \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, WrongServerMechanism)
+    DEFINE_MECHANISM_TEST(FIXTURE_NAME, WrongServerMechanism)     \
+    DEFINE_MECHANISM_TEST(FIXTURE_NAME, SCRAMSkipEmptyExchange)
 
 #define TEST_MECHANISM(CLASS_SUFFIX, MECH_NAME)        \
     DEFINE_MECHANISM_FIXTURE(CLASS_SUFFIX, MECH_NAME); \

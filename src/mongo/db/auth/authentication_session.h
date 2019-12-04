@@ -67,6 +67,11 @@ public:
         return *_mech;
     }
 
+    Status setOptions(BSONObj options) {
+        invariant(_mech);
+        return _mech->setOptions(options);
+    }
+
 private:
     std::unique_ptr<ServerMechanismBase> _mech;
 };
