@@ -57,7 +57,7 @@ def discover_modules(module_root, allowed_modules):
             print("skipping module: %s" % (name))
             continue
 
-        if os.path.isfile(build_py):
+        try:
             print("adding module: %s" % (name))
             fp = open(build_py, "r")
             try:
@@ -68,6 +68,8 @@ def discover_modules(module_root, allowed_modules):
                 found_modules.append(module)
             finally:
                 fp.close()
+        except (FileNotFoundError, IOError):
+            pass
 
     return found_modules
 
