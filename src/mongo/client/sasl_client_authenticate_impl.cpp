@@ -196,6 +196,12 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
 
     LOG(saslLogLevel) << "sasl client output: " << base64::encode(responsePayload) << endl;
 
+    // Handle a done from the server which comes before the client is complete.
+    const bool serverDone = inputObj[saslCommandDoneFieldName].trueValue();
+    if (serverDone && responsePayload.empty() && session->isSuccess()) {
+        return Status::OK();
+    }
+
     // Build command using our new payload and conversationId
     BSONObjBuilder commandBuilder;
     commandBuilder.appendElements(saslCommandPrefix);
@@ -268,9 +274,11 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
     if (!status.isOK())
         return status;
 
+    auto mechanismName = session->getParameter(SaslClientSession::parameterMechanism);
     BSONObj saslFirstCommandPrefix =
-        BSON(saslStartCommandName << 1 << saslCommandMechanismFieldName
-                                  << session->getParameter(SaslClientSession::parameterMechanism));
+        BSON(saslStartCommandName << 1 << saslCommandMechanismFieldName << mechanismName
+                                  << "options" << BSON(saslCommandOptionSkipEmptyExchange << true));
+
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
     return asyncSaslConversation(runCommand,
                                  session,

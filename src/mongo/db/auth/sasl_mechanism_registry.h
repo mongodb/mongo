@@ -191,6 +191,14 @@ public:
         }
     }
 
+    /**
+     * Flexible bag of options for a saslStart command.
+     */
+    virtual Status setOptions(BSONObj options) {
+        // Be default, ignore any options provided.
+        return Status::OK();
+    }
+
 protected:
     /**
      * Mechanism provided step implementation.

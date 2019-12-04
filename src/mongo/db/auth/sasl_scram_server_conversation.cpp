@@ -41,6 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -58,7 +59,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::step
     OperationContext* opCtx, StringData inputData) {
     _step++;
 
-    if (_step > 3 || _step <= 0) {
+    const int numSteps = (_skipEmptyExchange ? 2 : 3);
+    if (_step > numSteps || _step <= 0) {
         return Status(ErrorCodes::AuthenticationFailed,
                       str::stream() << "Invalid SCRAM authentication step: " << _step);
     }
@@ -249,7 +251,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     std::string outputData = sb.str();
 
     // add client-first-message-bare and server-first-message to _authMessage
-    _authMessage = client_first_message_bare.toString() + "," + outputData;
+    _authMessage = str::stream() << client_first_message_bare.toString() << "," << outputData;
 
     return std::make_tuple(false, std::move(outputData));
 }
@@ -346,12 +348,24 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
                       "SCRAM authentication failed, storedKey mismatch");
     }
 
-    invariant(!serverSignature.empty());
-    StringBuilder sb;
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    sb << "v=" << serverSignature;
+    invariant(!serverSignature.empty());
+    std::string reply("v=" + serverSignature);
+    return std::make_tuple(_skipEmptyExchange, reply);
+}
 
-    return std::make_tuple(false, sb.str());
+template <typename Policy>
+Status SaslSCRAMServerMechanism<Policy>::setOptions(BSONObj options) {
+    auto see = options[saslCommandOptionSkipEmptyExchange];
+    if (!see.eoo()) {
+        if (!see.isBoolean()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << saslCommandOptionSkipEmptyExchange << " must be boolean"};
+        }
+        _skipEmptyExchange = see.boolean();
+    }
+
+    return Status::OK();
 }
 
 template class SaslSCRAMServerMechanism<SCRAMSHA1Policy>;

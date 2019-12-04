@@ -241,6 +241,17 @@ StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext*
     }
 
     auto session = std::make_unique<AuthenticationSession>(std::move(swMech.getValue()));
+    auto options = cmdObj["options"];
+    if (!options.eoo()) {
+        if (options.type() != Object) {
+            return {ErrorCodes::BadValue, "saslStart.options must be an object"};
+        }
+        status = session->setOptions(options.Obj());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     Status statusStep = doSaslStep(opCtx, session.get(), cmdObj, result);
 
     if (!statusStep.isOK() || session->getMechanism().isSuccess()) {

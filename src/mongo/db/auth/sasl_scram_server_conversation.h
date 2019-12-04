@@ -67,6 +67,8 @@ public:
         }
     }
 
+    Status setOptions(BSONObj options) final;
+
 private:
     /**
      * Parse client-first-message and generate server-first-message
@@ -88,6 +90,9 @@ private:
 
     // client and server nonce concatenated
     std::string _nonce;
+
+    // Do not send empty 3rd reply in scram conversation.
+    bool _skipEmptyExchange{false};
 };
 
 extern template class SaslSCRAMServerMechanism<SCRAMSHA1Policy>;
