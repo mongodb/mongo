@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -70,15 +71,20 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOG(1) << "collMod: " << nss << " cmd:" << redact(cmdObj);
 
-        auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
+        auto routingInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        auto shardResponses = scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
             opCtx,
+            nss.db(),
             nss,
+            routingInfo,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNoRetry);
-        return appendRawResponses(
-            opCtx, &errmsg, &output, std::move(shardResponses), {ErrorCodes::NamespaceNotFound});
+            Shard::RetryPolicy::kNoRetry,
+            BSONObj() /* query */,
+            BSONObj() /* collation */);
+        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
     }
 
 } collectionModCmd;

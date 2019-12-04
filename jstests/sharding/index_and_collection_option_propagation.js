@@ -115,10 +115,11 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shar
 checkShardIndexes("idx1", [st.shard0, st.shard1], [st.shard2]);
 checkShardCollOption("validator", validationOption1, [st.shard0, st.shard1], [st.shard2]);
 
-// Though some shards don't own data for the sharded collection, createIndex, reIndex,
-// dropIndex, and collMod (which are broadcast to all shards) report overall success (that is,
-// NamespaceNotFound-type errors from shards are ignored, and they are not included in the 'raw'
-// shard responses).
+// Starting in v4.4, createIndex, reIndex, dropIndex, collMod only target the primary shard and
+// the shards that own chunks for the collection (as supposed to all shards in the previous
+// versions). The commands will retry on shard version errors, and only report overall success.
+// That is, IndexNotFound errors from shards are ignored, and not included in the 'raw' shard
+// responses.
 
 var res;
 
@@ -127,17 +128,26 @@ res = st.s.getDB(dbName).getCollection(collName).createIndex({"idx2": 1});
 assert.commandWorked(res);
 assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
-assert.eq(undefined,
-          res.raw[st.shard2.host],
-          tojson(res));  // CannotImplicitlyCreateCollection is ignored
+assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardIndexes("idx2", [st.shard0, st.shard1], [st.shard2]);
 
 // dropIndex
 res = st.s.getDB(dbName).getCollection(collName).dropIndex("idx1_1");
 assert.commandWorked(res);
-assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
+// TODO SERVER-44719: Once createIndex is made to check shard versions, after the createIndex
+// above, each shard should have refreshed its cache. So the mongos will not need to retry the
+// dropIndex here and will not get IndexNotFound from shard0 (which is ignored and causes the
+// response from shard0 to be empty).
+if (jsTestOptions().mongosBinVersion == "last-stable") {
+    assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
+} else {
+    // dropIndexes checks shard versions so causes the first try to succeed on shard0 but not
+    // on shard1. When it retries after the refresh, it fails with IndexNotFound on shard0
+    // so the response from shard0 is empty.
+    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
+}
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
-assert.eq(undefined, res.raw[st.shard2.host], tojson(res));  // NamespaceNotFound is ignored
+assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardIndexes("idx1", [], [st.shard0, st.shard1, st.shard2]);
 
 // collMod
@@ -153,7 +163,7 @@ res = st.s.getDB(dbName).runCommand({
 assert.commandWorked(res);
 assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
-assert.eq(undefined, res.raw[st.shard2.host], tojson(res));  // NamespaceNotFound is ignored
+assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardCollOption("validator", validationOption2, [st.shard0, st.shard1], [st.shard2]);
 
 // Check that errors from shards are aggregated correctly.
@@ -171,13 +181,18 @@ assert.neq(null, res.errmsg, tojson(res));
 res = st.s.getDB(dbName).getCollection(collName).createIndex({});
 assert.eq(res.raw[st.shard0.host].ok, 0, tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 0, tojson(res));
-assert.eq(res.raw[st.shard2.host].ok, 0, tojson(res));
 assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
 assert.eq(res.code, res.raw[st.shard1.host].code, tojson(res));
-assert.eq(res.code, res.raw[st.shard2.host].code, tojson(res));
 assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
 assert.eq(res.codeName, res.raw[st.shard1.host].codeName, tojson(res));
-assert.eq(res.codeName, res.raw[st.shard2.host].codeName, tojson(res));
+if (jsTestOptions().mongosBinVersion == "last-stable") {
+    assert.eq(res.raw[st.shard2.host].ok, 0, tojson(res));
+    assert.eq(res.code, res.raw[st.shard2.host].code, tojson(res));
+    assert.eq(res.codeName, res.raw[st.shard2.host].codeName, tojson(res));
+} else {
+    // If the mongos version is "latest", createIndex does not target shard2.
+    assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
+}
 assert.eq(res.code, ErrorCodes.CannotCreateIndex, tojson(res));
 assert.eq("CannotCreateIndex", res.codeName, tojson(res));
 assert.neq(null, res.errmsg, tojson(res));

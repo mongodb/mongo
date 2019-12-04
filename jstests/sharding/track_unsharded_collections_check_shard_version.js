@@ -32,7 +32,6 @@ function validateTestCase(testCase) {
                 "implicitlyCreatesCollection",
                 "whenNamespaceIsViewFailsWith",
                 "doesNotCheckShardVersion",
-                "doesNotSendShardVersionIfTracked",
                 "command",
                 "conditional"
             ].includes(key),
@@ -81,7 +80,6 @@ let testCases = {
     clearLog: {skip: "executes locally on mongos (not sent to any remote node)"},
     collMod: {
         whenNamespaceDoesNotExistFailsWith: ErrorCodes.NamespaceNotFound,
-        doesNotSendShardVersionIfTracked: true,
         command: collName => {
             return {collMod: collName};
         },
@@ -109,7 +107,6 @@ let testCases = {
         implicitlyCreatesCollection: true,
         whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
         doesNotCheckShardVersion: true,
-        doesNotSendShardVersionIfTracked: true,
         command: collName => {
             return {createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]};
         },
@@ -140,7 +137,6 @@ let testCases = {
     dropIndexes: {
         whenNamespaceDoesNotExistFailsWith: ErrorCodes.NamespaceNotFound,
         whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
-        doesNotSendShardVersionIfTracked: true,
         command: collName => {
             return {dropIndexes: collName, index: "*"};
         },
@@ -379,8 +375,7 @@ for (let command of Object.keys(res.commands)) {
         assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command(collName)));
     }
 
-    if (testCase.implicitlyCreatesCollection &&
-        !(testCase.doesNotCheckShardVersion || testCase.doesNotSendShardVersionIfTracked)) {
+    if (testCase.implicitlyCreatesCollection && !testCase.doesNotCheckShardVersion) {
         expectShardsCachedShardVersionToBe(st.shard0, ns, Timestamp(1, 0));
     } else {
         expectShardsCachedShardVersionToBe(st.shard0, ns, "UNKNOWN");
@@ -444,7 +439,7 @@ for (let command of Object.keys(res.commands)) {
     assert.commandWorked(st.s.adminCommand({flushRouterConfig: dbName}));
     assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command(collName)));
 
-    if (testCase.doesNotCheckShardVersion || testCase.doesNotSendShardVersionIfTracked) {
+    if (testCase.doesNotCheckShardVersion) {
         expectShardsCachedShardVersionToBe(st.shard0, ns, "UNKNOWN");
     } else {
         expectShardsCachedShardVersionToBe(st.shard0, ns, Timestamp(1, 0));

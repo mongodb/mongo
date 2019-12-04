@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -70,25 +71,24 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOG(1) << "dropIndexes: " << nss << " cmd:" << redact(cmdObj);
 
-        // If the collection is sharded, we target all shards rather than just shards that own
-        // chunks for the collection, because some shard may have previously owned chunks but no
-        // longer does (and so, may have the index). However, we ignore NamespaceNotFound errors
-        // from individual shards, because some shards may have never owned chunks for the
-        // collection. We additionally ignore IndexNotFound errors, because the index may not have
-        // been built on a shard if the earlier createIndexes command coincided with the shard
-        // receiving its first chunk for the collection (see SERVER-31715).
-        auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
+        // If the collection is sharded, we target only the primary shard and the shards that own
+        // chunks for the collection. We ignore IndexNotFound errors, because the index may have
+        // been dropped on an earlier attempt.
+        auto routingInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        auto shardResponses = scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
             opCtx,
+            nss.db(),
             nss,
+            routingInfo,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNotIdempotent);
-        return appendRawResponses(opCtx,
-                                  &errmsg,
-                                  &output,
-                                  std::move(shardResponses),
-                                  {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound});
+            Shard::RetryPolicy::kNotIdempotent,
+            BSONObj() /* query */,
+            BSONObj() /* collation */);
+        return appendRawResponses(
+            opCtx, &errmsg, &output, std::move(shardResponses), {ErrorCodes::IndexNotFound});
     }
 
 } dropIndexesCmd;

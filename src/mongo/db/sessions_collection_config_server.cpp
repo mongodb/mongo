@@ -78,15 +78,36 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 }
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
+    const auto nss = NamespaceString::kLogicalSessionsNamespace;
+    auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
     try {
-        dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
-            opCtx,
-            NamespaceString::kLogicalSessionsNamespace,
-            SessionsCollection::generateCreateIndexesCmd());
+        for (int tries = 0;; ++tries) {
+            const bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
+            try {
+                scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
+                    opCtx,
+                    nss.db(),
+                    nss,
+                    routingInfo,
+                    SessionsCollection::generateCreateIndexesCmd(),
+                    ReadPreferenceSetting::get(opCtx),
+                    Shard::RetryPolicy::kNoRetry,
+                    BSONObj() /* query */,
+                    BSONObj() /* collation */);
+                return;
+            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+                log() << "Attempt " << tries << " to generate TTL index for " << nss
+                      << " received StaleShardVersion error" << causedBy(ex);
+                if (canRetry) {
+                    continue;
+                }
+                throw;
+            }
+        }
     } catch (DBException& ex) {
-        ex.addContext(str::stream()
-                      << "Failed to generate TTL index for "
-                      << NamespaceString::kLogicalSessionsNamespace << " on all shards");
+        ex.addContext(str::stream() << "Failed to generate TTL index for " << nss);
         throw;
     }
 }

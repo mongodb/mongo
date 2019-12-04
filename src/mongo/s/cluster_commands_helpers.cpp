@@ -135,7 +135,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const CachedCollectionRoutingInfo& routingInfo,
     const BSONObj& cmdObj,
     const BSONObj& query,
-    const BSONObj& collation) {
+    const BSONObj& collation,
+    const bool alwaysIncludePrimaryShard = false) {
 
     auto cmdToSend = cmdObj;
     if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
@@ -162,6 +163,19 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     // The collection is sharded. Target all shards that own chunks that match the query.
     std::set<ShardId> shardIds;
     routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
+
+    if (alwaysIncludePrimaryShard && routingInfo.db().primaryId() != "config") {
+        // TODO (SERVER-44949): The only sharded collection which has the config server as
+        // the primary shard is config.system.sessions. Unfortunately, the config server
+        // calls this code path to create indexes on the sessions collection, and the code
+        // it uses to create the indexes would currently invariant if one of the targeted
+        // shards was the config server itself. To get around this, we skip targeting the
+        // config shard here, but as a result, listIndexes on config.system.sessions will
+        // not return the correct indexes. This bug existed prior to 4.4 as well, since
+        // the old code to create indexes on the sessions collection also did not build
+        // the index on the config server.
+        shardIds.insert(routingInfo.db().primaryId());
+    }
 
     for (const ShardId& shardId : shardIds) {
         requests.emplace_back(shardId,
@@ -377,6 +391,23 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const BSONObj& collation) {
     const auto requests =
         buildVersionedRequestsForTargetedShards(opCtx, nss, routingInfo, cmdObj, query, collation);
+
+    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+}
+
+std::vector<AsyncRequestsSender::Response>
+scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
+    OperationContext* opCtx,
+    StringData dbName,
+    const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const BSONObj& query,
+    const BSONObj& collation) {
+    const auto requests = buildVersionedRequestsForTargetedShards(
+        opCtx, nss, routingInfo, cmdObj, query, collation, true);
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
 }
@@ -656,29 +687,6 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
 
     auto atClusterTime = txnRouter.getSelectedAtClusterTime();
     return catalogCache->getCollectionRoutingInfoAt(opCtx, nss, atClusterTime.asTimestamp());
-}
-
-std::vector<AsyncRequestsSender::Response> dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
-    OperationContext* opCtx, const NamespaceString& nss, const BSONObj& cmdObj) {
-    auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
-        opCtx,
-        nss,
-        CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-        ReadPreferenceSetting::get(opCtx),
-        Shard::RetryPolicy::kNoRetry,
-        {ErrorCodes::CannotImplicitlyCreateCollection});
-
-    if (std::all_of(shardResponses.begin(), shardResponses.end(), [](const auto& response) {
-            return response.swResponse.getStatus().isOK() &&
-                getStatusFromCommandResult(response.swResponse.getValue().data) ==
-                ErrorCodes::CannotImplicitlyCreateCollection;
-        })) {
-        // Propagate the ExtraErrorInfo from the first response.
-        uassertStatusOK(
-            getStatusFromCommandResult(shardResponses.front().swResponse.getValue().data));
-    }
-
-    return shardResponses;
 }
 
 }  // namespace mongo
