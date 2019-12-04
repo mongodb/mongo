@@ -37,7 +37,9 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
@@ -170,6 +172,42 @@ Future<void> AsyncDBClient::authenticateInternal(boost::optional<std::string> me
 #endif
 
     return auth::authenticateInternalClient(clientName, mechanismHint, _makeAuthRunCommandHook());
+}
+
+Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSession> session,
+                                                    std::string authDB,
+                                                    BSONObj specAuth,
+                                                    auth::SpeculativeAuthType speculativeAuthType) {
+    if (specAuth.isEmpty()) {
+        // No reply could mean failed auth, or old server.
+        // A false reply will result in an explicit auth later.
+        return false;
+    }
+
+    if (speculativeAuthType == auth::SpeculativeAuthType::kNone) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Received unexpected isMaster."
+                                    << auth::kSpeculativeAuthenticate << " reply");
+    }
+
+    if (speculativeAuthType == auth::SpeculativeAuthType::kAuthenticate) {
+        return specAuth.hasField(saslCommandUserFieldName);
+    }
+
+    invariant(speculativeAuthType == auth::SpeculativeAuthType::kSaslStart);
+    invariant(session);
+
+    return asyncSaslConversation(_makeAuthRunCommandHook(),
+                                 session,
+                                 BSON(saslContinueCommandName << 1),
+                                 specAuth,
+                                 std::move(authDB),
+                                 kSaslClientLogLevelDefault)
+        // Swallow failure even if the initial saslStart was okay.
+        // It's possible for our speculative authentication to fail
+        // while explicit auth succeeds if we're in a keyfile rollover state.
+        // The first passphrase can fail, but later ones may be okay.
+        .onCompletion([](Status status) { return status.isOK(); });
 }
 
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,

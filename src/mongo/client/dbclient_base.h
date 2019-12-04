@@ -681,6 +681,10 @@ public:
 
     virtual bool isMongos() const = 0;
 
+    virtual bool authenticatedDuringConnect() const {
+        return false;
+    }
+
     /**
      * Parses command replies and runs them through the metadata reader.
      * This is virtual and non-const to allow subclasses to act on failures.

@@ -27,50 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/mongo_uri.h"
-
-#include "mongo/client/authenticate.h"
-#include "mongo/client/dbclient_base.h"
-#include "mongo/util/str.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
+class OperationContext;
 
-DBClientBase* MongoURI::connect(StringData applicationName,
-                                std::string& errmsg,
-                                boost::optional<double> socketTimeoutSecs) const {
-    OptionsMap::const_iterator it = _options.find("socketTimeoutMS");
-    if (it != _options.end() && !socketTimeoutSecs) {
-        try {
-            socketTimeoutSecs = std::stod(it->second) / 1000;
-        } catch (const std::exception& e) {
-            uasserted(ErrorCodes::BadValue,
-                      str::stream() << "Unable to parse socketTimeoutMS value" << causedBy(e));
-        }
-    }
-
-    auto ret = std::unique_ptr<DBClientBase>(
-        _connectString.connect(applicationName, errmsg, socketTimeoutSecs.value_or(0.0), this));
-    if (!ret) {
-        return nullptr;
-    }
-
-    if (!getSetName().empty()) {
-        // When performing initial topology discovery, don't bother authenticating
-        // since we will be immediately restarting our connect loop to a single node.
-        return ret.release();
-    }
-
-    if (!ret->authenticatedDuringConnect()) {
-        auto optAuthObj =
-            makeAuthObjFromOptions(ret->getMaxWireVersion(), ret->getIsMasterSaslMechanisms());
-        if (optAuthObj) {
-            ret->auth(optAuthObj.get());
-        }
-    }
-
-    return ret.release();
-}
-
+/**
+ * Handle isMaster: { speculativeAuthenticate: {...} }
+ */
+void doSpeculativeSaslStart(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result);
 }  // namespace mongo

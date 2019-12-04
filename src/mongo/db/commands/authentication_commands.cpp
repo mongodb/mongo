@@ -40,6 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
@@ -358,6 +360,26 @@ void disableAuthMechanism(StringData authMechanism) {
     if (authMechanism == kX509AuthMechanism) {
         _isX509AuthDisabled = true;
     }
+}
+
+void doSpeculativeAuthenticate(OperationContext* opCtx,
+                               BSONObj cmdObj,
+                               BSONObjBuilder* result) try {
+    auto mechElem = cmdObj["mechanism"];
+    if (mechElem.type() != String) {
+        return;
+    }
+
+    auto mechanism = mechElem.String();
+    authCounter.incSpeculativeAuthenticateReceived(mechanism);
+
+    BSONObjBuilder authResult;
+    if (cmdAuthenticate.run(opCtx, "$external", cmdObj, authResult)) {
+        authCounter.incSpeculativeAuthenticateSuccessful(mechanism);
+        result->append(auth::kSpeculativeAuthenticate, authResult.obj());
+    }
+} catch (...) {
+    // Treat failure like we never even got a speculative start.
 }
 
 }  // namespace mongo

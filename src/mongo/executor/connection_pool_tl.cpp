@@ -157,6 +157,7 @@ public:
         if (internalSecurity.user) {
             bob.append("saslSupportedMechs", internalSecurity.user->getName().getUnambiguousName());
         }
+        _speculativeAuthType = auth::speculateInternalAuth(&bob, &_session);
 
         return bob.obj();
     }
@@ -164,12 +165,19 @@ public:
     Status validateHost(const HostAndPort& remoteHost,
                         const BSONObj& isMasterRequest,
                         const RemoteCommandResponse& isMasterReply) override try {
-        const auto saslMechsElem = isMasterReply.data.getField("saslSupportedMechs");
+        const auto& reply = isMasterReply.data;
+
+        const auto saslMechsElem = reply.getField("saslSupportedMechs");
         if (saslMechsElem.type() == Array) {
             auto array = saslMechsElem.Array();
             for (const auto& elem : array) {
                 _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
             }
+        }
+
+        const auto specAuth = reply.getField(auth::kSpeculativeAuthenticate);
+        if (specAuth.type() == Object) {
+            _speculativeAuthenticate = specAuth.Obj().getOwned();
         }
 
         if (!_wrappedHook) {
@@ -202,8 +210,23 @@ public:
         return _saslMechsForInternalAuth;
     }
 
+    std::shared_ptr<SaslClientSession> getSession() {
+        return _session;
+    }
+
+    auth::SpeculativeAuthType getSpeculativeAuthType() const {
+        return _speculativeAuthType;
+    }
+
+    BSONObj getSpeculativeAuthenticateReply() {
+        return _speculativeAuthenticate;
+    }
+
 private:
     std::vector<std::string> _saslMechsForInternalAuth;
+    std::shared_ptr<SaslClientSession> _session;
+    auth::SpeculativeAuthType _speculativeAuthType;
+    BSONObj _speculativeAuthenticate;
     executor::NetworkConnectionHook* const _wrappedHook = nullptr;
 };
 
@@ -240,8 +263,18 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
             _client = std::move(client);
             return _client->initWireVersion("NetworkInterfaceTL", isMasterHook.get());
         })
-        .then([this, isMasterHook] {
+        .then([this, isMasterHook]() -> Future<bool> {
             if (_skipAuth) {
+                return false;
+            }
+
+            return _client->completeSpeculativeAuth(isMasterHook->getSession(),
+                                                    auth::getInternalAuthDB(),
+                                                    isMasterHook->getSpeculativeAuthenticateReply(),
+                                                    isMasterHook->getSpeculativeAuthType());
+        })
+        .then([this, isMasterHook](bool authenticatedDuringConnect) {
+            if (_skipAuth || authenticatedDuringConnect) {
                 return Future<void>::makeReady();
             }
 

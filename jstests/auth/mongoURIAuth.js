@@ -68,6 +68,6 @@ runURIAuthTest(false, true, SCRAM_SHA_256, SCRAM_SHA_256_regex);
 jsTestLog("Test that a mechanism specified in CreateUser() is the chosen authentication method.");
 runURIAuthTest(true, false, SCRAM_SHA_1, SCRAM_SHA_1_regex);
 
-jsTestLog("Test that SCRAM-SHA-1 is the default authentication method.");
+jsTestLog("Test that SCRAM-SHA-256 is the default authentication method.");
 runURIAuthTest(false, false, SCRAM_SHA_256, SCRAM_SHA_256_regex);
 })();

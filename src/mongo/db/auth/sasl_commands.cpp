@@ -39,6 +39,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authentication_session.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
 #include "mongo/util/sequence_util.h"
@@ -125,6 +127,7 @@ public:
 
 CmdSaslStart cmdSaslStart;
 CmdSaslContinue cmdSaslContinue;
+
 Status buildResponse(const AuthenticationSession* session,
                      const std::string& responsePayload,
                      BSONType responsePayloadType,
@@ -212,6 +215,9 @@ Status doSaslStep(OperationContext* opCtx,
                   << " on " << mechanism.getAuthenticationDatabase() << " from client "
                   << opCtx->getClient()->session()->remote();
         }
+        if (session->isSpeculative()) {
+            authCounter.incSpeculativeAuthenticateSuccessful(mechanism.mechanismName().toString());
+        }
     }
     return Status::OK();
 }
@@ -220,7 +226,8 @@ StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext*
                                                                const std::string& db,
                                                                const BSONObj& cmdObj,
                                                                BSONObjBuilder* result,
-                                                               std::string* principalName) {
+                                                               std::string* principalName,
+                                                               bool speculative) {
     bool autoAuthorize = false;
     Status status = bsonExtractBooleanFieldWithDefault(
         cmdObj, saslCommandAutoAuthorizeFieldName, autoAuthorizeDefault, &autoAuthorize);
@@ -240,7 +247,16 @@ StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext*
         return swMech.getStatus();
     }
 
-    auto session = std::make_unique<AuthenticationSession>(std::move(swMech.getValue()));
+    auto session =
+        std::make_unique<AuthenticationSession>(std::move(swMech.getValue()), speculative);
+
+    if (speculative &&
+        !session->getMechanism().properties().hasAllProperties(
+            SecurityPropertySet({SecurityProperty::kNoPlainText}))) {
+        return {ErrorCodes::BadValue,
+                "Plaintext mechanisms may not be used with speculativeSaslStart"};
+    }
+
     auto options = cmdObj["options"];
     if (!options.eoo()) {
         if (options.type() != Object) {
@@ -280,17 +296,11 @@ Status doSaslContinue(OperationContext* opCtx,
     return doSaslStep(opCtx, session, cmdObj, result);
 }
 
-CmdSaslStart::CmdSaslStart() : BasicCommand(saslStartCommandName) {}
-CmdSaslStart::~CmdSaslStart() {}
-
-std::string CmdSaslStart::help() const {
-    return "First step in a SASL authentication conversation.";
-}
-
-bool CmdSaslStart::run(OperationContext* opCtx,
-                       const std::string& db,
-                       const BSONObj& cmdObj,
-                       BSONObjBuilder& result) {
+bool runSaslStart(OperationContext* opCtx,
+                  const std::string& db,
+                  const BSONObj& cmdObj,
+                  BSONObjBuilder& result,
+                  bool speculative) {
     opCtx->markKillOnClientDisconnect();
     Client* client = opCtx->getClient();
     AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
@@ -301,7 +311,7 @@ bool CmdSaslStart::run(OperationContext* opCtx,
     }
 
     std::string principalName;
-    auto swSession = doSaslStart(opCtx, db, cmdObj, &result, &principalName);
+    auto swSession = doSaslStart(opCtx, db, cmdObj, &result, &principalName, speculative);
 
     if (!swSession.isOK() || swSession.getValue()->getMechanism().isSuccess()) {
         audit::logAuthentication(
@@ -313,6 +323,20 @@ bool CmdSaslStart::run(OperationContext* opCtx,
     }
 
     return true;
+}
+
+CmdSaslStart::CmdSaslStart() : BasicCommand(saslStartCommandName) {}
+CmdSaslStart::~CmdSaslStart() {}
+
+std::string CmdSaslStart::help() const {
+    return "First step in a SASL authentication conversation.";
+}
+
+bool CmdSaslStart::run(OperationContext* opCtx,
+                       const std::string& db,
+                       const BSONObj& cmdObj,
+                       BSONObjBuilder& result) {
+    return runSaslStart(opCtx, db, cmdObj, result, false);
 }
 
 CmdSaslContinue::CmdSaslContinue() : BasicCommand(saslContinueCommandName) {}
@@ -371,4 +395,26 @@ MONGO_INITIALIZER(PreSaslCommands)
 }
 
 }  // namespace
+
+void doSpeculativeSaslStart(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) try {
+    auto mechElem = cmdObj["mechanism"];
+    if (mechElem.type() != String) {
+        return;
+    }
+
+    authCounter.incSpeculativeAuthenticateReceived(mechElem.String());
+
+    auto dbElement = cmdObj["db"];
+    if (dbElement.type() != String) {
+        return;
+    }
+
+    BSONObjBuilder saslStartResult;
+    if (runSaslStart(opCtx, dbElement.String(), cmdObj, saslStartResult, true)) {
+        result->append(auth::kSpeculativeAuthenticate, saslStartResult.obj());
+    }
+} catch (...) {
+    // Treat failure like we never even got a speculative start.
+}
+
 }  // namespace mongo

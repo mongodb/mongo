@@ -50,7 +50,10 @@
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -108,78 +111,137 @@ private:
     const rpc::ProtocolSet _oldProtos;
 };
 
+StatusWith<bool> completeSpeculativeAuth(DBClientConnection* conn,
+                                         auth::SpeculativeAuthType speculativeAuthType,
+                                         std::shared_ptr<SaslClientSession> session,
+                                         const MongoURI& uri,
+                                         BSONObj isMaster) {
+    auto specAuthElem = isMaster[auth::kSpeculativeAuthenticate];
+    if (specAuthElem.eoo()) {
+        return false;
+    }
+
+    if (speculativeAuthType == auth::SpeculativeAuthType::kNone) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Unexpected isMaster." << auth::kSpeculativeAuthenticate
+                              << " reply"};
+    }
+
+    if (specAuthElem.type() != Object) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "isMaster." << auth::kSpeculativeAuthenticate
+                              << " reply must be an object"};
+    }
+
+    auto specAuth = specAuthElem.Obj();
+    if (specAuth.isEmpty()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "isMaster." << auth::kSpeculativeAuthenticate
+                              << " reply must be a non-empty obejct"};
+    }
+
+    if (speculativeAuthType == auth::SpeculativeAuthType::kAuthenticate) {
+        return specAuth.hasField(saslCommandUserFieldName);
+    }
+
+    invariant(speculativeAuthType == auth::SpeculativeAuthType::kSaslStart);
+
+    const auto hook = [conn](OpMsgRequest request) -> Future<BSONObj> {
+        try {
+            auto ret = conn->runCommand(std::move(request));
+            auto status = getStatusFromCommandResult(ret->getCommandReply());
+            if (!status.isOK()) {
+                return status;
+            }
+            return ret->getCommandReply();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    };
+
+    return asyncSaslConversation(hook,
+                                 session,
+                                 BSON(saslContinueCommandName << 1),
+                                 specAuth,
+                                 uri.getAuthenticationDatabase(),
+                                 kSaslClientLogLevelDefault)
+        .getNoThrow()
+        .isOK();
+}
+
 /**
  * Initializes the wire version of conn, and returns the isMaster reply.
  */
-executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
-                                                StringData applicationName,
-                                                const MongoURI& uri,
-                                                std::vector<std::string>* saslMechsForAuth) {
-    try {
-        // We need to force the usage of OP_QUERY on this command, even if we have previously
-        // detected support for OP_MSG on a connection. This is necessary to handle the case
-        // where we reconnect to an older version of MongoDB running at the same host/port.
-        ScopedForceOpQuery forceOpQuery{conn};
+executor::RemoteCommandResponse initWireVersion(
+    DBClientConnection* conn,
+    StringData applicationName,
+    const MongoURI& uri,
+    std::vector<std::string>* saslMechsForAuth,
+    auth::SpeculativeAuthType* speculativeAuthType,
+    std::shared_ptr<SaslClientSession>* saslClientSession) try {
+    // We need to force the usage of OP_QUERY on this command, even if we have previously
+    // detected support for OP_MSG on a connection. This is necessary to handle the case
+    // where we reconnect to an older version of MongoDB running at the same host/port.
+    ScopedForceOpQuery forceOpQuery{conn};
 
-        BSONObjBuilder bob;
-        bob.append("isMaster", 1);
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
 
-        if (!uri.getUser().empty()) {
-            const auto authDatabase = uri.getAuthenticationDatabase();
-            UserName user(uri.getUser(), authDatabase);
-            bob.append("saslSupportedMechs", user.getUnambiguousName());
-        }
-
-        if (getTestCommandsEnabled()) {
-            // Only include the host:port of this process in the isMaster command request if test
-            // commands are enabled. mongobridge uses this field to identify the process opening a
-            // connection to it.
-            StringBuilder sb;
-            sb << getHostName() << ':' << serverGlobalParams.port;
-            bob.append("hostInfo", sb.str());
-        }
-
-        auto versionString = VersionInfoInterface::instance().version();
-
-        Status serializeStatus = ClientMetadata::serialize(
-            "MongoDB Internal Client", versionString, applicationName, &bob);
-        if (!serializeStatus.isOK()) {
-            return serializeStatus;
-        }
-
-        conn->getCompressorManager().clientBegin(&bob);
-
-        if (WireSpec::instance().isInternalClient) {
-            WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
-        }
-
-        Date_t start{Date_t::now()};
-        auto result = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
-        Date_t finish{Date_t::now()};
-
-        BSONObj isMasterObj = result->getCommandReply().getOwned();
-
-        if (isMasterObj.hasField("minWireVersion") && isMasterObj.hasField("maxWireVersion")) {
-            int minWireVersion = isMasterObj["minWireVersion"].numberInt();
-            int maxWireVersion = isMasterObj["maxWireVersion"].numberInt();
-            conn->setWireVersions(minWireVersion, maxWireVersion);
-        }
-
-        if (isMasterObj.hasField("saslSupportedMechs") &&
-            isMasterObj["saslSupportedMechs"].type() == Array) {
-            auto array = isMasterObj["saslSupportedMechs"].Array();
-            for (const auto& elem : array) {
-                saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());
-            }
-        }
-
-        conn->getCompressorManager().clientFinish(isMasterObj);
-
-        return executor::RemoteCommandResponse{std::move(isMasterObj), finish - start};
-
-    } catch (...) {
-        return exceptionToStatus();
+    *speculativeAuthType = auth::speculateAuth(&bob, uri, saslClientSession);
+    if (!uri.getUser().empty()) {
+        UserName user(uri.getUser(), uri.getAuthenticationDatabase());
+        bob.append("saslSupportedMechs", user.getUnambiguousName());
     }
+
+    if (getTestCommandsEnabled()) {
+        // Only include the host:port of this process in the isMaster command request if test
+        // commands are enabled. mongobridge uses this field to identify the process opening a
+        // connection to it.
+        StringBuilder sb;
+        sb << getHostName() << ':' << serverGlobalParams.port;
+        bob.append("hostInfo", sb.str());
+    }
+
+    auto versionString = VersionInfoInterface::instance().version();
+
+    Status serializeStatus =
+        ClientMetadata::serialize("MongoDB Internal Client", versionString, applicationName, &bob);
+    if (!serializeStatus.isOK()) {
+        return serializeStatus;
+    }
+
+    conn->getCompressorManager().clientBegin(&bob);
+
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
+
+    Date_t start{Date_t::now()};
+    auto result = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
+    Date_t finish{Date_t::now()};
+
+    BSONObj isMasterObj = result->getCommandReply().getOwned();
+
+    if (isMasterObj.hasField("minWireVersion") && isMasterObj.hasField("maxWireVersion")) {
+        int minWireVersion = isMasterObj["minWireVersion"].numberInt();
+        int maxWireVersion = isMasterObj["maxWireVersion"].numberInt();
+        conn->setWireVersions(minWireVersion, maxWireVersion);
+    }
+
+    if (isMasterObj.hasField("saslSupportedMechs") &&
+        isMasterObj["saslSupportedMechs"].type() == Array) {
+        auto array = isMasterObj["saslSupportedMechs"].Array();
+        for (const auto& elem : array) {
+            saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());
+        }
+    }
+
+    conn->getCompressorManager().clientFinish(isMasterObj);
+
+    return executor::RemoteCommandResponse{std::move(isMasterObj), finish - start};
+
+} catch (...) {
+    return exceptionToStatus();
 }
 
 }  // namespace
@@ -231,7 +293,10 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
     // access the application name, do it through the _applicationName member.
     _applicationName = applicationName.toString();
 
-    auto swIsMasterReply = initWireVersion(this, _applicationName, _uri, &_saslMechsForAuth);
+    auto speculativeAuthType = auth::SpeculativeAuthType::kNone;
+    std::shared_ptr<SaslClientSession> saslClientSession;
+    auto swIsMasterReply = initWireVersion(
+        this, _applicationName, _uri, &_saslMechsForAuth, &speculativeAuthType, &saslClientSession);
     if (!swIsMasterReply.isOK()) {
         _markFailed(kSetFlag);
         return swIsMasterReply.status;
@@ -296,6 +361,18 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
             // Disconnect and mark failed.
             _markFailed(kReleaseSession);
             return validationStatus;
+        }
+    }
+
+    {
+        auto swAuth = completeSpeculativeAuth(
+            this, speculativeAuthType, saslClientSession, _uri, swIsMasterReply.data);
+        if (!swAuth.isOK()) {
+            return swAuth.getStatus();
+        }
+
+        if (swAuth.getValue()) {
+            _authenticatedDuringConnect = true;
         }
     }
 

@@ -692,12 +692,10 @@ bool SSLConfiguration::isClusterMember(StringData subjectName) const {
     return !canonicalClient.empty() && (canonicalClient == _canonicalServerSubjectName);
 }
 
-BSONObj SSLConfiguration::getServerStatusBSON() const {
-    BSONObjBuilder security;
-    security.append("SSLServerSubjectName", _serverSubjectName.toString());
-    security.appendBool("SSLServerHasCertificateAuthority", hasCA);
-    security.appendDate("SSLServerCertificateExpirationDate", serverCertificateExpirationDate);
-    return security.obj();
+void SSLConfiguration::getServerStatusBSON(BSONObjBuilder* security) const {
+    security->append("SSLServerSubjectName", _serverSubjectName.toString());
+    security->appendBool("SSLServerHasCertificateAuthority", hasCA);
+    security->appendDate("SSLServerCertificateExpirationDate", serverCertificateExpirationDate);
 }
 
 SSLManagerInterface::~SSLManagerInterface() {}

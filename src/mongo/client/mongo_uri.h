@@ -45,6 +45,7 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
 /**
  * Encode a string for embedding in a URI.
  * Replaces reserved bytes with %xx sequences.
@@ -261,6 +262,9 @@ public:
 
     friend StringBuilder& operator<<(StringBuilder&, const MongoURI&);
 
+    boost::optional<BSONObj> makeAuthObjFromOptions(
+        int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const;
+
 private:
     MongoURI(ConnectionString connectString,
              const std::string& user,
@@ -276,9 +280,6 @@ private:
           _retryWrites(std::move(retryWrites)),
           _sslMode(sslMode),
           _options(std::move(options)) {}
-
-    boost::optional<BSONObj> _makeAuthObjFromOptions(
-        int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const;
 
     static MongoURI parseImpl(const std::string& url);
 

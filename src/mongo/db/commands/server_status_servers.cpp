@@ -95,7 +95,6 @@ public:
 
 } network;
 
-#ifdef MONGO_CONFIG_SSL
 class Security : public ServerStatusSection {
 public:
     Security() : ServerStatusSection("security") {}
@@ -106,15 +105,23 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        BSONObj result;
-        if (getSSLManager()) {
-            result = getSSLManager()->getSSLConfiguration().getServerStatusBSON();
-        }
+        BSONObjBuilder result;
 
-        return result;
+        BSONObjBuilder auth;
+        authCounter.append(&auth);
+        result.append("authentication", auth.obj());
+
+#ifdef MONGO_CONFIG_SSL
+        if (getSSLManager()) {
+            getSSLManager()->getSSLConfiguration().getServerStatusBSON(&result);
+        }
+#endif
+
+        return result.obj();
     }
 } security;
 
+#ifdef MONGO_CONFIG_SSL
 /**
  * Status section of which tls versions connected to MongoDB and completed an SSL handshake.
  * Note: Clients are only not counted if they try to connect to the server with a unsupported TLS

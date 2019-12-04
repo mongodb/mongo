@@ -62,18 +62,20 @@ using std::endl;
 
 namespace {
 
-// Default log level on the client for SASL log messages.
-const int defaultSaslClientLogLevel = 4;
-
-const char* const saslClientLogFieldName = "clientLogLevel";
+constexpr auto saslClientLogFieldName = "clientLogLevel"_sd;
 
 int getSaslClientLogLevel(const BSONObj& saslParameters) {
-    int saslLogLevel = defaultSaslClientLogLevel;
+    int saslLogLevel = kSaslClientLogLevelDefault;
     BSONElement saslLogElement = saslParameters[saslClientLogFieldName];
-    if (saslLogElement.trueValue())
+
+    if (saslLogElement.trueValue()) {
         saslLogLevel = 1;
-    if (saslLogElement.isNumber())
+    }
+
+    if (saslLogElement.isNumber()) {
         saslLogLevel = saslLogElement.numberInt();
+    }
+
     return saslLogLevel;
 }
 
@@ -109,19 +111,12 @@ Status extractPassword(const BSONObj& saslParameters,
     }
     return Status::OK();
 }
+}  // namespace
 
-/**
- * Configures "session" to perform the client side of a SASL conversation over connection
- * "client".
- *
- * "saslParameters" is a BSON document providing the necessary configuration information.
- *
- * Returns Status::OK() on success.
- */
-Status configureSession(SaslClientSession* session,
-                        const HostAndPort& hostname,
-                        StringData targetDatabase,
-                        const BSONObj& saslParameters) {
+Status saslConfigureSession(SaslClientSession* session,
+                            const HostAndPort& hostname,
+                            StringData targetDatabase,
+                            const BSONObj& saslParameters) {
     std::string mechanism;
     Status status =
         bsonExtractStringField(saslParameters, saslCommandMechanismFieldName, &mechanism);
@@ -241,6 +236,7 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
         });
 }
 
+namespace {
 /**
  * Driver for the client side of a sasl authentication session, conducted synchronously over
  * "client".
@@ -270,7 +266,7 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
     // Come C++14, we should be able to do this in a nicer way.
     std::shared_ptr<SaslClientSession> session(SaslClientSession::create(mechanism));
 
-    status = configureSession(session.get(), hostname, targetDatabase, saslParameters);
+    status = saslConfigureSession(session.get(), hostname, targetDatabase, saslParameters);
     if (!status.isOK())
         return status;
 

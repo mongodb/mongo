@@ -87,6 +87,11 @@ public:
 
     Future<void> authenticateInternal(boost::optional<std::string> mechanismHint);
 
+    Future<bool> completeSpeculativeAuth(std::shared_ptr<SaslClientSession> session,
+                                         std::string authDB,
+                                         BSONObj specAuth,
+                                         auth::SpeculativeAuthType speculativeAuthtype);
+
     Future<void> initWireVersion(const std::string& appName,
                                  executor::NetworkConnectionHook* const hook);
 

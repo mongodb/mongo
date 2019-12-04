@@ -352,6 +352,7 @@ env.CppUnitTest(
         'balancer/balancer_chunk_selection_policy_test.cpp',
         'balancer/balancer_policy_test.cpp',
         'balancer/cluster_statistics_test.cpp',
+        'balancer/core_options_stub.cpp',
         'balancer/migration_manager_test.cpp',
         'balancer/migration_test_fixture.cpp',
         'balancer/scoped_migration_request_test.cpp',

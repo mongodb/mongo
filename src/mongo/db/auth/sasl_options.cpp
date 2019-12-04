@@ -29,6 +29,7 @@
 
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_options_gen.h"
+#include "mongo/db/stats/counters.h"
 
 #include "mongo/util/text.h"
 
@@ -46,4 +47,13 @@ SASLGlobalParams::SASLGlobalParams() {
     // Default value for auth failed delay
     authFailedDelay.store(0);
 }
+
+namespace {
+MONGO_INITIALIZER_WITH_PREREQUISITES(InitSpeculativeCounters, ("EndStartupOptionStorage"))
+(InitializerContext*) {
+    authCounter.initializeMechanismMap(saslGlobalParams.authenticationMechanisms);
+    return Status::OK();
+}
+}  // namespace
+
 }  // namespace mongo

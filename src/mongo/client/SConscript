@@ -139,6 +139,9 @@ env.Library(
         '$BUILD_DIR/mongo/executor/remote_command',
         'sasl_client'
     ],
+    LIBDEPS_PRIVATE=[
+        'connection_string',
+    ],
 )
 
 env.Library(

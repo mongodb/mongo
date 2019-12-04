@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,19 +27,16 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
-class OperationContext;
-
-constexpr StringData kX509AuthMechanism = "MONGODB-X509"_sd;
-
-void disableAuthMechanism(StringData authMechanism);
-
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj isMaster, BSONObjBuilder* result);
-
+namespace {
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
+                          ("BeginStartupOptionStorage"),
+                          ("EndStartupOptionStorage"))
+(InitializerContext* context) {
+    return Status::OK();
+}
+}  // namespace
 }  // namespace mongo

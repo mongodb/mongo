@@ -29,14 +29,19 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 class BSONObj;
+class SaslClientSession;
 
 /**
  * Attempts to authenticate "client" using the SASL protocol.
@@ -83,4 +88,30 @@ extern Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
  * into "*payload".  In all other cases, returns
  */
 Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type);
+
+// Default log level on the client for SASL log messages.
+constexpr int kSaslClientLogLevelDefault = 4;
+
+/**
+ * Configures and initializes "session" to perform the client side of a
+ * SASL conversation over connection "client".
+ *
+ * "saslParameters" is a BSON document providing the necessary configuration information.
+ *
+ * Returns Status::OK() on success.
+ */
+Status saslConfigureSession(SaslClientSession* session,
+                            const HostAndPort& hostname,
+                            StringData targetDatabase,
+                            const BSONObj& saslParameters);
+
+/**
+ * Continue a previously started sasl session and proceed until completion.
+ */
+Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
+                                   const std::shared_ptr<SaslClientSession>& session,
+                                   const BSONObj& saslCommandPrefix,
+                                   const BSONObj& inputObj,
+                                   std::string targetDatabase,
+                                   int saslLogLevel);
 }  // namespace mongo

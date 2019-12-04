@@ -30,11 +30,14 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/op_msg.h"
@@ -66,6 +69,9 @@ constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
 constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
 constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
 constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
+
+constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"_sd;
+constexpr auto kAuthenticateCommand = "authenticate"_sd;
 
 /**
  * Authenticate a user.
@@ -167,6 +173,35 @@ StringData getSaslCommandUserDBFieldName();
  * Return the field name for the user to authenticate.
  */
 StringData getSaslCommandUserFieldName();
+
+/**
+ * Which type of speculative authentication was performed (if any).
+ */
+enum class SpeculativeAuthType {
+    kNone,
+    kAuthenticate,
+    kSaslStart,
+};
+
+/**
+ * Constructs a "speculativeAuthenticate" or "speculativeSaslStart"
+ * payload for an isMaster request based on a given URI.
+ */
+SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
+                                  const MongoURI& uri,
+                                  std::shared_ptr<SaslClientSession>* saslClientSession);
+
+/**
+ * Constructs a "speculativeAuthenticate" or "speculativeSaslStart"
+ * payload for an isMaster request using internal (intracluster) authentication.
+ */
+SpeculativeAuthType speculateInternalAuth(BSONObjBuilder* isMasterRequest,
+                                          std::shared_ptr<SaslClientSession>* saslClientSession);
+
+/**
+ * Returns the AuthDB used by internal authentication.
+ */
+std::string getInternalAuthDB();
 
 }  // namespace auth
 }  // namespace mongo

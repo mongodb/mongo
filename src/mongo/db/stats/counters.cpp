@@ -33,6 +33,7 @@
 
 #include "mongo/db/stats/counters.h"
 
+#include "mongo/client/authenticate.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/log.h"
 
@@ -168,7 +169,65 @@ void NetworkCounter::append(BSONObjBuilder& b) {
     b.append("tcpFastOpen", tfo.obj());
 }
 
+void AuthCounter::initializeMechanismMap(const std::vector<std::string>& mechanisms) {
+    invariant(_mechanisms.empty());
+
+    for (const auto& mech : mechanisms) {
+        _mechanisms.emplace(
+            std::piecewise_construct, std::forward_as_tuple(mech), std::forward_as_tuple());
+    }
+}
+
+void AuthCounter::incSpeculativeAuthenticateReceived(const std::string& mechanism) try {
+    _mechanisms.at(mechanism).speculativeAuthenticate.received.fetchAndAddRelaxed(1);
+} catch (const std::out_of_range&) {
+    uasserted(51767,
+              str::stream() << "Received " << auth::kSpeculativeAuthenticate << " for mechanism "
+                            << mechanism << " which is unknown or not enabled");
+}
+
+void AuthCounter::incSpeculativeAuthenticateSuccessful(const std::string& mechanism) try {
+    _mechanisms.at(mechanism).speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
+} catch (const std::out_of_range&) {
+    // Should never actually occur since it'd mean we succeeded at a mechanism
+    // we're not configured for.
+    uasserted(51768,
+              str::stream() << "Unexpectedly succeeded at " << auth::kSpeculativeAuthenticate
+                            << " for " << mechanism << " which is not enabled");
+}
+
+/**
+ * authentication: {
+ *   "mechanisms": {
+ *     "SCRAM-SHA-256": {
+ *       "speculativeAuthenticate": { received: ###, successful: ### },
+ *     },
+ *     "MONGODB-X509": {
+ *       "speculativeAuthenticate": { received: ###, successful: ### },
+ *     },
+ *   },
+ * }
+ */
+void AuthCounter::append(BSONObjBuilder* b) {
+    BSONObjBuilder mechsBuilder(b->subobjStart("mechanisms"));
+
+    for (const auto& it : _mechanisms) {
+        const auto received = it.second.speculativeAuthenticate.received.load();
+        const auto successful = it.second.speculativeAuthenticate.successful.load();
+
+        BSONObjBuilder mechBuilder(mechsBuilder.subobjStart(it.first));
+        BSONObjBuilder specAuthBuilder(mechBuilder.subobjStart(auth::kSpeculativeAuthenticate));
+        specAuthBuilder.append("received", received);
+        specAuthBuilder.append("successful", successful);
+        specAuthBuilder.done();
+        mechBuilder.done();
+    }
+
+    mechsBuilder.done();
+}
+
 OpCounters globalOpCounters;
 OpCounters replOpCounters;
 NetworkCounter networkCounter;
+AuthCounter authCounter;
 }  // namespace mongo

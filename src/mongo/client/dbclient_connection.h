@@ -293,6 +293,10 @@ public:
 
     Status authenticateInternalUser() override;
 
+    bool authenticatedDuringConnect() const override {
+        return _authenticatedDuringConnect;
+    }
+
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
@@ -349,6 +353,8 @@ private:
     MessageCompressorManager _compressorManager;
 
     MongoURI _uri;
+
+    bool _authenticatedDuringConnect = false;
 };
 
 BSONElement getErrField(const BSONObj& result);

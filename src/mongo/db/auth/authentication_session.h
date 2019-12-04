@@ -45,8 +45,8 @@ class AuthenticationSession {
     AuthenticationSession& operator=(const AuthenticationSession&) = delete;
 
 public:
-    explicit AuthenticationSession(std::unique_ptr<ServerMechanismBase> mech)
-        : _mech(std::move(mech)) {}
+    explicit AuthenticationSession(std::unique_ptr<ServerMechanismBase> mech, bool speculative)
+        : _mech(std::move(mech)), _speculative(speculative) {}
 
     /**
      * Sets the authentication session for the given "client" to "newSession".
@@ -72,8 +72,13 @@ public:
         return _mech->setOptions(options);
     }
 
+    bool isSpeculative() const {
+        return _speculative;
+    }
+
 private:
     std::unique_ptr<ServerMechanismBase> _mech;
+    bool _speculative{false};
 };
 
 }  // namespace mongo

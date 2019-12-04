@@ -39,11 +39,13 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/range/algorithm/count.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/dns_name.h"
@@ -61,6 +63,7 @@ constexpr std::array<char, 16> hexits{
 // a `std::map<std::string, std::string>` as the other parameter.
 const std::vector<std::pair<std::string, std::string>> permittedTXTOptions = {{"authSource"s, ""s},
                                                                               {"replicaSet"s, ""s}};
+
 }  // namespace
 
 /**
@@ -571,4 +574,128 @@ std::string MongoURI::canonicalizeURIAsString() const {
     }
     return uri.str();
 }
+
+namespace {
+constexpr auto kAuthMechanismPropertiesKey = "mechanism_properties"_sd;
+
+constexpr auto kAuthServiceName = "SERVICE_NAME"_sd;
+constexpr auto kAuthServiceRealm = "SERVICE_REALM"_sd;
+constexpr auto kAuthAwsSessionToken = "AWS_SESSION_TOKEN"_sd;
+
+constexpr std::array<StringData, 3> kSupportedAuthMechanismProperties = {
+    kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken};
+
+BSONObj parseAuthMechanismProperties(const std::string& propStr) {
+    BSONObjBuilder bob;
+    std::vector<std::string> props;
+    boost::algorithm::split(props, propStr, boost::algorithm::is_any_of(",:"));
+    for (std::vector<std::string>::const_iterator it = props.begin(); it != props.end(); ++it) {
+        std::string prop((boost::algorithm::to_upper_copy(*it)));  // normalize case
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "authMechanismProperty: " << *it << " is not supported",
+                std::count(std::begin(kSupportedAuthMechanismProperties),
+                           std::end(kSupportedAuthMechanismProperties),
+                           StringData(prop)));
+        ++it;
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "authMechanismProperty: " << prop << " must have a value",
+                it != props.end());
+        bob.append(prop, *it);
+    }
+    return bob.obj();
+}
+}  // namespace
+
+boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
+    int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const {
+    // Usually, a username is required to authenticate.
+    // However X509 based authentication may, and typically does,
+    // omit the username, inferring it from the client certificate instead.
+    bool usernameRequired = true;
+
+    BSONObjBuilder bob;
+    if (!_password.empty()) {
+        bob.append(saslCommandPasswordFieldName, _password);
+    }
+
+    auto it = _options.find("authSource");
+    if (it != _options.end()) {
+        bob.append(saslCommandUserDBFieldName, it->second);
+    } else if (!_database.empty()) {
+        bob.append(saslCommandUserDBFieldName, _database);
+    } else {
+        bob.append(saslCommandUserDBFieldName, "admin");
+    }
+
+    it = _options.find("authMechanism");
+    if (it != _options.end()) {
+        bob.append(saslCommandMechanismFieldName, it->second);
+        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoAWS) {
+            usernameRequired = false;
+        }
+    } else if (!saslMechsForAuth.empty()) {
+        if (std::find(saslMechsForAuth.begin(),
+                      saslMechsForAuth.end(),
+                      auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
+            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
+        } else {
+            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
+        }
+    } else if (maxWireVersion >= 3) {
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
+    } else {
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismMongoCR);
+    }
+
+    if (usernameRequired && _user.empty()) {
+        return boost::none;
+    }
+
+    std::string username(_user);  // may have to tack on service realm before we append
+
+    it = _options.find("authMechanismProperties");
+    if (it != _options.end()) {
+        BSONObj parsed(parseAuthMechanismProperties(it->second));
+
+        bool hasNameProp = parsed.hasField(kAuthServiceName);
+        bool hasRealmProp = parsed.hasField(kAuthServiceRealm);
+
+        uassert(ErrorCodes::FailedToParse,
+                "Cannot specify both gssapiServiceName and SERVICE_NAME",
+                !(hasNameProp && _options.count("gssapiServiceName")));
+        // we append the parsed object so that mechanisms that don't accept it can assert.
+        bob.append(kAuthMechanismPropertiesKey, parsed);
+        // we still append using the old way the SASL code expects it
+        if (hasNameProp) {
+            bob.append(saslCommandServiceNameFieldName, parsed[kAuthServiceName].String());
+        }
+        // if we specified a realm, we just append it to the username as the SASL code
+        // expects it that way.
+        if (hasRealmProp) {
+            if (username.empty()) {
+                // In practice, this won't actually occur since
+                // this block corresponds to GSSAPI, while username
+                // may only be omitted with MOGNODB-X509.
+                return boost::none;
+            }
+            username.append("@").append(parsed[kAuthServiceRealm].String());
+        }
+
+        if (parsed.hasField(kAuthAwsSessionToken)) {
+            bob.append(saslCommandIamSessionToken, parsed[kAuthAwsSessionToken].String());
+        }
+    }
+
+    it = _options.find("gssapiServiceName");
+    if (it != _options.end()) {
+        bob.append(saslCommandServiceNameFieldName, it->second);
+    }
+
+    if (!username.empty()) {
+        bob.append("user", username);
+    }
+
+    return bob.obj();
+}
+
 }  // namespace mongo

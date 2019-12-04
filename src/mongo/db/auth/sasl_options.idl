@@ -36,6 +36,8 @@ global:
 
 server_parameters:
   authenticationMechanisms:
+    # Note: mongo/db/stats/counter.cpp makes the assumption that this
+    # setting will never be changed at runtime.
     description: "The set of accepted authentication mechanisms"
     set_at: startup
     default:

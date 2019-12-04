@@ -323,5 +323,135 @@ StringData getSaslCommandUserFieldName() {
     return saslCommandUserFieldName;
 }
 
+namespace {
+
+StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(BSONObjBuilder* isMaster,
+                                                                   const std::string& mechanism,
+                                                                   const HostAndPort& host,
+                                                                   StringData authDB,
+                                                                   BSONObj params) {
+    if (mechanism == kMechanismSaslPlain) {
+        return {ErrorCodes::BadValue, "PLAIN mechanism not supported with speculativeSaslStart"};
+    }
+
+    std::shared_ptr<SaslClientSession> session(SaslClientSession::create(mechanism));
+    auto status = saslConfigureSession(session.get(), host, authDB, params);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    std::string payload;
+    status = session->step("", &payload);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    BSONObjBuilder saslStart;
+    saslStart.append("saslStart", 1);
+    saslStart.append("mechanism", mechanism);
+    saslStart.appendBinData("payload", int(payload.size()), BinDataGeneral, payload.c_str());
+    saslStart.append("db", authDB);
+    isMaster->append(kSpeculativeAuthenticate, saslStart.obj());
+
+    return session;
+}
+
+StatusWith<SpeculativeAuthType> _speculateAuth(
+    BSONObjBuilder* isMaster,
+    const std::string& mechanism,
+    const HostAndPort& host,
+    StringData authDB,
+    BSONObj params,
+    std::shared_ptr<SaslClientSession>* saslClientSession) {
+    if (mechanism == kMechanismMongoX509) {
+        // MONGODB-X509
+        isMaster->append(kSpeculativeAuthenticate,
+                         BSON(kAuthenticateCommand << "1" << saslCommandMechanismFieldName
+                                                   << mechanism << saslCommandUserDBFieldName
+                                                   << "$external"));
+        return SpeculativeAuthType::kAuthenticate;
+    }
+
+    // Proceed as if this is a SASL mech and we either have a password,
+    // or we don't need one (e.g. MONGODB-AWS).
+    // Failure is absolutely an option.
+    auto swSaslClientSession = _speculateSaslStart(isMaster, mechanism, host, authDB, params);
+    if (!swSaslClientSession.isOK()) {
+        return swSaslClientSession.getStatus();
+    }
+
+    // It's okay to fail, the non-speculative auth flow will try again.
+    *saslClientSession = std::move(swSaslClientSession.getValue());
+    return SpeculativeAuthType::kSaslStart;
+}
+
+std::string getBSONString(BSONObj container, StringData field) {
+    auto elem = container[field];
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Field '" << field << "' must be of type string",
+            elem.type() == String);
+    return elem.String();
+}
+}  // namespace
+
+SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
+                                  const MongoURI& uri,
+                                  std::shared_ptr<SaslClientSession>* saslClientSession) {
+    auto mechanism = uri.getOption("authMechanism").get_value_or(kMechanismScramSha256.toString());
+
+    auto optParams = uri.makeAuthObjFromOptions(LATEST_WIRE_VERSION, {mechanism});
+    if (!optParams) {
+        return SpeculativeAuthType::kNone;
+    }
+
+    auto params = std::move(optParams.get());
+
+    auto ret = _speculateAuth(isMasterRequest,
+                              mechanism,
+                              uri.getServers().front(),
+                              uri.getAuthenticationDatabase(),
+                              params,
+                              saslClientSession);
+    if (!ret.isOK()) {
+        // Ignore error, fallback on explicit auth.
+        return SpeculativeAuthType::kNone;
+    }
+
+    return ret.getValue();
+}
+
+SpeculativeAuthType speculateInternalAuth(
+    BSONObjBuilder* isMasterRequest, std::shared_ptr<SaslClientSession>* saslClientSession) try {
+    auto params = getInternalAuthParams(0, kMechanismScramSha256.toString());
+    if (params.isEmpty()) {
+        return SpeculativeAuthType::kNone;
+    }
+
+    auto mechanism = getBSONString(params, saslCommandMechanismFieldName);
+    auto authDB = getBSONString(params, saslCommandUserDBFieldName);
+
+    auto ret = _speculateAuth(
+        isMasterRequest, mechanism, HostAndPort(), authDB, params, saslClientSession);
+    if (!ret.isOK()) {
+        return SpeculativeAuthType::kNone;
+    }
+
+    return ret.getValue();
+} catch (...) {
+    // Swallow any exception and fallback on explicit auth.
+    return SpeculativeAuthType::kNone;
+}
+
+std::string getInternalAuthDB() {
+    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+
+    if (!internalAuthParams.isEmpty()) {
+        return getBSONString(internalAuthParams, saslCommandUserDBFieldName);
+    }
+
+    auto isu = internalSecurity.user;
+    return isu ? isu->getName().getDB().toString() : "admin";
+}
+
 }  // namespace auth
 }  // namespace mongo

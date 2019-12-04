@@ -741,7 +741,9 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     _lastSlaveOkConn->setReplyMetadataReader(getReplyMetadataReader());
 
     if (_authPooledSecondaryConn) {
-        _authConnection(_lastSlaveOkConn.get());
+        if (!_lastSlaveOkConn->authenticatedDuringConnect()) {
+            _authConnection(_lastSlaveOkConn.get());
+        }
     } else {
         // Mongos pooled connections are authenticated through ShardingConnectionHook::onCreate()
     }

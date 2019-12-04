@@ -119,7 +119,7 @@ class SSLConfiguration {
 public:
     bool isClusterMember(StringData subjectName) const;
     bool isClusterMember(SSLX509Name subjectName) const;
-    BSONObj getServerStatusBSON() const;
+    void getServerStatusBSON(BSONObjBuilder*) const;
     Status setServerSubjectName(SSLX509Name name);
 
     const SSLX509Name& serverSubjectName() const {

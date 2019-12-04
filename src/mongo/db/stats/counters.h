@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
@@ -165,4 +167,29 @@ private:
 };
 
 extern NetworkCounter networkCounter;
+
+class AuthCounter {
+public:
+    void incSpeculativeAuthenticateReceived(const std::string& mechanism);
+    void incSpeculativeAuthenticateSuccessful(const std::string& mechanism);
+
+    void append(BSONObjBuilder*);
+
+    void initializeMechanismMap(const std::vector<std::string>&);
+
+private:
+    struct MechanismData {
+        struct {
+            AtomicWord<long long> received;
+            AtomicWord<long long> successful;
+        } speculativeAuthenticate;
+    };
+    using MechanismMap = std::map<std::string, MechanismData>;
+
+    // Mechanism maps are initialized at startup to contain all
+    // mechanisms known to authenticationMechanisms setParam.
+    // After that they are kept to a fixed size.
+    MechanismMap _mechanisms;
+};
+extern AuthCounter authCounter;
 }  // namespace mongo
