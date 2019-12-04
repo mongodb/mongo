@@ -21,6 +21,11 @@ import sys
 
 import SCons
 
+# We lazily import this at generate time.
+idlc = None
+
+IDL_GLOBAL_DEPS = []
+
 
 def idlc_emitter(target, source, env):
     """For each input IDL file, the tool produces a .cpp and .h file."""
@@ -42,20 +47,22 @@ IDLCAction = SCons.Action.Action('$IDLCCOM', '$IDLCCOMSTR')
 
 
 def idl_scanner(node, env, path):
-    # Use the import scanner mode of the IDL compiler to file imported files
-    cmd = [sys.executable, "buildscripts/idl/idlc.py",  '--include','src', str(node), '--write-dependencies']
-    try:
-        deps_str = subprocess.check_output(cmd).decode('utf-8')
-    except subprocess.CalledProcessError as e:
-        print("IDLC ERROR: %s" % e.output)
-        raise
+    nodes_deps_list = getattr(node.attributes, "IDL_NODE_DEPS", None)
+    if nodes_deps_list is not None:
+        return nodes_deps_list
 
-    deps_list = deps_str.splitlines()
+    nodes_deps_list = IDL_GLOBAL_DEPS[:]
 
-    nodes_deps_list = [ env.File(d) for d in deps_list]
-    nodes_deps_list.extend(env.Glob('#buildscripts/idl/*.py'))
-    nodes_deps_list.extend(env.Glob('#buildscripts/idl/idl/*.py'))
+    with open(str(node), encoding='utf-8') as file_stream:
+        parsed_doc = idlc.parser.parse(file_stream, str(node),
+                                       idlc.CompilerImportResolver(['src']))
 
+    if not parsed_doc.errors and parsed_doc.spec.imports is not None:
+        nodes_deps_list.extend([
+            env.File(d) for d in sorted(parsed_doc.spec.imports.dependencies)
+        ])
+
+    setattr(node.attributes, "IDL_NODE_DEPS", nodes_deps_list)
     return nodes_deps_list
 
 
@@ -73,6 +80,11 @@ def generate(env):
 
     env['BUILDERS']['Idlc'] = bld
 
+    sys.path.append(env.Dir("#buildscripts").get_abspath())
+    import buildscripts.idl.idl.compiler as idlc_mod
+    global idlc
+    idlc = idlc_mod
+
     env['IDLC'] = sys.executable + " buildscripts/idl/idlc.py"
     env['IDLCFLAGS'] = ''
     base_dir = env.subst('$BUILD_ROOT/$VARIANT_DIR').replace("#", "")
@@ -80,6 +92,7 @@ def generate(env):
         base_dir)
     env['IDLCSUFFIX'] = '.idl'
 
+    IDL_GLOBAL_DEPS = env.Glob('#buildscripts/idl/*.py') + env.Glob('#buildscripts/idl/idl/*.py')
     env['IDL_HAS_INLINE_DEPENDENCIES'] = True
 
 
