@@ -6,6 +6,7 @@ selector:
   roots:
   - jstests/core/commands_namespace_parsing.js
   - jstests/core/map_reduce_validation.js
+  - jstests/core/mr_bigobject.js
   - jstests/core/mr_preserve_indexes.js
   - jstests/core/mr_merge.js
   - jstests/core/mr_mutable_properties.js

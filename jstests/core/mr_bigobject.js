@@ -1,4 +1,4 @@
-// Tests that mapReduce's map function fails if it outputs objects that are too large.
+// Confirms that the mapReduce reduce function will process data sets larger than 16MB.
 // @tags: [
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
@@ -20,28 +20,23 @@ for (let i = 0; i < 5; i++)
     bulk.insert({_id: i, s: largeString});
 assert.commandWorked(bulk.execute());
 
-let mapFn = function() {
-    emit(1, this.s + this.s);
+// MapReduce succeeds when the reduce function processes single-key data sets larger than 16MB.
+const mapFn = function() {
+    emit(1, this.s);
 };
 
 let reduceFn = function(k, v) {
     return 1;
 };
 
-assert.throws(function() {
-    coll.mapReduce(mapFn, reduceFn, outputColl.getName());
-}, [], "emit should fail");
-
-mapFn = function() {
-    emit(1, this.s);
-};
-assert.commandWorked(coll.mapReduce(mapFn, reduceFn, outputColl.getName()));
+assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {"merge": outputColl.getName()}}));
 assert.eq([{_id: 1, value: 1}], outputColl.find().toArray());
 
+// The reduce function processes the expected amount of data.
 reduceFn = function(k, v) {
     total = 0;
-    for (var i = 0; i < v.length; i++) {
-        var x = v[i];
+    for (let i = 0; i < v.length; i++) {
+        const x = v[i];
         if (typeof (x) == "number")
             total += x;
         else
@@ -50,6 +45,6 @@ reduceFn = function(k, v) {
     return total;
 };
 
-assert.commandWorked(coll.mapReduce(mapFn, reduceFn, outputColl.getName()));
+assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {"merge": outputColl.getName()}}));
 assert.eq([{_id: 1, value: coll.count() * largeString.length}], outputColl.find().toArray());
 }());

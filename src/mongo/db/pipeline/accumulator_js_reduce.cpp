@@ -111,36 +111,60 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 }
 
 Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
-    auto val = [&]() {
-        if (_values.size() < 1) {
-            return Value{};
-        }
+    if (_values.size() < 1) {
+        return Value{};
+    }
 
+    Value result;
+    // Keep reducing until we have exactly one value.
+    while (true) {
         BSONArrayBuilder bsonValues;
-        for (const auto& val : _values) {
+        size_t numLeft = _values.size();
+        for (; numLeft > 0; numLeft--) {
+            Value val = _values[numLeft - 1];
+
+            // Do not insert if doing so would exceed the the maximum allowed BSONObj size.
+            if (bsonValues.len() + _key.getApproximateSize() + val.getApproximateSize() >
+                BSONObjMaxUserSize) {
+                // If we have reached the threshold for maximum allowed BSONObj size and only have a
+                // single value then no progress will be made on reduce. We must fail when this
+                // scenario is encountered.
+                size_t numNextReduce = _values.size() - numLeft;
+                uassert(31392, "Value too large to reduce", numNextReduce > 1);
+                break;
+            }
             bsonValues << val;
         }
 
         auto expCtx = getExpressionContext();
         auto reduceFunc = makeJsFunc(expCtx, _funcSource.toString());
 
-
         // Function signature: reduce(key, values).
         BSONObj params = BSON_ARRAY(_key << bsonValues.arr());
         // For reduce, the key and values are both passed as 'params' so there's no need to set
         // 'this'.
         BSONObj thisObj;
-        return expCtx->getJsExecWithScope()->callFunction(reduceFunc, params, thisObj);
-    }();
+        Value reduceResult =
+            expCtx->getJsExecWithScope()->callFunction(reduceFunc, params, thisObj);
+        if (numLeft == 0) {
+            result = reduceResult;
+            break;
+        } else {
+            // Remove all values which have been reduced.
+            _values.resize(numLeft);
+            // Include most recent result in the set of values to be reduced.
+            _values.push_back(reduceResult);
+        }
+    }
 
     // If we're merging after this, wrap the value in the same format it was inserted in.
     if (toBeMerged) {
         MutableDocument output;
         output.addField("k", _key);
-        output.addField("v", val);
+        output.addField("v", result);
         return Value(output.freeze());
     } else {
-        return val;
+        return result;
     }
 }
 

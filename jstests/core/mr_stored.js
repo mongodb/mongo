@@ -14,6 +14,8 @@
 (function() {
 "use strict";
 
+load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+
 // Use a unique database name to avoid conflicts with other tests that directly modify
 // system.js.
 const testDB = db.getSiblingDB("mr_stored");
@@ -58,8 +60,8 @@ const out = testDB.mr_stored_out;
 
 function assertCorrect(results) {
     assert.eq(2, Object.keySet(results).length);
-    assert.eq([9, 11, 30], results["1"].stats);
-    assert.eq([9, 41, 41], results["2"].stats);
+    assertArrayEq([9, 11, 30], results["1"].stats);
+    assertArrayEq([9, 41, 41], results["2"].stats);
 }
 
 // Stored Map.

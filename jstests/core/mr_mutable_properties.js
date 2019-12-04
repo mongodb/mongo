@@ -9,6 +9,9 @@
 // in Map, Reduce and Finalize functions
 (function() {
 "use strict";
+
+load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+
 const collection = db.mrMutableReceiver;
 collection.drop();
 collection.insert({a: 1});
@@ -60,17 +63,14 @@ const finalize = function(key, values) {
     return values;
 };
 
-const mr = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
-printjson(mr);
+const cmdResult = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
 
-// verify mutated properties exist (order dictated by emit sequence and properties added)
-assert.eq(mr.results[0].value.food[0].beef, 1);
-assert.eq(mr.results[0].value.food[1].cake, 1);
-assert.eq(mr.results[0].value.food[2].beat, 1);
-assert.eq(mr.results[0].value.food[3].mochi, 1);
-assert.eq(mr.results[0].value.food[4].ice, 1);
-assert.eq(mr.results[0].value.food[5].cream, 1);
-mr.results[0].value.food.forEach(function(val) {
-    assert.eq(val.mod, 1);
-});
+assertArrayEq(cmdResult.results[0].value.food, [
+    {"cake": 1, "mod": 1},
+    {"beef": 1, "mod": 1},
+    {"beat": 1, "mod": 1},
+    {"mochi": 1, "mod": 1},
+    {"ice": 1, "mod": 1},
+    {"cream": 1, "mod": 1}
+]);
 }());
