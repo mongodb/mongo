@@ -338,7 +338,6 @@ variables:
   - name: ssl_gen
   - name: sslSpecial_gen
 
-
 #######################################
 #            Functions                #
 #######################################
@@ -8960,6 +8959,70 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: enterprise-rhel-80-64-bit
+  display_name: "Enterprise RHEL 8.0"
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel80
+    mh_target: dist-mh
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel80-build
+  - name: compile_benchmarks
+    distros:
+    - rhel80-build
+  - name: audit
+  - name: auth_gen
+  - name: auth_audit_gen
+  - name: benchmarks_orphaned
+  - name: benchmarks_sharding
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: jstestfuzz_gen
+  - name: jstestfuzz_concurrent_gen
+  - name: jstestfuzz_concurrent_replication_gen
+  - name: jstestfuzz_concurrent_sharded_gen
+  - name: jstestfuzz_replication_gen
+  - name: jstestfuzz_sharded_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: external_auth
+  # Tests disabled by SERVER-44946
+  #- name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: snmp
+  - name: ssl_gen
+  - name: sslSpecial_gen
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
@@ -9184,6 +9247,105 @@ buildvariants:
     - rhel70
   - name: replica_sets
   - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
+  - name: serial_run
+  - name: sharding_jscore_passthrough
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
+  - name: tool
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
+- name: rhel80
+  display_name: SSL RHEL 8.0
+  run_on:
+  - rhel80-test
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-rhel80
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: org
+    scons_cache_scope: shared
+    tooltags: "ssl"
+    build_mongoreplay: true
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel80-build
+  - name: aggregation
+  - name: aggregation_auth
+  - name: auth_gen
+  - name: disk_wiredtiger
+  - name: failpoints
+  - name: failpoints_auth
+  - name: free_monitoring
+  - name: gle_auth
+  - name: gle_auth_write_cmd
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: jstestfuzz_gen
+  - name: jstestfuzz_concurrent_gen
+  - name: jstestfuzz_concurrent_replication_gen
+  - name: jstestfuzz_concurrent_sharded_gen
+  - name: jstestfuzz_replication_gen
+  - name: jstestfuzz_sharded_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: bulk_gle_passthrough
+  - name: parallel_gen
+  - name: parallel_compatibility
+  - name: concurrency
+    distros:
+    - rhel80-build
+  - name: concurrency_replication
+    distros:
+    - rhel80-build
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel80-build
+  - name: concurrency_replication_multi_stmt_txn
+    distros:
+    - rhel80-build
+  - name: concurrency_sharded_replication
+    distros:
+    - rhel80-build
+  - name: concurrency_sharded_replication_with_balancer
+    distros:
+    - rhel80-build
+  - name: concurrency_simultaneous
+    distros:
+    - rhel80-build
+  # Tests disabled by SERVER-44946
+  #- name: replica_sets
+  #- name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sharding_gen
   - name: sharding_auth_gen
