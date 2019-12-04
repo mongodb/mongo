@@ -76,7 +76,7 @@ void FailPoint::_shouldFailCloseBlock() {
     _fpInfo.subtractAndFetch(1);
 }
 
-int64_t FailPoint::setMode(Mode mode, ValType val, BSONObj extra) {
+auto FailPoint::setMode(Mode mode, ValType val, BSONObj extra) -> EntryCountT {
     /**
      * Outline:
      *
@@ -107,16 +107,21 @@ int64_t FailPoint::setMode(Mode mode, ValType val, BSONObj extra) {
     return _timesEntered.load();
 }
 
-void FailPoint::waitForTimesEntered(int64_t timesEntered) {
-    while (_timesEntered.load() < timesEntered) {
-        sleepmillis(100);
+auto FailPoint::waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept -> EntryCountT {
+    auto timesEntered = _timesEntered.load();
+    for (; timesEntered < targetTimesEntered; timesEntered = _timesEntered.load()) {
+        sleepmillis(duration_cast<Milliseconds>(kWaitGranularity).count());
     };
+    return timesEntered;
 }
 
-void FailPoint::waitForTimesEntered(OperationContext* opCtx, int64_t timesEntered) {
-    while (_timesEntered.load() < timesEntered) {
-        opCtx->sleepFor(Milliseconds(100));
-    }
+auto FailPoint::waitForTimesEntered(OperationContext* opCtx, EntryCountT targetTimesEntered) const
+    -> EntryCountT {
+    auto timesEntered = _timesEntered.load();
+    for (; timesEntered < targetTimesEntered; timesEntered = _timesEntered.load()) {
+        opCtx->sleepFor(kWaitGranularity);
+    };
+    return timesEntered;
 }
 
 const BSONObj& FailPoint::_getData() const {
@@ -291,7 +296,8 @@ FailPointRegistry& globalFailPointRegistry() {
     return p;
 }
 
-int64_t setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj) {
+auto setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
+    -> FailPoint::EntryCountT {
     FailPoint* failPoint = globalFailPointRegistry().find(failPointName);
     if (failPoint == nullptr)
         uasserted(ErrorCodes::FailPointSetFailed, failPointName + " not found");
@@ -307,7 +313,9 @@ FailPointEnableBlock::FailPointEnableBlock(std::string failPointName, BSONObj da
     : _failPointName(std::move(failPointName)) {
     _failPoint = globalFailPointRegistry().find(_failPointName);
     invariant(_failPoint != nullptr);
-    _failPoint->setMode(FailPoint::alwaysOn, 0, std::move(data));
+
+    _initialTimesEntered = _failPoint->setMode(FailPoint::alwaysOn, 0, std::move(data));
+
     warning() << "failpoint: " << _failPointName << " set to: " << _failPoint->toBSON();
 }
 

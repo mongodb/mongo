@@ -39,6 +39,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -109,6 +110,8 @@ private:
 
     enum ShouldFailEntryMode { kFirstTimeEntered, kEnteredAlready };
 
+    static constexpr auto kWaitGranularity = Milliseconds(100);
+
 public:
     using ValType = unsigned;
     enum Mode { off, alwaysOn, random, nTimes, skip };
@@ -118,6 +121,10 @@ public:
         ValType val;
         BSONObj extra;
     };
+
+    // long long values are able to be appended to BSON. If this is using declaration is changed,
+    // please make sure that the new type is also BSON-compatible.
+    using EntryCountT = long long;
 
     /**
      * An object representing an active FailPoint's interaction with the code it is
@@ -250,24 +257,26 @@ public:
      *
      * @returns the number of times the fail point has been entered so far.
      */
-    int64_t setMode(Mode mode, ValType val = 0, BSONObj extra = {});
-    int64_t setMode(ModeOptions opt) {
+    EntryCountT setMode(Mode mode, ValType val = 0, BSONObj extra = {});
+    EntryCountT setMode(ModeOptions opt) {
         return setMode(std::move(opt.mode), std::move(opt.val), std::move(opt.extra));
     }
 
     /**
      * Waits until the fail point has been entered the desired number of times.
      *
-     * @param timesEntered the number of times the fail point has been entered.
+     * @param targetTimesEntered the number of times the fail point has been entered.
+     *
+     * @returns the number of times the fail point has been entered so far.
      */
-    void waitForTimesEntered(int64_t timesEntered);
+    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept;
 
     /**
      * Like `waitForTimesEntered`, but interruptible via the `opCtx->sleepFor` mechanism.  See
      * `mongo::Interruptible::sleepFor` (Interruptible is a base class of
      * OperationContext).
      */
-    void waitForTimesEntered(OperationContext* opCtx, int64_t timesEntered);
+    EntryCountT waitForTimesEntered(OperationContext* opCtx, EntryCountT targetTimesEntered) const;
 
     /**
      * @returns a BSON object showing the current mode and data stored.
@@ -411,7 +420,7 @@ private:
     AtomicWord<std::uint32_t> _fpInfo{0};
 
     // Total number of times the fail point has been entered.
-    AtomicWord<int64_t> _timesEntered{0};
+    AtomicWord<EntryCountT> _timesEntered{0};
 
     // Invariant: These should be read only if kActiveBit of _fpInfo is set.
     Mode _mode{off};
@@ -467,9 +476,25 @@ public:
     FailPointEnableBlock(std::string failPointName, BSONObj cmdObj);
     ~FailPointEnableBlock();
 
+    // Const access to the underlying FailPoint
+    const FailPoint* failPoint() const {
+        return _failPoint;
+    }
+
+    // Const access to the underlying FailPoint
+    const FailPoint* operator->() const {
+        return failPoint();
+    }
+
+    // Return the value of timesEntered() when the block was entered
+    auto initialTimesEntered() const {
+        return _initialTimesEntered;
+    }
+
 private:
     std::string _failPointName;
     FailPoint* _failPoint;
+    FailPoint::EntryCountT _initialTimesEntered;
 };
 
 /**
@@ -478,7 +503,7 @@ private:
  * @throw DBException corresponding to ErrorCodes::FailPointSetFailed if no failpoint
  * called failPointName exists.
  */
-int64_t setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
+FailPoint::EntryCountT setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
 
 /**
  * Registration object for FailPoint. Its static-initializer registers FailPoint `fp`
