@@ -810,6 +810,7 @@ tasks:
         working_dir: src
         script: |
           genny/genny/scripts/genny_auto_tasks.sh --generate-all-tasks --output build/all_tasks.json
+          cat ../src/genny/genny/build/all_tasks.json
     - command: generate.tasks
       params:
         files:
