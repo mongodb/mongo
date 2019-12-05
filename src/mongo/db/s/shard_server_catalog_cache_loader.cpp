@@ -949,13 +949,14 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
     auto context = _contexts.makeOperationContext(*Client::getCurrent());
 
     bool taskFinished = false;
+    bool inShutdown = false;
     try {
         _updatePersistedCollAndChunksMetadata(context.opCtx(), nss);
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
         LOG(0) << "Failed to persist chunk metadata update for collection '" << nss
                << "' due to shutdown.";
-        return;
+        inShutdown = true;
     } catch (const DBException& ex) {
         LOG(0) << "Failed to persist chunk metadata update for collection '" << nss
                << causedBy(redact(ex));
@@ -964,13 +965,22 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
     {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        // If task completed successfully, remove it from work queue
+        // If task completed successfully, remove it from work queue.
         if (taskFinished) {
             _collAndChunkTaskLists[nss].pop_front();
         }
 
-        // Return if we have no more work
+        // Return if have no more work
         if (_collAndChunkTaskLists[nss].empty()) {
+            _collAndChunkTaskLists.erase(nss);
+            return;
+        }
+
+        // If shutting down need to remove tasks to end waiting on its completion.
+        if (inShutdown) {
+            while (!_collAndChunkTaskLists[nss].empty()) {
+                _collAndChunkTaskLists[nss].pop_front();
+            }
             _collAndChunkTaskLists.erase(nss);
             return;
         }
@@ -999,12 +1009,13 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
     auto context = _contexts.makeOperationContext(*Client::getCurrent());
 
     bool taskFinished = false;
+    bool inShutdown = false;
     try {
         _updatePersistedDbMetadata(context.opCtx(), dbName);
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
         LOG(0) << "Failed to persist metadata update for db '" << dbName << "' due to shutdown.";
-        return;
+        inShutdown = true;
     } catch (const DBException& ex) {
         LOG(0) << "Failed to persist chunk metadata update for database " << dbName
                << causedBy(redact(ex));
@@ -1013,13 +1024,22 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
     {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        // If task completed successfully, remove it from work queue
+        // If task completed successfully, remove it from work queue.
         if (taskFinished) {
             _dbTaskLists[dbName.toString()].pop_front();
         }
 
-        // Return if we have no more work
+        // Return if have no more work
         if (_dbTaskLists[dbName.toString()].empty()) {
+            _dbTaskLists.erase(dbName.toString());
+            return;
+        }
+
+        // If shutting down need to remove tasks to end waiting on its completion.
+        if (inShutdown) {
+            while (!_dbTaskLists[dbName.toString()].empty()) {
+                _dbTaskLists[dbName.toString()].pop_front();
+            }
             _dbTaskLists.erase(dbName.toString());
             return;
         }
