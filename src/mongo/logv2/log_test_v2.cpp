@@ -222,7 +222,7 @@ TEST_F(LogTestV2, Types) {
             using T = decltype(value);
             if constexpr (std::is_same_v<T, unsigned long long>) {
                 ASSERT_EQUALS(lastBSONElement().Number(), static_cast<long long>(value));
-            } else if constexpr (std::is_same_v<T, uint64_t>) {
+            } else if constexpr (std::is_same_v<T, unsigned long>) {
                 ASSERT_EQUALS(lastBSONElement().Number(), static_cast<int64_t>(value));
             } else {
                 ASSERT_EQUALS(lastBSONElement().Number(), value);
