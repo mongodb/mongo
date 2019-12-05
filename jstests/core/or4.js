@@ -72,7 +72,7 @@ assert.eq(5,
                   function(key, vals) {
                       return vals.length;
                   },
-                  {out: {inline: true}, query: {$or: [{a: 2}, {b: 3}]}})
+                  {out: {inline: 1}, query: {$or: [{a: 2}, {b: 3}]}})
               .counts.input);
 
 coll.remove({});
