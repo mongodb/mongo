@@ -192,7 +192,7 @@ void TopologyStateMachine::updateRSWithoutPrimary(TopologyDescription& topologyD
 
     addUnknownServers(topologyDescription, serverDescription);
 
-    if (serverDescAddress != serverDescription->getMe()) {
+    if (serverDescription->getMe() && serverDescAddress != serverDescription->getMe()) {
         removeServerDescription(topologyDescription, serverDescription->getAddress());
     }
 }
@@ -225,7 +225,8 @@ void TopologyStateMachine::updateRSWithPrimaryFromMember(
         return;
     }
 
-    if (serverDescription->getAddress() != serverDescription->getMe()) {
+    if (serverDescription->getMe() &&
+        serverDescription->getAddress() != serverDescription->getMe()) {
         removeAndCheckIfHasPrimary(topologyDescription, serverDescription);
         return;
     }
@@ -291,6 +292,8 @@ void TopologyStateMachine::updateRSFromPrimary(TopologyDescription& topologyDesc
     }
 
     addUnknownServers(topologyDescription, serverDescription);
+
+    std::vector<ServerAddress> toRemove;
     for (const auto& currentServerDescription : topologyDescription.getServers()) {
         const auto currentServerAddress = currentServerDescription->getAddress();
         auto hosts = serverDescription->getHosts().find(currentServerAddress);
@@ -300,8 +303,11 @@ void TopologyStateMachine::updateRSFromPrimary(TopologyDescription& topologyDesc
         if (hosts == serverDescription->getHosts().end() &&
             passives == serverDescription->getPassives().end() &&
             arbiters == serverDescription->getArbiters().end()) {
-            removeServerDescription(topologyDescription, currentServerDescription->getAddress());
+            toRemove.push_back(currentServerDescription->getAddress());
         }
+    }
+    for (const auto& serverAddress : toRemove) {
+        removeServerDescription(topologyDescription, serverAddress);
     }
 
     checkIfHasPrimary(topologyDescription, serverDescription);

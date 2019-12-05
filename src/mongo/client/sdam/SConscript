@@ -21,6 +21,22 @@ env.Library(
     ],
 )
 
+
+sdam_json_test = env.Program(
+    target='sdam_json_test',
+    source=[
+        'sdam_json_test_runner.cpp',
+        env.Idlc('sdam_json_test_runner_cli_options.idl')[0]],
+    LIBDEPS=[
+        'sdam',
+        'sdam_test',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser'],
+)[0]
+env.RegisterUnitTest(sdam_json_test)
+env.Alias("sdam_json_test_runner", str(sdam_json_test))
+
 env.Library(
     target='sdam_test',
     source=[

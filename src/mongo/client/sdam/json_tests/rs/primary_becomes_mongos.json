@@ -1,0 +1,54 @@
+{
+  "description": "Primary becomes mongos",
+  "uri": "mongodb://a/?replicaSet=rs",
+  "phases": [
+    {
+      "responses": [
+        [
+          "a:27017",
+          {
+            "ok": 1,
+            "ismaster": true,
+            "hosts": [
+              "a:27017"
+            ],
+            "setName": "rs",
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          }
+        ]
+      ],
+      "outcome": {
+        "servers": {
+          "a:27017": {
+            "type": "RSPrimary",
+            "setName": "rs"
+          }
+        },
+        "topologyType": "ReplicaSetWithPrimary",
+        "logicalSessionTimeoutMinutes": null,
+        "setName": "rs"
+      }
+    },
+    {
+      "responses": [
+        [
+          "a:27017",
+          {
+            "ok": 1,
+            "ismaster": true,
+            "msg": "isdbgrid",
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          }
+        ]
+      ],
+      "outcome": {
+        "servers": {},
+        "topologyType": "ReplicaSetNoPrimary",
+        "logicalSessionTimeoutMinutes": null,
+        "setName": "rs"
+      }
+    }
+  ]
+}
