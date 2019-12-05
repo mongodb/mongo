@@ -144,4 +144,29 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
 }
 
 }  // namespace
+
+// setParameter for tcmalloc_release_rate
+void TCMallocReleaseRateServerParameter::append(OperationContext*,
+                                                BSONObjBuilder& builder,
+                                                const std::string& fieldName) {
+    auto value = MallocExtension::instance()->GetMemoryReleaseRate();
+    builder.append(fieldName, value);
+}
+
+Status TCMallocReleaseRateServerParameter::setFromString(const std::string& tcmalloc_release_rate) {
+    double value;
+    Status status = NumberParser{}(tcmalloc_release_rate, &value);
+    if (!status.isOK()) {
+        return status;
+    }
+    if (value < 0) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "tcmallocReleaseRate cannot be negative: "
+                              << tcmalloc_release_rate};
+    }
+
+    MallocExtension::instance()->SetMemoryReleaseRate(value);
+    return Status::OK();
+}
+
 }  // namespace mongo

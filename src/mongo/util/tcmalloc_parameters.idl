@@ -70,3 +70,10 @@ server_parameters:
     description: 'REMOVED: Setting this parameter has no effect and it will be removed in a future version of MongoDB.'
     set_at: [ startup, runtime ]
     cpp_class: TCMallocEnableMarkThreadTemporarilyIdle
+
+  tcmallocReleaseRate:
+    description: "Configure tcmalloc_release_rate"
+    set_at: [startup, runtime]
+    cpp_class:
+      name: TCMallocReleaseRateServerParameter
+      override_set: false
