@@ -45,6 +45,7 @@ env.CppLibfuzzerTest(
     target='bson_validate_fuzzer',
     source=[
         'bson_validate_fuzzer.cpp',
+        'bson_validate_old.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
