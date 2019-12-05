@@ -164,15 +164,15 @@ public:
     bool abortIndexBuild(const UUID& buildUUID, const std::string& reason);
 
     /**
-     * Signals the index build to be interrupted and returns without waiting for it to stop. Does
-     * nothing if the index build has already been cleared away.
+     * Signals the index build to be aborted without being cleaned up and returns without waiting
+     * for it to stop. Does nothing if the index build has already been cleared away.
      *
      * Returns true if a build existed to be signaled, as opposed to having already finished and
      * been cleared away, or not having yet started..
      */
-    bool interruptIndexBuild(OperationContext* opCtx,
-                             const UUID& buildUUID,
-                             const std::string& reason);
+    bool abortIndexBuildWithoutCleanup(OperationContext* opCtx,
+                                       const UUID& buildUUID,
+                                       const std::string& reason);
 
     /**
      * Cleans up the index build state and unregisters it from the manager.

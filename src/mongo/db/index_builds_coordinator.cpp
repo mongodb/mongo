@@ -522,11 +522,40 @@ void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
     }
 }
 
+/**
+ * Returns true if index specs include any unique indexes. Due to uniqueness constraints set up at
+ * the start of the index build, we are not able to support failing over a two phase index build on
+ * a unique index to a new primary on stepdown.
+ */
+namespace {
+// TODO(SERVER-44654): remove when unique indexes support failover
+bool containsUniqueIndexes(const std::vector<BSONObj>& specs) {
+    for (const auto& spec : specs) {
+        if (spec["unique"].trueValue()) {
+            return true;
+        }
+    }
+    return false;
+}
+}  // namespace
+
 void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     log() << "IndexBuildsCoordinator::onStepUp - this node is stepping up to primary";
 
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [this, opCtx](std::shared_ptr<ReplIndexBuildState> replState) {
+        // TODO(SERVER-44654): re-enable failover support for unique indexes.
+        if (containsUniqueIndexes(replState->indexSpecs)) {
+            // We abort unique index builds on step-up on the new primary, as opposed to on
+            // step-down on the old primary. This is because the old primary cannot generate any new
+            // oplog entries, and consequently does not have a timestamp to delete the index from
+            // the durable catalog. This abort will replicate to the old primary, now secondary, to
+            // abort the build.
+            abortIndexBuildByBuildUUID(
+                opCtx, replState->buildUUID, "unique indexes do not support failover");
+            return;
+        }
+
         stdx::unique_lock<Latch> lk(replState->mutex);
         if (!replState->aborted) {
             // Leave commit timestamp as null. We will be writing a commitIndexBuild oplog entry now
@@ -1178,7 +1207,8 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     const Status& status) {
     if (status == ErrorCodes::InterruptedAtShutdown) {
         // Leave it as-if kill -9 happened. Startup recovery will rebuild the index.
-        _indexBuildsManager.interruptIndexBuild(opCtx, replState->buildUUID, "shutting down");
+        _indexBuildsManager.abortIndexBuildWithoutCleanup(
+            opCtx, replState->buildUUID, "shutting down");
         _indexBuildsManager.tearDownIndexBuild(
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
         return;
@@ -1228,7 +1258,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
 
     if (status == ErrorCodes::InterruptedAtShutdown) {
         // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
-        _indexBuildsManager.interruptIndexBuild(opCtx, replState->buildUUID, "shutting down");
+        _indexBuildsManager.abortIndexBuildWithoutCleanup(
+            opCtx, replState->buildUUID, "shutting down");
         _indexBuildsManager.tearDownIndexBuild(
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
         return;
@@ -1255,11 +1286,22 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
             invariant(replState->aborted, replState->buildUUID.toString());
             Timestamp abortIndexBuildTimestamp = replState->abortTimestamp;
 
+            // If we were aborted and no abort timestamp is set, then we should leave the index
+            // build unfinished. This can happen during rollback because we are not primary and
+            // cannot generate an optime to timestamp the index build abort. We rely on the
+            // rollback process to correct this state.
+            if (abortIndexBuildTimestamp.isNull()) {
+                _indexBuildsManager.abortIndexBuildWithoutCleanup(
+                    opCtx, replState->buildUUID, "no longer primary");
+                _indexBuildsManager.tearDownIndexBuild(
+                    opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+                return;
+            }
+
             // Unlock the RSTL to avoid deadlocks with state transitions. See SERVER-42824.
             unlockRSTLForIndexCleanup(opCtx);
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);
 
-            // TimestampBlock is a no-op if the abort timestamp is unset.
             TimestampBlock tsBlock(opCtx, abortIndexBuildTimestamp);
             _indexBuildsManager.tearDownIndexBuild(
                 opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);

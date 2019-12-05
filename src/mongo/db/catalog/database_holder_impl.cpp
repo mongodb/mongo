@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
@@ -243,18 +244,9 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
     std::set<std::string> dbs;
     for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
-        for (auto collIt = i->second->begin(opCtx); collIt != i->second->end(opCtx); ++collIt) {
-            auto coll = *collIt;
-            if (!coll) {
-                continue;
-            }
-
-            // It is the caller's responsibility to ensure that no index builds are active in the
-            // database.
-            invariant(!coll->getIndexCatalog()->haveAnyIndexesInProgress(),
-                      str::stream()
-                          << "An index is building on collection '" << coll->ns() << "'.");
-        }
+        // It is the caller's responsibility to ensure that no index builds are active in the
+        // database.
+        IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(i->first);
         dbs.insert(i->first);
     }
 

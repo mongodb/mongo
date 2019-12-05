@@ -272,9 +272,9 @@ bool IndexBuildsManager::abortIndexBuild(const UUID& buildUUID, const std::strin
     return true;
 }
 
-bool IndexBuildsManager::interruptIndexBuild(OperationContext* opCtx,
-                                             const UUID& buildUUID,
-                                             const std::string& reason) {
+bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
+                                                       const UUID& buildUUID,
+                                                       const std::string& reason) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
@@ -282,7 +282,7 @@ bool IndexBuildsManager::interruptIndexBuild(OperationContext* opCtx,
         return false;
     }
 
-    log() << "Index build interrupted: " << buildUUID << ": " << reason;
+    log() << "Index build aborted without cleanup: " << buildUUID << ": " << reason;
     std::shared_ptr<MultiIndexBlock> builder = builderIt->second;
 
     lk.unlock();
