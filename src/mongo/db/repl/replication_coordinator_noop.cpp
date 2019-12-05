@@ -467,5 +467,13 @@ void ReplicationCoordinatorNoOp::updateAndLogStateTransitionMetrics(
     MONGO_UNREACHABLE;
 }
 
+std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMasterResponse(
+    OperationContext* opCtx,
+    const SplitHorizon::Parameters& horizonParams,
+    TopologyVersion previous,
+    Date_t deadline) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

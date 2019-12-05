@@ -2841,6 +2841,11 @@ void TopologyCoordinator::restartHeartbeats() {
     }
 }
 
+void TopologyCoordinator::incrementTopologyVersion() {
+    auto counter = _topologyVersion.getCounter();
+    _topologyVersion.setCounter(counter + 1);
+}
+
 OpTime TopologyCoordinator::latestKnownOpTime() const {
     OpTime latest = getMyLastAppliedOpTime();
     for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();

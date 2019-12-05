@@ -188,10 +188,11 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     return builder.obj();
 }
 
-Status futureGetNoThrowWithDeadline(OperationContext* opCtx,
-                                    SharedSemiFuture<void>& f,
-                                    Date_t deadline,
-                                    ErrorCodes::Error error) {
+template <typename T>
+StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
+                                                   SharedSemiFuture<T>& f,
+                                                   Date_t deadline,
+                                                   ErrorCodes::Error error) {
     try {
         return opCtx->runWithDeadline(deadline, error, [&] { return f.getNoThrow(opCtx); });
     } catch (const DBException& e) {
@@ -1807,6 +1808,64 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
     bob.appendNumber("userOpsRunning", userOpsRunning.get());
 
     log() << "State transition ops metrics: " << bob.obj();
+}
+
+std::shared_ptr<IsMasterResponse> ReplicationCoordinatorImpl::_makeIsMasterResponse(
+    const SplitHorizon::Parameters& horizonParams) {
+    auto response = std::make_shared<IsMasterResponse>();
+    fillIsMasterForReplSet(response.get(), horizonParams);
+    return response;
+}
+
+std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMasterResponse(
+    OperationContext* opCtx,
+    const SplitHorizon::Parameters& horizonParams,
+    TopologyVersion previous,
+    Date_t deadline) {
+
+    TopologyVersion topologyVersion;
+    SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> future;
+    {
+        stdx::lock_guard lk(_mutex);
+        topologyVersion = _topCoord->getTopologyVersion();
+        future = _topologyChangePromise.getFuture();
+    }
+
+    if (previous.getProcessId() != topologyVersion.getProcessId()) {
+        // Getting a different process id indicates that the server has restarted so we return
+        // immediately with the updated process id.
+        return _makeIsMasterResponse(horizonParams);
+    }
+
+    auto prevCounter = previous.getCounter();
+    auto topologyVersionCounter = topologyVersion.getCounter();
+    uassert(31382,
+            str::stream() << "Received a topology version with counter: " << prevCounter
+                          << " which is greater than the server topology version counter: "
+                          << topologyVersionCounter,
+            prevCounter <= topologyVersionCounter);
+
+    if (prevCounter < topologyVersionCounter) {
+        // The received isMaster command contains a stale topology version so we respond
+        // immediately with a more current topology version.
+        return _makeIsMasterResponse(horizonParams);
+    }
+
+    // Wait for a topology change with timeout set to deadline.
+    auto statusWithIsMaster =
+        futureGetNoThrowWithDeadline(opCtx, future, deadline, opCtx->getTimeoutError());
+    auto status = statusWithIsMaster.getStatus();
+
+    if (status == ErrorCodes::ExceededTimeLimit) {
+        // Return an IsMasterResponse with the current topology version on timeout when waiting for
+        // a topology change.
+        return _makeIsMasterResponse(horizonParams);
+    }
+
+    uassertStatusOK(status);
+    // A topology change has happened so we return an IsMasterResponse with the updated
+    // topology version.
+    return statusWithIsMaster.getValue();
 }
 
 void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(

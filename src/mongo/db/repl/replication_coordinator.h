@@ -41,6 +41,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -936,6 +937,21 @@ public:
         const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
         const size_t numOpsKilled,
         const size_t numOpsRunning) const = 0;
+
+    /**
+     * Constructs and returns an IsMasterResponse. Will block until the given deadline waiting for a
+     * significant topology change if the 'counter' field of 'previous' is equal to the current
+     * TopologyVersion 'counter' from the TopologyCoordinator.
+     * Returns immediately if 'previous' < TopologyVersion of the TopologyCoordinator or if
+     * the processId differs.
+     * TODO(SERVER-44514): Make this method 'const' when we remove fillIsMasterForReplSet from the
+     * ReplicationCoordinator API.
+     */
+    virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
+        OperationContext* opCtx,
+        const SplitHorizon::Parameters& horizonParams,
+        TopologyVersion previous,
+        Date_t deadline) = 0;
 
 protected:
     ReplicationCoordinator();

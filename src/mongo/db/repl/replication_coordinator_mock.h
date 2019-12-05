@@ -320,6 +320,12 @@ public:
 
     virtual void setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites);
 
+    virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
+        OperationContext* opCtx,
+        const SplitHorizon::Parameters& horizonParams,
+        TopologyVersion previous,
+        Date_t deadline) override;
+
 private:
     ServiceContext* const _service;
     ReplSettings _settings;

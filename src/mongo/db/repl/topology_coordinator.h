@@ -673,6 +673,11 @@ public:
      */
     void restartHeartbeats();
 
+    /**
+     * Increments the counter field of the current TopologyVersion.
+     */
+    void incrementTopologyVersion();
+
     // Scans through all members that are 'up' and returns the latest known optime.
     OpTime latestKnownOpTime() const;
 

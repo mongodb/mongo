@@ -175,6 +175,10 @@ public:
         return _lastMajorityWrite->value;
     }
 
+    boost::optional<TopologyVersion> getTopologyVersion() const {
+        return _topologyVersion;
+    }
+
     /**
      * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
      * message to indicate that we have no replica set config.

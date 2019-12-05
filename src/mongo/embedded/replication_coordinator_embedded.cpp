@@ -493,5 +493,13 @@ void ReplicationCoordinatorEmbedded::updateAndLogStateTransitionMetrics(
     UASSERT_NOT_IMPLEMENTED;
 }
 
+std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::awaitIsMasterResponse(
+    OperationContext* opCtx,
+    const repl::SplitHorizon::Parameters& horizonParams,
+    repl::TopologyVersion previous,
+    Date_t deadline) {
+    UASSERT_NOT_IMPLEMENTED;
+};
+
 }  // namespace embedded
 }  // namespace mongo

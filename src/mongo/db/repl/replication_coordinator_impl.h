@@ -338,6 +338,12 @@ public:
         const size_t numOpsKilled,
         const size_t numOpsRunning) const override;
 
+    virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
+        OperationContext* opCtx,
+        const SplitHorizon::Parameters& horizonParams,
+        TopologyVersion previous,
+        Date_t deadline) override;
+
     // ================== Test support API ===================
 
     /**
@@ -1098,6 +1104,12 @@ private:
                                   StatusWith<int> myIndex);
 
     /**
+     * Fills an IsMasterResponse with the appropriate replication related fields.
+     */
+    std::shared_ptr<IsMasterResponse> _makeIsMasterResponse(
+        const SplitHorizon::Parameters& horizonParams);
+
+    /**
      * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
      * returned by a TopologyCoordinator::processHeartbeatResponse(V1) call with the given
      * value of "responseStatus".
@@ -1367,6 +1379,9 @@ private:
     // list of information about clients waiting for a particular lastApplied opTime.
     // Waiters in this list are checked and notified on self's lastApplied opTime updates.
     WaiterList _opTimeWaiterList;  // (M)
+
+    // Communicates the IsMasterResponse to all callers waiting on the associated SharedSemiFuture.
+    SharedPromise<std::shared_ptr<const IsMasterResponse>> _topologyChangePromise;  // (M)
 
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)

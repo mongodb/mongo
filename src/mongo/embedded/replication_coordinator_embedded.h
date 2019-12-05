@@ -264,6 +264,12 @@ public:
         const size_t numOpsKilled,
         const size_t numOpsRunning) const override;
 
+    std::shared_ptr<const repl::IsMasterResponse> awaitIsMasterResponse(
+        OperationContext* opCtx,
+        const repl::SplitHorizon::Parameters& horizonParams,
+        repl::TopologyVersion previous,
+        Date_t deadline) override;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

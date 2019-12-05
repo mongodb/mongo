@@ -561,5 +561,13 @@ void ReplicationCoordinatorMock::updateAndLogStateTransitionMetrics(
     return;
 }
 
+std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMasterResponse(
+    OperationContext* opCtx,
+    const SplitHorizon::Parameters& horizonParams,
+    TopologyVersion previous,
+    Date_t deadline) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

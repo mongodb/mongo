@@ -256,6 +256,12 @@ public:
         const size_t numOpsKilled,
         const size_t numOpsRunning) const final;
 
+    std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
+        OperationContext* opCtx,
+        const SplitHorizon::Parameters& horizonParams,
+        TopologyVersion previous,
+        Date_t deadline) final;
+
 private:
     ServiceContext* const _service;
 };

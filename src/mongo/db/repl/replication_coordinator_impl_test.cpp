@@ -3022,6 +3022,149 @@ TEST_F(ReplCoordTest, NodeReturnsListOfNodesOtherThanItselfInResponseToGetOtherN
     }
 }
 
+TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsCurrentTopologyVersionOnTimeOut) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, expectedTopologyVersion, deadline);
+        auto topologyVersion = response->getTopologyVersion();
+        // Assert that on timeout, the returned IsMasterResponse contains the same TopologyVersion.
+        ASSERT_EQUALS(topologyVersion->getCounter(), expectedTopologyVersion.getCounter());
+        ASSERT_EQUALS(topologyVersion->getProcessId(), expectedTopologyVersion.getProcessId());
+    });
+
+    // Set the network clock to the timeout deadline of awaitIsMasterResponse.
+    getNet()->enterNetwork();
+    getNet()->advanceTime(deadline);
+    ASSERT_EQUALS(deadline, getNet()->now());
+    getIsMasterThread.join();
+    getNet()->exitNetwork();
+}
+
+TEST_F(ReplCoordTest,
+       AwaitIsMasterResponseReturnsCurrentTopologyVersionOnRequestWithDifferentProcessId) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto topologyVersion = getTopoCoord().getTopologyVersion();
+
+    // Get the IsMasterResponse for a request that contains a different process ID. This
+    // should return immediately in all cases instead of waiting for a topology change.
+    auto differentPid = OID::gen();
+    ASSERT_NOT_EQUALS(differentPid, topologyVersion.getProcessId());
+
+    // Test receiving a TopologyVersion with a different process ID but the same counter.
+    auto topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, topologyVersion.getCounter());
+    ASSERT_EQUALS(topologyVersionWithDifferentProcessId.getCounter(), topologyVersion.getCounter());
+    auto response = getReplCoord()->awaitIsMasterResponse(
+        opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline);
+    auto responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), topologyVersion.getProcessId());
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), topologyVersion.getCounter());
+
+    // Increment the counter of topologyVersionWithDifferentProcessId.
+    topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, topologyVersion.getCounter() + 1);
+    ASSERT_GREATER_THAN(topologyVersionWithDifferentProcessId.getCounter(),
+                        topologyVersion.getCounter());
+
+    // Test receiving a TopologyVersion with a different process ID and a greater counter.
+    response = getReplCoord()->awaitIsMasterResponse(
+        opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline);
+    responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), topologyVersion.getProcessId());
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), topologyVersion.getCounter());
+}
+
+TEST_F(ReplCoordTest,
+       AwaitIsMasterResponseReturnsCurrentTopologyVersionOnRequestWithStaleTopologyVersion) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto staleTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    // Update the TopologyVersion in the TopologyCoordinator.
+    getTopoCoord().incrementTopologyVersion();
+    auto updatedTopologyVersion = getTopoCoord().getTopologyVersion();
+    ASSERT_LESS_THAN(staleTopologyVersion.getCounter(), updatedTopologyVersion.getCounter());
+
+    // Get the IsMasterResponse for a request that contains a stale TopologyVersion. This should
+    // return immediately instead of blocking and waiting for a topology change.
+    auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, staleTopologyVersion, deadline);
+    auto responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), updatedTopologyVersion.getCounter());
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), updatedTopologyVersion.getProcessId());
+}
+
+TEST_F(ReplCoordTest, AwaitIsMasterResponseFailsOnRequestWithFutureTopologyVersion) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto topologyVersion = getTopoCoord().getTopologyVersion();
+    auto futureTopologyVersion =
+        TopologyVersion(topologyVersion.getProcessId(), topologyVersion.getCounter() + 1);
+    ASSERT_GREATER_THAN(futureTopologyVersion.getCounter(), topologyVersion.getCounter());
+
+    // We should fail immediately if trying to build an IsMasterResponse for a request with a
+    // greater TopologyVersion.
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, futureTopologyVersion, deadline),
+        AssertionException,
+        31382);
+}
+
 TEST_F(ReplCoordTest, IsMasterResponseMentionsLackOfReplicaSetConfig) {
     start();
     IsMasterResponse response;
