@@ -67,6 +67,7 @@ selector:
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/split_large_key.js
   - jstests/sharding/balancer_window.js
+  - jstests/sharding/zone_changes_compound.js
   - jstests/sharding/zone_changes_hashed.js
   - jstests/sharding/zone_changes_range.js
   # No retries on direct writes to the config/admin databases on the config servers
