@@ -30,7 +30,7 @@ LimitMEMLOCK=infinity
 # total threads (user+kernel)
 TasksMax=infinity
 TasksAccounting=false
-# Recommended limits for for mongod as specified in
+# Recommended limits for mongod as specified in
 # https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
 
 [Install]
