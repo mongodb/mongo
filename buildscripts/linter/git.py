@@ -194,7 +194,7 @@ def get_files_to_check_from_patch(patches, filter_function):
 
     lines = []  # type: List[str]
     for patch in patches:
-        with open(patch, "r") as infile:
+        with open(patch, "r", encoding="utf-8") as infile:
             lines += infile.readlines()
 
     candidates = [check.match(line).group(1) for line in lines if check.match(line)]
