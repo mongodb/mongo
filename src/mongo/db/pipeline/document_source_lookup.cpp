@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -254,16 +255,19 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     auto pipeline = buildPipeline(inputDoc);
 
     std::vector<Value> results;
-    int objsize = 0;
+    long long objsize = 0;
     const auto maxBytes = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
+
     while (auto result = pipeline->getNext()) {
-        objsize += result->getApproximateSize();
+        long long safeSum = 0;
+        bool hasOverflowed = overflow::add(objsize, result->getApproximateSize(), &safeSum);
         uassert(4568,
                 str::stream() << "Total size of documents in " << _fromNs.coll()
                               << " matching pipeline's $lookup stage exceeds " << maxBytes
                               << " bytes",
 
-                objsize <= maxBytes);
+                !hasOverflowed && objsize <= maxBytes);
+        objsize = safeSum;
         results.emplace_back(std::move(*result));
     }
     _usedDisk = _usedDisk || pipeline->usedDisk();
