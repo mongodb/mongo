@@ -346,11 +346,6 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     _stopDataReplication_inlock(opCtx, lk);
 
-    if (_noopWriter) {
-        LOG(1) << "Stopping noop writer";
-        _noopWriter->stopWritingPeriodicNoops();
-    }
-
     log() << "Stopping replication storage threads";
     _taskExecutor->shutdown();
     _oplogApplierTaskExecutor->shutdown();
@@ -359,6 +354,13 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     lk.unlock();
 
     // Perform additional shutdown steps below that must be done outside _threadMutex.
+
+    // Stop the NoOpWriter before grabbing the mutex to avoid creating a deadlock as the NoOpWriter
+    // itself can block on the ReplicationCoordinator mutex. It is safe to access _noopWriter
+    // outside of _threadMutex because _noopWriter is protected by its own mutex.
+    invariant(_noopWriter);
+    LOG(1) << "Stopping noop writer";
+    _noopWriter->stopWritingPeriodicNoops();
 
     // We must wait for _taskExecutor outside of _threadMutex, since _taskExecutor is used to run
     // the dropPendingCollectionReaper, which takes database locks. It is safe to access
