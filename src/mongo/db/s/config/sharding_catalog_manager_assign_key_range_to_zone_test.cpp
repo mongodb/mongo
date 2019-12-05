@@ -717,7 +717,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMaxShardKeyShouldFail
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
 }
 
-TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingShouldNotRemoveRange) {
+TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
     shardedCollection.setNs(ns);
@@ -737,39 +737,13 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
             ->removeKeyRangeFromZone(
                 operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10))));
 
-    {
-        auto findStatus = findOneOnConfigCollection(
-            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
-        ASSERT_OK(findStatus);
-
-        auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
-        ASSERT_OK(tagDocStatus.getStatus());
-
-        auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns, tagDoc.getNS());
-        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
-        ASSERT_EQ(zoneName(), tagDoc.getTag());
-    }
-
-    {
-        const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(
-            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
-        ASSERT_OK(findStatus);
-
-        auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
-        ASSERT_OK(tagDocStatus.getStatus());
-
-        auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS(), tagDoc.getNS());
-        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
-        ASSERT_EQ(zoneName(), tagDoc.getTag());
-    }
+    // Check that zone range removal targets a shard key in its refined (expanded) state.
+    auto findStatus = findOneOnConfigCollection(
+        operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
+    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, findStatus);
 }
 
-TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingShouldNotRemoveRange) {
+TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMaxPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
     shardedCollection.setNs(ns);
@@ -789,36 +763,10 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
             ->removeKeyRangeFromZone(
                 operationContext(), ns, ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10))));
 
-    {
-        auto findStatus = findOneOnConfigCollection(
-            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
-        ASSERT_OK(findStatus);
-
-        auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
-        ASSERT_OK(tagDocStatus.getStatus());
-
-        auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns, tagDoc.getNS());
-        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
-        ASSERT_EQ(zoneName(), tagDoc.getTag());
-    }
-
-    {
-        const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(
-            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
-        ASSERT_OK(findStatus);
-
-        auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
-        ASSERT_OK(tagDocStatus.getStatus());
-
-        auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS(), tagDoc.getNS());
-        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
-        ASSERT_EQ(zoneName(), tagDoc.getTag());
-    }
+    // Check that zone range removal targets a shard key in its refined (expanded) state.
+    auto findStatus = findOneOnConfigCollection(
+        operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
+    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, findStatus);
 }
 
 }  // namespace

@@ -209,20 +209,10 @@ var $config = (function() {
             try {
                 attemptSwapZoneRange(db, latchCollName, currentZoneRangeMap);
             } catch (e) {
-                // If we get either:
-                // 1) a RangeOverlapConflict error, or
-                // 2) an error indicating that the range isn't equal to the range on disk,
-                //
-                // This is because the current zone removal logic doesn't perform a query on a
-                // fully extended shard key. This means that if a refine conflicts with zone
-                // removal, we may not remove this zone because the removal query won't match the
-                // refined (extended) shard key. Retrying swapping the zone range will allow us to
-                // target the shard key in its refined state.
-                //
-                // TODO SERVER-44283: Remove the RangeOverlapConflict retry logic due to no longer
-                // attempting to remove using the unextended shard key.
-                if (e.code === ErrorCodes.RangeOverlapConflict ||
-                    (e.message.includes('"b"') && e.message.includes('are not equal'))) {
+                // During the process of attempting to swap the zone range, the collection may
+                // become refined. Retrying swapping the zone range will allow us to target the
+                // shard key in its refined state.
+                if (e.message.includes('"b"') && e.message.includes('are not equal')) {
                     jsTestLog("Retrying swapZoneRange on collection " + latchCollName +
                               " due to refineCollectionShardKey conflict");
                     for (let zoneRange of Object.values(currentZoneRangeMap)) {

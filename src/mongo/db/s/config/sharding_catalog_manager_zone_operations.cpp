@@ -369,10 +369,12 @@ Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
         return fullShardKeyStatus.getStatus();
     }
 
+    const auto& fullShardKeyRange = namespaceNotSharded ? range : fullShardKeyStatus.getValue();
+
     BSONObjBuilder removeBuilder;
     removeBuilder.append(TagsType::ns(), nss.ns());
-    removeBuilder.append(TagsType::min(), range.getMin());
-    removeBuilder.append(TagsType::max(), range.getMax());
+    removeBuilder.append(TagsType::min(), fullShardKeyRange.getMin());
+    removeBuilder.append(TagsType::max(), fullShardKeyRange.getMax());
 
     return Grid::get(opCtx)->catalogClient()->removeConfigDocuments(
         opCtx, TagsType::ConfigNS, removeBuilder.obj(), kNoWaitWriteConcern);
