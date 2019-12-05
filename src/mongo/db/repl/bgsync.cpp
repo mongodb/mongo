@@ -770,7 +770,6 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
     try {
         bool success = writeConflictRetry(
             opCtx, "readLastAppliedOpTime", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                Lock::DBLock lk(opCtx, "local", MODE_X);
                 return Helpers::getLast(
                     opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
             });
