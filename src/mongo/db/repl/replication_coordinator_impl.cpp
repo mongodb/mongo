@@ -101,6 +101,7 @@ MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
+MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -280,6 +281,13 @@ InitialSyncerOptions createInitialSyncerOptions(
     options.syncSourceSelector = replCoord;
     options.oplogFetcherMaxFetcherRestarts =
         externalState->getOplogFetcherInitialSyncMaxFetcherRestarts();
+
+    // If this failpoint is set, override the default sync source retry interval for initial sync.
+    forceSyncSourceRetryWaitForInitialSync.execute([&](const BSONObj& data) {
+        auto retryMS = data["retryMS"].numberInt();
+        options.syncSourceRetryWait = Milliseconds(retryMS);
+    });
+
     return options;
 }
 }  // namespace

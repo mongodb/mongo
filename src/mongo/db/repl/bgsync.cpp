@@ -144,6 +144,9 @@ size_t getSize(const BSONObj& o) {
 // Failpoint which causes rollback to hang before starting.
 MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeStart);
 
+// Failpoint to override the time to sleep before retrying sync source selection.
+MONGO_FAIL_POINT_DEFINE(forceBgSyncSyncSourceRetryWaitMS);
+
 BackgroundSync::BackgroundSync(
     ReplicationCoordinator* replicationCoordinator,
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
@@ -390,11 +393,16 @@ void BackgroundSync::_produce() {
             log() << "failed to find sync source, received error "
                   << syncSourceResp.syncSourceStatus.getStatus();
         }
-        // No sync source found.
-        LOG(1) << "Could not find a sync source. Sleeping for 1 second before trying again.";
-        numTimesCouldNotFindSyncSource.increment(1);
 
-        sleepsecs(1);
+        long long sleepMS = 1000;
+        forceBgSyncSyncSourceRetryWaitMS.execute(
+            [&](const BSONObj& data) { sleepMS = data["sleepMS"].numberInt(); });
+
+        // No sync source found.
+        LOG(1) << "Could not find a sync source. Sleeping for " << sleepMS
+               << "ms before trying again.";
+        numTimesCouldNotFindSyncSource.increment(1);
+        mongo::sleepmillis(sleepMS);
         return;
     }
 

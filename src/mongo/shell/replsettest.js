@@ -77,6 +77,7 @@ var ReplSetTest = function(opts) {
 
     load("jstests/libs/parallelTester.js");   // For Thread.
     load("jstests/libs/fail_point_util.js");  // For configureFailPoint.
+    load("jstests/replsets/rslib.js");        // For setFailPoint.
 
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
@@ -653,8 +654,9 @@ var ReplSetTest = function(opts) {
      * Blocks until the secondary nodes have completed recovery and their roles are known. Blocks on
      * all secondary nodes or just 'slaves', if specified.
      */
-    this.awaitSecondaryNodes = function(timeout, slaves) {
+    this.awaitSecondaryNodes = function(timeout, slaves, retryIntervalMS) {
         timeout = timeout || self.kDefaultTimeoutMS;
+        retryIntervalMS = retryIntervalMS || 200;
 
         assert.soonNoExcept(function() {
             // Reload who the current slaves are
@@ -671,7 +673,7 @@ var ReplSetTest = function(opts) {
             }
 
             return ready;
-        }, "Awaiting secondaries", timeout);
+        }, "Awaiting secondaries", timeout, retryIntervalMS);
     };
 
     /**
@@ -1145,13 +1147,16 @@ var ReplSetTest = function(opts) {
             explicitBinVersionWasSpecifiedForSomeNode ||
             jsTest.options().useRandomBinVersionsWithinReplicaSet;
 
+        // If a test has explicitly disabled test commands or if we may be running an older mongod
+        // version then we cannot utilize failpoints below, since they may not be supported on older
+        // versions.
+        const failPointsSupported = jsTest.options().enableTestCommands && !explicitBinVersion;
+
         // Skip waiting for new data to appear in the oplog buffer when transitioning to primary.
         // This makes step up much faster for a node that doesn't need to drain any oplog
-        // operations. If a test has explicitly disabled test commands or if we may be running an
-        // older mongod version then we cannot utilize this failpoint. It is only an optimization so
-        // it's OK if we bypass it in some suites.
+        // operations. This is only an optimization so it's OK if we bypass it in some suites.
         let skipWaitFp;
-        if (jsTest.options().enableTestCommands && !explicitBinVersion) {
+        if (failPointsSupported) {
             skipWaitFp = configureFailPoint(this.nodes[0], "skipOplogBatcherWaitForData");
         }
 
@@ -1166,7 +1171,7 @@ var ReplSetTest = function(opts) {
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
         this.getPrimary(self.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
-        if (jsTest.options().enableTestCommands && !explicitBinVersion) {
+        if (failPointsSupported) {
             skipWaitFp.off();
         }
 
@@ -1196,7 +1201,20 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        // Allow nodes to find sync sources more quickly. We also turn down the heartbeat interval
+        // to speed up the initiation process. We use a failpoint so that we can easily turn this
+        // behavior on/off without doing a reconfig. This is only an optimization so it's OK if we
+        // bypass it in some suites.
+        if (failPointsSupported) {
+            this.nodes.forEach(function(conn) {
+                setFailPoint(conn, "forceSyncSourceRetryWaitForInitialSync", {retryMS: 25});
+                setFailPoint(conn, "forceHeartbeatIntervalMS", {intervalMS: 200});
+                setFailPoint(conn, "forceBgSyncSyncSourceRetryWaitMS", {sleepMS: 25});
+            });
+        }
+
         // Reconfigure the set to contain the correct number of nodes (if necessary).
+        const reconfigStart = new Date();  // Measure duration of reconfig and awaitSecondaryNodes.
         if (originalMembers) {
             config.members = originalMembers;
             if (originalSettings) {
@@ -1220,7 +1238,14 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             jsTest.authenticateNodes(this.nodes);
         }
-        this.awaitSecondaryNodes();
+
+        // Wait for initial sync to complete on all nodes. Use a faster polling interval so we can
+        // detect initial sync completion more quickly.
+        this.awaitSecondaryNodes(self.kDefaultTimeoutMS, self._slaves, 25 /* retryIntervalMS */);
+        print("ReplSetTest initiate reconfig and awaitSecondaryNodes took " +
+              (new Date() - reconfigStart) + "ms for " + this.nodes.length + " nodes in set '" +
+              this.name + "'");
+
         try {
             this.awaitHighestPriorityNodeIsPrimary();
         } catch (e) {
@@ -1296,9 +1321,24 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        const awaitTsStart = new Date();  // Measure duration of awaitLastStableRecoveryTimestamp.
         if (!doNotWaitForStableRecoveryTimestamp) {
-            self.awaitLastStableRecoveryTimestamp();
+            // Speed up the polling interval so we can detect recovery timestamps more quickly.
+            self.awaitLastStableRecoveryTimestamp(25 /* retryIntervalMS */);
         }
+        print("ReplSetTest initiate awaitLastStableRecoveryTimestamp took " +
+              (new Date() - awaitTsStart) + "ms for " + this.nodes.length + " nodes in set '" +
+              this.name + "'");
+
+        // Turn off the failpoints now that initial sync and initial setup is complete.
+        if (failPointsSupported) {
+            this.nodes.forEach(function(conn) {
+                clearFailPoint(conn, "forceSyncSourceRetryWaitForInitialSync");
+                clearFailPoint(conn, "forceHeartbeatIntervalMS");
+                clearFailPoint(conn, "forceBgSyncSyncSourceRetryWaitMS");
+            });
+        }
+
         print("ReplSetTest initiateWithAnyNodeAsPrimary took " + (new Date() - startTime) +
               "ms for " + this.nodes.length + " nodes.");
     };
@@ -1490,10 +1530,11 @@ var ReplSetTest = function(opts) {
      * all nodes to report having a stable recovery timestamp, we ensure a degree of stability in
      * our tests to run as expected.
      */
-    this.awaitLastStableRecoveryTimestamp = function() {
+    this.awaitLastStableRecoveryTimestamp = function(retryIntervalMS) {
         let rst = this;
         let master = rst.getPrimary();
         let id = tojson(rst.nodeList());
+        retryIntervalMS = retryIntervalMS || 200;
 
         // All nodes must be in primary/secondary state prior to this point. Perform a majority
         // write to ensure there is a committed operation on the set. The commit point will
@@ -1558,33 +1599,37 @@ var ReplSetTest = function(opts) {
 
         print("AwaitLastStableRecoveryTimestamp: Waiting for stable recovery timestamps for " + id);
 
-        assert.soonNoExcept(function() {
-            for (let node of rst.nodes) {
-                // The `lastStableRecoveryTimestamp` field contains a stable timestamp guaranteed to
-                // exist on storage engine recovery to stable timestamp.
-                let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+        assert.soonNoExcept(
+            function() {
+                for (let node of rst.nodes) {
+                    // The `lastStableRecoveryTimestamp` field contains a stable timestamp
+                    // guaranteed to exist on storage engine recovery to stable timestamp.
+                    let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
 
-                // Continue if we're connected to an arbiter.
-                if (res.myState === ReplSetTest.State.ARBITER) {
-                    continue;
+                    // Continue if we're connected to an arbiter.
+                    if (res.myState === ReplSetTest.State.ARBITER) {
+                        continue;
+                    }
+
+                    // A missing `lastStableRecoveryTimestamp` field indicates that the storage
+                    // engine does not support `recover to a stable timestamp`.
+                    //
+                    // A null `lastStableRecoveryTimestamp` indicates that the storage engine
+                    // supports "recover to a stable timestamp", but does not have a stable recovery
+                    // timestamp yet.
+                    if (res.hasOwnProperty("lastStableRecoveryTimestamp") &&
+                        res.lastStableRecoveryTimestamp.getTime() === 0) {
+                        print("AwaitLastStableRecoveryTimestamp: " + node.host +
+                              " does not have a stable recovery timestamp yet.");
+                        return false;
+                    }
                 }
 
-                // A missing `lastStableRecoveryTimestamp` field indicates that the storage
-                // engine does not support `recover to a stable timestamp`.
-                //
-                // A null `lastStableRecoveryTimestamp` indicates that the storage engine supports
-                // "recover to a stable timestamp", but does not have a stable recovery timestamp
-                // yet.
-                if (res.hasOwnProperty("lastStableRecoveryTimestamp") &&
-                    res.lastStableRecoveryTimestamp.getTime() === 0) {
-                    print("AwaitLastStableRecoveryTimestamp: " + node.host +
-                          " does not have a stable recovery timestamp yet.");
-                    return false;
-                }
-            }
-
-            return true;
-        }, "Not all members have a stable recovery timestamp");
+                return true;
+            },
+            "Not all members have a stable recovery timestamp",
+            ReplSetTest.kDefaultTimeoutMS,
+            retryIntervalMS);
 
         print("AwaitLastStableRecoveryTimestamp: A stable recovery timestamp has successfully " +
               "established on " + id);
