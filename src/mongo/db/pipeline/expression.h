@@ -1966,6 +1966,79 @@ private:
 };
 
 
+class ExpressionReplaceBase : public Expression {
+public:
+    ExpressionReplaceBase(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          boost::intrusive_ptr<Expression> input,
+                          boost::intrusive_ptr<Expression> find,
+                          boost::intrusive_ptr<Expression> replacement)
+        : Expression(expCtx, {std::move(input), std::move(find), std::move(replacement)}),
+          _input(_children[0]),
+          _find(_children[1]),
+          _replacement(_children[2]) {}
+
+    virtual const char* getOpName() const = 0;
+    Value evaluate(const Document& root, Variables* variables) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+    virtual Value _doEval(StringData input, StringData find, StringData replacement) const = 0;
+
+    // These are owned by this->Expression::_children. They are references to intrusive_ptr instead
+    // of direct references to Expression because we need to be able to replace each child in
+    // optimize() without invalidating the references.
+    boost::intrusive_ptr<Expression>& _input;
+    boost::intrusive_ptr<Expression>& _find;
+    boost::intrusive_ptr<Expression>& _replacement;
+};
+
+
+class ExpressionReplaceOne final : public ExpressionReplaceBase {
+public:
+    using ExpressionReplaceBase::ExpressionReplaceBase;
+
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+    static constexpr const char* const opName = "$replaceOne";
+    const char* getOpName() const final {
+        return opName;
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+protected:
+    Value _doEval(StringData input, StringData find, StringData replacement) const final;
+};
+
+class ExpressionReplaceAll final : public ExpressionReplaceBase {
+public:
+    using ExpressionReplaceBase::ExpressionReplaceBase;
+
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+    static constexpr const char* const opName = "$replaceAll";
+    const char* getOpName() const final {
+        return opName;
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+protected:
+    Value _doEval(StringData input, StringData find, StringData replacement) const final;
+};
+
 class ExpressionSecond final : public DateExpressionAcceptingTimeZone<ExpressionSecond> {
 public:
     ExpressionSecond(const boost::intrusive_ptr<ExpressionContext>& expCtx,

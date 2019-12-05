@@ -91,6 +91,8 @@ class ExpressionOr;
 class ExpressionPow;
 class ExpressionRange;
 class ExpressionReduce;
+class ExpressionReplaceOne;
+class ExpressionReplaceAll;
 class ExpressionSetDifference;
 class ExpressionSetEquals;
 class ExpressionSetIntersection;
@@ -220,6 +222,8 @@ public:
     virtual void visit(ExpressionPow*) = 0;
     virtual void visit(ExpressionRange*) = 0;
     virtual void visit(ExpressionReduce*) = 0;
+    virtual void visit(ExpressionReplaceOne*) = 0;
+    virtual void visit(ExpressionReplaceAll*) = 0;
     virtual void visit(ExpressionSetDifference*) = 0;
     virtual void visit(ExpressionSetEquals*) = 0;
     virtual void visit(ExpressionSetIntersection*) = 0;

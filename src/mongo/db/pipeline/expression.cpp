@@ -3815,6 +3815,172 @@ Value ExpressionReduce::serialize(bool explain) const {
                                     {"in", _in->serialize(explain)}}}});
 }
 
+/* ------------------------ ExpressionReplaceBase ------------------------ */
+
+void ExpressionReplaceBase::_doAddDependencies(DepsTracker* deps) const {
+    _input->addDependencies(deps);
+    _find->addDependencies(deps);
+    _replacement->addDependencies(deps);
+}
+
+Value ExpressionReplaceBase::serialize(bool explain) const {
+    return Value(Document{{getOpName(),
+                           Document{{"input", _input->serialize(explain)},
+                                    {"find", _find->serialize(explain)},
+                                    {"replacement", _replacement->serialize(explain)}}}});
+}
+
+namespace {
+std::tuple<intrusive_ptr<Expression>, intrusive_ptr<Expression>, intrusive_ptr<Expression>>
+parseExpressionReplaceBase(const char* opName,
+                           const intrusive_ptr<ExpressionContext>& expCtx,
+                           BSONElement expr,
+                           const VariablesParseState& vps) {
+
+    uassert(51751,
+            str::stream() << opName
+                          << " requires an object as an argument, found: " << typeName(expr.type()),
+            expr.type() == Object);
+
+    intrusive_ptr<Expression> input;
+    intrusive_ptr<Expression> find;
+    intrusive_ptr<Expression> replacement;
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "input"_sd) {
+            input = Expression::parseOperand(expCtx, elem, vps);
+        } else if (field == "find"_sd) {
+            find = Expression::parseOperand(expCtx, elem, vps);
+        } else if (field == "replacement"_sd) {
+            replacement = Expression::parseOperand(expCtx, elem, vps);
+        } else {
+            uasserted(51750, str::stream() << opName << " found an unknown argument: " << field);
+        }
+    }
+
+    uassert(51749, str::stream() << opName << " requires 'input' to be specified", input);
+    uassert(51748, str::stream() << opName << " requires 'find' to be specified", find);
+    uassert(
+        51747, str::stream() << opName << " requires 'replacement' to be specified", replacement);
+
+    return {input, find, replacement};
+}
+}  // namespace
+
+Value ExpressionReplaceBase::evaluate(const Document& root, Variables* variables) const {
+    Value input = _input->evaluate(root, variables);
+    Value find = _find->evaluate(root, variables);
+    Value replacement = _replacement->evaluate(root, variables);
+
+    // Throw an error if any arg is non-string, non-nullish.
+    uassert(51746,
+            str::stream() << getOpName()
+                          << " requires that 'input' be a string, found: " << input.toString(),
+            input.getType() == BSONType::String || input.nullish());
+    uassert(51745,
+            str::stream() << getOpName()
+                          << " requires that 'find' be a string, found: " << find.toString(),
+            find.getType() == BSONType::String || find.nullish());
+    uassert(51744,
+            str::stream() << getOpName() << " requires that 'replacement' be a string, found: "
+                          << replacement.toString(),
+            replacement.getType() == BSONType::String || replacement.nullish());
+
+    // Return null if any arg is nullish.
+    if (input.nullish())
+        return Value(BSONNULL);
+    if (find.nullish())
+        return Value(BSONNULL);
+    if (replacement.nullish())
+        return Value(BSONNULL);
+
+    return _doEval(input.getStringData(), find.getStringData(), replacement.getStringData());
+}
+
+intrusive_ptr<Expression> ExpressionReplaceBase::optimize() {
+    _input = _input->optimize();
+    _find = _find->optimize();
+    _replacement = _replacement->optimize();
+    return this;
+}
+
+/* ------------------------ ExpressionReplaceOne ------------------------ */
+
+REGISTER_EXPRESSION(replaceOne, ExpressionReplaceOne::parse);
+intrusive_ptr<Expression> ExpressionReplaceOne::parse(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+    auto [input, find, replacement] = parseExpressionReplaceBase(opName, expCtx, expr, vps);
+    return make_intrusive<ExpressionReplaceOne>(
+        expCtx, std::move(input), std::move(find), std::move(replacement));
+}
+
+Value ExpressionReplaceOne::_doEval(StringData input,
+                                    StringData find,
+                                    StringData replacement) const {
+    size_t startIndex = input.find(find);
+    if (startIndex == std::string::npos) {
+        return Value(StringData(input));
+    }
+
+    // An empty string matches at every position, so replaceOne should insert the replacement text
+    // at position 0. input.find correctly returns position 0 when 'find' is empty, so we don't need
+    // any special case to handle this.
+    size_t endIndex = startIndex + find.size();
+    StringBuilder output;
+    output << input.substr(0, startIndex);
+    output << replacement;
+    output << input.substr(endIndex);
+    return Value(output.stringData());
+}
+
+/* ------------------------ ExpressionReplaceAll ------------------------ */
+
+REGISTER_EXPRESSION(replaceAll, ExpressionReplaceAll::parse);
+intrusive_ptr<Expression> ExpressionReplaceAll::parse(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+    auto [input, find, replacement] = parseExpressionReplaceBase(opName, expCtx, expr, vps);
+    return make_intrusive<ExpressionReplaceAll>(
+        expCtx, std::move(input), std::move(find), std::move(replacement));
+}
+
+Value ExpressionReplaceAll::_doEval(StringData input,
+                                    StringData find,
+                                    StringData replacement) const {
+    // An empty string matches at every position, so replaceAll should insert 'replacement' at every
+    // position when 'find' is empty. Handling this as a special case lets us assume 'find' is
+    // nonempty in the usual case.
+    if (find.size() == 0) {
+        StringBuilder output;
+        for (char c : input) {
+            output << replacement << c;
+        }
+        output << replacement;
+        return Value(output.stringData());
+    }
+
+    StringBuilder output;
+    for (;;) {
+        size_t startIndex = input.find(find);
+        if (startIndex == std::string::npos) {
+            output << input;
+            break;
+        }
+
+        size_t endIndex = startIndex + find.size();
+        output << input.substr(0, startIndex);
+        output << replacement;
+        // This step assumes 'find' is nonempty. If 'find' were empty then input.find would always
+        // find a match at position 0, and the input would never shrink.
+        input = input.substr(endIndex);
+    }
+    return Value(output.stringData());
+}
+
 /* ------------------------ ExpressionReverseArray ------------------------ */
 
 Value ExpressionReverseArray::evaluate(const Document& root, Variables* variables) const {
