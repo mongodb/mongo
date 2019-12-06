@@ -94,6 +94,7 @@ var DBExplainQuery = (function() {
 
         var delegationFuncNames = [
             "addOption",
+            "allowDiskUse",
             "batchSize",
             "collation",
             "comment",

@@ -161,6 +161,12 @@ explain = t.find().max({a: 1}).hint({a: 1}).explain();
 assert.commandWorked(explain);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
+// .allowDiskUse()
+explain = t.explain().find().allowDiskUse().finish();
+assert.commandWorked(explain);
+explain = t.find().allowDiskUse().explain();
+assert.commandWorked(explain);
+
 // .showDiskLoc()
 explain = t.explain().find().showDiskLoc().finish();
 assert.commandWorked(explain);
