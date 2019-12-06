@@ -8413,6 +8413,26 @@ tasks:
         echo "Commit Queue Placeholder"
         exit 0
 
+- name: validate_commit_message
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+        if [ "${is_commit_queue}" = "true" ]; then
+          ${activate_virtualenv}
+          $python buildscripts/validate_commit_message.py "${commit_message}"
+        fi
+
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -12339,3 +12359,4 @@ buildvariants:
   - name: compile_core_tools_TG
     distros:
     - rhel62-large
+  - name: validate_commit_message
