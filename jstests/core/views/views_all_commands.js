@@ -230,7 +230,7 @@ let viewsCommandTests = {
             assert.eq(hash1, hash3, "hash should be the same again after removing 'view2'");
         }
     },
-    dbStats: {skip: "TODO(SERVER-25948)"},
+    dbStats: {command: {dbStats: 1}},
     delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
     distinct: {command: {distinct: "view", key: "_id"}},
     driverOIDTest: {skip: isUnrelated},
