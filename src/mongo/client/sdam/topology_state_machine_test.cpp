@@ -117,7 +117,7 @@ protected:
         return allExceptPrimary;
     }
 
-    static constexpr auto getServerDescriptionAddress = [](const auto& serverDescription) {
+    static auto getServerDescriptionAddress(const ServerDescriptionPtr& serverDescription) {
         return serverDescription->getAddress();
     };
 };

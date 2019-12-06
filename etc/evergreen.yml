@@ -9478,6 +9478,7 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: sharding_gen
   - name: .stitch
+  - name: server_discovery_and_monitoring_json_test_TG
 
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
