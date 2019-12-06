@@ -30,6 +30,7 @@ let testColl = testDB.foo;
 
 (() => {
     // Insert documents into each chunk
+    jsTestLog("Inserting documents");
     for (let i = 0; i < 100; i++) {
         testColl.insert({x: i});
     }
@@ -37,6 +38,8 @@ let testColl = testDB.foo;
     const expectedNumDocsTotal = 100;
     const expectedNumDocsShard0 = 50;
     const expectedNumDocsShard1 = 50;
+
+    jsTestLog("Verifying counts");
 
     // Verify total count.
     assert.eq(testColl.find().itcount(), expectedNumDocsTotal);
@@ -50,13 +53,15 @@ let testColl = testDB.foo;
     assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
 
     // Write some orphaned documents directly to shard0.
+    jsTestLog("Inserting orphans");
     let orphanCount = 0;
     for (let i = 70; i < 90; i++) {
-        shard0Coll.insert({x: i});
+        assert.commandWorked(shard0Coll.insert({x: i}));
         ++orphanCount;
     }
 
     // Verify counts.
+    jsTestLog("Verifying counts with orphans");
     assert.eq(testColl.find().itcount(), expectedNumDocsTotal);
     assert.eq(shard0Coll.find().itcount(), expectedNumDocsShard0 + orphanCount);
     assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
@@ -77,9 +82,11 @@ let testColl = testDB.foo;
     let deletionsColl = st.shard0.getCollection(rangeDeletionNs);
 
     // Write range to deletion collection
+    jsTestLog("Inserting deletion task");
     deletionsColl.insert(deletionTask);
 
     // Update deletion task
+    jsTestLog("Updating pending flag");
     deletionsColl.update(deletionTask, {$unset: {pending: ""}});
 
     // Verify that orphans are deleted.
