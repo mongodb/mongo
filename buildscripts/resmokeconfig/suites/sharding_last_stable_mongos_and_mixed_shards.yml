@@ -21,6 +21,8 @@ selector:
   # Enable when 4.4 becomes last stable
   - jstests/sharding/out_fails_to_replace_sharded_collection.js
   - jstests/sharding/merge_from_stale_mongos.js
+  # Enable when SERVER-44733 is backported
+  - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
 
 executor:
   config:

@@ -1,6 +1,6 @@
 // Tests resuming change streams on sharded collections.
 // We need to use a readConcern in this test, which requires read commands.
-// @tags: [requires_find_command, uses_change_streams]
+// @tags: [requires_find_command, uses_change_streams, requires_fcv_44]
 (function() {
 "use strict";
 
@@ -124,14 +124,14 @@ function testResume(mongosColl, collToWatch) {
         db: mongosDB,
         collName: collToWatch,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard1}}],
-        expectedCode: 40576
+        expectedCode: ErrorCodes.ChangeStreamFatalError
     });
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
         db: mongosDB,
         collName: collToWatch,
         pipeline: [{$changeStream: {startAtOperationTime: resumeTimeFirstUpdate}}],
-        expectedCode: 40576
+        expectedCode: ErrorCodes.ChangeStreamFatalError
     });
 
     // Test that the change stream can't resume if the resume token *is* present in the oplog,
@@ -143,7 +143,7 @@ function testResume(mongosColl, collToWatch) {
         db: mongosDB,
         collName: collToWatch,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
-        expectedCode: 40576
+        expectedCode: ErrorCodes.ChangeStreamFatalError
     });
 
     // Drop the collection.
