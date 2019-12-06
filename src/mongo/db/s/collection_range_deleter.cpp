@@ -89,6 +89,111 @@ boost::optional<DeleteNotification> checkOverlap(std::list<Deletion> const& dele
     return boost::none;
 }
 
+/**
+ * Performs the deletion of up to maxToDelete entries within the range in progress. Must be
+ * called under the collection lock.
+ *
+ * Returns the number of documents deleted, 0 if done with the range, or bad status if deleting
+ * the range failed.
+ */
+StatusWith<int> doDeletion(OperationContext* opCtx,
+                           Collection* collection,
+                           BSONObj const& keyPattern,
+                           ChunkRange const& range,
+                           int maxToDelete,
+                           bool throwWriteConflictForTest) {
+    invariant(collection != nullptr);
+
+    auto const& nss = collection->ns();
+
+    // The IndexChunk has a keyPattern that may apply to more than one index - we need to
+    // select the index and get the full index keyPattern here.
+    auto catalog = collection->getIndexCatalog();
+    const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
+    if (!idx) {
+        std::string msg = str::stream()
+            << "Unable to find shard key index for " << keyPattern.toString() << " in " << nss.ns();
+        LOG(0) << msg;
+        return {ErrorCodes::InternalError, msg};
+    }
+
+    // Extend bounds to match the index we found
+    const KeyPattern indexKeyPattern(idx->keyPattern());
+    const auto extend = [&](const auto& key) {
+        return Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(key, false));
+    };
+
+    const auto min = extend(range.getMin());
+    const auto max = extend(range.getMax());
+
+    LOG(1) << "begin removal of " << min << " to " << max << " in " << nss.ns();
+
+    const auto indexName = idx->indexName();
+    const IndexDescriptor* descriptor =
+        collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    if (!descriptor) {
+        std::string msg = str::stream()
+            << "shard key index with name " << indexName << " on '" << nss.ns() << "' was dropped";
+        LOG(0) << msg;
+        return {ErrorCodes::InternalError, msg};
+    }
+
+    auto deleteStageParams = std::make_unique<DeleteStageParams>();
+    deleteStageParams->fromMigrate = true;
+    deleteStageParams->isMulti = true;
+    deleteStageParams->returnDeleted = true;
+
+    if (serverGlobalParams.moveParanoia) {
+        deleteStageParams->removeSaver =
+            std::make_unique<RemoveSaver>("moveChunk", nss.ns(), "cleaning");
+    }
+
+    auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
+                                                     collection,
+                                                     std::move(deleteStageParams),
+                                                     descriptor,
+                                                     min,
+                                                     max,
+                                                     BoundInclusion::kIncludeStartKeyOnly,
+                                                     PlanExecutor::YIELD_MANUAL,
+                                                     InternalPlanner::FORWARD);
+
+    if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
+        LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
+        hangBeforeDoingDeletion.pauseWhileSet(opCtx);
+    }
+
+    PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
+
+    int numDeleted = 0;
+    do {
+        BSONObj deletedObj;
+
+        // TODO SERVER-41606: Remove this function when we refactor CollectionRangeDeleter.
+        if (throwWriteConflictForTest)
+            throw WriteConflictException();
+
+        PlanExecutor::ExecState state = exec->getNext(&deletedObj, nullptr);
+
+        if (state == PlanExecutor::IS_EOF) {
+            break;
+        }
+
+        if (state == PlanExecutor::FAILURE) {
+            warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
+                      << redact(min) << " to " << redact(max) << " in " << nss
+                      << ": FAILURE, stats: " << Explain::getWinningPlanStats(exec.get());
+            break;
+        }
+
+        invariant(PlanExecutor::ADVANCED == state);
+        ShardingStatistics::get(opCtx).countDocsDeletedOnDonor.addAndFetch(1);
+
+    } while (++numDeleted < maxToDelete);
+
+    return numDeleted;
+}
+
 }  // namespace
 
 CollectionRangeDeleter::CollectionRangeDeleter() = default;
@@ -195,8 +300,14 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         const auto& metadata = *scopedCollectionMetadata;
 
         try {
-            swNumDeleted = self->_doDeletion(
-                opCtx, collection, metadata->getKeyPattern(), *range, maxToDelete);
+            swNumDeleted = doDeletion(opCtx,
+                                      collection,
+                                      metadata->getKeyPattern(),
+                                      *range,
+                                      maxToDelete,
+                                      // _throwWriteConflictForTest is only used in unit tests, so
+                                      // taking the MetadataManager lock is not required.
+                                      self->_throwWriteConflictForTest);
             if (swNumDeleted.isOK()) {
                 LOG(0) << "Deleted " << swNumDeleted.getValue() << " documents in pass.";
             }
@@ -335,104 +446,6 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
     }
 
     return true;
-}
-
-StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
-                                                    Collection* collection,
-                                                    BSONObj const& keyPattern,
-                                                    ChunkRange const& range,
-                                                    int maxToDelete) {
-    invariant(collection != nullptr);
-    invariant(!isEmpty());
-
-    auto const& nss = collection->ns();
-
-    // The IndexChunk has a keyPattern that may apply to more than one index - we need to
-    // select the index and get the full index keyPattern here.
-    auto catalog = collection->getIndexCatalog();
-    const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
-    if (!idx) {
-        std::string msg = str::stream()
-            << "Unable to find shard key index for " << keyPattern.toString() << " in " << nss.ns();
-        LOG(0) << msg;
-        return {ErrorCodes::InternalError, msg};
-    }
-
-    // Extend bounds to match the index we found
-    const KeyPattern indexKeyPattern(idx->keyPattern());
-    const auto extend = [&](const auto& key) {
-        return Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(key, false));
-    };
-
-    const auto min = extend(range.getMin());
-    const auto max = extend(range.getMax());
-
-    LOG(1) << "begin removal of " << min << " to " << max << " in " << nss.ns();
-
-    const auto indexName = idx->indexName();
-    const IndexDescriptor* descriptor =
-        collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    if (!descriptor) {
-        std::string msg = str::stream()
-            << "shard key index with name " << indexName << " on '" << nss.ns() << "' was dropped";
-        LOG(0) << msg;
-        return {ErrorCodes::InternalError, msg};
-    }
-
-    auto deleteStageParams = std::make_unique<DeleteStageParams>();
-    deleteStageParams->fromMigrate = true;
-    deleteStageParams->isMulti = true;
-    deleteStageParams->returnDeleted = true;
-
-    if (serverGlobalParams.moveParanoia) {
-        deleteStageParams->removeSaver =
-            std::make_unique<RemoveSaver>("moveChunk", nss.ns(), "cleaning");
-    }
-
-    auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
-                                                     collection,
-                                                     std::move(deleteStageParams),
-                                                     descriptor,
-                                                     min,
-                                                     max,
-                                                     BoundInclusion::kIncludeStartKeyOnly,
-                                                     PlanExecutor::YIELD_MANUAL,
-                                                     InternalPlanner::FORWARD);
-
-    if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
-        LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
-        hangBeforeDoingDeletion.pauseWhileSet(opCtx);
-    }
-
-    PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
-
-    int numDeleted = 0;
-    do {
-        BSONObj deletedObj;
-
-        // TODO SERVER-41606: Remove this function when we refactor CollectionRangeDeleter.
-        if (_throwWriteConflictForTest)
-            throw WriteConflictException();
-
-        PlanExecutor::ExecState state = exec->getNext(&deletedObj, nullptr);
-
-        if (state == PlanExecutor::IS_EOF) {
-            break;
-        }
-
-        if (state == PlanExecutor::FAILURE) {
-            warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                      << redact(min) << " to " << redact(max) << " in " << nss
-                      << ": FAILURE, stats: " << Explain::getWinningPlanStats(exec.get());
-            break;
-        }
-
-        invariant(PlanExecutor::ADVANCED == state);
-        ShardingStatistics::get(opCtx).countDocsDeletedOnDonor.addAndFetch(1);
-
-    } while (++numDeleted < maxToDelete);
-
-    return numDeleted;
 }
 
 auto CollectionRangeDeleter::overlaps(ChunkRange const& range) const

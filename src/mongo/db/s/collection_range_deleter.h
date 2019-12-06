@@ -201,19 +201,6 @@ private:
         std::shared_ptr<MetadataManager> metadataManager);
 
     /**
-     * Performs the deletion of up to maxToDelete entries within the range in progress. Must be
-     * called under the collection lock.
-     *
-     * Returns the number of documents deleted, 0 if done with the range, or bad status if deleting
-     * the range failed.
-     */
-    StatusWith<int> _doDeletion(OperationContext* opCtx,
-                                Collection* collection,
-                                const BSONObj& keyPattern,
-                                ChunkRange const& range,
-                                int maxToDelete);
-
-    /**
      * Removes the latest-scheduled range from the ranges to be cleaned up, and notifies any
      * interested callers of this->overlaps(range) with specified status.
      */
