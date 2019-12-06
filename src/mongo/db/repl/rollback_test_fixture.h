@@ -96,6 +96,17 @@ public:
                                                       int recordId,
                                                       boost::optional<BSONObj> o2 = boost::none);
 
+    /**
+     * Creates an oplog entry with a recordId for a command operation. The oplog entry will not have
+     * a "ts" or "wall" field. This is used for creating inner ops for applyOps entries.
+     */
+    static std::pair<BSONObj, RecordId> makeCommandOpForApplyOps(
+        OptionalCollectionUUID uuid,
+        StringData nss,
+        BSONObj cmdObj,
+        int recordId,
+        boost::optional<BSONObj> o2 = boost::none);
+
 protected:
     // OperationContext provided to test cases for storage layer operations.
     ServiceContext::UniqueOperationContext _opCtx;
