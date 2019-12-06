@@ -1300,12 +1300,18 @@ private:
     executor::TaskExecutor::EventHandle _cancelElectionIfNeeded_inlock();
 
     /**
-     * Waits until the optime of the current node is at least the 'opTime'.
+     * Waits until the lastApplied opTime is at least the 'targetOpTime'.
      */
     Status _waitUntilOpTime(OperationContext* opCtx,
-                            bool isMajorityReadConcern,
-                            OpTime opTime,
+                            OpTime targetOpTime,
                             boost::optional<Date_t> deadline = boost::none);
+
+    /**
+     * Waits until the majority committed snapshot is at least the 'targetOpTime'.
+     */
+    Status _waitUntilMajorityOpTime(OperationContext* opCtx,
+                                    OpTime targetOpTime,
+                                    boost::optional<Date_t> deadline = boost::none);
 
     /**
      * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.

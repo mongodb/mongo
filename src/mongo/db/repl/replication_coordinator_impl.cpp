@@ -1339,113 +1339,97 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
 }
 
 Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
-                                                    bool isMajorityCommittedRead,
                                                     OpTime targetOpTime,
                                                     boost::optional<Date_t> deadline) {
-    if (!isMajorityCommittedRead) {
-        if (!_externalState->oplogExists(opCtx)) {
-            return {ErrorCodes::NotYetInitialized, "The oplog does not exist."};
-        }
+    if (!_externalState->oplogExists(opCtx)) {
+        return {ErrorCodes::NotYetInitialized, "The oplog does not exist."};
     }
 
-    stdx::unique_lock<Latch> lock(_mutex);
-
-    if (isMajorityCommittedRead && !_externalState->snapshotsEnabled()) {
-        return {ErrorCodes::CommandNotSupported,
-                "Current storage engine does not support majority committed reads"};
-    }
-
-    auto getCurrentOpTime = [this, isMajorityCommittedRead]() {
-        return isMajorityCommittedRead ? _getCurrentCommittedSnapshotOpTime_inlock()
-                                       : _getMyLastAppliedOpTime_inlock();
-    };
-
-    if (isMajorityCommittedRead && targetOpTime > getCurrentOpTime()) {
-        LOG(1) << "waitUntilOpTime: waiting for optime:" << targetOpTime
-               << " to be in a snapshot -- current snapshot: " << getCurrentOpTime();
-    }
-
-    while (targetOpTime > getCurrentOpTime()) {
-        if (_inShutdown) {
-            return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
-        }
-
-        if (isMajorityCommittedRead) {
-            // If we are doing a majority committed read we only need to wait for a new snapshot to
-            // update getCurrentOpTime() past targetOpTime. This block should only run once and
-            // return without further looping.
-
-            LOG(3) << "waitUntilOpTime: waiting for a new snapshot until " << opCtx->getDeadline();
-
-            try {
-                opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock, [&] {
-                    return _inShutdown || (targetOpTime <= getCurrentOpTime());
-                });
-            } catch (const DBException& e) {
-                return e.toStatus().withContext(
-                    str::stream() << "Error waiting for snapshot not less than "
-                                  << targetOpTime.toString() << ", current relevant optime is "
-                                  << getCurrentOpTime().toString() << ".");
-            }
-
+    {
+        stdx::unique_lock lock(_mutex);
+        if (targetOpTime > _getMyLastAppliedOpTime_inlock()) {
             if (_inShutdown) {
                 return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
             }
 
-            if (_currentCommittedSnapshot) {
-                // It seems that targetOpTime can sometimes be default OpTime{}. When there is no
-                // _currentCommittedSnapshot, _getCurrentCommittedSnapshotOpTime_inlock() and thus
-                // getCurrentOpTime() also return default OpTime{}. Hence this branch that only runs
-                // if _currentCommittedSnapshot actually exists.
-                LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
+            // We just need to wait for the opTime to catch up to what we need (not majority RC).
+            auto future = _opTimeWaiterList.add_inlock(targetOpTime);
+
+            LOG(3) << "waitUntilOpTime: OpID " << opCtx->getOpID() << " is waiting for OpTime "
+                   << targetOpTime << " until " << deadline.value_or(opCtx->getDeadline());
+
+            lock.unlock();
+            auto waitStatus = futureGetNoThrowWithDeadline(
+                opCtx, future, deadline.value_or(Date_t::max()), opCtx->getTimeoutError());
+            if (!waitStatus.isOK()) {
+                lock.lock();
+                return waitStatus.withContext(
+                    str::stream() << "Error waiting for optime " << targetOpTime.toString()
+                                  << ", current relevant optime is "
+                                  << _getMyLastAppliedOpTime_inlock().toString() << ".");
             }
-            return Status::OK();
-        }
-
-        // We just need to wait for the opTime to catch up to what we need (not majority RC).
-        auto future = _opTimeWaiterList.add_inlock(targetOpTime);
-
-        LOG(3) << "waitUntilOpTime: OpID " << opCtx->getOpID() << " is waiting for OpTime "
-               << targetOpTime << " until " << opCtx->getDeadline();
-
-        lock.unlock();
-        auto waitStatus = futureGetNoThrowWithDeadline(
-            opCtx, future, deadline.value_or(Date_t::max()), opCtx->getTimeoutError());
-        lock.lock();
-
-        if (!waitStatus.isOK()) {
-            return waitStatus.withContext(str::stream()
-                                          << "Error waiting for optime " << targetOpTime.toString()
-                                          << ", current relevant optime is "
-                                          << getCurrentOpTime().toString() << ".");
-        }
-
-        // If deadline is set no need to wait until the targetTime time is reached.
-        if (deadline) {
-            return Status::OK();
         }
     }
 
-    lock.unlock();
+    // We need to wait for all committed writes to be visible, even in the oplog (which uses
+    // special visibility rules).  We must do this after waiting for our target optime, because
+    // only then do we know that it will fill in all "holes" before that time.  If we do it
+    // earlier, we may return when the requested optime has been reached, but other writes
+    // at optimes before that time are not yet visible.
+    //
+    // We wait only on primaries, because on secondaries, other mechanisms assure that the
+    // last applied optime is always hole-free, and waiting for all earlier writes to be visible
+    // can deadlock against secondary command application.
+    //
+    // Note that oplog queries by secondary nodes depend on this behavior to wait for
+    // all oplog holes to be filled in, despite providing an afterClusterTime field
+    // with Timestamp(0,1).
+    _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx, /* primaryOnly =*/true);
 
-    if (!isMajorityCommittedRead) {
-        // This assumes the read concern is "local" level.
-        // We need to wait for all committed writes to be visible, even in the oplog (which uses
-        // special visibility rules).  We must do this after waiting for our target optime, because
-        // only then do we know that it will fill in all "holes" before that time.  If we do it
-        // earlier, we may return when the requested optime has been reached, but other writes
-        // at optimes before that time are not yet visible.
-        //
-        // We wait only on primaries, because on secondaries, other mechanisms assure that the
-        // last applied optime is always hole-free, and waiting for all earlier writes to be visible
-        // can deadlock against secondary command application.
-        //
-        // Note that oplog queries by secondary nodes depend on this behavior to wait for
-        // all oplog holes to be filled in, despite providing an afterClusterTime field
-        // with Timestamp(0,1).
-        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx, /* primaryOnly =*/true);
+    return Status::OK();
+}
+
+Status ReplicationCoordinatorImpl::_waitUntilMajorityOpTime(mongo::OperationContext* opCtx,
+                                                            mongo::repl::OpTime targetOpTime,
+                                                            boost::optional<Date_t> deadline) {
+    if (!_externalState->snapshotsEnabled()) {
+        return {ErrorCodes::CommandNotSupported,
+                "Current storage engine does not support majority committed reads"};
     }
 
+    stdx::unique_lock lock(_mutex);
+
+    LOG(1) << "waitUntilOpTime: waiting for optime:" << targetOpTime
+           << " to be in a snapshot -- current snapshot: "
+           << _getCurrentCommittedSnapshotOpTime_inlock();
+
+    LOG(3) << "waitUntilOpTime: waiting for a new snapshot until "
+           << deadline.value_or(opCtx->getDeadline());
+
+    try {
+        auto ok = opCtx->waitForConditionOrInterruptUntil(
+            _currentCommittedSnapshotCond, lock, deadline.value_or(Date_t::max()), [&] {
+                return _inShutdown || (targetOpTime <= _getCurrentCommittedSnapshotOpTime_inlock());
+            });
+        uassert(opCtx->getTimeoutError(), "operation exceeded time limit", ok);
+    } catch (const DBException& e) {
+        return e.toStatus().withContext(
+            str::stream() << "Error waiting for snapshot not less than " << targetOpTime.toString()
+                          << ", current relevant optime is "
+                          << _getCurrentCommittedSnapshotOpTime_inlock().toString() << ".");
+    }
+
+    if (_inShutdown) {
+        return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
+    }
+
+    if (_currentCommittedSnapshot) {
+        // It seems that targetOpTime can sometimes be default OpTime{}. When there is no
+        // _currentCommittedSnapshot, _getCurrentCommittedSnapshotOpTime_inlock() also returns
+        // default OpTime{}. Hence this branch only runs if _currentCommittedSnapshot actually
+        // exists.
+        LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
+    }
     return Status::OK();
 }
 
@@ -1476,7 +1460,11 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
         readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
         !readConcern.isSpeculativeMajority() && !opCtx->inMultiDocumentTransaction();
 
-    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime, deadline);
+    if (isMajorityCommittedRead) {
+        return _waitUntilMajorityOpTime(opCtx, targetOpTime, deadline);
+    } else {
+        return _waitUntilOpTime(opCtx, targetOpTime, deadline);
+    }
 }
 
 // TODO: remove when SERVER-29729 is done
@@ -1486,7 +1474,11 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
         readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
 
     const auto targetOpTime = readConcern.getArgsOpTime().value_or(OpTime());
-    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime);
+    if (isMajorityCommittedRead) {
+        return _waitUntilMajorityOpTime(opCtx, targetOpTime);
+    } else {
+        return _waitUntilOpTime(opCtx, targetOpTime);
+    }
 }
 
 Status ReplicationCoordinatorImpl::awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) {
@@ -1494,8 +1486,7 @@ Status ReplicationCoordinatorImpl::awaitTimestampCommitted(OperationContext* opC
     // its timestamp. This allows us to wait only on the timestamp of the commit point surpassing
     // this timestamp, without worrying about terms.
     OpTime waitOpTime(ts, OpTime::kUninitializedTerm);
-    const bool isMajorityCommittedRead = true;
-    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, waitOpTime);
+    return _waitUntilMajorityOpTime(opCtx, waitOpTime);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTimeAndWallTime_inlock() const {
