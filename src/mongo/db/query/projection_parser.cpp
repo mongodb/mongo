@@ -428,9 +428,6 @@ void parseInclusion(ParseContext* ctx,
                 !ctx->hasPositional);
 
         uassert(31256, "Cannot specify positional operator and $elemMatch.", !ctx->hasElemMatch);
-
-        StringData matchField = fullPathToParent ? fullPathToParent->front()
-                                                 : str::before(elem.fieldNameStringData(), '.');
         uassert(51050, "Projections with a positional operator require a matcher", ctx->query);
 
         // Check that the path does not end with ".$." which can be interpreted as the
