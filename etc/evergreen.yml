@@ -376,6 +376,7 @@ variables:
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-coverage
   - enterprise-rhel-62-64-bit-inmem
+  - enterprise-rhel-62-64-bit-logv2
   - enterprise-rhel-62-64-bit-flow-control-off
   - enterprise-rhel-62-64-bit-majority-read-concern-off
   - enterprise-rhel-62-64-bit-multi-txn-oplog-entries
@@ -11619,6 +11620,104 @@ buildvariants:
   - name: snmp
   - name: .ssl
   - name: .updatefuzzer
+
+- name: enterprise-rhel-62-64-bit-logv2
+  display_name: "~ Enterprise RHEL 6.2 (logv2)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-large
+  batchtime: 1440 # 1 day
+  expansions:
+    mh_target: archive-mh archive-mh-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars CPPDEFINES=MONGO_CONFIG_LOGV2_DEFAULT
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel62
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    large_distro_name: rhel62-large
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: compile_benchmarks
+    distros:
+    - rhel62-large
+  - name: burn_in_tests_gen
+  - name: burn_in_tests_multiversion_gen
+  - name: .aggfuzzer
+  - name: .aggregation
+  - name: audit
+  - name: .auth
+  - name: burn_in_tags_gen
+  - name: .benchmarks
+    distros:
+    - centos6-perf
+  - name: buildscripts_test
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .misc_js
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+    distros:
+    - rhel62-large
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .integration
+    distros:
+    - rhel62-large
+  - name: .jscore .common
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: jsCore_txns_large_txns_format
+  - name: jsonSchema
+  - name: .jstestfuzz
+  - name: .logical_session_cache
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion
+  - name: .query_fuzzer
+  - name: .read_write_concern .large
+    distros:
+    - rhel62-large
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel62-large
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough
+    distros:
+    - rhel62-large
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search_beta
+  - name: search_beta_auth
+  - name: search_beta_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: snmp
+  - name: .stitch
+  - name: .updatefuzzer
+  - name: secondary_reads_passthrough_gen
 
 - name: rhel-62-64-bit-mobile
   display_name: RHEL 6.2 (mobile)
