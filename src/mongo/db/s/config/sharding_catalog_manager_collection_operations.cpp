@@ -369,7 +369,7 @@ void sendDropCollectionToAllShards(OperationContext* opCtx, const NamespaceStrin
     }
 }
 
-void sendSSVAndUnsetShardingToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
+void sendSSVToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     const auto shardsStatus =
@@ -401,16 +401,6 @@ void sendSSVAndUnsetShardingToAllShards(OperationContext* opCtx, const Namespace
 
         uassertStatusOK(ssvResult.getStatus());
         uassertStatusOK(ssvResult.getValue().commandStatus);
-
-        auto unsetShardingStatus = shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            BSON("unsetSharding" << 1),
-            Shard::RetryPolicy::kIdempotent);
-
-        uassertStatusOK(unsetShardingStatus);
-        uassertStatusOK(unsetShardingStatus.getValue().commandStatus);
     }
 }
 
@@ -463,7 +453,7 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
 
     LOG(1) << "dropCollection " << nss.ns() << " collection marked as dropped";
 
-    sendSSVAndUnsetShardingToAllShards(opCtx, nss);
+    sendSSVToAllShards(opCtx, nss);
 
     LOG(1) << "dropCollection " << nss.ns() << " completed";
 
@@ -478,7 +468,7 @@ void ShardingCatalogManager::ensureDropCollectionCompleted(OperationContext* opC
            << " from previous dropCollection are cleared";
     sendDropCollectionToAllShards(opCtx, nss);
     removeChunksAndTagsForDroppedCollection(opCtx, nss);
-    sendSSVAndUnsetShardingToAllShards(opCtx, nss);
+    sendSSVToAllShards(opCtx, nss);
 }
 
 void ShardingCatalogManager::renameCollection(OperationContext* opCtx,

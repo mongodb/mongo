@@ -295,9 +295,8 @@ public:
     /**
      * Ensures that a namespace that has received a dropCollection, but no longer has an entry in
      * config.collections, has cleared all relevant metadata entries for the corresponding
-     * collection. As part of this, sends dropCollection, setShardVersion, and unsetSharding to all
-     * shards -- in case shards didn't receive these commands as part of the original
-     * dropCollection.
+     * collection. As part of this, sends dropCollection and setShardVersion to all shards -- in
+     * case shards didn't receive these commands as part of the original dropCollection.
      *
      * This function does not guarantee that all shards will eventually receive setShardVersion,
      * unless the client infinitely retries until hearing back success. This function does, however,

@@ -125,19 +125,6 @@ public:
             HostAndPort(shard.getHost()), shard, dropNS(), ChunkVersion::DROPPED());
     }
 
-    void expectUnsetSharding(const ShardType& shard) {
-        onCommand([shard](const RemoteCommandRequest& request) {
-            ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
-            ASSERT_EQ("admin", request.dbname);
-            ASSERT_BSONOBJ_EQ(BSON("unsetSharding" << 1), request.cmdObj);
-
-            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
-                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-            return BSON("n" << 1 << "ok" << 1);
-        });
-    }
-
     void expectCollectionDocMarkedAsDropped() {
         auto findStatus =
             findOneOnConfigCollection(operationContext(), CollectionType::ConfigNS, BSONObj());
@@ -196,10 +183,7 @@ TEST_F(DropColl2ShardTest, Basic) {
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
     expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
 
     future.default_timed_get();
 
@@ -234,10 +218,7 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     });
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
     expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
 
     future.default_timed_get();
 
@@ -368,48 +349,6 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
     expectNoTagDocs();
 }
 
-TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
-    auto future = launchAsync(
-        [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::Unauthorized); });
-
-    expectDrop(shard1());
-    expectDrop(shard2());
-
-    expectSetShardVersionZero(shard1());
-
-    onCommand([](const RemoteCommandRequest& request) {
-        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
-                         << "bad");
-    });
-
-    future.default_timed_get();
-
-    expectCollectionDocMarkedAsDropped();
-    expectNoChunkDocs();
-    expectNoTagDocs();
-}
-
-TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
-    auto future = launchAsync(
-        [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::CallbackCanceled); });
-
-    expectDrop(shard1());
-    expectDrop(shard2());
-
-    expectSetShardVersionZero(shard1());
-
-    onCommand([this](const RemoteCommandRequest& request) {
-        shutdownExecutor();  // shutdown executor so unsetSharding command will fail.
-        return BSON("ok" << 1);
-    });
-
-    future.default_timed_get();
-
-    expectCollectionDocMarkedAsDropped();
-    expectNoChunkDocs();
-    expectNoTagDocs();
-}
-
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
     auto future = launchAsync(
         [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::Unauthorized); });
@@ -418,7 +357,6 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
 
     onCommand([](const RemoteCommandRequest& request) {
         return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
@@ -440,58 +378,9 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
 
     onCommand([this](const RemoteCommandRequest& request) {
         shutdownExecutor();  // shutdown executor so ssv command will fail.
-        return BSON("ok" << 1);
-    });
-
-    future.default_timed_get();
-
-    expectCollectionDocMarkedAsDropped();
-    expectNoChunkDocs();
-    expectNoTagDocs();
-}
-
-TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
-    auto future = launchAsync(
-        [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::Unauthorized); });
-
-    expectDrop(shard1());
-    expectDrop(shard2());
-
-    expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
-    expectSetShardVersionZero(shard2());
-
-    onCommand([](const RemoteCommandRequest& request) {
-        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
-                         << "bad");
-    });
-
-    future.default_timed_get();
-
-    expectCollectionDocMarkedAsDropped();
-    expectNoChunkDocs();
-    expectNoTagDocs();
-}
-
-TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
-    auto future = launchAsync(
-        [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::CallbackCanceled); });
-
-    expectDrop(shard1());
-    expectDrop(shard2());
-
-    expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
-    expectSetShardVersionZero(shard2());
-
-    onCommand([this](const RemoteCommandRequest& request) {
-        shutdownExecutor();  // shutdown executor so unset command will fail.
         return BSON("ok" << 1);
     });
 
@@ -506,17 +395,14 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
  * Tests of dropCollection retry behavior.
  */
 
-TEST_F(DropColl2ShardTest, AfterSuccessRetryWillStillSendDropSSVandUnsetSharding) {
+TEST_F(DropColl2ShardTest, AfterSuccessRetryWillStillSendDropSSV) {
     auto firstDropFuture = launchAsync([this] { doDrop(); });
 
     expectDrop(shard1());
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
     expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
 
     firstDropFuture.default_timed_get();
 
@@ -530,10 +416,7 @@ TEST_F(DropColl2ShardTest, AfterSuccessRetryWillStillSendDropSSVandUnsetSharding
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
     expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
 
     secondDropFuture.default_timed_get();
 
@@ -542,7 +425,7 @@ TEST_F(DropColl2ShardTest, AfterSuccessRetryWillStillSendDropSSVandUnsetSharding
     expectNoTagDocs();
 }
 
-TEST_F(DropColl2ShardTest, AfterFailedDropRetryWillStillSendDropSSVandUnsetSharding) {
+TEST_F(DropColl2ShardTest, AfterFailedDropRetryWillStillSendDropSSV) {
     auto firstDropFuture = launchAsync(
         [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::Unauthorized); });
 
@@ -558,10 +441,7 @@ TEST_F(DropColl2ShardTest, AfterFailedDropRetryWillStillSendDropSSVandUnsetShard
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
     expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
 
     secondDropFuture.default_timed_get();
 
@@ -571,7 +451,7 @@ TEST_F(DropColl2ShardTest, AfterFailedDropRetryWillStillSendDropSSVandUnsetShard
     expectNoTagDocs();
 }
 
-TEST_F(DropColl2ShardTest, AfterFailedSSVRetryWillStillSendDropSSVandUnsetSharding) {
+TEST_F(DropColl2ShardTest, AfterFailedSSVRetryWillStillSendDropSSV) {
     auto firstDropFuture = launchAsync(
         [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::Unauthorized); });
 
@@ -590,10 +470,7 @@ TEST_F(DropColl2ShardTest, AfterFailedSSVRetryWillStillSendDropSSVandUnsetShardi
     expectDrop(shard2());
 
     expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
     expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
 
     secondDropFuture.default_timed_get();
 
@@ -602,43 +479,5 @@ TEST_F(DropColl2ShardTest, AfterFailedSSVRetryWillStillSendDropSSVandUnsetShardi
     expectNoTagDocs();
     expectNoTagDocs();
 }
-
-TEST_F(DropColl2ShardTest, AfterFailedUnsetShardingRetryWillStillSendDropSSVandUnsetSharding) {
-    auto firstDropFuture = launchAsync(
-        [this] { ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::Unauthorized); });
-
-    expectDrop(shard1());
-    expectDrop(shard2());
-
-    expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
-    expectSetShardVersionZero(shard2());
-
-    onCommand([this](const RemoteCommandRequest& request) {
-        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized);
-    });
-
-    firstDropFuture.default_timed_get();
-
-    auto secondDropFuture = launchAsync([this] { doDrop(); });
-
-    expectDrop(shard1());
-    expectDrop(shard2());
-
-    expectSetShardVersionZero(shard1());
-    expectUnsetSharding(shard1());
-
-    expectSetShardVersionZero(shard2());
-    expectUnsetSharding(shard2());
-
-    secondDropFuture.default_timed_get();
-
-    expectCollectionDocMarkedAsDropped();
-    expectNoChunkDocs();
-    expectNoTagDocs();
-    expectNoTagDocs();
-}
-
 }  // unnamed namespace
 }  // namespace mongo
