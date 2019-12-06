@@ -123,6 +123,11 @@ public:
     void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection);
 
     /**
+     * Similar to checkShardVersionOrThrow but returns a status instead of throwing.
+     */
+    Status checkShardVersionNoThrow(OperationContext* opCtx, bool isCollection) noexcept;
+
+    /**
      * Methods to control the collection's critical section. Methods listed below must be called
      * with both the collection lock and CollectionShardingRuntimeLock held in exclusive mode.
      *

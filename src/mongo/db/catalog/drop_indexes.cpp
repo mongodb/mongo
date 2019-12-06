@@ -224,6 +224,8 @@ Status dropIndexes(OperationContext* opCtx,
             collection->uuid());
 
         WriteUnitOfWork wunit(opCtx);
+
+        // This is necessary to check shard version.
         OldClientContext ctx(opCtx, nss.ns());
 
         // Use an empty BSONObjBuilder to avoid duplicate appends to result on retry loops.

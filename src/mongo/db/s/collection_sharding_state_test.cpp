@@ -69,7 +69,7 @@ protected:
         const auto version = metadata.getShardVersion();
         BSONObjBuilder builder;
         version.appendToCommand(&builder);
-        oss.initializeClientRoutingVersions(kTestNss, builder.obj());
+        oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
     }
 };
 

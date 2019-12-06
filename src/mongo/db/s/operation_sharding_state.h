@@ -96,7 +96,14 @@ public:
      * This initialization may only be performed once for the lifetime of the object, which
      * coincides with the lifetime of the client's request.
      */
-    void initializeClientRoutingVersions(NamespaceString nss, const BSONObj& cmdObj);
+    void initializeClientRoutingVersionsFromCommand(NamespaceString nss, const BSONObj& cmdObj);
+
+    /**
+     * Stores the given shardVersion and databaseVersion for the given namespace.
+     */
+    void initializeClientRoutingVersions(NamespaceString nss,
+                                         const boost::optional<ChunkVersion>& shardVersion,
+                                         const boost::optional<DatabaseVersion>& dbVersion);
 
     /**
      * Returns whether or not there is a shard version associated with this operation.

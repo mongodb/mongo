@@ -986,6 +986,13 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
     auto collection = autoColl.getCollection();
     const auto& nss = collection->ns();
 
+    // This check is for optimization purposes only as since this lock is released after this,
+    // and is acquired again when we build the index in _setUpIndexBuild.
+    auto status = CollectionShardingState::get(opCtx, nss)->checkShardVersionNoThrow(opCtx, true);
+    if (!status.isOK()) {
+        return status;
+    }
+
     // Lock from when we ascertain what indexes to build through to when the build is registered
     // on the Coordinator and persistedly set up in the catalog. This serializes setting up an
     // index build so that no attempts are made to register the same build twice.
@@ -1012,7 +1019,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
         buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol, commitQuorum);
     replIndexBuildState->stats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
 
-    Status status = _registerIndexBuild(lk, replIndexBuildState);
+    status = _registerIndexBuild(lk, replIndexBuildState);
     if (!status.isOK()) {
         return status;
     }
@@ -1035,6 +1042,14 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
     auto collection = autoColl.getCollection();
     const auto& nss = collection->ns();
+    auto status = CollectionShardingState::get(opCtx, nss)->checkShardVersionNoThrow(opCtx, true);
+    if (!status.isOK()) {
+        // We need to unregister the index build to allow retries to succeed.
+        stdx::unique_lock<Latch> lk(_mutex);
+        _unregisterIndexBuild(lk, replIndexBuildState);
+
+        return status;
+    }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool replSetAndNotPrimary =
@@ -1082,7 +1097,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         : IndexBuildsManager::IndexConstraints::kEnforce;
     options.protocol = replIndexBuildState->protocol;
 
-    auto status = [&] {
+    status = [&] {
         if (!replSetAndNotPrimary) {
             // On standalones and primaries, call setUpIndexBuild(), which makes the initial catalog
             // write. On primaries, this replicates the startIndexBuild oplog entry.

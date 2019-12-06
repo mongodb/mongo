@@ -106,7 +106,6 @@ let testCases = {
     createIndexes: {
         implicitlyCreatesCollection: true,
         whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
-        doesNotCheckShardVersion: true,
         command: collName => {
             return {createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]};
         },

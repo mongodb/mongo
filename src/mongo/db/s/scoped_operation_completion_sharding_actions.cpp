@@ -73,6 +73,13 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
     }
 
     if (auto staleInfo = status->extraInfo<StaleConfigInfo>()) {
+        if (staleInfo->getCriticalSectionSignal()) {
+            // Set migration critical section on operation sharding state: operation will wait for
+            // the migration to finish before returning.
+            auto& oss = OperationShardingState::get(_opCtx);
+            oss.setMigrationCriticalSectionSignal(staleInfo->getCriticalSectionSignal());
+        }
+
         auto handleMismatchStatus = onShardVersionMismatchNoExcept(
             _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())

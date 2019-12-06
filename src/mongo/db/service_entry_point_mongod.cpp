@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/implicit_create_collection.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_config_optime_gossip.h"
@@ -182,6 +183,13 @@ public:
     void handleException(const DBException& e, OperationContext* opCtx) const override {
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (auto sce = e.extraInfo<StaleConfigInfo>()) {
+            if (sce->getCriticalSectionSignal()) {
+                // Set migration critical section on operation sharding state: operation will wait
+                // for the migration to finish before returning.
+                auto& oss = OperationShardingState::get(opCtx);
+                oss.setMigrationCriticalSectionSignal(sce->getCriticalSectionSignal());
+            }
+
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh

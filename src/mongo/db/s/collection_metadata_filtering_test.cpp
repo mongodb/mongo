@@ -112,7 +112,7 @@ protected:
         const auto version = cm->getVersion(ShardId("0"));
         BSONObjBuilder builder;
         version.appendToCommand(&builder);
-        oss.initializeClientRoutingVersions(kNss, builder.obj());
+        oss.initializeClientRoutingVersionsFromCommand(kNss, builder.obj());
     }
 
     std::shared_ptr<MetadataManager> _manager;

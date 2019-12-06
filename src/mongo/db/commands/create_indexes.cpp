@@ -341,6 +341,13 @@ void checkDatabaseShardingState(OperationContext* opCtx, StringData dbName) {
 }
 
 /**
+ * Checks collection sharding state. Throws exception on error.
+ */
+void checkCollectionShardingState(OperationContext* opCtx, const NamespaceString& ns) {
+    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx, true);
+}
+
+/**
  * Opens or creates database for index creation.
  * On database creation, the lock will be made exclusive.
  */
@@ -440,6 +447,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
     opCtx->recoveryUnit()->abandonSnapshot();
     boost::optional<Lock::CollectionLock> exclusiveCollectionLock(
         boost::in_place_init, opCtx, ns, MODE_X);
+    checkCollectionShardingState(opCtx, ns);
 
     // Index builds can safely ignore prepare conflicts and perform writes. On primaries, an
     // exclusive lock in the final drain phase conflicts with prepared transactions.
@@ -700,6 +708,10 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock collLock(opCtx, ns, MODE_X);
+
+        // This check is for optimization purposes only as this lock is released immediately after
+        // this and is acquired again when we build the index.
+        checkCollectionShardingState(opCtx, ns);
 
         auto collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
         collectionUUID = collection->uuid();

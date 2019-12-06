@@ -82,14 +82,17 @@ bool OperationShardingState::allowImplicitCollectionCreation() const {
     return _allowImplicitCollectionCreation;
 }
 
-void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss,
-                                                             const BSONObj& cmdObj) {
+void OperationShardingState::initializeClientRoutingVersionsFromCommand(NamespaceString nss,
+                                                                        const BSONObj& cmdObj) {
     invariant(_shardVersions.empty());
     invariant(_databaseVersions.empty());
 
+    boost::optional<ChunkVersion> shardVersion;
+    boost::optional<DatabaseVersion> dbVersion;
+
     const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
     if (!shardVersionElem.eoo()) {
-        _shardVersions[nss.ns()] = uassertStatusOK(ChunkVersion::parseFromCommand(cmdObj));
+        shardVersion = uassertStatusOK(ChunkVersion::parseFromCommand(cmdObj));
     }
 
     const auto dbVersionElem = cmdObj.getField(kDbVersionField);
@@ -98,11 +101,29 @@ void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss
                 str::stream() << "expected databaseVersion element to be an object, got "
                               << dbVersionElem,
                 dbVersionElem.type() == BSONType::Object);
+
+        dbVersion = DatabaseVersion::parse(IDLParserErrorContext("initializeClientRoutingVersions"),
+                                           dbVersionElem.Obj());
+    }
+
+    initializeClientRoutingVersions(nss, shardVersion, dbVersion);
+}
+
+void OperationShardingState::initializeClientRoutingVersions(
+    NamespaceString nss,
+    const boost::optional<ChunkVersion>& shardVersion,
+    const boost::optional<DatabaseVersion>& dbVersion) {
+    invariant(_shardVersions.empty());
+    invariant(_databaseVersions.empty());
+
+    if (shardVersion) {
+        _shardVersions[nss.ns()] = *shardVersion;
+    }
+    if (dbVersion) {
         // Unforunately this is a bit ugly; it's because a command comes with a shardVersion or
         // databaseVersion, and the assumption is that those versions are applied to whatever is
         // returned by the Command's parseNs(), which can either be a full namespace or just a db.
-        _databaseVersions[nss.db().empty() ? nss.ns() : nss.db()] = DatabaseVersion::parse(
-            IDLParserErrorContext("initializeClientRoutingVersions"), dbVersionElem.Obj());
+        _databaseVersions[nss.db().empty() ? nss.ns() : nss.db()] = *dbVersion;
     }
 }
 

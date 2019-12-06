@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
+#include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
 
@@ -41,8 +42,12 @@ public:
 
     StaleConfigInfo(NamespaceString nss,
                     ChunkVersion received,
-                    boost::optional<ChunkVersion> wanted)
-        : _nss(std::move(nss)), _received(received), _wanted(wanted) {}
+                    boost::optional<ChunkVersion> wanted,
+                    std::shared_ptr<Notification<void>> criticalSectionSignal = nullptr)
+        : _nss(std::move(nss)),
+          _received(received),
+          _wanted(wanted),
+          _criticalSectionSignal(criticalSectionSignal) {}
 
     const auto& getNss() const {
         return _nss;
@@ -56,6 +61,10 @@ public:
         return _wanted;
     }
 
+    auto getCriticalSectionSignal() const {
+        return _criticalSectionSignal;
+    }
+
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
     static StaleConfigInfo parseFromCommandError(const BSONObj& commandError);
@@ -64,6 +73,10 @@ private:
     NamespaceString _nss;
     ChunkVersion _received;
     boost::optional<ChunkVersion> _wanted;
+
+    // This signal does not get serialized and therefore does not get propagated
+    // to the router.
+    std::shared_ptr<Notification<void>> _criticalSectionSignal;
 };
 using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;
 

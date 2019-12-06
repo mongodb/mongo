@@ -203,6 +203,16 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx, 
     (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, isCollection);
 }
 
+Status CollectionShardingState::checkShardVersionNoThrow(OperationContext* opCtx,
+                                                         bool isCollection) noexcept {
+    try {
+        checkShardVersionOrThrow(opCtx, isCollection);
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
 boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataWithVersionCheckAt(
     OperationContext* opCtx,
     const boost::optional<mongo::LogicalTime>& atClusterTime,
@@ -250,13 +260,9 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
     }();
 
     if (criticalSectionSignal) {
-        // Set migration critical section on operation sharding state: operation will wait for the
-        // migration to finish before returning failure and retrying.
-        auto& oss = OperationShardingState::get(opCtx);
-        oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
-
-        uasserted(StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion),
-                  str::stream() << "migration commit in progress for " << _nss.ns());
+        uasserted(
+            StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion, criticalSectionSignal),
+            str::stream() << "migration commit in progress for " << _nss.ns());
     }
 
     if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {

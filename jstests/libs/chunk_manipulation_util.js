@@ -240,8 +240,6 @@ function waitForMigrateStep(shardConnection, stepNumber) {
 //
 function runCommandDuringTransferMods(
     mongos, staticMongod, ns, bounds, fromShard, toShard, cmdFunc) {
-    let configDB = mongos.getDB('config');
-
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
     let joinMoveChunk =

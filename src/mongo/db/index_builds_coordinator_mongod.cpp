@@ -38,6 +38,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -139,6 +140,13 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     const auto deadline = opCtx->getDeadline();
     const auto timeoutError = opCtx->getTimeoutError();
 
+    const NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
+    const auto nss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
+
+    const auto& oss = OperationShardingState::get(opCtx);
+    const auto shardVersion = oss.getShardVersion(nss);
+    const auto dbVersion = oss.getDbVersion(dbName);
+
     // Task in thread pool should have similar CurOp representation to the caller so that it can be
     // identified as a createIndexes operation.
     LogicalOp logicalOp = LogicalOp::opInvalid;
@@ -165,6 +173,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         buildUUID,
         collectionUUID,
         dbName,
+        nss,
         deadline,
         indexBuildOptions,
         logicalOp,
@@ -172,7 +181,9 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         replState,
         startPromise = std::move(startPromise),
         startTimestamp,
-        timeoutError
+        timeoutError,
+        shardVersion,
+        dbVersion
     ](auto status) mutable noexcept {
         // Clean up if we failed to schedule the task.
         if (!status.isOK()) {
@@ -184,6 +195,9 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
         auto opCtx = Client::getCurrent()->makeOperationContext();
         opCtx->setDeadlineByDate(deadline, timeoutError);
+
+        auto& oss = OperationShardingState::get(opCtx.get());
+        oss.initializeClientRoutingVersions(nss, shardVersion, dbVersion);
 
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
