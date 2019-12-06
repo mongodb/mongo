@@ -218,27 +218,6 @@ PositionalProjectionLocation findFirstPositionalOperator(StringData fullPath) {
     return boost::none;
 }
 
-bool hasPositionalOperatorMatch(const MatchExpression* const query, StringData matchField) {
-    if (query->getCategory() == MatchExpression::MatchCategory::kLogical) {
-        for (unsigned int i = 0; i < query->numChildren(); ++i) {
-            if (hasPositionalOperatorMatch(query->getChild(i), matchField)) {
-                return true;
-            }
-        }
-    } else {
-        StringData queryPath = query->path();
-        // We have to make a distinction between match expressions that are
-        // initialized with an empty field/path name "" and match expressions
-        // for which the path is not meaningful (eg. $where).
-        if (!queryPath.rawData()) {
-            return false;
-        }
-        StringData pathPrefix = str::before(queryPath, '.');
-        return pathPrefix == matchField;
-    }
-    return false;
-}
-
 bool isPrefixOf(StringData first, StringData second) {
     if (first.size() >= second.size()) {
         return false;
@@ -453,10 +432,6 @@ void parseInclusion(ParseContext* ctx,
         StringData matchField = fullPathToParent ? fullPathToParent->front()
                                                  : str::before(elem.fieldNameStringData(), '.');
         uassert(51050, "Projections with a positional operator require a matcher", ctx->query);
-        uassert(31277,
-                str::stream() << "Positional projection '" << elem.fieldName() << "' does not "
-                              << "match the query document.",
-                hasPositionalOperatorMatch(ctx->query, matchField));
 
         // Check that the path does not end with ".$." which can be interpreted as the
         // positional projection.

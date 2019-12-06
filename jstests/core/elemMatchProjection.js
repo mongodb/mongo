@@ -121,14 +121,6 @@ assert.eq({aa: 1, dd: 5},
           "single object match (value match)");
 
 assert.throws(function() {
-    coll.find({group: 3, 'x.a': 2}, {'y.$': 1}).toArray();
-}, [], "throw on invalid projection (field mismatch)");
-
-assert.throws(function() {
-    coll.find({group: 3, 'x.a': 2}, {'y.$': 1}).sort({x: 1}).toArray();
-}, [], "throw on invalid sorted projection (field mismatch)");
-
-assert.throws(function() {
     coll.find({group: 3, 'x.a': 2}, {'x.$': 1, group: 0}).sort({x: 1}).toArray();
 }, [], "throw on invalid projection combination (include and exclude)");
 
@@ -136,9 +128,8 @@ assert.throws(function() {
     coll.find({group: 3, 'x.a': 1, 'y.aa': 1}, {'x.$': 1, 'y.$': 1}).toArray();
 }, [], "throw on multiple projections");
 
-assert.throws(function() {
-    coll.find({group: 3}, {'g.$': 1}).toArray();
-}, [], "throw on invalid projection (non-array field)");
+// Positional projection on non-existent field
+assert.eq(Object.hasOwnProperty(coll.find({group: 3}, {'g.$': 1}).toArray()[0], "g"), false);
 
 assert.eq({aa: 1, dd: 5},
           coll.find({group: 11, 'covered.dd': 5}, {'covered.$': 1}).toArray()[0].covered[0],

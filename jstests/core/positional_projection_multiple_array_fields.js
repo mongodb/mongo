@@ -33,8 +33,22 @@ assert.eq(coll.find({z: 12}, {"a.b": 1}).toArray(), [{_id: 1, a: [{"b": 1}, {"b"
 assert.eq(coll.find({z: 12}, {"a.b": 1, "z.$": 1}).toArray(),
           [{_id: 1, a: [{b: 1}, {b: 3}], z: [12]}]);
 
+// Test that the positional projection can be applied to a "parallel" array.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, a: [1, 2, 3], b: ["one", "two", "three"]}));
+assert.eq(coll.find({a: 2}, {"b.$": 1}).toArray(), [{_id: 1, b: ["two"]}]);
+
+// Similar test, but try a parallel array which is on a dotted path.
+assert.commandWorked(coll.insert({_id: 2, a: {b: [1, 2, 3]}, c: {d: ["one", "two", "three"]}}));
+assert.eq(coll.find({"a.b": 2}, {"c.d.$": 1}).toArray(), [{_id: 2, c: {d: ["two"]}}]);
+
+// Attempting to apply it to a parallel array which is smaller.
+assert.commandWorked(coll.insert({_id: 3, a: [4, 5, 6], b: ["four", "five"]}));
+let err = assert.throws(() => coll.find({a: 6}, {"b.$": 1}).toArray());
+assert.commandFailedWithCode(err, 51247);
+
 // Test that a positional projection and $elemMatch fail.
-let err = assert.throws(() => coll.find({z: 11}, {"z.$": 1, a: {$elemMatch: {b: 1}}}).toArray());
+err = assert.throws(() => coll.find({z: 11}, {"z.$": 1, a: {$elemMatch: {b: 1}}}).toArray());
 assert.commandFailedWithCode(err, 31255);
 
 // Test that a positional projection which conflicts with anything fails.
@@ -45,5 +59,5 @@ assert.commandFailedWithCode(err, 31249);
 
 // Multiple positional projections should fail.
 err = assert.throws(() => coll.find({"a.b": 1}, {"z.$": 1, "a.$": 1}).toArray());
-assert.commandFailedWithCode(err, 31277);
+assert.commandFailedWithCode(err, 31276);
 })();

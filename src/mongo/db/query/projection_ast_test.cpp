@@ -591,14 +591,6 @@ TEST_F(ProjectionASTTest, ParserErrorsOnMultiplePositionalInProjection) {
                        31287);
 }
 
-TEST_F(ProjectionASTTest, ParserErrorsOnPositionalProjectionNotMatchingQuery) {
-    ASSERT_THROWS_CODE(parseWithFindFeaturesEnabled(fromjson("{'a.$': 1}"), fromjson("{b: 1}")),
-                       DBException,
-                       31277);
-    ASSERT_THROWS_CODE(
-        parseWithFindFeaturesEnabled(fromjson("{'a.$': 1}"), boost::none), DBException, 51050);
-}
-
 TEST_F(ProjectionASTTest, ParserErrorsOnSubfieldPrefixedByDbRefField) {
     ASSERT_THROWS_CODE(
         parseWithDefaultPolicies(fromjson("{'a.$idFOOBAR': 1}")), DBException, 16410);
@@ -606,7 +598,7 @@ TEST_F(ProjectionASTTest, ParserErrorsOnSubfieldPrefixedByDbRefField) {
 
 TEST_F(ProjectionASTTest, ParserErrorsOnJustPositionalProjection) {
     ASSERT_THROWS_CODE(
-        parseWithFindFeaturesEnabled(fromjson("{'$': 1}"), fromjson("{a: 1}")), DBException, 31277);
+        parseWithFindFeaturesEnabled(fromjson("{'$': 1}"), fromjson("{a: 1}")), DBException, 40352);
 
     // {$: 1} is an invalid match expression.
     ASSERT_THROWS_CODE(parseWithFindFeaturesEnabled(fromjson("{$: 1}"), fromjson("{$: 1}")),
@@ -614,7 +606,7 @@ TEST_F(ProjectionASTTest, ParserErrorsOnJustPositionalProjection) {
                        ErrorCodes::BadValue);
 
     ASSERT_THROWS_CODE(
-        parseWithFindFeaturesEnabled(fromjson("{'$': 1}"), fromjson("{}")), DBException, 31277);
+        parseWithFindFeaturesEnabled(fromjson("{'$': 1}"), fromjson("{}")), DBException, 40352);
 }
 
 TEST_F(ProjectionASTTest, ParserErrorsOnPositionalAndSlice) {
@@ -650,6 +642,32 @@ TEST_F(ProjectionASTTest, ParserDoesNotErrorOnPositionalOfDbRefField) {
     Projection refProj = parseWithFindFeaturesEnabled(fromjson("{'a.$ref.b.$': 1, x: 1}"),
                                                       fromjson("{'a.$ref.b': 1}"));
     ASSERT(refProj.type() == ProjectType::kInclusion);
+}
+
+TEST_F(ProjectionASTTest, ParserDoesNotErrorOnPositionalOfNonQueryField) {
+    {
+        Projection proj =
+            parseWithFindFeaturesEnabled(fromjson("{'a.$': 1, x: 1}"), fromjson("{'a.b': 1}"));
+        ASSERT(proj.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection proj = parseWithFindFeaturesEnabled(fromjson("{'a.b.$': 1, x: 1}"),
+                                                       fromjson("{'a.b.$db': 1}"));
+        ASSERT(proj.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection proj =
+            parseWithFindFeaturesEnabled(fromjson("{'b.$': 1, x: 1}"), fromjson("{'a.b.c': 1}"));
+        ASSERT(proj.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection proj =
+            parseWithFindFeaturesEnabled(fromjson("{'b.c.$': 1, x: 1}"), fromjson("{'a.b.c': 1}"));
+        ASSERT(proj.type() == ProjectType::kInclusion);
+    }
 }
 
 TEST_F(ProjectionASTTest, ShouldThrowWhenParsingInvalidExpression) {
