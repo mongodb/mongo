@@ -624,7 +624,7 @@ def variable_arch_converter(val):
 def decide_platform_tools():
     if mongo_platform.is_running_os('windows'):
         # we only support MS toolchain on windows
-        return ['msvc', 'mslink', 'mslib', 'masm']
+        return ['msvc', 'mslink', 'mslib', 'masm', 'vcredist']
     elif mongo_platform.is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
     elif mongo_platform.is_running_os('darwin'):
@@ -846,7 +846,8 @@ env_vars.Add('MSVC_USE_SCRIPT',
     help='Sets the script used to setup Visual Studio.')
 
 env_vars.Add('MSVC_VERSION',
-    help='Sets the version of Visual Studio to use (e.g.  12.0, 11.0, 10.0)')
+    help='Sets the version of Visual C++ to use (e.g. 14.1 for VS2017, 14.2 for VS2019)',
+    default="14.1")
 
 env_vars.Add('NINJA_SUFFIX',
     help="""A suffix to add to the end of generated build.ninja
