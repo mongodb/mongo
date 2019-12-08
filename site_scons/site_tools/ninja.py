@@ -357,6 +357,12 @@ class NinjaState:
                 sys.executable,
                 " ".join([escape(arg) for arg in sys.argv])
             ),
+
+            # This must be set to a global default per:
+            # https://ninja-build.org/manual.html
+            #
+            # (The deps section)
+            "msvc_deps_prefix": "Note: including file:",
         }
 
         self.rules = {
@@ -364,6 +370,13 @@ class NinjaState:
                 "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
                 "description": "Building $out",
             },
+
+            # We add the deps processing variables to this below.
+            "CMD_W_DEPS": {
+                "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
+                "description": "Building $out",
+            },
+
             "SYMLINK": {
                 "command": (
                     "cmd /c mklink $out $in"
@@ -416,6 +429,13 @@ class NinjaState:
                 "restat": 1,
             },
         }
+
+        if env["PLATFORM"] == "win32":
+            self.rules["CMD_W_DEPS"]["deps"] = "msvc"
+        else:
+            self.rules["CMD_W_DEPS"]["deps"] = "gcc"
+            self.rules["CMD_W_DEPS"]["depfile"] = "$out.d"
+
         self.rules.update(env.get(NINJA_RULES, {}))
 
     def generate_builds(self, node):
@@ -702,10 +722,25 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         if cmd.endswith("&&"):
             cmd = cmd[0:-2].strip()
 
+    rule = "CMD"
+
+    # Use NO COMPILER as the default value because the obvious choice
+    # ('') empty string always returns true with in.
+    #
+    # If you'd done something clever here like env['CC'] =
+    # my_generator_function this will break.  In the interest of perf
+    # we aren't going to subst this again. Once Subst caching is done
+    # perhaps we should revisit this since the value will be
+    # pre-computed for CC by generating this command line.
+    CC = sub_env.get('CC', 'NO COMPILER')
+    CXX = sub_env.get('CXX', 'NO COMPILER')
+    if CC in cmd or CXX in cmd:
+        rule = "CMD_W_DEPS"
+
     return {
         "outputs": get_outputs(node),
         "implicit": implicit,
-        "rule": "CMD",
+        "rule": rule,
         "variables": {"cmd": cmd},
     }
 
@@ -859,6 +894,11 @@ def generate(env):
     always_exec_ninja_action = AlwaysExecAction(ninja_builder, {})
     ninja_builder_obj = SCons.Builder.Builder(action=always_exec_ninja_action)
     env.Append(BUILDERS={"Ninja": ninja_builder_obj})
+
+    if env["PLATFORM"] == "win32":
+        env.Append(CCFLAGS=["/showIncludes"])
+    else:
+        env.Append(CCFLAGS=["-MMD", "-MF", "${TARGET}.d"])
 
     # Provides a way for users to handle custom FunctionActions they
     # want to translate to Ninja.
