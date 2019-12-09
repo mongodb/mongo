@@ -29,6 +29,7 @@ NINJA_RULES = "__NINJA_CUSTOM_RULES"
 NINJA_CUSTOM_HANDLERS = "__NINJA_CUSTOM_HANDLERS"
 NINJA_BUILD = "NINJA_BUILD"
 NINJA_OUTPUTS = "__NINJA_OUTPUTS"
+__NINJA_RULE_MAPPING = {}
 
 # These are the types that get_command can do something with
 COMMAND_TYPES = (
@@ -686,17 +687,33 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         # pylint: disable=protected-access
         action = action._generate(tlist, slist, sub_env, 1, executor=executor)
 
+    rule = "CMD"
+
     # Actions like CommandAction have a method called process that is
     # used by SCons to generate the cmd_line they need to run. So
     # check if it's a thing like CommandAction and call it if we can.
     if hasattr(action, "process"):
         cmd_list, _, _ = action.process(tlist, slist, sub_env, executor=executor)
+
+        # Despite being having "list" in it's name this member is not
+        # actually a list. It's the pre-subst'd string of the command. We
+        # use it to determine if the command we generated needs to use a
+        # custom Ninja rule. By default this redirects CC/CXX commands to
+        # CMD_W_DEPS but the user can inject custom Ninja rules and tie
+        # them to commands by using their pre-subst'd string.
+        rule = __NINJA_RULE_MAPPING.get(action.cmd_list, "CMD")
+
         cmd = _string_from_cmd_list(cmd_list[0])
     else:
         # Anything else works with genstring, this is most commonly hit by
         # ListActions which essentially call process on all of their
         # commands and concatenate it for us.
         genstring = action.genstring(tlist, slist, sub_env)
+
+        # Detect if we have a custom rule for this
+        # "ListActionCommandAction" type thing.
+        rule = __NINJA_RULE_MAPPING.get(genstring, "CMD")
+
         if executor is not None:
             cmd = sub_env.subst(genstring, executor=executor)
         else:
@@ -721,21 +738,6 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
 
         if cmd.endswith("&&"):
             cmd = cmd[0:-2].strip()
-
-    rule = "CMD"
-
-    # Use NO COMPILER as the default value because the obvious choice
-    # ('') empty string always returns true with in.
-    #
-    # If you'd done something clever here like env['CC'] =
-    # my_generator_function this will break.  In the interest of perf
-    # we aren't going to subst this again. Once Subst caching is done
-    # perhaps we should revisit this since the value will be
-    # pre-computed for CC by generating this command line.
-    CC = sub_env.get('CC', 'NO COMPILER')
-    CXX = sub_env.get('CXX', 'NO COMPILER')
-    if CC in cmd or CXX in cmd:
-        rule = "CMD_W_DEPS"
 
     return {
         "outputs": get_outputs(node),
@@ -821,6 +823,12 @@ def register_custom_handler(env, name, handler):
     env[NINJA_CUSTOM_HANDLERS][name] = handler
 
 
+def register_custom_rule_mapping(env, pre_subst_string, rule):
+    """Register a custom handler for SCons function actions."""
+    global __NINJA_RULE_MAPPING
+    __NINJA_RULE_MAPPING[pre_subst_string] = rule
+
+
 def register_custom_rule(env, rule, command, description=""):
     """Allows specification of Ninja rules from inside SCons files."""
     env[NINJA_RULES][rule] = {
@@ -895,6 +903,8 @@ def generate(env):
     ninja_builder_obj = SCons.Builder.Builder(action=always_exec_ninja_action)
     env.Append(BUILDERS={"Ninja": ninja_builder_obj})
 
+    # This adds the required flags such that the generated compile
+    # commands will create depfiles as appropriate in the Ninja file.
     if env["PLATFORM"] == "win32":
         env.Append(CCFLAGS=["/showIncludes"])
     else:
@@ -905,8 +915,21 @@ def generate(env):
     env[NINJA_CUSTOM_HANDLERS] = {}
     env.AddMethod(register_custom_handler, "NinjaRegisterFunctionHandler")
 
+    # Provides a mechanism for inject custom Ninja rules which can
+    # then be mapped using NinjaRuleMapping.
     env[NINJA_RULES] = {}
     env.AddMethod(register_custom_rule, "NinjaRule")
+
+    # Add the ability to register custom NinjaRuleMappings for Command
+    # builders. We don't store this dictionary in the env to prevent
+    # accidental deletion of the CC/XXCOM mappings. You can still
+    # overwrite them if you really want to but you have to explicit
+    # about it this way. The reason is that if they were accidentally
+    # deleted you would get a very subtly incorrect Ninja file and
+    # might not catch it.
+    env.AddMethod(register_custom_rule_mapping, "NinjaRuleMapping")
+    env.NinjaRuleMapping("${CCCOM}", "CMD_W_DEPS")
+    env.NinjaRuleMapping("${CXXCOM}", "CMD_W_DEPS")
 
     # Make SCons node walk faster by preventing unnecessary work
     env.Decider("timestamp-match")
