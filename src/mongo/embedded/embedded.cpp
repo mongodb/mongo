@@ -62,6 +62,7 @@
 #include "mongo/db/ttl.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/embedded/periodic_runner_embedded.h"
+#include "mongo/embedded/read_write_concern_defaults_cache_lookup_embedded.h"
 #include "mongo/embedded/replication_coordinator_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
 #include "mongo/logger/log_component.h"
@@ -269,6 +270,8 @@ ServiceContext* initialize(const char* yaml_config) {
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
     }
+
+    ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupEmbedded);
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 

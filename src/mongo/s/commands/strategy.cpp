@@ -441,7 +441,7 @@ void runCommand(OperationContext* opCtx,
             // This command supports WC, but wasn't given one - so apply the default, if there is
             // one.
             if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                           .getDefaultWriteConcern()) {
+                                           .getDefaultWriteConcern(opCtx)) {
                 wc = *wcDefault;
                 LOG(2) << "Applying default writeConcern on " << request.getCommandName() << " of "
                        << wcDefault->toBSON();
@@ -461,7 +461,7 @@ void runCommand(OperationContext* opCtx,
             (startTransaction || !TransactionRouter::get(opCtx))) {
             if (readConcernArgs.isEmpty()) {
                 const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                           .getDefaultReadConcern();
+                                           .getDefaultReadConcern(opCtx);
                 if (rcDefault) {
                     {
                         // We must obtain the client lock to set ReadConcernArgs, because it's an

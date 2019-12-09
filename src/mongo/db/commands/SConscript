@@ -148,6 +148,9 @@ env.Library(
         env.Idlc('drop_connections.idl')[0],
         env.Idlc('rwc_defaults_commands.idl')[0],
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/commands',

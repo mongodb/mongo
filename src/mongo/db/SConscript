@@ -59,7 +59,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
     ]
 )
 
@@ -382,6 +381,16 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "logical_clock",
+    ],
+)
+
+env.Library(
+    target="read_write_concern_defaults_mock",
+    source=[
+        "read_write_concern_defaults_cache_lookup_mock.cpp",
+    ],
+    LIBDEPS=[
+        'read_write_concern_defaults',
     ],
 )
 
@@ -874,6 +883,7 @@ env.Library(
         "concurrency/lock_manager",
         "concurrency/write_conflict_exception",
         "curop",
+        'read_write_concern_defaults',
         "repl/read_concern_args",
         "repl/repl_coordinator_interface",
         "repl/speculative_majority_read_info",
@@ -1810,6 +1820,7 @@ envWithAsio.CppUnitTest(
         'op_observer_impl',
         'query_exec',
         'range_arithmetic',
+        'read_write_concern_defaults_mock',
         'repl/mock_repl_coord_server_fixture',
         'repl/oplog_interface_local',
         'repl/repl_coordinator_interface',

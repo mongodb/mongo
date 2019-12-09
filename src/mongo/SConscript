@@ -354,6 +354,7 @@ mongod = env.Program(
     target="mongod",
     source=[
         "db/db.cpp",
+        "db/read_write_concern_defaults_cache_lookup_mongod.cpp",
     ] + env.WindowsResourceFile("db/db.rc"),
     LIBDEPS=[
         '$BUILD_DIR/third_party/shim_snappy',
@@ -404,6 +405,7 @@ mongod = env.Program(
         'db/pipeline/process_interface_factory_mongod',
         'db/query_exec',
         'db/read_concern_d_impl',
+        'db/read_write_concern_defaults',
         'db/repair_database_and_check_version',
         'db/repl/bgsync',
         'db/repl/oplog_application',
@@ -522,6 +524,7 @@ if not hygienic:
 mongos = env.Program(
     target='mongos',
     source=[
+        "db/read_write_concern_defaults_cache_lookup_mongos.cpp",
         's/cluster_cursor_stats.cpp',
         's/mongos_options.cpp',
         's/mongos_options_init.cpp',
@@ -545,6 +548,7 @@ mongos = env.Program(
         'db/logical_session_cache',
         'db/logical_session_cache_impl',
         'db/logical_time_metadata_hook',
+        'db/read_write_concern_defaults',
         'db/server_options',
         'db/server_options_base',
         'db/service_liaison_mongos',

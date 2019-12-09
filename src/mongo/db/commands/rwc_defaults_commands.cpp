@@ -113,7 +113,7 @@ public:
 
         auto typedRun(OperationContext* opCtx) {
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            return rwcDefaults.getDefault();
+            return rwcDefaults.getDefault(opCtx);
         }
 
     private:

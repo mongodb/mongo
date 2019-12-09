@@ -260,7 +260,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
             // since this covers both isSpecified() && !isSpecified()
             if (readConcernArgs.isEmpty()) {
                 const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                           .getDefaultReadConcern();
+                                           .getDefaultReadConcern(opCtx);
                 if (rcDefault) {
                     readConcernArgs = std::move(*rcDefault);
                     LOG(2) << "Applying default readConcern on "

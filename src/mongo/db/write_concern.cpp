@@ -91,7 +91,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
                 !opCtx->getClient()->isInDirectClient()) {
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                     .getDefaultWriteConcern();
+                                     .getDefaultWriteConcern(opCtx);
                 if (wcDefault) {
                     LOG(2) << "Applying default writeConcern on " << cmdObj.firstElementFieldName()
                            << " of " << wcDefault->toBSON();

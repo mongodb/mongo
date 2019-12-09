@@ -102,6 +102,7 @@
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/periodic_runner_job_decrease_snapshot_cache_pressure.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 #include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
@@ -1091,6 +1092,8 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
     // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
     // initializeServerGlobalState) and before the creation of any other threads
     startSignalProcessingThread();
+
+    ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

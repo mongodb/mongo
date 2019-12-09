@@ -60,6 +60,7 @@
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mongos.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongos.h"
@@ -549,6 +550,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 
     LogicalClock::set(serviceContext, std::make_unique<LogicalClock>(serviceContext));
+
+    ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();

@@ -75,6 +75,7 @@ env.Library(
         'periodic_runner_embedded.cpp',
         'process_interface_factory_embedded.cpp',
         'read_concern_embedded.cpp',
+        'read_write_concern_defaults_cache_lookup_embedded.cpp',
         'replication_coordinator_embedded.cpp',
         'service_entry_point_embedded.cpp',
         'transaction_coordinator_factory_embedded.cpp',

@@ -31,6 +31,7 @@
 
 #include <map>
 
+#include "mongo/db/dist_cache.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/rw_concern_default_gen.h"
@@ -52,13 +53,17 @@ public:
     using ReadConcern = repl::ReadConcernArgs;
     using WriteConcern = WriteConcernOptions;
 
+    using LookupFn = std::function<boost::optional<RWConcernDefault>(OperationContext*)>;
+
     static constexpr StringData readConcernFieldName = ReadConcern::kReadConcernFieldName;
     static constexpr StringData writeConcernFieldName = WriteConcern::kWriteConcernField;
 
     static ReadWriteConcernDefaults& get(ServiceContext* service);
     static ReadWriteConcernDefaults& get(ServiceContext& service);
+    static void create(ServiceContext* service, LookupFn lookupFn);
 
-    ReadWriteConcernDefaults() = default;
+    ReadWriteConcernDefaults() = delete;
+    ReadWriteConcernDefaults(LookupFn lookupFn);
     ~ReadWriteConcernDefaults() = default;
 
     /**
@@ -92,20 +97,34 @@ public:
      */
     void invalidate();
 
-    RWConcernDefault getDefault() const;
-    boost::optional<ReadConcern> getDefaultReadConcern() const;
-    boost::optional<WriteConcern> getDefaultWriteConcern() const;
+    RWConcernDefault getDefault(OperationContext* opCtx);
+    boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
+    boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
 
 private:
-    enum Type { kReadWriteConcernEntry };
+    enum class Type { kReadWriteConcernEntry };
 
-    void _setDefault(WithLock, RWConcernDefault&& rwc);
-    boost::optional<RWConcernDefault> _getDefault(WithLock) const;
+    void _setDefault(RWConcernDefault&& rwc);
+    boost::optional<RWConcernDefault> _getDefault(OperationContext* opCtx);
 
-    // Protects access to the private members below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::_mutex");
+    class Cache : public DistCache<Type, RWConcernDefault> {
+        Cache(const Cache&) = delete;
+        Cache& operator=(const Cache&) = delete;
 
-    std::map<Type, RWConcernDefault> _defaults;
+    public:
+        Cache(LookupFn lookupFn);
+        virtual ~Cache() = default;
+
+    private:
+        boost::optional<RWConcernDefault> lookup(OperationContext* opCtx, const Type& key) override;
+
+        // For exclusive use by DistCache only.
+        Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::Cache");
+
+        LookupFn _lookupFn;
+    };
+
+    Cache _defaults;
 };
 
 }  // namespace mongo
