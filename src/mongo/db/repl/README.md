@@ -893,6 +893,79 @@ timestamp. If `atClusterTime` is not specified, then the read timestamp of the t
 the [`all_durable`](#replication-timestamp-glossary) timestamp when the transaction is started,
 which ensures a snapshot with no oplog holes.
 
+## Transaction Oplog Application
+
+Secondaries begin replicating transaction oplog entries once the primary has either prepared or
+committed the transaction. They use the `OplogApplier` to apply these entries, which then uses the
+writer thread pool to schedule operations to apply.
+<!-- TODO SERVER-43969: Link to oplog application section -->
+
+Before secondaries process and apply transaction oplog entries, they will track operations that
+require changes to `config.transactions`. This results in an update to the transactions table entry
+(`sessionTxnRecord`) that corresponds to the oplog entry operation. For example,
+`prepareTransaction`, `commitTransaction`, and `abortTransaction` will all update the `txnState`
+accordingly.
+
+### Unprepared Transactions Oplog Application
+
+Unprepared transactions are comprised of `applyOps` oplog entries. When they are smaller than 16MB,
+they will write a single `applyOps` oplog entry for the whole transaction upon commit. Since
+secondaries do not need to wait for any additional entries, they can apply the entry for a small
+unprepared transaction immediately.
+
+When transactions are larger than 16MB, they use the `prevOpTime` field, which is the opTime of the
+previous `applyOps` oplog entry, to link multiple `applyOps` oplog entries together. The
+`partialTxn: true` field is used here to indicate that the transaction is incomplete and cannot be
+applied immediately. Since the `partialTxn` field does not apply to all oplog entries, it is added
+as a subfield of the 'o' field. A secondary must wait until it receives the final `applyOps` oplog
+entry of a large unprepared transaction, which will have a non-empty `prevOpTime` field and no
+`partialTxn` field, before applying entries. This ensures we have all the entries associated with
+the transaction before applying them, allowing us to avoid failover scenarios where only part of a
+large transaction is replicated.
+
+When we see an `applyOps` oplog entry that is a part of an unprepared transaction, we will unpack
+the CRUD operations and apply them in parallel by using the writer thread pool. For larger
+transactions, once the secondary has received all the oplog entries, it will traverse the oplog
+chain to get all the operations from the transaction and do the same thing.
+
+Note that checking out the session is not necessary for unprepared transactions since they are
+just a series of CRUD operations for secondary oplog application. The atomicity of data on disk is
+guaranteed by recovery. The atomicity of visible data in memory is guaranteed by how we advance the
+[`lastApplied`](#replication-timestamp-glossary) on secondaries.
+
+### Prepared Transactions Oplog Application
+
+Prepared transactions also write down `applyOps` oplog entries that contain all the operations for
+the transaction, but do so when they are prepared. Prepared transactions smaller than 16MB only
+write one of these entries, while those larger than 16MB write multiple.
+
+We use a `prepare: true` field to indicate that an `applyOps` entry is for a prepared transaction.
+For large prepared transactions, this field will be present in the last `applyOps` entry of the
+oplog chain, indicating that the secondary must prepare the transaction. The timestamp of the
+prepare oplog entry is referred to as the [`prepareTimestamp`](#replication-timestamp-glossary).
+
+`prepareTransaction` oplog entries are applied in their own batches in a single WUOW. When
+applying prepared operations, which are unpacked from the prepared `applyOps` entry, the applier
+thread must first check out the appropriate session and **unstash** the transaction resources
+(`txnResources`). `txnResources` refers to the lock state and storage state of a transaction. When
+we "unstash" these resources, we transfer the management of them to the `OperationContext`. The
+applier thread will then add the prepare operations to the storage transaction and finally yield
+the locks used for transactions. This means that prepared transactions will only **stash** (which
+transfers the management of `txnResources` back to the session) the recovery unit. Stashing the
+locks would make secondary oplog application conflict with prepared transactions. These locks are
+restored the next time we **unstash** `txnResources`, which would be for `commitTransaction` or
+`abortTransaction`.
+
+Prepared transactions write down separate `commitTransaction` and `abortTransaction` oplog entries.
+`commitTransaction` oplog entries do not need to store the operations from the transaction since
+we have already recorded them through the prepare oplog entries. These entries are also applied
+in their own batches and follow the same procedure of checking out the appropriate session,
+unstashing transaction resources, and either committing or aborting the storage transaction.
+
+Note that secondaries can apply prepare oplog entries immediately but
+[recovering](#recovering-prepared-transactions) nodes must wait until they finish the process or
+see a commit oplog entry.
+
 ## Transaction Errors
 
 ### PreparedTransactionInProgress Errors
