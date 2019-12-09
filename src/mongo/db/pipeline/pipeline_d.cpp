@@ -530,6 +530,16 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
                                                 &sortObj,
                                                 &projForQuery));
 
+    // There may be fewer dependencies now if the sort was covered.
+    if (!sortObj.isEmpty()) {
+        LOG(5) << "Agg: recomputing dependencies due to a covered sort: " << redact(sortObj)
+               << ". Current projection: " << redact(projForQuery)
+               << ". Current dependencies: " << redact(deps.toProjection());
+        deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
+                                             ? DepsTracker::MetadataAvailable::kTextScore
+                                             : DepsTracker::MetadataAvailable::kNoMetadata);
+    }
+
 
     if (!projForQuery.isEmpty() && !sources.empty()) {
         // Check for redundant $project in query with the same specification as the inclusion
@@ -767,6 +777,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             if (swExecutorSortAndProj.isOK()) {
                 // Success! We have a non-blocking sort and a covered projection.
+                LOG(5) << "Agg: Have a non-blocking sort and covered projection";
                 exec = std::move(swExecutorSortAndProj.getValue());
             } else if (swExecutorSortAndProj != ErrorCodes::NoQueryExecutionPlans) {
 
@@ -775,6 +786,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                     "covered projection in addition to a non-blocking sort");
             } else {
                 // The query system couldn't cover the projection.
+                LOG(5) << "Agg: The query system found a non-blocking sort but couldn't cover the "
+                          "projection";
                 *projectionObj = BSONObj();
                 exec = std::move(swExecutorSort.getValue());
             }
@@ -792,6 +805,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                 "Failed to determine whether query system can provide a non-blocking sort");
         }
     }
+    LOG(5) << "Agg: The query system couldn't cover the sort";
 
     // Either there's no sort or the query system can't provide a non-blocking sort.
     *sortObj = BSONObj();
@@ -863,14 +877,9 @@ void PipelineD::addCursorSource(Pipeline* pipeline,
 
     if (!projectionObj.isEmpty()) {
         cursor->setProjection(projectionObj, boost::none);
+        LOG(5) << "Agg: Setting projection with no dependencies: " << redact(projectionObj);
     } else {
-        // There may be fewer dependencies now if the sort was covered.
-        if (!sortObj.isEmpty()) {
-            deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
-                                                 ? DepsTracker::MetadataAvailable::kTextScore
-                                                 : DepsTracker::MetadataAvailable::kNoMetadata);
-        }
-
+        LOG(5) << "Agg: Setting projection with dependencies: " << redact(deps.toProjection());
         cursor->setProjection(deps.toProjection(), deps.toParsedDeps());
     }
 }
