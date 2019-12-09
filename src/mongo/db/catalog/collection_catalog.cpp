@@ -293,16 +293,9 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
     }
 
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    auto it = _orderedCollections.lower_bound(std::make_pair(nss.db().toString(), minUuid));
-
-    // The entry _mapIter points to is valid if it's not at the end of _orderedCollections and
-    // the entry's database is the same as dbName.
-    while (it != _orderedCollections.end() && it->first.first == nss.db()) {
-        if (it->second->ns() == nss) {
-            return it->first.second;
-        }
-        ++it;
+    auto it = _collections.find(nss);
+    if (it != _collections.end()) {
+        return it->second->uuid();
     }
     return boost::none;
 }

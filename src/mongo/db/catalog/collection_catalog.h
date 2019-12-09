@@ -162,8 +162,7 @@ public:
                                                      CollectionUUID uuid) const;
 
     /**
-     * Returns the UUID if `nss` exists in CollectionCatalog. The time complexity of
-     * this function is linear to the number of collections in `nss.db()`.
+     * Returns the UUID if `nss` exists in CollectionCatalog.
      */
     boost::optional<CollectionUUID> lookupUUIDByNSS(OperationContext* opCtx,
                                                     const NamespaceString& nss) const;
