@@ -32,7 +32,6 @@
 #include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
@@ -85,21 +84,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             it != parserMap.end());
 
     return it->second(stageSpec, expCtx);
-}
-
-DocumentSource::GetNextResult DocumentSource::getNext() {
-    pExpCtx->checkForInterrupt();
-    invariant(pExpCtx->opCtx->getServiceContext());
-    invariant(pExpCtx->opCtx->getServiceContext()->getFastClockSource());
-    ScopedTimer timer(pExpCtx->opCtx->getServiceContext()->getFastClockSource(),
-                      &_commonStats.executionTimeMillis);
-    ++_commonStats.works;
-
-    GetNextResult next = doGetNext();
-    if (next.isAdvanced()) {
-        ++_commonStats.advanced;
-    }
-    return next;
 }
 
 const char* DocumentSource::getSourceName() const {

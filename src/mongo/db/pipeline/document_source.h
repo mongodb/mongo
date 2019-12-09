@@ -46,6 +46,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -247,7 +248,22 @@ public:
      * return it) before asking for another result. Failing to do so can result in extra work, since
      * the Document/Value library must copy data on write when that data has a refcount above one.
      */
-    GetNextResult getNext();
+    GetNextResult getNext() {
+        pExpCtx->checkForInterrupt();
+        auto serviceCtx = pExpCtx->opCtx->getServiceContext();
+        invariant(serviceCtx);
+        auto fcs = serviceCtx->getFastClockSource();
+        invariant(fcs);
+
+        ScopedTimer timer(fcs, &_commonStats.executionTimeMillis);
+        ++_commonStats.works;
+
+        GetNextResult next = doGetNext();
+        if (next.isAdvanced()) {
+            ++_commonStats.advanced;
+        }
+        return next;
+    }
 
     /**
      * Returns a struct containing information about any special constraints imposed on using this
