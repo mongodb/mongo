@@ -111,7 +111,7 @@ class MongoDFixture(interface.Fixture):
 
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
-    def _do_teardown(self):
+    def _do_teardown(self, kill=False):
         if self.mongod is None:
             self.logger.warning("The mongod fixture has not been set up yet.")
             return  # Still a success even if nothing is running.
@@ -124,10 +124,12 @@ class MongoDFixture(interface.Fixture):
             self.logger.warning(msg)
             raise errors.ServerFailure(msg)
 
-        self.mongod.stop()
+        self.mongod.stop(kill)
         exit_code = self.mongod.wait()
 
-        if exit_code == 0:
+        # SIGKILL has an exit code of 9 and Python's subprocess module returns
+        # negative versions of system calls.
+        if exit_code == 0 or (exit_code == -9 and kill):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(self.port))
         else:
             self.logger.warning("Stopped the mongod on port {:d}. "

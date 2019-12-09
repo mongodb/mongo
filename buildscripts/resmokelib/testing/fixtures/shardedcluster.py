@@ -191,7 +191,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Started the balancer")
 
-    def _do_teardown(self):
+    def _do_teardown(self, kill=False):
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
@@ -206,13 +206,13 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
         if self.configsvr is not None:
-            teardown_handler.teardown(self.configsvr, "config server")
+            teardown_handler.teardown(self.configsvr, "config server", kill=kill)
 
         for mongos in self.mongos:
-            teardown_handler.teardown(mongos, "mongos")
+            teardown_handler.teardown(mongos, "mongos", kill=kill)
 
         for shard in self.shards:
-            teardown_handler.teardown(shard, "shard")
+            teardown_handler.teardown(shard, "shard", kill=kill)
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the sharded cluster.")
@@ -429,7 +429,7 @@ class _MongoSFixture(interface.Fixture):
 
         self.logger.info("Successfully contacted the mongos on port %d.", self.port)
 
-    def _do_teardown(self):
+    def _do_teardown(self, kill=False):
         if self.mongos is None:
             self.logger.warning("The mongos fixture has not been set up yet.")
             return  # Teardown is still a success even if nothing is running.
@@ -442,7 +442,7 @@ class _MongoSFixture(interface.Fixture):
             self.logger.warning(msg)
             raise errors.ServerFailure(msg)
 
-        self.mongos.stop()
+        self.mongos.stop(kill=kill)
         exit_code = self.mongos.wait()
 
         if exit_code == 0:

@@ -70,3 +70,27 @@ class FixtureTeardownTestCase(FixtureTestCase):
         except:
             self.logger.exception("An error occurred during the teardown of %s.", self.fixture)
             raise
+
+
+class FixtureKillTestCase(FixtureTestCase):
+    """TestCase for killing a fixture. Intended for use before archiving a failed test."""
+
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED
+    PHASE = "kill"
+
+    def __init__(self, logger, fixture, job_name):
+        """Initialize the FixtureKillTestCase."""
+        FixtureTestCase.__init__(self, logger, job_name, self.PHASE)
+        self.fixture = fixture
+
+    def run_test(self):
+        """Tear down the fixture."""
+        try:
+            self.return_code = 2  # Test return code of 2 is used for fixture failures.
+            self.logger.info("Killing the fixture %s.", self.fixture)
+            self.fixture.teardown(finished=False, kill=True)
+            self.logger.info("Finished killing %s.", self.fixture)
+            self.return_code = 0
+        except:
+            self.logger.exception("An error occurred while killing %s.", self.fixture)
+            raise
