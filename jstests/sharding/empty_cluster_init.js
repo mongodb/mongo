@@ -3,6 +3,10 @@
 // Starts a bunch of mongoses in parallel, and ensures that there's only a single config
 // version initialization.
 //
+// This test manually starts routers with the latest binary which can't connect to config server
+// nodes using the last-stable binary because their wire versions are incompatible.
+// @tags: [multiversion_incompatible]
+//
 
 var configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
