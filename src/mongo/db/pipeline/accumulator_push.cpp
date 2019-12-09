@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/query_knobs.h"
 
 namespace mongo {
 
@@ -84,8 +85,9 @@ Value AccumulatorPush::getValue(bool toBeMerged) {
 }
 
 AccumulatorPush::AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 int maxMemoryUsageBytes)
-    : Accumulator(expCtx), _maxMemUsageBytes(maxMemoryUsageBytes) {
+                                 boost::optional<int> maxMemoryUsageBytes)
+    : Accumulator(expCtx),
+      _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -96,6 +98,6 @@ void AccumulatorPush::reset() {
 
 intrusive_ptr<Accumulator> AccumulatorPush::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new AccumulatorPush(expCtx);
+    return new AccumulatorPush(expCtx, boost::none);
 }
-}
+}  // namespace mongo

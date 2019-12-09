@@ -97,4 +97,20 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerGenerateCoveredWholeIndexScans
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryIgnoreUnknownJSONSchemaKeywords, bool, false);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryProhibitBlockingMergeOnMongoS, bool, false);
+
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxPushBytes, int, 100 * 1024 * 1024)
+    ->withValidator([](const int& newVal) {
+        if (newVal <= 0) {
+            return Status(ErrorCodes::BadValue, "internalQueryMaxPushBytes must be positive");
+        }
+        return Status::OK();
+    });
+
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxAddToSetBytes, int, 100 * 1024 * 1024)
+    ->withValidator([](const int& newVal) {
+        if (newVal <= 0) {
+            return Status(ErrorCodes::BadValue, "internalQueryMaxAddToSetBytes must be positive");
+        }
+        return Status::OK();
+    });
 }  // namespace mongo

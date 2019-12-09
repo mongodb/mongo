@@ -127,4 +127,8 @@ extern AtomicInt32 internalDocumentSourceCursorBatchSizeBytes;
 extern AtomicInt32 internalDocumentSourceLookupCacheSizeBytes;
 
 extern AtomicBool internalQueryProhibitBlockingMergeOnMongoS;
+
+extern AtomicInt32 internalQueryMaxPushBytes;
+
+extern AtomicInt32 internalQueryMaxAddToSetBytes;
 }  // namespace mongo
