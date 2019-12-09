@@ -32,34 +32,5 @@ mongobridge = env.Program(
     AIB_COMPONENT='tools',
 )
 
-mongoebench = yamlEnv.Program(
-    target='mongoebench',
-    source=[
-        'mongoebench_main.cpp',
-        'mongoebench_options.cpp',
-        'mongoebench_options_init.cpp',
-        env.Idlc('mongoebench_options.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger' if get_option('wiredtiger') == 'on' else [],
-        '$BUILD_DIR/mongo/embedded/embedded',
-        '$BUILD_DIR/mongo/embedded/embedded_integration_helpers',
-        '$BUILD_DIR/mongo/shell/benchrun',
-        '$BUILD_DIR/mongo/util/signal_handlers',
-    ],
-    AIB_COMPONENT="embedded-test",
-    AIB_COMPONENTS_EXTRA=[
-        "tests",
-        "benchmarks",
-    ],
-)
-
-# TODO: remove this when hygienic is driving all tarball creation
-install_mongoebench = env.Install("#/", mongoebench)
-env.Alias("install-embedded-test", [install_mongoebench[0]])
 install_mongobridge = env.Install("#/", mongobridge)
 env.Alias("install-tools", [install_mongobridge[0]])
-
-env.Alias('all', mongoebench)  # This ensures it compiles and links, but doesn't copy it anywhere.

@@ -343,8 +343,6 @@ def fetch_artifacts(evg_api, build_id, revision):
             # Need to extract certain files from the pre-existing artifacts.tgz.
             extract_files = [
                 executable_name("mongobridge"),
-                executable_name("mongoebench"),
-                executable_name("mongoed"),
                 executable_name("mongotmock"),
                 executable_name("wt"),
             ]
