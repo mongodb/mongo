@@ -891,6 +891,78 @@ def ninja_whereis(thing, *_args, **_kwargs):
     return shutil.which(thing)
 
 
+class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
+    """Overwrite the __call__ method of SCons' TempFileMunge to not delete."""
+
+    def __call__(self, target, source, env, for_signature):
+        if for_signature:
+            return self.cmd
+
+        node = target[0] if SCons.Util.is_List(target) else target
+        if node is not None:
+            cmdlist = getattr(node.attributes, 'tempfile_cmdlist', None)
+            if cmdlist is not None:
+                return cmdlist
+
+        cmd = super().__call__(target, source, env, for_signature)
+
+        # If TempFileMunge.__call__ returns a string it means that no
+        # response file was needed. No processing required so just
+        # return the command.
+        if isinstance(cmd, str): 
+            return cmd
+
+        # Strip the removal commands from the command list.
+        #
+        # SCons' TempFileMunge class has some very strange
+        # behavior where it, as part of the command line, tries to
+        # delete the response file after executing the link
+        # command. We want to keep those response files since
+        # Ninja will keep using them over and over. The
+        # TempFileMunge class creates a cmdlist to do this, a
+        # common SCons convention for executing commands see:
+        # https://github.com/SCons/scons/blob/master/src/engine/SCons/Action.py#L949
+        #
+        # This deletion behavior is not configurable. So we wanted
+        # to remove the deletion command from the command list by
+        # simply slicing it out here. Unfortunately for some
+        # strange reason TempFileMunge doesn't make the "rm"
+        # command it's own list element. It appends it to the
+        # tempfile argument to cmd[0] (which is CC/CXX) and then
+        # adds the tempfile again as it's own element.
+        #
+        # So we just kind of skip that middle element. Since the
+        # tempfile is in the command list on it's own at the end we
+        # can cut it out entirely. This is what I would call
+        # "likely to break" in future SCons updates. Hopefully it
+        # breaks because they start doing the right thing and not
+        # weirdly splitting these arguments up. For reference a
+        # command list that we get back from the OG TempFileMunge
+        # looks like this:
+        #
+        # [
+        #     'g++',
+        #     '@/mats/tempfiles/random_string.lnk\nrm',
+        #     '/mats/tempfiles/random_string.lnk',
+        # ]
+        #
+        # Note the weird newline and rm command in the middle
+        # element and the lack of TEMPFILEPREFIX on the last
+        # element.
+        prefix = env.subst('$TEMPFILEPREFIX')
+        if not prefix:
+            prefix = '@'
+            new_cmdlist = [cmd[0], prefix + cmd[-1]]
+            setattr(node.attributes, 'tempfile_cmdlist', new_cmdlist)
+
+        return new_cmdlist
+
+
+    def _print_cmd_str(*_args, **_kwargs):
+        """Disable this method"""
+        pass
+
+
 def generate(env):
     """Generate the NINJA builders."""
     if not exists(env):
@@ -952,9 +1024,6 @@ def generate(env):
 
     SCons.Util.WhereIs = ninja_whereis
 
-    # pylint: disable=protected-access
-    SCons.Platform.TempFileMunge._print_cmd_str = ninja_noop
-
     # Replace false Compiling* messages with a more accurate output
     #
     # We also use this to tag all Nodes with Builders using
@@ -991,6 +1060,8 @@ def generate(env):
     os.environ["TMP"] = os.environ["TMPDIR"]
     if not os.path.isdir(os.environ["TMPDIR"]):
         env.Execute(SCons.Defaults.Mkdir(os.environ["TMPDIR"]))
+
+    env['TEMPFILE'] = NinjaEternalTempFile
 
     # Force the SConsign to be written, we benefit from SCons caching of
     # implicit dependencies and conftests. Unfortunately, we have to do this
