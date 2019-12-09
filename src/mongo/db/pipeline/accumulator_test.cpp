@@ -345,6 +345,28 @@ TEST(Accumulators, AddToSetRespectsCollation) {
                             Value(std::vector<Value>{Value("a"_sd)})}});
 }
 
+TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const int maxMemoryBytes = 20ull;
+    auto addToSet = AccumulatorAddToSet(expCtx, maxMemoryBytes);
+    ASSERT_THROWS_CODE(
+        addToSet.process(
+            Value("This is a large string. Certainly we must be over 20 bytes by now"_sd), false),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const int maxMemoryBytes = 20ull;
+    auto addToSet = AccumulatorPush(expCtx, maxMemoryBytes);
+    ASSERT_THROWS_CODE(
+        addToSet.process(
+            Value("This is a large string. Certainly we must be over 20 bytes by now"_sd), false),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
+}
+
 /* ------------------------- AccumulatorMergeObjects -------------------------- */
 
 namespace AccumulatorMergeObjects {

@@ -49,36 +49,45 @@ const char* AccumulatorPush::getOpName() const {
 void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
-            vpValue.push_back(input);
+            _array.push_back(input);
             _memUsageBytes += input.getApproximateSize();
+            uassert(ErrorCodes::ExceededMemoryLimit,
+                    str::stream()
+                        << "$push used too much memory and cannot spill to disk. Memory limit: "
+                        << _maxMemUsageBytes << " bytes",
+                    _memUsageBytes < _maxMemUsageBytes);
         }
     } else {
-        // If we're merging, we need to take apart the arrays we
-        // receive and put their elements into the array we are collecting.
-        // If we didn't, then we'd get an array of arrays, with one array
-        // from each merge source.
-        verify(input.getType() == Array);
+        // If we're merging, we need to take apart the arrays we receive and put their elements into
+        // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
+        // array from each merge source.
+        invariant(input.getType() == Array);
 
         const vector<Value>& vec = input.getArray();
-        vpValue.insert(vpValue.end(), vec.begin(), vec.end());
-
-        for (size_t i = 0; i < vec.size(); i++) {
-            _memUsageBytes += vec[i].getApproximateSize();
+        for (auto&& val : vec) {
+            _memUsageBytes += val.getApproximateSize();
+            uassert(ErrorCodes::ExceededMemoryLimit,
+                    str::stream()
+                        << "$push used too much memory and cannot spill to disk. Memory limit: "
+                        << _maxMemUsageBytes << " bytes",
+                    _memUsageBytes < _maxMemUsageBytes);
         }
+        _array.insert(_array.end(), vec.begin(), vec.end());
     }
 }
 
 Value AccumulatorPush::getValue(bool toBeMerged) {
-    return Value(vpValue);
+    return Value(_array);
 }
 
-AccumulatorPush::AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Accumulator(expCtx) {
+AccumulatorPush::AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 int maxMemoryUsageBytes)
+    : Accumulator(expCtx), _maxMemUsageBytes(maxMemoryUsageBytes) {
     _memUsageBytes = sizeof(*this);
 }
 
 void AccumulatorPush::reset() {
-    vector<Value>().swap(vpValue);
+    vector<Value>().swap(_array);
     _memUsageBytes = sizeof(*this);
 }
 
