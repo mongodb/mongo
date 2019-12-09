@@ -53,12 +53,24 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const MatchExpression* matchExpr) const override {
+        if (!matchExpr) {
+            return _planCacheStats;
+        }
+
         std::vector<BSONObj> filteredStats{};
         std::copy_if(_planCacheStats.begin(),
                      _planCacheStats.end(),
                      std::back_inserter(filteredStats),
                      [&matchExpr](const BSONObj& obj) { return matchExpr->matchesBSON(obj); });
         return filteredStats;
+    }
+
+    std::string getShardName(OperationContext* opCtx) const override {
+        return "testShardName";
+    }
+
+    std::string getHostAndPort(OperationContext* opCtx) const override {
+        return "testHostName";
     }
 
 private:
@@ -79,15 +91,6 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ShouldFailToParseIfSpecIsANonEmptyObjec
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx()),
         AssertionException,
         ErrorCodes::FailedToParse);
-}
-
-TEST_F(DocumentSourcePlanCacheStatsTest, CannotCreateWhenInMongos) {
-    const auto specObj = fromjson("{$planCacheStats: {}}");
-    getExpCtx()->inMongos = true;
-    ASSERT_THROWS_CODE(
-        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx()),
-        AssertionException,
-        50932);
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeSuccessfully) {
@@ -170,8 +173,71 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
     auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats, match}, getExpCtx()));
     pipeline->optimizePipeline();
 
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(), stats[1]);
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(), stats[3]);
+    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+                      BSON("foo"
+                           << "bar"
+                           << "host"
+                           << "testHostName"));
+    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+                      BSON("foo"
+                           << "bar"
+                           << "match" << true << "host"
+                           << "testHostName"));
+    ASSERT(!pipeline->getNext());
+}
+
+TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
+    std::vector<BSONObj> stats{BSON("foo"
+                                    << "bar"),
+                               BSON("foo"
+                                    << "baz")};
+    getExpCtx()->mongoProcessInterface =
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
+
+    const auto specObj = fromjson("{$planCacheStats: {}}");
+    auto planCacheStats =
+        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats}, getExpCtx()));
+    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+                      BSON("foo"
+                           << "bar"
+                           << "host"
+                           << "testHostName"));
+    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+                      BSON("foo"
+                           << "baz"
+                           << "host"
+                           << "testHostName"));
+    ASSERT(!pipeline->getNext());
+}
+
+TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) {
+    std::vector<BSONObj> stats{BSON("foo"
+                                    << "bar"),
+                               BSON("foo"
+                                    << "baz")};
+    getExpCtx()->mongoProcessInterface =
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
+    getExpCtx()->fromMongos = true;
+
+    const auto specObj = fromjson("{$planCacheStats: {}}");
+    auto planCacheStats =
+        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats}, getExpCtx()));
+    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+                      BSON("foo"
+                           << "bar"
+                           << "host"
+                           << "testHostName"
+                           << "shard"
+                           << "testShardName"));
+    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+                      BSON("foo"
+                           << "baz"
+                           << "host"
+                           << "testHostName"
+                           << "shard"
+                           << "testShardName"));
     ASSERT(!pipeline->getNext());
 }
 

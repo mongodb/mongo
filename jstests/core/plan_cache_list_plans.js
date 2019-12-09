@@ -11,7 +11,9 @@
 //   # false when the test assumes they are true because the query has already been run many times.
 //   assumes_balancer_off,
 //   inspects_whether_plan_cache_entry_is_active,
-//   assumes_against_mongod_not_mongos,
+//   assumes_unsharded_collection,
+//   # Sharding support for $planCacheStats requires all nodes to be binary version 4.4.
+//   requires_fcv_44,
 // ]
 
 (function() {

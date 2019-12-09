@@ -314,6 +314,11 @@ public:
     virtual std::string getShardName(OperationContext* opCtx) const = 0;
 
     /**
+     * Returns the "host:port" string for this node.
+     */
+    virtual std::string getHostAndPort(OperationContext* opCtx) const = 0;
+
+    /**
      * Returns the fields of the document key (in order) for the collection corresponding to 'uuid',
      * including the shard key and _id. If _id is not in the shard key, it is added last. If the
      * collection is not sharded or no longer exists, returns only _id. Also returns a boolean that

@@ -178,6 +178,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::string getHostAndPort(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext*, const NamespaceString&, UUID) const override {
         MONGO_UNREACHABLE;

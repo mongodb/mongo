@@ -29,12 +29,15 @@
  *   assumes_read_preference_unchanged,
  *   assumes_read_concern_unchanged,
  *   does_not_support_stepdowns,
- *   assumes_against_mongod_not_mongos,
+ *   assumes_unsharded_collection,
+ *   # Sharding support for $planCacheStats requires all nodes to be binary version 4.4.
+ *   requires_fcv_44,
  * ]
  */
 
 (function() {
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
 const coll = db.jstests_index_filter_commands;
 
@@ -172,34 +175,36 @@ print('Plan details after setting filter = ' + tojson(planAfterSetFilter.details
 // Tests for the 'indexFilterSet' explain field.
 //
 
-// No filter.
-coll.getPlanCache().clear();
-assert.eq(false, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
-assert.eq(false,
-          coll.find(queryA1, projectionA1)
-              .sort(sortA1)
-              .explain('queryPlanner')
-              .queryPlanner.indexFilterSet);
+if (!FixtureHelpers.isMongos(db)) {
+    // No filter.
+    coll.getPlanCache().clear();
+    assert.eq(false, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
+    assert.eq(false,
+              coll.find(queryA1, projectionA1)
+                  .sort(sortA1)
+                  .explain('queryPlanner')
+                  .queryPlanner.indexFilterSet);
 
-// With one filter set.
-assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
-assert.eq(true, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
-assert.eq(false,
-          coll.find(queryA1, projectionA1)
-              .sort(sortA1)
-              .explain('queryPlanner')
-              .queryPlanner.indexFilterSet);
+    // With one filter set.
+    assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
+    assert.eq(true, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
+    assert.eq(false,
+              coll.find(queryA1, projectionA1)
+                  .sort(sortA1)
+                  .explain('queryPlanner')
+                  .queryPlanner.indexFilterSet);
 
-// With two filters set.
-assert.commandWorked(coll.runCommand(
-    'planCacheSetFilter',
-    {query: queryA1, projection: projectionA1, sort: sortA1, indexes: [indexA1B1, indexA1C1]}));
-assert.eq(true, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
-assert.eq(true,
-          coll.find(queryA1, projectionA1)
-              .sort(sortA1)
-              .explain('queryPlanner')
-              .queryPlanner.indexFilterSet);
+    // With two filters set.
+    assert.commandWorked(coll.runCommand(
+        'planCacheSetFilter',
+        {query: queryA1, projection: projectionA1, sort: sortA1, indexes: [indexA1B1, indexA1C1]}));
+    assert.eq(true, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
+    assert.eq(true,
+              coll.find(queryA1, projectionA1)
+                  .sort(sortA1)
+                  .explain('queryPlanner')
+                  .queryPlanner.indexFilterSet);
+}
 
 //
 // Tests for index filter commands and multiple indexes with the same key pattern.

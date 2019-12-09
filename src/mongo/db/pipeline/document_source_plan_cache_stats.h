@@ -86,8 +86,6 @@ public:
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     // This stage must run on a mongod, and will fail at parse time
-                                     // if an attempt is made to run it on mongos.
                                      HostTypeRequirement::kAnyShard,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
@@ -126,6 +124,14 @@ private:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
     }
+
+    // If running through mongos in a sharded cluster, stores the shard name so that it can be
+    // appended to each plan cache entry document.
+    std::string _shardName;
+
+    // If running through mongos in a sharded cluster, stores the "host:port" string so that it can
+    // be appended to each plan cache entry document.
+    std::string _hostAndPort;
 
     // The result set for this change is produced through the mongo process interface on the first
     // call to getNext(), and then held by this data member.

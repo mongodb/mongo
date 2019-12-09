@@ -49,10 +49,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
                           << " parameters object must be empty. Found: " << typeName(spec.type()),
             spec.embeddedObject().isEmpty());
 
-    uassert(50932,
-            str::stream() << kStageName << " cannot be executed against a MongoS.",
-            !pExpCtx->inMongos && !pExpCtx->fromMongos && !pExpCtx->needsMerge);
-
     return new DocumentSourcePlanCacheStats(pExpCtx);
 }
 
@@ -105,7 +101,32 @@ DocumentSource::GetNextResult DocumentSourcePlanCacheStats::doGetNext() {
         return GetNextResult::makeEOF();
     }
 
-    return Document{*_resultsIter++};
+    MutableDocument nextPlanCacheEntry{Document{*_resultsIter++}};
+
+    // Augment each plan cache entry with this node's host and port string.
+    if (_hostAndPort.empty()) {
+        _hostAndPort = pExpCtx->mongoProcessInterface->getHostAndPort(pExpCtx->opCtx);
+        uassert(31386,
+                "Aggregation request specified 'fromMongos' but unable to retrieve host name "
+                "for $planCacheStats pipeline stage.",
+                !_hostAndPort.empty());
+    }
+    nextPlanCacheEntry.setField("host", Value{_hostAndPort});
+
+    // If we're returning results to mongos, then additionally augment each plan cache entry with
+    // the shard name, for the node from which we're collecting plan cache information.
+    if (pExpCtx->fromMongos) {
+        if (_shardName.empty()) {
+            _shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
+            uassert(31385,
+                    "Aggregation request specified 'fromMongos' but unable to retrieve shard name "
+                    "for $planCacheStats pipeline stage.",
+                    !_shardName.empty());
+        }
+        nextPlanCacheEntry.setField("shard", Value{_shardName});
+    }
+
+    return nextPlanCacheEntry.freeze();
 }
 
 }  // namespace mongo

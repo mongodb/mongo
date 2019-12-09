@@ -195,4 +195,8 @@ std::set<FieldPath> MongoProcessCommon::_convertToFieldPaths(
     return fieldPaths;
 }
 
+std::string MongoProcessCommon::getHostAndPort(OperationContext* opCtx) const {
+    return getHostNameCachedAndPort();
+}
+
 }  // namespace mongo
