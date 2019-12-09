@@ -8966,6 +8966,7 @@ buildvariants:
   run_on:
   - rhel80-test
   expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -9009,8 +9010,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: external_auth
-  # Tests disabled by SERVER-44946
-  #- name: replica_sets_auth_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
@@ -9268,6 +9268,7 @@ buildvariants:
   - rhel80-test
   batchtime: 1440 # 1 day
   expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -9343,9 +9344,8 @@ buildvariants:
   - name: concurrency_simultaneous
     distros:
     - rhel80-build
-  # Tests disabled by SERVER-44946
-  #- name: replica_sets
-  #- name: replica_sets_auth_gen
+  - name: replica_sets
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sharding_gen
   - name: sharding_auth_gen
