@@ -15,7 +15,7 @@ selector:
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # This test makes assertions about whether aggregations will need to spill to disk, which assumes
   # all the data is located on a single shard.
-  - jstests/aggregation/bugs/server9444.js
+  - jstests/aggregation/spill_to_disk.js
   # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
   - jstests/aggregation/match_swapping_renamed_fields.js
   - jstests/aggregation/use_query_project_and_sort.js
