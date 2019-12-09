@@ -92,7 +92,7 @@ namespace boost { namespace proto
 
         // Work-around for:
         // https://connect.microsoft.com/VisualStudio/feedback/details/765449/codegen-stack-corruption-using-runtime-checks-when-aggregate-initializing-struct
-    #if BOOST_WORKAROUND(BOOST_MSVC, BOOST_TESTED_AT(1700))
+    #if BOOST_WORKAROUND(BOOST_MSVC, < 1800)
         template<typename T, typename Expr, typename C, typename U>
         BOOST_FORCEINLINE
         Expr make_terminal(T &t, Expr *, proto::term<U C::*> *)
