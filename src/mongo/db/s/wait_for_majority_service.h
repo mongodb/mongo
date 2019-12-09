@@ -74,7 +74,7 @@ private:
      */
     void _periodicallyWaitForMajority(ServiceContext* service);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("WaitForMaorityService::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("WaitForMajorityService::_mutex");
 
     // Contains an ordered list of opTimes to wait to be majority comitted.
     OpTimeWaitingMap _queuedOpTimes;

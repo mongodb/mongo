@@ -114,7 +114,7 @@ private:
     void _rebuildShard(WithLock, ConnectionString const& newConnString, ShardFactory* factory);
 
     // Protects the lookup maps below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardRegistryData::_mutex");
 
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
 

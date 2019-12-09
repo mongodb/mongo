@@ -31,7 +31,7 @@
 
 namespace mongo {
 int64_t KVPrefix::_nextValue = 0;
-Mutex KVPrefix::_nextValueMutex = MONGO_MAKE_LATCH();
+Mutex KVPrefix::_nextValueMutex = MONGO_MAKE_LATCH("KVPrefix::_nextValueMutex");
 const KVPrefix KVPrefix::kNotPrefixed = KVPrefix(-1);
 
 std::string KVPrefix::toString() const {

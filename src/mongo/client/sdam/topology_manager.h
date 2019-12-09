@@ -65,7 +65,7 @@ public:
     const TopologyDescriptionPtr getTopologyDescription() const;
 
 private:
-    mutable mongo::Mutex _mutex = mongo::Mutex(StringData("TopologyManager"));
+    mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("TopologyManager");
     const SdamConfiguration _config;
     ClockSource* _clockSource;
     std::shared_ptr<TopologyDescription> _topologyDescription;
