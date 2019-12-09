@@ -388,8 +388,6 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                 # Need to extract certain files from the pre-existing artifacts.tgz.
                 extract_files = [
                     executable_name("mongobridge"),
-                    executable_name("mongoebench"),
-                    executable_name("mongoed"),
                     executable_name("mongotmock"),
                     executable_name("wt"),
                 ]
