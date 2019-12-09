@@ -37,6 +37,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -251,7 +252,7 @@ private:
         }
     }
 
-    mutable Mutex _lock = MONGO_MAKE_LATCH("BlockingQueue::_lock");
+    mutable Mutex _lock = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BlockingQueue::_lock");
     std::queue<T> _queue;
     const size_t _maxSize;
     size_t _currentSize = 0;

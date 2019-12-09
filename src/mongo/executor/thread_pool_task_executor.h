@@ -38,6 +38,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -188,7 +189,8 @@ private:
     std::shared_ptr<ThreadPoolInterface> _pool;
 
     // Mutex guarding all remaining fields.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ThreadPoolTaskExecutor::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "ThreadPoolTaskExecutor::_mutex");
 
     // Queue containing all items currently scheduled into the thread pool but not yet completed.
     WorkQueue _poolInProgressQueue;

@@ -36,6 +36,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/future.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 namespace executor {
@@ -79,7 +80,8 @@ private:
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     const ConnectionPool::Options _connPoolOptions;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TLTypeFactory::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TLTypeFactory::_mutex");
     AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };

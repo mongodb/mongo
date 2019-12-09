@@ -40,6 +40,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
 namespace mongo {
@@ -147,7 +148,8 @@ private:
     std::unique_ptr<transport::TransportLayer> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(3), "NetworkInterfaceTL::_mutex");
     ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::shared_ptr<ConnectionPool> _pool;
@@ -165,7 +167,8 @@ private:
     AtomicWord<State> _state;
     stdx::thread _ioThread;
 
-    Mutex _inProgressMutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::_inProgressMutex");
+    Mutex _inProgressMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_inProgressMutex");
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandState>> _inProgress;
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<AlarmState>>
         _inProgressAlarms;

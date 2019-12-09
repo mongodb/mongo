@@ -35,6 +35,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -101,7 +102,8 @@ private:
     template <typename Callable>
     void _foreach(Callable&& cb) const;
 
-    mutable Mutex _tlsMutex = MONGO_MAKE_LATCH("TransportLayerManager::_tlsMutex");
+    mutable Mutex _tlsMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "TransportLayerManager::_tlsMutex");
     std::vector<std::unique_ptr<TransportLayer>> _tls;
 };
 

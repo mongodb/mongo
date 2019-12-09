@@ -194,7 +194,7 @@ private:
     const int _messagingPortTags;
 
     // Mutex guarding members of the connection pool
-    Mutex _mutex = MONGO_MAKE_LATCH("ConnectionPool::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("ClientConnectionPool::_mutex");
 
     // Map from HostAndPort to idle connections.
     HostConnectionMap _connections;

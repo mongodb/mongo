@@ -44,6 +44,7 @@
 #include "mongo/transport/session_asio.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/future.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -456,7 +457,7 @@ private:
         return EventFDHolder::getForClient(_opCtx->getClient());
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("BatonASIO::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BatonASIO::_mutex");
 
     OperationContext* _opCtx;
 

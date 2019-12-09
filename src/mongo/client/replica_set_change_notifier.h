@@ -38,6 +38,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -102,7 +103,8 @@ private:
     void _addListener(Listener* listener);
     void _removeListener(Listener* listener);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetChangeNotifier::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ReplicaSetChangeNotifier::_mutex");
     std::vector<Listener*> _listeners;
     stdx::unordered_map<Key, State> _replicaSetStates;
 };

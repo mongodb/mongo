@@ -44,6 +44,7 @@
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -96,7 +97,8 @@ public:
 
 private:
     // protects _map
-    Mutex _mutex = MONGO_MAKE_LATCH("ConnectionShardStatus::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ConnectionShardStatus::_mutex");
 
     // a map from a connection into ChunkManager's sequence number for each namespace
     typedef map<unsigned long long, map<string, unsigned long long>> SequenceMap;

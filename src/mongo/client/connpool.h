@@ -38,6 +38,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -393,7 +394,8 @@ private:
 
     typedef std::map<PoolKey, PoolForHost, poolKeyCompare> PoolMap;  // servername -> pool
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("DBConnectionPool::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "DBConnectionPool::_mutex");
     std::string _name;
 
     // The maximum number of connections we'll save in the pool per-host

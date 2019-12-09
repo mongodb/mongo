@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -66,7 +67,8 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("MutableObserverRegistry::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "MutableObserverRegistry::_mutex");
     std::vector<unique_function<void(const T&)>> _registry;
 };
 

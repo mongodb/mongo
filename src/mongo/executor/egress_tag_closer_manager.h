@@ -36,6 +36,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -65,7 +66,8 @@ public:
         const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc);
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("EgressTagCloserManager::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "EgressTagCloserManager::_mutex");
     stdx::unordered_set<EgressTagCloser*> _egressTagClosers;
 };
 

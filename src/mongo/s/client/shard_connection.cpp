@@ -48,6 +48,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 
@@ -75,7 +76,8 @@ public:
     void appendInfo(BSONObjBuilder* b) const;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ActiveClientConnections::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ActiveClientConnections::_mutex");
     std::set<const ClientConnections*> _clientConnections;
 
 } activeClientConnections;

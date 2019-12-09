@@ -35,6 +35,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -94,7 +95,8 @@ private:
     StatusWith<OID> _fetchClusterIdFromConfig(OperationContext* opCtx,
                                               const repl::ReadConcernLevel& readConcernLevel);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ClusterIdentityLoader::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ClusterIdentityLoader::_mutex");
     stdx::condition_variable _inReloadCV;
 
     // Used to ensure that only one thread at a time attempts to reload the cluster ID from the

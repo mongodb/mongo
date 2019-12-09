@@ -36,6 +36,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -87,13 +88,14 @@ private:
 
     // You can read _outof without a lock, but have to hold _resizeMutex to change.
     AtomicWord<int> _outof;
-    Mutex _resizeMutex = MONGO_MAKE_LATCH("TicketHolder::_resizeMutex");
+    Mutex _resizeMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TicketHolder::_resizeMutex");
 #else
     bool _tryAcquire();
 
     AtomicWord<int> _outof;
     int _num;
-    Mutex _mutex = MONGO_MAKE_LATCH("TicketHolder::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TicketHolder::_mutex");
     stdx::condition_variable _newTicket;
 #endif
 };

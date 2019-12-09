@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/log.h"
 
@@ -70,7 +71,7 @@ private:
         bool isContended = false;
         boost::optional<stdx::thread> thread{boost::none};
 
-        Mutex mutex = MONGO_MAKE_LATCH(kBlockedOpMutexName);
+        Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(3), kBlockedOpMutexName);
     };
     LatchState _latchState;
 
@@ -79,7 +80,8 @@ private:
         boost::optional<stdx::thread> thread{boost::none};
 
         stdx::condition_variable cv;
-        Mutex mutex = MONGO_MAKE_LATCH(kBlockedOpInterruptibleName);
+        Mutex mutex =
+            MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), kBlockedOpInterruptibleName);
         bool isDone = false;
     };
     InterruptibleState _interruptibleState;
