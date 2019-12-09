@@ -1,8 +1,9 @@
 """Unit tests for the evergreen_task_timeout script."""
 
 import unittest
+from mock import MagicMock, patch
 
-from buildscripts.validate_commit_message import main, STATUS_OK, STATUS_ERROR
+from buildscripts.validate_commit_message import main, STATUS_OK, STATUS_ERROR, GIT_SHOW_COMMAND
 
 # pylint: disable=missing-docstring,no-self-use
 
@@ -13,6 +14,13 @@ INVALID_MESSAGES = [
     ["This is not a valid message"],  # message must be valid
     ["Fix lint plus extras is not a valid message"],  # Fix lint is strict
 ]
+
+NS = "buildscripts.validate_commit_message"
+
+
+def ns(relative_name):  # pylint: disable=invalid-name
+    """Return a full name from a name relative to the test module"s name space."""
+    return NS + "." + relative_name
 
 
 class ValidateCommitMessageTest(unittest.TestCase):
@@ -42,3 +50,10 @@ class ValidateCommitMessageTest(unittest.TestCase):
 
     def test_ignore_warnings(self):
         self.assertTrue(all(main(["-i"] + message) == STATUS_OK for message in INVALID_MESSAGES))
+
+    def test_last_git_commit_success(self):
+        with patch(
+                ns("subprocess.check_output"),
+                return_value=bytearray('SERVER-1111 this is a test', 'utf-8')) as check_output_mock:
+            self.assertEqual(main([]), 0)
+            check_output_mock.assert_called_with(GIT_SHOW_COMMAND)

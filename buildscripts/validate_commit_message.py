@@ -27,10 +27,11 @@
 # it in the license file.
 #
 """Validate that the commit message is ok."""
-import re
-import sys
 import argparse
 import os
+import re
+import subprocess
+import sys
 
 VALID_PATTERNS = [
     re.compile(r"^Fix lint$"),  # Allow "Fix lint" as the sole commit summary
@@ -42,10 +43,14 @@ PRIVATE_PATTERNS = [re.compile(r"^[A-Z]+-[0-9]+")]
 STATUS_OK = 0
 STATUS_ERROR = 1
 
+GIT_SHOW_COMMAND = ["git", "show", "-1", "-s", "--format=%s"]
+
 
 def main(argv=None):
     """Execute Main function to validate commit messages."""
-    parser = argparse.ArgumentParser(usage="Validate the commit message.")
+    parser = argparse.ArgumentParser(
+        usage="Validate the commit message. "
+        "It validates the latest message when no arguments are provided.")
     parser.add_argument(
         "-i",
         action="store_true",
@@ -56,12 +61,17 @@ def main(argv=None):
     parser.add_argument(
         "message",
         metavar="commit message",
-        nargs="+",
+        nargs="*",
         help="The commit message to validate",
     )
     args = parser.parse_args(argv)
 
-    message = " ".join(args.message)
+    if not args.message:
+        print('Validating last git commit message')
+        result = subprocess.check_output(GIT_SHOW_COMMAND)
+        message = result.decode('utf-8')
+    else:
+        message = " ".join(args.message)
 
     if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
         status = STATUS_OK
