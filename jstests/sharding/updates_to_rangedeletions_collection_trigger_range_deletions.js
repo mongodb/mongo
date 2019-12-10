@@ -23,7 +23,8 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 
 // Move chunk [50, inf) to shard1.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}));
 
 let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
