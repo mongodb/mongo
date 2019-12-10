@@ -523,6 +523,8 @@ prepare_transaction(TINFO *tinfo)
     testutil_check(__wt_snprintf(buf, sizeof(buf), "prepare_timestamp=%" PRIx64, ts));
     ret = session->prepare_transaction(session, buf);
 
+    logop(session, "prepare ts=%" PRIu64, ts);
+
     testutil_check(pthread_rwlock_unlock(&g.ts_lock));
 
     return (ret);

@@ -45,6 +45,7 @@ static void signal_timer(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 signal_timer(int signo)
 {
+    fprintf(stderr, "format alarm timed out\n");
     fprintf(stderr, "format caught signal %d, aborting the process\n", signo);
     fflush(stderr);
     __wt_abort(NULL);

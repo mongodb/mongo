@@ -912,7 +912,7 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
             WT_ERR_MSG(session, WT_ERROR, "log file %s corrupted: Bad magic number %" PRIu32,
               fh->name, desc->log_magic);
         else
-            WT_PANIC_RET(session, WT_ERROR, "log file %s corrupted: Bad magic number %" PRIu32,
+            WT_ERR_MSG(session, WT_TRY_SALVAGE, "log file %s corrupted: Bad magic number %" PRIu32,
               fh->name, desc->log_magic);
     }
     /*

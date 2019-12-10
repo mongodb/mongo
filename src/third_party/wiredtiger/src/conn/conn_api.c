@@ -1911,7 +1911,7 @@ __wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursors)
                   "read-committed" :
                   (s->isolation == WT_ISO_READ_UNCOMMITTED ? "read-uncommitted" : "snapshot")));
             WT_ERR(__wt_msg(session, "  Transaction:"));
-            WT_ERR(__wt_verbose_dump_txn_one(session, &s->txn));
+            WT_ERR(__wt_verbose_dump_txn_one(session, &s->txn, 0, NULL));
         } else {
             WT_ERR(__wt_msg(session, "  Number of positioned cursors: %u", s->ncursors));
             TAILQ_FOREACH (cursor, &s->cursors, q) {
