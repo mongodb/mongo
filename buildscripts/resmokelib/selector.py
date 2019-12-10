@@ -676,7 +676,6 @@ _SELECTOR_REGISTRY = {
     "cpp_integration_test": (_CppTestSelectorConfig, _CppTestSelector),
     "cpp_unit_test": (_CppTestSelectorConfig, _CppTestSelector),
     "benchmark_test": (_CppTestSelectorConfig, _CppTestSelector),
-    "benchrun_embedded_test": (_JsonTestSelectorConfig, _Selector),
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "parallel_fsm_workload_test": (_MultiJSTestSelectorConfig, _MultiJSTestSelector),

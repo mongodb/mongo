@@ -1,4 +1,4 @@
-// This test verifies writeConcern behavior on a standalone mongod or embedded mongoed.
+// This test verifies writeConcern behavior on a standalone mongod.
 
 (function() {
     'use strict';

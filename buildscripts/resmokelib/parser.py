@@ -112,10 +112,6 @@ def _make_parser():  # pylint: disable=too-many-statements
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
-    parser.add_option("--mongoebench", dest="mongoebench_executable", metavar="PATH",
-                      help=("The path to the mongoebench (benchrun embedded) executable for"
-                            " resmoke.py to use."))
-
     parser.add_option("--mongos", dest="mongos_executable", metavar="PATH",
                       help="The path to the mongos executable for resmoke.py to use.")
 
@@ -303,23 +299,9 @@ def _make_parser():  # pylint: disable=too-many-statements
     benchmark_options.add_option("--benchmarkRepetitions", type="int", dest="benchmark_repetitions",
                                  metavar="BENCHMARK_REPETITIONS", help=benchmark_repetitions_help)
 
-    benchrun_devices = ["Android", "Desktop"]
-    benchmark_options.add_option("--benchrunDevice", dest="benchrun_device", metavar="DEVICE",
-                                 type="choice", action="store", choices=benchrun_devices,
-                                 help=("The device to run the benchrun test on, choose from {}."
-                                       " Defaults to DEVICE='%default'.".format(benchrun_devices)))
-
-    benchmark_options.add_option("--benchrunReportRoot", dest="benchrun_report_root",
-                                 metavar="PATH", help="The root path for benchrun test report.")
-
-    benchmark_options.add_option("--benchrunEmbeddedRoot", dest="benchrun_embedded_root",
-                                 metavar="PATH",
-                                 help="The root path on the mobile device, for a benchrun test.")
-
-    parser.set_defaults(benchrun_device="Desktop", dry_run="off", find_suites=False,
-                        list_suites=False, logger_file="console", prealloc_journal="off",
-                        shuffle="auto", stagger_jobs="off", suite_files="with_server",
-                        majority_read_concern="on")
+    parser.set_defaults(dry_run="off", find_suites=False, list_suites=False, logger_file="console",
+                        prealloc_journal="off", shuffle="auto", stagger_jobs="off",
+                        suite_files="with_server", majority_read_concern="on")
     return parser
 
 
@@ -384,8 +366,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
     _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")
     _config.BASE_PORT = int(config.pop("base_port"))
-    _config.BENCHRUN_DEVICE = config.pop("benchrun_device")
-    _config.BENCHRUN_EMBEDDED_ROOT = config.pop("benchrun_embedded_root")
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
@@ -398,7 +378,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
     _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")
-    _config.MONGOEBENCH_EXECUTABLE = _expand_user(config.pop("mongoebench_executable"))
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
     _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
     _config.NO_JOURNAL = config.pop("no_journal")
@@ -443,7 +422,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     if benchmark_min_time is not None:
         _config.BENCHMARK_MIN_TIME = datetime.timedelta(seconds=benchmark_min_time)
     _config.BENCHMARK_REPETITIONS = config.pop("benchmark_repetitions")
-    _config.BENCHRUN_REPORT_ROOT = config.pop("benchrun_report_root")
 
     shuffle = config.pop("shuffle")
     if shuffle == "auto":

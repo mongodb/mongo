@@ -748,9 +748,9 @@ BenchRunWorker::BenchRunWorker(size_t id,
 
 BenchRunWorker::~BenchRunWorker() {
     try {
-        // We explicitly call join() on the started thread to ensure that any thread-local variables
-        // (e.g. 'currentClient' when running through mongoebench) have been destructed before
-        // returning from BenchRunWorker's destructor.
+        // We explicitly call join() on the started thread to ensure
+        // that any thread-local variables have been destructed
+        // before returning from BenchRunWorker's destructor.
         _thread.join();
     } catch (...) {
         severe() << "caught exception in destructor: " << exceptionToStatus();
