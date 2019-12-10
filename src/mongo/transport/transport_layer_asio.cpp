@@ -144,23 +144,13 @@ public:
     void run() noexcept override {
         ThreadIdGuard threadIdGuard(this);
         asio::io_context::work work(_ioContext);
-        try {
-            _ioContext.run();
-        } catch (...) {
-            severe() << "Uncaught exception in reactor: " << exceptionToStatus();
-            fassertFailed(40491);
-        }
+        _ioContext.run();
     }
 
     void runFor(Milliseconds time) noexcept override {
         ThreadIdGuard threadIdGuard(this);
         asio::io_context::work work(_ioContext);
-        try {
-            _ioContext.run_for(time.toSystemDuration());
-        } catch (...) {
-            severe() << "Uncaught exception in reactor: " << exceptionToStatus();
-            fassertFailed(50473);
-        }
+        _ioContext.run_for(time.toSystemDuration());
     }
 
     void stop() override {
