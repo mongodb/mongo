@@ -8,37 +8,41 @@
 (function() {
 "use strict";
 
-load('jstests/noPassthrough/libs/index_build.js');
+load("jstests/noPassthrough/libs/index_build.js");
 
 let replSet = new ReplSetTest({name: "server35671", nodes: 1});
-let setFailpointBool = (failpointName, alwaysOn, times) => {
+let setFailpointBool = (testDB, failpointName, alwaysOn, times) => {
     if (times) {
-        return db.adminCommand({configureFailPoint: failpointName, mode: {"times": times}});
+        return testDB.adminCommand({configureFailPoint: failpointName, mode: {"times": times}});
     } else if (alwaysOn) {
-        return db.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"});
+        return testDB.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"});
     } else {
-        return db.adminCommand({configureFailPoint: failpointName, mode: "off"});
+        return testDB.adminCommand({configureFailPoint: failpointName, mode: "off"});
     }
 };
 replSet.startSet();
 replSet.initiate();
-var db = replSet.getPrimary();
-setFailpointBool("hangAfterStartingIndexBuildUnlocked", true);
+let testDB = replSet.getPrimary().getDB("test");
+// This test depends on using the IndexBuildsCoordinator to build this index, which as of
+// SERVER-44405, will not occur in this test unless the collection is created beforehand.
+assert.commandWorked(testDB.runCommand({create: "coll"}));
+
+setFailpointBool(testDB, "hangAfterStartingIndexBuildUnlocked", true);
 
 // Blocks because of failpoint
-var join =
-    startParallelShell("db.coll.createIndex({a: 1, b: 1}, {background: true})", replSet.ports[0]);
+let join = startParallelShell(
+    "db.getSiblingDB('test').coll.createIndex({a: 1, b: 1}, {background: true})", replSet.ports[0]);
 
 // Let the createIndex start to run.
-IndexBuildTest.waitForIndexBuildToScanCollection(db.getDB('test'), 'coll', 'a_1_b_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(testDB, "coll", "a_1_b_1");
 
 // Repeated calls should continue to fail without crashing.
-assert.commandFailed(db.adminCommand({restartCatalog: 1}));
-assert.commandFailed(db.adminCommand({restartCatalog: 1}));
-assert.commandFailed(db.adminCommand({restartCatalog: 1}));
+assert.commandFailed(testDB.adminCommand({restartCatalog: 1}));
+assert.commandFailed(testDB.adminCommand({restartCatalog: 1}));
+assert.commandFailed(testDB.adminCommand({restartCatalog: 1}));
 
 // Unset failpoint so we can join the parallel shell.
-setFailpointBool("hangAfterStartingIndexBuildUnlocked", false);
+setFailpointBool(testDB, "hangAfterStartingIndexBuildUnlocked", false);
 join();
 replSet.stopSet();
 })();

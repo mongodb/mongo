@@ -81,7 +81,7 @@ constexpr StringData kUniqueFieldName = "unique"_sd;
 void checkShardKeyRestrictions(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const BSONObj& newIdxKey) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, nss));
 
     const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     if (!metadata->isSharded())
@@ -297,7 +297,7 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
     invariant(_collectionIndexBuilds.empty());
 }
 
-bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() const {
+bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() {
     auto storageEngine = getGlobalServiceContext()->getStorageEngine();
     return storageEngine->supportsTwoPhaseIndexBuild();
 }
@@ -1000,7 +1000,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
 
     std::vector<BSONObj> filteredSpecs;
     try {
-        filteredSpecs = _addDefaultsAndFilterExistingIndexes(opCtx, collection, nss, specs);
+        filteredSpecs = prepareSpecListForCreate(opCtx, collection, nss, specs);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -1009,7 +1009,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
         // The requested index (specs) are already built or are being built. Return success
         // early (this is v4.0 behavior compatible).
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        int numIndexes = _getNumIndexesTotal(opCtx, collection);
+        int numIndexes = getNumIndexesTotal(opCtx, collection);
         indexCatalogStats.numIndexesBefore = numIndexes;
         indexCatalogStats.numIndexesAfter = numIndexes;
         return SharedSemiFuture(indexCatalogStats);
@@ -1017,7 +1017,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol, commitQuorum);
-    replIndexBuildState->stats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
+    replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
 
     status = _registerIndexBuild(lk, replIndexBuildState);
     if (!status.isOK()) {
@@ -1384,7 +1384,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         auto collection =
             CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
         invariant(collection);
-        replState->stats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
+        replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
     } catch (const DBException& ex) {
         status = ex.toStatus();
     }
@@ -1738,7 +1738,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     long long dataSize = 0;
 
     ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-    indexCatalogStats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
+    indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
 
     try {
         log() << "Index builds manager starting: " << buildUUID << ": " << nss;
@@ -1757,7 +1757,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
                                                              MultiIndexBlock::kNoopOnCreateEachFn,
                                                              MultiIndexBlock::kNoopOnCommitFn));
 
-        indexCatalogStats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
+        indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
 
         log() << "Index builds manager completed successfully: " << buildUUID << ": " << nss
               << ". Index specs requested: " << replState->indexSpecs.size()
@@ -1882,7 +1882,7 @@ ScopedStopNewCollectionIndexBuilds::~ScopedStopNewCollectionIndexBuilds() {
     _indexBuildsCoordinatorPtr->_allowIndexBuildsOnCollection(_collectionUUID);
 }
 
-int IndexBuildsCoordinator::_getNumIndexesTotal(OperationContext* opCtx, Collection* collection) {
+int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx, Collection* collection) {
     invariant(collection);
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isLocked(),
@@ -1895,12 +1895,13 @@ int IndexBuildsCoordinator::_getNumIndexesTotal(OperationContext* opCtx, Collect
     return indexCatalog->numIndexesTotal(opCtx);
 }
 
-std::vector<BSONObj> IndexBuildsCoordinator::_addDefaultsAndFilterExistingIndexes(
+std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
     const std::vector<BSONObj>& indexSpecs) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(
+        UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
     invariant(collection);
 
     // During secondary oplog application, the index specs have already been normalized in the
@@ -1914,16 +1915,18 @@ std::vector<BSONObj> IndexBuildsCoordinator::_addDefaultsAndFilterExistingIndexe
         uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
 
     auto indexCatalog = collection->getIndexCatalog();
-    auto filteredSpecs = indexCatalog->removeExistingIndexes(
+    std::vector<BSONObj> resultSpecs;
+
+    resultSpecs = indexCatalog->removeExistingIndexes(
         opCtx, specsWithCollationDefaults, true /*removeIndexBuildsToo*/);
 
-    for (const BSONObj& spec : filteredSpecs) {
+    for (const BSONObj& spec : resultSpecs) {
         if (spec[kUniqueFieldName].trueValue()) {
             checkShardKeyRestrictions(opCtx, nss, spec[kKeyFieldName].Obj());
         }
     }
 
-    return filteredSpecs;
+    return resultSpecs;
 }
 
 }  // namespace mongo

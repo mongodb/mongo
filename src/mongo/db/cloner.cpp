@@ -404,7 +404,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                            // If two phase index builds are enabled, the index build will be
                            // coordinated using startIndexBuild and commitIndexBuild oplog entries.
                            if (opCtx->writesAreReplicated() &&
-                               !IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+                               !IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
                                opObserver->onCreateIndex(
                                    opCtx, collection->ns(), collection->uuid(), spec, fromMigrate);
                            }

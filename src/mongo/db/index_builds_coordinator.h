@@ -112,7 +112,7 @@ public:
      * Returns true if two phase index builds are supported.
      * This is determined by the current FCV and the server parameter 'enableTwoPhaseIndexBuild'.
      */
-    bool supportsTwoPhaseIndexBuild() const;
+    static bool supportsTwoPhaseIndexBuild();
 
     /**
      * Sets up the in-memory and durable state of the index build. When successful, returns after
@@ -345,14 +345,38 @@ public:
      * written on failure.
      * Throws exception on error.
      */
-    void createIndexesOnEmptyCollection(OperationContext* opCtx,
-                                        UUID collectionUUID,
-                                        const std::vector<BSONObj>& specs,
-                                        bool fromMigrate);
+    static void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                               UUID collectionUUID,
+                                               const std::vector<BSONObj>& specs,
+                                               bool fromMigrate);
 
     void sleepIndexBuilds_forTestOnly(bool sleep);
 
     void verifyNoIndexBuilds_forTestOnly();
+
+    /**
+     * Helper function that adds collation defaults to 'indexSpecs', as well as filtering out
+     * existing indexes (ready or building) and checking uniqueness constraints are compatible with
+     * sharding.
+     *
+     * Produces final specs to use for an index build, if the result is non-empty.
+     *
+     * This function throws on error. Expects caller to have exclusive access to `collection`.
+     */
+    static std::vector<BSONObj> prepareSpecListForCreate(OperationContext* opCtx,
+                                                         Collection* collection,
+                                                         const NamespaceString& nss,
+                                                         const std::vector<BSONObj>& indexSpecs);
+
+    /**
+     * Returns total number of indexes in collection, including unfinished/in-progress indexes.
+     *
+     * Used to set statistics on index build results.
+     *
+     * Expects a lock to be held by the caller, so that 'collection' is safe to use.
+     */
+    static int getNumIndexesTotal(OperationContext* opCtx, Collection* collection);
+
 
 private:
     // Friend classes in order to be the only allowed callers of
@@ -560,30 +584,6 @@ protected:
         const IndexBuildOptions& indexBuildOptions,
         boost::optional<Lock::CollectionLock>* exclusiveCollectionLock,
         const Timestamp& commitIndexBuildTimestamp);
-
-    /**
-     * Returns total number of indexes in collection, including unfinished/in-progress indexes.
-     *
-     * Helper function that is used in sub-classes. Used to set statistics on index build results.
-     *
-     * Expects a lock to be held by the caller, so that 'collection' is safe to use.
-     */
-    int _getNumIndexesTotal(OperationContext* opCtx, Collection* collection);
-
-    /**
-     * Adds collation defaults to 'indexSpecs', as well as filtering out existing indexes (ready or
-     * building) and checking uniqueness constraints are compatible with sharding.
-     *
-     * Helper function that is used in sub-classes. Produces final specs that the Coordinator will
-     * register and use for the build, if the result is non-empty.
-     *
-     * This function throws on error. Expects a DB X lock to be held by the caller.
-     */
-    std::vector<BSONObj> _addDefaultsAndFilterExistingIndexes(
-        OperationContext* opCtx,
-        Collection* collection,
-        const NamespaceString& nss,
-        const std::vector<BSONObj>& indexSpecs);
 
     /**
      * Runs the index build.

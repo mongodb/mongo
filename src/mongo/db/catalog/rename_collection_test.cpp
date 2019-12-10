@@ -354,8 +354,7 @@ void RenameCollectionTest::setUp() {
     service->setOpObserver(std::move(opObserver));
 
     // Cache two phase index build support setting.
-    _supportsTwoPhaseIndexBuild =
-        IndexBuildsCoordinator::get(_opCtx.get())->supportsTwoPhaseIndexBuild();
+    _supportsTwoPhaseIndexBuild = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild();
 
     _sourceNss = NamespaceString("test.foo");
     _targetNss = NamespaceString("test.bar");

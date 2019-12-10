@@ -805,7 +805,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   ui);
           auto collUUID = ui.get();
 
-          if (IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+          if (IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
               return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
           }
 

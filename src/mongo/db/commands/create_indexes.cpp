@@ -38,10 +38,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -68,6 +70,13 @@
 namespace mongo {
 
 namespace {
+// This failpoint simulates a WriteConflictException during createIndexes where the collection is
+// implicitly created.
+MONGO_FAIL_POINT_DEFINE(createIndexesWriteConflict);
+
+// This failpoint causes createIndexes with an implicit collection creation to hang before the
+// collection is created.
+MONGO_FAIL_POINT_DEFINE(hangBeforeCreateIndexesCollectionCreate);
 
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
@@ -181,6 +190,23 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
 
     return indexSpecs;
 }
+
+void appendFinalIndexFieldsToResult(int numIndexesBefore,
+                                    int numIndexesAfter,
+                                    BSONObjBuilder& result,
+                                    int numSpecs,
+                                    boost::optional<CommitQuorumOptions> commitQuorum) {
+    result.append(kNumIndexesBeforeFieldName, numIndexesBefore);
+    result.append(kNumIndexesAfterFieldName, numIndexesAfter);
+    if (numIndexesAfter == numIndexesBefore) {
+        result.append(kNoteFieldName, "all indexes already exist");
+    } else if (numIndexesAfter < numIndexesBefore + numSpecs) {
+        result.append(kNoteFieldName, "index already exists");
+    }
+
+    commitQuorum->append("commitQuorum", &result);
+}
+
 
 /**
  * Ensures that the options passed in for TTL indexes are valid.
@@ -348,8 +374,9 @@ void checkCollectionShardingState(OperationContext* opCtx, const NamespaceString
 }
 
 /**
- * Opens or creates database for index creation.
+ * Opens or creates database for index creation. Only intended for mobile storage engine.
  * On database creation, the lock will be made exclusive.
+ * TODO(SERVER-42513): Remove this function.
  */
 Database* getOrCreateDatabase(OperationContext* opCtx, StringData dbName, Lock::DBLock* dbLock) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -368,8 +395,9 @@ Database* getOrCreateDatabase(OperationContext* opCtx, StringData dbName, Lock::
 }
 
 /**
- * Gets or creates collection to hold indexes.
+ * Gets or creates collection to hold indexes. Only intended for mobile storage engine.
  * Appends field to command result to indicate if the collection already exists.
+ * TODO(SERVER-42513): Remove this function.
  */
 Collection* getOrCreateCollection(OperationContext* opCtx,
                                   Database* db,
@@ -404,6 +432,80 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
     });
 }
 
+/**
+ * Attempts to create indexes in `specs` on a non-existent collection with namespace `ns`, thereby
+ * implicitly creating the collection.
+ * Returns a BSONObj containing fields to be appended to the result of the calling function.
+ * `commitQuorum` is passed only to be appended to the result, for completeness. It is otherwise
+ * unused.
+ * Expects to be run at the end of a larger writeConflictRetry loop.
+ */
+BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const std::vector<BSONObj>& specs,
+                                        boost::optional<CommitQuorumOptions> commitQuorum) {
+    BSONObjBuilder createResult;
+
+    WriteUnitOfWork wunit(opCtx);
+
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->getDb(opCtx, ns.db());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            "Cannot create indexes on a view",
+            !db || !ViewCatalog::get(db)->lookup(opCtx, ns.ns()));
+
+    // We need to create the collection.
+    BSONObjBuilder builder;
+    builder.append("create", ns.coll());
+    CollectionOptions options;
+    builder.appendElements(options.toBSON());
+    BSONObj idIndexSpec;
+
+    if (MONGO_unlikely(hangBeforeCreateIndexesCollectionCreate.shouldFail())) {
+        // Simulate a scenario where a conflicting collection creation occurs
+        // mid-index build.
+        log() << "Hanging create collection due to failpoint "
+                 "'hangBeforeCreateIndexesCollectionCreate'";
+        hangBeforeCreateIndexesCollectionCreate.pauseWhileSet();
+    }
+
+    auto createStatus =
+        createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
+    if (!UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, ns)) {
+        // We should retry the createIndexes command so we can perform the checks for index
+        // and/or collection existence again.
+        throw WriteConflictException();
+    }
+
+    uassertStatusOK(createStatus);
+
+    // Obtain the newly-created collection object.
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
+    invariant(
+        UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
+    /**
+     * TODO(SERVER-44849) Ensure the collection, which may or may not have been created earlier
+     * in the same multi-document transaction, is empty.
+     */
+
+    const int numIndexesBefore = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
+    auto filteredSpecs =
+        IndexBuildsCoordinator::prepareSpecListForCreate(opCtx, collection, ns, specs);
+    IndexBuildsCoordinator::createIndexesOnEmptyCollection(
+        opCtx, collection->uuid(), filteredSpecs, false);
+
+    const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
+
+    if (MONGO_unlikely(createIndexesWriteConflict.shouldFail())) {
+        throw WriteConflictException();
+    }
+    wunit.commit();
+
+    appendFinalIndexFieldsToResult(
+        numIndexesBefore, numIndexesAfter, createResult, int(specs.size()), commitQuorum);
+
+    return createResult.obj();
+}
 /**
  * Creates indexes using the given specs for the mobile storage engine.
  * TODO(SERVER-42513): Remove this function.
@@ -682,10 +784,9 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
     // 1) We are in a replication mode that allows for index creation.
     // 2) Check sharding state.
-    // 3) Create the collection to hold the index(es) if necessary.
+    // 3) Check if we can create the index without handing control to the IndexBuildsCoordinator.
     OptionalCollectionUUID collectionUUID;
     {
-        // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
         checkDatabaseShardingState(opCtx, ns.db());
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
@@ -693,28 +794,38 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
         }
 
-        if (indexesAlreadyExist(opCtx, ns, specs, &result)) {
+        bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
+            if (indexesAlreadyExist(opCtx, ns, specs, &result)) {
+                return true;
+            }
+
+            // TODO SERVER-44849 Remove once createIndexes on new indexes is permitted
+            // inside transactions.
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    str::stream() << "Cannot create new indexes on " << ns
+                                  << " in a multi-document transaction.",
+                    !opCtx->inMultiDocumentTransaction());
+
+            auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
+            if (!collection) {
+                auto createIndexesResult =
+                    runCreateIndexesOnNewCollection(opCtx, ns, specs, commitQuorum);
+                // No further sources of WriteConflicts can occur at this point, so it is safe to
+                // append elements to `result` inside the writeConflictRetry loop.
+                result.appendElements(createIndexesResult);
+                result.appendBool(kCreateCollectionAutomaticallyFieldName, true);
+                return true;
+            }
+
+            collectionUUID = collection->uuid();
+            result.appendBool(kCreateCollectionAutomaticallyFieldName, false);
+            return false;
+        });
+
+        if (indexExists) {
+            // No need to proceed if the index either already existed or has just been built.
             return true;
         }
-
-        // Multi-document transactions should not take exclusive locks, so do not proceed further
-        // if we are in a multi-document transaction.
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create new indexes on " << ns.ns()
-                              << " in a multi-document transaction.",
-                !opCtx->inMultiDocumentTransaction());
-
-        auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
-
-        opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock collLock(opCtx, ns, MODE_X);
-
-        // This check is for optimization purposes only as this lock is released immediately after
-        // this and is acquired again when we build the index.
-        checkCollectionShardingState(opCtx, ns);
-
-        auto collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
-        collectionUUID = collection->uuid();
     }
 
     // Use AutoStatsTracker to update Top.
@@ -728,7 +839,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto buildUUID = UUID::gen();
-    auto protocol = indexBuildsCoord->supportsTwoPhaseIndexBuild()
+    auto protocol = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()
         ? IndexBuildProtocol::kTwoPhase
         : IndexBuildProtocol::kSinglePhase;
     log() << "Registering index build: " << buildUUID;
@@ -757,6 +868,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // If this node is no longer a primary, the index build will continue to run in the
             // background and will complete when this node receives a commitIndexBuild oplog entry
             // from the new primary.
+
             if (indexBuildsCoord->supportsTwoPhaseIndexBuild() &&
                 ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
                 log() << "Index build continuing in background: " << buildUUID;
@@ -782,6 +894,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
             // The index build will continue to run in the background and will complete when this
             // node receives a commitIndexBuild oplog entry from the new primary.
+
             if (indexBuildsCoord->supportsTwoPhaseIndexBuild()) {
                 log() << "Index build continuing in background: " << buildUUID;
                 throw;
@@ -825,15 +938,8 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     // getLastError results as the previous non-IndexBuildsCoordinator behavior.
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
-    result.append(kNumIndexesBeforeFieldName, stats.numIndexesBefore);
-    result.append(kNumIndexesAfterFieldName, stats.numIndexesAfter);
-    if (stats.numIndexesAfter == stats.numIndexesBefore) {
-        result.append(kNoteFieldName, "all indexes already exist");
-    } else if (stats.numIndexesAfter < stats.numIndexesBefore + int(specs.size())) {
-        result.append(kNoteFieldName, "index already exists");
-    }
-
-    commitQuorum->append("commitQuorum", &result);
+    appendFinalIndexFieldsToResult(
+        stats.numIndexesBefore, stats.numIndexesAfter, result, int(specs.size()), commitQuorum);
 
     return true;
 }

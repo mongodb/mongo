@@ -2166,7 +2166,7 @@ public:
 
         // Two phase index builds do not emit an createIndexes oplog entry for each index.
         Timestamp indexAComplete;
-        if (!IndexBuildsCoordinator::get(_opCtx)->supportsTwoPhaseIndexBuild()) {
+        if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
             indexAComplete = queryOplog(BSON("op"
                                              << "c"
                                              << "o.createIndexes" << nss.coll() << "o.name"
@@ -2806,7 +2806,7 @@ public:
                                                              << "user_1_db_1")))
                                 .getTimestamp();
         Timestamp indexCreateTs;
-        if (!IndexBuildsCoordinator::get(_opCtx)->supportsTwoPhaseIndexBuild()) {
+        if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
             indexCreateTs =
                 repl::OplogEntry(queryOplog(BSON("op"
                                                  << "c"

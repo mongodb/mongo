@@ -332,7 +332,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // This blocking behavior can also introduce a deadlock with two-phase index builds on
     // a secondary if a prepared transaction blocks on an index build, but the index build can't
     // re-acquire its X lock because of the transaction.
-    if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
         for (const auto& op : ops) {
             auto ns = op.getNss();
             auto uuid = *op.getUuid();

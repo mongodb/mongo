@@ -43,10 +43,8 @@ const indexSpecC = {
 
 testColl.drop();
 assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
-
-// TODO (SERVER-40952): currently createIndexes will hold an X lock for the duration of the
-// build if the collection is not created beforehand. This test needs that not to happen, so we
-// can pause a build and a subsequently issued request can get an IX lock.
+// This test depends on using the IndexBuildsCoordinator to build this index, which as of
+// SERVER-44405, will not occur in this test unless the collection is created beforehand.
 assert.commandWorked(testDB.runCommand({create: collName}));
 
 function runSuccessfulIndexBuild(dbName, collName, indexSpec, requestNumber) {
