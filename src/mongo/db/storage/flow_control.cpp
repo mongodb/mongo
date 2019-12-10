@@ -197,7 +197,9 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
     bob.append("targetRateLimit", _lastTargetTicketsPermitted.load());
     bob.append("timeAcquiringMicros",
                FlowControlTicketholder::get(opCtx)->totalTimeAcquiringMicros());
-    bob.append("locksPerOp", _lastLocksPerOp.load());
+    // Ensure sufficient significant figures of locksPerOp are reported in FTDC, which stores data
+    // as integers.
+    bob.append("locksPerKiloOp", _lastLocksPerOp.load() * 1000);
     bob.append("sustainerRate", _lastSustainerAppliedCount.load());
     bob.append("isLagged", _isLagged.load());
     bob.append("isLaggedCount", _isLaggedCount.load());

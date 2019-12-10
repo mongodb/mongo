@@ -191,7 +191,7 @@ TEST_F(FlowControlTest, QueryingLocksPerOp) {
 
             BSONElement noopVar;
             auto serverStatusSection = flowControl->generateSection(opCtx.get(), noopVar);
-            ASSERT_EQ(numSamples, serverStatusSection["locksPerOp"].Double());
+            ASSERT_EQ(numSamples * 1000, serverStatusSection["locksPerKiloOp"].Double());
         } else {
             ASSERT_EQ(-1.0, flowControl->_getLocksPerOp());
         }
