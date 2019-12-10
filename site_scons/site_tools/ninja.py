@@ -29,6 +29,7 @@ NINJA_RULES = "__NINJA_CUSTOM_RULES"
 NINJA_CUSTOM_HANDLERS = "__NINJA_CUSTOM_HANDLERS"
 NINJA_BUILD = "NINJA_BUILD"
 NINJA_OUTPUTS = "__NINJA_OUTPUTS"
+NINJA_WHEREIS_MEMO = {}
 __NINJA_RULE_MAPPING = {}
 
 # These are the types that get_command can do something with
@@ -888,7 +889,25 @@ def ninja_noop(*_args, **_kwargs):
 
 def ninja_whereis(thing, *_args, **_kwargs):
     """Replace env.WhereIs with a much faster version"""
-    return shutil.which(thing)
+    global NINJA_WHEREIS_MEMO
+
+    # Optimize for success, this gets called significantly more often
+    # when the value is already memoized than when it's not.
+    try:
+        return NINJA_WHEREIS_MEMO[thing]
+    except KeyError:
+        # We do not honor any env['ENV'] or env[*] variables in the
+        # generated ninja ile. Ninja passes your raw shell environment
+        # down to it's subprocess so the only sane option is to do the
+        # same during generation. At some point, if and when we try to
+        # upstream this, I'm sure a sticking point will be respecting
+        # env['ENV'] variables and such but it's actually quite
+        # complicated. I have a naive version but making it always work
+        # with shell quoting is nigh impossible. So I've decided to
+        # cross that bridge when it's absolutely required.
+        path = shutil.which(thing)
+        NINJA_WHEREIS_MEMO[thing] = path
+        return path
 
 
 class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
