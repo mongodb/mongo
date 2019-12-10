@@ -1038,19 +1038,23 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     _initialSyncState->allDatabaseClonerFuture =
         _initialSyncState->allDatabaseCloner->runOnExecutor(_clonerExec)
-            .onCompletion([this, onCompletionGuard](Status status) {
+            .onCompletion([this, onCompletionGuard](Status status) mutable {
                 // The completion guard must run on the main executor.  This only makes a difference
                 // for unit tests, but we always schedule it that way to avoid special casing test
                 // code.
+                stdx::unique_lock<Latch> lock(_mutex);
                 auto exec_status = _exec->scheduleWork(
                     [this, status, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
                         _allDatabaseClonerCallback(status, onCompletionGuard);
                     });
                 if (!exec_status.isOK()) {
-                    stdx::unique_lock<Latch> lock(_mutex);
                     onCompletionGuard->setResultAndCancelRemainingWork_inlock(
                         lock, exec_status.getStatus());
                 }
+                // In unit tests, this reset ensures the completion guard does not run during the
+                // destruction of the lambda (which occurs on the wrong executor), except in the
+                // shutdown case.
+                onCompletionGuard.reset();
             });
 
     if (!status.isOK()) {

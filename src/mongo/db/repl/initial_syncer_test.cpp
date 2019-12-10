@@ -4207,9 +4207,6 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         {
             executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
-            // Make the cloner callback run.
-            net->runReadyNetworkOperations();
-
             auto when = net->now() + _options.initialSyncRetryWait;
             ASSERT_EQUALS(when, net->runUntil(when));
 
