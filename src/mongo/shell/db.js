@@ -651,8 +651,7 @@ var DB;
         print("\tdb.shutdownServer()");
         print("\tdb.stats()");
         print("\tdb.version() current version of the server");
-        print("\tdb.watch() - opens a change stream cursor for a database to report on all " +
-              " changes to its non-system collections.");
+
         return __magicNoPrint;
     };
 
@@ -795,6 +794,7 @@ var DB;
      * </p>
      */
     DB.prototype.groupeval = function(parmsObj) {
+
         var groupFunction = function() {
             var parms = args[0];
             var c = db[parms.ns].find(parms.cond || {});
@@ -1404,7 +1404,7 @@ var DB;
     };
 
     /* Loads any scripts contained in system.js into the client shell.
-     */
+    */
     DB.prototype.loadServerScripts = function() {
         var global = Function('return this')();
         this.system.js.find().forEach(function(u) {
@@ -2006,4 +2006,5 @@ var DB;
             return this._session;
         };
     })(Object.prototype.hasOwnProperty);
+
 }());
