@@ -15,8 +15,7 @@ try {
         assert.commandWorked(
             db.adminCommand({configureFailPoint: 'disablePipelineOptimization', mode: mode}));
 
-        // TODO SERVER-43034: include $add and $sum.
-        ["$multiply"].forEach((op) => {
+        ["$multiply", "$add", "$sum"].forEach((op) => {
             (function testCommutativityWithConstArguments() {
                 specials.forEach((special) => {
                     numbers.forEach((num) => {

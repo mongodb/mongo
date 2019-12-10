@@ -204,4 +204,32 @@ TEST(Summation, AddDoubles) {
     ASSERT_EQUALS(sum.getDouble(), doubleValuesSum);
     ASSERT(straightSum != sum.getDouble());
 }
+
+TEST(Summation, ConvertInfinityToDecimal) {
+    constexpr double infinity = std::numeric_limits<double>::infinity();
+    DoubleDoubleSummation sum;
+
+    sum.addDouble(infinity);
+    ASSERT_EQUALS(infinity, sum.getDouble());
+    ASSERT_TRUE(sum.getDecimal().isInfinite());
+    ASSERT_FALSE(sum.getDecimal().isNaN());
+
+    sum.addDouble(1);
+    ASSERT_EQUALS(infinity, sum.getDouble());
+    ASSERT_TRUE(sum.getDecimal().isInfinite());
+    ASSERT_FALSE(sum.getDecimal().isNaN());
+}
+
+TEST(Summation, ConvertNaNToDecimal) {
+    constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+    DoubleDoubleSummation sum;
+
+    sum.addDouble(nan);
+    ASSERT_TRUE(sum.getDecimal().isNaN());
+    ASSERT_FALSE(sum.getDecimal().isInfinite());
+
+    sum.addDouble(1);
+    ASSERT_TRUE(sum.getDecimal().isNaN());
+    ASSERT_FALSE(sum.getDecimal().isInfinite());
+}
 }  // namespace mongo
