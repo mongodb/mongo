@@ -92,7 +92,7 @@ WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern, BSONObj pathP
     auto policies = ProjectionPolicies::wildcardIndexSpecProjectionPolicies();
     auto projection = projection_ast::parse(expCtx, projSpec, policies);
     return projection_executor::buildProjectionExecutor(
-        expCtx, &projection, policies, true /* optimizeExecutor */);
+        expCtx, &projection, policies, projection_executor::kDefaultBuilderParams);
 }
 
 WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,

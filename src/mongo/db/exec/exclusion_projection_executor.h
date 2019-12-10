@@ -44,7 +44,9 @@ namespace mongo::projection_executor {
 class ExclusionNode final : public ProjectionNode {
 public:
     ExclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
-        : ProjectionNode(policies, std::move(pathToNode)) {}
+        : ProjectionNode(policies, std::move(pathToNode)) {
+        _projectMissingFields = true;
+    }
 
     ExclusionNode* addOrGetChild(const std::string& field) {
         return static_cast<ExclusionNode*>(ProjectionNode::addOrGetChild(field));
@@ -64,12 +66,12 @@ public:
     }
 
 protected:
-    std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const final {
+    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
         return std::make_unique<ExclusionNode>(
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
-    Document initializeOutputDocument(const Document& inputDoc) const final {
-        return inputDoc;
+    MutableDocument initializeOutputDocument(const Document& inputDoc) const final {
+        return MutableDocument{inputDoc};
     }
     Value applyLeafProjectionToValue(const Value& value) const final {
         return Value();
@@ -88,7 +90,8 @@ protected:
 class ExclusionProjectionExecutor : public ProjectionExecutor {
 public:
     ExclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                ProjectionPolicies policies)
+                                ProjectionPolicies policies,
+                                bool allowFastPath = false)
         : ProjectionExecutor(expCtx, policies), _root(new ExclusionNode(_policies)) {}
 
     TransformerType getType() const final {

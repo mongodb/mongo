@@ -56,8 +56,9 @@ using std::vector;
 auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& policies) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto projection = projection_ast::parse(expCtx, spec, policies);
-    auto executor =
-        buildProjectionExecutor(expCtx, &projection, policies, true /* optimizeExecutor */);
+    auto builderParams = BuilderParamsBitSet{kDefaultBuilderParams};
+    builderParams.reset(kAllowFastPath);
+    auto executor = buildProjectionExecutor(expCtx, &projection, policies, builderParams);
     invariant(executor->getType() == TransformerInterface::TransformerType::kExclusionProjection);
     return executor;
 }

@@ -29,10 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/projection_executor_builder.h"
+
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
-#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/projection_ast_walker.h"
@@ -243,13 +244,13 @@ template <typename Executor>
 auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const projection_ast::ProjectionPathASTNode* root,
                              const ProjectionPolicies policies,
-                             bool optimizeExecutor) {
+                             const BuilderParamsBitSet params) {
     ProjectionExecutorVisitorContext<Executor> context{
-        {std::make_unique<Executor>(expCtx, policies), expCtx}};
+        {std::make_unique<Executor>(expCtx, policies, params[kAllowFastPath]), expCtx}};
     ProjectionExecutorVisitor<Executor> executorVisitor{&context};
     projection_ast::PathTrackingWalker walker{&context, {&executorVisitor}, {}};
     projection_ast_walker::walk(&walker, root);
-    if (optimizeExecutor) {
+    if (params[kOptimizeExecutor]) {
         context.data().executor->optimize();
     }
     return std::move(context.data().executor);
@@ -260,16 +261,22 @@ std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const projection_ast::Projection* projection,
     const ProjectionPolicies policies,
-    bool optimizeExecutor) {
+    BuilderParamsBitSet params) {
     invariant(projection);
+
+    // Fast-path can only be used with inclusion-only projections, so we need to reset the
+    // fast-path flag.
+    if (!projection->isInclusionOnly()) {
+        params.reset(kAllowFastPath);
+    }
 
     switch (projection->type()) {
         case kInclusion:
             return buildProjectionExecutor<InclusionProjectionExecutor>(
-                expCtx, projection->root(), policies, optimizeExecutor);
+                expCtx, projection->root(), policies, params);
         case kExclusion:
             return buildProjectionExecutor<ExclusionProjectionExecutor>(
-                expCtx, projection->root(), policies, optimizeExecutor);
+                expCtx, projection->root(), policies, params);
         default:
             MONGO_UNREACHABLE;
     }

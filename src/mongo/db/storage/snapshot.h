@@ -82,6 +82,7 @@ public:
     Snapshotted() : _id(), _value() {}
 
     Snapshotted(SnapshotId id, const T& value) : _id(id), _value(value) {}
+    Snapshotted(SnapshotId id, T&& value) : _id(id), _value(std::forward<T>(value)) {}
 
     void reset() {
         *this = Snapshotted();

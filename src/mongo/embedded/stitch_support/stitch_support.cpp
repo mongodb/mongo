@@ -198,7 +198,7 @@ struct stitch_support_v1_projection {
 
         this->requiresMatch = proj.requiresMatchDetails();
         this->projectionExec = mongo::projection_executor::buildProjectionExecutor(
-            expCtx, &proj, policies, true /* optimizeExecutor */);
+            expCtx, &proj, policies, mongo::projection_executor::kDefaultBuilderParams);
     }
 
     mongo::ServiceContext::UniqueClient client;

@@ -128,6 +128,15 @@ public:
         return _deps.hasExpressions;
     }
 
+    /**
+     * Check if this an inclusion only projection, without expressions and metadata, and the entire
+     * document is not required.
+     */
+    bool isInclusionOnly() const {
+        return _type == ProjectType::kInclusion && !_deps.requiresMatchDetails &&
+            _deps.metadataRequested.none() && !_deps.requiresDocument && !_deps.hasExpressions;
+    }
+
 private:
     ProjectionPathASTNode _root;
     ProjectType _type;

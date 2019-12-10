@@ -57,8 +57,7 @@ auto makeProjectionWithDefaultPolicies(BSONObj spec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ProjectionPolicies defaultPolicies;
     auto projection = projection_ast::parse(expCtx, spec, defaultPolicies);
-    return buildProjectionExecutor(
-        expCtx, &projection, defaultPolicies, true /* optimizeExecutor */);
+    return buildProjectionExecutor(expCtx, &projection, defaultPolicies, kDefaultBuilderParams);
 }
 
 // Helper to simplify the creation of a ProjectionExecutor which bans computed fields.
@@ -69,8 +68,7 @@ auto makeProjectionWithBannedComputedFields(BSONObj spec) {
         ProjectionPolicies::kArrayRecursionPolicyDefault,
         ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields};
     auto projection = projection_ast::parse(expCtx, spec, banComputedFields);
-    return buildProjectionExecutor(
-        expCtx, &projection, banComputedFields, true /* optimizeExecutor */);
+    return buildProjectionExecutor(expCtx, &projection, banComputedFields, kDefaultBuilderParams);
 }
 
 //
@@ -605,6 +603,5 @@ TEST(ProjectionExecutorType, GetExpressionForPathGetsNonTopLevelExpression) {
     BSONObjBuilder bob;
     ASSERT_EQ(expr, node.getExpressionForPath(FieldPath("key.second")));
 }
-
 }  // namespace
 }  // namespace mongo::projection_executor

@@ -45,8 +45,9 @@ auto createProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& exp
                               const BSONObj& projSpec,
                               ProjectionPolicies policies) {
     auto projection = projection_ast::parse(expCtx, projSpec, policies);
-    return projection_executor::buildProjectionExecutor(
-        expCtx, &projection, policies, true /* optimizeExecutor */);
+    auto builderParams = BuilderParamsBitSet{kDefaultBuilderParams};
+    builderParams.reset(kAllowFastPath);
+    return buildProjectionExecutor(expCtx, &projection, policies, builderParams);
 }
 
 class PositionalProjectionExecutionTest : public AggregationContextFixture {

@@ -52,6 +52,11 @@ void ProjectionNode::addExpressionForPath(const FieldPath& path,
                                           boost::intrusive_ptr<Expression> expr) {
     // If the computed fields policy is 'kBanComputedFields', we should never reach here.
     invariant(_policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
+
+    // We're going to add an expression either to this node, or to some child of this node.
+    // In any case, the entire subtree will contain at least one computed field.
+    _subtreeContainsComputedFields = true;
+
     if (path.getPathLength() == 1) {
         auto fieldName = path.fullPath();
         _expressions[fieldName] = expr;
@@ -63,13 +68,16 @@ void ProjectionNode::addExpressionForPath(const FieldPath& path,
 }
 
 boost::intrusive_ptr<Expression> ProjectionNode::getExpressionForPath(const FieldPath& path) const {
+    // The FieldPath always conatins at least one field.
+    auto fieldName = path.getFieldName(0).toString();
+
     if (path.getPathLength() == 1) {
-        if (_expressions.find(path.getFieldName(0)) != _expressions.end()) {
-            return _expressions.at(path.getFieldName(0));
+        if (_expressions.find(fieldName) != _expressions.end()) {
+            return _expressions.at(fieldName);
         }
         return nullptr;
     }
-    if (auto child = getChild(path.getFieldName(0).toString())) {
+    if (auto child = getChild(fieldName)) {
         return child->getExpressionForPath(path.tail());
     }
     return nullptr;
@@ -96,10 +104,15 @@ Document ProjectionNode::applyToDocument(const Document& inputDoc) const {
     // Defer to the derived class to initialize the output document, then apply.
     MutableDocument outputDoc{initializeOutputDocument(inputDoc)};
     applyProjections(inputDoc, &outputDoc);
-    applyExpressions(inputDoc, &outputDoc);
+
+    if (_subtreeContainsComputedFields) {
+        applyExpressions(inputDoc, &outputDoc);
+    }
 
     // Make sure that we always pass through any metadata present in the input doc.
-    outputDoc.copyMetaDataFrom(inputDoc);
+    if (inputDoc.metadata()) {
+        outputDoc.copyMetaDataFrom(inputDoc);
+    }
     return outputDoc.freeze();
 }
 
@@ -107,24 +120,23 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
     // Iterate over the input document so that the projected document retains its field ordering.
     auto it = inputDoc.fieldIterator();
     while (it.more()) {
-        auto fieldPair = it.next();
-        auto fieldName = fieldPair.first.toString();
-        if (_projectedFields.count(fieldName)) {
-            outputProjectedField(
-                fieldName, applyLeafProjectionToValue(fieldPair.second), outputDoc);
-            continue;
-        }
+        auto fieldName = it.fieldName();
+        absl::string_view fieldNameKey{fieldName.rawData(), fieldName.size()};
 
-        auto childIt = _children.find(fieldName);
-        if (childIt != _children.end()) {
+        if (_projectedFields.find(fieldNameKey) != _projectedFields.end()) {
             outputProjectedField(
-                fieldName, childIt->second->applyProjectionsToValue(fieldPair.second), outputDoc);
+                fieldName, applyLeafProjectionToValue(it.next().second), outputDoc);
+        } else if (auto childIt = _children.find(fieldNameKey); childIt != _children.end()) {
+            outputProjectedField(
+                fieldName, childIt->second->applyProjectionsToValue(it.next().second), outputDoc);
+        } else {
+            it.advance();
         }
     }
 
     // Ensure we project all specified fields, including those not present in the input document.
     // TODO SERVER-37791: This block is only necessary due to a bug in exclusion semantics.
-    if (applyLeafProjectionToValue(Value(true)).missing()) {
+    if (_projectMissingFields) {
         for (auto&& fieldName : _projectedFields) {
             if (inputDoc[fieldName].missing()) {
                 outputProjectedField(fieldName, Value(), outputDoc);
@@ -189,7 +201,7 @@ Value ProjectionNode::applyExpressionsToValue(const Document& root, Value inputV
         }
         return Value(std::move(values));
     } else {
-        if (subtreeContainsComputedFields()) {
+        if (_subtreeContainsComputedFields) {
             // Our semantics in this case are to replace whatever existing value we find with a new
             // document of all the computed values. This case represents applying a projection like
             // {"a.b": {$literal: 1}} to the document {a: 1}. This should yield {a: {b: 1}}.
@@ -200,13 +212,6 @@ Value ProjectionNode::applyExpressionsToValue(const Document& root, Value inputV
         // We didn't have any expressions, so just skip this value.
         return transformSkippedValueForOutput(inputValue);
     }
-}
-
-bool ProjectionNode::subtreeContainsComputedFields() const {
-    return (!_expressions.empty()) ||
-        std::any_of(_children.begin(), _children.end(), [](const auto& childPair) {
-               return childPair.second->subtreeContainsComputedFields();
-           });
 }
 
 void ProjectionNode::reportProjectedPaths(std::set<std::string>* projectedPaths) const {

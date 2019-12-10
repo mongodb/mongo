@@ -179,6 +179,17 @@ public:
         }
     }
 
+    /**
+     * Get the field name that the iterator currently points to without bringing anything into
+     * cache.
+     */
+    const StringData fieldName() {
+        if (_it) {
+            return _it->nameSD();
+        }
+        return (*_bsonIt).fieldNameStringData();
+    }
+
     Position position() const {
         return Position(_it->ptr() - _first->ptr());
     }

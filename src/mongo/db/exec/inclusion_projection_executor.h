@@ -41,7 +41,7 @@ namespace mongo::projection_executor {
  * level inclusions or additions, with any child InclusionNodes representing dotted or nested
  * inclusions or additions.
  */
-class InclusionNode final : public ProjectionNode {
+class InclusionNode : public ProjectionNode {
 public:
     InclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
         : ProjectionNode(policies, std::move(pathToNode)) {}
@@ -77,12 +77,13 @@ protected:
     void outputProjectedField(StringData field, Value val, MutableDocument* outputDoc) const final {
         outputDoc->addField(field, val);
     }
-    std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const final {
+    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const override {
         return std::make_unique<InclusionNode>(
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
-    Document initializeOutputDocument(const Document& inputDoc) const final {
-        return {};
+    MutableDocument initializeOutputDocument(const Document& inputDoc) const final {
+        return MutableDocument{_children.size() + _expressions.size() +
+                               std::min(_projectedFields.size(), inputDoc.size())};
     }
     Value applyLeafProjectionToValue(const Value& value) const final {
         return value;
@@ -90,6 +91,33 @@ protected:
     Value transformSkippedValueForOutput(const Value& value) const final {
         return Value();
     }
+};
+
+/**
+ * A fast-path inclusion projection implementation which applies a BSON-to-BSON transformation
+ * rather than constructing an output document using the Document/Value API. For inclusion-only
+ * projections (which are projections without expressions, metadata, find-only expressions ($slice,
+ * $elemMatch, and positional), and not requiring an entire document) it can be much faster than the
+ * default InclusionNode implementation. On a document-by-document basis, if the fast-path
+ * projection cannot be applied to the input document, it will fall back to the default
+ * implementation.
+ */
+class FastPathEligibleInclusionNode final : public InclusionNode {
+public:
+    FastPathEligibleInclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
+        : InclusionNode(policies, std::move(pathToNode)) {}
+
+    Document applyToDocument(const Document& inputDoc) const final;
+
+protected:
+    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
+        return std::make_unique<FastPathEligibleInclusionNode>(
+            _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
+    }
+
+private:
+    void _applyProjections(BSONObj bson, BSONObjBuilder* bob) const;
+    void _applyProjectionsToArray(BSONObj array, BSONArrayBuilder* bab) const;
 };
 
 /**
@@ -106,9 +134,13 @@ public:
         : ProjectionExecutor(expCtx, policies), _root(std::move(root)) {}
 
     InclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                ProjectionPolicies policies)
-        : InclusionProjectionExecutor(expCtx, policies, std::make_unique<InclusionNode>(policies)) {
-    }
+                                ProjectionPolicies policies,
+                                bool allowFastPath = false)
+        : InclusionProjectionExecutor(
+              expCtx,
+              policies,
+              allowFastPath ? std::make_unique<FastPathEligibleInclusionNode>(policies)
+                            : std::make_unique<InclusionNode>(policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;

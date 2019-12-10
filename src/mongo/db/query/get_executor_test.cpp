@@ -56,7 +56,7 @@ auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& pol
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto projection = projection_ast::parse(expCtx, spec, policies);
     auto executor = projection_executor::buildProjectionExecutor(
-        expCtx, &projection, policies, true /* optimizeExecutor */);
+        expCtx, &projection, policies, projection_executor::kDefaultBuilderParams);
     return executor;
 }
 

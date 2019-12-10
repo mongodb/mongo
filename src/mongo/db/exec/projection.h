@@ -101,8 +101,8 @@ public:
 private:
     Status transform(WorkingSetMember* member) const final;
 
-    // True, if the projection contains a recordId $meta expression.
-    const bool _wantRecordId;
+    // Represents all metadata used in the projection.
+    const QueryMetadataBitSet _requestedMetadata;
     const projection_ast::ProjectType _projectType;
     std::unique_ptr<projection_executor::ProjectionExecutor> _executor;
 };
@@ -170,7 +170,7 @@ private:
     Status transform(WorkingSetMember* member) const final;
 
     // Has the field names present in the simple projection.
-    FieldSet _includedFields;
+    stdx::unordered_set<std::string> _includedFields;
 };
 
 }  // namespace mongo

@@ -86,7 +86,7 @@ public:
     /**
      * Applies all projections and expressions, if applicable, and returns the resulting document.
      */
-    Document applyToDocument(const Document& inputDoc) const;
+    virtual Document applyToDocument(const Document& inputDoc) const;
 
     /**
      * Recursively evaluates all expressions in the projection, writing the results to 'outputDoc'.
@@ -124,20 +124,15 @@ public:
     void serialize(boost::optional<ExplainOptions::Verbosity> explain,
                    MutableDocument* output) const;
 
-    /**
-     * Returns true if this node or any child of this node contains a computed field.
-     */
-    bool subtreeContainsComputedFields() const;
-
 protected:
     // Returns a unique_ptr to a new instance of the implementing class for the given 'fieldName'.
-    virtual std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const = 0;
+    virtual std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const = 0;
 
     // Returns the initial document to which the current level of the projection should be applied.
     // For an inclusion projection this will be an empty document, to which we will add the fields
     // we wish to retain. For an exclusion this will be the complete document, from which we will
     // eliminate the fields we wish to omit.
-    virtual Document initializeOutputDocument(const Document& inputDoc) const = 0;
+    virtual MutableDocument initializeOutputDocument(const Document& inputDoc) const = 0;
 
     // Given an input leaf value, returns the value that should be added to the output document.
     // Depending on the projection type this will be either the value itself, or "missing".
@@ -150,16 +145,20 @@ protected:
     // Writes the given value to the output doc, replacing the existing value of 'field' if present.
     virtual void outputProjectedField(StringData field, Value val, MutableDocument* outDoc) const;
 
-    // TODO use StringMap once SERVER-23700 is resolved.
     stdx::unordered_map<std::string, std::unique_ptr<ProjectionNode>> _children;
-    stdx::unordered_map<size_t, std::unique_ptr<ProjectionNode>> _arrayBranches;
-
-    StringMap<boost::intrusive_ptr<Expression>> _expressions;
+    stdx::unordered_map<std::string, boost::intrusive_ptr<Expression>> _expressions;
     stdx::unordered_set<std::string> _projectedFields;
-
     ProjectionPolicies _policies;
-
     std::string _pathToNode;
+
+    // Whether this node or any child of this node contains a computed field.
+    bool _subtreeContainsComputedFields{false};
+
+    // TODO SERVER-37791: This flag is only necessary due to a bug in exclusion semantics.
+    // Whether to project fields not present in the input document. For example, for the
+    // specification {a: 0, b: 0}, if 'b' is not present in the input document, it will be projected
+    // into the output document as an empty/missing Value.
+    bool _projectMissingFields{false};
 
 private:
     // Iterates 'inputDoc' for each projected field, adding to or removing from 'outputDoc'. Also

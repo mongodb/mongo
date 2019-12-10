@@ -702,6 +702,21 @@ public:
         return fp;
     }
 
+    /**
+     * Returns the name of the field the iterator currently points to, without advancing.
+     */
+    StringData fieldName() {
+        invariant(more());
+        return _it.fieldName();
+    }
+
+    /**
+     * Advance the iterator without accessing the current Value.
+     */
+    void advance() {
+        _it.advance();
+    }
+
 private:
     // We'll hang on to the original document to ensure we keep its storage alive
     Document _doc;

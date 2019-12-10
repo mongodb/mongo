@@ -173,10 +173,10 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child)
     : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
-      _wantRecordId{projection->metadataDeps()[DocumentMetadataFields::kRecordId]},
+      _requestedMetadata{projection->metadataDeps()},
       _projectType{projection->type()},
       _executor{projection_executor::buildProjectionExecutor(
-          expCtx, projection, {}, true /* optimizeExecutor */)} {}
+          expCtx, projection, {}, projection_executor::kDefaultBuilderParams)} {}
 
 Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     Document input;
@@ -185,7 +185,8 @@ Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     // The recordId metadata is different though, because it's a fundamental part of the WSM and
     // we store it within the WSM itself rather than WSM metadata, so we need to transfer it into
     // the metadata object if the projection has a recordId $meta expression.
-    if (_wantRecordId && !member->metadata().hasRecordId()) {
+    if (_requestedMetadata[DocumentMetadataFields::kRecordId] &&
+        !member->metadata().hasRecordId()) {
         member->metadata().setRecordId(member->recordId);
     }
 
@@ -205,11 +206,16 @@ Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
         input = rehydrateIndexKey(member->keyData[0].indexKeyPattern, member->keyData[0].keyData);
     }
 
-    // Before applying the projection we will move document metadata from the WSM into the document
-    // itself, in case the projection contains $meta expressions and needs this data, and will move
-    // it back to the WSM once the projection has been applied.
-    auto projected = attachMetadataToWorkingSetMember(
-        _executor->applyTransformation(attachMetadataToDocument(std::move(input), member)), member);
+    // If the projection doesn't need any metadata, then we'll just apply the projection to the
+    // input document. Otherwise, before applying the projection, we will move document metadata
+    // from the WSM into the document itself, and will move it back to the WSM once the projection
+    // has been applied.
+    auto projected = _requestedMetadata.any()
+        ? attachMetadataToWorkingSetMember(
+              _executor->applyTransformation(attachMetadataToDocument(std::move(input), member)),
+              member)
+        : _executor->applyTransformation(input);
+
     // An exclusion projection can return an unowned object since the output document is
     // constructed from the input one backed by BSON which is owned by the storage system, so we
     // need to  make sure we transition an owned document.
@@ -295,10 +301,15 @@ Status ProjectionStageSimple::transform(WorkingSetMember* member) const {
     // Apply the SIMPLE_DOC projection.
     // Look at every field in the source document and see if we're including it.
     auto objToProject = member->doc.value().toBson();
+    auto nFieldsNeeded = _includedFields.size();
     for (auto&& elt : objToProject) {
-        if (auto fieldIt = _includedFields.find(elt.fieldNameStringData());
-            _includedFields.end() != fieldIt) {
+        auto fieldName{elt.fieldNameStringData()};
+        absl::string_view fieldNameKey{fieldName.rawData(), fieldName.size()};
+        if (auto fieldIt = _includedFields.find(fieldNameKey); _includedFields.end() != fieldIt) {
             bob.append(elt);
+            if (--nFieldsNeeded == 0) {
+                break;
+            }
         }
     }
 

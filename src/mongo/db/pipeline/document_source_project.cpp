@@ -76,14 +76,18 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
                 auto projection = projection_ast::parse(expCtx, projectSpec, policies);
                 // We won't optimize the executor on creation, and will do it as part of the
                 // pipeline optimization process when requested via the 'optimize()' method on
-                // 'DocumentSourceSingleDocumentTransformation'.
+                // 'DocumentSourceSingleDocumentTransformation', so we won't pass the
+                // 'kOptimzeExecutor' flag to the projection executor builder.
                 //
                 // Note that this is also important for $lookup inner pipelines to not being
                 // optimized too early, as it may lead to incorrect positioning of the caching
                 // stage due to missing dependencies on certain variables, as they could have been
                 // optimized away.
+                auto builderParams = projection_executor::BuilderParamsBitSet{
+                    projection_executor::kDefaultBuilderParams};
+                builderParams.reset(projection_executor::kOptimizeExecutor);
                 return projection_executor::buildProjectionExecutor(
-                    expCtx, &projection, policies, false /* optimizeExecutor */);
+                    expCtx, &projection, policies, builderParams);
             } catch (DBException& ex) {
                 ex.addContext("Invalid " + specifiedName.toString());
                 throw;
