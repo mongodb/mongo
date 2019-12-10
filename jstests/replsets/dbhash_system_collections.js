@@ -1,4 +1,5 @@
 // Test that the dbhash command checks system collections that are replicated.
+// @tags: [requires_fcv_44]
 'use strict';
 
 (function() {

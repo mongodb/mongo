@@ -1,6 +1,9 @@
 /**
  * Test that attempting to call getParameter on the featureCompatibilityVersion before the fCV is
  * initialized does not crash the server (see SERVER-34600).
+ *
+ * This tests behavior dependent on a specific FCV.
+ * @tags: [multiversion_incompatible]
  */
 (function() {
 'use strict';

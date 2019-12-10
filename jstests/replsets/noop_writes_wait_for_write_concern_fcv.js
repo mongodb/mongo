@@ -1,5 +1,8 @@
 /**
  * Tests that a no-op setFeatureCompatibilityVersion request still waits for write concern.
+ *
+ * This tests behavior on both latest and last-stable FCVs.
+ * @tags: [multiversion_incompatible]
  */
 (function() {
 "use strict";

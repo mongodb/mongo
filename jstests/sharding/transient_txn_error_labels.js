@@ -1,5 +1,11 @@
-// Test TransientTransactionErrors error label in transactions.
-// @tags: [uses_transactions]
+/**
+ * Test TransientTransactionErrors error label in transactions.
+ * @tags: [
+ *  uses_transactions,
+ *  requires_fcv_44,
+ * ]
+ */
+
 (function() {
 "use strict";
 

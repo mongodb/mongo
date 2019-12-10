@@ -1,5 +1,6 @@
 /**
  * Tests that stepdown terminates writes, but does not disconnect connections.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

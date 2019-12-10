@@ -1,7 +1,7 @@
 /**
  * Tests that prepared transactions are correctly rolled-back.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
  */
 (function() {
 "use strict";

@@ -1,6 +1,9 @@
 /**
  * Tests that when a node restarts during initial sync before it can clone the FCV document, it is
  * still able to start up successfully and restart initial sync.
+ *
+ * This test asserts a certain FCV is cloned through initial sync.
+ * @tags: [multiversion_incompatible]
  */
 
 (function() {

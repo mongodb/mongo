@@ -1,5 +1,9 @@
-// Test TransientTransactionError error label for commands in transactions with write concern.
-// @tags: [uses_transactions]
+/**
+ * Test TransientTransactionError error label for commands in transactions with write concern.
+ * @tags: [
+ *  uses_transactions
+ * ]
+ */
 (function() {
 "use strict";
 

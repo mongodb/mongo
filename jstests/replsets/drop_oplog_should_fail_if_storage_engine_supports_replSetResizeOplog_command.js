@@ -7,7 +7,11 @@
  * Note: We detect whether a storage engine supports the replSetResizeOplog command
  * by checking whether it supportsRecoveryTimestamp().
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *  requires_persistence,
+ *  # Multiversion testing is not supported for tests running ReplSetTest as standalones.
+ *  multiversion_incompatible,
+ * ]
  */
 
 (function() {

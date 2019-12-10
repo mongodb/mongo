@@ -1,5 +1,7 @@
 /**
  * This test enables TLA+ Trace Checking and ensures that it succeeds.
+ *
+ * @tags: [requires_fcv_44]
  */
 
 (function() {

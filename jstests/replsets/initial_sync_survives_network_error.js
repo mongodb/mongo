@@ -1,6 +1,7 @@
 /**
  * Tests that initial sync survives a network error during each stage of the cloning process,
  * except for the query stage.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
