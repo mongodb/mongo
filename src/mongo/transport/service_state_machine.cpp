@@ -436,6 +436,9 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
 
     // Pass sourced Message to handler to generate response.
     auto opCtx = Client::getCurrent()->makeOperationContext();
+    if (_inExhaust) {
+        opCtx->markKillOnClientDisconnect();
+    }
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
