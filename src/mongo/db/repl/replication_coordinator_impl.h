@@ -45,8 +45,10 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_resolver.h"
+#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
@@ -292,7 +294,7 @@ public:
     /**
      * Get current term from topology coordinator
      */
-    virtual long long getTerm() override;
+    virtual long long getTerm() const override;
 
     // Returns the ServiceContext where this instance runs.
     virtual ServiceContext* getServiceContext() override {
@@ -343,6 +345,11 @@ public:
         const SplitHorizon::Parameters& horizonParams,
         TopologyVersion previous,
         Date_t deadline) override;
+
+    void tlaPlusRaftMongoEvent(
+        OperationContext* opCtx,
+        RaftMongoSpecActionEnum action,
+        boost::optional<Timestamp> oplogReadTimestamp = boost::none) const override;
 
     // ================== Test support API ===================
 
@@ -718,6 +725,26 @@ private:
         // into RS_ROLLBACK, must have the RSTL in mode X. Otherwise, no lock or mutex is necessary
         // to set it.
         AtomicWord<unsigned> _canServeNonLocalReads;
+    };
+
+    // Inner class to ensure an opCtx is available in a scope.
+    class EnsureOperationContext {
+    public:
+        EnsureOperationContext() : _opCtxPtr(cc().getOperationContext()) {
+            if (!_opCtxPtr) {
+                // The UniqueOperationContext's deleter will call cc().resetOperationContext().
+                _tmpOpCtx = cc().makeOperationContext();
+                _opCtxPtr = _tmpOpCtx.get();
+            }
+        }
+
+        OperationContext* getOperationContext() const {
+            return _opCtxPtr;
+        }
+
+    private:
+        ServiceContext::UniqueOperationContext _tmpOpCtx;
+        OperationContext* _opCtxPtr;
     };
 
     void _resetMyLastOpTimes(WithLock lk);
@@ -1334,6 +1361,15 @@ private:
      * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).
      */
     int64_t _nextRandomInt64_inlock(int64_t limit);
+
+    /**
+     * Trace a replication event for the RaftMongo.tla spec.
+     */
+    void _tlaPlusRaftMongoEvent(WithLock,
+                                OperationContext* opCtx,
+                                RaftMongoSpecActionEnum action,
+                                boost::optional<Timestamp> oplogReadTimestamp = boost::none) const
+        noexcept;
 
     //
     // All member variables are labeled with one of the following codes indicating the

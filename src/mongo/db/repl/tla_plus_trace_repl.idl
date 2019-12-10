@@ -26,41 +26,50 @@
 # it in the license file.
 #
 
-# TLA+ Trace Checker Event IDL File
+# RaftMongo.tla Trace Events
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::repl"
 
 imports:
     - "mongo/idl/basic_types.idl"
-    - "mongo/util/net/hostandport.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/util/tla_plus_trace.idl"
 
 enums:
-    TLAPlusSpec:
-        description: "The supported TLA+ specs."
-        type: string
-        values:
-            kRaftMongo: "RaftMongo"
-
     RaftMongoSpecAction:
-        description: "The supported actions in the RaftMongoSpec."
+        description: "The supported actions in the RaftMongo.tla spec."
         type: string
         values:
+            kAdvanceCommitPoint: "AdvanceCommitPoint"
             kAppendOplog: "AppendOplog"
+            kBecomePrimaryByMagic: "BecomePrimaryByMagic"
+            kClientWrite: "ClientWrite"
+            kLearnCommitPointFromSyncSourceNeverBeyondLastApplied: "LearnCommitPointFromSyncSourceNeverBeyondLastApplied"
+            kLearnCommitPointWithTermCheck: "LearnCommitPointWithTermCheck"
+            kReplSetInitiate: "ReplSetInitiate"
+            kRollbackOplog: "RollbackOplog"
+
+    RaftMongoSpecServerState:
+        description: "The server states (leader or follower) modeled in RaftMongo.tla."
+        type: string
+        values:
+            kLeader: "Leader"
+            kFollower: "Follower"
 
 structs:
-    TlaPlusTraceEvent:
-        description: "A document used for generating a TLA+ trace checker event."
+    RaftMongoSpecEvent:
+        description: "A subdocument containing values modeled by the RaftMongo.tla spec."
         fields:
-            spec:
-                type: TLAPlusSpec
-                description: "The TLA+ Spec that this event corresponds to."
-            action:
-                type: string
-                description: "The action that this event is logging."
-            host:
-                type: HostAndPort
-                description: "The HostAndPort logging the event."
-            state:
-                type: object
-                description: "State relevant to the current spec and action."
+            serverState:
+                type: RaftMongoSpecServerState
+                description: "This server's state."
+            commitPoint:
+                type: optime
+                description: "The current commit point according to this server."
+            term:
+                type: long
+                description: "The current term according to this server."
+            log:
+                type: array<optime>
+                description: "Optimes of all entries in the oplog."

@@ -227,7 +227,7 @@ public:
 
     void dropAllSnapshots() override;
 
-    long long getTerm() override;
+    long long getTerm() const override;
 
     Status updateTerm(OperationContext*, long long) override;
 

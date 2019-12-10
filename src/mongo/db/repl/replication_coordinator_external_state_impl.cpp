@@ -109,6 +109,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/tla_plus_trace.h"
 
 namespace mongo {
 namespace repl {
@@ -409,8 +410,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
                                WriteUnitOfWork wuow(opCtx);
                                Helpers::putSingleton(opCtx, configCollectionName, config);
-                               const auto msgObj = BSON("msg"
-                                                        << "initiating set");
+                               const auto msgObj = BSON("msg" << kInitiatingSetMsg);
                                _service->getOpObserver()->onOpMessage(opCtx, msgObj);
                                wuow.commit();
                                // ReplSetTest assumes that immediately after the replSetInitiate
@@ -419,12 +419,17 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // fail if it finds its sync source has an empty oplog.  Thus, we
                                // need to wait here until the seed document is visible in our oplog.
                                _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+                               if (MONGO_unlikely(logForTLAPlusSpecs.shouldFail())) {
+                                   repl::ReplicationCoordinator::get(opCtx)->tlaPlusRaftMongoEvent(
+                                       opCtx, repl::RaftMongoSpecActionEnum::kReplSetInitiate);
+                               }
                            });
 
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
+
     return Status::OK();
 }
 

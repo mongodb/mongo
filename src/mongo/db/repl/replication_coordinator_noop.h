@@ -219,7 +219,7 @@ public:
 
     void dropAllSnapshots() final;
 
-    long long getTerm() final;
+    long long getTerm() const final;
 
     Status updateTerm(OperationContext*, long long) final;
 

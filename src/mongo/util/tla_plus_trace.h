@@ -29,21 +29,28 @@
 
 #pragma once
 
-#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/tla_plus_trace_gen.h"
 
 namespace mongo {
-namespace repl {
 
-/*
- * Log execution traces so we can compare MongoDB's implementation to our TLA+ specs.
- */
 extern FailPoint logForTLAPlusSpecs;
 
 /**
- * Trace an event for the RaftMongo spec.
+ * Use like:
+ * if (MONGO_unlikely(logForTLAPlusSpecs.scopedIf(
+ *         enabledForSpec(TLAPlusSpecEnum::kRaftMongo)).isActive()))
+ * {
+ *     ... log event for spec "Foo.tla" ...
+ * }
+ *
+ * The return value is a lambda like "bool lambda(const BSONObj& data)".
  */
-void tlaPlusRaftMongoEvent(OperationContext* opCtx, RaftMongoSpecActionEnum action);
+std::function<bool(const BSONObj& data)> enabledForSpec(TLAPlusSpecEnum spec);
 
-}  // namespace repl
+/**
+ * Trace an event for a TLA+ spec.
+ */
+void logTlaPlusTraceEvent(const TlaPlusTraceEvent& event);
+
 }  // namespace mongo

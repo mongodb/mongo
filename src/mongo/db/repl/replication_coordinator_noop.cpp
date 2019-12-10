@@ -416,7 +416,7 @@ Status ReplicationCoordinatorNoOp::processHeartbeatV1(const ReplSetHeartbeatArgs
     MONGO_UNREACHABLE;
 }
 
-long long ReplicationCoordinatorNoOp::getTerm() {
+long long ReplicationCoordinatorNoOp::getTerm() const {
     MONGO_UNREACHABLE;
 }
 

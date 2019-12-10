@@ -30,7 +30,7 @@ const coll = rst.getPrimary().getDB('test').collection;
 jsTestLog("Insert one document");
 assert.commandWorked(coll.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
-checkLog.contains(rst.getSecondary(), '{ spec: \"RaftMongo\", action: \"AppendOplog\",');
+checkLog.contains(rst.getSecondary(), '\"spec\" : \"RaftMongo\", \"action\" : \"AppendOplog\"');
 
 rst.stopSet();
 })();

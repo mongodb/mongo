@@ -31,6 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 using boost::intrusive_ptr;
 namespace mongo {
@@ -333,8 +334,9 @@ void DocumentSourceShardCheckResumability::_assertOplogHasEnoughHistory(
         // if its timestamp is later than the resume token. No events earlier than the token can
         // have fallen off this oplog, and it is therefore safe to resume. Otherwise, verify that
         // the timestamp of the first oplog entry is earlier than that of the resume token.
+        using repl::kInitiatingSetMsg;
         const bool isNewRS =
-            Value::compare(firstOplogEntry["o"]["msg"], Value("initiating set"_sd), nullptr) == 0 &&
+            Value::compare(firstOplogEntry["o"]["msg"], Value(kInitiatingSetMsg), nullptr) == 0 &&
             Value::compare(firstOplogEntry["op"], Value("n"_sd), nullptr) == 0;
         uassert(ErrorCodes::ChangeStreamFatalError,
                 "Resume of change stream was not possible, as the resume point may no longer be in "

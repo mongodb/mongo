@@ -587,7 +587,10 @@ public:
         kAborting,
         kCommitting,
     };
-    State getState_forTest() const;
+
+    State getState() const {
+        return _state;
+    }
 
     std::string toString(State state) const {
         switch (state) {
@@ -613,13 +616,6 @@ public:
 
 protected:
     RecoveryUnit();
-
-    /**
-     * Returns the current state.
-     */
-    State _getState() const {
-        return _state;
-    }
 
     /**
      * Transitions to new state.

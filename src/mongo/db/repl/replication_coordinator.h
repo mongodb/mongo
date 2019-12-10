@@ -41,6 +41,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/db/repl/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -791,7 +792,7 @@ public:
     /**
      * Returns the current term.
      */
-    virtual long long getTerm() = 0;
+    virtual long long getTerm() const = 0;
 
     /**
      * Attempts to update the current term for the V1 election protocol. If the term changes and
@@ -952,6 +953,14 @@ public:
         const SplitHorizon::Parameters& horizonParams,
         TopologyVersion previous,
         Date_t deadline) = 0;
+
+    /**
+     * Trace a replication event for the RaftMongo.tla spec.
+     */
+    virtual void tlaPlusRaftMongoEvent(
+        OperationContext* opCtx,
+        RaftMongoSpecActionEnum action,
+        boost::optional<Timestamp> oplogReadTimestamp = boost::none) const {}
 
 protected:
     ReplicationCoordinator();

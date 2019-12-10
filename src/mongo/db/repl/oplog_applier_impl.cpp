@@ -43,7 +43,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/insert_group.h"
-#include "mongo/db/repl/tla_plus_trace_repl.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/platform/basic.h"
@@ -475,6 +474,12 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
                                 << lastAppliedOpTimeAtEndOfBatch.toString()
                                 << " in the middle of batch application");
 
+
+        // For RaftMongo.tla trace-checking, dump the oplog including new entries, before the new
+        // entries are visible and cause other RaftMongo events.
+        _replCoord->tlaPlusRaftMongoEvent(
+            &opCtx, RaftMongoSpecActionEnum::kAppendOplog, lastOpTimeInBatch.getTimestamp());
+
         // 3. Update oplog visibility by notifying the storage engine of the new oplog entries.
         const bool orderedCommit = true;
         _storageInterface->oplogDiskLocRegister(
@@ -671,10 +676,6 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                 }
             }
         }
-    }
-
-    if (MONGO_unlikely(logForTLAPlusSpecs.shouldFail())) {
-        tlaPlusRaftMongoEvent(opCtx, RaftMongoSpecActionEnum::kAppendOplog);
     }
 
     // Tell the storage engine to flush the journal now that a replication batch has completed. This

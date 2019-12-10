@@ -480,7 +480,7 @@ bool ReplicationCoordinatorMock::getWriteConcernMajorityShouldJournal() {
     return true;
 }
 
-long long ReplicationCoordinatorMock::getTerm() {
+long long ReplicationCoordinatorMock::getTerm() const {
     return _term;
 }
 

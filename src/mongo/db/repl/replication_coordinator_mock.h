@@ -256,7 +256,7 @@ public:
 
     virtual bool getWriteConcernMajorityShouldJournal();
 
-    virtual long long getTerm();
+    virtual long long getTerm() const;
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);
 
