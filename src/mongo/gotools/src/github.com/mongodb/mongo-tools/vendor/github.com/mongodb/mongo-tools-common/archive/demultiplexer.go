@@ -22,10 +22,10 @@ import (
 )
 
 // DemuxOut is a Demultiplexer output consumer
-// The Write() and Close() occur in the same thread as the Demultiplexer runs in.
+// The Write() and End() occur in the same thread as the Demultiplexer runs in.
 type DemuxOut interface {
 	Write([]byte) (int, error)
-	Close() error
+	End()
 	Sum64() (uint64, bool)
 }
 
@@ -39,13 +39,19 @@ const (
 type Demultiplexer struct {
 	In io.Reader
 	//TODO wrap up these three into a structure
-	outs               map[string]DemuxOut
-	lengths            map[string]int64
-	currentNamespace   string
-	buf                [db.MaxBSONSize]byte
-	NamespaceChan      chan string
+	outs             map[string]DemuxOut
+	lengths          map[string]int64
+	currentNamespace string
+	buf              [db.MaxBSONSize]byte
+
+	// NamespaceChan is used to send a namespace to a consumer of namespaces.
+	NamespaceChan chan string
+
+	// NamespaceErrorChan is used to receive an error or nil from a namespace
+	// consumer immediately after each namespace is sent and validated.
 	NamespaceErrorChan chan error
-	NamespaceStatus    map[string]int
+
+	NamespaceStatus map[string]int
 }
 
 func CreateDemux(namespaceMetadatas []*CollectionMetadata, in io.Reader) *Demultiplexer {
@@ -139,7 +145,7 @@ func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 		if rcr, ok := demux.outs[demux.currentNamespace].(*RegularCollectionReceiver); ok {
 			rcr.err = io.EOF
 		}
-		demux.outs[demux.currentNamespace].Close()
+		demux.outs[demux.currentNamespace].End()
 		demux.NamespaceStatus[demux.currentNamespace] = NamespaceClosed
 		length := int64(demux.lengths[demux.currentNamespace])
 		crcUInt64, ok := demux.outs[demux.currentNamespace].Sum64()
@@ -180,7 +186,7 @@ func (demux *Demultiplexer) End() error {
 			if rcr, ok := demux.outs[ns].(*RegularCollectionReceiver); ok {
 				rcr.err = newError("archive io error")
 			}
-			demux.outs[ns].Close()
+			demux.outs[ns].End()
 		}
 		err = newError(fmt.Sprintf("archive finished but contained files were unfinished (%v)", openNss))
 	} else {
@@ -242,6 +248,7 @@ type RegularCollectionReceiver struct {
 	partialReadBuf   []byte
 	hash             hash.Hash64
 	closeOnce        sync.Once
+	endOnce          sync.Once
 	openOnce         sync.Once
 	err              error
 }
@@ -266,7 +273,6 @@ func (receiver *RegularCollectionReceiver) Read(r []byte) (int, error) {
 	// Since we're the "reader" here, not the "writer" we need to start with a read, in case the chan is closed
 	wLen, ok := <-receiver.readLenChan
 	if !ok {
-		close(receiver.readBufChan)
 		return 0, receiver.err
 	}
 	if wLen > db.MaxBSONSize {
@@ -331,7 +337,17 @@ func (receiver *RegularCollectionReceiver) Write(buf []byte) (int, error) {
 	//  As a writer, we need to write first, so that the reader can properly detect EOF
 	//  Additionally, the reader needs to know the write size, so that it can give us a
 	//  properly sized buffer. Sending the incoming buffersize fills both of these needs.
-	receiver.readLenChan <- len(buf)
+	//  However, it's possible the intent has been closed already so the reader
+	//  won't be reading the channel.  To avoid deadlock, we check for closed
+	//  readBufChan.
+	select {
+	case receiver.readLenChan <- len(buf):
+		// do nothing other than send
+	case <-receiver.readBufChan:
+		// Will only receive this if closed
+		return 0, errInterrupted
+	}
+
 	// Receive from the reader a buffer to put the bytes into
 	readBuf := <-receiver.readBufChan
 	if len(readBuf) < len(buf) {
@@ -348,12 +364,22 @@ func (receiver *RegularCollectionReceiver) Write(buf []byte) (int, error) {
 // cause the RegularCollectionReceiver.Read() to receive EOF
 // Close will get called twice, once in the demultiplexer, and again when the restore goroutine is done with its intent.file
 func (receiver *RegularCollectionReceiver) Close() error {
+	// Close must be idempotent and repeat channel closes panic; only do once.
 	receiver.closeOnce.Do(func() {
-		close(receiver.readLenChan)
-		// make sure that we don't return until any reader has finished
-		<-receiver.readBufChan
+		close(receiver.readBufChan)
 	})
 	return nil
+}
+
+// End signals to any waiting readers that there is nothing more to read, then
+// it waits on the readBufChan, which is closed by the reader-side Close()
+// method.
+func (receiver *RegularCollectionReceiver) End() {
+	// To keep this idempotent, close the channel only once.
+	receiver.endOnce.Do(func() {
+		close(receiver.readLenChan)
+	})
+	<-receiver.readBufChan
 }
 
 // SpecialCollectionCache implements both DemuxOut as well as intents.file
@@ -378,10 +404,15 @@ func (cache *SpecialCollectionCache) Open() error {
 	return nil
 }
 
-// Close is part of the both interfaces, and it does nothing
+// Close is part of the intents.file interface, and does nothing
 func (cache *SpecialCollectionCache) Close() error {
-	cache.Intent.Size = int64(cache.buf.Len())
 	return nil
+}
+
+// End indicates we've read all there is to read, so
+// we update the intent size based on the final length.
+func (cache *SpecialCollectionCache) End() {
+	cache.Intent.Size = int64(cache.buf.Len())
 }
 
 func (cache *SpecialCollectionCache) Read(p []byte) (int, error) {
@@ -425,6 +456,9 @@ func (*MutedCollection) Write(b []byte) (int, error) {
 func (*MutedCollection) Close() error {
 	return nil
 }
+
+// End is part of the DemuxOut interface and does nothing.
+func (*MutedCollection) End() {}
 
 // Open is part of the intents.file interface, and does nothing
 func (*MutedCollection) Open() error {

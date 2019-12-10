@@ -7,11 +7,14 @@
 package archive
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/mongodb/mongo-tools-common/db"
 )
+
+var errInterrupted = errors.New("archive reading interrupted")
 
 // parser.go implements the parsing of the low-level archive format
 // The low level archive format is defined as zero or more blocks
@@ -57,6 +60,11 @@ func newParserError(msg string) error {
 
 // newParserWrappedError creates a parserError with a message as well as an underlying cause error
 func newParserWrappedError(msg string, err error) error {
+	// If parsing was terminated intentionally, pass through that error
+	// instead of a parser error.
+	if err == errInterrupted {
+		return err
+	}
 	return &parserError{
 		Err: err,
 		Msg: msg,

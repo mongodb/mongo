@@ -10,7 +10,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mongodb/mongo-tools-common/bsonutil"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	mopt "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -248,4 +250,42 @@ func ApplyFlags(opts *mopt.FindOneOptions, flags int) {
 	if flags&LogReplay > 0 {
 		opts.SetOplogReplay(true)
 	}
+}
+
+// RunApplyOpsCreateIndex will create index using applyOps.
+// For versions that support collection UUIDs (<3.6) it uses an insert to system indexes.
+// Later versions use the createIndexes command.
+func (sp *SessionProvider) RunApplyOpsCreateIndex(C, DB string, index bson.D, UUID *primitive.Binary, result *interface{}) error {
+	var op Oplog
+
+	// Add an index version if it is missing. An index version could be missing because
+	// a tool stripped it out (e.g. mongorestore strips out versions before attempting createIndex)
+	// or because the index came from an oplog entry from versions <3.4.
+	_, err := bsonutil.FindValueByKey("v", &index)
+	if err != nil {
+		index = append(index, bson.E{Key: "v", Value: 1})
+	}
+
+	if UUID != nil {
+		o := append(bson.D{{Key: "createIndexes", Value: C}}, index...)
+
+		op = Oplog{
+			Operation: "c",
+			Namespace: fmt.Sprintf("%s.$cmd", DB),
+			Object:    o,
+			UI:        UUID,
+		}
+	} else {
+		op = Oplog{
+			Operation: "i",
+			Namespace: fmt.Sprintf("%s.system.indexes", DB),
+			Object:    index,
+		}
+	}
+
+	err = sp.Run(bson.D{{Key: "applyOps", Value: []Oplog{op}}}, result, DB)
+	if err != nil {
+		return fmt.Errorf("error building index: %v", err)
+	}
+	return nil
 }
