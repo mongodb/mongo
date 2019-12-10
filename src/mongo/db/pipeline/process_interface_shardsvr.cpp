@@ -303,7 +303,8 @@ void MongoInterfaceShardServer::createCollection(OperationContext* opCtx,
 void MongoInterfaceShardServer::createIndexes(OperationContext* opCtx,
                                               const NamespaceString& ns,
                                               const std::vector<BSONObj>& indexSpecs) {
-    auto cachedDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db());
+    auto cachedDbInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     BSONObjBuilder newCmdBuilder;
     newCmdBuilder.append("createIndexes", ns.coll());
     newCmdBuilder.append("indexes", indexSpecs);
@@ -315,7 +316,7 @@ void MongoInterfaceShardServer::createIndexes(OperationContext* opCtx,
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
                                              ns.db(),
-                                             cachedDbInfo.getValue(),
+                                             std::move(cachedDbInfo),
                                              cmdObj,
                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                              Shard::RetryPolicy::kIdempotent);
@@ -331,7 +332,8 @@ void MongoInterfaceShardServer::createIndexes(OperationContext* opCtx,
 void MongoInterfaceShardServer::dropCollection(OperationContext* opCtx, const NamespaceString& ns) {
     // Build and execute the dropCollection command against the primary shard of the given
     // database.
-    auto cachedDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db());
+    auto cachedDbInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     BSONObjBuilder newCmdBuilder;
     newCmdBuilder.append("drop", ns.coll());
     if (!opCtx->getWriteConcern().usedDefault) {
@@ -342,7 +344,7 @@ void MongoInterfaceShardServer::dropCollection(OperationContext* opCtx, const Na
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
                                              ns.db(),
-                                             cachedDbInfo.getValue(),
+                                             std::move(cachedDbInfo),
                                              cmdObj,
                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                              Shard::RetryPolicy::kIdempotent);
