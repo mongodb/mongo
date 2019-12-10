@@ -10,39 +10,37 @@
 
     assert.commandWorked(coll.insert({inf: Infinity, nan: NaN}));
 
-    (function testCommutativityWithConstArguments() {
-        specials.forEach((special) => {
-            numbers.forEach((num) => {
-                const expected = [
-                    {a: (num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val)}
-                ];
-                assert.eq(
-                    expected,
-                    coll.aggregate([{$project: {a: {"$multiply": [special.val, num]}, _id: 0}}])
-                        .toArray());
-                assert.eq(
-                    expected,
-                    coll.aggregate([{$project: {a: {"$multiply": [num, special.val]}, _id: 0}}])
-                        .toArray());
+    ["$multiply", "$add", "$sum"].forEach((op) => {
+        (function testCommutativityWithConstArguments() {
+            specials.forEach((special) => {
+                numbers.forEach((num) => {
+                    const expected = [{
+                        a: (num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val)
+                    }];
+                    assert.eq(expected,
+                              coll.aggregate([{$project: {a: {[op]: [special.val, num]}, _id: 0}}])
+                                  .toArray());
+                    assert.eq(expected,
+                              coll.aggregate([{$project: {a: {[op]: [num, special.val]}, _id: 0}}])
+                                  .toArray());
+                });
             });
-        });
-    })();
+        })();
 
-    (function testCommutativityWithNonConstArgument() {
-        specials.forEach((special) => {
-            numbers.forEach((num) => {
-                const expected = [
-                    {a: (num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val)}
-                ];
-                assert.eq(
-                    expected,
-                    coll.aggregate([{$project: {a: {"$multiply": [special.path, num]}, _id: 0}}])
-                        .toArray());
-                assert.eq(
-                    expected,
-                    coll.aggregate([{$project: {a: {"$multiply": [num, special.path]}, _id: 0}}])
-                        .toArray());
+        (function testCommutativityWithNonConstArgument() {
+            specials.forEach((special) => {
+                numbers.forEach((num) => {
+                    const expected = [{
+                        a: (num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val)
+                    }];
+                    assert.eq(expected,
+                              coll.aggregate([{$project: {a: {[op]: [special.path, num]}, _id: 0}}])
+                                  .toArray());
+                    assert.eq(expected,
+                              coll.aggregate([{$project: {a: {[op]: [num, special.path]}, _id: 0}}])
+                                  .toArray());
+                });
             });
-        });
-    })();
+        })();
+    });
 })();
