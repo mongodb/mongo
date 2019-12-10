@@ -75,6 +75,7 @@ public:
     typedef unsigned ValType;
     enum Mode { off, alwaysOn, random, nTimes, skip };
     enum RetCode { fastOff = 0, slowOff, slowOn, userIgnored };
+    enum ShouldFailEntryMode { kFirstTimeEntered, kEnteredAlready };
 
     /**
      * Explicitly resets the seed used for the PRNG in this thread.  If not called on a thread,
@@ -90,14 +91,21 @@ public:
     FailPoint();
 
     /**
-     * Note: This is not side-effect free - it can change the state to OFF after calling.
-     * Note: see MONGO_FAIL_POINT_BLOCK_IF for information on the passed callable
+     * @param cb         see `MONGO_FAIL_POINT_BLOCK_IF` for more information.
+     * @param entryMode  kEnteredAlready if the caller has already entered the fail point,
+     *                   and kFirstTimeEntered otherwise. If `entryMode` is kFirstTimeEntered,
+     *                   calls to `shouldFail` can have side effects. For example, they affect
+     *                   the counters kept to manage the `skip` or `nTimes` modes (See `setMode`).
+     *
+     * Calls to `shouldFail` should be placed inside MONGO_unlikely for performance.
+     *    if (MONGO_unlikely(failpoint.shouldFail())) ...
      *
      * @return true if fail point is active.
      */
     template <typename Callable = std::nullptr_t>
-    inline bool shouldFail(Callable&& cb = nullptr) {
-        RetCode ret = shouldFailOpenBlock(std::forward<Callable>(cb));
+    inline bool shouldFail(Callable&& cb = nullptr,
+                           ShouldFailEntryMode entryMode = kFirstTimeEntered) {
+        RetCode ret = shouldFailOpenBlock(std::forward<Callable>(cb), entryMode);
 
         if (MONGO_likely(ret == fastOff)) {
             return false;
@@ -112,7 +120,8 @@ public:
      * decrementing it. Must call shouldFailCloseBlock afterwards when the return value
      * is not fastOff. Otherwise, this will remain read-only forever.
      *
-     * Note: see MONGO_FAIL_POINT_BLOCK_IF for information on the passed callable
+     * Note: see MONGO_FAIL_POINT_BLOCK_IF for information on the passed callable, and
+     *       shouldFail for information on entryMode.
      *
      * @return slowOn if its active and needs to be closed
      *         userIgnored if its active and needs to be closed, but shouldn't be acted on
@@ -120,12 +129,17 @@ public:
      *         fastOff if its disabled and doesn't need to be closed
      */
     template <typename Callable = std::nullptr_t>
-    inline RetCode shouldFailOpenBlock(Callable&& cb = nullptr) {
+    inline RetCode shouldFailOpenBlock(Callable&& cb = nullptr,
+                                       ShouldFailEntryMode entryMode = kFirstTimeEntered) {
         if (MONGO_likely((_fpInfo.loadRelaxed() & ACTIVE_BIT) == 0)) {
             return fastOff;
         }
 
-        return slowShouldFailOpenBlock(std::forward<Callable>(cb));
+        if (entryMode == kEnteredAlready) {
+            return _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
+                std::forward<Callable>(cb));
+        }
+        return _slowShouldFailOpenBlock(std::forward<Callable>(cb));
     }
 
     /**
@@ -215,15 +229,16 @@ private:
      * If a callable is passed, and returns false, this will return userIgnored and avoid altering
      * the mode in any way.  The argument is the fail point payload.
      */
-    RetCode slowShouldFailOpenBlockImpl(std::function<bool(const BSONObj&)> cb) noexcept;
+    RetCode _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
+        std::function<bool(const BSONObj&)> cb) noexcept;
 
     /**
      * slow path for #shouldFailOpenBlock
      *
-     * Calls slowShouldFailOpenBlockImpl. If it returns slowOn, increments the number of times
-     * the fail point has been entered before returning the RetCode.
+     * Calls _slowShouldFailOpenBlockWithoutIncrementingTimesEntered. If it returns slowOn,
+     * increments the number of times the fail point has been entered before returning the RetCode.
      */
-    RetCode slowShouldFailOpenBlock(std::function<bool(const BSONObj&)> cb) noexcept;
+    RetCode _slowShouldFailOpenBlock(std::function<bool(const BSONObj&)> cb) noexcept;
 
     /**
      * @return the stored BSONObj in this fail point. Note that this cannot be safely
@@ -246,7 +261,8 @@ class ScopedFailPoint {
 public:
     template <typename Callable = std::nullptr_t>
     ScopedFailPoint(FailPoint* failPoint, Callable&& cb = nullptr) : _failPoint(failPoint) {
-        FailPoint::RetCode ret = _failPoint->shouldFailOpenBlock(std::forward<Callable>(cb));
+        FailPoint::RetCode ret = _failPoint->shouldFailOpenBlock(
+            std::forward<Callable>(cb), FailPoint::ShouldFailEntryMode::kFirstTimeEntered);
         _shouldClose = ret != FailPoint::fastOff;
         _shouldRun = ret == FailPoint::slowOn;
     }
@@ -290,14 +306,18 @@ private:
 #define MONGO_FAIL_POINT(symbol) MONGO_unlikely(symbol.shouldFail())
 
 inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET(FailPoint& failPoint) {
-    while (MONGO_FAIL_POINT(failPoint)) {
+    for (auto entryMode = FailPoint::ShouldFailEntryMode::kFirstTimeEntered;
+         MONGO_unlikely(failPoint.shouldFail(nullptr, entryMode));
+         entryMode = FailPoint::ShouldFailEntryMode::kEnteredAlready) {
         sleepmillis(100);
     }
 }
 
 inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(OperationContext* opCtx,
                                                             FailPoint& failPoint) {
-    while (MONGO_FAIL_POINT(failPoint)) {
+    for (auto entryMode = FailPoint::ShouldFailEntryMode::kFirstTimeEntered;
+         MONGO_unlikely(failPoint.shouldFail(nullptr, entryMode));
+         entryMode = FailPoint::ShouldFailEntryMode::kEnteredAlready) {
         opCtx->sleepFor(Milliseconds(100));
     }
 }

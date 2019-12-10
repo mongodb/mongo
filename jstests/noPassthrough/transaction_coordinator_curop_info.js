@@ -7,6 +7,7 @@
 (function() {
 'use strict';
 load('jstests/libs/fail_point_util.js');
+load('jstests/sharding/libs/sharded_transactions_helpers.js');  // for waitForFailpoint
 
 function commitTxn(st, lsid, txnNumber, expectedError = null) {
     let cmd = "db.adminCommand({" +
@@ -27,7 +28,12 @@ function commitTxn(st, lsid, txnNumber, expectedError = null) {
 function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
     jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to appear in the log ${
         timesEntered} time(s).`);
-    failPoint.wait(timesEntered);
+    if (timesEntered > 1) {
+        const expectedLog = "Hit " + failPoint.failPointName + " failpoint";
+        waitForFailpoint(expectedLog, timesEntered);
+    } else {
+        failPoint.wait();
+    }
 
     jsTest.log(`Running curOp operation after '${failPoint.failPointName}' failpoint.`);
     let result = adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
