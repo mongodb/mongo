@@ -426,7 +426,13 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
             nss,
             collectionUUID,
             _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
-        pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
+        // When looking up on a mongoD, we only ever want to read from the local collection. By
+        // default, makePipeline will attach a cursor source which may read from remote if the
+        // collection is sharded, so we manually attach a local-only cursor source here.
+        MakePipelineOptions opts;
+        opts.attachCursorSource = false;
+        pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
+        pipeline = attachCursorSourceToPipelineForLocalRead(foreignExpCtx, pipeline.release());
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
     }
