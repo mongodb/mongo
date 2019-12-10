@@ -377,11 +377,16 @@ void BackgroundSync::_produce() {
         // out of date. In that case we sleep for 1 second to reduce the amount we spin waiting
         // for our map to update.
         if (oldSource == source) {
+            long long sleepMS = 1000;
+            forceBgSyncSyncSourceRetryWaitMS.execute(
+                [&](const BSONObj& data) { sleepMS = data["sleepMS"].numberInt(); });
+
             log() << "Chose same sync source candidate as last time, " << source
-                  << ". Sleeping for 1 second to avoid immediately choosing a new sync source for "
-                     "the same reason as last time.";
+                  << ". Sleeping for " << sleepMS
+                  << "ms to avoid immediately choosing a new sync source for the same reason as "
+                     "last time.";
             numTimesChoseSameSyncSource.increment(1);
-            sleepsecs(1);
+            mongo::sleepmillis(sleepMS);
         } else {
             log() << "Changed sync source from "
                   << (oldSource.empty() ? std::string("empty") : oldSource.toString()) << " to "

@@ -1330,6 +1330,12 @@ var ReplSetTest = function(opts) {
               (new Date() - awaitTsStart) + "ms for " + this.nodes.length + " nodes in set '" +
               this.name + "'");
 
+        // Make sure all nodes are up to date. Do this while we still have a shortened heartbeat
+        // interval so it completes more quickly.
+        asCluster(self.nodes, function() {
+            self.awaitNodesAgreeOnAppliedOpTime();
+        });
+
         // Turn off the failpoints now that initial sync and initial setup is complete.
         if (failPointsSupported) {
             this.nodes.forEach(function(conn) {
