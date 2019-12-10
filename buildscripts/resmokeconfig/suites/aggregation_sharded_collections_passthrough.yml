@@ -29,6 +29,9 @@ selector:
   - jstests/aggregation/bugs/cursor_timeout.js
   - jstests/aggregation/bugs/lookup_unwind_getmore.js
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
+  # This test makes assertions about whether aggregations will need to spill to disk, which assumes
+  # all the data is located on a single shard.
+  - jstests/aggregation/spill_to_disk.js
   # TODO: Remove after SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
 
