@@ -310,7 +310,7 @@ void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        BSON("forceRoutingTableRefresh" << nss.ns()),
+        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
 
