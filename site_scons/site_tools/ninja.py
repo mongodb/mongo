@@ -952,9 +952,9 @@ class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
         prefix = env.subst('$TEMPFILEPREFIX')
         if not prefix:
             prefix = '@'
-            new_cmdlist = [cmd[0], prefix + cmd[-1]]
-            setattr(node.attributes, 'tempfile_cmdlist', new_cmdlist)
 
+        new_cmdlist = [cmd[0], prefix + cmd[-1]]
+        setattr(node.attributes, 'tempfile_cmdlist', new_cmdlist)
         return new_cmdlist
 
 
