@@ -219,6 +219,14 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             }
         }
 
+        if (nss == NamespaceString::kRangeDeletionNamespace) {
+            auto deletionTask = RangeDeletionTask::parse(
+                IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
+
+            if (!deletionTask.getPending())
+                migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+        }
+
         if (metadata->isSharded()) {
             incrementChunkOnInsertOrUpdate(opCtx,
                                            nss,

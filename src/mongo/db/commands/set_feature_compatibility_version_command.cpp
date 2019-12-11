@@ -46,6 +46,7 @@
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -178,6 +179,12 @@ public:
             }
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                const auto shardingState = ShardingState::get(opCtx);
+                if (shardingState->enabled()) {
+                    LOG(0) << "Upgrade: submitting orphaned ranges for cleanup";
+                    migrationutil::submitOrphanRangesForCleanup(opCtx);
+                }
+
                 // The primary shard sharding a collection will write the initial chunks for a
                 // collection directly to the config server, so wait for all shard collections to
                 // complete to guarantee no chunks are missed by the update on the config server.

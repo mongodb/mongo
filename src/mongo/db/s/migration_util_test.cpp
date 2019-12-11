@@ -260,13 +260,19 @@ void addRangeToReceivingChunks(OperationContext* opCtx,
     notification.abandon();
 }
 
-RangeDeletionTask createDeletionTask(NamespaceString nss, const UUID& uuid, int min, int max) {
-    return RangeDeletionTask(UUID::gen(),
-                             nss,
-                             uuid,
-                             ShardId("donorShard"),
-                             ChunkRange{BSON("_id" << min), BSON("_id" << max)},
-                             CleanWhenEnum::kDelayed);
+RangeDeletionTask createDeletionTask(
+    NamespaceString nss, const UUID& uuid, int min, int max, bool pending = true) {
+    auto task = RangeDeletionTask(UUID::gen(),
+                                  nss,
+                                  uuid,
+                                  ShardId("donorShard"),
+                                  ChunkRange{BSON("_id" << min), BSON("_id" << max)},
+                                  CleanWhenEnum::kNow);
+
+    if (pending)
+        task.setPending(true);
+
+    return task;
 }
 
 // Test that overlappingRangeQuery() can handle the cases that we expect to encounter.
@@ -427,7 +433,7 @@ TEST_F(MigrationUtilsTest, TestInvalidRangeIsDeleted) {
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
-    store.add(opCtx, createDeletionTask(kNss, uuid, 10, 20));
+    store.add(opCtx, createDeletionTask(kNss, uuid, 10, 20, false));
 
     ASSERT_EQ(store.count(opCtx), 1);
 

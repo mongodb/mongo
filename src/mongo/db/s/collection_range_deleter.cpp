@@ -52,6 +52,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/persistent_task_store.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -355,44 +357,64 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
 
         // Get the lock again to finish off this range (including notifying, if necessary).
         // Don't allow lock interrupts while cleaning up.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto* const collection = autoColl.getCollection();
-        auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-        auto& metadataManager = csr->_metadataManager;
+        bool finishedDeleting = false;
+        {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+            auto* const collection = autoColl.getCollection();
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+            auto& metadataManager = csr->_metadataManager;
 
-        if (!_checkCollectionMetadataStillValid(
-                nss, collectionUuid, forTestOnly, collection, metadataManager)) {
-            return boost::none;
-        }
-
-        auto* const self = forTestOnly ? forTestOnly : &metadataManager->_rangesToClean;
-
-        stdx::lock_guard<Latch> scopedLock(csr->_metadataManager->_managerLock);
-
-        if (!replicationStatus.isOK()) {
-            LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
-                   << redact(range->toString()) << " : " << redact(replicationStatus.reason());
-
-            // If range were already popped (e.g. by dropping nss during the waitForWriteConcern
-            // above) its notification would have been triggered, so this check suffices to ensure
-            // that it is safe to pop the range here
-            if (!notification.ready()) {
-                invariant(!self->isEmpty() && self->_orphans.front().notification == notification);
-                LOG(0) << "Abandoning deletion of latest range in " << nss.ns() << " after local "
-                       << "deletions because of replication failure";
-                self->_pop(replicationStatus);
+            if (!_checkCollectionMetadataStillValid(
+                    nss, collectionUuid, forTestOnly, collection, metadataManager)) {
+                return boost::none;
             }
-        } else {
-            LOG(0) << "Finished deleting documents in " << nss.ns() << " range "
-                   << redact(range->toString());
 
-            self->_pop(swNumDeleted.getStatus());
+            auto* const self = forTestOnly ? forTestOnly : &metadataManager->_rangesToClean;
+
+            stdx::lock_guard<Latch> scopedLock(csr->_metadataManager->_managerLock);
+
+            if (!replicationStatus.isOK()) {
+                LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
+                       << redact(range->toString()) << " : " << redact(replicationStatus.reason());
+
+                // If range were already popped (e.g. by dropping nss during the waitForWriteConcern
+                // above) its notification would have been triggered, so this check suffices to
+                // ensure that it is safe to pop the range here
+                if (!notification.ready()) {
+                    invariant(!self->isEmpty() &&
+                              self->_orphans.front().notification == notification);
+                    LOG(0) << "Abandoning deletion of latest range in " << nss.ns()
+                           << " after local "
+                           << "deletions because of replication failure";
+                    self->_pop(replicationStatus);
+                }
+            } else {
+                LOG(0) << "Finished deleting documents in " << nss.ns() << " range "
+                       << redact(range->toString());
+
+                finishedDeleting = true;
+                self->_pop(swNumDeleted.getStatus());
+            }
+
+            if (!self->_orphans.empty()) {
+                LOG(1) << "Deleting " << nss.ns() << " range "
+                       << redact(self->_orphans.front().range.toString()) << " next.";
+            }
         }
 
-        if (!self->_orphans.empty()) {
-            LOG(1) << "Deleting " << nss.ns() << " range "
-                   << redact(self->_orphans.front().range.toString()) << " next.";
+        if (finishedDeleting) {
+            try {
+                PersistentTaskStore<RangeDeletionTask> store(
+                    opCtx, NamespaceString::kRangeDeletionNamespace);
+                store.remove(opCtx,
+                             QUERY(RangeDeletionTask::kCollectionUuidFieldName
+                                   << collectionUuid << RangeDeletionTask::kRangeFieldName
+                                   << range->toBSON()));
+            } catch (const DBException& e) {
+                LOG(0) << "Failed to delete range deletion task for range " << range.get()
+                       << " in collection " << nss << causedBy(e.what());
+            }
         }
 
         return Date_t::now() + Milliseconds(rangeDeleterBatchDelayMS.load());

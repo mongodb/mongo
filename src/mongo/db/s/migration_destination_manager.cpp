@@ -744,11 +744,19 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
     {
         const ChunkRange range(_min, _max);
 
-        if (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUuid)) {
-            _setStateFail(str::stream() << "Migration aborted because range overlaps with a "
-                                           "range that is scheduled for deletion: collection: "
-                                        << _nss.ns() << " range: " << redact(range.toString()));
-            return;
+        while (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUuid)) {
+            LOG(0) << "Migration paused because range overlaps with a "
+                      "range that is scheduled for deletion: collection: "
+                   << _nss.ns() << " range: " << redact(range.toString());
+
+            auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
+
+            if (!status.isOK()) {
+                _setStateFail(redact(status.reason()));
+                return;
+            }
+
+            opCtx->sleepFor(Milliseconds(1000));
         }
 
         // TODO(SERVER-44163): Delete this block after the MigrationCoordinator has been integrated

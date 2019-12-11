@@ -63,28 +63,43 @@ BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const BSONObj& min,
                                     const BSONObj& max);
 
-// Creates a query object that can used to find overlapping ranges in the pending range deletions
-// collection.
+/**
+ * Creates a query object that can used to find overlapping ranges in the pending range deletions
+ * collection.
+ */
 Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid);
 
-// Checks the pending range deletions collection to see if there are any pending ranges that
-// conflict with the passed in range.
+/**
+ * Checks the pending range deletions collection to see if there are any pending ranges that
+ * conflict with the passed in range.
+ */
 bool checkForConflictingDeletions(OperationContext* opCtx,
                                   const ChunkRange& range,
                                   const UUID& uuid);
 
-// Submits a RangeDeletionTask to the CollectionRangeDeleter.
-// Returns false if the submission failed and is not retryable.
+/**
+ * Submits a RangeDeletionTask to the CollectionRangeDeleter.
+ * Returns false if the submission failed and is not retryable.
+ */
 bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& deletionTask);
 
-// Queries the rangeDeletions collection for ranges that are ready to be deleted and submits them to
-// the range deleter.
+/**
+ * Queries the rangeDeletions collection for ranges that are ready to be deleted and submits them to
+ * the range deleter.
+ */
 void submitPendingDeletions(OperationContext* opCtx);
 
-// Asynchronously calls submitPendingDeletions using the fixed executor pool.
+/**
+ * Asynchronously calls submitPendingDeletions using the fixed executor pool.
+ */
 void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
 
 void dropRangeDeletionsCollection(OperationContext* opCtx);
+
+/**
+ * Find and submit all orphan ranges for deletion.
+ */
+void submitOrphanRangesForCleanup(OperationContext* opCtx);
 
 /**
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority

@@ -54,22 +54,21 @@
 namespace mongo {
 namespace {
 
-enum CleanupResult { CleanupResult_Done, CleanupResult_Continue, CleanupResult_Error };
+enum class CleanupResult { kDone, kContinue, kError };
 
 /**
  * Cleans up one range of orphaned data starting from a range that overlaps or starts at
  * 'startingFromKey'.  If empty, startingFromKey is the minimum key of the sharded range.
  *
- * @return CleanupResult_Continue and 'stoppedAtKey' if orphaned range was found and cleaned
- * @return CleanupResult_Done if no orphaned ranges remain
- * @return CleanupResult_Error and 'errMsg' if an error occurred
+ * @return CleanupResult::kContinue and 'stoppedAtKey' if orphaned range was found and cleaned
+ * @return CleanupResult::kDone if no orphaned ranges remain
+ * @return CleanupResult::kError and 'errMsg' if an error occurred
  *
- * If the collection is not sharded, returns CleanupResult_Done.
+ * If the collection is not sharded, returns CleanupResult::kDone.
  */
 CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   const NamespaceString& ns,
                                   const BSONObj& startingFromKeyConst,
-                                  const WriteConcernOptions& secondaryThrottle,
                                   BSONObj* stoppedAtKey,
                                   std::string* errMsg) {
     BSONObj startingFromKey = startingFromKeyConst;
@@ -83,7 +82,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         if (!metadata->isSharded()) {
             LOG(0) << "skipping orphaned data cleanup for " << ns.ns()
                    << ", collection is not sharded";
-            return CleanupResult_Done;
+            return CleanupResult::kDone;
         }
 
         BSONObj keyPattern = metadata->getKeyPattern();
@@ -94,7 +93,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                     << " does not match shard key pattern " << keyPattern;
 
                 log() << *errMsg;
-                return CleanupResult_Error;
+                return CleanupResult::kError;
             }
         } else {
             startingFromKey = metadata->getMinKey();
@@ -105,7 +104,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
             LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
                    << redact(startingFromKey) << ", no orphan ranges remain";
 
-            return CleanupResult_Done;
+            return CleanupResult::kDone;
         }
 
         *stoppedAtKey = targetRange->getMax();
@@ -127,10 +126,10 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
     if (!result.isOK()) {
         log() << redact(result.reason());
         *errMsg = result.reason();
-        return CleanupResult_Error;
+        return CleanupResult::kError;
     }
 
-    return CleanupResult_Continue;
+    return CleanupResult::kContinue;
 }
 
 /**
@@ -214,11 +213,6 @@ public:
             return false;
         }
 
-        const auto secondaryThrottle =
-            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
-        const auto writeConcern = uassertStatusOK(
-            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(opCtx, secondaryThrottle));
-
         ShardingState* const shardingState = ShardingState::get(opCtx);
 
         if (!shardingState->enabled()) {
@@ -231,16 +225,16 @@ public:
 
         BSONObj stoppedAtKey;
         CleanupResult cleanupResult =
-            cleanupOrphanedData(opCtx, nss, startingFromKey, writeConcern, &stoppedAtKey, &errmsg);
+            cleanupOrphanedData(opCtx, nss, startingFromKey, &stoppedAtKey, &errmsg);
 
-        if (cleanupResult == CleanupResult_Error) {
+        if (cleanupResult == CleanupResult::kError) {
             return false;
         }
 
-        if (cleanupResult == CleanupResult_Continue) {
+        if (cleanupResult == CleanupResult::kContinue) {
             result.append(stoppedAtKeyField(), stoppedAtKey);
         } else {
-            dassert(cleanupResult == CleanupResult_Done);
+            dassert(cleanupResult == CleanupResult::kDone);
         }
 
         return true;

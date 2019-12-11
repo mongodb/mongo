@@ -33,9 +33,11 @@
 
 #include "mongo/db/s/migration_util.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/query.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache.h"
@@ -202,6 +204,94 @@ void dropRangeDeletionsCollection(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     client.dropCollection(NamespaceString::kRangeDeletionNamespace.toString(),
                           WriteConcerns::kMajorityWriteConcern);
+}
+
+template <typename Callable>
+void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Callable&& handler) {
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+
+    const auto css = CollectionShardingRuntime::get(opCtx, nss);
+    const auto metadata = css->getCurrentMetadata();
+    const auto emptyChunkMap =
+        RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
+
+    if (!metadata->isSharded()) {
+        LOG(0) << "Upgrade: skipping orphaned range enumeration for " << nss
+               << ", collection is not sharded";
+        return;
+    }
+
+    auto startingKey = metadata->getMinKey();
+
+    while (true) {
+        auto range = metadata->getNextOrphanRange(emptyChunkMap, startingKey);
+        if (!range) {
+            LOG(2) << "Upgrade: Completed orphaned range enumeration for " << nss.toString()
+                   << " starting from " << redact(startingKey) << ", no orphan ranges remain";
+
+            return;
+        }
+
+        handler(*range);
+
+        startingKey = range->getMax();
+    }
+}
+
+void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
+    try {
+        auto version = forceShardFilteringMetadataRefresh(opCtx, nss, true);
+
+        if (version == ChunkVersion::UNSHARDED())
+            return;
+
+        LOG(2) << "Upgrade: Cleaning up existing orphans for " << nss << " : " << uuid;
+
+        std::vector<RangeDeletionTask> deletions;
+        forEachOrphanRange(opCtx, nss, [&deletions, &opCtx, &nss, &uuid](const auto& range) {
+            // Since this is not part of an active migration, the migration UUID and the donor shard
+            // are set to unused values so that they don't conflict.
+            RangeDeletionTask task(
+                UUID::gen(), nss, uuid, ShardId("fromFCVUpgrade"), range, CleanWhenEnum::kDelayed);
+            deletions.emplace_back(task);
+        });
+
+        if (deletions.empty())
+            return;
+
+        PersistentTaskStore<RangeDeletionTask> store(opCtx,
+                                                     NamespaceString::kRangeDeletionNamespace);
+
+        for (const auto& task : deletions) {
+            LOG(2) << "Upgrade: Submitting range for cleanup: " << task.getRange() << " from "
+                   << nss;
+            store.add(opCtx, task);
+        }
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
+        LOG(0) << "Upgrade: Failed to cleanup orphans for " << nss
+               << " because the namespace was not found: " << e.what()
+               << ", the collection must have been dropped";
+    }
+}
+
+void submitOrphanRangesForCleanup(OperationContext* opCtx) {
+    // TODO(SERVER-45047): block incoming migrations
+
+    auto& catalog = CollectionCatalog::get(opCtx);
+    const auto& dbs = catalog.getAllDbNames();
+
+    for (const auto& dbName : dbs) {
+        if (dbName == NamespaceString::kLocalDb)
+            continue;
+
+        for (auto collIt = catalog.begin(dbName); collIt != catalog.end(); ++collIt) {
+            auto uuid = collIt.uuid().get();
+            auto nss = catalog.lookupNSSByUUID(opCtx, uuid).get();
+            LOG(2) << "Upgrade: processing collection: " << nss;
+
+            submitOrphanRanges(opCtx, nss, uuid);
+        }
+    }
 }
 
 void persistMigrationCoordinatorLocally(OperationContext* opCtx,
