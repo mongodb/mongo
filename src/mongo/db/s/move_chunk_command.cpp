@@ -225,20 +225,20 @@ private:
         moveTimingHelper.done(2);
         moveChunkHangAtStep2.pauseWhileSet();
 
-        uassertStatusOKWithWarning(migrationSourceManager.startClone(opCtx));
+        uassertStatusOKWithWarning(migrationSourceManager.startClone());
         moveTimingHelper.done(3);
         moveChunkHangAtStep3.pauseWhileSet();
 
-        uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(opCtx));
+        uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp());
         moveTimingHelper.done(4);
         moveChunkHangAtStep4.pauseWhileSet();
 
-        uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(opCtx));
-        uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(opCtx));
+        uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection());
+        uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient());
         moveTimingHelper.done(5);
         moveChunkHangAtStep5.pauseWhileSet();
 
-        uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
+        uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig());
         moveTimingHelper.done(6);
         moveChunkHangAtStep6.pauseWhileSet();
     }

@@ -57,7 +57,9 @@ public:
                            CollectionUUID collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
-                           bool fromMigrate) override {}
+                           bool fromMigrate) override;
+
+    void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) override;
 
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -112,7 +114,7 @@ public:
                    OptionalCollectionUUID uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<TTLCollModInfo> ttlInfo) override {}
+                   boost::optional<TTLCollModInfo> ttlInfo) override;
 
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
 
@@ -126,7 +128,7 @@ public:
                      const NamespaceString& nss,
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
-                     const BSONObj& indexInfo) override {}
+                     const BSONObj& indexInfo) override;
 
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,

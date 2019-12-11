@@ -101,6 +101,12 @@ public:
                                    const std::vector<BSONObj>& indexes,
                                    bool fromMigrate) = 0;
 
+    /**
+     * TODO (SERVER-45017): Remove when v4.4 becomes last-stable.
+     */
+    virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,
+                                              const NamespaceString& nss) = 0;
+
     virtual void onCommitIndexBuild(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     CollectionUUID collUUID,

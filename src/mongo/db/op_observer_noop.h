@@ -48,6 +48,9 @@ public:
                            const std::vector<BSONObj>& indexes,
                            bool fromMigrate) override {}
 
+    void onStartIndexBuildSinglePhase(OperationContext* opCtx,
+                                      const NamespaceString& nss) override {}
+
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
                             CollectionUUID collUUID,

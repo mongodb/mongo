@@ -188,6 +188,19 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
     }
 }
 
+/**
+ * Aborts any ongoing migration for the given namespace. Should only be called when observing index
+ * operations.
+ */
+void abortOngoingMigration(OperationContext* opCtx, const NamespaceString nss) {
+    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+    auto msm = MigrationSourceManager::get(csr, csrLock);
+    if (msm) {
+        msm->abortDueToConflictingIndexOperation();
+    }
+}
+
 }  // namespace
 
 ShardServerOpObserver::ShardServerOpObserver() = default;
@@ -428,5 +441,37 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
 
     return {};
 }
+
+void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              CollectionUUID collUUID,
+                                              const UUID& indexBuildUUID,
+                                              const std::vector<BSONObj>& indexes,
+                                              bool fromMigrate) {
+    abortOngoingMigration(opCtx, nss);
+};
+
+void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    abortOngoingMigration(opCtx, nss);
+}
+
+void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        OptionalCollectionUUID uuid,
+                                        const std::string& indexName,
+                                        const BSONObj& indexInfo) {
+    abortOngoingMigration(opCtx, nss);
+};
+
+void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      OptionalCollectionUUID uuid,
+                                      const BSONObj& collModCmd,
+                                      const CollectionOptions& oldCollOptions,
+                                      boost::optional<TTLCollModInfo> ttlInfo) {
+    abortOngoingMigration(opCtx, nss);
+};
+
 
 }  // namespace mongo
