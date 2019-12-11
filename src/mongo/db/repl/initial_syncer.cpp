@@ -1050,6 +1050,10 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                 if (!exec_status.isOK()) {
                     onCompletionGuard->setResultAndCancelRemainingWork_inlock(
                         lock, exec_status.getStatus());
+                    // In the shutdown case, it is possible the completion guard will be run
+                    // from this thread (since the lambda holding another copy didn't schedule).
+                    // If it does, we will self-deadlock if we're holding the lock, so release it.
+                    lock.unlock();
                 }
                 // In unit tests, this reset ensures the completion guard does not run during the
                 // destruction of the lambda (which occurs on the wrong executor), except in the
