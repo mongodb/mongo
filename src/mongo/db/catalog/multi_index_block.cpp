@@ -186,29 +186,7 @@ MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn =
 MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(OperationContext* opCtx,
                                                                         const Collection* coll) {
     return [opCtx, ns = coll->ns()](std::vector<BSONObj>& specs) -> Status {
-        // This function sets a timestamp for the initial catalog write when beginning an index
-        // build, if necessary.  There are four scenarios:
-
-        // 1. A timestamp is already set -- replication application sets a timestamp ahead of time.
-        // This could include the phase of initial sync where it applies oplog entries.  Also,
-        // primaries performing an index build via `applyOps` may have a wrapping commit timestamp.
-        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull())
-            return Status::OK();
-
-        // 2. If the node is initial syncing, we do not set a timestamp.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->isReplEnabled() && replCoord->getMemberState().startup2())
-            return Status::OK();
-
-        // 3. If the index build is on the local database, do not timestamp.
-        if (ns.isLocal())
-            return Status::OK();
-
-        // 4. All other cases, we generate a timestamp by writing a no-op oplog entry.  This is
-        // better than using a ghost timestamp.  Writing an oplog entry ensures this node is
-        // primary.
-        opCtx->getServiceContext()->getOpObserver()->onOpMessage(
-            opCtx, BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
+        opCtx->getServiceContext()->getOpObserver()->onStartIndexBuildSinglePhase(opCtx, ns);
         return Status::OK();
     };
 }

@@ -113,7 +113,7 @@ public:
      * Expected state: kCreated
      * Resulting state: kCloning on success, kDone on failure
      */
-    Status startClone(OperationContext* opCtx);
+    Status startClone();
 
     /**
      * Waits for the cloning to catch up sufficiently so we won't have to stay in the critical
@@ -123,7 +123,7 @@ public:
      * Expected state: kCloning
      * Resulting state: kCloneCaughtUp on success, kDone on failure
      */
-    Status awaitToCatchUp(OperationContext* opCtx);
+    Status awaitToCatchUp();
 
     /**
      * Waits for the active clone operation to catch up and enters critical section. Once this call
@@ -134,7 +134,7 @@ public:
      * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
-    Status enterCriticalSection(OperationContext* opCtx);
+    Status enterCriticalSection();
 
     /**
      * Tells the recipient of the chunk to commit the chunk contents, which it received.
@@ -142,7 +142,7 @@ public:
      * Expected state: kCriticalSection
      * Resulting state: kCloneCompleted on success, kDone on failure
      */
-    Status commitChunkOnRecipient(OperationContext* opCtx);
+    Status commitChunkOnRecipient();
 
     /**
      * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
@@ -156,7 +156,7 @@ public:
      * Expected state: kCloneCompleted
      * Resulting state: kDone
      */
-    Status commitChunkMetadataOnConfig(OperationContext* opCtx);
+    Status commitChunkMetadataOnConfig();
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
@@ -166,7 +166,13 @@ public:
      * Expected state: Any
      * Resulting state: kDone
      */
-    void cleanupOnError(OperationContext* opCtx);
+    void cleanupOnError();
+
+    /**
+     * Aborts the migration after observing a concurrent index operation by marking its operation
+     * context as killed.
+     */
+    void abortDueToConflictingIndexOperation();
 
     /**
      * Returns the cloner which is being used for this migration. This value is available only if
@@ -191,21 +197,24 @@ private:
     // comments explaining the various state transitions.
     enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kCloneCompleted, kDone };
 
-    ScopedCollectionMetadata _getCurrentMetadataAndCheckEpoch(OperationContext* opCtx);
+    ScopedCollectionMetadata _getCurrentMetadataAndCheckEpoch();
 
     /**
      * If this donation moves the first chunk to the recipient (i.e., the recipient didn't have any
      * chunks), this function writes a no-op message to the oplog, so that change stream will notice
      * that and close the cursor in order to notify mongos to target the new shard as well.
      */
-    void _notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
-                                                   const ScopedCollectionMetadata& metadata);
+    void _notifyChangeStreamsOnRecipientFirstChunk(const ScopedCollectionMetadata& metadata);
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
-    void _cleanup(OperationContext* opCtx);
+    void _cleanup();
+
+    // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
+    // The caller must guarantee it outlives the MigrationSourceManager.
+    OperationContext* const _opCtx;
 
     // The parameters to the moveChunk command
     const MoveChunkRequest _args;

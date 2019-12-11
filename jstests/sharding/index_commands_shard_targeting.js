@@ -10,6 +10,7 @@
 
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/fail_point_util.js");
+load("jstests/sharding/libs/sharded_index_util.js");
 
 /*
  * Returns the metadata for the collection in the shard's catalog cache.
@@ -59,35 +60,6 @@ function moveChunkNotRefreshRecipient(mongos, ns, fromShard, toShard, findQuery)
 }
 
 /*
- * Asserts that the shard has an index for the collection with the given index key.
- */
-function assertIndexExistsOnShard(shard, dbName, collName, targetIndexKey) {
-    let res = shard.getDB(dbName).runCommand({listIndexes: collName});
-    assert.commandWorked(res);
-
-    let indexesOnShard = res.cursor.firstBatch;
-    const isTargetIndex = (index) => bsonWoCompare(index.key, targetIndexKey) === 0;
-    assert(indexesOnShard.some(isTargetIndex));
-}
-
-/*
- * Asserts that the shard does not have an index for the collection with the given index key.
- */
-function assertIndexDoesNotExistOnShard(shard, dbName, collName, targetIndexKey) {
-    let res = shard.getDB(dbName).runCommand({listIndexes: collName});
-    if (!res.ok && res.code === ErrorCodes.NamespaceNotFound) {
-        // The collection does not exist on the shard, neither does the target index.
-        return;
-    }
-    assert.commandWorked(res);
-
-    let indexesOnShard = res.cursor.firstBatch;
-    indexesOnShard.forEach(function(index) {
-        assert.neq(0, bsonWoCompare(index.key, targetIndexKey));
-    });
-}
-
-/*
  * Runs the command after performing chunk operations to make the primary shard (shard0) not own
  * any chunks for the collection, and the subset of non-primary shards (shard1 and shard2) that
  * own chunks for the collection have stale catalog cache.
@@ -117,8 +89,8 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     assertCollectionVersionOlderThan(st.shard2, ns, mongosCollectionVersion);
     assertCollectionVersionOlderThan(st.shard3, ns, mongosCollectionVersion);
 
-    if (testCase.setUp) {
-        testCase.setUp();
+    if (testCase.setUpFuncForCheckShardVersionTest) {
+        testCase.setUpFuncForCheckShardVersionTest();
     }
     assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
 
@@ -134,10 +106,9 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
 }
 
 /*
- * Runs the command during a chunk migration after the donor enters the read-only phase of the
- * critical section. Asserts that the command is blocked behind the critical section.
- *
- * Assumes that shard0 is the primary shard.
+ * Runs moveChunk to move one chunk from the primary shard (shard0) to shard1. Pauses the
+ * migration after shard0 enters the read-only phase of the critical section, and runs
+ * the given command function. Asserts that the command is blocked behind the critical section.
  */
 function assertCommandBlocksIfCriticalSectionInProgress(
     st, staticMongod, dbName, collName, testCase) {
@@ -145,17 +116,19 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     const fromShard = st.shard0;
     const toShard = st.shard1;
 
+    if (testCase.setUpFuncForCriticalSectionTest) {
+        testCase.setUpFuncForCriticalSectionTest();
+    }
+
+    // Split the initial chunk.
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 
-    // Turn on the fail point and wait for moveChunk to hit the fail point.
+    // Turn on the fail point, and move one of the chunks to shard1 so that there are two
+    // shards that own chunks for the collection. Wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.chunkDataCommitted);
     let joinMoveChunk =
         moveChunkParallel(staticMongod, st.s.host, {_id: 0}, null, ns, toShard.shardName);
     waitForMoveChunkStep(fromShard, moveChunkStepNames.chunkDataCommitted);
-
-    if (testCase.setUp) {
-        testCase.setUp();
-    }
 
     // Run the command and assert that it eventually times out.
     const cmdWithMaxTimeMS = Object.assign({}, testCase.command, {maxTimeMS: 500});
@@ -189,28 +162,55 @@ const testCases = {
         return {
             command: {createIndexes: collName, indexes: [index]},
             assertCommandRanOnShard: (shard) => {
-                assertIndexExistsOnShard(shard, dbName, collName, index.key);
+                ShardedIndexUtil.assertIndexExistsOnShard(shard, dbName, collName, index.key);
             },
             assertCommandDidNotRunOnShard: (shard) => {
-                assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
+                ShardedIndexUtil.assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
             }
         };
     },
     dropIndexes: collName => {
+        const ns = dbName + "." + collName;
+        const createIndexOnAllShards = () => {
+            allShards.forEach(function(shard) {
+                assert.commandWorked(
+                    shard.getDB(dbName).runCommand({createIndexes: collName, indexes: [index]}));
+            });
+        };
         return {
             command: {dropIndexes: collName, index: index.name},
-            setUp: () => {
-                // Create the index directly on all the shards.
-                allShards.forEach(function(shard) {
-                    assert.commandWorked(shard.getDB(dbName).runCommand(
-                        {createIndexes: collName, indexes: [index]}));
-                });
+            setUpFuncForCheckShardVersionTest: () => {
+                // Create the index directly on all the shards. Note that this will not cause stale
+                // shards to refresh their shard versions.
+                createIndexOnAllShards();
+            },
+            setUpFuncForCriticalSectionTest: () => {
+                // Move the initial chunk from the shard0 (primary shard) to shard1 and then move it
+                // from shard1 back to shard0. This is just to make the collection also exist on
+                // shard1 so that the createIndexes command below won't create the collection on
+                // shard1 with a different UUID which will cause the moveChunk command in the test
+                // to fail.
+                assert.commandWorked(st.s.adminCommand({
+                    moveChunk: ns,
+                    find: {_id: MinKey},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true
+                }));
+                assert.commandWorked(st.s.adminCommand({
+                    moveChunk: ns,
+                    find: {_id: MinKey},
+                    to: st.shard0.shardName,
+                    _waitForDelete: true
+                }));
+
+                // Create the index directly on all the shards so shards.
+                createIndexOnAllShards();
             },
             assertCommandRanOnShard: (shard) => {
-                assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
+                ShardedIndexUtil.assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
             },
             assertCommandDidNotRunOnShard: (shard) => {
-                assertIndexExistsOnShard(shard, dbName, collName, index.key);
+                ShardedIndexUtil.assertIndexExistsOnShard(shard, dbName, collName, index.key);
             }
         };
     },
@@ -232,7 +232,7 @@ const testCases = {
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-// Test that the indexes commands send and check shard vesions, and only target the primary
+// Test that the index commands send and check shard vesions, and only target the primary
 // shard and the shards that own chunks for the collection.
 const expectedTargetedShards = new Set([st.shard0, st.shard1, st.shard2]);
 assert.lt(expectedTargetedShards.size, numShards);
@@ -255,7 +255,7 @@ for (const command of Object.keys(testCases)) {
     });
 }
 
-// Test that the indexes commands are blocked behind the critical section.
+// Test that the index commands are blocked behind the critical section.
 const staticMongod = MongoRunner.runMongod({});
 
 for (const command of Object.keys(testCases)) {
