@@ -409,7 +409,7 @@ TEST_F(StitchSupportTest, CheckProjectionWorksWithDefaults) {
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : 200 }", results[1]);
 
     std::tie(results, needsMatch) =
-        checkProjection("{'a.$.c': 1}",
+        checkProjection("{'a.$': 1}",
                         {"{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}",
                          "{_id: 1, a: [{b: 1, c: 100, d: 45}, {b: 2, c: 200}]}"},
                         "{'a.b': 1}");
@@ -428,9 +428,8 @@ TEST_F(StitchSupportTest, CheckProjectionWorksWithDefaults) {
 }
 
 TEST_F(StitchSupportTest, CheckProjectionProducesExpectedStatus) {
-    ASSERT_EQ(
-        "Projections with a positional operator require a matcher",
-        checkProjectionStatus("{'a.$.c': 1}", "{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}"));
+    ASSERT_EQ("Projections with a positional operator require a matcher",
+              checkProjectionStatus("{'a.$': 1}", "{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}"));
     ASSERT_EQ("$textScore, $sortKey, $recordId and $geoNear are not allowed in this context",
               checkProjectionStatus("{a: {$meta: 'textScore'}}", "{_id: 1, a: 100, b: 200}"));
 

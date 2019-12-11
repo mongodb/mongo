@@ -192,30 +192,8 @@ void addNodeAtPath(ProjectionPathASTNode* root,
     addNodeAtPathHelper(root, path, 0, std::move(newChild));
 }
 
-/**
- * Return a pair {begin, end} indicating where the first positional operator in the string is.
- * If there is no positional operator, returns boost::none.
- */
-using PositionalProjectionLocation = boost::optional<std::pair<size_t, size_t>>;
-PositionalProjectionLocation findFirstPositionalOperator(StringData fullPath) {
-    size_t first = fullPath.find(".$.");
-    if (first != std::string::npos) {
-        return {{first, first + 3}};
-    }
-
-    // There are no cases of the positional operator in between paths, so it must be at the end.
-    if (fullPath.endsWith(".$")) {
-        return {{fullPath.size() - 2, fullPath.size()}};
-    }
-
-    // If the entire path is just a '$' we consider that part of the positional projection.
-    // This case may arise if there are two positional projections in a row, such as "a.$.$".
-    // For now such cases are banned elsewhere in the parsing code.
-    if (fullPath == "$") {
-        return {{0, fullPath.size()}};
-    }
-
-    return boost::none;
+bool hasPositionalOperator(StringData path) {
+    return path.endsWith(".$");
 }
 
 bool isPrefixOf(StringData first, StringData second) {
@@ -407,13 +385,14 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
 void parseInclusion(ParseContext* ctx,
                     BSONElement elem,
                     ProjectionPathASTNode* parent,
-                    boost::optional<FieldPath> fullPathToParent,
-                    PositionalProjectionLocation firstPositionalProjection) {
+                    boost::optional<FieldPath> fullPathToParent) {
     // There are special rules about _id being included. _id may be included in both inclusion and
     // exclusion projections.
     const bool isTopLevelIdProjection = elem.fieldNameStringData() == "_id" && parent->isRoot();
 
-    if (!firstPositionalProjection) {
+    const bool hasPositional = hasPositionalOperator(elem.fieldNameStringData());
+
+    if (!hasPositional) {
         FieldPath path(elem.fieldNameStringData());
         addNodeAtPath(parent, path, std::make_unique<BooleanConstantASTNode>(true));
 
@@ -430,27 +409,12 @@ void parseInclusion(ParseContext* ctx,
         uassert(31256, "Cannot specify positional operator and $elemMatch.", !ctx->hasElemMatch);
         uassert(51050, "Projections with a positional operator require a matcher", ctx->query);
 
-        // Check that the path does not end with ".$." which can be interpreted as the
-        // positional projection.
-        uassert(31270,
-                str::stream() << "Path cannot end with '.$.'",
-                !elem.fieldNameStringData().endsWith(".$."));
-
-        const auto [firstPositionalBegin, firstPositionalEnd] = *firstPositionalProjection;
-
-        // See if there's another positional operator after the first one. If there is,
-        // it's invalid.
-        StringData remainingPathAfterPositional =
-            elem.fieldNameStringData().substr(firstPositionalEnd);
-        uassert(31287,
-                str::stream() << "Cannot use positional operator twice: "
-                              << elem.fieldNameStringData(),
-                findFirstPositionalOperator(remainingPathAfterPositional) == boost::none &&
-                    remainingPathAfterPositional != "$");
-
         // Get everything up to the first positional operator.
+        // Should at least be ".$"
+        StringData elemFieldName = elem.fieldNameStringData();
+        invariant(elemFieldName.size() > 2);
         StringData pathWithoutPositionalOperator =
-            elem.fieldNameStringData().substr(0, firstPositionalBegin);
+            elemFieldName.substr(0, elemFieldName.size() - 2);
 
         FieldPath path(pathWithoutPositionalOperator);
 
@@ -578,12 +542,21 @@ void parseElement(ParseContext* ctx,
                   BSONElement elem,
                   boost::optional<FieldPath> fullPathToParent,
                   ProjectionPathASTNode* parent) {
-    const auto firstPositionalProjection = findFirstPositionalOperator(elem.fieldNameStringData());
+    const bool hasPositional = hasPositionalOperator(elem.fieldNameStringData());
 
     // If there is a positional projection, find only features must be enabled.
     uassert(31324,
             "Cannot use positional projection in aggregation projection",
-            (!firstPositionalProjection || ctx->policies.findOnlyFeaturesAllowed()));
+            (!hasPositional || ctx->policies.findOnlyFeaturesAllowed()));
+
+    // Be sure that uses of positional projection that were correct in versions before 4.4 that are
+    // now incorrect get a good error message.
+    uassert(31394,
+            "As of 4.4, it's illegal to specify positional operator in the middle of a path."
+            "Positional projection may only be used at the end, for example: a.b.$. If the query "
+            "previously used a form like a.b.$.d, remove the parts following the '$' and the "
+            "results will be equivalent.",
+            !str::contains(elem.fieldNameStringData(), ".$."));
 
     if (elem.type() == BSONType::Object) {
         BSONObj subObj = elem.embeddedObject();
@@ -592,19 +565,18 @@ void parseElement(ParseContext* ctx,
         // any expression.
         uassert(31271,
                 "positional projection cannot be used with an expression or sub object",
-                static_cast<bool>(!firstPositionalProjection));
+                !hasPositional);
 
         parseSubObject(ctx, elem.fieldNameStringData(), fullPathToParent, subObj, parent);
     } else if (isInclusionOrExclusionType(elem.type())) {
         if (elem.trueValue()) {
-            parseInclusion(ctx, elem, parent, fullPathToParent, firstPositionalProjection);
+            parseInclusion(ctx, elem, parent, fullPathToParent);
         } else {
+            uassert(31395, "positional projection cannot be used with exclusion", !hasPositional);
             parseExclusion(ctx, elem, parent);
         }
     } else {
-        uassert(31308,
-                "positional projection cannot be used with a literal",
-                static_cast<bool>(!firstPositionalProjection));
+        uassert(31308, "positional projection cannot be used with a literal", !hasPositional);
 
         parseLiteral(ctx, elem, parent);
     }

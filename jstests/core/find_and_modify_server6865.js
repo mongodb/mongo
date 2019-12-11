@@ -92,14 +92,12 @@ testFAMWorked({
               {query: {_id: 42, 'b.name': 'third'}, fields: {'b.$': 1}, remove: true},
               {_id: 42, b: [{name: 'third', value: 3}]});
 
-// Query on an array of objects while using a position projection.
-// Verifies that the projection {'b.$.value': 1} is treated the
-// same as {'b.$': 1}.
+// Query on an array of objects while using a positional projection.
 testFAMWorked({
     _id: 42,
     b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
 },
-              {query: {_id: 42, 'b.name': 'third'}, fields: {'b.$.value': 1}, remove: true},
+              {query: {_id: 42, 'b.name': 'third'}, fields: {'b.$': 1}, remove: true},
               {_id: 42, b: [{name: 'third', value: 3}]});
 
 // Query on an array of objects using $elemMatch while using an inclusion projection.
