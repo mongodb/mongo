@@ -8153,8 +8153,8 @@ buildvariants:
 #          Mobile SDK buildvariants       #
 ###########################################
 
-- name: embedded-sdk-macosx-10.10
-  display_name: "Embedded SDK - macOS 10.10"
+- name: embedded-sdk-macosx-10.11
+  display_name: "Embedded SDK - macOS 10.11"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -8167,7 +8167,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: "10.10"
+    cdriver_cmake_osx_deployment_target: "10.11"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"

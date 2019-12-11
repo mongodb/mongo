@@ -2002,7 +2002,7 @@ def doConfigure(myenv):
 
     conf.Finish()
 
-    # We require macOS 10.10, iOS 10.2, or tvOS 10.2
+    # We require macOS 10.11 or newer
     if env.TargetOSIs('darwin'):
 
         # TODO: Better error messages, mention the various -mX-version-min-flags in the error, and
@@ -2013,12 +2013,8 @@ def doConfigure(myenv):
             #include <AvailabilityMacros.h>
             #include <TargetConditionals.h>
 
-            #if TARGET_OS_OSX && (MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_10)
+            #if TARGET_OS_OSX && (__MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_11)
             #error 1
-            #elif TARGET_OS_IOS && (__IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_10_2)
-            #error 2
-            #elif TARGET_OS_TV && (__TV_OS_VERSION_MIN_REQUIRED < __TVOS_10_1)
-            #error 3
             #endif
             """
 
@@ -2032,7 +2028,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckDarwinMinima():
-            conf.env.ConfError("Required target minimum of macOS 10.10, iOS 10.2, or tvOS 10.1 not found")
+            conf.env.ConfError("Required target minimum of macOS 10.11 not found")
 
         conf.Finish()
 
