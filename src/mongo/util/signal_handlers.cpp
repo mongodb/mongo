@@ -53,24 +53,9 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/signal_win32.h"
-
-#if defined(_WIN32)
-namespace {
-const char* strsignal(int signalNum) {
-    // should only see SIGABRT on windows
-    switch (signalNum) {
-        case SIGABRT:
-            return "SIGABRT";
-        default:
-            return "UNKNOWN";
-    }
-}
-}  // namespace
-#endif
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
-
-using std::endl;
 
 /*
  * WARNING: PLEASE READ BEFORE CHANGING THIS MODULE
@@ -160,47 +145,133 @@ void eventProcessingThread() {
 
 #else
 
-// The signals in asyncSignals will be processed by this thread only, in order to
-// ensure the db and log mutexes aren't held. Because this is run in a different thread, it does
-// not need to be safe to call in signal context.
-sigset_t asyncSignals;
+/**
+ * Filled by the `waitForSignal` function.
+ * Only Linux has `sigwaitinfo` to synchronously get a signal with its `siginfo_t`.
+ * Only Linux has a procfs from which to read metadata for such signal sending process.
+ * So outside Linux we just get the `sig`.
+ */
+struct SignalWaitResult {
+    int sig;
+#if defined(__linux__)
+    siginfo_t si;
+#endif  // defined(__linux__)
+};
+
+/** Fill `result` with a caught signal from `sigset`. Return true on success. */
+bool waitForSignal(const sigset_t& sigset, SignalWaitResult* result) {
+    MONGO_IDLE_THREAD_BLOCK;
+#if defined(__linux__)
+    while (true) {
+        errno = 0;
+        result->sig = sigwaitinfo(&sigset, &result->si);
+        int errsv = errno;
+        if (result->sig == -1) {
+            if (errsv == EINTR)
+                continue;
+            severe() << "sigwaitinfo failed with error:" << strerror(errsv);
+            return false;
+        }
+        return true;
+    }
+#else
+    return sigwait(&sigset, &result->sig) == 0;
+#endif
+}
+
+const int kSignalProcessingThreadExclusives[] = {SIGHUP, SIGINT, SIGTERM, SIGUSR1, SIGXCPU};
+
+struct LogRotationState {
+    static constexpr auto kNever = static_cast<time_t>(-1);
+    LogFileStatus logFileStatus;
+    time_t previous;
+};
+
+void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation) {
+    int sig = waited.sig;
+    log() << "got signal " << sig << " (" << strsignal(sig) << ")";
+#ifdef __linux__
+    const siginfo_t& si = waited.si;
+    switch (si.si_code) {
+        case SI_USER:
+        case SI_QUEUE:
+            log() << "kill from pid:" << si.si_pid << " uid:" << si.si_uid;
+            break;
+        case SI_TKILL:
+            log() << "tgkill";
+            break;
+        case SI_KERNEL:
+            log() << "kernel";
+            break;
+    }
+#endif  // __linux__
+
+    if (sig == SIGUSR1) {
+        // log rotate signal
+        {
+            // Rate limit: 1 second per signal
+            auto now = time(nullptr);
+            if (rotation->previous != rotation->kNever && difftime(now, rotation->previous) <= 1.0)
+                return;
+            rotation->previous = now;
+        }
+        fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate, logV2Enabled()));
+        if (rotation->logFileStatus == LogFileStatus::kNeedToRotateLogFile) {
+            logProcessDetailsForLogRotate(getGlobalServiceContext());
+        }
+        return;
+    }
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+    if (sig == stackTraceSignal()) {
+        auto logObj = log();
+        auto& stream = logObj.setIsTruncatable(false).stream();
+        OstreamStackTraceSink sink{stream};
+        printAllThreadStacks(sink);
+        return;
+    }
+#endif
+    // interrupt/terminate signal
+    log() << "will terminate after current cmd ends";
+    exitCleanly(EXIT_CLEAN);
+}
+
+/**
+ * The signals in `kSignalProcessingThreadExclusives` will be delivered to this thread only,
+ * to ensure the db and log mutexes aren't held.
+ */
 void signalProcessingThread(LogFileStatus rotate) {
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+    markAsStackTraceProcessingThread();
+#endif
     setThreadName("signalProcessingThread");
 
-    time_t signalTimeSeconds = -1;
-    time_t lastSignalTimeSeconds = -1;
+    LogRotationState logRotationState{rotate, logRotationState.kNever};
+
+    sigset_t waitSignals;
+    sigemptyset(&waitSignals);
+
+    for (int sig : kSignalProcessingThreadExclusives)
+        sigaddset(&waitSignals, sig);
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+    // On this thread, block the stackTraceSignal and rely on sigwaitinfo to deliver it.
+    sigaddset(&waitSignals, stackTraceSignal());
+#endif
+
+    errno = 0;
+    if (int r = pthread_sigmask(SIG_SETMASK, &waitSignals, nullptr); r != 0) {
+        int errsv = errno;
+        severe() << "pthread_sigmask failed with error:" << strerror(errsv);
+        fassertFailed(31377);
+    }
 
     while (true) {
-        int actualSignal = 0;
-        int status = [&] {
-            MONGO_IDLE_THREAD_BLOCK;
-            return sigwait(&asyncSignals, &actualSignal);
-        }();
-        fassert(16781, status == 0);
-        switch (actualSignal) {
-            case SIGUSR1:
-                // log rotate signal
-                signalTimeSeconds = time(nullptr);
-                if (signalTimeSeconds <= lastSignalTimeSeconds) {
-                    // ignore multiple signals in the same or earlier second.
-                    break;
-                }
-
-                lastSignalTimeSeconds = signalTimeSeconds;
-                fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate, logV2Enabled()));
-                if (rotate == LogFileStatus::kNeedToRotateLogFile) {
-                    logProcessDetailsForLogRotate(getGlobalServiceContext());
-                }
-                break;
-            default:
-                // interrupt/terminate signal
-                log() << "got signal " << actualSignal << " (" << strsignal(actualSignal)
-                      << "), will terminate after current cmd ends" << endl;
-                exitCleanly(EXIT_CLEAN);
-                break;
-        }
+        SignalWaitResult waited;
+        fassert(16781, waitForSignal(waitSignals, &waited));
+        handleOneSignal(waited, &logRotationState);
     }
 }
+
 #endif
 }  // namespace
 
@@ -211,14 +282,6 @@ void setupSignalHandlers() {
             "Couldn't register Windows Ctrl-C handler",
             SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
 #else
-    // asyncSignals is a global variable listing the signals that should be handled by the
-    // interrupt thread, once it is started via startSignalProcessingThread().
-    sigemptyset(&asyncSignals);
-    sigaddset(&asyncSignals, SIGHUP);
-    sigaddset(&asyncSignals, SIGINT);
-    sigaddset(&asyncSignals, SIGTERM);
-    sigaddset(&asyncSignals, SIGUSR1);
-    sigaddset(&asyncSignals, SIGXCPU);
 #endif
 }
 
@@ -226,8 +289,16 @@ void startSignalProcessingThread(LogFileStatus rotate) {
 #ifdef _WIN32
     stdx::thread(eventProcessingThread).detach();
 #else
+
+    // The signals that should be handled by the SignalProcessingThread, once it is started via
+    // startSignalProcessingThread().
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    for (int sig : kSignalProcessingThreadExclusives)
+        sigaddset(&sigset, sig);
+
     // Mask signals in the current (only) thread. All new threads will inherit this mask.
-    invariant(pthread_sigmask(SIG_SETMASK, &asyncSignals, nullptr) == 0);
+    invariant(pthread_sigmask(SIG_SETMASK, &sigset, nullptr) == 0);
     // Spawn a thread to capture the signals we just masked off.
     stdx::thread(signalProcessingThread, rotate).detach();
 #endif

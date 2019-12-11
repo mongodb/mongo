@@ -117,6 +117,11 @@ CheapJson::Value::Value(CheapJson* env, Kind k) : _env(env), _kind(k) {
     }
 }
 
+CheapJson::Value::Value(const Value& parent, Kind k) : Value{parent._env, k} {
+    _parent = &parent;
+    _pretty = _parent->_pretty;
+}
+
 CheapJson::Value::~Value() {
     if (_kind == kObj) {
         _env->_sink << "}";
@@ -129,19 +134,19 @@ CheapJson::Value::~Value() {
 
 auto CheapJson::Value::appendObj() -> Value {
     _next();
-    return Value{_env, kObj};
+    return Value{*this, kObj};
 }
 
 auto CheapJson::Value::appendArr() -> Value {
     _next();
-    return Value{_env, kArr};
+    return Value{*this, kArr};
 }
 
 auto CheapJson::Value::appendKey(StringData k) -> Value {
     fassert(_kind == kObj, "appendKey requires this to be kObj");
     _next();
     _env->_sink << Quoted(k) << ":";
-    return Value{_env, kNop};
+    return Value{*this, kNop};
 }
 
 void CheapJson::Value::append(StringData v) {
@@ -188,7 +193,7 @@ void CheapJson::Value::_copyBsonElementValue(const BSONElement& be) {
 void CheapJson::Value::_next() {
     _env->_sink << _sep;
     _sep = ","_sd;
-    if (_env->_pretty && (_kind == kObj || _kind == kArr)) {
+    if (_pretty && (_kind == kObj || _kind == kArr)) {
         _env->_sink << "\n"_sd;
         for (int i = 0; i < _env->_indent; ++i) {
             _env->_sink << "  "_sd;

@@ -37,6 +37,18 @@
 
 #include "mongo/base/string_data.h"
 
+/**
+ * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe
+ * when we are using the libunwind backtrace implementation. The feature and related
+ * functions are only defined when `MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS`:
+ *    - setupStackTraceSignalAction
+ *    - markAsStackTraceProcessingThread
+ *    - printAllThreadStacks
+ */
+#if defined(__linux__) && defined(MONGO_USE_LIBUNWIND)
+#define MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS
+#endif
+
 namespace mongo {
 
 const size_t kStackTraceFrameMax = 100;
@@ -210,5 +222,29 @@ size_t rawBacktrace(void** addrs, size_t capacity);
 void printStackTrace(StackTraceSink& sink);
 void printStackTrace(std::ostream& os);
 void printStackTrace();
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+
+/**
+ * Called from single-thread init time. Initializes the `printAllThreadStacks` system,
+ * which will be triggered by `signal`. Threads must not block this `signal`.
+ */
+void setupStackTraceSignalAction(int signal);
+
+/**
+ * External stack trace request signals are forwarded to the thread that calls this function.
+ * That thread should call `printAllThreadStacks` when it receives the stack trace signal.
+ */
+void markAsStackTraceProcessingThread();
+
+/**
+ * Provides a means for a server to dump all thread stacks in response to an
+ * asynchronous signal from an external `kill`. The signal processing thread calls this
+ * function when it receives the signal for the process. This function then sends the
+ * same signal via `tgkill` to every other thread and collects their responses.
+ */
+void printAllThreadStacks(StackTraceSink& sink);
+
+#endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
 }  // namespace mongo

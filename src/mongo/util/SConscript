@@ -378,7 +378,12 @@ env.Library(
     ],
 )
 
-env.Library(
+signalEnv = env.Clone()
+
+if use_libunwind:
+    signalEnv.InjectThirdParty('unwind')
+
+signalEnv.Library(
     target="signal_handlers",
     source=[
         "signal_handlers.cpp",
