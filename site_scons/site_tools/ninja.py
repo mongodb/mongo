@@ -838,20 +838,6 @@ def register_custom_rule(env, rule, command, description=""):
     }
 
 
-def exists(env):
-    """Enable if called."""
-
-    # This variable disables the tool when storing the SCons command in the
-    # generated ninja file to ensure that the ninja tool is not loaded when
-    # SCons should do actual work as a subprocess of a ninja build. The ninja
-    # tool is very invasive into the internals of SCons and so should never be
-    # enabled when SCons needs to build a target.
-    if env.get("__NINJA_NO", "0") == "1":
-        return False
-
-    return True
-
-
 def ninja_csig(original):
     """Return a dummy csig"""
 
@@ -982,11 +968,22 @@ class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
         pass
 
 
+def exists(env):
+    """Enable if called."""
+
+    # This variable disables the tool when storing the SCons command in the
+    # generated ninja file to ensure that the ninja tool is not loaded when
+    # SCons should do actual work as a subprocess of a ninja build. The ninja
+    # tool is very invasive into the internals of SCons and so should never be
+    # enabled when SCons needs to build a target.
+    if env.get("__NINJA_NO", "0") == "1":
+        return False
+
+    return True
+
+
 def generate(env):
     """Generate the NINJA builders."""
-    if not exists(env):
-        return
-
     env[NINJA_SYNTAX] = env.get(NINJA_SYNTAX, "ninja_syntax.py")
 
     # Add the Ninja builder.
@@ -1024,6 +1021,18 @@ def generate(env):
 
     # Make SCons node walk faster by preventing unnecessary work
     env.Decider("timestamp-match")
+
+    # This is the point of no return, anything after this comment
+    # makes changes to SCons that are irreversible and incompatible
+    # with a normal SCons build. We return early if __NINJA_NO=1 has
+    # been given on the command line (i.e. by us in the generated
+    # ninja file) here to prevent these modifications from happening
+    # when we want SCons to do work. Everything before this was
+    # necessary to setup the builder and other functions so that the
+    # tool can be unconditionally used in the users's SCons files.
+
+    if not exists(env):
+        return
 
     # Monkey patch get_csig for some node classes. It slows down the build
     # significantly and we don't need content signatures calculated when

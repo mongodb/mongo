@@ -3749,83 +3749,82 @@ env.Tool('icecream')
 
 if get_option('ninja') == 'true':
     ninja_builder = Tool("ninja")
-    if ninja_builder.exists(env):
-        ninja_builder.generate(env)
+    ninja_builder.generate(env)
 
-        # Explicitly add all generated sources to the DAG so NinjaBuilder can
-        # generate rules for them. SCons if the files don't exist will not wire up
-        # the dependencies in the DAG because it cannot scan them. The Ninja builder
-        # does not care about the actual edge here as all generated sources will be
-        # pushed to the "bottom" of it's DAG via the order_only dependency on
-        # _generated_sources (an internal phony target)
-        if get_option('install-mode') == 'hygienic':
-            env.Alias("install-common-base", env.Alias("generated-sources"))
-        else:
-            env.Alias("all", env.Alias("generated-sources"))
-            env.Alias("core", env.Alias("generated-sources"))
+    # Explicitly add all generated sources to the DAG so NinjaBuilder can
+    # generate rules for them. SCons if the files don't exist will not wire up
+    # the dependencies in the DAG because it cannot scan them. The Ninja builder
+    # does not care about the actual edge here as all generated sources will be
+    # pushed to the "bottom" of it's DAG via the order_only dependency on
+    # _generated_sources (an internal phony target)
+    if get_option('install-mode') == 'hygienic':
+        env.Alias("install-common-base", env.Alias("generated-sources"))
+    else:
+        env.Alias("all", env.Alias("generated-sources"))
+        env.Alias("core", env.Alias("generated-sources"))
 
-        if get_option("install-mode") == "hygienic":
-            ninja_build = env.Ninja(
-                target="new.build.ninja",
-                source=env.Alias("install-all-meta"),
-            )
-        else:
-            ninja_build = env.Ninja(
-                target="new.build.ninja",
-                source=env.Alias("all"),
-            )
-
-        from glob import glob
-        sconscripts = [env.File(g) for g in glob("**/SConscript", recursive=True)]
-        sconscripts += [env.File("#SConstruct")]
-        env.Depends(ninja_build, sconscripts)
-
-
-        def skip(env, node):
-            """
-            Write an empty test text file.
-            
-            Instead of calling SCONS to generate a *test.txt that most
-            users aren't using (and the current generator skips) we
-            simply teach Ninja how to make an empty file on the given
-            platform so as not to break dependency trees.
-            """
-            cmd = "touch {}".format(str(node))
-            if env["PLATFORM"] == "win32":
-                cmd = "copy NUL {}".format(str(node))
-            return {
-                "outputs": [str(node)],
-                "rule": "CMD",
-                "variables": {
-                    "cmd": cmd,
-                }
-            }
-
-        env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", skip)
-        env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", skip)
-        env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", skip)
-
-        # We can create empty files for FAKELIB in Ninja because it
-        # does not care about content signatures. We have to
-        # write_uuid_to_file for FAKELIB in SCons because SCons does.
-        env.NinjaRule(
-            rule="FAKELIB",
-            command="cmd /c copy NUL $out" if env["PLATFORM"] == "win32" else "touch $out",
+    if get_option("install-mode") == "hygienic":
+        ninja_build = env.Ninja(
+            target="new.build.ninja",
+            source=env.Alias("install-all-meta"),
+        )
+    else:
+        ninja_build = env.Ninja(
+            target="new.build.ninja",
+            source=env.Alias("all"),
         )
 
-        def fakelib_in_ninja(env, node):
-            """Generates empty .a files"""
-            return {
-                "outputs": [node.get_path()],
-                "rule": "FAKELIB",
-                "implicit": [str(s) for s in node.sources],
+    from glob import glob
+    sconscripts = [env.File(g) for g in glob("**/SConscript", recursive=True)]
+    sconscripts += [env.File("#SConstruct")]
+    env.Depends(ninja_build, sconscripts)
+
+
+    def skip(env, node):
+        """
+        Write an empty test text file.
+        
+        Instead of calling SCONS to generate a *test.txt that most
+        users aren't using (and the current generator skips) we
+        simply teach Ninja how to make an empty file on the given
+        platform so as not to break dependency trees.
+        """
+        cmd = "touch {}".format(str(node))
+        if env["PLATFORM"] == "win32":
+            cmd = "copy NUL {}".format(str(node))
+        return {
+            "outputs": [str(node)],
+            "rule": "CMD",
+            "variables": {
+                "cmd": cmd,
             }
+        }
 
-        env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja)
+    env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", skip)
+    env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", skip)
+    env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", skip)
 
-        # Load ccache after icecream since order matters when we're both changing CCCOM
-        if get_option('ccache') == 'true':
-            env.Tool('ccache')
+    # We can create empty files for FAKELIB in Ninja because it
+    # does not care about content signatures. We have to
+    # write_uuid_to_file for FAKELIB in SCons because SCons does.
+    env.NinjaRule(
+        rule="FAKELIB",
+        command="cmd /c copy NUL $out" if env["PLATFORM"] == "win32" else "touch $out",
+    )
+
+    def fakelib_in_ninja(env, node):
+        """Generates empty .a files"""
+        return {
+            "outputs": [node.get_path()],
+            "rule": "FAKELIB",
+            "implicit": [str(s) for s in node.sources],
+        }
+
+    env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja)
+
+    # Load ccache after icecream since order matters when we're both changing CCCOM
+    if get_option('ccache') == 'true':
+        env.Tool('ccache')
 
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
