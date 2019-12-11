@@ -29,20 +29,41 @@
 
 #include "mongo/platform/basic.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <fmt/format.h>
 #include <fmt/printf.h>
 #include <functional>
+#include <map>
+#include <random>
 #include <regex>
+#include <signal.h>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/config.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_json.h"
+
+/** `sigaltstack` was introduced in glibc-2.12 in 2010. */
+#if !defined(_WIN32)
+#define HAVE_SIGALTSTACK
+#endif
+
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <time.h>
+#include <unistd.h>
+#endif  //  __linux__
 
 namespace mongo {
 
@@ -51,11 +72,27 @@ namespace stack_trace_test_detail {
 void testFunctionWithLinkage() {
     printf("...");
 }
+
+struct RecursionParam {
+    std::uint64_t n;
+    std::function<void()> f;
+};
+
+MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t i = 0) {
+    if (i == p.n) {
+        p.f();
+    } else {
+        recurseWithLinkage(p, i + 1);
+    }
+    return 0;
+}
+
 }  // namespace stack_trace_test_detail
 
 namespace {
 
 using namespace fmt::literals;
+using namespace std::literals::chrono_literals;
 
 constexpr bool kSuperVerbose = 0;  // Devel instrumentation
 
@@ -64,25 +101,6 @@ constexpr bool kIsWindows = true;
 #else
 constexpr bool kIsWindows = false;
 #endif
-
-struct RecursionParam {
-    std::ostream& out;
-    std::vector<std::function<void(RecursionParam&)>> stack;
-};
-
-// Pops a callable and calls it. printStackTrace when we're out of callables.
-// Calls itself a few times to synthesize a nice big call stack.
-MONGO_COMPILER_NOINLINE void recursionTest(RecursionParam& p) {
-    if (p.stack.empty()) {
-        // I've come to invoke `stack` elements and test `printStackTrace()`,
-        // and I'm all out of `stack` elements.
-        printStackTrace(p.out);
-        return;
-    }
-    auto f = std::move(p.stack.back());
-    p.stack.pop_back();
-    f(p);
-}
 
 class LogAdapter {
 public:
@@ -215,13 +233,12 @@ TEST(StackTrace, PosixFormat) {
     if (kIsWindows) {
         return;
     }
-
-    const std::string trace = [&] {
-        std::ostringstream os;
-        RecursionParam param{os, {3, recursionTest}};
-        recursionTest(param);
-        return os.str();
-    }();
+    std::string trace;
+    stack_trace_test_detail::RecursionParam param{3, [&] {
+                                                      StringStackTraceSink sink{trace};
+                                                      printStackTrace(sink);
+                                                  }};
+    stack_trace_test_detail::recurseWithLinkage(param, 3);
 
     if (kSuperVerbose) {
         tlog() << "trace:{" << trace << "}";
@@ -338,10 +355,13 @@ TEST(StackTrace, WindowsFormat) {
 
     // TODO: rough: string parts are not escaped and can contain the ' ' delimiter.
     const std::string trace = [&] {
-        std::ostringstream os;
-        RecursionParam param{os, {3, recursionTest}};
-        recursionTest(param);
-        return os.str();
+        std::string s;
+        stack_trace_test_detail::RecursionParam param{3, [&] {
+                                                          StringStackTraceSink sink{s};
+                                                          printStackTrace(sink);
+                                                      }};
+        stack_trace_test_detail::recurseWithLinkage(param);
+        return s;
     }();
     const std::regex re(R"re(()re"                  // line pattern open
                         R"re(([^\\]?))re"           // moduleName: cannot have backslashes
@@ -468,6 +488,92 @@ TEST(StackTrace, MetadataGeneratorFunctionMeasure) {
 }
 #endif  // _WIN32
 
+#ifdef HAVE_SIGALTSTACK
+class StackTraceSigAltStackTest : public unittest::Test {
+public:
+    using unittest::Test::Test;
+
+    template <typename T>
+    static std::string ostr(const T& v) {
+        std::ostringstream os;
+        os << v;
+        return os.str();
+    }
+
+    static void handlerPreamble(int sig) {
+        unittest::log() << "tid:" << ostr(stdx::this_thread::get_id()) << ", caught signal " << sig
+                        << "!\n";
+        char storage;
+        unittest::log() << "local var:" << (const void*)&storage << "\n";
+    }
+
+    static void tryHandler(void (*handler)(int, siginfo_t*, void*)) {
+        constexpr int sig = SIGUSR1;
+        constexpr size_t kStackSize = size_t{1} << 20;  // 1 MiB
+        auto buf = std::make_unique<std::array<unsigned char, kStackSize>>();
+        constexpr unsigned char kSentinel = 0xda;
+        std::fill(buf->begin(), buf->end(), kSentinel);
+        unittest::log() << "sigaltstack buf: [" << std::hex << buf->size() << std::dec << "] @"
+                        << std::hex << uintptr_t(buf->data()) << std::dec << "\n";
+        stdx::thread thr([&] {
+            unittest::log() << "tid:" << ostr(stdx::this_thread::get_id()) << " running\n";
+            {
+                stack_t ss;
+                ss.ss_sp = buf->data();
+                ss.ss_size = buf->size();
+                ss.ss_flags = 0;
+                if (int r = sigaltstack(&ss, nullptr); r < 0) {
+                    perror("sigaltstack");
+                }
+            }
+            {
+                struct sigaction sa = {};
+                sa.sa_sigaction = handler;
+                sa.sa_mask = {};
+                sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+                if (int r = sigaction(sig, &sa, nullptr); r < 0) {
+                    perror("sigaction");
+                }
+            }
+            raise(sig);
+            {
+                stack_t ss;
+                ss.ss_sp = 0;
+                ss.ss_size = 0;
+                ss.ss_flags = SS_DISABLE;
+                if (int r = sigaltstack(&ss, nullptr); r < 0) {
+                    perror("sigaltstack");
+                }
+            }
+        });
+        thr.join();
+        size_t used = std::distance(
+            std::find_if(buf->begin(), buf->end(), [](unsigned char x) { return x != kSentinel; }),
+            buf->end());
+        unittest::log() << "stack used: " << used << " bytes\n";
+    }
+};
+
+TEST_F(StackTraceSigAltStackTest, Minimal) {
+    tryHandler([](int sig, siginfo_t*, void*) { handlerPreamble(sig); });
+}
+
+TEST_F(StackTraceSigAltStackTest, Print) {
+    tryHandler([](int sig, siginfo_t*, void*) {
+        handlerPreamble(sig);
+        printStackTrace();
+    });
+}
+
+TEST_F(StackTraceSigAltStackTest, Backtrace) {
+    tryHandler([](int sig, siginfo_t*, void*) {
+        handlerPreamble(sig);
+        std::array<void*, kStackTraceFrameMax> addrs;
+        rawBacktrace(addrs.data(), addrs.size());
+    });
+}
+#endif  // HAVE_SIGALTSTACK
+
 class CheapJsonTest : public unittest::Test {
 public:
     using unittest::Test::Test;
@@ -581,8 +687,8 @@ TEST_F(CheapJsonTest, Pretty) {
     std::string s;
     StringStackTraceSink sink{s};
     CheapJson env{sink};
-    env.pretty();
     auto doc = env.doc();
+    doc.setPretty(true);
     {
         auto obj = doc.appendObj();
         obj.appendKey("headerKey").append(255);
@@ -599,6 +705,192 @@ TEST_F(CheapJsonTest, Pretty) {
     "innerKey":"hi"},
   "footerKey":123})"_sd);
 }
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+class PrintAllThreadStacksTest : public unittest::Test {
+public:
+    void doPrintAllThreadStacks(size_t numThreads) {
+        std::string dumped;
+        StringStackTraceSink sink{dumped};
+
+        struct Worker {
+            stdx::thread thread;
+            int tid;
+        };
+        std::vector<Worker> workers(numThreads);
+
+        Mutex mutex;
+        stdx::condition_variable cv;
+        bool endAll = false;
+
+        for (size_t i = 0; i < numThreads; ++i) {
+            workers[i] = {stdx::thread([&, i] {
+                stdx::unique_lock lock{mutex};
+                workers[i].tid = syscall(SYS_gettid);
+                cv.wait(lock, [&] { return endAll; });
+            })};
+        }
+        printAllThreadStacks(sink);
+        {
+            stdx::unique_lock lock{mutex};
+            endAll = true;
+        }
+        cv.notify_all();
+        for (auto& w : workers)
+            w.thread.join();
+
+        if (kSuperVerbose)
+            tlog() << dumped;
+
+        std::set<int> seenTids;
+
+        // Make some assertions about `dumped`.
+        BSONObj jsonObj = fromjson(dumped);
+        auto allInfoElement = jsonObj.getObjectField("threadInfo");
+        for (const auto& ti : allInfoElement) {
+            const BSONObj& obj = ti.Obj();
+            seenTids.insert(obj.getIntField("tid"));
+            ASSERT(obj.hasElement("backtrace"));
+        }
+
+        for (auto&& w : workers)
+            ASSERT(seenTids.find(w.tid) != seenTids.end()) << "missing tid:" << w.tid;
+    }
+};
+
+TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
+    struct WatchInt {
+        int v = 0;
+        Mutex* m;
+        stdx::condition_variable cond;
+
+        void incr(int i) {
+            stdx::unique_lock lock{*m};
+            v += i;
+            cond.notify_all();
+        }
+        void wait(int target) {
+            stdx::unique_lock lock{*m};
+            cond.wait(lock, [&] { return v == target; });
+        }
+    };
+    Mutex mutex;
+    WatchInt endAll{0, &mutex};
+    WatchInt pending{0, &mutex};
+
+    struct Worker {
+        stdx::thread thread;
+        int tid;
+        bool blocks;
+    };
+
+    std::deque<Worker> workers;
+
+    auto killAllWorkers = [&] {
+        endAll.incr(1);
+        for (auto& w : workers)
+            w.thread.join();
+    };
+
+    auto spawnWorker = [&](bool blocksSignal) {
+        pending.incr(1);
+        auto& ref = workers.emplace_back();
+        ref.thread = stdx::thread([&, blocksSignal] {
+            ref.tid = syscall(SYS_gettid);
+            ref.blocks = blocksSignal;
+            if (blocksSignal) {
+                sigset_t mask;
+                sigemptyset(&mask);
+                sigaddset(&mask, SIGUSR2);
+                pthread_sigmask(SIG_BLOCK, &mask, nullptr);
+            }
+            pending.incr(-1);
+            endAll.wait(1);
+        });
+    };
+
+    for (int i = 0; i < 2; ++i)
+        spawnWorker(true);
+    for (int i = 0; i < 2; ++i)
+        spawnWorker(false);
+    pending.wait(0);
+
+    std::string dumped;
+
+    stdx::thread dumper([&] {
+        StringStackTraceSink sink{dumped};
+        printAllThreadStacks(sink);
+    });
+    sleep(1);
+    killAllWorkers();
+    dumper.join();
+
+    BSONObj jsonObj = fromjson(dumped);
+    std::map<int, BSONObj> tidDumps;  // All are references into jsonObj.
+    auto allInfoElement = jsonObj.getObjectField("threadInfo");
+
+    std::set<int> mustSee;
+    for (const auto& w : workers)
+        mustSee.insert(w.tid);
+
+    for (const auto& ti : allInfoElement) {
+        const BSONObj& obj = ti.Obj();
+        int tid = obj.getIntField("tid");
+        mustSee.erase(tid);
+        // tlog() << format(FMT_STRING("  {} : {}"), tid, tojson(obj));
+        auto witer =
+            std::find_if(workers.begin(), workers.end(), [&](auto&& w) { return w.tid == tid; });
+        if (witer == workers.end())
+            continue;
+        bool missingBacktrace = !obj.hasElement("backtrace");
+        ASSERT_EQ(witer->blocks, missingBacktrace);
+    }
+    ASSERT(mustSee.empty()) << format(FMT_STRING("tids missing from report: {}"),
+                                      fmt::join(mustSee, ","));
+}
+
+TEST_F(PrintAllThreadStacksTest, Go_2_Threads) {
+    doPrintAllThreadStacks(2);
+}
+TEST_F(PrintAllThreadStacksTest, Go_20_Threads) {
+    doPrintAllThreadStacks(20);
+}
+TEST_F(PrintAllThreadStacksTest, Go_200_Threads) {
+    doPrintAllThreadStacks(200);
+}
+
+#endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+
+#if defined(MONGO_USE_LIBUNWIND) || defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+/**
+ * Try to backtrace from a stack containing a libc function. To do this
+ * we need a libc function that makes a user-provided callback, like qsort.
+ */
+TEST(StackTrace, BacktraceThroughLibc) {
+    struct Result {
+        void notify() {
+            if (called)
+                return;
+            called = true;
+            arrSize = rawBacktrace(arr.data(), arr.size());
+        }
+        bool called = 0;
+        std::array<void*, kStackTraceFrameMax> arr;
+        size_t arrSize;
+    };
+    static Result capture;
+    std::array<int, 2> arr{{}};
+    qsort(arr.data(), arr.size(), sizeof(arr[0]), [](const void* a, const void* b) {
+        // Order them by position in the array.
+        capture.notify();
+        return static_cast<int>(static_cast<const int*>(a) < static_cast<const int*>(b));
+    });
+    unittest::log() << "caught [" << capture.arrSize << "]:";
+    for (size_t i = 0; i < capture.arrSize; ++i) {
+        unittest::log() << "  [" << i << "] " << capture.arr[i];
+    }
+}
+#endif  // mongo stacktrace backend
 
 
 }  // namespace

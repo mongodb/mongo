@@ -97,10 +97,6 @@ public:
     // Create an empty JSON document.
     Value doc();
 
-    void pretty() {
-        _pretty = true;
-    }
-
 private:
     void indent() {
         ++_indent;
@@ -109,7 +105,6 @@ private:
         --_indent;
     }
 
-    bool _pretty = false;
     int _indent = 0;
     StackTraceSink& _sink;
 };
@@ -159,6 +154,10 @@ public:
         return _env;
     }
 
+    void setPretty(bool newPretty) {
+        _pretty = newPretty;
+    }
+
 private:
     enum Kind {
         kNop,  // A blank Value, not an aggregate, emits no punctuation. Can emit one element.
@@ -168,12 +167,15 @@ private:
 
     /* Emit the opening brace corresponding to the specified `k`. */
     Value(CheapJson* env, Kind k);
+    Value(const Value& parent, Kind k);
     void _copyBsonElementValue(const BSONElement& be);
     void _next();
 
+    const Value* _parent = nullptr;
     CheapJson* _env;
     Kind _kind;
-    StringData _sep;  // Emitted upon append. Starts empty, then set to ",".
+    StringData _sep;      // Emitted upon append. Starts empty, then set to ",".
+    bool _pretty{false};  // inherited from parent, but can override.
 };
 
 }  // namespace mongo::stack_trace_detail

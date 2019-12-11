@@ -57,4 +57,12 @@ void reportOutOfMemoryErrorAndExit();
  */
 void clearSignalMask();
 
+#ifdef __linux__
+/**
+ * Returns the signal used to initiate all-thread stack traces.
+ */
+int stackTraceSignal();
+#endif
+
+
 }  // namespace mongo
