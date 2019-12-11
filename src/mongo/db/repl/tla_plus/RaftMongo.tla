@@ -1,34 +1,30 @@
 --------------------------------- MODULE RaftMongo ---------------------------------
 \* This is the formal specification for the Raft consensus algorithm in MongoDB
 
-EXTENDS Naturals, FiniteSets, Sequences, TLC
+EXTENDS Integers, FiniteSets, Sequences, TLC
 
 \* The set of server IDs
-CONSTANTS Server
-
-\* Server states.
-\* Candidate is not used, but this is fine.
-CONSTANTS Follower, Candidate, Leader
-
-\* A reserved value.
-CONSTANTS Nil
+CONSTANTS Server, MaxClientWriteSize
 
 ----
 \* Global variables
 
-\* The server's term number.
+\* Whether a client has called "replSetInitiate" on one of the servers.
+VARIABLE replSetInitiated
+
+\* The election term number.
 VARIABLE globalCurrentTerm
 
 ----
 \* The following variables are all per server (functions with domain Server).
 
-\* The server's state (Follower, Candidate, or Leader).
+\* The server's state ("Follower", "Candidate", or "Leader").
 VARIABLE state
 
 \* The commit point learned by each server.
 VARIABLE commitPoint
 
-electionVars == <<globalCurrentTerm, state>>
+electionVars == <<replSetInitiated, globalCurrentTerm, state>>
 serverVars == <<electionVars, commitPoint>>
 
 \* A Sequence of log entries. The index into this sequence is the index of the
@@ -50,8 +46,8 @@ vars == <<serverVars, logVars>>
 \* important property is that every quorum overlaps with every other.
 Quorum == {i \in SUBSET(Server) : Cardinality(i) * 2 > Cardinality(Server)}
 
-\* The term of the last entry in a log, or 0 if the log is empty.
-GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
+\* The term of the last entry in a log, or -1 if the log is empty.
+GetTerm(xlog, index) == IF index = 0 THEN -1 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
 
@@ -63,9 +59,10 @@ Max(s) == CHOOSE x \in s : \A y \in s : x >= y
 ----
 \* Define initial values for all variables
 
-InitServerVars == /\ globalCurrentTerm = 0
-                  /\ state             = [i \in Server |-> Follower]
-                  /\ commitPoint       = [i \in Server |-> [term |-> 0, index |-> 0]]
+InitServerVars == /\ globalCurrentTerm = -1
+                  /\ replSetInitiated  = FALSE
+                  /\ state             = [i \in Server |-> "Follower"]
+                  /\ commitPoint       = [i \in Server |-> [term |-> -1, index |-> 0]]
 InitLogVars == /\ log          = [i \in Server |-> << >>]
 Init == /\ InitServerVars
         /\ InitLogVars
@@ -75,10 +72,12 @@ Init == /\ InitServerVars
 \* i = recipient, j = sender, m = message
 
 AppendOplog(i, j) ==
-    \* /\ state[i] = Follower  \* Disable primary catchup and draining
+    \* /\ state[i] = "Follower"  \* Disable primary catchup and draining
     /\ Len(log[i]) < Len(log[j])
     /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
-    /\ log' = [log EXCEPT ![i] = Append(log[i], log[j][Len(log[i]) + 1])]
+    /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
+        LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
+        IN  log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
     /\ UNCHANGED <<serverVars>>
 
 CanRollbackOplog(i, j) ==
@@ -106,7 +105,7 @@ Agree(me, logIndex) ==
 
 IsCommitted(me, logIndex) ==
     /\ Agree(me, logIndex) \in Quorum
-    \* If we comment out the following line, a replicated log entry from old primary will voilate the safety.
+    \* If we comment out the following line, a replicated log entry from old primary will violate the safety.
     \* [ P (2), S (), S ()]
     \* [ S (2), S (), P (3)]
     \* [ S (2), S (2), P (3)] !!! the log from term 2 shouldn't be considered as committed.
@@ -123,7 +122,18 @@ NeverRollbackCommitted ==
     \A i \in Server: ~RollbackCommitted(i)
 
 \* ACTION
+\* Follower i receives replSetInitiate and writes the first oplog entry, which is a no-op.
+\* Not needed for correctness, but modeled here to match the implementation.
+ReplSetInitiate(i) ==
+    /\ Init
+    /\ LET entry == [term |-> globalCurrentTerm]
+       IN /\ replSetInitiated' = TRUE
+          /\ log' = [log EXCEPT ![i] = Append(log[i], entry)]
+    /\ UNCHANGED <<globalCurrentTerm, state, commitPoint>>
+
+\* ACTION
 \* i = the new primary node.
+\* In the implementation, term starts at -1, then 1, then increments normally.
 BecomePrimaryByMagic(i) ==
     LET notBehind(me, j) ==
             \/ LastTerm(log[me]) > LastTerm(log[j])
@@ -131,27 +141,33 @@ BecomePrimaryByMagic(i) ==
                /\ Len(log[me]) >= Len(log[j])
         ayeVoters(me) ==
             { index \in Server : notBehind(me, index) }
+        nextTerm == IF globalCurrentTerm = -1 THEN 1 ELSE globalCurrentTerm + 1
     IN /\ ayeVoters(i) \in Quorum
-       /\ state' = [index \in Server |-> IF index = i THEN Leader ELSE Follower]
-       /\ globalCurrentTerm' = globalCurrentTerm + 1
-       /\ UNCHANGED <<commitPoint, logVars>>
+       /\ state' = [index \in Server |-> IF index = i THEN "Leader" ELSE "Follower"]
+       /\ globalCurrentTerm' = nextTerm
+       /\ UNCHANGED <<replSetInitiated, commitPoint, logVars>>
 
 \* ACTION
-\* Leader i receives a client request to add v to the log.
+\* Leader i receives a client request to add one or more entries to the log.
 ClientWrite(i) ==
-    /\ state[i] = Leader
-    /\ LET entry == [term  |-> globalCurrentTerm]
-           newLog == Append(log[i], entry)
-       IN  log' = [log EXCEPT ![i] = newLog]
-    /\ UNCHANGED <<serverVars>>
+    /\ state[i] = "Leader"
+    /\ \E numEntries \in 1..MaxClientWriteSize :
+        LET entry == [term |-> globalCurrentTerm]
+            newEntries == [ j \in 1..numEntries |-> entry ]
+            newLog == log[i] \o newEntries
+        IN  log' = [log EXCEPT ![i] = newLog]
+    /\ UNCHANGED <<replSetInitiated, serverVars>>
 
 \* ACTION
 AdvanceCommitPoint ==
     \E leader \in Server :
-        /\ state[leader] = Leader
-        /\ IsCommitted(leader, Len(log[leader]))
-        /\ commitPoint' = [commitPoint EXCEPT ![leader] = [term |-> LastTerm(log[leader]), index |-> Len(log[leader])]]
-        /\ UNCHANGED <<electionVars, logVars>>
+        /\ state[leader] = "Leader"
+        \* New commitPoint is any committed log index after current commitPoint
+        /\ \E committedIndex \in (commitPoint[leader].index+1)..Len(log[leader]) :
+            /\ IsCommitted(leader, committedIndex)
+            /\ LET newCommitPoint == [term |-> LogTerm(leader, committedIndex), index |-> committedIndex]
+               IN  commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
+            /\ UNCHANGED <<electionVars, logVars>>
 
 \* Return whether Node i can learn the commit point from Node j.
 CommitPointLessThan(i, j) ==
@@ -212,6 +228,9 @@ RollbackOplogAction ==
 BecomePrimaryByMagicAction ==
     \E i \in Server : BecomePrimaryByMagic(i)
 
+ReplSetInitiateAction ==
+    \E i \in Server : ReplSetInitiate(i)
+
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
 
@@ -257,21 +276,28 @@ CommitPointEventuallyPropagates ==
 
 ----
 \* Defines how the variables may transition.
+\*
+\* MongoDB's commit point learning protocol has evolved as we discovered
+\* protocol bugs, see:
+\*
+\* https://conf.tlapl.us/07_-_TLAConf19_-_William_Schultz_-_Fixing_a_MongoDB_Replication_Protocol_Bug_with_TLA.pdf
+\*
 Next ==
     \* --- Replication protocol
     \/ AppendOplogAction
     \/ RollbackOplogAction
     \/ BecomePrimaryByMagicAction
+    \/ ReplSetInitiateAction
     \/ ClientWriteAction
     \*
     \* --- Commit point learning protocol
-    \/ AdvanceCommitPoint
-    \* \/ LearnCommitPointAction
-    \/ LearnCommitPointFromSyncSourceAction
-    \* \/ AppendEntryAndLearnCommitPointFromSyncSourceAction
-    \* \/ LearnCommitPointWithTermCheckAction
-    \* \/ LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction
+    \/ AdvanceCommitPoint \* correct, simple primary behavior
+    \/ LearnCommitPointWithTermCheckAction
+    \/ LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction
 
+Safety == Init /\ [][Next]_vars
+
+\* Comment or uncomment the commit point learning actions here to match those in "Next".
 Liveness ==
     /\ SF_vars(AppendOplogAction)
     /\ SF_vars(RollbackOplogAction)
@@ -282,13 +308,12 @@ Liveness ==
     \* --- Commit point learning protocol
     /\ WF_vars(AdvanceCommitPoint)
     \* /\ WF_vars(LearnCommitPointAction)
-    /\ SF_vars(LearnCommitPointFromSyncSourceAction)
     \* /\ SF_vars(AppendEntryAndLearnCommitPointFromSyncSourceAction)
-    \* /\ SF_vars(LearnCommitPointWithTermCheckAction)
-    \* /\ SF_vars(LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction)
+    /\ SF_vars(LearnCommitPointWithTermCheckAction)
+    /\ SF_vars(LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction)
 
 \* The specification must start with the initial state and transition according
 \* to Next.
-Spec == Init /\ [][Next]_vars /\ Liveness
+Spec == Safety /\ Liveness
 
 ===============================================================================
