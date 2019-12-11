@@ -58,6 +58,7 @@
 #include "mongo/util/uuid.h"
 
 #include <boost/log/attributes/constant.hpp>
+#include <boost/optional.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
@@ -360,6 +361,55 @@ TEST_F(LogTestV2, Types) {
                                   .Obj()),
                   uuid);
     ASSERT_EQUALS(UUID::parse(lastBSONElement().Obj()), uuid);
+
+    // boost::optional
+    LOGV2("boost::optional empty {}", "name"_attr = boost::optional<bool>());
+    ASSERT_EQUALS(text.back(),
+                  std::string("boost::optional empty ") +
+                      constants::kNullOptionalString.toString());
+    ASSERT(mongo::fromjson(json.back())
+               .getField(kAttributesFieldName)
+               .Obj()
+               .getField("name")
+               .isNull());
+    ASSERT(lastBSONElement().isNull());
+
+    LOGV2("boost::optional<bool> {}", "name"_attr = boost::optional<bool>(true));
+    ASSERT_EQUALS(text.back(), std::string("boost::optional<bool> true"));
+    ASSERT_EQUALS(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").Bool(),
+        true);
+    ASSERT_EQUALS(lastBSONElement().Bool(), true);
+
+    LOGV2("boost::optional<boost::optional<bool>> {}",
+          "name"_attr = boost::optional<boost::optional<bool>>(boost::optional<bool>(true)));
+    ASSERT_EQUALS(text.back(), std::string("boost::optional<boost::optional<bool>> true"));
+    ASSERT_EQUALS(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").Bool(),
+        true);
+    ASSERT_EQUALS(lastBSONElement().Bool(), true);
+
+    TypeWithBSON withBSON(1.0, 2.0);
+    LOGV2("boost::optional<TypeWithBSON> {}",
+          "name"_attr = boost::optional<TypeWithBSON>(withBSON));
+    ASSERT_EQUALS(text.back(), std::string("boost::optional<TypeWithBSON> ") + withBSON.toString());
+    ASSERT(mongo::fromjson(json.back())
+               .getField(kAttributesFieldName)
+               .Obj()
+               .getField("name")
+               .Obj()
+               .woCompare(withBSON.toBSON()) == 0);
+    ASSERT(lastBSONElement().Obj().woCompare(withBSON.toBSON()) == 0);
+
+    TypeWithoutBSON withoutBSON(1.0, 2.0);
+    LOGV2("boost::optional<TypeWithBSON> {}",
+          "name"_attr = boost::optional<TypeWithoutBSON>(withoutBSON));
+    ASSERT_EQUALS(text.back(),
+                  std::string("boost::optional<TypeWithBSON> ") + withoutBSON.toString());
+    ASSERT_EQUALS(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").String(),
+        withoutBSON.toString());
+    ASSERT_EQUALS(lastBSONElement().String(), withoutBSON.toString());
 }
 
 TEST_F(LogTestV2, TextFormat) {

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/constants.h"
 #include "mongo/stdx/variant.h"
 
 #include <functional>
@@ -97,6 +98,22 @@ public:
     NamedAttribute(StringData n, float val) : NamedAttribute(n, static_cast<double>(val)) {}
     NamedAttribute(StringData n, std::string const& val) : NamedAttribute(n, StringData(val)) {}
     NamedAttribute(StringData n, long double val) = delete;
+
+    template <typename T>
+    NamedAttribute(StringData n, const boost::optional<T>& val)
+        : NamedAttribute(val ? NamedAttribute(n, *val) : NamedAttribute()) {
+        if (!val) {
+            CustomAttributeValue custom;
+            // Use BSONAppend instead of toBSON because we just want the null value and not a whole
+            // object with a field name
+            custom.BSONAppend = [](BSONObjBuilder& builder, StringData fieldName) {
+                builder.appendNull(fieldName);
+            };
+            custom.toString = [&val]() { return constants::kNullOptionalString.toString(); };
+            name = n;
+            value = std::move(custom);
+        }
+    }
 
     template <typename T,
               typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>

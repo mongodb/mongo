@@ -48,4 +48,7 @@ constexpr StringData kMessageFieldName = "msg"_sd;
 constexpr StringData kAttributesFieldName = "attr"_sd;
 constexpr StringData kTagsFieldName = "tags"_sd;
 
+// String to be used when logging empty boost::optional with the text formatter
+constexpr StringData kNullOptionalString = "(nothing)"_sd;
+
 }  // namespace mongo::logv2::constants
