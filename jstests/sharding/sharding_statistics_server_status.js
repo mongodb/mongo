@@ -34,6 +34,7 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
         assert(statsFromServerStatus[i].totalCriticalSectionTimeMillis);
         assert(statsFromServerStatus[i].totalDonorChunkCloneTimeMillis);
         assert(statsFromServerStatus[i].countDonorMoveChunkLockTimeout);
+        assert(statsFromServerStatus[i].countDonorMoveChunkAbortConflictingIndexOperation);
         assert.eq(stats[i].countDonorMoveChunkStarted,
                   statsFromServerStatus[i].countDonorMoveChunkStarted);
         assert.eq(stats[i].countDocsClonedOnRecipient,
@@ -51,6 +52,13 @@ function checkServerStatusMigrationLockTimeoutCount(shardConn, count) {
         assert.commandWorked(shardConn.adminCommand({serverStatus: 1})).shardingStatistics;
     assert(shardStats.hasOwnProperty("countDonorMoveChunkLockTimeout"));
     assert.eq(count, shardStats.countDonorMoveChunkLockTimeout);
+}
+
+function checkServerStatusAbortedMigrationCount(shardConn, count) {
+    const shardStats =
+        assert.commandWorked(shardConn.adminCommand({serverStatus: 1})).shardingStatistics;
+    assert(shardStats.hasOwnProperty("countDonorMoveChunkAbortConflictingIndexOperation"));
+    assert.eq(count, shardStats.countDonorMoveChunkAbortConflictingIndexOperation);
 }
 
 function runConcurrentMoveChunk(host, ns, toShard) {
@@ -73,6 +81,9 @@ const coll = mongos.getCollection(dbName + "." + collName);
 const numDocsToInsert = 3;
 const shardArr = [st.shard0, st.shard1];
 const stats = [new ShardStat(), new ShardStat()];
+const index = {
+    x: 1
+};
 let numDocsInserted = 0;
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
@@ -177,6 +188,50 @@ checkServerStatusMigrationLockTimeoutCount(donorConn, 2);
 
 assert.commandWorked(donorConn.adminCommand(
     {setParameter: 1, migrationLockAcquisitionMaxWaitMS: originalMigrationLockTimeout}));
+
+//
+// Tests for the count of migrations aborted due to concurrent index operations.
+//
+// TODO (SERVER-45017): Remove this mongos bin version check when v4.4 becomes last-stable.
+if (jsTestOptions().mongosBinVersion != "last-stable") {
+    // Counter starts at 0.
+    checkServerStatusAbortedMigrationCount(donorConn, 0);
+
+    // Pause a migration after cloning starts.
+    pauseMoveChunkAtStep(donorConn, moveChunkStepNames.startedMoveChunk);
+    moveChunkThread =
+        new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+    moveChunkThread.start();
+    waitForMoveChunkStep(donorConn, moveChunkStepNames.startedMoveChunk);
+
+    // Run an index command.
+    assert.commandWorked(coll.createIndexes([index]));
+
+    // Unpause the migration and verify that it gets aborted.
+    unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.startedMoveChunk);
+    moveChunkThread.join();
+    assert.commandFailedWithCode(moveChunkThread.returnData(), ErrorCodes.Interrupted);
+
+    checkServerStatusAbortedMigrationCount(donorConn, 1);
+
+    // Pause a migration before entering the critical section.
+    pauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);
+    moveChunkThread =
+        new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+    moveChunkThread.start();
+    waitForMoveChunkStep(donorConn, moveChunkStepNames.reachedSteadyState);
+
+    // Run an index command.
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({collMod: collName, validator: {x: {$type: "string"}}}));
+
+    // Unpause the migration and verify that it gets aborted.
+    unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);
+    moveChunkThread.join();
+    assert.commandFailedWithCode(moveChunkThread.returnData(), ErrorCodes.Interrupted);
+
+    checkServerStatusAbortedMigrationCount(donorConn, 2);
+}
 
 st.stop();
 })();

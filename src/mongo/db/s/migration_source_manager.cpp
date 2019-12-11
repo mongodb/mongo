@@ -624,6 +624,7 @@ void MigrationSourceManager::cleanupOnError() {
 
 void MigrationSourceManager::abortDueToConflictingIndexOperation() {
     _opCtx->markKilled();
+    _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
 }
 
 ScopedCollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
