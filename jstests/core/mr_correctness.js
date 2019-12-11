@@ -36,10 +36,13 @@ function reduceObjs(key, values) {
 const outColl = db[coll.getName() + "_out"];
 outColl.drop();
 (function testBasicMapReduce() {
-    const res = db.runCommand(
-        {mapReduce: coll.getName(), map: mapToObj, reduce: reduceObjs, out: outColl.getName()});
+    const res = db.runCommand({
+        mapReduce: coll.getName(),
+        map: mapToObj,
+        reduce: reduceObjs,
+        out: {merge: outColl.getName()}
+    });
     assert.commandWorked(res);
-    assert.eq(4, res.counts.input);
     assert.eq(res.result, outColl.getName());
 
     assert.eq(
@@ -64,10 +67,9 @@ outColl.drop();
         map: mapToObj,
         reduce: reduceObjs,
         query: {x: {$gt: 2}},
-        out: outColl.getName()
+        out: {merge: outColl.getName()}
     });
     assert.commandWorked(res);
-    assert.eq(2, res.counts.input, () => tojson(res));
     assert.eq(res.result, outColl.getName());
     const keys = {};
     for (let result of outColl.find().toArray()) {
@@ -102,10 +104,9 @@ function reduceNumbers(key, values) {
         map: mapToNumber,
         reduce: reduceNumbers,
         query: {x: {$gt: 2}},
-        out: outColl.getName()
+        out: {merge: outColl.getName()}
     });
     assert.commandWorked(res);
-    assert.eq(2, res.counts.input, () => tojson(res));
     assert.eq(res.result, outColl.getName());
     const keys = {};
     for (let result of outColl.find().toArray()) {
@@ -125,10 +126,13 @@ function reduceNumbers(key, values) {
     }
     assert.commandWorked(bulk.execute());
 
-    const res = db.runCommand(
-        {mapReduce: coll.getName(), map: mapToObj, reduce: reduceObjs, out: outColl.getName()});
+    const res = db.runCommand({
+        mapReduce: coll.getName(),
+        map: mapToObj,
+        reduce: reduceObjs,
+        out: {merge: outColl.getName()}
+    });
     assert.commandWorked(res);
-    assert.eq(999, res.counts.input, () => tojson(res));
     assert.eq(res.result, outColl.getName());
     assert.eq(4,
               outColl.find().count(),
@@ -141,26 +145,6 @@ function reduceNumbers(key, values) {
     assert.eq(3, outColl.findOne({_id: "c"}).value.count, () => outColl.findOne({_id: "c"}));
     assert.eq(995, outColl.findOne({_id: "d"}).value.count, () => outColl.findOne({_id: "d"}));
     outColl.drop();
-}());
-
-(function testThatVerboseOptionIncludesTimingInformation() {
-    const cmd =
-        {mapReduce: coll.getName(), map: mapToObj, reduce: reduceObjs, out: outColl.getName()};
-    const withoutVerbose = assert.commandWorked(db.runCommand(cmd));
-    // TODO SERVER-43290 The verbose option should have the same effect on mongos.
-    assert(FixtureHelpers.isMongos(db) || !withoutVerbose.hasOwnProperty("timing"));
-    const withVerbose = assert.commandWorked(db.runCommand(Object.merge(cmd, {verbose: true})));
-    assert(withVerbose.hasOwnProperty("timing"));
-}());
-
-(function testMapReduceAgainstNonExistentCollection() {
-    assert.commandFailedWithCode(db.runCommand({
-        mapReduce: "lasjdlasjdlasjdjasldjalsdj12e",
-        map: mapToObj,
-        reduce: reduceObjs,
-        out: outColl.getName()
-    }),
-                                 ErrorCodes.NamespaceNotFound);
 }());
 
 (function testHighCardinalityKeySet() {
@@ -178,8 +162,12 @@ function reduceNumbers(key, values) {
     }
     assert.commandWorked(bulk.execute());
 
-    const res = db.runCommand(
-        {mapReduce: coll.getName(), out: outColl.getName(), map: mapToObj, reduce: reduceObjs});
+    const res = db.runCommand({
+        mapReduce: coll.getName(),
+        out: {merge: outColl.getName()},
+        map: mapToObj,
+        reduce: reduceObjs
+    });
     assert.commandWorked(res);
     assert.eq(res.result, outColl.getName());
     let actualValues = {};

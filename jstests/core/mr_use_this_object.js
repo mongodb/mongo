@@ -41,7 +41,7 @@ const reducer = function(k, v) {
     return {stats: stats, total: total};
 };
 
-assert.commandWorked(coll.mapReduce(mapper, reducer, {out: outputColl.getName()}));
+assert.commandWorked(coll.mapReduce(mapper, reducer, {out: {merge: outputColl.getName()}}));
 
 let resultAsObj = outputColl.convertToSingleObject("value");
 assert.eq(2,
@@ -59,7 +59,7 @@ mapper = function() {
     emit(this[x], {stats: [this[y]]});
 };
 
-assert.commandWorked(coll.mapReduce(mapper, reducer, {out: outputColl.getName()}));
+assert.commandWorked(coll.mapReduce(mapper, reducer, {out: {merge: outputColl.getName()}}));
 
 resultAsObj = outputColl.convertToSingleObject("value");
 assert.eq(2,

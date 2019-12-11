@@ -102,11 +102,6 @@ rst.upgradeSet({binVersion: "latest"});
 sourceDB = rst.getPrimary().getDB(dbName);
 sourceColl = sourceDB[collName];
 
-// Now that we've upgraded the replica set to the latest binary version, switch on the query knob to
-// enable MR in agg.
-assert.commandWorked(rst.getPrimary().getDB(dbName).adminCommand(
-    {setParameter: 1, internalQueryUseAggMapReduce: true}));
-
 //
 // Binary version 4.4 and FCV 4.2.
 //

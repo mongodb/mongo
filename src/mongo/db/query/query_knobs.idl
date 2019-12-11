@@ -298,13 +298,6 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
-  internalQueryUseAggMapReduce:
-    description: "If true runs mapReduce in a pipeline instead of the mapReduce command."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryUseAggMapReduce"
-    cpp_vartype: AtomicWord<bool>
-    default: false
-
   internalQueryMaxJsEmitBytes:
     description: "Limits the vector of values emitted from a single document's call to JsEmit to the
         given size in bytes."

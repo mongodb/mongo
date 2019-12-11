@@ -181,7 +181,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     let outputSpec = cmdObj.out;
     if (typeof (outputSpec) === "string") {
         this.getDB(dbName)[outputSpec].drop();  // This will implicitly shard it.
-        outputSpec = {replace: outputSpec, sharded: true};
+        outputSpec = {replace: outputSpec};
     } else if (typeof (outputSpec) !== "object") {
         // This is a malformed command, just send it along.
         return originalRunCommand.apply(this, arguments);

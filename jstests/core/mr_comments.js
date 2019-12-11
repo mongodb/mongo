@@ -16,18 +16,19 @@ outColl.drop();
 assert.commandWorked(coll.insert([{foo: 1}, {foo: 1}, {foo: 2}]));
 
 // Test using comments within the function.
-let res = db.runCommand({
+assert.commandWorked(db.runCommand({
     mapreduce: coll.getName(),
     map: "// This is a comment\n\n    // Emit some stuff\n    emit(this.foo, 1)\n",
     reduce: function(key, values) {
         return Array.sum(values);
     },
-    out: outColl.getName()
-});
-assert.eq(3, res.counts.emit);
+    out: {merge: outColl.getName()}
+}));
+assert.eq(2, outColl.find().toArray().length);
 
 // Test using a multi-line string literal.
-res = db.runCommand({
+outColl.drop();
+assert.commandWorked(db.runCommand({
     mapreduce: coll.getName(),
     map: `
     // This is a comment
@@ -38,18 +39,19 @@ res = db.runCommand({
     reduce: function(key, values) {
         return Array.sum(values);
     },
-    out: outColl.getName()
-});
-assert.eq(3, res.counts.emit);
+    out: {merge: outColl.getName()}
+}));
+assert.eq(2, outColl.find().toArray().length);
 
 // Test that a function passed with a comment in front of it is still recognized.
-res = db.runCommand({
+outColl.drop();
+assert.commandWorked(db.runCommand({
     mapreduce: coll.getName(),
     map: "// This is a comment\nfunction(){\n    // Emit some stuff\n    emit(this.foo, 1)\n}\n",
     reduce: function(key, values) {
         return Array.sum(values);
     },
-    out: outColl.getName()
-});
-assert.eq(3, res.counts.emit);
+    out: {merge: outColl.getName()}
+}));
+assert.eq(2, outColl.find().toArray().length);
 }());

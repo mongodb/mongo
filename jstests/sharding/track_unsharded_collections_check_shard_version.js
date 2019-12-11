@@ -211,8 +211,6 @@ let testCases = {
     logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},
     logout: {skip: "not on a user database"},
     mapReduce: {
-        // Uses connection versioning.
-        whenNamespaceDoesNotExistFailsWith: ErrorCodes.NamespaceNotFound,
         whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
         command: collName => {
             return {

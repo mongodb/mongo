@@ -1,4 +1,5 @@
 // Test shard targeting for queries on a collection with a default collation.
+// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 
@@ -233,63 +234,59 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // MapReduce.
 
-// The following set of tests assume that we're running against the new version of MR.
-if (TestData.setParameters.internalQueryUseAggMapReduce == 1) {
-    // Test that the filter on mapReduce respects the non-simple collation inherited from the
-    // collection default.
-    assert.eq(2,
-              assert
-                  .commandWorked(collCaseInsensitive.mapReduce(
-                      function() {
-                          emit(this._id, 1);
-                      },
-                      function(key, values) {
-                          return Array.sum(values);
-                      },
-                      {out: {inline: 1}, query: {a: "foo"}}))
-                  .results.length);
+// Test that the filter on mapReduce respects the non-simple collation inherited from the
+// collection default.
+assert.eq(2,
+          assert
+              .commandWorked(collCaseInsensitive.mapReduce(
+                  function() {
+                      emit(this._id, 1);
+                  },
+                  function(key, values) {
+                      return Array.sum(values);
+                  },
+                  {out: {inline: 1}, query: {a: "foo"}}))
+              .results.length);
 
-    // Test that mapReduce respects the non-simple default collation for the emitted keys. In this
-    // case, the emitted keys "foo" and "FOO" should be considered equal.
-    assert.eq(1,
-              assert
-                  .commandWorked(collCaseInsensitive.mapReduce(
-                      function() {
-                          emit(this.a, 1);
-                      },
-                      function(key, values) {
-                          return Array.sum(values);
-                      },
-                      {out: {inline: 1}, query: {a: "foo"}}))
-                  .results.length);
+// Test that mapReduce respects the non-simple default collation for the emitted keys. In this
+// case, the emitted keys "foo" and "FOO" should be considered equal.
+assert.eq(1,
+          assert
+              .commandWorked(collCaseInsensitive.mapReduce(
+                  function() {
+                      emit(this.a, 1);
+                  },
+                  function(key, values) {
+                      return Array.sum(values);
+                  },
+                  {out: {inline: 1}, query: {a: "foo"}}))
+              .results.length);
 
-    // Test that the filter on mapReduce respects the simple collation if specified.
-    assert.eq(1,
-              assert
-                  .commandWorked(collCaseInsensitive.mapReduce(
-                      function() {
-                          emit(this.a, 1);
-                      },
-                      function(key, values) {
-                          return Array.sum(values);
-                      },
-                      {out: {inline: 1}, query: {a: "foo"}, collation: {locale: "simple"}}))
-                  .results.length);
+// Test that the filter on mapReduce respects the simple collation if specified.
+assert.eq(1,
+          assert
+              .commandWorked(collCaseInsensitive.mapReduce(
+                  function() {
+                      emit(this.a, 1);
+                  },
+                  function(key, values) {
+                      return Array.sum(values);
+                  },
+                  {out: {inline: 1}, query: {a: "foo"}, collation: {locale: "simple"}}))
+              .results.length);
 
-    // Test that mapReduce respects the user-specified simple collation for the emitted keys.
-    assert.eq(
-        2,
-        assert
-            .commandWorked(collCaseInsensitive.mapReduce(
-                function() {
-                    emit(this.a, 1);
-                },
-                function(key, values) {
-                    return Array.sum(values);
-                },
-                {out: {inline: 1}, query: {a: {$type: "string"}}, collation: {locale: "simple"}}))
-            .results.length);
-}
+// Test that mapReduce respects the user-specified simple collation for the emitted keys.
+assert.eq(2,
+          assert
+              .commandWorked(collCaseInsensitive.mapReduce(
+                  function() {
+                      emit(this.a, 1);
+                  },
+                  function(key, values) {
+                      return Array.sum(values);
+                  },
+                  {out: {inline: 1}, query: {a: {$type: "string"}}, collation: {locale: "simple"}}))
+              .results.length);
 
 // Remove.
 

@@ -33,20 +33,17 @@ const outputColl = db.mr_fail_invalid_js_out;
             emit(tag, 1);
         }
     };
-    assert.commandWorked(coll.mapReduce(goodMapFn, reduceFn, {out: outputColl.getName()}));
+    assert.commandWorked(coll.mapReduce(goodMapFn, reduceFn, {out: {merge: outputColl.getName()}}));
     outputColl.drop();
 
-    // First test that a single missing path will just produce null keys.
+    // mapReduce fails when attempting to merge a missing key.
     const singleInvalidPathMapFn = function() {
         emit(this.missing_field, this.x);
     };
 
-    assert.commandWorked(
-        coll.mapReduce(singleInvalidPathMapFn, reduceFn, {out: outputColl.getName()}));
-    const undefinedTypeCode = 6;
-    const nullTypeCode = 10;
-    assert.eq(0, outputColl.find({_id: {$type: undefinedTypeCode}}).itcount());
-    assert.eq(1, outputColl.find({_id: {$type: nullTypeCode}}).itcount());
+    assert.throws(() => coll.mapReduce(
+                      singleInvalidPathMapFn, reduceFn, {out: {merge: outputColl.getName()}}),
+                  []);
 
     // Now test that a traversal through a missing path will cause an error.
     const badMapFn = function() {
@@ -54,7 +51,7 @@ const outputColl = db.mr_fail_invalid_js_out;
     };
 
     assert.throws(
-        () => coll.mapReduce(newMapFn, reduceFn, {out: outputColl.getName()}),
+        () => coll.mapReduce(newMapFn, reduceFn, {out: {merge: outputColl.getName()}}),
         [],
         "expected mapReduce to throw because map function references path that does not exist");
 
@@ -88,7 +85,7 @@ const outputColl = db.mr_fail_invalid_js_out;
     };
 
     // First test that a valid command succeeds.
-    let res = coll.mapReduce(goodMapFn, goodReduceFn, outputColl.getName());
+    let res = coll.mapReduce(goodMapFn, goodReduceFn, {out: {merge: outputColl.getName()}});
 
     assert.eq([{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}],
               outputColl.find().sort({_id: 1}).toArray());
@@ -110,7 +107,8 @@ const outputColl = db.mr_fail_invalid_js_out;
 
     // Test that things are still in an ok state and the next mapReduce can succeed.
     outputColl.drop();
-    assert.commandWorked(coll.mapReduce(goodMapFn, goodReduceFn, outputColl.getName()));
+    assert.commandWorked(
+        coll.mapReduce(goodMapFn, goodReduceFn, {out: {merge: outputColl.getName()}}));
     assert.eq([{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}],
               outputColl.find().sort({_id: 1}).toArray());
     assert(outputColl.drop());

@@ -261,16 +261,22 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             {
                 test: function(db) {
                     assert.commandWorked(db.currentop_query.mapReduce(() => {}, (a, b) => {}, {
-                        query: {$comment: "currentop_query"},
+                        query: {$comment: "currentop_query_mr"},
                         out: {inline: 1},
                     }));
                 },
-                command: "mapreduce",
                 planSummary: "COLLSCAN",
-                currentOpFilter: {
-                    "command.query.$comment": "currentop_query",
-                    "ns": /^currentop_query.*currentop_query/
-                }
+                // A mapReduce which gets sent to the shards is internally translated to an
+                // aggregation.
+                currentOpFilter:
+                    (isRemoteShardCurOp ? {
+                        "cursor.originatingCommand.aggregate": "currentop_query",
+                        "cursor.originatingCommand.pipeline.0.$match.$comment": "currentop_query_mr"
+                    }
+                                        : {
+                                              "command.query.$comment": "currentop_query_mr",
+                                              "ns": /^currentop_query.*currentop_query/
+                                          }),
             },
             {
                 test: function(db) {

@@ -3,7 +3,7 @@
  * and afterClusterTime reads are the only reads that should block on a prepared transaction. Reads
  * that happen as part of a write should also block on a prepared transaction.
  *
- * Also test that dbHash and mapReduce, which acquire collection S locks for reads, do not block on
+ * Also test that dbHash, which acquires a collection S lock for reads, does not block on
  * a prepared transaction on secondaries. Otherwise, it would cause deadlocks when the prepared
  * transaction reacquires locks (since locks were yielded on secondaries) at commit time. This test
  * makes sure dbHash and mapReduce do not accept a non local read concern or afterClusterTime and so
@@ -203,10 +203,9 @@ function runTest() {
         mapReduce({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
         ErrorCodes.InvalidOptions);
 
-    jsTestLog("Test mapReduce doesn't support read concern other than local.");
+    jsTestLog("Test mapReduce doesn't support read concern other than local or available.");
     assert.commandWorked(mapReduce({level: 'local'}, secondaryTestDB));
-    assert.commandFailedWithCode(mapReduce({level: 'available'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandWorked(mapReduce({level: 'available'}, secondaryTestDB));
     assert.commandFailedWithCode(mapReduce({level: 'majority'}, secondaryTestDB),
                                  ErrorCodes.InvalidOptions);
     assert.commandFailedWithCode(mapReduce({level: 'snapshot'}, secondaryTestDB),
@@ -215,17 +214,13 @@ function runTest() {
                                  ErrorCodes.InvalidOptions);
 
     jsTestLog("Test mapReduce that writes is not allowed to run on secondaries.");
-    // It currently returns ErrorCodes.PrimarySteppedDown in this case.
-    assert.commandFailedWithCode(mapReduce({}, secondaryTestDB, "outColl"),
-                                 [ErrorCodes.InvalidOptions, ErrorCodes.PrimarySteppedDown]);
+    assert.commandFailedWithCode(mapReduce({}, secondaryTestDB, "outColl"), [ErrorCodes.NotMaster]);
 
     jsTestLog("Test mapReduce on secondary doesn't block on a prepared transaction.");
     assert.commandWorked(mapReduce({}, secondaryTestDB));
 
-    jsTestLog("Test mapReduce on primary blocks on collection S lock which conflicts with " +
-              "a prepared transaction.");
-    assert.commandFailedWithCode(mapReduce({}, testDB, {inline: 1}, failureTimeout),
-                                 ErrorCodes.MaxTimeMSExpired);
+    jsTestLog("Test mapReduce on a primary doesn't block on a prepared transaction.");
+    assert.commandWorked(mapReduce({}, testDB));
 
     // validate does not accept a non local read concern or afterClusterTime and it also sets
     // ignore_prepare=true during its execution. Therefore, validate should never get prepare

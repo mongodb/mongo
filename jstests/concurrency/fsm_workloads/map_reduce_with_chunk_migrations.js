@@ -98,9 +98,6 @@ var $config = extendWorkload($config, function($config, $super) {
             cluster.shardCollection(db[this.collWithMigrations], this.shardKey, false);
             $super.setup.apply(this, [db, this.collWithMigrations, cluster]);
         }
-
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
     };
 
     return $config;

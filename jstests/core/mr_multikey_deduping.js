@@ -5,6 +5,8 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 // ]
+
+load("jstests/aggregation/extras/utils.js");  // For resultsEq
 (function() {
 "use strict";
 
@@ -23,21 +25,18 @@ outColl.drop();
         return Array.sum(vals);
     };
 
-    let res =
-        assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: outColl.getName(), query: {}}));
-    assert.eq(1, res.counts.input);
+    let res = assert.commandWorked(
+        coll.mapReduce(mapFn, reduceFn, {out: {merge: outColl.getName()}, query: {}}));
     assert(outColl.drop());
 
-    res = assert.commandWorked(
-        coll.mapReduce(mapFn, reduceFn, {out: outColl.getName(), query: {arr: {$gte: 0}}}));
-    assert.eq(1, res.counts.input);
+    res = assert.commandWorked(coll.mapReduce(
+        mapFn, reduceFn, {out: {merge: outColl.getName()}, query: {arr: {$gte: 0}}}));
     assert(outColl.drop());
 
     // Now test that we get the same results when there's an index present.
     assert.commandWorked(coll.ensureIndex({arr: 1}));
-    res = assert.commandWorked(
-        coll.mapReduce(mapFn, reduceFn, {out: outColl.getName(), query: {arr: {$gte: 0}}}));
-    assert.eq(1, res.counts.input);
+    res = assert.commandWorked(coll.mapReduce(
+        mapFn, reduceFn, {out: {merge: outColl.getName()}, query: {arr: {$gte: 0}}}));
     assert(outColl.drop());
 }());
 
@@ -62,7 +61,7 @@ outColl.drop();
     const resultsNoIndexNoQuery =
         assert
             .commandWorked(db.runCommand(
-                {mapreduce: coll.getName(), map: mapFn, reduce: reduceFn, out: {inline: true}}))
+                {mapreduce: coll.getName(), map: mapFn, reduce: reduceFn, out: {inline: 1}}))
             .results;
     const resultsNoIndexEqualityOnName = assert
                                              .commandWorked(db.runCommand({
@@ -70,7 +69,7 @@ outColl.drop();
                                                  map: mapFn,
                                                  reduce: reduceFn,
                                                  query: {name: 'name1'},
-                                                 out: {inline: true}
+                                                 out: {inline: 1}
                                              }))
                                              .results;
     const resultsNoIndexRangeOnName = assert
@@ -79,21 +78,22 @@ outColl.drop();
                                               map: mapFn,
                                               reduce: reduceFn,
                                               query: {name: {$gt: 'name'}},
-                                              out: {inline: true}
+                                              out: {inline: 1}
                                           }))
                                           .results;
 
-    assert.eq([{_id: "cat", value: 3}, {_id: "dog", value: 2}, {_id: "mouse", value: 1}],
-              resultsNoIndexNoQuery);
-    assert.eq([{_id: "cat", value: 1}, {_id: "dog", value: 1}], resultsNoIndexEqualityOnName);
-    assert.eq(resultsNoIndexNoQuery, resultsNoIndexRangeOnName);
+    assert(resultsEq([{_id: "cat", value: 3}, {_id: "dog", value: 2}, {_id: "mouse", value: 1}],
+                     resultsNoIndexNoQuery));
+    assert(
+        resultsEq([{_id: "cat", value: 1}, {_id: "dog", value: 1}], resultsNoIndexEqualityOnName));
+    assert(resultsEq(resultsNoIndexNoQuery, resultsNoIndexRangeOnName));
 
     assert.commandWorked(coll.ensureIndex({name: 1, tags: 1}));
 
     const resultsIndexedNoQuery =
         assert
             .commandWorked(db.runCommand(
-                {mapreduce: coll.getName(), map: mapFn, reduce: reduceFn, out: {inline: true}}))
+                {mapreduce: coll.getName(), map: mapFn, reduce: reduceFn, out: {inline: 1}}))
             .results;
     const resultsIndexedEqualityOnName = assert
                                              .commandWorked(db.runCommand({
@@ -101,7 +101,7 @@ outColl.drop();
                                                  map: mapFn,
                                                  reduce: reduceFn,
                                                  query: {name: 'name1'},
-                                                 out: {inline: true}
+                                                 out: {inline: 1}
                                              }))
                                              .results;
     const resultsIndexedRangeOnName = assert
@@ -110,12 +110,12 @@ outColl.drop();
                                               map: mapFn,
                                               reduce: reduceFn,
                                               query: {name: {$gt: 'name'}},
-                                              out: {inline: true}
+                                              out: {inline: 1}
                                           }))
                                           .results;
 
-    assert.eq(resultsNoIndexNoQuery, resultsIndexedNoQuery);
-    assert.eq(resultsNoIndexEqualityOnName, resultsIndexedEqualityOnName);
-    assert.eq(resultsNoIndexRangeOnName, resultsIndexedRangeOnName);
+    assert(resultsEq(resultsNoIndexNoQuery, resultsIndexedNoQuery));
+    assert(resultsEq(resultsNoIndexEqualityOnName, resultsIndexedEqualityOnName));
+    assert(resultsEq(resultsNoIndexRangeOnName, resultsIndexedRangeOnName));
 }());
 }());

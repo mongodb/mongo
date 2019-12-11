@@ -551,10 +551,6 @@ let testCases = {
     mapReduce: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                assert.commandWorked(
-                    mongosConn.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-            },
             command: function(dbName, collName) {
                 return {
                     mapReduce: collName,
@@ -570,10 +566,6 @@ let testCases = {
         },
         explain: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                assert.commandWorked(
-                    mongosConn.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-            },
             command: function(dbName, collName) {
                 return {
                     explain: {

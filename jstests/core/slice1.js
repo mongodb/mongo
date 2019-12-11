@@ -1,10 +1,13 @@
-t = db.slice1;
+(function() {
+"use strict";
+
+let t = db.slice1;
 t.drop();
 
 t.insert({_id: 1, a: [0, 1, 2, 3, 4, 5, -5, -4, -3, -2, -1], b: 1, c: 1});
 
 // first three
-out = t.findOne({}, {a: {$slice: 3}});
+let out = t.findOne({}, {a: {$slice: 3}});
 assert.eq(out.a, [0, 1, 2], '1');
 
 // last three
@@ -73,3 +76,4 @@ assert.eq(out.a, [[3, 3, 3]], 'n 2');
 
 out = t.findOne({}, {a: {$slice: [0, 2]}});
 assert.eq(out.a, [[1, 1, 1], [2, 2, 2]], 'n 2');
+})();

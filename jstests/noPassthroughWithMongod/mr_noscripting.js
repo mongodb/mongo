@@ -2,9 +2,6 @@ var conn = MongoRunner.runMongod({noscripting: ''});
 var testDB = conn.getDB('foo');
 var coll = testDB.bar;
 
-// TODO SERVER-42511 Remove the usage of internalQueryUseAggMapReduce.
-assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-
 coll.insert({x: 1});
 
 var map = function() {

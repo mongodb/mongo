@@ -2,10 +2,7 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 //   uses_map_reduce_with_temp_collections,
-//   does_not_support_stepdowns,
-//   # TODO SERVER-42511: Remove this requires_fcv tag once the internalQueryUseAggMapReduce knob
-//   # is removed.
-//   requires_fcv_44,
+//   does_not_support_stepdowns
 // ]
 (function() {
 "use strict";
@@ -50,6 +47,9 @@ assert.commandFailedWithCode(db.runCommand({
                              ErrorCodes.CommandNotSupported);
 
 // Test that you can output to a different database.
+// Create the other database.
+db.getSiblingDB("mr_validation_other").foo.drop();
+assert.commandWorked(db.getSiblingDB("mr_validation_other").createCollection("foo"));
 assert.commandWorked(db.runCommand({
     mapReduce: source.getName(),
     map: mapFunc,
@@ -126,11 +126,9 @@ if (!FixtureHelpers.isMongos(db)) {
         db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
         ErrorCodes.CommandNotSupportedOnView);
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
     assert.commandFailedWithCode(
         db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
         ErrorCodes.CommandNotSupportedOnView);
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
 }
 
 // Test that mapReduce fails gracefully if the query parameter is the wrong type.

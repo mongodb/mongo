@@ -14,10 +14,7 @@
  * Writes the results of each thread to the same collection.
  * @tags: [
  *   # mapReduce does not support afterClusterTime.
- *   does_not_support_causal_consistency,
- *   # TODO SERVER-42511: Remove this requires_fcv tag once the internalQueryUseAggMapReduce knob
- *   # is removed in the fsm workloads.
- *   requires_fcv_44
+ *   does_not_support_causal_consistency
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload

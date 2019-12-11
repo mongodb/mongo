@@ -34,7 +34,7 @@ const reduceFn = function(key, values) {
 };
 
 assert.commandWorked(
-    coll.mapReduce(mapFn, reduceFn, {out: outputColl.getName(), scope: {xx: {val: 1}}}));
+    coll.mapReduce(mapFn, reduceFn, {out: {merge: outputColl.getName()}, scope: {xx: {val: 1}}}));
 
 assert.eq(3, outputColl.find().itcount());
 assert.eq(1, outputColl.count({_id: "a", "value.count": 2}));
@@ -43,7 +43,7 @@ assert.eq(1, outputColl.count({_id: "c", "value.count": 3}));
 
 outputColl.drop();
 assert.commandWorked(
-    coll.mapReduce(mapFn, reduceFn, {scope: {xx: {val: 2}}, out: outputColl.getName()}));
+    coll.mapReduce(mapFn, reduceFn, {scope: {xx: {val: 2}}, out: {merge: outputColl.getName()}}));
 
 assert.eq(3, outputColl.find().itcount());
 assert.eq(1, outputColl.count({_id: "a", "value.count": 4}));

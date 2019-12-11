@@ -9,6 +9,7 @@ const testDB = st.getDB("mrShard");
 const inputColl = testDB.srcSharded;
 
 st.adminCommand({enableSharding: testDB.getName()});
+st.adminCommand({enableSharding: "mrShardOtherDB"});
 st.ensurePrimaryShard(testDB.getName(), st.shard1.shardName);
 
 const nDistinctKeys = 512;
@@ -22,16 +23,6 @@ function seedCollection() {
         }
     }
     assert.commandWorked(bulk.execute());
-}
-
-function verifyOutput(mrOutput) {
-    assert.commandWorked(mrOutput);
-    const nTotalDocs = nDistinctKeys * nValuesPerKey;
-    assert.eq(mrOutput.counts.input, nTotalDocs, `input count is wrong: ${tojson(mrOutput)}`);
-    assert.eq(mrOutput.counts.emit, nTotalDocs, `emit count is wrong: ${tojson(mrOutput)}`);
-    assert.gt(
-        mrOutput.counts.reduce, nValuesPerKey - 1, `reduce count is wrong: ${tojson(mrOutput)}`);
-    assert.eq(mrOutput.counts.output, nDistinctKeys, `output count is wrong: ${tojson(mrOutput)}`);
 }
 
 function mapFn() {
@@ -54,36 +45,37 @@ function testMrOutput({inputSharded, outputSharded}) {
     }
 
     function runMRTestWithOutput(outOptions) {
-        verifyOutput(inputColl.mapReduce(mapFn, reduceFn, outOptions));
+        assert.commandWorked(inputColl.mapReduce(mapFn, reduceFn, outOptions));
     }
 
-    runMRTestWithOutput({out: {merge: outputColl.getName(), sharded: outputSharded}});
+    runMRTestWithOutput(
+        {out: Object.assign({merge: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
 
     assert.commandWorked(outputColl.remove({}));
-    runMRTestWithOutput({out: {reduce: outputColl.getName(), sharded: outputSharded}});
+    runMRTestWithOutput(
+        {out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
     // Test the same thing using runCommand directly.
-    verifyOutput(testDB.runCommand({
+    assert.commandWorked(testDB.runCommand({
         mapReduce: inputColl.getName(),
         map: mapFn,
         reduce: reduceFn,
-        out: {reduce: outputColl.getName(), sharded: outputSharded}
+        out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {})
     }));
 
-    const out = inputColl.mapReduce(mapFn, reduceFn, {out: {inline: 1}});
-    verifyOutput(out);
-    assert(out.results != 'undefined', "no results for inline");
+    const output = inputColl.mapReduce(mapFn, reduceFn, {out: {inline: 1}});
+    assert.commandWorked(output);
+    assert(output.results != 'undefined', "no results for inline");
 
     if (!outputSharded) {
         // We don't support replacing an existing sharded collection.
         runMRTestWithOutput(outputColl.getName());
-        runMRTestWithOutput({out: {replace: outputColl.getName(), sharded: outputSharded}});
-        runMRTestWithOutput(
-            {out: {replace: outputColl.getName(), sharded: outputSharded, db: "mrShardOtherDB"}});
-        verifyOutput(testDB.runCommand({
+        runMRTestWithOutput({out: {replace: outputColl.getName()}});
+        runMRTestWithOutput({out: {replace: outputColl.getName(), db: "mrShardOtherDB"}});
+        assert.commandWorked(testDB.runCommand({
             mapReduce: inputColl.getName(),
             map: mapFn,
             reduce: reduceFn,
-            out: {replace: outputColl.getName(), sharded: outputSharded}
+            out: {replace: outputColl.getName()}
         }));
     }
 }
@@ -94,9 +86,9 @@ testMrOutput({inputSharded: true, outputSharded: false});
 testMrOutput({inputSharded: true, outputSharded: true});
 
 // Ensure that mapReduce with a sharded input collection can accept the collation option.
-let out = inputColl.mapReduce(mapFn, reduceFn, {out: {inline: 1}, collation: {locale: "en_US"}});
-verifyOutput(out);
-assert(out.results != 'undefined', "no results for inline with collation");
+let output = inputColl.mapReduce(mapFn, reduceFn, {out: {inline: 1}, collation: {locale: "en_US"}});
+assert.commandWorked(output);
+assert(output.results != 'undefined', "no results for inline with collation");
 
 assert.commandWorked(inputColl.remove({}));
 
@@ -105,13 +97,12 @@ assert.commandWorked(inputColl.remove({}));
 // collation is passed along to the shards.
 assert.eq(inputColl.find().itcount(), 0);
 assert.commandWorked(inputColl.insert({key: 0, value: 0, str: "FOO"}));
-out = inputColl.mapReduce(
+output = inputColl.mapReduce(
     mapFn,
     reduceFn,
     {out: {inline: 1}, query: {str: "foo"}, collation: {locale: "en_US", strength: 2}});
-assert.commandWorked(out);
-assert.eq(out.counts.input, 1);
-assert.eq(out.results, [{_id: 0, value: 1}]);
+assert.commandWorked(output);
+assert.eq(output.results, [{_id: 0, value: 1}]);
 
 st.stop();
 })();

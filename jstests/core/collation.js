@@ -957,20 +957,6 @@ assert.eq(null,
 // Collation tests for mapReduce.
 //
 
-// mapReduce should return "collection doesn't exist" error when collation specified and
-// collection does not exist.
-coll.drop();
-assert.throws(function() {
-    coll.mapReduce(
-        function() {
-            emit(this.str, 1);
-        },
-        function(key, values) {
-            return Array.sum(values);
-        },
-        {out: {inline: 1}, collation: {locale: "fr"}});
-});
-
 // mapReduce should return correct results when collation specified and no indexes exist.
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));

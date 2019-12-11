@@ -243,7 +243,7 @@ let testCases = {
             assert.eq(1, res.results[0]._id, tojson(res));
             assert.eq(2, res.results[0].value, tojson(res));
         },
-        behavior: "targetsPrimaryUsesConnectionVersioning"
+        behavior: "versioned"
     },
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},
