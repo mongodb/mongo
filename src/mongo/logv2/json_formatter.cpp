@@ -55,8 +55,8 @@ struct JSONValueExtractor {
             BSONObjBuilder builder;
             val.BSONAppend(builder, name);
             // This is a JSON subobject, no quotes needed
-            storeUnquoted(name,
-                          builder.obj().getField(name).jsonString(JsonStringFormat::Strict, false));
+            storeUnquoted(
+                name, builder.done().getField(name).jsonString(JsonStringFormat::Strict, false));
         } else if (val.toBSON) {
             // This is a JSON subobject, no quotes needed
             storeUnquoted(name, val.toBSON().jsonString());

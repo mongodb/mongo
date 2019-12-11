@@ -99,6 +99,13 @@ public:
     NamedAttribute(StringData n, std::string const& val) : NamedAttribute(n, StringData(val)) {}
     NamedAttribute(StringData n, long double val) = delete;
 
+    NamedAttribute(StringData n, BSONElement const& val) : name(n) {
+        CustomAttributeValue custom;
+        custom.toBSON = [&val]() { return val.wrap(); };
+        custom.toString = [&val]() { return val.toString(); };
+        value = std::move(custom);
+    }
+
     template <typename T>
     NamedAttribute(StringData n, const boost::optional<T>& val)
         : NamedAttribute(val ? NamedAttribute(n, *val) : NamedAttribute()) {

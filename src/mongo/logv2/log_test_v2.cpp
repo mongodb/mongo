@@ -294,9 +294,9 @@ TEST_F(LogTestV2, Types) {
 
     // BSONObj
     BSONObjBuilder builder;
-    builder.append("int32"_sd, 0);
+    builder.append("int32"_sd, 1);
     builder.append("int64"_sd, std::numeric_limits<int64_t>::max());
-    builder.append("double"_sd, 0.0);
+    builder.append("double"_sd, 1.0);
     builder.append("str"_sd, str_data);
     BSONObj bsonObj = builder.obj();
     LOGV2("bson {}", "name"_attr = bsonObj);
@@ -308,6 +308,19 @@ TEST_F(LogTestV2, Types) {
                .Obj()
                .woCompare(bsonObj) == 0);
     ASSERT(lastBSONElement().Obj().woCompare(bsonObj) == 0);
+
+    // BSONElement
+    LOGV2("bson element {}", "name"_attr = bsonObj.getField("int32"_sd));
+    ASSERT(text.back() == std::string("bson element ") + bsonObj.getField("int32"_sd).toString());
+    ASSERT(mongo::fromjson(json.back())
+               .getField(kAttributesFieldName)
+               .Obj()
+               .getField("name"_sd)
+               .Obj()
+               .getField("int32"_sd)
+               .Int() == bsonObj.getField("int32"_sd).Int());
+    ASSERT(lastBSONElement().Obj().getField("int32"_sd).Int() ==
+           bsonObj.getField("int32"_sd).Int());
 
     // Date_t
     Date_t date = Date_t::now();
