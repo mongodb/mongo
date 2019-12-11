@@ -71,6 +71,10 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(pauseShardCollectionBeforeCriticalSection);
+MONGO_FAIL_POINT_DEFINE(pauseShardCollectionReadOnlyCriticalSection);
+MONGO_FAIL_POINT_DEFINE(pauseShardCollectionCommitPhase);
+MONGO_FAIL_POINT_DEFINE(pauseShardCollectionAfterCriticalSection);
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionBeforeReturning);
 
 struct ShardCollectionTargetState {
@@ -718,10 +722,14 @@ UUID shardCollection(OperationContext* opCtx,
             refreshAllShards(opCtx, nss, dbPrimaryShardId, initialChunks.chunks);
         };
 
+    pauseShardCollectionBeforeCriticalSection.pauseWhileSet();
+
     {
         // From this point onward the collection can only be read, not written to, so it is safe to
         // construct the prerequisites and generate the target state.
         CollectionCriticalSection critSec(opCtx, nss);
+
+        pauseShardCollectionReadOnlyCriticalSection.pauseWhileSet();
 
         if (auto collectionOptional =
                 InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
@@ -736,6 +744,8 @@ UUID shardCollection(OperationContext* opCtx,
 
         // From this point onward, the collection can not be written to or read from.
         critSec.enterCommitPhase();
+
+        pauseShardCollectionCommitPhase.pauseWhileSet();
 
         logStartShardCollection(opCtx, cmdObj, nss, request, *targetState, dbPrimaryShardId);
 
@@ -766,6 +776,7 @@ UUID shardCollection(OperationContext* opCtx,
     }
 
     // We have now left the critical section.
+    pauseShardCollectionAfterCriticalSection.pauseWhileSet();
 
     if (optimizationType == InitialSplitPolicy::ShardingOptimizationType::None) {
         invariant(initialChunks.chunks.empty());
