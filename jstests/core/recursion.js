@@ -27,7 +27,7 @@ function mapReduceRecursion() {
             })();
         },
         function() {},
-        {out: 'inline'});
+        {out: {merge: 'out_coll'}});
 }
 
 assert.commandWorked(db.recursion.insert({}));

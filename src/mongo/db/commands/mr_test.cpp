@@ -341,7 +341,9 @@ void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                             const UUID& indexBuildUUID,
                                             const std::vector<BSONObj>& indexes,
                                             bool fromMigrate) {
-    indexesCreated = indexes;
+    for (auto&& obj : indexes) {
+        indexesCreated.push_back(obj.getOwned());
+    }
 }
 
 void MapReduceOpObserver::onInserts(OperationContext* opCtx,

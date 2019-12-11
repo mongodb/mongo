@@ -4,13 +4,9 @@
 function buildCommandProfile(command, sharded) {
     let commandProfile = {};
 
-    if (sharded && command.mapReduce) {
-        // Unlike other read commands, mapReduce is rewritten to a different format when sent to
-        // shards if the input collection is sharded, because it is executed in two phases.
-        // We do not check for the 'map' and 'reduce' fields, because they are functions, and
-        // we cannot compaare functions for equality.
-        commandProfile["command.out"] = {$regex: "^tmp.mrs"};
-        commandProfile["command.shardedFirstPass"] = true;
+    if (command.mapReduce) {
+        // MapReduce is rewritten to an aggregate pipeline.
+        commandProfile["command.aggregate"] = command.mapReduce;
     } else if (command.update) {
         // Updates are batched, but only allow using buildCommandProfile() for an update batch that
         // contains a single update, since the profiler generates separate entries for each update

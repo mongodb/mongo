@@ -74,12 +74,7 @@ assert.eq(16, resultAsSingleObj.b.avg, () => tojson(resultAsSingleObj));
 assert.eq(18, resultAsSingleObj.c.avg, () => tojson(resultAsSingleObj));
 outputColl.drop();
 
-// inline just need to exist - so set it to false to make sure the code is just checking for
-// existence
-// For now, mapReduce is expected to return inline results when an out.inline argument is specified,
-// regardless of integer value specified. TODO SERVER-42511 convert this test into one that verifies
-// specifying anything but 1 fails.
-res = coll.mapReduce(mapFn, reduceFn, {finalize: finalizeFn, out: {inline: 0}});
+res = coll.mapReduce(mapFn, reduceFn, {finalize: finalizeFn, out: {inline: 1}});
 assert.commandWorked(res);
 resultAsSingleObj = reformat(res);
 assert.eq(9, resultAsSingleObj.a.avg, () => tojson(resultAsSingleObj));
@@ -88,7 +83,7 @@ assert.eq(18, resultAsSingleObj.c.avg, () => tojson(resultAsSingleObj));
 outputColl.drop();
 assert(!("result" in res), () => `Expected inline output with 'results': ${tojson(res)}`);
 
-res = coll.mapReduce(mapFn, reduceFn, {finalize: finalizeFn, out: {inline: 5}});
+res = coll.mapReduce(mapFn, reduceFn, {finalize: finalizeFn, out: {inline: 1}});
 assert.commandWorked(res);
 resultAsSingleObj = reformat(res);
 assert.eq(9, resultAsSingleObj.a.avg, () => tojson(resultAsSingleObj));

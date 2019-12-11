@@ -30,7 +30,8 @@ function getOpCode() {
         const cmdBody = op.command;
         if (cmdBody.$truncated) {
             const stringifiedCmd = cmdBody.$truncated;
-            return stringifiedCmd.search('mapreduce') >= 0 &&
+            return (stringifiedCmd.search('mapreduce') >= 0 ||
+                    stringifiedCmd.search('aggregate') >= 0) &&
                 stringifiedCmd.search(source.getName()) >= 0;
         }
 

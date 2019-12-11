@@ -57,14 +57,11 @@ public:
     }
 
     bool _runImpl(OperationContext* opCtx,
-                  const std::string& dbname,
+                  const std::string&,
                   const BSONObj& cmd,
-                  std::string& errmsg,
+                  std::string&,
                   BSONObjBuilder& result) final {
-        if (internalQueryUseAggMapReduce.load()) {
-            return runAggregationMapReduce(opCtx, cmd, result, boost::none);
-        }
-        return runMapReduce(opCtx, dbname, applyReadWriteConcern(opCtx, this, cmd), errmsg, result);
+        return runAggregationMapReduce(opCtx, cmd, result, boost::none);
     }
 } clusterMapReduceCommand;
 

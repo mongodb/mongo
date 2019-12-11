@@ -25,7 +25,9 @@ const reduceFn = function(k, vs) {
     return Array.sum(vs);
 };
 
-(function testReplace() {
+// TODO SERVER-42511 we should fix up and call the functions in this file once we flip on the new
+// implementation.
+function testReplace() {
     let res = assert.commandWorked(
         coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
     const expected =
@@ -42,11 +44,8 @@ const reduceFn = function(k, vs) {
         coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
     actual = outColl.find().sort({_id: 1}).toArray();
     assert.eq(expected, actual);
-}());
+}
 
-// TODO SERVER-42511 we should call 'testMerge()' and 'testReduce()' once we flip on the new
-// implementation. Today these would fail in certain sharded passthroughs, as described in
-// SERVER-44238.
 function testMerge() {
     outColl.drop();
     assert.commandWorked(

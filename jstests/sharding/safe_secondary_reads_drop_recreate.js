@@ -238,7 +238,7 @@ let testCases = {
             assert.commandWorked(res);
             assert.eq(0, res.results.length, tojson(res));
         },
-        behavior: "targetsPrimaryUsesConnectionVersioning"
+        behavior: "versioned"
     },
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},

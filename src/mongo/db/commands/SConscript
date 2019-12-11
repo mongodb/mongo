@@ -520,6 +520,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/pipeline/mongo_process_interface',
+        '$BUILD_DIR/mongo/db/pipeline/process_interface_factory_mongod',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
         '$BUILD_DIR/mongo/idl/idl_parser',

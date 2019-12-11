@@ -49,48 +49,30 @@ assert.commandWorked(
 // legacy mapReduce.
 assert.commandWorked(st.s.getDB(dbName).getCollection(outColl).insert({_id: -1, not_id: 0}));
 
-// TODO SERVER-42511 remove this once the switch to MR in agg is complete.
-const usingAgg = st.getDB(dbName)
-                     .adminCommand({getParameter: 1, internalQueryUseAggMapReduce: 1})
-                     .internalQueryUseAggMapReduce;
-const expectedError = usingAgg ? 31313 : 31311;
-
-// TODO SERVER-44461: Allow running this test when using non-agg MR.
-if (!usingAgg) {
-    jsTestLog("Skipping test case. See SERVER-44461.");
-    st.stop();
-    return;
-}
-
 // Through the same mongos, verify that mapReduce fails since the output collection is not sharded
 // by _id.
 assert.commandFailedWithCode(
     st.s.getDB(dbName).runCommand(
         {mapReduce: "coll", map: map, reduce: reduce, out: {merge: outColl, sharded: true}}),
-    expectedError);
+    31313);
 
 assert.commandFailedWithCode(
     st.s.getDB(dbName).runCommand(
         {mapReduce: "coll", map: map, reduce: reduce, out: {reduce: outColl, sharded: true}}),
-    expectedError);
+    31313);
 
 // Expect a similar failure through a stale mongos.
 assert.commandFailedWithCode(
     staleMongos1.getDB(dbName).runCommand(
         {mapReduce: "coll", map: map, reduce: reduce, out: {merge: outColl, sharded: true}}),
-    expectedError);
+    31313);
 
 // Mode replace is unique, since the legacy mapReduce will unconditionally drop and reshard the
 // target collection on _id.
-if (usingAgg) {
-    assert.commandFailedWithCode(
-        st.s.getDB(dbName).runCommand(
-            {mapReduce: "coll", map: map, reduce: reduce, out: {replace: outColl, sharded: true}}),
-        expectedError);
-} else {
-    assert.commandWorked(st.s.getDB(dbName).runCommand(
-        {mapReduce: "coll", map: map, reduce: reduce, out: {replace: outColl, sharded: true}}));
-}
+assert.commandFailedWithCode(
+    st.s.getDB(dbName).runCommand(
+        {mapReduce: "coll", map: map, reduce: reduce, out: {replace: outColl, sharded: true}}),
+    31313);
 
 function testAgainstValidShardedOutput(shardKey) {
     // Drop and reshard the target collection.
@@ -133,7 +115,7 @@ testAgainstValidShardedOutput({_id: "hashed"});
     assert.commandFailedWithCode(
         st.s.getDB(dbName).runCommand(
             {mapReduce: "coll", map: map, reduce: reduce, out: {merge: outColl, sharded: true}}),
-        expectedError);
+        31313);
 
     // Run the same mapReduce through a stale mongos and expect it to fail as well. Make sure to
     // leave at least one document in the target collection for the same reason as above.
@@ -141,7 +123,7 @@ testAgainstValidShardedOutput({_id: "hashed"});
     assert.commandFailedWithCode(
         staleMongos1.getDB(dbName).runCommand(
             {mapReduce: "coll", map: map, reduce: reduce, out: {merge: outColl, sharded: true}}),
-        expectedError);
+        31313);
 })();
 
 st.stop();

@@ -1,12 +1,15 @@
 // Test partial indexes with commands that don't use explain.  These commands are tested against
 // mongod with the --notablescan flag set, so that they fail if the index is not used.
+load("jstests/aggregation/extras/utils.js");  // For resultsEq
 (function() {
 "use strict";
 var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});
-var coll = runner.getDB("test").index_partial_no_explain_cmds;
+const db = runner.getDB("test");
+var coll = db.index_partial_no_explain_cmds;
 var ret;
 
 coll.drop();
+db.getCollection("mrOutput").drop();
 
 assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}}));
 
@@ -29,8 +32,9 @@ var reduceFunc = function(keyId, countArray) {
     return Array.sum(countArray);
 };
 
-ret = coll.mapReduce(mapFunc, reduceFunc, {out: "inline", query: {x: {$gt: 1}, a: 1}});
-assert.eq(1, ret.counts.input);
+assert.commandWorked(
+    coll.mapReduce(mapFunc, reduceFunc, {out: "mrOutput", query: {x: {$gt: 1}, a: 1}}));
+assert(resultsEq([{"_id": 2, "value": 1}], db.getCollection("mrOutput").find().toArray()));
 
 //
 // Test distinct.

@@ -158,7 +158,7 @@ res = db.runCommand({
         return val;
     },
     query: {b: 2},
-    out: {inline: true}
+    out: {inline: 1}
 });
 assert.commandWorked(res);
 countB++;

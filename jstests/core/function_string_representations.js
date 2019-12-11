@@ -12,7 +12,8 @@
 (function() {
 "use strict";
 
-var col = db.function_string_representations;
+const col = db.function_string_representations;
+const out = db.map_reduce_example;
 col.drop();
 assert.commandWorked(col.insert({
     _id: "abc123",
@@ -24,12 +25,16 @@ assert.commandWorked(col.insert({
 
 var mapFunction = "function() {emit(this._id, this.price);}";
 var reduceFunction = "function(keyCustId, valuesPrices) {return Array.sum(valuesPrices);}";
-assert.commandWorked(col.mapReduce(mapFunction, reduceFunction, {out: "map_reduce_example"}));
+out.drop();
+assert.commandWorked(
+    col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
 
 // Provided strings may end with semicolons and/or whitespace
 mapFunction += " ; ";
 reduceFunction += " ; ";
-assert.commandWorked(col.mapReduce(mapFunction, reduceFunction, {out: "map_reduce_example"}));
+out.drop();
+assert.commandWorked(
+    col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
 
 // $where exhibits the same behavior
 var whereFunction = "function() {return this.price === 25;}";

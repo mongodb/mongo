@@ -34,6 +34,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_agg.h"
@@ -112,6 +113,15 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
     translatedCmd[AggregationRequest::kFromMongosName] = Value(true);
     translatedCmd[AggregationRequest::kRuntimeConstants] =
         Value(pipeline->getContext()->getRuntimeConstants().toBSON());
+
+    if (shouldBypassDocumentValidationForCommand(originalCmd)) {
+        translatedCmd[bypassDocumentValidationCommandOption()] = Value(true);
+    }
+
+    if (originalCmd[AggregationRequest::kCollationName]) {
+        translatedCmd[AggregationRequest::kCollationName] =
+            Value(originalCmd[AggregationRequest::kCollationName]);
+    }
 
     // TODO SERVER-44884: We set this flag to indicate that the shards should always use the new
     // upsert mechanism when executing relevant $merge modes. After branching for 4.5, supported
@@ -224,7 +234,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     if (verbosity) {
         map_reduce_output_format::appendExplainResponse(result, aggResults);
     } else if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
-        // TODO SERVER-43290: Add support for cluster MapReduce statistics.
         // If the inline results could not fit into a single batch, then kill the remote
         // operation(s) and return an error since mapReduce does not support a cursor-style
         // response.

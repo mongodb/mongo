@@ -145,7 +145,6 @@ selector:
   - jstests/sharding/features2.js
   - jstests/sharding/names.js
   - jstests/sharding/explain_agg_read_pref.js
-  - jstests/sharding/mrShardedOutput.js
   - jstests/sharding/split_stale_mongos.js
   - jstests/sharding/multi_write_target.js
   - jstests/sharding/array_shard_key.js

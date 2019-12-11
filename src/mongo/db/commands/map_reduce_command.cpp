@@ -78,11 +78,9 @@ private:
         // Execute the mapReduce as an aggregation pipeline only if fully upgraded to 4.4, since
         // a 4.2 mongos in a mixed version cluster expects a fundamentally different response that
         // is not supported by the aggregation equivalent.
-        if (internalQueryUseAggMapReduce.load() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)
             return map_reduce_agg::runAggregationMapReduce(opCtx, cmd, result, boost::none);
-        }
         return mr::runMapReduce(opCtx, dbname, cmd, errmsg, result);
     }
 } mapReduceCommand;

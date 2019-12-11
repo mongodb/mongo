@@ -13,6 +13,8 @@
  * - setUp: A function that does any set up (inserts, etc.) needed to check the command's results.
  * - command: The command to run, with all required options. Note, this field is also used to
  *            identify the operation in the system profiler.
+ * - filter: [OPTIONAL] When specified, used instead of 'command' to identify the operation in the
+ *           system profiler.
  * - checkResults: A function that asserts whether the command should succeed or fail. If the
  *                 command is expected to succeed, the function should assert the expected results.
  *                 *when the range has not been deleted from the donor.*
@@ -264,6 +266,36 @@ let testCases = {
             },
             out: {inline: 1}
         },
+        filter: {
+            aggregate: coll,
+            "pipeline": [
+                {
+                    "$project": {
+                        "emits": {
+                            "$_internalJsEmit": {
+                                "eval":
+                                    "function() {\n                emit(this.x, 1);\n            }",
+                                "this": "$$ROOT"
+                            }
+                        },
+                        "_id": false
+                    }
+                },
+                {"$unwind": {"path": "$emits"}},
+                {
+                    "$group": {
+                        "_id": "$emits.k",
+                        "value": {
+                            "$_internalJsReduce": {
+                                "data": "$emits",
+                                "eval":
+                                    "function(key, values) {\n                return Array.sum(values);\n            }"
+                            }
+                        }
+                    }
+                }
+            ],
+        },
         checkResults: function(res) {
             assert.commandWorked(res);
             assert.eq(1, res.results.length, tojson(res));
@@ -271,9 +303,12 @@ let testCases = {
             assert.eq(2, res.results[0].value, tojson(res));
         },
         checkAvailableReadConcernResults: function(res) {
-            assert.commandFailed(res);
+            assert.commandWorked(res);
+            assert.eq(1, res.results.length, tojson(res));
+            assert.eq(1, res.results[0]._id, tojson(res));
+            assert.eq(2, res.results[0].value, tojson(res));
         },
-        behavior: "targetsPrimaryUsesConnectionVersioning"
+        behavior: "versioned"
     },
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},
@@ -442,19 +477,19 @@ for (let command of commands) {
     test.checkAvailableReadConcernResults(availableReadConcernRes);
 
     let defaultReadConcernRes = staleMongos.getDB(db).runCommand(cmdReadPrefSecondary);
-    if (command === 'mapReduce') {
-        // mapReduce is always sent to a primary, which defaults to 'local' readConcern
-        test.checkResults(defaultReadConcernRes);
-    } else {
-        // Secondaries default to the 'available' readConcern
-        test.checkAvailableReadConcernResults(defaultReadConcernRes);
-    }
+    // Secondaries default to the 'available' readConcern
+    test.checkAvailableReadConcernResults(defaultReadConcernRes);
 
     let localReadConcernRes = staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernLocal);
     test.checkResults(localReadConcernRes);
 
     // Build the query to identify the operation in the system profiler.
-    let commandProfile = buildCommandProfile(test.command, true /* sharded */);
+    let filter = test.command;
+    if (test.filter != undefined) {
+        filter = test.filter;
+    }
+
+    let commandProfile = buildCommandProfile(filter, true /* sharded */);
 
     if (test.behavior === "unshardedOnly") {
         // Check that neither the donor nor recipient shard secondaries received either request.
