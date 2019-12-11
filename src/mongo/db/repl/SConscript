@@ -1172,6 +1172,7 @@ env.Library(
         'rollback_source_impl',
     ],
     LIBDEPS_PRIVATE=[
+        'local_oplog_info',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
