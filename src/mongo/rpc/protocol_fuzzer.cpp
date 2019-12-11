@@ -108,7 +108,7 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
             invariant(!isSupportedRequestNetworkOp(msg.operation()));
             break;
     }
-} catch (const DBException& e) {
+} catch (const DBException&) {
     // Ignore all errors from our assert macros
 }
 
