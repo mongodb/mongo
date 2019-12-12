@@ -449,7 +449,7 @@ auto MetadataManager::_pushRangeToClean(WithLock lock, ChunkRange const& range, 
 void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
     auto when = _rangesToClean.add(std::move(ranges));
     if (when) {
-        auto collectionUuid = _metadata.front()->metadata->getChunkManager()->getUUID();
+        auto collectionUuid = _metadata.back()->metadata->getChunkManager()->getUUID();
         invariant(collectionUuid);
         scheduleCleanup(_executor, _nss, *collectionUuid, *when);
     }
