@@ -618,7 +618,27 @@ void ServiceStateMachine::_terminateAndLogIfError(Status status) {
     }
 }
 
+void ServiceStateMachine::_cleanupExhaustResources() noexcept try {
+    if (!_inExhaust) {
+        return;
+    }
+    auto request = OpMsgRequest::parse(_inMessage);
+    // Clean up cursor for exhaust getMore request.
+    if (request.getCommandName() == "getMore"_sd) {
+        auto cursorId = request.body["getMore"].Long();
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        // Fire and forget. This is a best effort attempt to immediately clean up the exhaust
+        // cursor. If the killCursors request fails here for any reasons, it will still be
+        // cleaned up once the cursor times out.
+        _sep->handleRequest(opCtx.get(), makeKillCursorsMessage(cursorId));
+    }
+} catch (const DBException& e) {
+    log() << "Error cleaning up resources for exhaust requests: " << e.toStatus();
+}
+
 void ServiceStateMachine::_cleanupSession(ThreadGuard guard) {
+    _cleanupExhaustResources();
+
     _state.store(State::Ended);
 
     _inMessage.reset();

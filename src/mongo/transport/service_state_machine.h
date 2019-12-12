@@ -221,6 +221,11 @@ private:
      */
     void _cleanupSession(ThreadGuard guard);
 
+    /*
+     * Releases all the resources associated with the exhaust request.
+     */
+    void _cleanupExhaustResources() noexcept;
+
     AtomicWord<State> _state{State::Created};
 
     ServiceEntryPoint* _sep;

@@ -76,6 +76,15 @@ void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }
 
+void setWaitAfterCommandFinishesExecutionFailpoint(DBClientBase* conn, bool enable) {
+    auto cmdObj = BSON("configureFailPoint"
+                       << "waitAfterCommandFinishesExecution"
+                       << "mode" << (enable ? "alwaysOn" : "off") << "data"
+                       << BSON("ns" << testNSS.toString()));
+    auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
+    ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+}
+
 void setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(DBClientBase* conn,
                                                                       bool enable) {
     auto cmdObj = BSON("configureFailPoint"
@@ -203,7 +212,10 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
     }
 }
 
-TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisconnect) {
+// Test exhaust cursor is cleaned up on client disconnect. By default, the test client disconnects
+// while the exhaust getMore is running. If disconnectAfterGetMoreBatch is set to true, the test
+// client disconnects after the exhaust getMore is run but before the server sends out the response.
+void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
     auto conn = connect();
 
     // We need to set failpoints around getMore which cause it to hang, so only test against a
@@ -242,9 +254,25 @@ TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisc
                                                 << "cursor.nDocsReturned" << 3);
     ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch));
 
+    if (disconnectAfterGetMoreBatch) {
+        // Allow the exhaust getMore to run but block it before sending out the response.
+        setWaitAfterCommandFinishesExecutionFailpoint(conn.get(), true);
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
+        ASSERT(confirmCurrentOpContents(conn.get(),
+                                        BSON("command.getMore"
+                                             << queryCursor->getCursorId() << "msg"
+                                             << "waitAfterCommandFinishesExecution")));
+    }
+
     // Kill the client connection while the exhaust getMore is blocked on the failpoint.
     queryConnection->shutdownAndDisallowReconnect();
     unittest::log() << "Killed exhaust connection.";
+
+    if (disconnectAfterGetMoreBatch) {
+        // Disable the failpoint to allow the exhaust getMore to continue sending out the response
+        // after the client disconnects. This will result in a broken pipe error.
+        setWaitAfterCommandFinishesExecutionFailpoint(conn.get(), false);
+    }
 
     curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore"
                                            << queryCursor->getCursorId());
@@ -262,5 +290,15 @@ TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisc
     // Confirm that the cursor was cleaned up and does not appear in the $currentOp idleCursor
     // output.
     ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, expectEmptyResult));
+}
+
+TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisconnect) {
+    // Test that an exhaust getMore is interrupted on client disconnect.
+    testClientDisconnect(false /* disconnectAfterGetMoreBatch */);
+}
+
+TEST(CurrentOpExhaustCursorTest, CleanupExhaustCursorOnBrokenPipe) {
+    // Test that exhaust cursor is cleaned up on broken pipe even if the exhaust getMore succeeded.
+    testClientDisconnect(true /* disconnectAfterGetMoreBatch */);
 }
 }  // namespace mongo
