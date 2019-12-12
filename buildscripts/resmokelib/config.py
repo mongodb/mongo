@@ -60,6 +60,7 @@ DEFAULTS = {
     "flow_control_tickets": None,
     "genny_executable": None,
     "include_with_any_tags": None,
+    "install_dir": None,
     "jobs": 1,
     "mongo_executable": None,
     "mongod_executable": None,
@@ -303,6 +304,9 @@ INCLUDE_WITH_ANY_TAGS = None
 
 # If set, then resmoke.py starts the specified number of Job instances to run tests.
 JOBS = None
+
+# Where to find the MONGO*_EXECUTABLE binaries
+INSTALL_DIR = None
 
 # The path to the mongo executable used by resmoke.py.
 MONGO_EXECUTABLE = None

@@ -5,6 +5,7 @@ import os
 import os.path
 import sys
 import shlex
+import configparser
 
 import datetime
 import optparse
@@ -42,6 +43,9 @@ def _make_parser():  # pylint: disable=too-many-statements
 
     parser.add_option("--configDir", dest="config_dir", metavar="CONFIG_DIR",
                       help="Directory to search for resmoke configuration files")
+
+    parser.add_option("--installDir", dest="install_dir", metavar="INSTALL_DIR",
+                      help="Directory to search for MongoDB binaries")
 
     parser.add_option(
         "--archiveFile", dest="archive_file", metavar="ARCHIVE_FILE",
@@ -578,13 +582,20 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         if cmdline_vars[cmdline_key] is not None:
             config[cmdline_key] = cmdline_vars[cmdline_key]
 
+    if os.path.isfile("resmoke.ini"):
+        config_parser = configparser.ConfigParser()
+        config_parser.read("resmoke.ini")
+        if "resmoke" in config_parser.sections():
+            user_config = dict(config_parser["resmoke"])
+            config.update(user_config)
+
     _config.ARCHIVE_FILE = config.pop("archive_file")
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
     _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
-    _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
+    _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
     _config.DRY_RUN = config.pop("dry_run")
     # EXCLUDE_WITH_ANY_TAGS will always contain the implicitly defined EXCLUDED_TAG.
@@ -602,10 +613,24 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MIXED_BIN_VERSIONS = config.pop("mixed_bin_versions")
     if _config.MIXED_BIN_VERSIONS is not None:
         _config.MIXED_BIN_VERSIONS = _config.MIXED_BIN_VERSIONS.split("-")
+
+    _config.INSTALL_DIR = config.pop("install_dir")
+    if _config.INSTALL_DIR is not None:
+        # Inject INSTALL_DIR into the $PATH so RunProgram in the shell
+        # helpers can find the installed binaries.
+        os.environ['PATH'] = "{}:{}".format(_expand_user(_config.INSTALL_DIR), os.environ['PATH'])
+
+        for binary in ["mongo", "mongod", "mongos", "dbtest"]:
+            keyname = binary + "_executable"
+            if config.get(keyname, None) is None:
+                config[keyname] = os.path.join(_config.INSTALL_DIR, binary)
+
+    _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
     _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
+
     _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
