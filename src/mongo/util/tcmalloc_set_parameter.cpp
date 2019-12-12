@@ -124,11 +124,69 @@ Status TcmallocNumericPropertyServerParameter::setFromString(const std::string& 
     return set(builder.done().firstElement());
 }
 
+// setParameter for tcmalloc_release_rate
+class TcmallocReleaseRateServerParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(TcmallocReleaseRateServerParameter);
+
+public:
+    explicit TcmallocReleaseRateServerParameter();
+
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
+};
+
+TcmallocReleaseRateServerParameter::TcmallocReleaseRateServerParameter()
+    : ServerParameter(ServerParameterSet::getGlobal(), "tcmallocReleaseRate", true, true) {}
+
+void TcmallocReleaseRateServerParameter::append(OperationContext*,
+                                                BSONObjBuilder& builder,
+                                                const std::string& fieldName) {
+    auto value = MallocExtension::instance()->GetMemoryReleaseRate();
+    builder.append(fieldName, value);
+}
+
+Status TcmallocReleaseRateServerParameter::set(const BSONElement& newValueElement) {
+    if (!newValueElement.isNumber()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected server parameter " << newValueElement.fieldName()
+                                    << " to have numeric type, but found "
+                                    << newValueElement.toString(false)
+                                    << " of type "
+                                    << typeName(newValueElement.type()));
+    }
+    double value = newValueElement.numberDouble();
+    if (value < 0) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "tcmallocReleaseRate cannot be negative: " << value};
+    }
+    MallocExtension::instance()->SetMemoryReleaseRate(value);
+    return Status::OK();
+}
+
+Status TcmallocReleaseRateServerParameter::setFromString(const std::string& tcmalloc_release_rate) {
+    double value;
+    Status status = parseNumberFromString(tcmalloc_release_rate, &value);
+    if (!status.isOK()) {
+        return status;
+    }
+    if (value < 0) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "tcmallocReleaseRate cannot be negative: "
+                              << tcmalloc_release_rate};
+    }
+
+    MallocExtension::instance()->SetMemoryReleaseRate(value);
+    return Status::OK();
+}
+
 TcmallocNumericPropertyServerParameter tcmallocMaxTotalThreadCacheBytesParameter(
     "tcmallocMaxTotalThreadCacheBytes", "tcmalloc.max_total_thread_cache_bytes");
 
 TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
     "tcmallocAggressiveMemoryDecommit", "tcmalloc.aggressive_memory_decommit");
+
+TcmallocReleaseRateServerParameter tcmallocReleaseRate();
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
                           MONGO_NO_PREREQUISITES,
@@ -151,4 +209,5 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
 }
 
 }  // namespace
+
 }  // namespace mongo

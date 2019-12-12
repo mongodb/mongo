@@ -184,6 +184,9 @@ public:
             appendNumericPropertyIfAvailable(
                 sub, "spinlock_total_delay_ns", "tcmalloc.spinlock_total_delay_ns");
 
+            auto tcmallocReleaseRate = MallocExtension::instance()->GetMemoryReleaseRate();
+            sub.appendNumber("release_rate", tcmallocReleaseRate);
+
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
             if (verbosity >= 2) {
                 // Size class information
