@@ -13,12 +13,6 @@ CONSTANT Server
 CONSTANT MaxClientWriteSize
 
 ----
-\* Global variables
-
-\* Whether a client has called "replSetInitiate" on one of the servers.
-VARIABLE replSetInitiated
-
-----
 \* The following variables are all per server (functions with domain Server).
 
 \* The server's state ("Follower", "Candidate", or "Leader").
@@ -30,7 +24,7 @@ VARIABLE term
 \* The commit point learned by each server.
 VARIABLE commitPoint
 
-electionVars == <<replSetInitiated, state, term>>
+electionVars == <<state, term>>
 serverVars == <<electionVars, commitPoint>>
 
 \* A Sequence of log entries. The index into this sequence is the index of the
@@ -57,6 +51,11 @@ GetTerm(xlog, index) == IF index = 0 THEN -1 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
 
+\* Server i is allowed to sync from server j.
+CanSyncFrom(i, j) ==
+    /\ Len(log[i]) <= Len(log[j])
+    /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
+
 \* Return the minimum value from a set, or undefined if the set is empty.
 Min(s) == CHOOSE x \in s : \A y \in s : x <= y
 \* Return the maximum value from a set, or undefined if the set is empty.
@@ -65,8 +64,7 @@ Max(s) == CHOOSE x \in s : \A y \in s : x >= y
 ----
 \* Define initial values for all variables
 
-InitServerVars == /\ replSetInitiated  = FALSE
-                  /\ state             = [i \in Server |-> "Follower"]
+InitServerVars == /\ state             = [i \in Server |-> "Follower"]
                   /\ term              = [i \in Server |-> -1]
                   /\ commitPoint       = [i \in Server |-> [term |-> -1, index |-> 0]]
 InitLogVars == /\ log          = [i \in Server |-> << >>]
@@ -85,11 +83,11 @@ AppendOplog(i, j) ==
         LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
         IN /\ log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
            /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
-    /\ UNCHANGED <<replSetInitiated, state, commitPoint>>
+    /\ UNCHANGED <<state, commitPoint>>
 
 LearnTermViaHeartbeat(i, j) ==
     /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
-    /\ UNCHANGED <<replSetInitiated, state, commitPoint, logVars>>
+    /\ UNCHANGED <<state, commitPoint, logVars>>
 
 CanRollbackOplog(i, j) ==
     /\ Len(log[i]) > 0
@@ -138,16 +136,6 @@ NeverRollbackCommitted ==
     \A i \in Server: ~RollbackCommitted(i)
 
 \* ACTION
-\* Follower i receives replSetInitiate and writes the first oplog entry, which is a no-op.
-\* Not needed for correctness, but modeled here to match the implementation.
-ReplSetInitiate(i) ==
-    /\ Init
-    /\ LET entry == [term |-> -1]
-       IN /\ replSetInitiated' = TRUE
-          /\ log' = [log EXCEPT ![i] = Append(log[i], entry)]
-    /\ UNCHANGED <<state, term, commitPoint>>
-
-\* ACTION
 \* i = the new primary node.
 \* In the implementation, term starts at -1, then 1, then increments normally.
 BecomePrimaryByMagic(i) ==
@@ -161,7 +149,7 @@ BecomePrimaryByMagic(i) ==
     IN /\ ayeVoters(i) \in Quorum
        /\ state' = [index \in Server |-> IF index = i THEN "Leader" ELSE "Follower"]
        /\ term' = [term EXCEPT ![i] = nextTerm]
-       /\ UNCHANGED <<replSetInitiated, commitPoint, logVars>>
+       /\ UNCHANGED <<commitPoint, logVars>>
 
 \* ACTION
 \* Leader i receives a client request to add one or more entries to the log.
@@ -172,7 +160,7 @@ ClientWrite(i) ==
             newEntries == [ j \in 1..numEntries |-> entry ]
             newLog == log[i] \o newEntries
         IN  log' = [log EXCEPT ![i] = newLog]
-    /\ UNCHANGED <<replSetInitiated, serverVars>>
+    /\ UNCHANGED <<serverVars>>
 
 \* ACTION
 AdvanceCommitPoint ==
@@ -194,7 +182,7 @@ CommitPointLessThan(i, j) ==
 \* ACTION
 LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
     \* From sync source
-    /\ ENABLED AppendOplog(i, j)
+    /\ CanSyncFrom(i, j)
     /\ CommitPointLessThan(i, j)
     \* Never beyond last applied
     /\ LET myCommitPoint ==
@@ -217,9 +205,6 @@ RollbackOplogAction ==
 
 BecomePrimaryByMagicAction ==
     \E i \in Server : BecomePrimaryByMagic(i)
-
-ReplSetInitiateAction ==
-    \E i \in Server : ReplSetInitiate(i)
 
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
@@ -265,7 +250,6 @@ Next ==
     \/ LearnTermViaHeartbeatAction
     \/ RollbackOplogAction
     \/ BecomePrimaryByMagicAction
-    \/ ReplSetInitiateAction
     \/ ClientWriteAction
     \*
     \* --- Commit point learning protocol

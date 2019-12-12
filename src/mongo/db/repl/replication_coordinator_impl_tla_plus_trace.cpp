@@ -118,7 +118,14 @@ void ReplicationCoordinatorImpl::_tlaPlusRaftMongoEvent(
         auto cursor = oplogRecordStore->getCursor(opCtx, !backward);
         std::vector<OpTime> entryOpTimes;
         while (auto record = cursor->next()) {
-            auto opTime = OplogEntry(record.get().data.toBson()).getOpTime();
+            auto entry = OplogEntry(record.get().data.toBson());
+            auto msg = entry.getObject()["msg"];
+            if (!msg.eoo() && msg.String() == kInitiatingSetMsg) {
+                // Skip "initiating set" message.
+                continue;
+            }
+
+            auto opTime = entry.getOpTime();
             if (!oplogReadTimestamp || oplogReadTimestamp >= opTime.getTimestamp()) {
                 entryOpTimes.emplace_back(opTime);
             }
