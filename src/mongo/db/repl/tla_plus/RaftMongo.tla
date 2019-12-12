@@ -46,8 +46,8 @@ vars == <<serverVars, logVars>>
 \* important property is that every quorum overlaps with every other.
 Quorum == {i \in SUBSET(Server) : Cardinality(i) * 2 > Cardinality(Server)}
 
-\* The term of the last entry in a log, or -1 if the log is empty.
-GetTerm(xlog, index) == IF index = 0 THEN -1 ELSE xlog[index].term
+\* The term of the last entry in a log, or 0 if the log is empty.
+GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
 
@@ -65,8 +65,8 @@ Max(s) == CHOOSE x \in s : \A y \in s : x >= y
 \* Define initial values for all variables
 
 InitServerVars == /\ state             = [i \in Server |-> "Follower"]
-                  /\ term              = [i \in Server |-> -1]
-                  /\ commitPoint       = [i \in Server |-> [term |-> -1, index |-> 0]]
+                  /\ term              = [i \in Server |-> 0]
+                  /\ commitPoint       = [i \in Server |-> [term |-> 0, index |-> 0]]
 InitLogVars == /\ log          = [i \in Server |-> << >>]
 Init == /\ InitServerVars
         /\ InitLogVars
@@ -137,7 +137,6 @@ NeverRollbackCommitted ==
 
 \* ACTION
 \* i = the new primary node.
-\* In the implementation, term starts at -1, then 1, then increments normally.
 BecomePrimaryByMagic(i) ==
     LET notBehind(me, j) ==
             \/ LastTerm(log[me]) > LastTerm(log[j])
@@ -145,10 +144,9 @@ BecomePrimaryByMagic(i) ==
                /\ Len(log[me]) >= Len(log[j])
         ayeVoters(me) ==
             { index \in Server : notBehind(me, index) }
-        nextTerm == IF GlobalCurrentTerm = -1 THEN 1 ELSE GlobalCurrentTerm + 1
     IN /\ ayeVoters(i) \in Quorum
        /\ state' = [index \in Server |-> IF index = i THEN "Leader" ELSE "Follower"]
-       /\ term' = [term EXCEPT ![i] = nextTerm]
+       /\ term' = [term EXCEPT ![i] = GlobalCurrentTerm + 1]
        /\ UNCHANGED <<commitPoint, logVars>>
 
 \* ACTION
