@@ -231,6 +231,9 @@ public:
             if (collRaii.getCollection()) {
                 WriteUnitOfWork wunit(_opCtx);
                 invariant(collRaii.getCollection()->truncate(_opCtx).isOK());
+                if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                    ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+                }
                 collRaii.getCollection()->getIndexCatalog()->dropAllIndexes(_opCtx, false);
                 wunit.commit();
                 return;

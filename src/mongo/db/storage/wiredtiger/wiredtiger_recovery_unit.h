@@ -144,6 +144,10 @@ public:
 
     void setRoundUpPreparedTimestamps(bool value) override;
 
+    void setCatalogConflictingTimestamp(Timestamp timestamp) override;
+
+    Timestamp getCatalogConflictingTimestamp() const override;
+
     void setTimestampReadSource(ReadSource source,
                                 boost::optional<Timestamp> provided = boost::none) override;
 
@@ -320,6 +324,7 @@ private:
     uint64_t _mySnapshotId;
     Timestamp _majorityCommittedSnapshot;
     Timestamp _readAtTimestamp;
+    Timestamp _catalogConflictTimestamp;
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;

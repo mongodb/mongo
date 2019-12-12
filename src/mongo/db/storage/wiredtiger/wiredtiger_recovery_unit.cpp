@@ -429,6 +429,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
+    _catalogConflictTimestamp = Timestamp();
     _roundUpPreparedTimestamps = RoundUpPreparedTimestamps::kNoRound;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
@@ -833,6 +834,25 @@ bool WiredTigerRecoveryUnit::_inUnitOfWork() const {
 
 bool WiredTigerRecoveryUnit::_isCommittingOrAborting() const {
     return State::kCommitting == _state || State::kAborting == _state;
+}
+
+void WiredTigerRecoveryUnit::setCatalogConflictingTimestamp(Timestamp timestamp) {
+    // This cannot be called after a storage snapshot is allocated.
+    invariant(!_isActive(), toString(_state));
+    invariant(_timestampReadSource == ReadSource::kNoTimestamp,
+              str::stream() << "Illegal to set catalog conflicting timestamp for a read source "
+                            << static_cast<int>(_timestampReadSource));
+    invariant(_catalogConflictTimestamp.isNull(),
+              str::stream() << "Trying to set catalog conflicting timestamp to "
+                            << timestamp.toString() << ". It's already set to "
+                            << _catalogConflictTimestamp.toString());
+    invariant(!timestamp.isNull());
+
+    _catalogConflictTimestamp = timestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::getCatalogConflictingTimestamp() const {
+    return _catalogConflictTimestamp;
 }
 
 }  // namespace mongo
