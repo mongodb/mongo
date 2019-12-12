@@ -34,7 +34,6 @@ imports:
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/write_concern_options.idl"
 
-
 commands:
     setDefaultRWConcern:
         description: "set the current read/write concern defaults (cluster-wide)"
@@ -52,3 +51,8 @@ commands:
     getDefaultRWConcern:
         description: "get the current read/write concern defaults being applied by this node"
         namespace: ignored
+        fields:
+            inMemory:
+                type: bool
+                description: "If true, return the locally cached read/write concern defaults"
+                optional: true

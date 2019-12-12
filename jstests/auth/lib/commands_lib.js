@@ -3756,6 +3756,16 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "getDefaultRWConcern",
+          command: {getDefaultRWConcern: 1},
+          skipUnlessReplicaSet: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: roles_all, privileges: []},
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "getDiagnosticData",
           command: {getDiagnosticData: 1},
           testcases: [
@@ -5091,6 +5101,16 @@ var authCommandsLib = {
                 roles: Object.extend({backup: 1}, roles_monitoring),
                 privileges: [{resource: {cluster: true}, actions: ["serverStatus"]}]
               }
+          ]
+        },
+        {
+          testname: "setDefaultRWConcern",
+          command: {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}},
+          skipUnlessReplicaSet: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: roles_all, privileges: []},
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
           ]
         },
         {

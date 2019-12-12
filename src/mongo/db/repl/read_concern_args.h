@@ -130,7 +130,7 @@ public:
     bool isSpeculativeMajority() const;
 
     /**
-     * Appends level and afterOpTime.
+     * Appends level, afterOpTime, and any other sub-fields in a 'readConcern' sub-object.
      */
     void appendInfo(BSONObjBuilder* builder) const;
 
@@ -165,9 +165,15 @@ public:
 
     boost::optional<LogicalTime> getArgsAtClusterTime() const;
     BSONObj toBSON() const;
+    BSONObj toBSONInner() const;
     std::string toString() const;
 
 private:
+    /**
+     * Appends level, afterOpTime, and the other "inner" fields of the read concern args.
+     */
+    void _appendInfoInner(BSONObjBuilder* builder) const;
+
     /**
      *  Read data after the OpTime of an operation on this replica set. Deprecated.
      *  The only user is for read-after-optime calls using the config server optime.

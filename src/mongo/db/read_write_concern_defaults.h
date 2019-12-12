@@ -82,6 +82,7 @@ public:
      * Interface when an admin has run the command to change the defaults.
      * At least one of the `rc` or `wc` params must be set.
      * Will generate and use a new epoch and setTime for the updated defaults, which are returned.
+     * Validates the supplied read and write concerns can serve as defaults.
      */
     RWConcernDefault setConcerns(OperationContext* opCtx,
                                  const boost::optional<ReadConcern>& rc,
