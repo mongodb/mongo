@@ -14,3 +14,9 @@ configs:
         arg_vartype: String
         cpp_varname: saslIamClientGlobalParams.awsSessionToken
 
+server_parameters:
+    awsEC2InstanceMetadataUrl:
+        description: "Test parameter to override the URL for AWS EC2 Instance Metadata"
+        set_at: startup
+        cpp_varname: saslIamClientGlobalParams.awsEC2InstanceMetadataUrl
+        default: "http://169.254.169.254"

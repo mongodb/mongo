@@ -64,6 +64,16 @@ private:
      */
     iam::AWSCredentials _getUserCredentials() const;
 
+    /**
+     * Get AWS credentials from local HTTP server.
+     */
+    iam::AWSCredentials _getLocalAWSCredentials() const;
+
+    /**
+     * Get AWS credentials from EC2 Instance metadata HTTP server.
+     */
+    iam::AWSCredentials _getEc2Credentials() const;
+
     StatusWith<bool> _firstStep(std::string* outputData);
     StatusWith<bool> _secondStep(StringData inputData, std::string* outputData);
 
