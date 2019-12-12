@@ -1,10 +1,16 @@
 --------------------------------- MODULE RaftMongo ---------------------------------
-\* This is the formal specification for the Raft consensus algorithm in MongoDB
+\* This is the formal specification for the Raft consensus algorithm in MongoDB.
 
 EXTENDS Integers, FiniteSets, Sequences, TLC
 
-\* The set of server IDs
-CONSTANTS Server, MaxClientWriteSize
+\* The set of server IDs.
+CONSTANT Server
+
+\* The number of oplog entries that can be created on the primary at one time.
+\* For model-checking, this can be 1 or a small number. For model-based trace-
+\* checking, set this to the highest observed number of oplog entries that
+\* become visible on the primary at one time.
+CONSTANT MaxClientWriteSize
 
 ----
 \* Global variables
@@ -72,7 +78,6 @@ Init == /\ InitServerVars
 \* i = recipient, j = sender, m = message
 
 AppendOplog(i, j) ==
-    \* /\ state[i] = "Follower"  \* Disable primary catchup and draining
     /\ Len(log[i]) < Len(log[j])
     /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
     /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
@@ -86,7 +91,6 @@ CanRollbackOplog(i, j) ==
        LastTerm(log[i]) < LastTerm(log[j])
     /\
        \/ Len(log[i]) > Len(log[j])
-       \* There seems no short-cut of OR clauses, so I have to specify the negative case
        \/ /\ Len(log[i]) <= Len(log[j])
           /\ LastTerm(log[i]) /= LogTerm(j, Len(log[i]))
 
@@ -105,10 +109,10 @@ Agree(me, logIndex) ==
 
 IsCommitted(me, logIndex) ==
     /\ Agree(me, logIndex) \in Quorum
-    \* If we comment out the following line, a replicated log entry from old primary will violate the safety.
+    \* Committing log entries in older terms violates the safety properties of the spec.
     \* [ P (2), S (), S ()]
     \* [ S (2), S (), P (3)]
-    \* [ S (2), S (2), P (3)] !!! the log from term 2 shouldn't be considered as committed.
+    \* [ S (2), S (2), P (3)] ! the term 2 entry shouldn't be considered committed.
     /\ LogTerm(me, logIndex) = globalCurrentTerm
 
 \* RollbackCommitted and NeverRollbackCommitted are not actions.
@@ -176,24 +180,6 @@ CommitPointLessThan(i, j) ==
       /\ commitPoint[i].index < commitPoint[j].index
 
 \* ACTION
-\* Node i learns the commit point from j via heartbeat.
-LearnCommitPoint(i, j) ==
-    /\ CommitPointLessThan(i, j)
-    /\ commitPoint' = [commitPoint EXCEPT ![i] = commitPoint[j]]
-    /\ UNCHANGED <<electionVars, logVars>>
-
-\* ACTION
-\* Node i learns the commit point from j via heartbeat with term check
-LearnCommitPointWithTermCheck(i, j) ==
-    /\ LastTerm(log[i]) = commitPoint[j].term
-    /\ LearnCommitPoint(i, j)
-
-\* ACTION
-LearnCommitPointFromSyncSource(i, j) ==
-    /\ ENABLED AppendOplog(i, j)
-    /\ LearnCommitPoint(i, j)
-
-\* ACTION
 LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
     \* From sync source
     /\ ENABLED AppendOplog(i, j)
@@ -206,17 +192,6 @@ LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
             ELSE [term |-> LastTerm(log[i]), index |-> Len(log[i])]
        IN commitPoint' = [commitPoint EXCEPT ![i] = myCommitPoint]
     /\ UNCHANGED <<electionVars, logVars>>
-
-\* ACTION
-AppendEntryAndLearnCommitPointFromSyncSource(i, j) ==
-    \* Append entry
-    /\ Len(log[i]) < Len(log[j])
-    /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
-    /\ log' = [log EXCEPT ![i] = Append(log[i], log[j][Len(log[i]) + 1])]
-    \* Learn commit point
-    /\ CommitPointLessThan(i, j)
-    /\ commitPoint' = [commitPoint EXCEPT ![i] = commitPoint[j]]
-    /\ UNCHANGED <<electionVars>>
 
 ----
 AppendOplogAction ==
@@ -234,20 +209,8 @@ ReplSetInitiateAction ==
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
 
-LearnCommitPointAction ==
-    \E i, j \in Server : LearnCommitPoint(i, j)
-
-LearnCommitPointWithTermCheckAction ==
-    \E i, j \in Server : LearnCommitPointWithTermCheck(i, j)
-
-LearnCommitPointFromSyncSourceAction ==
-    \E i, j \in Server : LearnCommitPointFromSyncSource(i, j)
-
 LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction ==
     \E i, j \in Server : LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j)
-
-AppendEntryAndLearnCommitPointFromSyncSourceAction ==
-    \E i, j \in Server : AppendEntryAndLearnCommitPointFromSyncSource(i, j)
 
 ----
 \* Properties to check
@@ -258,7 +221,6 @@ RollbackBeforeCommitPoint(i) ==
     /\ \/ LastTerm(log[i]) < commitPoint[i].term
        \/ /\ LastTerm(log[i]) = commitPoint[i].term
           /\ Len(log[i]) <= commitPoint[i].index
-\* todo: clean up
 
 NeverRollbackBeforeCommitPoint == \A i \in Server: ~RollbackBeforeCommitPoint(i)
 
@@ -291,8 +253,7 @@ Next ==
     \/ ClientWriteAction
     \*
     \* --- Commit point learning protocol
-    \/ AdvanceCommitPoint \* correct, simple primary behavior
-    \/ LearnCommitPointWithTermCheckAction
+    \/ AdvanceCommitPoint
     \/ LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction
 
 Safety == Init /\ [][Next]_vars
@@ -305,11 +266,7 @@ Liveness ==
     /\ WF_vars(\E i \in Server : LastTerm(log[i]) # globalCurrentTerm /\ ClientWrite(i))
     \* /\ WF_vars(ClientWriteAction)
     \*
-    \* --- Commit point learning protocol
     /\ WF_vars(AdvanceCommitPoint)
-    \* /\ WF_vars(LearnCommitPointAction)
-    \* /\ SF_vars(AppendEntryAndLearnCommitPointFromSyncSourceAction)
-    /\ SF_vars(LearnCommitPointWithTermCheckAction)
     /\ SF_vars(LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction)
 
 \* The specification must start with the initial state and transition according
