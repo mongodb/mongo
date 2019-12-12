@@ -505,6 +505,16 @@ TEST(QueryProjectionTest, ProjectionWithExpressionIsNotSimple) {
     ASSERT_EQ(fields[0], "_id");
 }
 
+TEST(QueryProjectionTest, ProjectionWithTopLevelExpressionConstantDoesNotRequireField) {
+    auto proj = createProjection("{}", "{a: {$add: ['$b', 3]}}");
+    ASSERT_FALSE(proj.isSimple());
+
+    const auto& fields = proj.getRequiredFields();
+    ASSERT_EQ(fields.size(), 2);
+    ASSERT_EQ(fields[0], "_id");
+    ASSERT_EQ(fields[1], "b");
+}
+
 TEST(QueryProjectionTest, ProjectionWithROOTNeedsWholeDocument) {
     auto proj = createProjection("{}", "{a: '$$ROOT'}");
     ASSERT_FALSE(proj.isSimple());
@@ -520,6 +530,16 @@ TEST(QueryProjectionTest, ProjectionWithFieldPathExpressionDoesNotNeedWholeDocum
     ASSERT_EQ(fields.size(), 2);
     ASSERT_EQ(fields[0], "b");
     ASSERT_EQ(fields[1], "c");
+}
+
+TEST(QueryProjectionTest, AssignmentToDottedPathRequiresFirstComponent) {
+    auto proj = createProjection("{}", "{_id: 0, 'a.b': {$add: [5, 3]}}");
+    ASSERT_FALSE(proj.isSimple());
+    ASSERT_FALSE(proj.requiresDocument());
+
+    const auto& fields = proj.getRequiredFields();
+    ASSERT_EQ(fields.size(), 1);
+    ASSERT_EQ(fields[0], "a");
 }
 
 }  // namespace

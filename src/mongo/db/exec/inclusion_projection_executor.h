@@ -55,10 +55,10 @@ public:
             deps->fields.insert(FieldPath::getFullyQualifiedPath(_pathToNode, includedField));
         }
 
-        if (!_pathToNode.empty() && !_expressions.empty()) {
-            // The shape of any computed fields in the output will change depending on if the field
-            // is an array or not, so in addition to any dependencies of the expression itself, we
-            // need to add this field to our dependencies.
+        if (!_pathToNode.empty() && _subtreeContainsComputedFields) {
+            // The shape of any computed fields in the output will change depending on if there are
+            // any arrays on the path to the expression.  In addition to any dependencies of the
+            // expression itself, we need to add this field to our dependencies.
             deps->fields.insert(_pathToNode);
         }
 
