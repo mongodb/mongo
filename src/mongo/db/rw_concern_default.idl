@@ -38,6 +38,7 @@ imports:
 structs:
     RWConcernDefault:
         description: "Represents a set of read/write concern defaults, and associated metadata"
+        strict: false
         fields:
             defaultReadConcern:
                 description: "The default read concern"

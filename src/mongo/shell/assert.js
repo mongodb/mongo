@@ -284,7 +284,7 @@ assert = (function() {
 
         if (count != arr.length) {
             doassert(_buildAssertionMessage(
-                msg, "None of values from " + tojson(arr) + " was in " + tojson(result)));
+                msg, "Not all of the values from " + tojson(arr) + " were in " + tojson(result)));
         }
     };
 

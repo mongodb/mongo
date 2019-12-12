@@ -34,10 +34,23 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdName) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    uassert(51300,
+            str::stream() << "'" << cmdName << "' is not supported on standalone nodes.",
+            replCoord->isReplEnabled());
+
+    uassert(51301,
+            str::stream() << "'" << cmdName << "' is not supported on shard nodes.",
+            serverGlobalParams.clusterRole != ClusterRole::ShardServer);
+}
 
 class SetDefaultRWConcernCommand : public TypedCommand<SetDefaultRWConcernCommand> {
 public:
@@ -62,17 +75,11 @@ public:
         using InvocationBase::InvocationBase;
 
         auto typedRun(OperationContext* opCtx) {
-            auto rc = request().getDefaultReadConcern();
-            auto wc = request().getDefaultWriteConcern();
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "At least one of the \""
-                                  << SetDefaultRWConcern::kDefaultReadConcernFieldName << "\" or \""
-                                  << SetDefaultRWConcern::kDefaultWriteConcernFieldName
-                                  << "\" fields must be present",
-                    rc || wc);
+            assertNotStandaloneOrShardServer(opCtx, SetDefaultRWConcern::kCommandName);
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            auto newDefaults = rwcDefaults.setConcerns(opCtx, rc, wc);
+            auto newDefaults = rwcDefaults.setConcerns(
+                opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
             log() << "successfully set RWC defaults to " << newDefaults.toBSON();
             return newDefaults;
         }
@@ -83,7 +90,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext*) const override {
-            // TODO: add and use privilege action
+            // TODO SERVER-45038: add and use privilege action
         }
 
         NamespaceString ns() const override {
@@ -112,6 +119,10 @@ public:
         using InvocationBase::InvocationBase;
 
         auto typedRun(OperationContext* opCtx) {
+            assertNotStandaloneOrShardServer(opCtx, GetDefaultRWConcern::kCommandName);
+
+            // TODO SERVER-43720 Implement inMemory option.
+
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
             return rwcDefaults.getDefault(opCtx);
         }
@@ -122,7 +133,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext*) const override {
-            // TODO: add and use privilege action
+            // TODO SERVER-45038: add and use privilege action
         }
 
         NamespaceString ns() const override {

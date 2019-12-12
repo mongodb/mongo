@@ -40,5 +40,5 @@ types:
         description: "An object representing a read concern."
         bson_serialization_type: object
         cpp_type: "mongo::repl::ReadConcernArgs"
-        serializer: "mongo::repl::ReadConcernArgs::toBSON"
+        serializer: "mongo::repl::ReadConcernArgs::toBSONInner"
         deserializer: "mongo::repl::ReadConcernArgs::fromBSONThrows"

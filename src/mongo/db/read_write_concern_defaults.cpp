@@ -83,7 +83,12 @@ void ReadWriteConcernDefaults::_setDefault(RWConcernDefault&& rwc) {
 RWConcernDefault ReadWriteConcernDefaults::setConcerns(OperationContext* opCtx,
                                                        const boost::optional<ReadConcern>& rc,
                                                        const boost::optional<WriteConcern>& wc) {
-    invariant(rc || wc);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "At least one of the \""
+                          << RWConcernDefault::kDefaultReadConcernFieldName << "\" or \""
+                          << RWConcernDefault::kDefaultWriteConcernFieldName
+                          << "\" fields must be present",
+            rc || wc);
 
     if (rc) {
         checkSuitabilityAsDefault(*rc);
@@ -96,8 +101,12 @@ RWConcernDefault ReadWriteConcernDefaults::setConcerns(OperationContext* opCtx,
     auto epoch = LogicalClock::get(opCtx->getServiceContext())->getClusterTime().asTimestamp();
 
     RWConcernDefault rwc;
-    rwc.setDefaultReadConcern(rc);
-    rwc.setDefaultWriteConcern(wc);
+    if (rc && !rc->isEmpty()) {
+        rwc.setDefaultReadConcern(rc);
+    }
+    if (wc && !wc->usedDefaultW) {
+        rwc.setDefaultWriteConcern(wc);
+    }
     rwc.setEpoch(epoch);
     rwc.setSetTime(now);
     rwc.setLocalSetTime(now);

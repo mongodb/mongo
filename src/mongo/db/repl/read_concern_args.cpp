@@ -82,6 +82,12 @@ BSONObj ReadConcernArgs::toBSON() const {
     return bob.obj();
 }
 
+BSONObj ReadConcernArgs::toBSONInner() const {
+    BSONObjBuilder bob;
+    _appendInfoInner(&bob);
+    return bob.obj();
+}
+
 bool ReadConcernArgs::isEmpty() const {
     return !_afterClusterTime && !_opTime && !_atClusterTime && !_level;
 }
@@ -261,25 +267,27 @@ bool ReadConcernArgs::isSpeculativeMajority() const {
         _majorityReadMechanism == MajorityReadMechanism::kSpeculative;
 }
 
-void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
-    BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
-
+void ReadConcernArgs::_appendInfoInner(BSONObjBuilder* builder) const {
     if (_level) {
-        rcBuilder.append(kLevelFieldName, readConcernLevels::toString(_level.get()));
+        builder->append(kLevelFieldName, readConcernLevels::toString(_level.get()));
     }
 
     if (_opTime) {
-        _opTime->append(&rcBuilder, kAfterOpTimeFieldName.toString());
+        _opTime->append(builder, kAfterOpTimeFieldName.toString());
     }
 
     if (_afterClusterTime) {
-        rcBuilder.append(kAfterClusterTimeFieldName, _afterClusterTime->asTimestamp());
+        builder->append(kAfterClusterTimeFieldName, _afterClusterTime->asTimestamp());
     }
 
     if (_atClusterTime) {
-        rcBuilder.append(kAtClusterTimeFieldName, _atClusterTime->asTimestamp());
+        builder->append(kAtClusterTimeFieldName, _atClusterTime->asTimestamp());
     }
+}
 
+void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
+    BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
+    _appendInfoInner(&rcBuilder);
     rcBuilder.done();
 }
 
