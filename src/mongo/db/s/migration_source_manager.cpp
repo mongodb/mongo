@@ -485,29 +485,27 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                                    << "metadata also failed"));
     }
 
-    // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
-    // section. It is okay if the refresh fails because that will cause the metadata to be cleared
-    // and subsequent callers will try to do a full refresh.
-    try {
-        forceShardFilteringMetadataRefresh(_opCtx, getNss(), true);
-    } catch (const DBException& ex) {
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-        AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
+    // Incrementally refresh the metadata before leaving the critical section.
+    for (int attempts = 1;; attempts++) {
+        try {
+            forceShardFilteringMetadataRefresh(_opCtx, getNss(), true);
+            break;
+        } catch (const DBException& ex) {
+            const auto refreshStatus = ex.toStatus();
 
-        CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
+            if ((ErrorCodes::isInterruption(refreshStatus.code()) ||
+                 ErrorCodes::isShutdownError(refreshStatus.code()) ||
+                 refreshStatus == ErrorCodes::CallbackCanceled) &&
+                globalInShutdownDeprecated()) {
+                // Since the server is already doing a clean shutdown, this call will just join
+                // the previous shutdown call.
+                shutdown(waitForShutdown());
+            }
 
-        log() << "Failed to refresh metadata after a "
-              << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
-              << ". Metadata was cleared so it will get a full refresh when accessed again."
-              << causedBy(redact(ex.toStatus()));
-
-        // migrationCommitStatus may be OK or an error. The migration is considered a success at
-        // this point if the commit succeeded. The metadata refresh either occurred or the metadata
-        // was safely cleared.
-        return migrationCommitStatus.withContext(
-            str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
-                             " migration commit due to '"
-                          << ex.toString() << "' after commit failed");
+            log() << "Failed to refresh metadata after " << attempts << " attempts, after a "
+                  << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
+                  << causedBy(redact(refreshStatus)) << ". Will try to refresh again.";
+        }
     }
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
@@ -515,17 +513,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
         // This condition may only happen if the migration commit has failed for any reason
         if (migrationCommitStatus.isOK()) {
-            severe() << "The migration commit succeeded, but the new chunk placement was not "
-                        "reflected after metadata refresh, which is an indication of an "
-                        "afterOpTime bug.";
-            severe() << "The current config server opTime is " << Grid::get(_opCtx)->configOpTime();
-            severe() << "The commit response came from "
-                     << redact(commitChunkMigrationResponse.getValue().hostAndPort->toString())
-                     << " and contained";
-            severe() << "  response: "
-                     << redact(commitChunkMigrationResponse.getValue().response.toString());
-
-            fassertFailed(50878);
+            return {ErrorCodes::ConflictingOperationInProgress,
+                    "Migration commit succeeded but refresh found that the chunk is still owned; "
+                    "this node may be a stale primary of its replica set, and the new primary may "
+                    "have re-received the chunk"};
         }
 
         // The chunk modification was not applied, so report the original error
