@@ -770,48 +770,47 @@ Status TransportLayerASIO::setup() {
     return Status::OK();
 }
 
-Status TransportLayerASIO::start() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _running.store(true);
+void TransportLayerASIO::_runListener() noexcept {
+    setThreadName("listener");
 
-    if (_listenerOptions.isIngress()) {
-        for (auto& acceptor : _acceptors) {
-            asio::error_code ec;
-            acceptor.second.listen(serverGlobalParams.listenBacklog, ec);
-            if (ec) {
-                severe() << "Error listening for new connections on " << acceptor.first << ": "
-                         << ec.message();
-                fassertFailed(31339);
-            }
-
-            _acceptConnection(acceptor.second);
-            log() << "Listening on " << acceptor.first.getAddr();
-        }
-
-        _listenerThread = stdx::thread([this] {
-            setThreadName("listener");
-            while (_running.load()) {
-                _acceptorReactor->run();
-            }
-        });
-
-        const char* ssl = "";
-#ifdef MONGO_CONFIG_SSL
-        if (_sslMode() != SSLParams::SSLMode_disabled) {
-            ssl = " ssl";
-        }
-#endif
-        log() << "waiting for connections on port " << _listenerPort << ssl;
-    } else {
-        invariant(_acceptors.empty());
+    stdx::unique_lock lk(_mutex);
+    if (_isShutdown) {
+        return;
     }
 
-    return Status::OK();
-}
+    for (auto& acceptor : _acceptors) {
+        asio::error_code ec;
+        acceptor.second.listen(serverGlobalParams.listenBacklog, ec);
+        if (ec) {
+            severe() << "Error listening for new connections on " << acceptor.first << ": "
+                     << ec.message();
+            fassertFailed(31339);
+        }
 
-void TransportLayerASIO::shutdown() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _running.store(false);
+        _acceptConnection(acceptor.second);
+        log() << "Listening on " << acceptor.first.getAddr();
+    }
+
+    const char* ssl = "";
+#ifdef MONGO_CONFIG_SSL
+    if (_sslMode() != SSLParams::SSLMode_disabled) {
+        ssl = " ssl";
+    }
+#endif
+    log() << "waiting for connections on port " << _listenerPort << ssl;
+
+    _listener.active = true;
+    _listener.cv.notify_all();
+    ON_BLOCK_EXIT([&] {
+        _listener.active = false;
+        _listener.cv.notify_all();
+    });
+
+    while (!_isShutdown) {
+        lk.unlock();
+        _acceptorReactor->run();
+        lk.lock();
+    }
 
     // Loop through the acceptors and cancel their calls to async_accept. This will prevent new
     // connections from being opened.
@@ -827,17 +826,53 @@ void TransportLayerASIO::shutdown() {
             }
         }
     }
+}
 
-    // If the listener thread is joinable (that is, we created/started a listener thread), then
-    // the io_context is owned exclusively by the TransportLayer and we should stop it and join
-    // the listener thread.
-    //
-    // Otherwise the ServiceExecutor may need to continue running the io_context to drain running
-    // connections, so we just cancel the acceptors and return.
-    if (_listenerThread.joinable()) {
-        _acceptorReactor->stop();
-        _listenerThread.join();
+Status TransportLayerASIO::start() {
+    stdx::unique_lock lk(_mutex);
+
+    // Make sure we haven't shutdown already
+    invariant(!_isShutdown);
+
+    if (_listenerOptions.isIngress()) {
+        _listener.thread = stdx::thread([this] { _runListener(); });
+        _listener.cv.wait(lk, [&] { return _isShutdown || _listener.active; });
+        return Status::OK();
     }
+
+    invariant(_acceptors.empty());
+    return Status::OK();
+}
+
+void TransportLayerASIO::shutdown() {
+    stdx::unique_lock lk(_mutex);
+
+    if (std::exchange(_isShutdown, true)) {
+        // We were already stopped
+        return;
+    }
+
+    if (!_listenerOptions.isIngress()) {
+        // Egress only reactors never start a listener
+        return;
+    }
+
+    auto thread = std::exchange(_listener.thread, {});
+    if (!thread.joinable()) {
+        // If the listener never started, then we can return now
+        return;
+    }
+
+    // Spam stop() on the reactor, it interrupts run()
+    while (_listener.active) {
+        lk.unlock();
+        _acceptorReactor->stop();
+        lk.lock();
+    }
+
+    // Release the lock and wait for the thread to die
+    lk.unlock();
+    thread.join();
 }
 
 ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
@@ -855,8 +890,9 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
 
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec, GenericSocket peerSocket) mutable {
-        if (!_running.load())
+        if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
             return;
+        }
 
         if (ec) {
             log() << "Error accepting new connection on "
