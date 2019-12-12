@@ -157,6 +157,8 @@ private:
                                                  const HostAndPort& peer,
                                                  const Milliseconds& timeout);
 
+    void _runListener() noexcept;
+
 #ifdef MONGO_CONFIG_SSL
     SSLParams::SSLModes _sslMode() const;
 #endif
@@ -197,13 +199,20 @@ private:
     std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;
 
     // Only used if _listenerOptions.async is false.
-    stdx::thread _listenerThread;
+    struct Listener {
+        stdx::thread thread;
+        stdx::condition_variable cv;
+        bool active = false;
+    };
+    Listener _listener;
 
     ServiceEntryPoint* const _sep = nullptr;
-    AtomicWord<bool> _running{false};
+
     Options _listenerOptions;
     // The real incoming port in case of _listenerOptions.port==0 (ephemeral).
     int _listenerPort = 0;
+
+    bool _isShutdown = false;
 };
 
 }  // namespace transport
