@@ -235,6 +235,14 @@ public:
                         const NamespaceString& nss,
                         const OID& collectionEpoch,
                         const ChunkRange& chunk);
+    /**
+     * If a chunk matching 'requestedChunk' exists, bumps the chunk's version to one greater than
+     * the current collection version.
+     */
+    void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                         const BSONObj& minKey,
+                                         const BSONObj& maxKey,
+                                         const ChunkVersion& version);
 
     //
     // Database Operations
