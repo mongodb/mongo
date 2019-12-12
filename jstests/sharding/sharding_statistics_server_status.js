@@ -34,7 +34,10 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
         assert(statsFromServerStatus[i].totalCriticalSectionTimeMillis);
         assert(statsFromServerStatus[i].totalDonorChunkCloneTimeMillis);
         assert(statsFromServerStatus[i].countDonorMoveChunkLockTimeout);
-        assert(statsFromServerStatus[i].countDonorMoveChunkAbortConflictingIndexOperation);
+        // TODO (SERVER-45017): Remove this mongos bin version check when v4.4 becomes last-stable.
+        if (jsTestOptions().mongosBinVersion != "last-stable") {
+            assert(statsFromServerStatus[i].countDonorMoveChunkAbortConflictingIndexOperation);
+        }
         assert.eq(stats[i].countDonorMoveChunkStarted,
                   statsFromServerStatus[i].countDonorMoveChunkStarted);
         assert.eq(stats[i].countDocsClonedOnRecipient,
