@@ -18,19 +18,19 @@ CONSTANT MaxClientWriteSize
 \* Whether a client has called "replSetInitiate" on one of the servers.
 VARIABLE replSetInitiated
 
-\* The election term number.
-VARIABLE globalCurrentTerm
-
 ----
 \* The following variables are all per server (functions with domain Server).
 
 \* The server's state ("Follower", "Candidate", or "Leader").
 VARIABLE state
 
+\* The term learned by each server.
+VARIABLE term
+
 \* The commit point learned by each server.
 VARIABLE commitPoint
 
-electionVars == <<replSetInitiated, globalCurrentTerm, state>>
+electionVars == <<replSetInitiated, state, term>>
 serverVars == <<electionVars, commitPoint>>
 
 \* A Sequence of log entries. The index into this sequence is the index of the
@@ -65,9 +65,9 @@ Max(s) == CHOOSE x \in s : \A y \in s : x >= y
 ----
 \* Define initial values for all variables
 
-InitServerVars == /\ globalCurrentTerm = -1
-                  /\ replSetInitiated  = FALSE
+InitServerVars == /\ replSetInitiated  = FALSE
                   /\ state             = [i \in Server |-> "Follower"]
+                  /\ term              = [i \in Server |-> -1]
                   /\ commitPoint       = [i \in Server |-> [term |-> -1, index |-> 0]]
 InitLogVars == /\ log          = [i \in Server |-> << >>]
 Init == /\ InitServerVars
@@ -77,13 +77,19 @@ Init == /\ InitServerVars
 \* Message handlers
 \* i = recipient, j = sender, m = message
 
+\* Receive one or more oplog entries from j, and learn j's term.
 AppendOplog(i, j) ==
     /\ Len(log[i]) < Len(log[j])
     /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
     /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
         LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
-        IN  log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
-    /\ UNCHANGED <<serverVars>>
+        IN /\ log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
+           /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
+    /\ UNCHANGED <<replSetInitiated, state, commitPoint>>
+
+LearnTermViaHeartbeat(i, j) ==
+    /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
+    /\ UNCHANGED <<replSetInitiated, state, commitPoint, logVars>>
 
 CanRollbackOplog(i, j) ==
     /\ Len(log[i]) > 0
@@ -107,13 +113,19 @@ Agree(me, logIndex) ==
         /\ Len(log[node]) >= logIndex
         /\ LogTerm(me, logIndex) = LogTerm(node, logIndex) }
 
+GlobalCurrentTerm ==
+    LET terms == {term[i]: i \in Server}
+     IN Max(terms)
+
 IsCommitted(me, logIndex) ==
     /\ Agree(me, logIndex) \in Quorum
     \* Committing log entries in older terms violates the safety properties of the spec.
     \* [ P (2), S (), S ()]
     \* [ S (2), S (), P (3)]
     \* [ S (2), S (2), P (3)] ! the term 2 entry shouldn't be considered committed.
-    /\ LogTerm(me, logIndex) = globalCurrentTerm
+    /\ \E leader \in Server:
+        /\ state[leader] = "Leader"
+        /\ LogTerm(me, logIndex) = GlobalCurrentTerm
 
 \* RollbackCommitted and NeverRollbackCommitted are not actions.
 \* They are used for verification.
@@ -130,10 +142,10 @@ NeverRollbackCommitted ==
 \* Not needed for correctness, but modeled here to match the implementation.
 ReplSetInitiate(i) ==
     /\ Init
-    /\ LET entry == [term |-> globalCurrentTerm]
+    /\ LET entry == [term |-> -1]
        IN /\ replSetInitiated' = TRUE
           /\ log' = [log EXCEPT ![i] = Append(log[i], entry)]
-    /\ UNCHANGED <<globalCurrentTerm, state, commitPoint>>
+    /\ UNCHANGED <<state, term, commitPoint>>
 
 \* ACTION
 \* i = the new primary node.
@@ -145,10 +157,10 @@ BecomePrimaryByMagic(i) ==
                /\ Len(log[me]) >= Len(log[j])
         ayeVoters(me) ==
             { index \in Server : notBehind(me, index) }
-        nextTerm == IF globalCurrentTerm = -1 THEN 1 ELSE globalCurrentTerm + 1
+        nextTerm == IF GlobalCurrentTerm = -1 THEN 1 ELSE GlobalCurrentTerm + 1
     IN /\ ayeVoters(i) \in Quorum
        /\ state' = [index \in Server |-> IF index = i THEN "Leader" ELSE "Follower"]
-       /\ globalCurrentTerm' = nextTerm
+       /\ term' = [term EXCEPT ![i] = nextTerm]
        /\ UNCHANGED <<replSetInitiated, commitPoint, logVars>>
 
 \* ACTION
@@ -156,7 +168,7 @@ BecomePrimaryByMagic(i) ==
 ClientWrite(i) ==
     /\ state[i] = "Leader"
     /\ \E numEntries \in 1..MaxClientWriteSize :
-        LET entry == [term |-> globalCurrentTerm]
+        LET entry == [term |-> term[i]]
             newEntries == [ j \in 1..numEntries |-> entry ]
             newLog == log[i] \o newEntries
         IN  log' = [log EXCEPT ![i] = newLog]
@@ -197,6 +209,9 @@ LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
 AppendOplogAction ==
     \E i,j \in Server : AppendOplog(i, j)
 
+LearnTermViaHeartbeatAction ==
+    \E i,j \in Server : LearnTermViaHeartbeat(i, j)
+    
 RollbackOplogAction ==
     \E i,j \in Server : RollbackOplog(i, j)
 
@@ -247,6 +262,7 @@ CommitPointEventuallyPropagates ==
 Next ==
     \* --- Replication protocol
     \/ AppendOplogAction
+    \/ LearnTermViaHeartbeatAction
     \/ RollbackOplogAction
     \/ BecomePrimaryByMagicAction
     \/ ReplSetInitiateAction
@@ -261,9 +277,10 @@ Safety == Init /\ [][Next]_vars
 \* Comment or uncomment the commit point learning actions here to match those in "Next".
 Liveness ==
     /\ SF_vars(AppendOplogAction)
+    /\ SF_vars(LearnTermViaHeartbeatAction)
     /\ SF_vars(RollbackOplogAction)
     \* A new primary should eventually write one entry.
-    /\ WF_vars(\E i \in Server : LastTerm(log[i]) # globalCurrentTerm /\ ClientWrite(i))
+    /\ WF_vars(\E i \in Server : LastTerm(log[i]) # GlobalCurrentTerm /\ ClientWrite(i))
     \* /\ WF_vars(ClientWriteAction)
     \*
     /\ WF_vars(AdvanceCommitPoint)
