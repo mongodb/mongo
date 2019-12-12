@@ -95,6 +95,7 @@ let viewsCommandTests = {
     _configsvrDropCollection: {skip: isAnInternalCommand},
     _configsvrDropDatabase: {skip: isAnInternalCommand},
     _configsvrEnableSharding: {skip: isAnInternalCommand},
+    _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
     _configsvrMoveChunk: {skip: isAnInternalCommand},
     _configsvrMovePrimary: {skip: isAnInternalCommand},
     _configsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
