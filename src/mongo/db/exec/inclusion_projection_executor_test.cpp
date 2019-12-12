@@ -220,6 +220,32 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddPathToDependenciesForNestedComputedFields) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(
+        BSON("a.b.c" << BSON("$add" << BSON_ARRAY(1 << 2))));
+
+    DepsTracker deps;
+    inclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 3UL);
+    ASSERT_EQ(deps.fields.count("_id"), 1UL);
+    ASSERT_EQ(deps.fields.count("a"), 1UL);
+    ASSERT_EQ(deps.fields.count("a.b"), 1UL);
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+       ShouldNotAddTopLevelDependencyWithExpressionOnTopLevelPath) {
+    auto inclusion =
+        makeInclusionProjectionWithDefaultPolicies(BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));
+
+    DepsTracker deps;
+    inclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 1UL);
+    ASSERT_EQ(deps.fields.count("_id"), 1UL);
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+       ShouldAddPathToDependenciesForNestedComputedFieldsUsingVariableReferences) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("x.y"
                                                                      << "$z"));
 
