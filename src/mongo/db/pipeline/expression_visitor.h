@@ -49,6 +49,7 @@ class ExpressionFirst;
 class ExpressionLast;
 class ExpressionObjectToArray;
 class ExpressionArrayToObject;
+class ExpressionBsonSize;
 class ExpressionCeil;
 class ExpressionCoerceToBool;
 class ExpressionCompare;
@@ -187,6 +188,7 @@ public:
     virtual void visit(ExpressionLast*) = 0;
     virtual void visit(ExpressionObjectToArray*) = 0;
     virtual void visit(ExpressionArrayToObject*) = 0;
+    virtual void visit(ExpressionBsonSize*) = 0;
     virtual void visit(ExpressionCeil*) = 0;
     virtual void visit(ExpressionCoerceToBool*) = 0;
     virtual void visit(ExpressionCompare*) = 0;

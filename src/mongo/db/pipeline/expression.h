@@ -916,6 +916,21 @@ public:
     }
 };
 
+class ExpressionBsonSize final : public ExpressionFixedArity<ExpressionBsonSize, 1> {
+public:
+    explicit ExpressionBsonSize(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionBsonSize, 1>(expCtx) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final {
+        return "$bsonSize";
+    }
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+};
+
 class ExpressionCeil final : public ExpressionSingleNumericArg<ExpressionCeil> {
 public:
     explicit ExpressionCeil(const boost::intrusive_ptr<ExpressionContext>& expCtx)

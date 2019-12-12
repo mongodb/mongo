@@ -26,7 +26,31 @@ const testCases = [
     {validator: {$expr: {$eq: [{$meta: "sortKey"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
     {validator: {$expr: {$eq: [{$meta: "recordId"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
     {validator: {$expr: {$eq: [{$meta: "geoNearPoint"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
-    {validator: {$expr: {$eq: [{$meta: "geoNearDistance"}, 'foobar']}}, nonMatchingDocument: {a: 1}}
+    {
+        validator: {$expr: {$eq: [{$meta: "geoNearDistance"}, 'foobar']}},
+        nonMatchingDocument: {a: 1}
+    },
+    {validator: {$expr: {$isNumber: {}}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$eq: [{$bsonSize: {}}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$eq: [{$binarySize: ''}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {
+        validator:
+            {$expr: {$eq: [{$replaceOne: {input: '', find: '', replacement: ''}}, 'foobar']}},
+        nonMatchingDocument: {a: 1}
+    },
+    {
+        validator:
+            {$expr: {$eq: [{$replaceAll: {input: '', find: '', replacement: ''}}, 'foobar']}},
+        nonMatchingDocument: {a: 1}
+    },
+    {
+        validator: {$expr: {$eq: [{$first: {$literal: ['a']}}, 'foobar']}},
+        nonMatchingDocument: {a: 1}
+    },
+    {
+        validator: {$expr: {$eq: [{$last: {$literal: ['a']}}, 'foobar']}},
+        nonMatchingDocument: {a: 1}
+    },
 ];
 
 let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});

@@ -28,7 +28,14 @@ const pipelinesWithNewFeatures = [
     [
         {$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: "loc"}},
         {$project: {m: {$meta: "geoNearDistance"}}}
-    ]
+    ],
+    [{$project: {x: {$isNumber: {}}}}],
+    [{$project: {x: {$bsonSize: {}}}}],
+    [{$project: {x: {$binarySize: ''}}}],
+    [{$project: {x: {$replaceOne: {input: '', find: '', replacement: ''}}}}],
+    [{$project: {x: {$replaceAll: {input: '', find: '', replacement: ''}}}}],
+    [{$project: {x: {$first: {$literal: ['a']}}}}],
+    [{$project: {x: {$last: {$literal: ['a']}}}}],
 ];
 
 let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
@@ -70,10 +77,24 @@ pipelinesWithNewFeatures.forEach(
     (pipe, i) => assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
                                       `Failed to query view with pipeline ${tojson(pipe)}`));
 
+// Trying to create a new view in the same database as existing invalid view should fail,
+// even if the new view doesn't use any new query features.
+assert.commandFailedWithCode(
+    testDB.createView("newViewOldFeatures", "coll", [{$project: {_id: 1}}]),
+    ErrorCodes.QueryFeatureNotAllowed,
+    `Expected *not* to be able to create view on database ${testDB} while in FCV ${lastStableFCV}`);
+
+// Trying to create a new view succeeds if it's on a separate database.
+const testDB2 = conn.getDB(testName + '2');
+assert.commandWorked(testDB2.dropDatabase());
+assert.commandWorked(testDB2.createView("newViewOldFeatures", "coll", [{$project: {_id: 1}}]));
+
 // Trying to create a new view using new query features should fail.
+// (We use a separate DB to ensure this can only fail because of the view we're trying to create,
+// as opposed to an existing view.)
 pipelinesWithNewFeatures.forEach(
     (pipe, i) => assert.commandFailedWithCode(
-        testDB.createView("view_fail" + i, "coll", pipe),
+        testDB2.createView("view_fail" + i, "coll", pipe),
         ErrorCodes.QueryFeatureNotAllowed,
         `Expected *not* to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
             ` ${lastStableFCV}`));
