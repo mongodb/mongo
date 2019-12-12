@@ -174,15 +174,16 @@ int sspiClientMechNew(void* glob_context,
     std::unique_ptr<SspiConnContext> pcctx(new SspiConnContext());
     pcctx->userPlusRealm = userPlusRealm;
     TimeStamp ignored;
-    SECURITY_STATUS status = AcquireCredentialsHandleW(nullptr,  // principal
-                                                       const_cast<LPWSTR>(L"kerberos"),
-                                                       SECPKG_CRED_OUTBOUND,
-                                                       nullptr,        // LOGON id
-                                                       &authIdentity,  // auth data
-                                                       nullptr,        // get key fn
-                                                       nullptr,        // get key arg
-                                                       &pcctx->cred,
-                                                       &ignored);
+    SECURITY_STATUS status =
+        AcquireCredentialsHandleW(nullptr,  // principal
+                                  const_cast<LPWSTR>(L"kerberos"),
+                                  SECPKG_CRED_OUTBOUND,
+                                  nullptr,                                          // LOGON id
+                                  authIdentity.Password ? &authIdentity : nullptr,  // auth data
+                                  nullptr,                                          // get key fn
+                                  nullptr,                                          // get key arg
+                                  &pcctx->cred,
+                                  &ignored);
     if (status != SEC_E_OK) {
         HandleLastError(cparams->utils, status, "AcquireCredentialsHandle");
         return SASL_FAIL;
