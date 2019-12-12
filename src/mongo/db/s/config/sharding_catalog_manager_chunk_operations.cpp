@@ -42,6 +42,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -1044,6 +1045,102 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
             str::stream() << "failed to clear jumbo flag due to " << chunkQuery
                           << " not matching any existing chunks",
             didUpdate);
+}
+
+void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                                             const BSONObj& minKey,
+                                                             const BSONObj& maxKey,
+                                                             const ChunkVersion& version) {
+    auto earlyReturnBeforeDoingWriteGuard = makeGuard([&] {
+        // Ensure waiting for writeConcern of the data read.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    });
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk operations.
+    // TODO (SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
+    // move chunks on different collections to proceed in parallel.
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+    const auto requestedChunkQuery =
+        BSON(ChunkType::min(minKey) << ChunkType::max(maxKey) << ChunkType::epoch(version.epoch()));
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    // Get the chunk matching the requested chunk.
+    const auto matchingChunksVector =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                ChunkType::ConfigNS,
+                                                requestedChunkQuery,
+                                                BSONObj() /* sort */,
+                                                1 /* limit */))
+            .docs;
+    if (matchingChunksVector.empty()) {
+        // This can happen in a number of cases, such as that the collection has been dropped, its
+        // shard key has been refined, the chunk has been split, or the chunk has been merged.
+        LOG(0) << "ensureChunkVersionIsGreaterThan did not find any chunks with minKey " << minKey
+               << ", maxKey " << maxKey << ", and epoch " << version.epoch()
+               << ". Returning success.";
+        return;
+    }
+
+    const auto currentChunk =
+        uassertStatusOK(ChunkType::fromConfigBSON(matchingChunksVector.front()));
+
+    if (version.isOlderThan(currentChunk.getVersion())) {
+        LOG(0) << "ensureChunkVersionIsGreaterThan found that the chunk with minKey " << minKey
+               << ", maxKey " << maxKey << ", and epoch " << version.epoch()
+               << " already has a higher version than " << version << ". Current chunk is "
+               << currentChunk.toConfigBSON() << ". Returning success.";
+        return;
+    }
+
+    // Get the chunk with the current collectionVersion for this epoch.
+    const auto highestChunksVector =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                ChunkType::ConfigNS,
+                                                BSON(ChunkType::epoch(version.epoch())) /* query */,
+                                                BSON(ChunkType::lastmod << -1) /* sort */,
+                                                1 /* limit */))
+            .docs;
+    if (highestChunksVector.empty()) {
+        LOG(0) << "ensureChunkVersionIsGreaterThan did not find any chunks with epoch "
+               << version.epoch()
+               << " when attempting to find the collectionVersion. The collection must have been "
+                  "dropped concurrently. Returning success.";
+        return;
+    }
+    const auto highestChunk =
+        uassertStatusOK(ChunkType::fromConfigBSON(highestChunksVector.front()));
+
+    // Generate a new version for the chunk by incrementing the collectionVersion's major version.
+    auto newChunk = currentChunk;
+    newChunk.setVersion(
+        ChunkVersion(highestChunk.getVersion().majorVersion() + 1, 0, version.epoch()));
+
+    // Update the chunk, if it still exists, to have the bumped version.
+    earlyReturnBeforeDoingWriteGuard.dismiss();
+    auto didUpdate = uassertStatusOK(
+        Grid::get(opCtx)->catalogClient()->updateConfigDocument(opCtx,
+                                                                ChunkType::ConfigNS,
+                                                                requestedChunkQuery,
+                                                                newChunk.toConfigBSON(),
+                                                                false /* upsert */,
+                                                                kNoWaitWriteConcern));
+    if (didUpdate) {
+        LOG(0) << "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey "
+               << minKey << ", maxKey " << maxKey << ", and epoch " << version.epoch()
+               << ". Chunk is now " << newChunk.toConfigBSON();
+    } else {
+        LOG(0) << "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey " << minKey
+               << ", maxKey " << maxKey << ", and epoch " << version.epoch()
+               << " when trying to bump its version. The collection must have been dropped "
+                  "concurrently. Returning success.";
+    }
 }
 
 }  // namespace mongo
