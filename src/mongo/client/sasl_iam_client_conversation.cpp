@@ -55,7 +55,13 @@ SaslIAMClientConversation::SaslIAMClientConversation(SaslClientSession* saslClie
     : SaslClientConversation(saslClientSession) {}
 
 iam::AWSCredentials SaslIAMClientConversation::_getCredentials() const {
-    return _getUserCredentials();
+
+    if (_saslClientSession->hasParameter(SaslClientSession::parameterUser) &&
+        _saslClientSession->hasParameter(SaslClientSession::parameterPassword)) {
+        return _getUserCredentials();
+    } else {
+        return _getLocalAWSCredentials();
+    }
 }
 
 iam::AWSCredentials SaslIAMClientConversation::_getUserCredentials() const {
@@ -70,6 +76,50 @@ iam::AWSCredentials SaslIAMClientConversation::_getUserCredentials() const {
     return iam::AWSCredentials(
         _saslClientSession->getParameter(SaslClientSession::parameterUser).toString(),
         _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString());
+}
+
+iam::AWSCredentials SaslIAMClientConversation::_getLocalAWSCredentials() const {
+    // T O D O - branch on the environment variable that ECS tasks set
+    return _getEc2Credentials();
+}
+
+iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
+    try {
+
+        std::unique_ptr<HttpClient> httpClient = HttpClient::create();
+
+        // The local web server is just a normal HTTP server
+        httpClient->allowInsecureHTTP(true);
+
+        // Retrieve the role attached to the EC2 instance
+        DataBuilder getRoleResult =
+            httpClient->get(getDefaultHost() + "/latest/meta-data/iam/security-credentials/");
+
+        ConstDataRange cdrRole = getRoleResult.getCursor();
+        StringData getRoleOutput;
+        cdrRole.readInto<StringData>(&getRoleOutput);
+
+        std::string role = iam::parseRoleFromEC2IamSecurityCredentials(getRoleOutput);
+
+        // Retrieve the temporary credentials of the EC2 instance
+        DataBuilder getRoleCredentialsResult = httpClient->get(
+            str::stream() << getDefaultHost() + "/latest/meta-data/iam/security-credentials/"
+                          << role);
+
+        ConstDataRange cdrCredentials = getRoleCredentialsResult.getCursor();
+        StringData getRoleCredentialsOutput;
+        cdrCredentials.readInto<StringData>(&getRoleCredentialsOutput);
+
+        return iam::parseCredentialsFromEC2IamSecurityCredentials(getRoleCredentialsOutput);
+    } catch (const DBException& e) {
+        // Wrap exceptions from HTTP to make them clearer
+        uassertStatusOK(Status(e.code(),
+                               str::stream()
+                                   << "Failed to retrieve EC2 Instance Metadata Credentials:"
+                                   << e.reason()));
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 StatusWith<bool> SaslIAMClientConversation::step(StringData inputData, std::string* outputData) {
