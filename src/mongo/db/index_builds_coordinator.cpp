@@ -1703,6 +1703,13 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
         if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
             LOG(1) << "Skipping createIndexes oplog entry for index build: "
                    << replState->buildUUID;
+            // Get a timestamp to complete the index build in the absence of a createIndexBuild
+            // oplog entry.
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx,
+                                                                              collection->ns())) {
+                log() << "Did not timestamp index commit write.";
+            }
             return;
         }
 
