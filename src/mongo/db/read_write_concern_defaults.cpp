@@ -93,24 +93,18 @@ RWConcernDefault ReadWriteConcernDefaults::setConcerns(OperationContext* opCtx,
                           << "\" fields must be present",
             rc || wc);
 
-    if (rc) {
-        checkSuitabilityAsDefault(*rc);
-    }
-    if (wc) {
-        checkSuitabilityAsDefault(*wc);
-    }
-
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
-    auto epoch = LogicalClock::get(opCtx->getServiceContext())->getClusterTime().asTimestamp();
-
     RWConcernDefault rwc;
     if (rc && !rc->isEmpty()) {
+        checkSuitabilityAsDefault(*rc);
         rwc.setDefaultReadConcern(rc);
     }
     if (wc && !wc->usedDefaultW) {
+        checkSuitabilityAsDefault(*wc);
         rwc.setDefaultWriteConcern(wc);
     }
+    auto epoch = LogicalClock::get(opCtx->getServiceContext())->getClusterTime().asTimestamp();
     rwc.setEpoch(epoch);
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
     rwc.setSetTime(now);
     rwc.setLocalSetTime(now);
 
