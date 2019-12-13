@@ -486,6 +486,56 @@ inline T invariantWithContextAndLocation(StatusWith<T> sw,
     return std::move(sw.getValue());
 }
 
+MONGO_COMPILER_NORETURN void invariantStatusOKFailed(const Status& status,
+                                                     const char* file,
+                                                     unsigned line) noexcept;
+
+/**
+ * Like uassertStatusOK(status), but for checking if an invariant holds on a status.
+ */
+#define invariantStatusOK(...) \
+    ::mongo::invariantStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+inline void invariantStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        invariantStatusOKFailed(status, file, line);
+    }
+}
+
+template <typename T>
+inline T invariantStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigned line) {
+    invariantStatusOKWithLocation(sw.getStatus(), file, line);
+    return std::move(sw.getValue());
+}
+
+/**
+ * Similar to invariantStatusOK(status), but also takes an expression that evaluates to something
+ * convertible to std::string to add more context to error messages. This contextExpr is only
+ * evaluated if the status is not OK.
+ */
+#define invariantStatusOKWithContext(status, contextExpr) \
+    ::mongo::invariantStatusOKWithContextAndLocation(     \
+        status, [&]() -> std::string { return (contextExpr); }, __FILE__, __LINE__)
+template <typename ContextExpr>
+inline void invariantStatusOKWithContextAndLocation(const Status& status,
+                                                    ContextExpr&& contextExpr,
+                                                    const char* file,
+                                                    unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        invariantStatusOKFailed(
+            status.withContext(std::forward<ContextExpr>(contextExpr)()), file, line);
+    }
+}
+
+template <typename T, typename ContextExpr>
+inline T invariantStatusOKWithContextAndLocation(StatusWith<T> sw,
+                                                 ContextExpr&& contextExpr,
+                                                 const char* file,
+                                                 unsigned line) {
+    invariantStatusOKWithContextAndLocation(
+        sw.getStatus(), std::forward<ContextExpr>(contextExpr), file, line);
+    return std::move(sw.getValue());
+}
+
 // some special ids that we want to duplicate
 
 // > 10000 asserts

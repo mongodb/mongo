@@ -140,6 +140,16 @@ MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
     std::abort();
 }
 
+MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
+                                                     const char* file,
+                                                     unsigned line) noexcept {
+    severe() << "Invariant failure " << redact(status) << " at " << file << ' ' << std::dec << line
+             << std::endl;
+    breakpoint();
+    severe() << "\n\n***aborting after invariant() failure\n\n" << std::endl;
+    std::abort();
+}
+
 MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
                                                        const char* file,
                                                        unsigned line) noexcept {
