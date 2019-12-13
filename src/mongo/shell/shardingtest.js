@@ -1705,12 +1705,40 @@ var ShardingTest = function(params) {
              MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
         this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
 
-        for (let i = 0; i < numShards; i++) {
-            if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
-                const rs = this._rs[i].test;
-                rs.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdatesCmd: 1});
+        const x509AuthRequired = (mongosOptions[0] && mongosOptions[0].clusterAuthMode &&
+                                  mongosOptions[0].clusterAuthMode === "x509");
+
+        // Flushes the routing table cache on connection 'conn'. If 'keyFileLocal' is defined,
+        // authenticates the keyfile user on 'authConn' - a connection or set of connections for
+        // the shard - before executing the flush.
+        const flushRT = function flushRoutingTableAndHandleAuth(conn, authConn, keyFileLocal) {
+            // Invokes the actual execution of cache refresh.
+            const execFlushRT = (conn) => {
+                assert.commandWorked(conn.getDB("admin").runCommand(
+                    {_flushRoutingTableCacheUpdates: "config.system.sessions"}));
+            };
+
+            if (keyFileLocal) {
+                authutil.asCluster(authConn, keyFileLocal, () => execFlushRT(conn));
             } else {
-                this["shard" + i].getDB("admin").runCommand({_flushRoutingTableCacheUpdatesCmd: 1});
+                execFlushRT(conn);
+            }
+        };
+
+        // TODO SERVER-45108: Enable support for x509 auth for _flushRoutingTableCacheUpdates.
+        if (!otherParams.manualAddShard && !x509AuthRequired) {
+            for (let i = 0; i < numShards; i++) {
+                if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
+                    const rs = this._rs[i].test;
+                    flushRT(rs.getPrimary(), rs.nodes, keyFile);
+                } else {
+                    // If specified, use the keyFile for the standalone shard.
+                    const keyFileLocal = (otherParams.shards && otherParams.shards[i] &&
+                                          otherParams.shards[i].keyFile)
+                        ? otherParams.shards[i].keyFile
+                        : keyFile;
+                    flushRT(this["shard" + i], this["shard" + i], keyFileLocal);
+                }
             }
         }
     }
