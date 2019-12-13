@@ -1,7 +1,7 @@
 /**
  * Perform tests for moveChunk and splitChunk commands when the shard key is compound hashed.
  *
- * @tags: [requires_fcv_44]
+ * @tags: [requires_fcv_44, multiversion_incompatible]
  */
 (function() {
 'use strict';

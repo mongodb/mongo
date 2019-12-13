@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
@@ -362,18 +363,12 @@ TEST_F(CMCollapseTreeTest, TextWithQuery) {
 
 //  { a: 0 } -> hashed a: [hash(0), hash(0)]
 TEST_F(CMCollapseTreeTest, HashedSinglePoint) {
-    const char* queryStr = "{ a: 0 }";
-    auto query(canonicalize(queryStr));
-    ASSERT(query.get() != nullptr);
-
-    BSONObj key = fromjson("{a: 'hashed'}");
-
-    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
-    ASSERT_EQUALS(indexBounds.size(), 1U);
-    const OrderedIntervalList& oil = indexBounds.fields.front();
-    ASSERT_EQUALS(oil.intervals.size(), 1U);
-    const Interval& interval = oil.intervals.front();
-    ASSERT(interval.isPoint());
+    IndexBounds expectedBounds;
+    expectedBounds.fields.push_back(OrderedIntervalList());
+    const auto hashOfZero = BSONElementHasher::hash64(BSON("" << 0).firstElement(), 0);
+    expectedBounds.fields[0].intervals.push_back(
+        Interval(BSON("" << hashOfZero << "" << hashOfZero), true, true));
+    checkIndexBoundsWithKey("{a: 'hashed'}", "{ a: 0}", expectedBounds);
 }
 
 // { a: { $lt: 2, $gt: 1} } -> hashed a: [Minkey, Maxkey]
@@ -399,6 +394,53 @@ TEST_F(CMCollapseTreeTest, HashedRegex) {
     expectedOil.intervals.push_back(Interval(builder.obj(), true, true));
 
     checkIndexBoundsWithKey("{a: 'hashed'}", "{ a: /abc/ }", expectedBounds);
+}
+
+TEST_F(CMCollapseTreeTest, CompoundHashedShardKeyWithHashedPrefix) {
+    const auto shardKey = "{a: 'hashed', b: 1}";
+    const auto query = "{$or: [{a:{$in:[1]},b:{$in:[1]}}, {a:{$in:[1,5]},b:{$gt:0,$lt:3}}]}";
+
+    IndexBounds expectedBounds;
+    expectedBounds.fields.push_back(OrderedIntervalList());
+    expectedBounds.fields.push_back(OrderedIntervalList());
+    const auto hashOfOne = BSONElementHasher::hash64(BSON("" << 1.0).firstElement(), 0);
+    const auto hashOfFive = BSONElementHasher::hash64(BSON("" << 5.0).firstElement(), 0);
+
+    // a: [[hash(5), hash(5)], [hash(1), hash(1)]]. Note, hash(5) is less than hash(1), hence it
+    // appears before hash(1).
+    expectedBounds.fields[0].intervals.push_back(
+        Interval(BSON("" << hashOfFive << "" << hashOfFive), true, true));
+    expectedBounds.fields[0].intervals.push_back(
+        Interval(BSON("" << hashOfOne << "" << hashOfOne), true, true));
+
+    // b: (0,3)
+    expectedBounds.fields[1].intervals.push_back(Interval(BSON("" << 0 << "" << 3), false, false));
+
+    checkIndexBoundsWithKey(shardKey, query, expectedBounds);
+}
+
+TEST_F(CMCollapseTreeTest, CompoundHashedShardKeyWithRangePrefix) {
+    const auto shardKey = "{a: 1, b: 'hashed', c: 1}";
+    const auto query = "{a:{$gt:0,$lte:3}, b: 4}";
+
+    IndexBounds expectedBounds;
+    expectedBounds.fields.push_back(OrderedIntervalList());
+    expectedBounds.fields.push_back(OrderedIntervalList());
+    expectedBounds.fields.push_back(OrderedIntervalList());
+    const auto hashOfFour = BSONElementHasher::hash64(BSON("" << 4.0).firstElement(), 0);
+
+    // a: (0,3]
+    expectedBounds.fields[0].intervals.push_back(Interval(BSON("" << 0 << "" << 3), false, true));
+    // b: [hash(4), hash(4)]
+    expectedBounds.fields[1].intervals.push_back(
+        Interval(BSON("" << hashOfFour << "" << hashOfFour), true, true));
+    // c: [MinKey, MaxKey]
+    BSONObjBuilder builder;
+    builder.appendMinKey("");
+    builder.appendMaxKey("");
+    expectedBounds.fields[2].intervals.push_back(Interval(builder.obj(), true, true));
+
+    checkIndexBoundsWithKey(shardKey, query, expectedBounds);
 }
 
 /**

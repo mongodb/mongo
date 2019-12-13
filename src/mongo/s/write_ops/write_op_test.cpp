@@ -30,11 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/chunk_manager_targeter.h"
 #include "mongo/s/write_ops/mock_ns_targeter.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
@@ -42,6 +45,7 @@
 
 namespace mongo {
 namespace {
+const NamespaceString kNss("TestDB", "TestColl");
 
 WriteErrorDetail buildError(int code, const BSONObj& info, const std::string& message) {
     WriteErrorDetail error;
@@ -486,6 +490,334 @@ TEST(WriteOpTests, RetrySingleOp) {
     writeOp.noteWriteError(*targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+}
+
+class ChunkManagerTargeterTest : public CatalogCacheTestFixture {
+public:
+    ChunkManagerTargeter prepare(BSONObj shardKeyPattern, const std::vector<BSONObj>& splitPoints) {
+        chunkManager =
+            makeChunkManager(kNss, ShardKeyPattern(shardKeyPattern), nullptr, false, splitPoints);
+        ChunkManagerTargeter cmTargeter(kNss);
+        auto status = cmTargeter.init(operationContext());
+        return cmTargeter;
+    }
+    std::shared_ptr<ChunkManager> chunkManager;
+};
+
+TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKey) {
+    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
+    // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    // [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << BSONNULL), BSON("a.b" << -100), BSON("a.b" << 0), BSON("a.b" << 100)};
+    auto cmTargeter = prepare(BSON("a.b" << 1 << "c.d"
+                                         << "hashed"),
+                              splitPoints);
+
+    auto res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: -111}, c: {d: '1'}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "1");
+
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: -10}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "2");
+
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 4}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "3");
+
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 1000}, c: null, d: {}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "4");
+
+    // Missing field will be treated as null and will be targeted to the chunk which holds null,
+    // which is shard '1'.
+    res = cmTargeter.targetInsert(operationContext(), BSONObj());
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "1");
+    res = cmTargeter.targetInsert(operationContext(), BSON("a" << 10));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "1");
+
+    // Arrays along shard key path are not allowed.
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{a: [1,2]}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{c: [1,2]}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{c: {d: [1,2]}}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+}
+
+TEST_F(ChunkManagerTargeterTest, TargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix) {
+    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk
+    // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
+    auto cmTargeter = prepare(BSON("a.b"
+                                   << "hashed"
+                                   << "c.d" << 1),
+                              splitPoints);
+
+    for (int i = 0; i < 1000; i++) {
+        auto insertObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
+        const auto res = cmTargeter.targetInsert(operationContext(), insertObj);
+        ASSERT_OK(res.getStatus());
+
+        // Verify that the given document is being routed based on hashed value of 'i'.
+        auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(
+            BSON("a.b" << BSONElementHasher::hash64(insertObj["a"]["b"],
+                                                    BSONElementHasher::DEFAULT_HASH_SEED)));
+        ASSERT_EQUALS(res.getValue().shardName, chunk.getShardId());
+    }
+
+    // Arrays along shard key path are not allowed.
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{a: [1,2]}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+}
+
+TEST_F(ChunkManagerTargeterTest, TargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix) {
+    // For the purpose of this test, we will keep the hashed field constant to 0 so that we can
+    // correctly test the targeting based on range field.
+    auto hashedValueOfZero = BSONElementHasher::hash64(BSON("" << 0).firstElement(),
+                                                       BSONElementHasher::DEFAULT_HASH_SEED);
+    // Create 5 chunks and 5 shards such that shardId
+    // '0' has chunk [{'a.b': hash(0), 'c.d': MinKey}, {'a.b': hash(0), 'c.d': null}),
+    // '1' has chunk [{'a.b': hash(0), 'c.d': null},   {'a.b': hash(0), 'c.d': -100}),
+    // '2' has chunk [{'a.b': hash(0), 'c.d': -100},   {'a.b': hash(0), 'c.d':  0}),
+    // '3' has chunk [{'a.b': hash(0), 'c.d':0},       {'a.b': hash(0), 'c.d': 100}) and
+    // '4' has chunk [{'a.b': hash(0), 'c.d': 100},    {'a.b': hash(0), 'c.d': MaxKey}).
+    std::vector<BSONObj> splitPoints = {BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL),
+                                        BSON("a.b" << hashedValueOfZero << "c.d" << -100),
+                                        BSON("a.b" << hashedValueOfZero << "c.d" << 0),
+                                        BSON("a.b" << hashedValueOfZero << "c.d" << 100)};
+    auto cmTargeter = prepare(BSON("a.b"
+                                   << "hashed"
+                                   << "c.d" << 1),
+                              splitPoints);
+
+    auto res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -111}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "1");
+
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -11}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "2");
+
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 0}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "3");
+
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 111}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "4");
+
+    // Missing field will be treated as null and will be targeted to the chunk which holds null,
+    // which is shard '1'.
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "1");
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}, c: 5}"));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().shardName, "1");
+}
+
+write_ops::UpdateOpEntry buildUpdate(BSONObj query, BSONObj update, bool upsert) {
+    write_ops::UpdateOpEntry entry;
+    entry.setQ(query);
+    entry.setU(update);
+    entry.setUpsert(upsert);
+    return entry;
+}
+
+TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
+    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
+    // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    // [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << BSONNULL), BSON("a.b" << -100LL), BSON("a.b" << 0LL), BSON("a.b" << 100LL)};
+    auto cmTargeter = prepare(BSON("a.b" << 1 << "c.d"
+                                         << "hashed"),
+                              splitPoints);
+
+    // When update targets using replacement object.
+    auto res = cmTargeter.targetUpdate(
+        operationContext(),
+        buildUpdate(fromjson("{'a.b': {$gt : 2}}"), fromjson("{a: {b: -1}}"), false));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "2");
+
+    // When update targets using query.
+    res = cmTargeter.targetUpdate(
+        operationContext(),
+        buildUpdate(fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
+                    fromjson("{$set: {p : 1}}"),
+                    false));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "3");
+
+    res = cmTargeter.targetUpdate(
+        operationContext(),
+        buildUpdate(fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "1");
+
+    // For op-style updates, query on _id gets targeted to all shards.
+    res = cmTargeter.targetUpdate(
+        operationContext(), buildUpdate(fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 5);
+
+    // For replacement style updates, query on _id uses replacement doc to target. If the
+    // replacement doc doesn't have shard key fields, then update should be routed to the shard
+    // holding 'null' shard key documents.
+    res = cmTargeter.targetUpdate(operationContext(),
+                                  buildUpdate(fromjson("{_id: 1}"), fromjson("{p: 111}}"), false));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "1");
+
+
+    // Upsert requires full shard key in query, even if the query can target a single shard.
+    res = cmTargeter.targetUpdate(operationContext(),
+                                  buildUpdate(fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
+                                              fromjson("{a: {b: -111}}"),
+                                              true));
+    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
+
+    // Upsert success case.
+    res = cmTargeter.targetUpdate(
+        operationContext(),
+        buildUpdate(fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "4");
+}
+
+TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
+    auto findChunk = [&](BSONElement elem) {
+        return chunkManager->findIntersectingChunkWithSimpleCollation(
+            BSON("a.b" << BSONElementHasher::hash64(elem, BSONElementHasher::DEFAULT_HASH_SEED)));
+    };
+
+    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk
+    // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
+    auto cmTargeter = prepare(BSON("a.b"
+                                   << "hashed"
+                                   << "c.d" << 1),
+                              splitPoints);
+
+    for (int i = 0; i < 1000; i++) {
+        auto updateQueryObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
+
+        // Verify that the given document is being routed based on hashed value of 'i' in
+        // 'updateQueryObj'.
+        const auto res = cmTargeter.targetUpdate(
+            operationContext(), buildUpdate(updateQueryObj, fromjson("{$set: {p: 1}}"), false));
+        ASSERT_OK(res.getStatus());
+        ASSERT_EQUALS(res.getValue().size(), 1);
+        ASSERT_EQUALS(res.getValue()[0].shardName,
+                      findChunk(updateQueryObj["a"]["b"]).getShardId());
+    }
+
+    // Range queries on hashed field cannot be used for targeting. In this case, update will be
+    // targeted based on update document.
+    const auto updateObj = fromjson("{a: {b: -1}}");
+    auto res = cmTargeter.targetUpdate(
+        operationContext(), buildUpdate(fromjson("{'a.b': {$gt : 101}}"), updateObj, false));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, findChunk(updateObj["a"]["b"]).getShardId());
+    res = cmTargeter.targetUpdate(
+        operationContext(),
+        buildUpdate(fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false));
+    ASSERT_EQUALS(res.getStatus(), ErrorCodes::InvalidOptions);
+}
+
+write_ops::DeleteOpEntry buildDelete(BSONObj query) {
+    write_ops::DeleteOpEntry entry;
+    entry.setQ(query);
+    entry.setMulti(false);
+    return entry;
+}
+
+TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
+    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
+    // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    // [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << BSONNULL), BSON("a.b" << -100LL), BSON("a.b" << 0LL), BSON("a.b" << 100LL)};
+    auto cmTargeter = prepare(BSON("a.b" << 1 << "c.d"
+                                         << "hashed"),
+                              splitPoints);
+
+    // Cannot delete without full shardkey in the query.
+    auto res =
+        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 2}}")));
+    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
+    res = cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  -101}")));
+    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
+
+    // Delete targeted correctly with full shard key in query.
+    res = cmTargeter.targetDelete(operationContext(),
+                                  buildDelete(fromjson("{'a.b':  -101, 'c.d': 5}")));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "1");
+
+    // Query with MinKey value should go to chunk '0' because MinKey is smaller than
+    // BSONNULL.
+    res = cmTargeter.targetDelete(
+        operationContext(),
+        buildDelete(BSONObjBuilder().appendMinKey("a.b").append("c.d", 4).obj()));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "0");
+
+    res =
+        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  0, 'c.d': 5}")));
+    ASSERT_OK(res.getStatus());
+    ASSERT_EQUALS(res.getValue().size(), 1);
+    ASSERT_EQUALS(res.getValue()[0].shardName, "3");
+}
+
+TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
+    auto findChunk = [&](BSONElement elem) {
+        return chunkManager->findIntersectingChunkWithSimpleCollation(
+            BSON("a.b" << BSONElementHasher::hash64(elem, BSONElementHasher::DEFAULT_HASH_SEED)));
+    };
+
+    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk
+    // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
+    auto cmTargeter = prepare(BSON("a.b"
+                                   << "hashed"
+                                   << "c.d" << 1),
+                              splitPoints);
+
+    for (int i = 0; i < 1000; i++) {
+        auto queryObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
+        // Verify that the given document is being routed based on hashed value of 'i' in
+        // 'queryObj'.
+        const auto res = cmTargeter.targetDelete(operationContext(), buildDelete(queryObj));
+        ASSERT_OK(res.getStatus());
+        ASSERT_EQUALS(res.getValue().size(), 1);
+        ASSERT_EQUALS(res.getValue()[0].shardName, findChunk(queryObj["a"]["b"]).getShardId());
+    }
+
+    // Range queries on hashed field cannot be used for targeting.
+    auto res =
+        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 101}}")));
+    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
 }
 
 }  // namespace

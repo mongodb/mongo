@@ -64,6 +64,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'batch_write_types',
         'cluster_write_op',
