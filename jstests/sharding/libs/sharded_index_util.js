@@ -11,7 +11,8 @@ let ShardedIndexUtil = (function() {
 
         let indexesOnShard = res.cursor.firstBatch;
         const isTargetIndex = (index) => bsonWoCompare(index.key, targetIndexKey) === 0;
-        assert(indexesOnShard.some(isTargetIndex));
+        assert(indexesOnShard.some(isTargetIndex),
+               `expected shard ${shard.shardName} to have the index ${tojson(targetIndexKey)}`);
     };
 
     /*
@@ -27,7 +28,10 @@ let ShardedIndexUtil = (function() {
 
         let indexesOnShard = res.cursor.firstBatch;
         indexesOnShard.forEach(function(index) {
-            assert.neq(0, bsonWoCompare(index.key, targetIndexKey));
+            assert.neq(0,
+                       bsonWoCompare(index.key, targetIndexKey),
+                       `expected shard ${shard.shardName} to not have the index ${
+                           tojson(targetIndexKey)}`);
         });
     };
 

@@ -1,5 +1,7 @@
 /**
- * Test to make sure that the createIndex command gets sent to all shards.
+ * Test to make sure that the createIndex command gets sent to all shards if the mongos
+ * version is last-stable, and to shards that own chunks only if the mongos version is
+ * latest.
  */
 (function() {
 'use strict';
@@ -20,14 +22,17 @@ assert.commandWorked(testDB.user.insert({_id: 0}));
 var res = testDB.user.ensureIndex({i: 1});
 assert.commandWorked(res);
 
+// TODO (SERVER-45017): Remove this check when v4.4 becomes last-stable.
+const isLastStableMongos = (jsTestOptions().mongosBinVersion === "last-stable");
+
 var indexes = testDB.user.getIndexes();
-assert.eq(2, indexes.length);
+assert.eq(isLastStableMongos ? 2 : 1, indexes.length);
 
 indexes = st.rs0.getPrimary().getDB('test').user.getIndexes();
 assert.eq(2, indexes.length);
 
 indexes = st.rs1.getPrimary().getDB('test').user.getIndexes();
-assert.eq(2, indexes.length);
+assert.eq(isLastStableMongos ? 2 : 1, indexes.length);
 
 st.stop();
 })();

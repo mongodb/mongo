@@ -86,7 +86,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
         for (int tries = 0;; ++tries) {
             const bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
             try {
-                scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
+                scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     nss.db(),
                     nss,

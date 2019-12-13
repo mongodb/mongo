@@ -1,8 +1,7 @@
 /*
- * Test that the index commands send and check shard versions, and only target the primary
- * shard and the shards that have chunks for the collection. Also test that the commands fail
- * if they are run when the critical section is in progress, and block until the critical
- * section is over.
+ * Test that the index commands send and check shard versions, and only target the shards
+ * that have chunks for the collection. Also test that the commands fail if they are run
+ * when the critical section is in progress, and block until the critical section is over.
  * @tags: [requires_fcv_44]
  */
 (function() {
@@ -232,9 +231,9 @@ const testCases = {
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-// Test that the index commands send and check shard vesions, and only target the primary
-// shard and the shards that own chunks for the collection.
-const expectedTargetedShards = new Set([st.shard0, st.shard1, st.shard2]);
+// Test that the index commands send and check shard vesions, and only target the shards
+// that own chunks for the collection.
+const expectedTargetedShards = new Set([st.shard1, st.shard2]);
 assert.lt(expectedTargetedShards.size, numShards);
 
 for (const command of Object.keys(testCases)) {

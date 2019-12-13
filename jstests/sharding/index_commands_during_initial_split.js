@@ -77,15 +77,28 @@ const shardToZone = {
     [st.shard2.shardName]: {name: "zone2", min: {_id: 0}, max: {_id: MaxKey}}
 };
 const zones = Object.values(shardToZone);
-const expectedTargetedShards = new Set([st.shard0, st.shard1, st.shard2]);
-assert.lt(expectedTargetedShards.size, numShards);
 
-const criticalSectionFailPointNames =
-    new Set(["pauseShardCollectionReadOnlyCriticalSection", "pauseShardCollectionCommitPhase"]);
-const failpointNames = [
-    "pauseShardCollectionBeforeCriticalSection",
-    ...criticalSectionFailPointNames,
-    "pauseShardCollectionAfterCriticalSection"
+const failPoints = [
+    {
+        name: "pauseShardCollectionBeforeCriticalSection",
+        expectedAffectedShards: new Set([st.shard0, st.shard1, st.shard2]),
+        criticalSectionInProgress: false
+    },
+    {
+        name: "pauseShardCollectionReadOnlyCriticalSection",
+        expectedAffectedShards: new Set([st.shard0, st.shard1, st.shard2]),
+        criticalSectionInProgress: true
+    },
+    {
+        name: "pauseShardCollectionCommitPhase",
+        expectedAffectedShards: new Set([st.shard0, st.shard1, st.shard2]),
+        criticalSectionInProgress: true
+    },
+    {
+        name: "pauseShardCollectionAfterCriticalSection",
+        expectedAffectedShards: new Set([st.shard1, st.shard2]),
+        criticalSectionInProgress: false
+    }
 ];
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -94,15 +107,15 @@ for (const [shardName, zone] of Object.entries(shardToZone)) {
     assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: zone.name}));
 }
 
-failpointNames.forEach(failpointName => {
-    jsTest.log(`Testing createIndexes in step ${failpointName}...`);
-    const collName = "testCreateIndexes" + failpointName;
+failPoints.forEach(failPoint => {
+    jsTest.log(`Testing createIndexes in step ${failPoint.name}...`);
+    const collName = "testCreateIndexes" + failPoint.name;
     const ns = dbName + "." + collName;
     const cmd = {createIndexes: collName, indexes: [index]};
-    const isBlocked = criticalSectionFailPointNames.has(failpointName);
+    const isBlocked = failPoint.criticalSectionInProgress;
 
     assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
-    runCommandDuringShardCollection(st, ns, shardKey, zones, failpointName, cmd, isBlocked);
+    runCommandDuringShardCollection(st, ns, shardKey, zones, failPoint.name, cmd, isBlocked);
 
     if (isBlocked) {
         return;
@@ -110,7 +123,7 @@ failpointNames.forEach(failpointName => {
 
     // Assert that the index only exists on the targeted shards.
     allShards.forEach(shard => {
-        if (expectedTargetedShards.has(shard)) {
+        if (failPoint.expectedAffectedShards.has(shard)) {
             ShardedIndexUtil.assertIndexExistsOnShard(shard, dbName, collName, index.key);
         } else {
             ShardedIndexUtil.assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
@@ -118,17 +131,17 @@ failpointNames.forEach(failpointName => {
     });
 });
 
-failpointNames.forEach(failpointName => {
-    jsTest.log(`Testing dropIndexes in step ${failpointName}...`);
-    const collName = "testDropIndexes" + failpointName;
+failPoints.forEach(failPoint => {
+    jsTest.log(`Testing dropIndexes in step ${failPoint.name}...`);
+    const collName = "testDropIndexes" + failPoint.name;
     const ns = dbName + "." + collName;
     const cmd = {dropIndexes: collName, index: index.name};
-    const isBlocked = criticalSectionFailPointNames.has(failpointName);
+    const isBlocked = failPoint.criticalSectionInProgress;
 
     assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
     assert.commandWorked(
         st.s.getDB(dbName).runCommand({createIndexes: collName, indexes: [index]}));
-    runCommandDuringShardCollection(st, ns, shardKey, zones, failpointName, cmd, isBlocked);
+    runCommandDuringShardCollection(st, ns, shardKey, zones, failPoint.name, cmd, isBlocked);
 
     if (isBlocked) {
         return;
@@ -136,19 +149,24 @@ failpointNames.forEach(failpointName => {
 
     // Assert that the index does not exist on any shards.
     allShards.forEach(shard => {
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
+        const usedToOwnChunks = (shard.shardName === st.shard0.shardName);
+        if (failPoint.expectedAffectedShards.has(shard) || !usedToOwnChunks) {
+            ShardedIndexUtil.assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);
+        } else {
+            ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, index.key);
+        }
     });
 });
 
-failpointNames.forEach(failpointName => {
-    jsTest.log(`Testing collMod in step ${failpointName}...`);
-    const collName = "testCollMod" + failpointName;
+failPoints.forEach(failPoint => {
+    jsTest.log(`Testing collMod in step ${failPoint.name}...`);
+    const collName = "testCollMod" + failPoint.name;
     const ns = dbName + "." + collName;
     const cmd = {collMod: collName, validator: {x: {$type: "string"}}};
-    const isBlocked = criticalSectionFailPointNames.has(failpointName);
+    const isBlocked = failPoint.criticalSectionInProgress;
 
     assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
-    runCommandDuringShardCollection(st, ns, shardKey, zones, failpointName, cmd, isBlocked);
+    runCommandDuringShardCollection(st, ns, shardKey, zones, failPoint.name, cmd, isBlocked);
 
     if (isBlocked) {
         return;
@@ -156,7 +174,7 @@ failpointNames.forEach(failpointName => {
 
     // Assert that only the targeted shards do document validation.
     allShards.forEach(shard => {
-        if (expectedTargetedShards.has(shard)) {
+        if (failPoint.expectedAffectedShards.has(shard)) {
             assert.commandFailedWithCode(shard.getCollection(ns).insert({x: 1}),
                                          ErrorCodes.DocumentValidationFailure);
         } else {

@@ -135,8 +135,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const CachedCollectionRoutingInfo& routingInfo,
     const BSONObj& cmdObj,
     const BSONObj& query,
-    const BSONObj& collation,
-    const bool alwaysIncludePrimaryShard = false) {
+    const BSONObj& collation) {
 
     auto cmdToSend = cmdObj;
     if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
@@ -163,19 +162,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     // The collection is sharded. Target all shards that own chunks that match the query.
     std::set<ShardId> shardIds;
     routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
-
-    if (alwaysIncludePrimaryShard && routingInfo.db().primaryId() != "config") {
-        // TODO (SERVER-44949): The only sharded collection which has the config server as
-        // the primary shard is config.system.sessions. Unfortunately, the config server
-        // calls this code path to create indexes on the sessions collection, and the code
-        // it uses to create the indexes would currently invariant if one of the targeted
-        // shards was the config server itself. To get around this, we skip targeting the
-        // config shard here, but as a result, listIndexes on config.system.sessions will
-        // not return the correct indexes. This bug existed prior to 4.4 as well, since
-        // the old code to create indexes on the sessions collection also did not build
-        // the index on the config server.
-        shardIds.insert(routingInfo.db().primaryId());
-    }
 
     for (const ShardId& shardId : shardIds) {
         requests.emplace_back(shardId,
@@ -391,23 +377,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const BSONObj& collation) {
     const auto requests =
         buildVersionedRequestsForTargetedShards(opCtx, nss, routingInfo, cmdObj, query, collation);
-
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
-}
-
-std::vector<AsyncRequestsSender::Response>
-scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
-    OperationContext* opCtx,
-    StringData dbName,
-    const NamespaceString& nss,
-    const CachedCollectionRoutingInfo& routingInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const BSONObj& query,
-    const BSONObj& collation) {
-    const auto requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, routingInfo, cmdObj, query, collation, true);
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
 }
