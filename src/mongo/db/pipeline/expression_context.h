@@ -290,9 +290,11 @@ public:
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
         maxFeatureCompatibilityVersion;
 
-    // True if this ExpressionContext is associated with a Change Stream that should serialize its
-    // "$sortKey" using the 4.2 format.
-    bool use42ChangeStreamSortKeys = false;
+    // In a shard mongoD, we use this to determine the format for "sortKey" data. This format has to
+    // match the format that the mongoS expects.
+    // TODO (SERVER-43361): After branching for 4.5, there will be no need to support any format
+    // other than the "k44SortKey" format, so this will be removed.
+    SortKeyFormat sortKeyFormat = SortKeyFormat::k44SortKey;
 
     // True if this context is associated with a pipeline which is permitted to use the new
     // upsertSupplied mechanism for applicable $merge modes.

@@ -1,5 +1,9 @@
 /**
  * Test issuing raw find and getMore commands to mongos using db.runCommand().
+ *
+ * Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
+ * sort key format.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
@@ -153,12 +157,12 @@ assert.commandWorked(cmdRes);
 assert.eq(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 assert.eq(cmdRes.cursor.firstBatch.length, 6);
-assert.eq(cmdRes.cursor.firstBatch[0], {key: {"": -9}});
-assert.eq(cmdRes.cursor.firstBatch[1], {key: {"": -5}});
-assert.eq(cmdRes.cursor.firstBatch[2], {key: {"": -1}});
-assert.eq(cmdRes.cursor.firstBatch[3], {key: {"": 1}});
-assert.eq(cmdRes.cursor.firstBatch[4], {key: {"": 5}});
-assert.eq(cmdRes.cursor.firstBatch[5], {key: {"": 9}});
+assert.eq(cmdRes.cursor.firstBatch[0], {key: [-9]});
+assert.eq(cmdRes.cursor.firstBatch[1], {key: [-5]});
+assert.eq(cmdRes.cursor.firstBatch[2], {key: [-1]});
+assert.eq(cmdRes.cursor.firstBatch[3], {key: [1]});
+assert.eq(cmdRes.cursor.firstBatch[4], {key: [5]});
+assert.eq(cmdRes.cursor.firstBatch[5], {key: [9]});
 
 st.stop();
 })();

@@ -470,7 +470,7 @@ constexpr StringData Document::metaFieldGeoNearPoint;
 constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
 
-BSONObj Document::toBsonWithMetaData(bool use42ChangeStreamSortKeys) const {
+BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
     BSONObjBuilder bb;
     toBson(&bb);
     if (!metadata()) {
@@ -482,17 +482,21 @@ BSONObj Document::toBsonWithMetaData(bool use42ChangeStreamSortKeys) const {
     if (metadata().hasRandVal())
         bb.append(metaFieldRandVal, metadata().getRandVal());
     if (metadata().hasSortKey()) {
-        if (use42ChangeStreamSortKeys) {
-            // TODO (SERVER-43361): In 4.2 and earlier, the "sort key" for a change stream document
-            // gets serialized differently than sort keys for normal pipeline documents. Once we no
-            // longer need to support that format, we can remove the 'use42ChangeStreamSortKeys'
-            // flag and this special case along with it.
-            invariant(metadata().isSingleElementKey());
-            metadata().getSortKey().addToBsonObj(&bb, metaFieldSortKey);
-        } else {
-            bb.append(metaFieldSortKey,
-                      DocumentMetadataFields::serializeSortKey(metadata().isSingleElementKey(),
-                                                               metadata().getSortKey()));
+        switch (sortKeyFormat) {
+            case SortKeyFormat::k42ChangeStreamSortKey:
+                invariant(metadata().isSingleElementKey());
+                metadata().getSortKey().addToBsonObj(&bb, metaFieldSortKey);
+                break;
+            case SortKeyFormat::k42SortKey:
+                bb.append(metaFieldSortKey,
+                          DocumentMetadataFields::serializeSortKeyAsObject(
+                              metadata().isSingleElementKey(), metadata().getSortKey()));
+                break;
+            case SortKeyFormat::k44SortKey:
+                bb.append(metaFieldSortKey,
+                          DocumentMetadataFields::serializeSortKeyAsArray(
+                              metadata().isSingleElementKey(), metadata().getSortKey()));
+                break;
         }
     }
     if (metadata().hasGeoNearDistance())

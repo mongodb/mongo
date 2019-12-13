@@ -107,6 +107,7 @@ const char kAllowSpeculativeMajorityReadField[] = "allowSpeculativeMajorityRead"
 const char kInternalReadAtClusterTimeField[] = "$_internalReadAtClusterTime";
 const char kRequestResumeTokenField[] = "$_requestResumeToken";
 const char kResumeAfterField[] = "$_resumeAfter";
+const char kUse44SortKeys[] = "_use44SortKeys";
 
 // Field names for sorting options.
 const char kNaturalSortField[] = "$natural";
@@ -411,6 +412,12 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
             qr->_requestResumeToken = el.boolean();
+        } else if (fieldName == kUse44SortKeys) {
+            Status status = checkFieldType(el, Bool);
+            if (!status.isOK()) {
+                return status;
+            }
+            qr->_use44SortKeys = el.boolean();
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -594,6 +601,10 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (!_resumeAfter.isEmpty()) {
         cmdBuilder->append(kResumeAfterField, _resumeAfter);
+    }
+
+    if (_use44SortKeys) {
+        cmdBuilder->append(kUse44SortKeys, true);
     }
 }
 

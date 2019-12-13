@@ -207,7 +207,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
     }
 }
 
-BSONObj DocumentMetadataFields::serializeSortKey(bool isSingleElementKey, const Value& value) {
+BSONObj DocumentMetadataFields::serializeSortKeyAsObject(bool isSingleElementKey,
+                                                         const Value& value) {
     // Missing values don't serialize correctly in this format, so use nulls instead, since they are
     // considered equivalent with woCompare().
     if (isSingleElementKey) {
@@ -219,6 +220,21 @@ BSONObj DocumentMetadataFields::serializeSortKey(bool isSingleElementKey, const 
         bb << "" << missingToNull(val);
     }
     return bb.obj();
+}
+
+BSONArray DocumentMetadataFields::serializeSortKeyAsArray(bool isSingleElementKey,
+                                                          const Value& value) {
+    // Missing values don't serialize correctly in this format, so use nulls instead, since they are
+    // considered equivalent with woCompare().
+    if (isSingleElementKey) {
+        return BSON_ARRAY(missingToNull(value));
+    }
+    invariant(value.isArray());
+    BSONArrayBuilder bb;
+    for (auto&& val : value.getArray()) {
+        bb << missingToNull(val);
+    }
+    return bb.arr();
 }
 
 Value DocumentMetadataFields::deserializeSortKey(bool isSingleElementKey,

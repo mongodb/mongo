@@ -797,7 +797,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvalauateMetaExpressions) {
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -825,7 +825,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvalauateMet
 
     ASSERT_DOCUMENT_EQ(result,
                        Document{fromjson("{a: 1, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
-                                         "h: [4, 5], i: 6, j: {foo: 7}, k: {'': {bar: 8}}}")});
+                                         "h: [4, 5], i: 6, j: {foo: 7}, k: [{bar: 8}]}")});
 }
 
 //

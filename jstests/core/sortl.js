@@ -1,5 +1,10 @@
 // Tests equality query on _id with a sort, intended to be tested on both mongos and mongod. For
 // SERVER-20641.
+//
+// Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
+// sort key format.
+// @tags: [requires_fcv_44]
+
 (function() {
 'use strict';
 var coll = db.sortl;
@@ -11,7 +16,7 @@ assert.eq(res.next(), {_id: 1, a: 2});
 assert.eq(res.hasNext(), false);
 
 res = coll.find({_id: 1}, {b: {$meta: "sortKey"}}).sort({a: 1});
-assert.eq(res.next(), {_id: 1, a: 2, b: {"": 2}});
+assert.eq(res.next(), {_id: 1, a: 2, b: [2]});
 assert.eq(res.hasNext(), false);
 
 res = db.runCommand({

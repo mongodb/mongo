@@ -84,10 +84,6 @@ Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
     }
 
     auto indexKey = member->metadata().hasIndexKey() ? member->metadata().getIndexKey() : BSONObj();
-    auto sortKey = member->metadata().hasSortKey()
-        ? DocumentMetadataFields::serializeSortKey(member->metadata().isSingleElementKey(),
-                                                   member->metadata().getSortKey())
-        : BSONObj();
 
     MutableDocument md;
 
@@ -96,7 +92,27 @@ Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
     }
 
     for (const auto& fieldPath : _sortKeyMetaFields) {
-        md.setNestedField(fieldPath, Value(sortKey));
+        if (!member->metadata().hasSortKey()) {
+            md.setNestedField(fieldPath, Value{});
+            continue;
+        }
+
+        switch (_sortKeyFormat) {
+            case SortKeyFormat::k44SortKey:
+                md.setNestedField(
+                    fieldPath,
+                    Value(DocumentMetadataFields::serializeSortKeyAsArray(
+                        member->metadata().isSingleElementKey(), member->metadata().getSortKey())));
+                break;
+            case SortKeyFormat::k42SortKey:
+                md.setNestedField(
+                    fieldPath,
+                    Value(DocumentMetadataFields::serializeSortKeyAsObject(
+                        member->metadata().isSingleElementKey(), member->metadata().getSortKey())));
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 
     member->keyData.clear();
