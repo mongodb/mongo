@@ -462,6 +462,7 @@ assert.commandWorked(coll.insert([
 pipelines = [
     [{'$project': {date: {'$dateFromParts': {year: "$outOfRangeValue"}}}}],
     [{'$project': {date: {'$dateFromParts': {year: -1}}}}],
+    [{'$project': {date: {'$dateFromParts': {year: 0}}}}],
     [{'$project': {date: {'$dateFromParts': {year: 10000}}}}],
 ];
 
@@ -478,6 +479,7 @@ assert.commandWorked(coll.insert([{
     _id: 0,
     minusOne: -1,
     zero: 0,
+    one: 1,
     thirteen: 13,
     twentyFive: 25,
     sixtyOne: 61,
@@ -490,7 +492,7 @@ assert.commandWorked(coll.insert([{
 }]));
 
 tests = [
-    {expected: "0000-01-01T00:00:00.000Z", parts: {year: "$zero"}},
+    {expected: "0001-01-01T00:00:00.000Z", parts: {year: "$one"}},
     {expected: "9999-01-01T00:00:00.000Z", parts: {year: "$tenThousandMinusOne"}},
     {expected: "2016-11-01T00:00:00.000Z", parts: {year: 2017, month: "$minusOne"}},
     {expected: "2016-12-01T00:00:00.000Z", parts: {year: 2017, month: "$zero"}},
@@ -580,15 +582,15 @@ assertErrCodeAndErrMsgContains(coll, pipeline, 40515, "'millisecond' must evalua
 coll.drop();
 
 assert.commandWorked(coll.insert(
-    [{_id: 0, bigYear: 10000, smallYear: -1, prettyBigInt: 32768, prettyBigNegativeInt: -32769}]));
+    [{_id: 0, bigYear: 10000, smallYear: 0, prettyBigInt: 32768, prettyBigNegativeInt: -32769}]));
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: "$bigYear"}}}}];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 40523, "'year' must evaluate to an integer in the range 0 to 9999");
+    coll, pipeline, 40523, "'year' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: "$smallYear"}}}}];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 40523, "'year' must evaluate to an integer in the range 0 to 9999");
+    coll, pipeline, 40523, "'year' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigInt"}}}}];
 assertErrCodeAndErrMsgContains(
@@ -627,11 +629,11 @@ assertErrCodeAndErrMsgContains(
 
 pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$bigYear"}}}}];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 0 to 9999");
+    coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$smallYear"}}}}];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 0 to 9999");
+    coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigInt"}}}}];
 assertErrCodeAndErrMsgContains(

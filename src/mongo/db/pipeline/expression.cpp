@@ -1339,9 +1339,9 @@ Value ExpressionDateFromParts::evaluate(const Document& root, Variables* variabl
         }
 
         uassert(40523,
-                str::stream() << "'year' must evaluate to an integer in the range " << 0 << " to "
+                str::stream() << "'year' must evaluate to an integer in the range " << 1 << " to "
                               << 9999 << ", found " << year,
-                year >= 0 && year <= 9999);
+                year >= 1 && year <= 9999);
 
         return Value(
             timeZone->createFromDateParts(year, month, day, hour, minute, second, millisecond));
@@ -1361,9 +1361,9 @@ Value ExpressionDateFromParts::evaluate(const Document& root, Variables* variabl
         }
 
         uassert(31095,
-                str::stream() << "'isoWeekYear' must evaluate to an integer in the range " << 0
+                str::stream() << "'isoWeekYear' must evaluate to an integer in the range " << 1
                               << " to " << 9999 << ", found " << isoWeekYear,
-                isoWeekYear >= 0 && isoWeekYear <= 9999);
+                isoWeekYear >= 1 && isoWeekYear <= 9999);
 
         return Value(timeZone->createFromIso8601DateParts(
             isoWeekYear, isoWeek, isoDayOfWeek, hour, minute, second, millisecond));
