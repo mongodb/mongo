@@ -64,7 +64,7 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     // We depend on thread pool sizes being equal between primaries and secondaries. If a secondary
     // has fewer resources than a primary, index build oplog entries can replicate in an order that
     // the secondary is unable to fulfill, leading to deadlocks. See SERVER-44250.
-    options.maxThreads = 10;
+    options.maxThreads = 3;
 
     // Ensure all threads have a client.
     options.onCreateThread = [](const std::string& threadName) {
@@ -78,6 +78,10 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
 
 IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
     : _threadPool(makeDefaultThreadPoolOptions()) {
+    _threadPool.startup();
+}
+IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod(ThreadPool::Options options)
+    : _threadPool(std::move(options)) {
     _threadPool.startup();
 }
 
