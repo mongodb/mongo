@@ -7,18 +7,14 @@
 (function() {
     'use strict';
 
-    load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
-
     const coll = db.spill_to_disk;
     coll.drop();
 
-    const sharded = FixtureHelpers.isSharded(coll);
-
-    const memoryLimitMB = sharded ? 200 : 100;
+    const memoryLimitMB = 100;
 
     const bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
     for (let i = 0; i < memoryLimitMB + 1; i++)
-        coll.insert({_id: i, bigStr: i + bigStr, random: Math.random()});
+        coll.insert({_id: i.toString(), bigStr: i + bigStr, random: Math.random()});
 
     assert.gt(coll.stats().size, memoryLimitMB * 1024 * 1024);
 
@@ -107,10 +103,7 @@
         canSpillToDisk: false
     });
     test({
-        pipeline: [{
-            $group:
-                {_id: null, bigArray: {$addToSet: {$concat: ['$bigStr', {$toString: "$_id"}]}}}
-        }],
+        pipeline: [{$group: {_id: null, bigArray: {$addToSet: {$concat: ['$bigStr', "$_id"]}}}}],
         expectedCodes: [groupCode, ErrorCodes.ExceededMemoryLimit],
         canSpillToDisk: false
     });
