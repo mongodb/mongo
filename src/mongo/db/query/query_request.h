@@ -429,6 +429,13 @@ public:
         _resumeAfter = resumeAfter;
     }
 
+    bool use44SortKeys() const {
+        return _use44SortKeys;
+    }
+
+    void setUse44SortKeys(bool use44SortKeys) {
+        _use44SortKeys = use44SortKeys;
+    }
 
     /**
      * Return options as a bit vector.
@@ -567,6 +574,8 @@ private:
     // The Timestamp that RecoveryUnit::setTimestampReadSource() should be called with. The optional
     // should only ever be engaged when testing commands are enabled.
     boost::optional<Timestamp> _internalReadAtClusterTime;
+
+    bool _use44SortKeys = false;
 };
 
 }  // namespace mongo

@@ -2666,7 +2666,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSortKey) {
     Value sortKey = Value(std::vector<Value>{Value(1), Value(2)});
     doc.metadata().setSortKey(sortKey, /* isSingleElementSortKey = */ false);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
-    ASSERT_BSONOBJ_EQ(val.getDocument().toBson(), BSON("" << 1 << "" << 2));
+    ASSERT_VALUE_EQ(val, Value(std::vector<Value>{Value(1), Value(2)}));
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaTextScore) {

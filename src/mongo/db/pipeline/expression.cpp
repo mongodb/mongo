@@ -2700,10 +2700,24 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
         case MetaType::kIndexKey:
             return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
         case MetaType::kSortKey:
-            return metadata.hasSortKey()
-                ? Value(DocumentMetadataFields::serializeSortKey(metadata.isSingleElementKey(),
-                                                                 metadata.getSortKey()))
-                : Value();
+            if (metadata.hasSortKey()) {
+                switch (getExpressionContext()->sortKeyFormat) {
+                    case SortKeyFormat::k42ChangeStreamSortKey:
+                        invariant(metadata.isSingleElementKey());
+                        return Value(metadata.getSortKey());
+                    case SortKeyFormat::k42SortKey:
+                        return Value(DocumentMetadataFields::serializeSortKeyAsObject(
+                            metadata.isSingleElementKey(), metadata.getSortKey()));
+                    case SortKeyFormat::k44SortKey:
+                        return Value(DocumentMetadataFields::serializeSortKeyAsArray(
+                            metadata.isSingleElementKey(), metadata.getSortKey()));
+                        break;
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            } else {
+                return Value();
+            }
         default:
             MONGO_UNREACHABLE;
     }

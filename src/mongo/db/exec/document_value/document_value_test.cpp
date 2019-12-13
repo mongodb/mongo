@@ -595,7 +595,7 @@ TEST(MetaFields, IndexKeyMetadataSerializesCorrectly) {
     ASSERT_TRUE(doc.metadata().hasIndexKey());
     ASSERT_BSONOBJ_EQ(doc.metadata().getIndexKey(), BSON("b" << 1));
 
-    auto serialized = doc.toBsonWithMetaData();
+    auto serialized = doc.toBsonWithMetaData(SortKeyFormat::k42SortKey);
     ASSERT_BSONOBJ_EQ(serialized, BSON("a" << 1 << "$indexKey" << BSON("b" << 1)));
 }
 
@@ -709,7 +709,7 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
                                                         << "def"_sd));
     Document doc = docBuilder.freeze();
-    BSONObj obj = doc.toBsonWithMetaData();
+    BSONObj obj = doc.toBsonWithMetaData(SortKeyFormat::k42SortKey);
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
     ASSERT_EQ(20, obj[Document::metaFieldRandVal].numberLong());
     ASSERT_EQ(30.0, obj[Document::metaFieldSearchScore].Double());

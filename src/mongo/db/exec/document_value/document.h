@@ -59,6 +59,26 @@ class MutableDocument;
  */
 class Position;
 
+/**
+ * "Sort keys" are stored in memory as a Value with Array type (with an exception for singleton sort
+ * keys). When serializing a sort key for storage in document metadata or as part of a
+ * {$meta: "sortKey"} projection, there are three possible storage formats:
+ */
+enum class SortKeyFormat {
+    // We expect the in-memory sort key to have one object, which has the format:
+    // {_data: ..., _typeBits:...}. This same object becomes the serialized sort key. This format
+    // exists for compatibility with 4.2 and will be deleted in 4.6 (SERVER-43361).
+    k42ChangeStreamSortKey,
+
+    // A sort key with values "a" and "b" would get translated to an object that looks like:
+    // {"": "a", "": "b"}. Also scheduled for deletion in 4.6.
+    k42SortKey,
+
+    // A sort key with values "a" and "b" would get translated to an array that looks like:
+    // ["a", "b"].
+    k44SortKey,
+};
+
 /** A Document is similar to a BSONObj but with a different in-memory representation.
  *
  *  A Document can be treated as a const std::map<std::string, const Value> that is
@@ -239,14 +259,16 @@ public:
     boost::optional<BSONObj> toBsonIfTriviallyConvertible() const;
 
     /**
-     * Like the 'toBson()' method, but includes metadata at the top-level. When
-     * 'use42ChangeStreamSortKeys' is true, we assume that any Value in the "sortKey" metadata
-     * represents the resume token, which gets assigned directly to the "$sortKey" field. Otherwise,
-     * the "$sortKey" field gets assigned using DocumentMetadataFields::serializeSortKey(). Output
-     * is parseable by the 'fromBsonWithMetaData()' method. Note that parsing is able to infer the
-     * value of 'use42ChangeStreamSortKeys' from the format of the '$sortKey' field.
+     * Like the 'toBson()' method, but includes metadata at the top-level. When the metadata
+     * includes a sort key, the 'sortKeyFormat' parameter controls how it gets converted from its
+     * in-memory representation as a Value to its serialized representation as either a BSONObj or
+     * BSONArray. The possible formats are described in the comment above the 'SortKeyFormat' enum.
+     *
+     * Note that the 'fromBsonWithMetaData()' function does not need a corresponding 'sortKeyFormat'
+     * parameter, because sort key deserialization is able to infer the sort key format based on the
+     * layout of the object.
      */
-    BSONObj toBsonWithMetaData(bool use42ChangeStreamSortKeys = false) const;
+    BSONObj toBsonWithMetaData(SortKeyFormat sortKeyFormat) const;
 
     /**
      * Like Document(BSONObj) but treats top-level fields with special names as metadata.

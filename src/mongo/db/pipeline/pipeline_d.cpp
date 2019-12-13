@@ -659,12 +659,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     if (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
         plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
-
-        // SERVER-42713: If "use44SortKeys" isn't set, then this aggregation request is from an
-        // earlier version of mongos, and we must fall back to the old way of serializing change
-        // stream sort keys from 4.2 and earlier.
-        invariant(aggRequest);
-        expCtx->use42ChangeStreamSortKeys = !aggRequest->getUse44SortKeys();
     }
 
     // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The

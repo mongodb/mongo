@@ -141,8 +141,11 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             auto returnKeyNode = static_cast<const ReturnKeyNode*>(root);
             auto childStage =
                 buildStages(opCtx, collection, cq, qsol, returnKeyNode->children[0], ws);
-            return std::make_unique<ReturnKeyStage>(
-                opCtx, std::move(returnKeyNode->sortKeyMetaFields), ws, std::move(childStage));
+            return std::make_unique<ReturnKeyStage>(opCtx,
+                                                    std::move(returnKeyNode->sortKeyMetaFields),
+                                                    ws,
+                                                    cq.getExpCtx()->sortKeyFormat,
+                                                    std::move(childStage));
         }
         case STAGE_PROJECTION_DEFAULT: {
             auto pn = static_cast<const ProjectionNodeDefault*>(root);

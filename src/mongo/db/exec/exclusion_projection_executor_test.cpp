@@ -316,7 +316,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
 
-TEST(ExclusionProjectionExecutionTest, ShouldEvalauateMetaExpressions) {
+TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -344,7 +344,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvalauateMetaExpressions) {
 
     ASSERT_DOCUMENT_EQ(result,
                        Document{fromjson("{b: 2, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
-                                         "h: [4, 5], i: 6, j: {foo: 7}, k: {'': {bar: 8}}}")});
+                                         "h: [4, 5], i: 6, j: {foo: 7}, k: [{bar: 8}]}")});
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {

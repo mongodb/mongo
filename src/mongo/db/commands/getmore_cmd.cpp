@@ -295,8 +295,10 @@ public:
                 while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
                        PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
                     auto* expCtx = exec->getExpCtx().get();
+                    // Note that "needsMerge" implies a find or aggregate operation, which should
+                    // always have a non-NULL 'expCtx' value.
                     BSONObj obj = cursor->needsMerge()
-                        ? doc.toBsonWithMetaData(expCtx ? expCtx->use42ChangeStreamSortKeys : false)
+                        ? doc.toBsonWithMetaData(expCtx->sortKeyFormat)
                         : doc.toBson();
 
                     // If adding this object will cause us to exceed the message size limit, then we

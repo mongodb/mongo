@@ -190,6 +190,10 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     // Any expansion of the 'showRecordId' flag should have already happened on mongos.
     newQR->setShowRecordId(false);
 
+    // Indicate to shard servers that this is a 4.4 or newer mongoS, and they should serialize sort
+    // keys in the new format.
+    newQR->setUse44SortKeys(true);
+
     invariant(newQR->validate());
     return std::move(newQR);
 }
