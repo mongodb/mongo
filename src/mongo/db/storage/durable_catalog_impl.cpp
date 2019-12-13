@@ -969,6 +969,9 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
         }
     }
 
+    // Confirm that our index is not already in the current metadata.
+    invariant(-1 == md.findIndexOffset(imd.name()));
+
     md.indexes.push_back(imd);
     putMetaData(opCtx, catalogId, md);
 
