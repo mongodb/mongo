@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/read_write_concern_defaults.h"
 
 #include "mongo/db/logical_clock.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -126,6 +129,20 @@ void ReadWriteConcernDefaults::invalidate() {
     _defaults.invalidate(Type::kReadWriteConcernEntry);
 }
 
+void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
+    auto possibleNewDefaults = _defaults.lookup(opCtx, Type::kReadWriteConcernEntry);
+    if (!possibleNewDefaults) {
+        return;
+    }
+    auto currentDefaultsHandle = _defaults.acquire(opCtx, Type::kReadWriteConcernEntry);
+    if (!currentDefaultsHandle ||
+        (possibleNewDefaults->getEpoch() > (**currentDefaultsHandle)->getEpoch())) {
+        // Use the new defaults if they have a higher epoch, or if there are currently no defaults.
+        log() << "refreshed RWC defaults to " << possibleNewDefaults->toBSON();
+        _defaults.revalidate(Type::kReadWriteConcernEntry, std::move(*possibleNewDefaults));
+    }
+}
+
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::_getDefault(OperationContext* opCtx) {
     auto defaultsHandle = _defaults.acquire(opCtx, Type::kReadWriteConcernEntry);
     if (defaultsHandle) {
@@ -183,8 +200,11 @@ ReadWriteConcernDefaults::Cache::Cache(LookupFn lookupFn)
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::Cache::lookup(
     OperationContext* opCtx, const ReadWriteConcernDefaults::Type& key) {
     invariant(key == Type::kReadWriteConcernEntry);
-    // TODO: failpoint to uassert a custom Status
-    return _lookupFn(opCtx);
+    auto newDefaults = _lookupFn(opCtx);
+    if (newDefaults) {
+        newDefaults->setLocalSetTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    }
+    return newDefaults;
 }
 
 }  // namespace mongo

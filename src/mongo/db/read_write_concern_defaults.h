@@ -98,6 +98,12 @@ public:
      */
     void invalidate();
 
+    /**
+     * Manually looks up the latest defaults, and if their epoch is more recent than the cached
+     * defaults, then update the cache with the new defaults.
+     */
+    void refreshIfNecessary(OperationContext* opCtx);
+
     RWConcernDefault getDefault(OperationContext* opCtx);
     boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
     boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
@@ -116,9 +122,9 @@ private:
         Cache(LookupFn lookupFn);
         virtual ~Cache() = default;
 
-    private:
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx, const Type& key) override;
 
+    private:
         // For exclusive use by DistCache only.
         Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::Cache");
 

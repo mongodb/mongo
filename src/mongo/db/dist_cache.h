@@ -73,6 +73,14 @@ public:
             return _underlyingValue;
         }
 
+        UnderlyingValue* operator->() {
+            return &_underlyingValue;
+        }
+
+        const UnderlyingValue* operator->() const {
+            return &_underlyingValue;
+        }
+
         /**
          * Returns true if this copy of information about this value is still valid. If this returns
          * false, this object should no longer be used and should be returned to the
