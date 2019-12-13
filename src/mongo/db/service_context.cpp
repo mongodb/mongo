@@ -72,6 +72,15 @@ ServiceContext* getGlobalServiceContext() {
     return globalServiceContext;
 }
 
+ServiceContext* getCurrentServiceContext() {
+    auto client = Client::getCurrent();
+    if (client) {
+        return client->getServiceContext();
+    }
+
+    return nullptr;
+}
+
 void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceContext) {
     if (globalServiceContext) {
         // Make sure that calling getGlobalServiceContext() during the destructor results in

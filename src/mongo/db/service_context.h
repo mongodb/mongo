@@ -609,6 +609,15 @@ bool hasGlobalServiceContext();
 ServiceContext* getGlobalServiceContext();
 
 /**
+ * Returns the ServiceContext associated with the current Client.
+ *
+ * Returns a nullptr if there is not a current Client
+ *
+ * Caller does not own pointer.
+ */
+ServiceContext* getCurrentServiceContext();
+
+/**
  * Sets the global ServiceContext.  If 'serviceContext' is NULL, un-sets and deletes
  * the current global ServiceContext.
  *
