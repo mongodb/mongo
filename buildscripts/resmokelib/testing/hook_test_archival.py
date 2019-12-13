@@ -5,6 +5,7 @@ import threading
 
 from .. import config
 from .. import utils
+from .. import errors
 from ..utils import globstar
 
 
@@ -41,21 +42,34 @@ class HookTestArchival(object):
         self._lock = threading.Lock()
 
     def _should_archive(self, success):
-        """Return True if failed test or 'on_success' is True."""
-        return not success or self.on_success
+        """Determine whether archiving should be done."""
+        return config.ARCHIVE_FILE and self.archive_instance \
+            and (not success or self.on_success)
 
-    def _archive_hook(self, logger, hook, test, success):
-        """Provide helper to archive hooks."""
-        hook_match = hook.REGISTERED_NAME in self.hooks
-        if not hook_match or not self._should_archive(success):
+    def _archive_hook(self, logger, result, manager):
+        """
+        Provide helper to archive hooks.
+
+        :param logger: Where the logging output should be placed.
+        :param result: A TestResult named tuple containing the test, hook, and outcome.
+        :param manager: FixtureTestCaseManager object for the calling Job.
+        """
+        if not result.hook.REGISTERED_NAME in self.hooks:
             return
 
-        test_name = "{}:{}".format(test.short_name(), hook.REGISTERED_NAME)
-        self._archive_hook_or_test(logger, test_name, test)
+        test_name = "{}:{}".format(result.test.short_name(), result.hook.REGISTERED_NAME)
+        self._archive_hook_or_test(logger, test_name, result.test, manager)
 
-    def _archive_test(self, logger, test, success):
-        """Provide helper to archive tests."""
-        test_name = test.test_name
+    def _archive_test(self, logger, result, manager):
+        """
+        Provide helper to archive tests.
+
+        :param logger: Where the logging output should be placed.
+        :param result: A TestResult named tuple containing the test, hook, and outcome.
+        :param manager: FixtureTestCaseManager object for the calling Job.
+
+        """
+        test_name = result.test.test_name
 
         if self.archive_all:
             test_match = True
@@ -67,23 +81,29 @@ class HookTestArchival(object):
                     test_match = True
                     break
 
-        if not test_match or not self._should_archive(success):
-            return
+        if test_match:
+            self._archive_hook_or_test(logger, test_name, result.test, manager)
 
-        self._archive_hook_or_test(logger, test_name, test)
+    def archive(self, logger, result, manager):
+        """
+        Archive data files for hooks or tests.
 
-    def archive(self, logger, test, success, hook=None):
-        """Archive data files for hooks or tests."""
-        if not config.ARCHIVE_FILE or not self.archive_instance:
+        :param logger: Where the logging output should be placed.
+        :param result: A TestResult named tuple containing the test, hook, and outcome.
+        :param manager: FixtureTestCaseManager object for the calling Job.
+        """
+        if not self._should_archive(result.success):
             return
-        if hook:
-            self._archive_hook(logger, hook, test, success)
+        if result.hook:
+            self._archive_hook(logger, result, manager)
         else:
-            self._archive_test(logger, test, success)
+            self._archive_test(logger, result, manager)
 
-    def _archive_hook_or_test(self, logger, test_name, test):
+    def _archive_hook_or_test(self, logger, test_name, test, manager):
         """Trigger archive of data files for a test or hook."""
 
+        # We can still attempt archiving even if the teardown fails.
+        teardown_success = manager.teardown_fixture(logger, kill=True)
         with self._lock:
             # Test repeat number is how many times the particular test has been archived.
             if test_name not in self._tests_repeat:
@@ -111,3 +131,10 @@ class HookTestArchival(object):
             logger.warning("Archive failed for %s: %s", test_name, message)
         else:
             logger.info("Archive succeeded for %s: %s", test_name, message)
+
+        setup_success = manager.setup_fixture(logger)
+        if not teardown_success:
+            raise errors.StopExecution(
+                "Error while killing test fixtures; data files may be invalid.")
+        if not setup_success:
+            raise errors.StopExecution("Error while restarting test fixtures after archiving.")
