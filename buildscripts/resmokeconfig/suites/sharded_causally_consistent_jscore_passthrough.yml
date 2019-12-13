@@ -77,8 +77,6 @@ selector:
   - jstests/core/mr1.js
   - jstests/core/mr3.js
   - jstests/core/mr4.js
-  # TODO: SERVER-30052
-  - jstests/core/queryoptimizer3.js
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
   # Tests that won't work with an injected 'majority' readConcern
