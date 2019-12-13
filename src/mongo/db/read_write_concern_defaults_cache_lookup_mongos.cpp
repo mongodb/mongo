@@ -27,13 +27,32 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongos.h"
+
+#include "mongo/db/commands/rwc_defaults_commands_gen.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
 boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoS(
     OperationContext* opCtx) {
-    return boost::none;
+    GetDefaultRWConcern configsvrRequest;
+    configsvrRequest.setDbName(NamespaceString::kAdminDb);
+
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting(ReadPreference::Nearest),
+        NamespaceString::kAdminDb.toString(),
+        configsvrRequest.toBSON({}),
+        Shard::RetryPolicy::kIdempotent));
+
+    uassertStatusOK(cmdResponse.commandStatus);
+
+    return RWConcernDefault::parse(
+        IDLParserErrorContext("readWriteConcernDefaultsCacheLookupMongoS"), cmdResponse.response);
 }
 
 }  // namespace mongo

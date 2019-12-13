@@ -34,6 +34,7 @@
 #include "mongo/s/sharding_uptime_reporter.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_mongos.h"
@@ -117,6 +118,14 @@ void ShardingUptimeReporter::startPeriodicThread() {
                                   ->refreshAndCheck(opCtx.get());
                 if (!status.isOK()) {
                     warning() << "failed to refresh mongos settings" << causedBy(status);
+                }
+
+                try {
+                    ReadWriteConcernDefaults::get(opCtx.get()->getServiceContext())
+                        .refreshIfNecessary(opCtx.get());
+                } catch (const DBException& ex) {
+                    warning() << "failed to refresh RWC defaults"
+                              << causedBy(redact(ex.toStatus()));
                 }
             }
 
