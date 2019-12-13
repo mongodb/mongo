@@ -8449,8 +8449,9 @@ buildvariants:
 - <<: *linux-64-debug-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
-  # TODO (SERVER-45127): Reset batchtime to default.
+  # TODO (SERVER-45127): Reset 'batchtime' and 'stepback' to default.
   batchtime: 10080 # 7 days
+  stepback: false
   modules:
   - wtdevelop
   expansions:
