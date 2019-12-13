@@ -18,16 +18,21 @@ const viewDef = {
     viewOn: collName,
     pipeline: []
 };
-assert.commandWorked(db.system.views.insert(viewDef));
 
-// If the reinitialization of the durable view catalog tries to create a NamespaceString using
-// the 'viewName' field, it will throw an exception in a place that is not exception safe,
-// resulting in an invariant failure. This previously occurred because validation was only
-// checking the collection part of the namespace, not the dbname part. With correct validation
-// in place, reinitialization succeeds despite the invalid name.
-assert.commandWorked(db.adminCommand({restartCatalog: 1}));
+try {
+    assert.commandWorked(db.system.views.insert(viewDef));
 
-// Don't let the bogus view stick around, or else it will cause an error in validation.
-const res = db.system.views.deleteOne({_id: viewName});
-assert.eq(1, res.deletedCount);
+    // If the reinitialization of the durable view catalog tries to create a NamespaceString using
+    // the 'viewName' field, it will throw an exception in a place that is not exception safe,
+    // resulting in an invariant failure. This previously occurred because validation was only
+    // checking the collection part of the namespace, not the dbname part. With correct validation
+    // in place, reinitialization succeeds despite the invalid name.
+    assert.commandWorked(db.adminCommand({restartCatalog: 1}));
+} finally {
+    // Don't let the bogus view stick around, or else it will cause an error in validation.
+    var result = db.system.views.deleteOne({_id: viewName});
+}
+// If this test otherwise succeeded, assert cleaning up succeeded.
+// Skip this assertion if the test otherwise failed, to avoid masking the original error.
+assert.eq(1, result.deletedCount);
 }());
