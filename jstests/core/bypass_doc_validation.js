@@ -108,9 +108,31 @@ function runBypassDocumentValidationTest(validator) {
     assert.commandWorked(res);
     assert.eq(1, outputColl.count({value: 'mapReduce'}));
 
-    // TODO SERVER-42511 Test the mapReduce command reading from a different database with output in
-    // this database which has the document validation.
-
+    // Test the mapReduce command if it is reading from a different database and collection without
+    // validation.
+    const otherDb = myDb.getSisterDB("mr_second_input_db");
+    const otherDbColl = otherDb.mr_second_input_coll;
+    assert.commandWorked(otherDbColl.insert({val: 1}));
+    outputColl.drop();
+    assert.commandWorked(myDb.createCollection(outputCollName, {validator: validator}));
+    res = otherDb.runCommand({
+        mapReduce: otherDbColl.getName(),
+        map: map,
+        reduce: reduce,
+        out: {replace: outputCollName, db: myDb.getName()},
+        bypassDocumentValidation: false
+    });
+    assertFailsValidation(res);
+    assert.eq(0, outputColl.count({value: 'mapReduce'}));
+    res = otherDb.runCommand({
+        mapReduce: otherDbColl.getName(),
+        map: map,
+        reduce: reduce,
+        out: {replace: outputCollName, db: myDb.getName()},
+        bypassDocumentValidation: true
+    });
+    assert.commandWorked(res);
+    assert.eq(1, outputColl.count({value: 'mapReduce'}));
     // Test the insert command. Includes a test for a document with no _id (SERVER-20859).
     res = myDb.runCommand({insert: collName, documents: [{}], bypassDocumentValidation: false});
     assertFailsValidation(BulkWriteResult(res));

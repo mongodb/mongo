@@ -7,7 +7,7 @@
  *
  * This test is labeled resource intensive because its total io_write is 58MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive]
+ * @tags: [resource_intensive, requires_fcv_44]
  */
 load('jstests/libs/write_concern_util.js');
 
@@ -266,234 +266,231 @@ const reduce = function(key, values) {
     return count;
 };
 
-// TODO SERVER-42511: Remove with internalQueryUseAggMapReduce M/R feature flag.
-if (TestData.setParameters.internalQueryUseAggMapReduce) {
-    // MapReduce on an unsharded collection.
-    commands.push({
-        req: {mapReduce: collName, map: map, reduce: reduce, out: "foo"},
-        setupFunc: function() {
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            if (writesExpected) {
-                assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
-                db.foo.drop();
-            } else {
-                assert.eq(0, db.foo.find().itcount());
-            }
-        },
-        admin: false,
-        // MapReduce with a replace output action is not expected to write on write concern error.
-        isExpectedToWriteOnWriteConcernFailure: false,
-    });
+// MapReduce on an unsharded collection.
+commands.push({
+    req: {mapReduce: collName, map: map, reduce: reduce, out: "foo"},
+    setupFunc: function() {
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        if (writesExpected) {
+            assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
+            db.foo.drop();
+        } else {
+            assert.eq(0, db.foo.find().itcount());
+        }
+    },
+    admin: false,
+    // MapReduce with a replace output action is not expected to write on write concern error.
+    isExpectedToWriteOnWriteConcernFailure: false,
+});
 
-    // MapReduce on an unsharded collection with an output to a sharded collection.
-    commands.push({
-        req: {mapReduce: collName, map: map, reduce: reduce, out: {merge: "foo", sharded: true}},
-        setupFunc: function() {
-            db.adminCommand({enablesharding: db.toString()});
-            assert.commandWorked(db.foo.createIndex({_id: "hashed"}));
-            st.shardColl(db.foo, {_id: "hashed"}, false);
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            if (writesExpected) {
-                assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
-                db.foo.drop();
-            } else {
-                assert.eq(0, db.foo.find().itcount());
-            }
-        },
-        admin: false,
-        isExpectedToWriteOnWriteConcernFailure: true,
-    });
+// MapReduce on an unsharded collection with an output to a sharded collection.
+commands.push({
+    req: {mapReduce: collName, map: map, reduce: reduce, out: {merge: "foo", sharded: true}},
+    setupFunc: function() {
+        db.adminCommand({enablesharding: db.toString()});
+        assert.commandWorked(db.foo.createIndex({_id: "hashed"}));
+        st.shardColl(db.foo, {_id: "hashed"}, false);
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        if (writesExpected) {
+            assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
+            db.foo.drop();
+        } else {
+            assert.eq(0, db.foo.find().itcount());
+        }
+    },
+    admin: false,
+    isExpectedToWriteOnWriteConcernFailure: true,
+});
 
-    // MapReduce on a sharded collection.
-    commands.push({
-        req: {mapReduce: collName, map: map, reduce: reduce, out: "foo"},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            if (writesExpected) {
-                assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
-                db.foo.drop();
-            } else {
-                assert.eq(0, db.foo.find().itcount());
-            }
-        },
-        admin: false,
-        // MapReduce with a replace output action expected not to write on write concern error.
-        isExpectedToWriteOnWriteConcernFailure: false,
-    });
+// MapReduce on a sharded collection.
+commands.push({
+    req: {mapReduce: collName, map: map, reduce: reduce, out: "foo"},
+    setupFunc: function() {
+        shardCollectionWithChunks(st, coll);
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        if (writesExpected) {
+            assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
+            db.foo.drop();
+        } else {
+            assert.eq(0, db.foo.find().itcount());
+        }
+    },
+    admin: false,
+    // MapReduce with a replace output action expected not to write on write concern error.
+    isExpectedToWriteOnWriteConcernFailure: false,
+});
 
-    // MapReduce from a sharded collection with merge to a sharded collection.
-    commands.push({
-        req: {mapReduce: collName, map: map, reduce: reduce, out: {merge: "foo", sharded: true}},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            assert.commandWorked(db.foo.createIndex({_id: "hashed"}));
-            st.shardColl(db.foo, {_id: "hashed"}, false);
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            if (writesExpected) {
-                assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
-                db.foo.drop();
-            } else {
-                assert.eq(0, db.foo.find().itcount());
-            }
-        },
-        admin: false,
-        // When output action is "merge" writes to the output collection are expected to succeed,
-        // regardless of writeConcern error.
-        isExpectedToWriteOnWriteConcernFailure: true,
-    });
+// MapReduce from a sharded collection with merge to a sharded collection.
+commands.push({
+    req: {mapReduce: collName, map: map, reduce: reduce, out: {merge: "foo", sharded: true}},
+    setupFunc: function() {
+        shardCollectionWithChunks(st, coll);
+        assert.commandWorked(db.foo.createIndex({_id: "hashed"}));
+        st.shardColl(db.foo, {_id: "hashed"}, false);
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        if (writesExpected) {
+            assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
+            db.foo.drop();
+        } else {
+            assert.eq(0, db.foo.find().itcount());
+        }
+    },
+    admin: false,
+    // When output action is "merge" writes to the output collection are expected to succeed,
+    // regardless of writeConcern error.
+    isExpectedToWriteOnWriteConcernFailure: true,
+});
 
-    // MapReduce on an unsharded collection, output to different database.
-    commands.push({
-        req: {mapReduce: collName, map: map, reduce: reduce, out: {replace: "foo", db: "other"}},
-        setupFunc: function() {
-            db.getSiblingDB("other").createCollection("foo");
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            const otherDB = db.getSiblingDB("other");
-            if (writesExpected) {
-                assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
-                otherDB.foo.drop();
-            } else {
-                assert.eq(0, otherDB.foo.find().itcount());
-            }
-        },
-        admin: false,
-        // MapReduce with a replace output action is not expected to write on write concern error.
-        isExpectedToWriteOnWriteConcernFailure: false,
-    });
+// MapReduce on an unsharded collection, output to different database.
+commands.push({
+    req: {mapReduce: collName, map: map, reduce: reduce, out: {replace: "foo", db: "other"}},
+    setupFunc: function() {
+        db.getSiblingDB("other").createCollection("foo");
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        const otherDB = db.getSiblingDB("other");
+        if (writesExpected) {
+            assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
+            otherDB.foo.drop();
+        } else {
+            assert.eq(0, otherDB.foo.find().itcount());
+        }
+    },
+    admin: false,
+    // MapReduce with a replace output action is not expected to write on write concern error.
+    isExpectedToWriteOnWriteConcernFailure: false,
+});
 
-    // MapReduce on a sharded collection, output to a different database.
-    commands.push({
-        req: {mapReduce: collName, map: map, reduce: reduce, out: {replace: "foo", db: "other"}},
-        setupFunc: function() {
-            db.getSiblingDB("other").createCollection("foo");
-            shardCollectionWithChunks(st, coll);
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            const otherDB = db.getSiblingDB("other");
-            if (writesExpected) {
-                assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
-                otherDB.foo.drop();
-            } else {
-                assert.eq(0, otherDB.foo.find().itcount());
-            }
-        },
-        admin: false,
-        // MapReduce with a replace output action expected not to write on write concern error.
-        isExpectedToWriteOnWriteConcernFailure: false,
-    });
+// MapReduce on a sharded collection, output to a different database.
+commands.push({
+    req: {mapReduce: collName, map: map, reduce: reduce, out: {replace: "foo", db: "other"}},
+    setupFunc: function() {
+        db.getSiblingDB("other").createCollection("foo");
+        shardCollectionWithChunks(st, coll);
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        const otherDB = db.getSiblingDB("other");
+        if (writesExpected) {
+            assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
+            otherDB.foo.drop();
+        } else {
+            assert.eq(0, otherDB.foo.find().itcount());
+        }
+    },
+    admin: false,
+    // MapReduce with a replace output action expected not to write on write concern error.
+    isExpectedToWriteOnWriteConcernFailure: false,
+});
 
-    // MapReduce on an unsharded collection with merge to a sharded collection in a different db.
-    commands.push({
-        req: {
-            mapReduce: collName,
-            map: map,
-            reduce: reduce,
-            out: {merge: "foo", db: "other", sharded: true}
-        },
-        setupFunc: function() {
-            const otherDB = db.getSiblingDB("other");
-            otherDB.createCollection("foo");
-            otherDB.adminCommand({enablesharding: otherDB.toString()});
-            assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
-            st.shardColl(db.foo, {_id: "hashed"}, false);
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            const otherDB = db.getSiblingDB("other");
-            if (writesExpected) {
-                assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
-                otherDB.foo.drop();
-            } else {
-                assert.eq(0, otherDB.foo.find().itcount());
-            }
-        },
-        admin: false,
-        isExpectedToWriteOnWriteConcernFailure: true,
-    });
+// MapReduce on an unsharded collection with merge to a sharded collection in a different db.
+commands.push({
+    req: {
+        mapReduce: collName,
+        map: map,
+        reduce: reduce,
+        out: {merge: "foo", db: "other", sharded: true}
+    },
+    setupFunc: function() {
+        const otherDB = db.getSiblingDB("other");
+        otherDB.createCollection("foo");
+        otherDB.adminCommand({enablesharding: otherDB.toString()});
+        assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
+        st.shardColl(db.foo, {_id: "hashed"}, false);
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        const otherDB = db.getSiblingDB("other");
+        if (writesExpected) {
+            assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
+            otherDB.foo.drop();
+        } else {
+            assert.eq(0, otherDB.foo.find().itcount());
+        }
+    },
+    admin: false,
+    isExpectedToWriteOnWriteConcernFailure: true,
+});
 
-    // MapReduce from a sharded collection with merge to a sharded collection in different db.
-    commands.push({
-        req: {
-            mapReduce: collName,
-            map: map,
-            reduce: reduce,
-            out: {merge: "foo", db: "other", sharded: true}
-        },
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            const otherDB = db.getSiblingDB("other");
-            otherDB.createCollection("foo");
-            assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
-            st.shardColl(otherDB.foo, {_id: "hashed"}, false);
-            coll.insert({x: -3, tags: ["a", "b"]});
-            coll.insert({x: -7, tags: ["b", "c"]});
-            coll.insert({x: 23, tags: ["c", "a"]});
-            coll.insert({x: 27, tags: ["b", "c"]});
-        },
-        confirmFunc: function(writesExpected = true) {
-            const otherDB = db.getSiblingDB("other");
-            if (writesExpected) {
-                assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
-                assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
-                assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
-                otherDB.foo.drop();
-            } else {
-                assert.eq(0, otherDB.foo.find().itcount());
-            }
-        },
-        admin: false,
-        // When output action is "merge" writes to the output collection are expected to succeed,
-        // regardless of writeConcern error.
-        isExpectedToWriteOnWriteConcernFailure: true,
-    });
-}
+// MapReduce from a sharded collection with merge to a sharded collection in different db.
+commands.push({
+    req: {
+        mapReduce: collName,
+        map: map,
+        reduce: reduce,
+        out: {merge: "foo", db: "other", sharded: true}
+    },
+    setupFunc: function() {
+        shardCollectionWithChunks(st, coll);
+        const otherDB = db.getSiblingDB("other");
+        otherDB.createCollection("foo");
+        assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
+        st.shardColl(otherDB.foo, {_id: "hashed"}, false);
+        coll.insert({x: -3, tags: ["a", "b"]});
+        coll.insert({x: -7, tags: ["b", "c"]});
+        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 27, tags: ["b", "c"]});
+    },
+    confirmFunc: function(writesExpected = true) {
+        const otherDB = db.getSiblingDB("other");
+        if (writesExpected) {
+            assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
+            assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
+            otherDB.foo.drop();
+        } else {
+            assert.eq(0, otherDB.foo.find().itcount());
+        }
+    },
+    admin: false,
+    // When output action is "merge" writes to the output collection are expected to succeed,
+    // regardless of writeConcern error.
+    isExpectedToWriteOnWriteConcernFailure: true,
+});
 
 function testValidWriteConcern(cmd) {
     cmd.req.writeConcern = {w: 'majority', wtimeout: 5 * 60 * 1000};
