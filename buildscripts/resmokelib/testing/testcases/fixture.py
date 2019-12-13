@@ -22,9 +22,11 @@ class FixtureSetupTestCase(FixtureTestCase):
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
     PHASE = "setup"
 
-    def __init__(self, logger, fixture, job_name):
+    def __init__(self, logger, fixture, job_name, times_set_up):
         """Initialize the FixtureSetupTestCase."""
-        FixtureTestCase.__init__(self, logger, job_name, self.PHASE)
+        specific_phase = "{phase}_{times_set_up}".format(phase=self.PHASE,
+                                                         times_set_up=times_set_up)
+        FixtureTestCase.__init__(self, logger, job_name, specific_phase)
         self.fixture = fixture
 
     def run_test(self):
@@ -78,9 +80,11 @@ class FixtureKillTestCase(FixtureTestCase):
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
     PHASE = "kill"
 
-    def __init__(self, logger, fixture, job_name):
+    def __init__(self, logger, fixture, job_name, times_set_up):
         """Initialize the FixtureKillTestCase."""
-        FixtureTestCase.__init__(self, logger, job_name, self.PHASE)
+        specific_phase = "{phase}_{times_set_up}".format(phase=self.PHASE,
+                                                         times_set_up=times_set_up)
+        FixtureTestCase.__init__(self, logger, job_name, specific_phase)
         self.fixture = fixture
 
     def run_test(self):

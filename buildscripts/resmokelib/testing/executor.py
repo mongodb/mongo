@@ -227,7 +227,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         """
         success = True
         for job in self._jobs:
-            if not job.teardown_fixture():
+            if not job.manager.teardown_fixture(self.logger):
                 self.logger.warning("Teardown of %s of job %s was not successful", job.fixture,
                                     job.job_num)
                 success = False
