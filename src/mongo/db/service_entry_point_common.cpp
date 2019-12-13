@@ -250,7 +250,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
             // server defaults.  So, warn if the operation has not specified readConcern and is on a
             // shard/config server.
             if (!readConcernArgs.isSpecified()) {
-                // TODO: Disabled until after SERVER-43712, to avoid log spam.
+                // TODO: Disabled until after SERVER-44539, to avoid log spam.
                 // log() << "Missing readConcern on " << invocation->definition()->getName();
             }
         } else {
