@@ -490,7 +490,7 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
 
     auto lookedUpDocument = pipeline->getNext();
     if (auto next = pipeline->getNext()) {
-        uasserted(ErrorCodes::TooManyMatchingDocuments,
+        uasserted(ErrorCodes::ChangeStreamFatalError,
                   str::stream() << "found more than one document with document key "
                                 << documentKey.toString() << " [" << lookedUpDocument->toString()
                                 << ", " << next->toString() << "]");
