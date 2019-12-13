@@ -336,7 +336,7 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
             continue;
         }
         uassertStatusOK(prepareResult);
-        result.push_back(spec);
+        result.push_back(prepareResult.getValue());
     }
     return result;
 }
