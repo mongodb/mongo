@@ -25,28 +25,7 @@ const reduceFn = function(k, vs) {
     return Array.sum(vs);
 };
 
-// TODO SERVER-42511 we should fix up and call the functions in this file once we flip on the new
-// implementation.
-function testReplace() {
-    let res = assert.commandWorked(
-        coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
-    const expected =
-        [{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}];
-    let actual = outColl.find().sort({_id: 1}).toArray();
-    assert.eq(expected, actual);
-
-    assert.eq(res.result.collection, outCollStr, "Wrong collection " + res.result.collection);
-    assert.eq(res.result.db, outDbStr, "Wrong db " + res.result.db);
-
-    // Run the whole thing again and make sure it does the same thing.
-    assert.commandWorked(outColl.insert({_id: 5, value: 1}));
-    assert.commandWorked(
-        coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
-    actual = outColl.find().sort({_id: 1}).toArray();
-    assert.eq(expected, actual);
-}
-
-function testMerge() {
+(function testMerge() {
     outColl.drop();
     assert.commandWorked(
         outColl.insert([{_id: 1, value: "something else"}, {_id: 5, value: "existing"}]));
@@ -61,9 +40,9 @@ function testMerge() {
     ];
     let actual = outColl.find().sort({_id: 1}).toArray();
     assert.eq(expected, actual);
-}
+})();
 
-function testReduce() {
+(function testReduce() {
     outColl.drop();
     assert.commandWorked(outColl.insert([{_id: 1, value: 100}, {_id: 5, value: 0}]));
     let res = assert.commandWorked(
@@ -77,5 +56,5 @@ function testReduce() {
     ];
     let actual = outColl.find().sort({_id: 1}).toArray();
     assert.eq(expected, actual);
-}
+})();
 }());

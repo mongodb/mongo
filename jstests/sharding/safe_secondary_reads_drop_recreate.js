@@ -13,8 +13,8 @@
  * - checkResults: A function that asserts whether the command should succeed or fail. If the
  *                 command is expected to succeed, the function should assert the expected results
  *                 *when the the collection has been dropped and recreated as empty.*
- * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
- * "versioned". Determines what system profiler checks are performed.
+ * - behavior: Must be "unshardedOnly", or "versioned". Determines what system profiler checks are
+ * performed.
  *
  * Tagged as 'requires_fcv_44', since this test cannot run against versions less then 4.4. This is
  * because 'planCacheListPlans' and 'planCacheListQueryShapes' were deleted in 4.4, and thus not
@@ -40,9 +40,7 @@ let validateTestCase = function(test) {
     assert(test.setUp && typeof (test.setUp) === "function");
     assert(test.command && typeof (test.command) === "object");
     assert(test.checkResults && typeof (test.checkResults) === "function");
-    assert(test.behavior === "unshardedOnly" ||
-           test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
-           test.behavior === "versioned");
+    assert(test.behavior === "unshardedOnly" || test.behavior === "versioned");
 };
 
 let testCases = {
@@ -346,19 +344,6 @@ let scenarios = {
         if (test.behavior === "unshardedOnly") {
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
-        } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
-            // Check that the primary shard primary received the request without a shardVersion
-            // field and returned success.
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: primaryShardPrimary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": false},
-                    "command.$readPreference": {$exists: false},
-                    "command.readConcern": {"level": "local"},
-                    "errCode": {"$exists": false}
-                },
-                                      commandProfile)
-            });
         } else if (test.behavior == "versioned") {
             // Check that the primary shard secondary returned stale shardVersion.
             profilerHasSingleMatchingEntryOrThrow({
@@ -416,19 +401,6 @@ let scenarios = {
         if (test.behavior === "unshardedOnly") {
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
-        } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
-            // Check that the primary shard primary received the request without a shardVersion
-            // field and returned success.
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: primaryShardPrimary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": false},
-                    "command.$readPreference": {$exists: false},
-                    "command.readConcern": {"level": "local"},
-                    "errCode": {"$exists": false},
-                },
-                                      commandProfile)
-            });
         } else if (test.behavior == "versioned") {
             // Check that the primary shard secondary returned stale shardVersion.
             profilerHasSingleMatchingEntryOrThrow({
@@ -500,19 +472,6 @@ let scenarios = {
                 {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
-        } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
-            // Check that the recipient shard primary received the request without a
-            // shardVersion field and returned success.
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: recipientShardPrimary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": false},
-                    "command.$readPreference": {$exists: false},
-                    "command.readConcern": {"level": "local"},
-                    "errCode": {"$exists": false},
-                },
-                                      commandProfile)
-            });
         } else if (test.behavior == "versioned") {
             // Check that the donor shard secondary returned stale shardVersion.
             profilerHasSingleMatchingEntryOrThrow({

@@ -26,7 +26,6 @@ const reduceFn = function(key, values) {
     return 1;
 };
 
-// TODO SERVER-42511 Remove the usage of internalQueryUseAggMapReduce.
 assert.commandFailedWithCode(
     testDB.runCommand({mapreduce: 'bar', map: mapFn, reduce: reduceFn, out: {inline: 1}}), 31264);
 

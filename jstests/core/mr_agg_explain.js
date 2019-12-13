@@ -1,6 +1,6 @@
 /**
  * Tests that running mapReduce with explain behaves as expected.
- * @tags: [incompatible_with_embedded]
+ * @tags: [incompatible_with_embedded, requires_fcv_44]
  */
 (function() {
 "use strict";
