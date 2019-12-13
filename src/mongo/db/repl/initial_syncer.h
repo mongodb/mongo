@@ -301,6 +301,10 @@ private:
      *         |
      *         |
      *         V
+     *   _lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime()
+     *         |
+     *         |
+     *         V
      *   _getBeginFetchingOpTimeCallback()
      *         |
      *         |
@@ -405,21 +409,13 @@ private:
 
     /**
      * Callback for first '_lastOplogEntryFetcher' callback. A successful response lets us
-     * determine the starting point for tailing the oplog using the OplogFetcher as well as
-     * setting a reference point for the state of the sync source's oplog when data cloning
-     * completes.
+     * determine the default starting point for tailing the oplog using the OplogFetcher if there
+     * are no active transactions on the sync source. This will be used as the default for the
+     * beginFetchingTimestamp.
      */
-    void _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
+    void _lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime(
         const StatusWith<Fetcher::QueryResponse>& result,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-        OpTime& beginFetchingOpTime);
-
-    /**
-     * Callback that gets the optime of the oldest active transaction in the sync source's
-     * transaction table. It will be used as the beginFetchingTimestamp.
-     */
-    void _getBeginFetchingOpTimeCallback(const StatusWith<Fetcher::QueryResponse>& result,
-                                         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Schedules a remote command to issue a find command on sync source's transaction table, which
@@ -427,7 +423,27 @@ private:
      * beginFetchingTimestamp.
      */
     Status _scheduleGetBeginFetchingOpTime_inlock(
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        const OpTime& defaultBeginFetchingOpTime);
+
+    /**
+     * Callback that gets the optime of the oldest active transaction in the sync source's
+     * transaction table. It will be used as the beginFetchingTimestamp.
+     */
+    void _getBeginFetchingOpTimeCallback(const StatusWith<Fetcher::QueryResponse>& result,
+                                         std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                                         const OpTime& defaultBeginFetchingOpTime);
+
+    /**
+     * Callback for second '_lastOplogEntryFetcher' callback. A successful response lets us
+     * determine the starting point for applying oplog entries during the oplog application phase
+     * as well as setting a reference point for the state of the sync source's oplog when data
+     * cloning completes.
+     */
+    void _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime& beginFetchingOpTime);
 
     /**
      * Callback for the '_fCVFetcher'. A successful response lets us check if the remote node
