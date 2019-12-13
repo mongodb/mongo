@@ -172,6 +172,27 @@ TEST(AssertUtils, UassertStatusOKPreservesExtraInfo) {
     }
 }
 
+TEST(AssertUtils, UassertStatusOKWithContextPreservesExtraInfo) {
+    const auto status = Status(ErrorExtraInfoExample(123), "");
+
+    try {
+        uassertStatusOKWithContext(status, "foo");
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        uassertStatusOKWithContext(status, "foo");
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
 TEST(AssertUtils, UassertTypedExtraInfoWorks) {
     try {
         uasserted(ErrorExtraInfoExample(123), "");
@@ -226,6 +247,14 @@ DEATH_TEST(UassertionTerminationTest, uassertStatusOK, "Terminating with uassert
 DEATH_TEST(UassertionTerminationTest, uassertStatusOKOverload, "Terminating with uassertStatusOK") {
     uassertStatusOK(
         StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with uassertStatusOK"));
+}
+
+DEATH_TEST(UassertionTerminationTest,
+           uassertStatusOKWithContext,
+           "Terminating with uassertStatusOKWithContext") {
+    uassertStatusOKWithContext(
+        Status(ErrorCodes::InternalError, "Terminating with uassertStatusOKWithContext"),
+        "Terminating with uassertStatusOKWithContext");
 }
 
 // fassert and its friends
@@ -347,6 +376,34 @@ DEATH_TEST(InvariantTerminationTest,
         << "Terminating with std::string invariant message: " << 12345;
     invariant(StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariant"),
               msg);
+}
+
+DEATH_TEST(InvariantTerminationTest, invariantStatusOK, "Terminating with invariantStatusOK") {
+    invariantStatusOK(Status(ErrorCodes::InternalError, "Terminating with invariantStatusOK"));
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantStatusOKOverload,
+           "Terminating with invariantStatusOK") {
+    invariantStatusOK(
+        StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariantStatusOK"));
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantStatusOKWithContext,
+           "Terminating with invariantStatusOKWithContext") {
+    invariantStatusOKWithContext(
+        Status(ErrorCodes::InternalError, "Terminating with invariantStatusOKWithContext"),
+        "Terminating with invariantStatusOKWithContext");
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantStatusOKWithContextOverload,
+           "Terminating with invariantStatusOKWithContextOverload") {
+    invariantStatusOKWithContext(
+        StatusWith<std::string>(ErrorCodes::InternalError,
+                                "Terminating with invariantStatusOKWithContext"),
+        "Terminating with invariantStatusOKWithContextOverload");
 }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)

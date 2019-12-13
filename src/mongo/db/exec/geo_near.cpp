@@ -245,7 +245,7 @@ static R2Annulus twoDDistanceBounds(const GeoNearParams& nearParams,
         // Reset the full bounds based on our index bounds
         GeoHashConverter::Parameters hashParams;
         Status status = GeoHashConverter::parseParameters(twoDIndex->infoObj(), &hashParams);
-        invariant(status.isOK());  // The index status should always be valid
+        invariantStatusOK(status);  // The index status should always be valid
 
         // The biggest distance possible in this indexed collection is the diagonal of the
         // square indexed region.
@@ -272,7 +272,7 @@ GeoNear2DStage::DensityEstimator::DensityEstimator(PlanStage::Children* children
     GeoHashConverter::Parameters hashParams;
     Status status = GeoHashConverter::parseParameters(std::move(infoObj), &hashParams);
     // The index status should always be valid.
-    invariant(status.isOK());
+    invariantStatusOK(status);
 
     _converter.reset(new GeoHashConverter(hashParams));
     _centroidCell = _converter->hash(_nearParams->nearQuery->centroid->oldPoint);
@@ -538,7 +538,7 @@ static double min2DBoundsIncrement(const GeoNearExpression& query,
                                    const IndexDescriptor* twoDIndex) {
     GeoHashConverter::Parameters hashParams;
     Status status = GeoHashConverter::parseParameters(twoDIndex->infoObj(), &hashParams);
-    invariant(status.isOK());  // The index status should always be valid
+    invariantStatusOK(status);  // The index status should always be valid
     GeoHashConverter hasher(hashParams);
 
     // The hasher error is the diagonal of a 2D hash region - it's generally not helpful
