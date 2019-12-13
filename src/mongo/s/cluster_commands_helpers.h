@@ -154,22 +154,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const BSONObj& collation);
 
 /**
- * Similar to scatterGatherVersionedTargetByRoutingTable but always targets the primary
- * shard for the namespace.
- */
-std::vector<AsyncRequestsSender::Response>
-scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
-    OperationContext* opCtx,
-    StringData dbName,
-    const NamespaceString& nss,
-    const CachedCollectionRoutingInfo& routingInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const BSONObj& query,
-    const BSONObj& collation);
-
-/**
  * Utility for dispatching commands on a namespace, but with special hybrid versioning:
  * - If the namespace is unsharded, a version is attached (so this node can find out if its routing
  * table was stale, and the namespace is actually sharded), and only the primary shard is targeted.

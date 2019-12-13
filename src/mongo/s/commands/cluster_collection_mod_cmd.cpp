@@ -73,7 +73,7 @@ public:
 
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        auto shardResponses = scatterGatherVersionedTargetPrimaryShardAndByRoutingTable(
+        auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             nss.db(),
             nss,
