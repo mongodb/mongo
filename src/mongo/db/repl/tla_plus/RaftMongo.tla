@@ -61,6 +61,40 @@ Min(s) == CHOOSE x \in s : \A y \in s : x <= y
 \* Return the maximum value from a set, or undefined if the set is empty.
 Max(s) == CHOOSE x \in s : \A y \in s : x >= y
 
+GlobalCurrentTerm ==
+    LET terms == {term[i]: i \in Server}
+     IN Max(terms)
+
+\* The set of nodes that has log[me][logIndex] in their oplog
+Agree(me, logIndex) ==
+    { node \in Server :
+        /\ Len(log[node]) >= logIndex
+        /\ LogTerm(me, logIndex) = LogTerm(node, logIndex) }
+
+IsCommitted(me, logIndex) ==
+    /\ Agree(me, logIndex) \in Quorum
+    \* Committing log entries in older terms violates the safety properties of the spec.
+    \* [ P (2), S (), S ()]
+    \* [ S (2), S (), P (3)]
+    \* [ S (2), S (2), P (3)] ! the term 2 entry shouldn't be considered committed.
+    /\ \E leader \in Server:
+        /\ state[leader] = "Leader"
+        /\ LogTerm(me, logIndex) = GlobalCurrentTerm
+
+CanRollbackOplog(i, j) ==
+    /\ Len(log[i]) > 0
+    /\ \* The log with later term is more up-to-date
+       LastTerm(log[i]) < LastTerm(log[j])
+    /\
+       \/ Len(log[i]) > Len(log[j])
+       \/ /\ Len(log[i]) <= Len(log[j])
+          /\ LastTerm(log[i]) /= LogTerm(j, Len(log[i]))
+
+RollbackCommitted(i) ==
+    \E j \in Server:
+        /\ CanRollbackOplog(i, j)
+        /\ IsCommitted(i, Len(log[i]))
+
 ----
 \* Define initial values for all variables
 
@@ -89,51 +123,12 @@ LearnTermViaHeartbeat(i, j) ==
     /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
     /\ UNCHANGED <<state, commitPoint, logVars>>
 
-CanRollbackOplog(i, j) ==
-    /\ Len(log[i]) > 0
-    /\ \* The log with later term is more up-to-date
-       LastTerm(log[i]) < LastTerm(log[j])
-    /\
-       \/ Len(log[i]) > Len(log[j])
-       \/ /\ Len(log[i]) <= Len(log[j])
-          /\ LastTerm(log[i]) /= LogTerm(j, Len(log[i]))
-
 RollbackOplog(i, j) ==
     /\ CanRollbackOplog(i, j)
     \* Rollback 1 oplog entry
     /\ LET new == [index2 \in 1..(Len(log[i]) - 1) |-> log[i][index2]]
          IN log' = [log EXCEPT ![i] = new]
     /\ UNCHANGED <<serverVars>>
-
-\* The set of nodes that has log[me][logIndex] in their oplog
-Agree(me, logIndex) ==
-    { node \in Server :
-        /\ Len(log[node]) >= logIndex
-        /\ LogTerm(me, logIndex) = LogTerm(node, logIndex) }
-
-GlobalCurrentTerm ==
-    LET terms == {term[i]: i \in Server}
-     IN Max(terms)
-
-IsCommitted(me, logIndex) ==
-    /\ Agree(me, logIndex) \in Quorum
-    \* Committing log entries in older terms violates the safety properties of the spec.
-    \* [ P (2), S (), S ()]
-    \* [ S (2), S (), P (3)]
-    \* [ S (2), S (2), P (3)] ! the term 2 entry shouldn't be considered committed.
-    /\ \E leader \in Server:
-        /\ state[leader] = "Leader"
-        /\ LogTerm(me, logIndex) = GlobalCurrentTerm
-
-\* RollbackCommitted and NeverRollbackCommitted are not actions.
-\* They are used for verification.
-RollbackCommitted(i) ==
-    \E j \in Server:
-        /\ CanRollbackOplog(i, j)
-        /\ IsCommitted(i, Len(log[i]))
-
-NeverRollbackCommitted ==
-    \A i \in Server: ~RollbackCommitted(i)
 
 \* ACTION
 \* i = the new primary node.
@@ -165,7 +160,7 @@ AdvanceCommitPoint ==
     \E leader \in Server :
         /\ state[leader] = "Leader"
         \* New commitPoint is any committed log index after current commitPoint
-        /\ \E committedIndex \in (commitPoint[leader].index+1)..Len(log[leader]) :
+        /\ \E committedIndex \in (commitPoint[leader].index + 1)..Len(log[leader]) :
             /\ IsCommitted(leader, committedIndex)
             /\ LET newCommitPoint == [term |-> LogTerm(leader, committedIndex), index |-> committedIndex]
                IN  commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
@@ -184,7 +179,7 @@ LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
     /\ CommitPointLessThan(i, j)
     \* Never beyond last applied
     /\ LET myCommitPoint ==
-            \* If they have the same term, commit point can be ahead.
+            \* If j's term is less than or equal to i's, commit point can be ahead.
             IF commitPoint[j].term <= LastTerm(log[i])
             THEN commitPoint[j]
             ELSE [term |-> LastTerm(log[i]), index |-> Len(log[i])]
@@ -271,5 +266,9 @@ Liveness ==
 \* The specification must start with the initial state and transition according
 \* to Next.
 Spec == Safety /\ Liveness
+
+\* Invariant for model-checking
+NeverRollbackCommitted ==
+    \A i \in Server: ~RollbackCommitted(i)
 
 ===============================================================================
