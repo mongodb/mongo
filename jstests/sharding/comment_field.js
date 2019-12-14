@@ -132,6 +132,16 @@ function runCommentParamTest(
     let expectedAdditionalEntries = (cmdName === "update") ? command["updates"].length : 0;
     expectedAdditionalEntries += (cmdName === "delete") ? command["deletes"].length : 0;
 
+    // Verify that profile entry has 'comment' field.
+    const profileFilter = {"command.comment": commentObj};
+    assert.eq(shard0DB.system.profile.find(profileFilter).itcount() +
+                  shard1DB.system.profile.find(profileFilter).itcount(),
+              (expectedAdditionalEntries > 0) ? expectedAdditionalEntries : expectedRunningOps,
+              () => tojson({
+                  [st.shard0.name]: shard0DB.system.profile.find().toArray(),
+                  [st.shard1.name]: shard1DB.system.profile.find().toArray()
+              }));
+
     // Run the 'checkLog' only for commands with uuid so that the we know the log line belongs to
     // current operation.
     if (commentObj["uuid"]) {
@@ -147,17 +157,6 @@ function runCommentParamTest(
             ],
             expectedLogLines);
     }
-
-    // Reset log level to zero.
-    for (let shardDB of [shard0DB, shard1DB]) {
-        shardDB.getSiblingDB("admin").setLogLevel(0);
-    }
-
-    // Verify that profile entry has 'comment' field.
-    const profileFilter = {"command.comment": commentObj};
-    assert.eq(shard0DB.system.profile.find(profileFilter).itcount() +
-                  shard1DB.system.profile.find(profileFilter).itcount(),
-              (expectedAdditionalEntries > 0) ? expectedAdditionalEntries : expectedRunningOps);
 }
 
 // For find command on a sharded collection, when all the shards are targetted.
