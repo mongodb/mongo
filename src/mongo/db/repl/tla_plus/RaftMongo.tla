@@ -71,6 +71,12 @@ Agree(me, logIndex) ==
         /\ Len(log[node]) >= logIndex
         /\ LogTerm(me, logIndex) = LogTerm(node, logIndex) }
 
+\* Return whether Node i can learn the commit point from Node j.
+CommitPointLessThan(i, j) ==
+   \/ commitPoint[i].term < commitPoint[j].term
+   \/ /\ commitPoint[i].term = commitPoint[j].term
+      /\ commitPoint[i].index < commitPoint[j].index
+
 IsCommitted(me, logIndex) ==
     /\ Agree(me, logIndex) \in Quorum
     \* Committing log entries in older terms violates the safety properties of the spec.
@@ -123,6 +129,12 @@ LearnTermViaHeartbeat(i, j) ==
     /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
     /\ UNCHANGED <<state, commitPoint, logVars>>
 
+\* Node i learns the commit point from j via heartbeat.
+LearnCommitPoint(i, j) ==
+    /\ CommitPointLessThan(i, j)
+    /\ commitPoint' = [commitPoint EXCEPT ![i] = commitPoint[j]]
+    /\ UNCHANGED <<electionVars, logVars>>
+
 RollbackOplog(i, j) ==
     /\ CanRollbackOplog(i, j)
     \* Rollback 1 oplog entry
@@ -166,11 +178,11 @@ AdvanceCommitPoint ==
                IN  commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
             /\ UNCHANGED <<electionVars, logVars>>
 
-\* Return whether Node i can learn the commit point from Node j.
-CommitPointLessThan(i, j) ==
-   \/ commitPoint[i].term < commitPoint[j].term
-   \/ /\ commitPoint[i].term = commitPoint[j].term
-      /\ commitPoint[i].index < commitPoint[j].index
+\* ACTION
+\* Node i learns the commit point from j via heartbeat with term check
+LearnCommitPointWithTermCheck(i, j) ==
+    /\ LastTerm(log[i]) = commitPoint[j].term
+    /\ LearnCommitPoint(i, j)
 
 \* ACTION
 LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
@@ -201,6 +213,9 @@ BecomePrimaryByMagicAction ==
 
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
+
+LearnCommitPointWithTermCheckAction ==
+    \E i, j \in Server : LearnCommitPointWithTermCheck(i, j)
 
 LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction ==
     \E i, j \in Server : LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j)
@@ -247,6 +262,7 @@ Next ==
     \*
     \* --- Commit point learning protocol
     \/ AdvanceCommitPoint
+    \/ LearnCommitPointWithTermCheckAction
     \/ LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction
 
 Safety == Init /\ [][Next]_vars
@@ -261,6 +277,7 @@ Liveness ==
     \* /\ WF_vars(ClientWriteAction)
     \*
     /\ WF_vars(AdvanceCommitPoint)
+    /\ SF_vars(LearnCommitPointWithTermCheckAction)
     /\ SF_vars(LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction)
 
 \* The specification must start with the initial state and transition according
