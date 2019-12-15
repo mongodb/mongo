@@ -1,3 +1,9 @@
+\* Copyright 2019 MongoDB, Inc.
+\*
+\* This work is licensed under:
+\* - Creative Commons Attribution-3.0 United States License
+\*   http://creativecommons.org/licenses/by/3.0/us/
+
 --------------------------------- MODULE RaftMongoWithRaftReconfig --------------------------------
 \* This is the formal specification for the Raft consensus algorithm in MongoDB.
 \* It allows reconfig using the protocol for single server membership changes described in Raft.
