@@ -1556,4 +1556,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+ 27) License Notice for Raft TLA+ Specification
+-----------------------------------------------
+
+https://github.com/ongardie/dissertation/blob/master/LICENSE
+
+Copyright 2014 Diego Ongaro.
+
+Some of our TLA+ specifications are based on the Raft TLA+ specification by Diego Ongaro.
+
 End
