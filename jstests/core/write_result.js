@@ -6,7 +6,10 @@
 //   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
 //   requires_non_retryable_writes,
-//   requires_fastcount
+//   requires_fastcount,
+//   # TODO (SERVER-43892): We can enable this test in the multiversion passthrough, which starts
+//   # shards as replica sets, once the test can be run against replica set shards.
+//   multiversion_incompatible,
 // ]
 
 //
