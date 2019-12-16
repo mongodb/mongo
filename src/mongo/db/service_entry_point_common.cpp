@@ -1146,6 +1146,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
                 CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
             }
 
+            opCtx->setExhaust(OpMsg::isFlagSet(message, OpMsg::kExhaustSupported));
+
             execCommandDatabase(opCtx, c, request, replyBuilder.get(), behaviors);
         } catch (const DBException& ex) {
             BSONObjBuilder metadataBob;
@@ -1178,6 +1180,11 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
     DbResponse dbResponse;
 
+    dbResponse.shouldRunAgainForExhaust = replyBuilder->shouldRunAgainForExhaust();
+    dbResponse.nextInvocation = replyBuilder->getNextInvocation();
+
+    // TODO SERVER-44517: This block can be removed once 'exhaustNS' and 'exhaustCursorId' are
+    // removed from DbResponse.
     if (OpMsg::isFlagSet(message, OpMsg::kExhaustSupported)) {
         auto responseObj = replyBuilder->getBodyBuilder().asTempObj();
         auto cursorObj = responseObj.getObjectField("cursor");

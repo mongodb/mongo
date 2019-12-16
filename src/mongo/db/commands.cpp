@@ -614,9 +614,11 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
 //////////////////////////////////////////////////////////////
 // Command
 
-class BasicCommand::Invocation final : public CommandInvocation {
+class BasicCommandWithReplyBuilderInterface::Invocation final : public CommandInvocation {
 public:
-    Invocation(OperationContext*, const OpMsgRequest& request, BasicCommand* command)
+    Invocation(OperationContext*,
+               const OpMsgRequest& request,
+               BasicCommandWithReplyBuilderInterface* command)
         : CommandInvocation(command),
           _command(command),
           _request(&request),
@@ -625,10 +627,11 @@ public:
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         opCtx->lockState()->setDebugInfo(redact(_request->body));
-        BSONObjBuilder bob = result->getBodyBuilder();
-        bool ok = _command->run(opCtx, _dbName, _request->body, bob);
-        if (!ok)
+        bool ok = _command->runWithReplyBuilder(opCtx, _dbName, _request->body, result);
+        if (!ok) {
+            BSONObjBuilder bob = result->getBodyBuilder();
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
+        }
     }
 
     void explain(OperationContext* opCtx,
@@ -666,7 +669,7 @@ private:
         return _request->body;
     }
 
-    BasicCommand* const _command;
+    BasicCommandWithReplyBuilderInterface* const _command;
     const OpMsgRequest* const _request;
     const std::string _dbName;
 };
@@ -688,8 +691,8 @@ void Command::snipForLogging(mutablebson::Document* cmdObj) const {
 }
 
 
-std::unique_ptr<CommandInvocation> BasicCommand::parse(OperationContext* opCtx,
-                                                       const OpMsgRequest& request) {
+std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
+    OperationContext* opCtx, const OpMsgRequest& request) {
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
     return std::make_unique<Invocation>(opCtx, request, this);
 }
@@ -701,22 +704,22 @@ Command::Command(StringData name, StringData oldName)
     globalCommandRegistry()->registerCommand(this, name, oldName);
 }
 
-Status BasicCommand::explain(OperationContext* opCtx,
-                             const OpMsgRequest& request,
-                             ExplainOptions::Verbosity verbosity,
-                             rpc::ReplyBuilderInterface* result) const {
+Status BasicCommandWithReplyBuilderInterface::explain(OperationContext* opCtx,
+                                                      const OpMsgRequest& request,
+                                                      ExplainOptions::Verbosity verbosity,
+                                                      rpc::ReplyBuilderInterface* result) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 
-Status BasicCommand::checkAuthForOperation(OperationContext* opCtx,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) const {
+Status BasicCommandWithReplyBuilderInterface::checkAuthForOperation(OperationContext* opCtx,
+                                                                    const std::string& dbname,
+                                                                    const BSONObj& cmdObj) const {
     return checkAuthForCommand(opCtx->getClient(), dbname, cmdObj);
 }
 
-Status BasicCommand::checkAuthForCommand(Client* client,
-                                         const std::string& dbname,
-                                         const BSONObj& cmdObj) const {
+Status BasicCommandWithReplyBuilderInterface::checkAuthForCommand(Client* client,
+                                                                  const std::string& dbname,
+                                                                  const BSONObj& cmdObj) const {
     std::vector<Privilege> privileges;
     this->addRequiredPrivileges(dbname, cmdObj, &privileges);
     if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))

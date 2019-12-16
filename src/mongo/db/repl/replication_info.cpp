@@ -75,7 +75,16 @@ using std::unique_ptr;
 
 namespace repl {
 namespace {
-void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
+/**
+ * Appends replication-related fields to the isMaster response. Returns the topology version that
+ * was included in the response.
+ * TODO SERVER-44813: Always return a topology version, including on standalones.
+ */
+boost::optional<TopologyVersion> appendReplicationInfo(OperationContext* opCtx,
+                                                       BSONObjBuilder& result,
+                                                       int level) {
+    TopologyVersion topologyVersion;
+
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
         const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
@@ -85,7 +94,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
         if (level) {
             replCoord->appendSlaveInfoData(&result);
         }
-        return;
+        return isMasterResponse.getTopologyVersion();
     }
 
     result.appendBool("ismaster",
@@ -154,6 +163,8 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
 
         replCoord->appendSlaveInfoData(&result);
     }
+
+    return boost::none;
 }
 
 class ReplicationInfoServerStatus : public ServerStatusSection {
@@ -213,9 +224,9 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMaster final : public BasicCommand {
+class CmdIsMaster final : public BasicCommandWithReplyBuilderInterface {
 public:
-    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
+    CmdIsMaster() : BasicCommandWithReplyBuilderInterface("isMaster", "ismaster") {}
 
     bool requiresAuth() const final {
         return false;
@@ -238,10 +249,10 @@ public:
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const final {}  // No auth required
 
-    bool run(OperationContext* opCtx,
-             const string&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
+    bool runWithReplyBuilder(OperationContext* opCtx,
+                             const string&,
+                             const BSONObj& cmdObj,
+                             rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
         // TODO Unwind after SERVER-41070
@@ -365,12 +376,13 @@ public:
         // present if and only if topologyVersion is present in the request.
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        boost::optional<TopologyVersion> clientTopologyVersion;
         if (topologyVersionElement && maxAwaitTimeMSField) {
-            auto topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                                                          topologyVersionElement.Obj());
+            clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+                                                           topologyVersionElement.Obj());
             uassert(31372,
                     "topologyVersion must have a non-negative counter",
-                    topologyVersion.getCounter() >= 0);
+                    clientTopologyVersion->getCounter() >= 0);
 
             long long maxAwaitTimeMS;
             uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
@@ -390,7 +402,8 @@ public:
                     !topologyVersionElement && !maxAwaitTimeMSField);
         }
 
-        appendReplicationInfo(opCtx, result, 0);
+        auto result = replyBuilder->getBodyBuilder();
+        auto currentTopologyVersion = appendReplicationInfo(opCtx, result, 0);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;
@@ -431,6 +444,34 @@ public:
 
         auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
         saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
+
+        // TODO SERVER-44813: currentTopologyVersion should always be set.
+        if (opCtx->isExhaust() && currentTopologyVersion) {
+            LOG(3) << "Using exhaust for isMaster protocol";
+
+            uassert(51756,
+                    "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",
+                    maxAwaitTimeMSField);
+            invariant(clientTopologyVersion);
+
+            if (clientTopologyVersion->getProcessId() == currentTopologyVersion->getProcessId() &&
+                clientTopologyVersion->getCounter() == currentTopologyVersion->getCounter()) {
+                // Indicate that the previous invocation should be reused for the next invocation.
+                replyBuilder->setNextInvocation(boost::none);
+            } else {
+                BSONObjBuilder nextInvocationBuilder;
+                for (auto&& elt : cmdObj) {
+                    if (elt.fieldNameStringData() == "topologyVersion"_sd) {
+                        BSONObjBuilder topologyVersionBuilder(
+                            nextInvocationBuilder.subobjStart("topologyVersion"));
+                        currentTopologyVersion->serialize(&topologyVersionBuilder);
+                    } else {
+                        nextInvocationBuilder.append(elt);
+                    }
+                }
+                replyBuilder->setNextInvocation(nextInvocationBuilder.obj());
+            }
+        }
 
         return true;
     }

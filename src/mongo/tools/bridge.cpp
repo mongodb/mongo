@@ -171,14 +171,6 @@ public:
         return "<unknown>";
     }
 
-    void setExhaust(bool val) {
-        _inExhaust = val;
-    }
-
-    bool inExhaust() const {
-        return _inExhaust;
-    }
-
     void extractHostInfo(OpMsgRequest request) {
         if (_seenFirstMessage)
             return;
@@ -212,7 +204,6 @@ private:
     PseudoRandom _prng;
     boost::optional<HostAndPort> _host;
     bool _seenFirstMessage = false;
-    bool _inExhaust = false;
 };
 
 const transport::Session::Decoration<ProxiedConnection> ProxiedConnection::_get =
@@ -230,6 +221,18 @@ public:
 };
 
 DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const Message& request) {
+    uassert(51754,
+            "Mongobridge does not support exhaust",
+            !OpMsg::isFlagSet(request, OpMsg::kExhaustSupported));
+
+    if (request.operation() == dbQuery) {
+        DbMessage d(request);
+        QueryMessage q(d);
+        if (q.queryOptions & QueryOption_Exhaust) {
+            uasserted(51755, "Mongobridge does not support exhaust");
+        }
+    }
+
     const auto& source = opCtx->getClient()->session();
     auto& dest = ProxiedConnection::get(source);
     auto brCtx = BridgeContext::get();
@@ -261,25 +264,6 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         if (!dest.getSession()) {
             source->end();
             uasserted(50861, str::stream() << "Unable to connect to " << source->remote());
-        }
-    }
-
-    if (dest.inExhaust()) {
-        DbMessage dbm(request);
-
-        auto response = uassertStatusOK(dest->sourceMessage());
-        if (response.operation() == dbCompressed) {
-            MessageCompressorManager compressorMgr;
-            response = uassertStatusOK(compressorMgr.decompressMessage(response));
-        }
-
-        MsgData::View header = response.header();
-        QueryResult::View qr = header.view2ptr();
-        if (qr.getCursorId()) {
-            return {std::move(response)};
-        } else {
-            dest.setExhaust(false);
-            return {Message(), dbm.getns()};
         }
     }
 
@@ -372,22 +356,10 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
             return {Message()};
         }
 
-        std::string exhaustNS;
-        if (request.operation() == dbQuery) {
-            DbMessage d(request);
-            QueryMessage q(d);
-            dest.setExhaust(q.queryOptions & QueryOption_Exhaust);
-            if (dest.inExhaust()) {
-                exhaustNS = d.getns();
-            }
-        } else {
-            dest.setExhaust(false);
-        }
-
         // The original checksum won't be valid once the network layer replaces requestId. Remove it
         // because the network layer re-checksums the response.
         OpMsg::removeChecksum(&response);
-        return {std::move(response), exhaustNS};
+        return {std::move(response)};
     } else {
         return {Message()};
     }

@@ -97,12 +97,9 @@ Message makeLegacyExhaustMessage(Message* m, const DbResponse& dbresponse) {
 
 /**
  * Given a request and its already generated response, checks for exhaust flags. If exhaust is
- * allowed, modifies the given request message to produce the subsequent exhaust message, and
- * modifies the response message to indicate it is part of an exhaust stream. Returns the modified
- * request message for it to be used as the subsequent, 'synthetic' exhaust request. Returns an
- * empty message if exhaust is not allowed.
- *
- * Currently only supports exhaust for 'getMore' commands.
+ * allowed, produces the subsequent request message, and modifies the response message to indicate
+ * it is part of an exhaust stream. Returns the subsequent request message, which is known as a
+ * 'synthetic' exhaust request. Returns an empty message if exhaust is not allowed.
  */
 Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
     if (requestMsg.operation() == dbQuery) {
@@ -112,6 +109,44 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
     if (!OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported)) {
         return Message();
     }
+
+    const bool checksumPresent = OpMsg::isFlagSet(requestMsg, OpMsg::kChecksumPresent);
+    if (dbresponse->shouldRunAgainForExhaust) {
+        Message exhaustMessage;
+
+        if (auto nextInvocation = dbresponse->nextInvocation) {
+            // The command provided a new BSONObj for the next invocation.
+            OpMsgBuilder builder;
+            builder.setBody(*nextInvocation);
+            exhaustMessage = builder.finish();
+        } else {
+            // Reuse the previous invocation for the next invocation.
+            OpMsg::removeChecksum(&requestMsg);
+            exhaustMessage = requestMsg;
+        }
+
+        // The id of the response is used as the request id of this 'synthetic' request. Re-checksum
+        // if needed.
+        exhaustMessage.header().setId(dbresponse->response.header().getId());
+        exhaustMessage.header().setResponseToMsgId(
+            dbresponse->response.header().getResponseToMsgId());
+        OpMsg::setFlag(&exhaustMessage, OpMsg::kExhaustSupported);
+        if (checksumPresent) {
+            OpMsg::appendChecksum(&exhaustMessage);
+        }
+
+        OpMsg::removeChecksum(&dbresponse->response);
+        // Indicate that the response is part of an exhaust stream. Re-checksum if needed.
+        OpMsg::setFlag(&dbresponse->response, OpMsg::kMoreToCome);
+        if (checksumPresent) {
+            OpMsg::appendChecksum(&dbresponse->response);
+        }
+
+        return exhaustMessage;
+    }
+
+    // TODO SERVER-44517: Everything below this line should go away, and we should return Message(),
+    // since the command did not set a next invocation.
 
     // Only support exhaust for 'getMore' commands.
     auto request = OpMsgRequest::parse(requestMsg);
@@ -125,7 +160,6 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
         return Message();
     }
 
-    const bool checksumPresent = OpMsg::isFlagSet(requestMsg, OpMsg::kChecksumPresent);
     OpMsg::removeChecksum(&dbresponse->response);
     // Indicate that the response is part of an exhaust stream. Re-checksum if needed.
     OpMsg::setFlag(&dbresponse->response, OpMsg::kMoreToCome);
