@@ -74,7 +74,6 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                      kProgressMeterCheckInterval,
                      "documents copied",
                      str::stream() << _sourceNss.toString() << " collection clone progress"),
-      _dbWorkTaskRunner(dbPool),
       _scheduleDbWorkFn([this](executor::TaskExecutor::CallbackFn work) {
           auto task = [ this, work = std::move(work) ](
                           OperationContext * opCtx,
@@ -88,7 +87,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
           };
           _dbWorkTaskRunner.schedule(std::move(task));
           return executor::TaskExecutor::CallbackHandle();
-      }) {
+      }),
+      _dbWorkTaskRunner(dbPool) {
     invariant(sourceNss.isValid());
     invariant(collectionOptions.uuid);
     _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.db().toString(), *collectionOptions.uuid);
@@ -118,7 +118,11 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
         log() << "CollectionCloner ns: '" << getCloner()->getSourceNss() << "' uuid: UUID(\""
               << getCloner()->getSourceUuid()
               << "\") stopped because collection was dropped on source.";
+        getCloner()->waitForDatabaseWorkToComplete();
         return kSkipRemainingStages;
+    } catch (const DBException&) {
+        getCloner()->waitForDatabaseWorkToComplete();
+        throw;
     }
 }
 
@@ -184,7 +188,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::queryStage() {
                        QueryOption_NoCursorTimeout | QueryOption_SlaveOk |
                            (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
                        _collectionClonerBatchSize);
-    _dbWorkTaskRunner.join();
+    waitForDatabaseWorkToComplete();
     // We want to free the _collLoader regardless of whether the commit succeeds.
     std::unique_ptr<CollectionBulkLoader> loader = std::move(_collLoader);
     uassertStatusOK(loader->commit());
@@ -277,6 +281,10 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
 bool CollectionCloner::isMyFailPoint(const BSONObj& data) const {
     auto nss = data["nss"].str();
     return (nss.empty() || nss == _sourceNss.toString()) && BaseCloner::isMyFailPoint(data);
+}
+
+void CollectionCloner::waitForDatabaseWorkToComplete() {
+    _dbWorkTaskRunner.join();
 }
 
 CollectionCloner::Stats CollectionCloner::getStats() const {
