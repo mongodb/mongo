@@ -49,6 +49,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -411,7 +412,35 @@ void MongoInterfaceStandalone::createCollection(OperationContext* opCtx,
 void MongoInterfaceStandalone::createIndexes(OperationContext* opCtx,
                                              const NamespaceString& ns,
                                              const std::vector<BSONObj>& indexSpecs) {
-    _client.createIndexes(ns.ns(), indexSpecs);
+    AutoGetCollection autoColl(opCtx, ns, MODE_X);
+    writeConflictRetry(
+        opCtx, "MongoInterfaceStandalone::createIndexesOnEmptyCollection", ns.ns(), [&] {
+            auto collection = autoColl.getCollection();
+            invariant(collection,
+                      str::stream() << "Failed to create indexes for aggregation because "
+                                       "collection does not exist: "
+                                    << ns << ": " << BSON("indexes" << indexSpecs));
+
+            invariant(0U == collection->numRecords(opCtx),
+                      str::stream() << "Expected empty collection for index creation: " << ns
+                                    << ": numRecords: " << collection->numRecords(opCtx) << ": "
+                                    << BSON("indexes" << indexSpecs));
+
+            // Secondary index builds do not filter existing indexes so we have to do this on the
+            // primary.
+            auto removeIndexBuildsToo = false;
+            auto filteredIndexes = collection->getIndexCatalog()->removeExistingIndexes(
+                opCtx, indexSpecs, removeIndexBuildsToo);
+            if (filteredIndexes.empty()) {
+                return;
+            }
+
+            WriteUnitOfWork wuow(opCtx);
+            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                opCtx, collection->uuid(), filteredIndexes, false  // fromMigrate
+            );
+            wuow.commit();
+        });
 }
 void MongoInterfaceStandalone::dropCollection(OperationContext* opCtx, const NamespaceString& ns) {
     BSONObjBuilder result;

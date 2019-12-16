@@ -215,6 +215,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
         '$BUILD_DIR/mongo/db/transaction',
