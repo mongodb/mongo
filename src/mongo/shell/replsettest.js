@@ -1098,7 +1098,8 @@ var ReplSetTest = function(opts) {
      * TODO(SERVER-14017): remove this in favor of using initiate() everywhere.
      */
     this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd, {
-        doNotWaitForStableRecoveryTimestamp: doNotWaitForStableRecoveryTimestamp = false
+        doNotWaitForStableRecoveryTimestamp: doNotWaitForStableRecoveryTimestamp = false,
+        doNotWaitForReplication: doNotWaitForReplication = false
     } = {}) {
         let startTime = new Date();  // Measure the execution time of this function.
         var master = this.nodes[0].getDB("admin");
@@ -1333,11 +1334,14 @@ var ReplSetTest = function(opts) {
               (new Date() - awaitTsStart) + "ms for " + this.nodes.length + " nodes in set '" +
               this.name + "'");
 
-        // Make sure all nodes are up to date. Do this while we still have a shortened heartbeat
-        // interval so it completes more quickly.
-        asCluster(self.nodes, function() {
-            self.awaitNodesAgreeOnAppliedOpTime();
-        });
+        // Make sure all nodes are up to date. Bypass this if the heartbeat interval wasn't turned
+        // down or the test specifies that we should not wait for replication. This is only an
+        // optimization so it's OK if we bypass it in some suites.
+        if (failPointsSupported && !doNotWaitForReplication) {
+            asCluster(self.nodes, function() {
+                self.awaitNodesAgreeOnAppliedOpTime();
+            });
+        }
 
         // Turn off the failpoints now that initial sync and initial setup is complete.
         if (failPointsSupported) {
