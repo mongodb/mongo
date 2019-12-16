@@ -125,13 +125,6 @@ public:
     virtual ~MongoProcessInterface(){};
 
     /**
-     * Sets the OperationContext of the DBDirectClient used by mongo process interface functions.
-     * This method must be called after updating the 'opCtx' member of the ExpressionContext
-     * associated with the document source.
-     */
-    virtual void setOperationContext(OperationContext* opCtx) = 0;
-
-    /**
      * Creates a new TransactionHistoryIterator object. Only applicable in processes which support
      * locally traversing the oplog.
      */

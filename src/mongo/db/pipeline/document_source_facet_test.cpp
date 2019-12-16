@@ -541,22 +541,11 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
     ASSERT_TRUE(dummy->isOptimized);
 }
 
-/**
- * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
- * but has no other parts of the interface implemented.
- */
-class StubMongoProcessOkWithOpCtxChanges : public StubMongoProcessInterface {
-public:
-    void setOperationContext(OperationContext* opCtx) final {
-        return;
-    }
-};
-
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
     // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
     // that won't throw when we do so.
-    ctx->mongoProcessInterface = std::make_unique<StubMongoProcessOkWithOpCtxChanges>();
+    ctx->mongoProcessInterface = std::make_unique<StubMongoProcessInterface>();
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = unittest::assertGet(Pipeline::createFacetPipeline({firstDummy}, ctx));

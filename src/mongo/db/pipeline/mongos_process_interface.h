@@ -49,8 +49,6 @@ public:
 
     virtual ~MongoSInterface() = default;
 
-    void setOperationContext(OperationContext* opCtx) final {}
-
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,

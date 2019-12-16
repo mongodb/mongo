@@ -46,10 +46,6 @@ class StubMongoProcessInterface : public MongoProcessInterface {
 public:
     virtual ~StubMongoProcessInterface() = default;
 
-    void setOperationContext(OperationContext* opCtx) override {
-        MONGO_UNREACHABLE;
-    }
-
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const override {
         MONGO_UNREACHABLE;

@@ -154,8 +154,6 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) {}
 
-void MongoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {}
-
 std::unique_ptr<TransactionHistoryIteratorBase>
 MongoInterfaceStandalone::createTransactionHistoryIterator(repl::OpTime time) const {
     bool permitYield = true;

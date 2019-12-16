@@ -47,17 +47,6 @@
 
 namespace mongo {
 
-/**
- * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
- * but has no other parts of the interface implemented.
- */
-class StubMongoProcessOkWithOpCtxChanges : public StubMongoProcessInterface {
-public:
-    void setOperationContext(OperationContext* opCtx) final {
-        return;
-    }
-};
-
 namespace {
 /**
  * This class is used for an Exchange consumer to temporarily relinquish control of a mutex
@@ -98,7 +87,7 @@ class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     std::unique_ptr<executor::TaskExecutor> _executor;
     virtual void setUp() override {
-        getExpCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessOkWithOpCtxChanges>();
+        getExpCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
 
         auto net = executor::makeNetworkInterface("ExchangeTest");
 

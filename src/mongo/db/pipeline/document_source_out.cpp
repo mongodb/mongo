@@ -72,11 +72,6 @@ DocumentSourceOut::~DocumentSourceOut() {
 
             DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
 
-            // Reset the operation context back to original once dropCollection is done.
-            ON_BLOCK_EXIT(
-                [this] { pExpCtx->mongoProcessInterface->setOperationContext(pExpCtx->opCtx); });
-
-            pExpCtx->mongoProcessInterface->setOperationContext(cleanupOpCtx.get());
             pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), _tempNs);
         });
 }
