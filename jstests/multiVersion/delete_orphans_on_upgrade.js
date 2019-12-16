@@ -12,7 +12,7 @@ const ns = dbName + "." + collName;
 // Create 2 shards with 3 replicas each.
 let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
-print("setting fcv: " + lastStableFCV);
+jsTestLog("Setting FCV: " + lastStableFCV);
 assert.commandWorked(
     st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 checkFCV(st.shard0.getDB("admin"), lastStableFCV);
@@ -26,8 +26,10 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 100}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 150}}));
 
 // Move chunks [50, 100) and [150, inf) to shard1 to create a gap.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 150}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {x: 150}, to: st.shard1.shardName, _waitForDelete: true}));
 
 let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
@@ -68,7 +70,7 @@ assert.eq(testColl.find().itcount(), expectedNumDocsTotal);
 assert.eq(shard0Coll.find().itcount(), expectedNumDocsShard0 + orphanCount);
 assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
 
-print("setting fcv: " + latestFCV);
+jsTestLog("Setting FCV: " + latestFCV);
 assert.commandWorked(st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: latestFCV}));
 checkFCV(st.shard0.getDB("admin"), latestFCV);
 
