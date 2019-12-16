@@ -552,6 +552,7 @@ icuEnv.CppUnitTest(
         'procparser_test.cpp' if env.TargetOSIs('linux') else [],
         'producer_consumer_queue_test.cpp',
         'progress_meter_test.cpp',
+        'registry_list_test.cpp',
         'represent_as_test.cpp',
         'safe_num_test.cpp',
         'secure_zero_memory_test.cpp',
