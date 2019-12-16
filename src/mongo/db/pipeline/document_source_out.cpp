@@ -35,11 +35,13 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/background.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
@@ -47,6 +49,7 @@ namespace mongo {
 using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
+MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson);
@@ -161,6 +164,16 @@ void DocumentSourceOut::initialize() {
             pExpCtx->opCtx, _tempNs.db().toString(), cmd.done());
     }
 
+    // Disallows drops and renames on this namespace.
+    BackgroundOperation backgroundOp(_tempNs.ns());
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &outWaitAfterTempCollectionCreation,
+        pExpCtx->opCtx,
+        "outWaitAfterTempCollectionCreation",
+        []() {
+            log() << "Hanging aggregation due to 'outWaitAfterTempCollectionCreation' "
+                  << "failpoint";
+        });
     if (_originalIndexes.empty()) {
         return;
     }
