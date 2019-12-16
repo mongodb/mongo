@@ -170,8 +170,18 @@ public:
                                             bool multi,
                                             boost::optional<OID> targetEpoch) = 0;
 
-    virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
-                                                  const NamespaceString& ns) = 0;
+    /**
+     * Returns index usage statistics for each index on collection 'ns' along with additional
+     * information including the index specification and whether the index is currently being built.
+     *
+     * By passing true for 'addShardName', the caller can request that each document in the
+     * resulting vector includes a 'shard' field which denotes this node's shard name. It is illegal
+     * to set this option unless this node is a shardsvr.
+     */
+    virtual std::vector<Document> getIndexStats(OperationContext* opCtx,
+                                                const NamespaceString& ns,
+                                                StringData host,
+                                                bool addShardName) = 0;
 
     virtual std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                              const NamespaceString& ns,
