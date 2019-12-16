@@ -152,11 +152,9 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) : _client(opCtx) {}
+MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) {}
 
-void MongoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {
-    _client.setOpCtx(opCtx);
-}
+void MongoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {}
 
 std::unique_ptr<TransactionHistoryIteratorBase>
 MongoInterfaceStandalone::createTransactionHistoryIterator(repl::OpTime time) const {
