@@ -645,7 +645,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     // are visible before potentially truncating the oplog.
     storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
-    IndexBuildsCoordinator::get(opCtx)->onRollback(opCtx);
+    auto abortedIndexBuilds = IndexBuildsCoordinator::get(opCtx)->onRollback(opCtx);
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     if (!forceRollbackViaRefetch.load() && storageEngine->supportsRecoverToStableTimestamp()) {
@@ -654,7 +654,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             opCtx, source, &localOplog, storageInterface, getConnection);
     } else {
         log() << "Rollback using the 'rollbackViaRefetch' method.";
-        _fallBackOnRollbackViaRefetch(opCtx, source, requiredRBID, &localOplog, getConnection);
+        _fallBackOnRollbackViaRefetch(
+            opCtx, source, abortedIndexBuilds, requiredRBID, &localOplog, getConnection);
     }
 
     // Reset the producer to clear the sync source and the last optime fetched.
@@ -699,6 +700,7 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
 void BackgroundSync::_fallBackOnRollbackViaRefetch(
     OperationContext* opCtx,
     const HostAndPort& source,
+    const IndexBuilds& abortedIndexBuilds,
     int requiredRBID,
     OplogInterface* localOplog,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
@@ -708,7 +710,13 @@ void BackgroundSync::_fallBackOnRollbackViaRefetch(
                                       NamespaceString::kRsOplogNamespace.ns(),
                                       rollbackRemoteOplogQueryBatchSize.load());
 
-    rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
+    rollback(opCtx,
+             *localOplog,
+             rollbackSource,
+             abortedIndexBuilds,
+             requiredRBID,
+             _replCoord,
+             _replicationProcess);
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {

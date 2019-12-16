@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/collection_index_builds_tracker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -136,13 +137,11 @@ public:
         IndexBuildOptions indexBuildOptions) = 0;
 
     /**
-     * Given a vector of two-phase index builds, start, but do not complete each one in a background
-     * thread. Each index build will wait for a replicate commit or abort, as in steady-state
+     * Given a set of two-phase index builds, start, but do not complete each one in a background
+     * thread. Each index build will wait for a replicated commit or abort, as in steady-state
      * replication.
      */
-    void restartIndexBuildsForRecovery(
-        OperationContext* opCtx,
-        const std::map<UUID, StorageEngine::IndexBuildToRestart>& buildsToRestart);
+    void restartIndexBuildsForRecovery(OperationContext* opCtx, const IndexBuilds& buildsToRestart);
 
     /**
      * Runs the full index rebuild for recovery. This will only rebuild single-phase index builds.
@@ -240,8 +239,9 @@ public:
     /**
      * Invoked when the node enters the rollback state.
      * Unblocks index builds that have been waiting to commit/abort during the secondary state.
+     * Returns an IndexBuilds of aborted index builds.
      */
-    void onRollback(OperationContext* opCtx);
+    IndexBuilds onRollback(OperationContext* opCtx);
 
     /**
      * TODO: This is not yet implemented.

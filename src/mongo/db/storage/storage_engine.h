@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
@@ -501,19 +502,6 @@ public:
         const std::string indexName;
     };
 
-    /**
-     * Describes an index build on a collection that should be restarted.
-     */
-    struct IndexBuildToRestart {
-        IndexBuildToRestart(UUID collUUID) : collUUID(collUUID) {}
-
-        // Collection UUID.
-        const UUID collUUID;
-
-        // Index specs for the build.
-        std::vector<BSONObj> indexSpecs;
-    };
-
     /*
      * ReconcileResult is the result of reconciling abandoned storage engine idents and unfinished
      * index builds.
@@ -525,7 +513,7 @@ public:
         // A map of unfinished two-phase indexes that must be restarted in the background, but
         // not to completion; they will wait for replicated commit or abort operations. This is a
         // mapping from index build UUID to index build.
-        std::map<UUID, IndexBuildToRestart> indexBuildsToRestart;
+        IndexBuilds indexBuildsToRestart;
     };
 
     /**

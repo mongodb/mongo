@@ -53,6 +53,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/ops/delete.h"
@@ -218,6 +219,78 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
     return Status::OK();
 }
 
+namespace {
+
+typedef struct {
+    UUID buildUUID;
+    std::vector<std::string> indexNames;
+    std::vector<BSONObj> indexSpecs;
+} IndexBuildOplogEntry;
+
+// Parses an oplog entry for "startIndexBuild", "commitIndexBuild", or "abortIndexBuild".
+StatusWith<IndexBuildOplogEntry> parseIndexBuildOplogObject(const BSONObj& obj) {
+    // Example object which takes the same form for all three oplog entries.
+    // {
+    //     < "startIndexBuild" | "commitIndexBuild" | "abortIndexBuild" > : "coll",
+    //     "indexBuildUUID" : <UUID>,
+    //     "indexes" : [
+    //         {
+    //             "key" : {
+    //                 "x" : 1
+    //             },
+    //             "name" : "x_1",
+    //             "v" : 2
+    //         },
+    //         {
+    //             "key" : {
+    //                 "k" : 1
+    //             },
+    //             "name" : "k_1",
+    //             "v" : 2
+    //         }
+    //     ]
+    // }
+    //
+    //
+    auto buildUUIDElem = obj.getField("indexBuildUUID");
+    if (buildUUIDElem.eoo()) {
+        return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexBuildUUID'"};
+    }
+    auto swBuildUUID = UUID::parse(buildUUIDElem);
+    if (!swBuildUUID.isOK()) {
+        return swBuildUUID.getStatus().withContext("Error parsing 'indexBuildUUID'");
+    }
+
+    auto indexesElem = obj.getField("indexes");
+    if (indexesElem.eoo()) {
+        return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexes'"};
+    }
+
+    if (indexesElem.type() != Array) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field 'indexes' must be an array of index spec objects"};
+    }
+
+    std::vector<std::string> indexNames;
+    std::vector<BSONObj> indexSpecs;
+    for (auto& indexElem : indexesElem.Array()) {
+        if (!indexElem.isABSONObj()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Element of 'indexes' must be an object"};
+        }
+        std::string indexName;
+        auto status = bsonExtractStringField(indexElem.Obj(), "name", &indexName);
+        if (!status.isOK()) {
+            return status.withContext("Error extracting 'name' from index spec");
+        }
+        indexNames.push_back(indexName);
+        indexSpecs.push_back(indexElem.Obj().getOwned());
+    }
+    return IndexBuildOplogEntry{swBuildUUID.getValue(), indexNames, indexSpecs};
+}
+
+}  // namespace
+
 Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* opCtx,
                                                              const OplogInterface& localOplog,
                                                              FixUpInfo& fixUpInfo,
@@ -379,6 +452,16 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 // Inserts the index name and the index spec of the index to be created into the map
                 // of index name and index specs that need to be created for the given collection.
+                //
+                // If this dropped index was a two-phase index build, we add it to the list to
+                // build in the foreground, without the IndexBuildsCoordinator, since we have no
+                // knowledge of the original build UUID information. If no start or commit oplog
+                // entries are rolled-back, this forces the index build to complete before rollback
+                // finishes.
+                //
+                // If we find by processing earlier oplog entries that the commit or abort
+                // entries are also rolled-back, we will instead rebuild the index with the
+                // Coordinator so it can wait for a replicated commit or abort.
                 fixUpInfo.indexesToCreate[*uuid].insert(
                     std::pair<std::string, BSONObj>(indexName, obj2));
 
@@ -422,16 +505,118 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 return Status::OK();
             }
-            // TODO(SERVER-39452): Ignore no-op startIndexBuild, abortIndexBuild, and
-            // commitIndexBuild commands.
-            // Revisit when we are ready to implement rollback logic.
             case OplogEntry::CommandType::kStartIndexBuild: {
+                auto swIndexBuildOplogObject = parseIndexBuildOplogObject(obj);
+                if (!swIndexBuildOplogObject.isOK()) {
+                    return {ErrorCodes::UnrecoverableRollbackError,
+                            str::stream()
+                                << "Error parsing 'startIndexBuild' oplog entry: "
+                                << swIndexBuildOplogObject.getStatus() << ": " << redact(obj)};
+                }
+
+                auto& indexBuildOplogObject = swIndexBuildOplogObject.getValue();
+
+                // If the index build has been committed or aborted, and the commit or abort
+                // oplog entry has also been rolled back, the index build will have been added
+                // to the set to be restarted. Remove it, and then add it to the set to be
+                // dropped. If the index has already been dropped by abort, then this is a
+                // no-op.
+                auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
+                auto buildUUID = indexBuildOplogObject.buildUUID;
+                auto existingIt = buildsToRestart.find(buildUUID);
+                if (existingIt != buildsToRestart.end()) {
+                    LOG(2) << "Index build that was previously marked to be restarted will now be "
+                              "dropped due to a rolled-back 'startIndexBuild' oplog entry: "
+                           << buildUUID;
+                    buildsToRestart.erase(existingIt);
+
+                    // If the index build was committed or aborted, we must mark the index as
+                    // needing to be dropped. Add each index to drop by name individually.
+                    for (auto& indexName : indexBuildOplogObject.indexNames) {
+                        fixUpInfo.indexesToDrop[*uuid].insert(indexName);
+                    }
+                    return Status::OK();
+                }
+
+                // If the index build was not committed or aborted, the index build is
+                // unfinished in the catalog will need to be dropped before any other collection
+                // operations.
+                for (auto& indexName : indexBuildOplogObject.indexNames) {
+                    fixUpInfo.unfinishedIndexesToDrop[*uuid].insert(indexName);
+                }
+
                 return Status::OK();
             }
             case OplogEntry::CommandType::kAbortIndexBuild: {
+                auto swIndexBuildOplogObject = parseIndexBuildOplogObject(obj);
+                if (!swIndexBuildOplogObject.isOK()) {
+                    return {ErrorCodes::UnrecoverableRollbackError,
+                            str::stream()
+                                << "Error parsing 'abortIndexBuild' oplog entry: "
+                                << swIndexBuildOplogObject.getStatus() << ": " << redact(obj)};
+                }
+
+                auto& indexBuildOplogObject = swIndexBuildOplogObject.getValue();
+                auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
+                auto buildUUID = indexBuildOplogObject.buildUUID;
+                invariant(buildsToRestart.find(buildUUID) == buildsToRestart.end(),
+                          str::stream()
+                              << "Tried to restart an index build after rolling back an "
+                                 "'abortIndexBuild' oplog entry, but a build with the same "
+                                 "UUID is already marked to be restarted: "
+                              << buildUUID);
+
+                LOG(2) << "Index build will be restarted after a rolled-back 'abortIndexBuild': "
+                       << buildUUID;
+                IndexBuildDetails details{*uuid};
+                for (auto& spec : indexBuildOplogObject.indexSpecs) {
+                    invariant(spec.isOwned());
+                    details.indexSpecs.emplace_back(spec);
+                }
+                buildsToRestart.insert({buildUUID, details});
                 return Status::OK();
             }
             case OplogEntry::CommandType::kCommitIndexBuild: {
+                auto swIndexBuildOplogObject = parseIndexBuildOplogObject(obj);
+                if (!swIndexBuildOplogObject.isOK()) {
+                    return {ErrorCodes::UnrecoverableRollbackError,
+                            str::stream()
+                                << "Error parsing 'commitIndexBuild' oplog entry: "
+                                << swIndexBuildOplogObject.getStatus() << ": " << redact(obj)};
+                }
+
+                auto& indexBuildOplogObject = swIndexBuildOplogObject.getValue();
+
+                // If a dropIndexes oplog entry was already rolled-back, the index build needs to
+                // be restarted, but not committed. If the index is in the set to be created, then
+                // its drop was rolled-back and it should be removed.
+                auto& toCreate = fixUpInfo.indexesToCreate[*uuid];
+                for (auto& indexName : indexBuildOplogObject.indexNames) {
+                    auto existing = toCreate.find(indexName);
+                    if (existing != toCreate.end()) {
+                        toCreate.erase(existing);
+                    }
+                }
+
+                // Add the index build to be restarted.
+                auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
+                auto buildUUID = indexBuildOplogObject.buildUUID;
+                invariant(buildsToRestart.find(buildUUID) == buildsToRestart.end(),
+                          str::stream()
+                              << "Tried to restart an index build after rolling back a "
+                                 "'commitIndexBuild' oplog entry, but a build with the same "
+                                 "UUID is already marked to be restarted: "
+                              << buildUUID);
+
+                LOG(2) << "Index build will be restarted after a rolled-back 'commitIndexBuild': "
+                       << buildUUID;
+
+                IndexBuildDetails details{*uuid};
+                for (auto& spec : indexBuildOplogObject.indexSpecs) {
+                    invariant(spec.isOwned());
+                    details.indexSpecs.emplace_back(spec);
+                }
+                buildsToRestart.insert({buildUUID, details});
                 return Status::OK();
             }
             case OplogEntry::CommandType::kRenameCollection: {
@@ -690,7 +875,7 @@ void dropIndex(OperationContext* opCtx,
                IndexCatalog* indexCatalog,
                const string& indexName,
                NamespaceString& nss) {
-    bool includeUnfinishedIndexes = false;
+    bool includeUnfinishedIndexes = true;
     auto indexDescriptor =
         indexCatalog->findIndexByName(opCtx, indexName, includeUnfinishedIndexes);
     if (!indexDescriptor) {
@@ -699,10 +884,19 @@ void dropIndex(OperationContext* opCtx,
         return;
     }
     WriteUnitOfWork wunit(opCtx);
-    auto status = indexCatalog->dropIndex(opCtx, indexDescriptor);
-    if (!status.isOK()) {
-        severe() << "Rollback failed to drop index " << indexName << " in " << nss.toString()
-                 << ": " << redact(status);
+    auto entry = indexCatalog->getEntry(indexDescriptor);
+    if (entry->isReady(opCtx)) {
+        auto status = indexCatalog->dropIndex(opCtx, indexDescriptor);
+        if (!status.isOK()) {
+            severe() << "Rollback failed to drop index " << indexName << " in " << nss.toString()
+                     << ": " << redact(status);
+        }
+    } else {
+        auto status = indexCatalog->dropUnfinishedIndex(opCtx, indexDescriptor);
+        if (!status.isOK()) {
+            severe() << "Rollback failed to drop unfinished index " << indexName << " in "
+                     << nss.toString() << ": " << redact(status);
+        }
     }
     wunit.commit();
 }
@@ -935,6 +1129,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
 Status _syncRollback(OperationContext* opCtx,
                      const OplogInterface& localOplog,
                      const RollbackSource& rollbackSource,
+                     const IndexBuilds& abortedIndexBuilds,
                      int requiredRBID,
                      ReplicationCoordinator* replCoord,
                      ReplicationProcess* replicationProcess) {
@@ -950,6 +1145,11 @@ Status _syncRollback(OperationContext* opCtx,
     // Find the UUID of the transactions collection. An OperationContext is required because the
     // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
     how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
+
+    // Populate the initial list of index builds to restart with the builds that were aborted due to
+    // rollback. They may need to be restarted if no associated oplog entries are rolled-back, or
+    // they may be made redundant by a rolled-back startIndexBuild oplog entry.
+    how.indexBuildsToRestart.insert(abortedIndexBuilds.begin(), abortedIndexBuilds.end());
 
     log() << "Finding the Common Point";
     try {
@@ -1143,11 +1343,23 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     // indexes.
     // We drop indexes before renaming collections so that if a collection name gets longer,
     // any indexes with names that are now too long will already be dropped.
-    log() << "Rolling back createIndexes commands.";
+    log() << "Rolling back createIndexes and startIndexBuild operations";
     for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
 
         UUID uuid = it->first;
         std::set<std::string> indexNames = it->second;
+
+        rollbackCreateIndexes(opCtx, uuid, indexNames);
+    }
+
+    // Drop any unfinished indexes. These are indexes where the startIndexBuild oplog entry was
+    // rolled-back, but the unfinished index still exists in the catalog. Drop these before any
+    // collection drops, because one of the preconditions of dropping a collection is that there are
+    // no unfinished indxes.
+    log() << "Rolling back unfinished startIndexBuild operations";
+    for (auto index : fixUpInfo.unfinishedIndexesToDrop) {
+        UUID uuid = index.first;
+        std::set<std::string> indexNames = index.second;
 
         rollbackCreateIndexes(opCtx, uuid, indexNames);
     }
@@ -1166,6 +1378,9 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!fixUpInfo.indexesToCreate.count(uuid));
         invariant(!fixUpInfo.collectionsToRename.count(uuid));
         invariant(!fixUpInfo.collectionsToResyncMetadata.count(uuid));
+        invariant(!std::any_of(fixUpInfo.indexBuildsToRestart.begin(),
+                               fixUpInfo.indexBuildsToRestart.end(),
+                               [&](auto build) { return build.second.collUUID == uuid; }));
 
         boost::optional<NamespaceString> nss =
             CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
@@ -1323,6 +1538,10 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
         rollbackDropIndexes(opCtx, uuid, indexNames);
     }
+
+    log() << "Restarting rolled-back committed or aborted index builds.";
+    IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
+        opCtx, fixUpInfo.indexBuildsToRestart);
 
     log() << "Deleting and updating documents to roll back insert, update and remove "
              "operations";
@@ -1605,6 +1824,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
+                    const IndexBuilds& abortedIndexBuilds,
                     int requiredRBID,
                     ReplicationCoordinator* replCoord,
                     ReplicationProcess* replicationProcess) {
@@ -1613,8 +1833,13 @@ Status syncRollback(OperationContext* opCtx,
 
     DisableDocumentValidation validationDisabler(opCtx);
     UnreplicatedWritesBlock replicationDisabler(opCtx);
-    Status status = _syncRollback(
-        opCtx, localOplog, rollbackSource, requiredRBID, replCoord, replicationProcess);
+    Status status = _syncRollback(opCtx,
+                                  localOplog,
+                                  rollbackSource,
+                                  abortedIndexBuilds,
+                                  requiredRBID,
+                                  replCoord,
+                                  replicationProcess);
 
     log() << "Rollback finished. The final minValid is: "
           << replicationProcess->getConsistencyMarkers()->getMinValid(opCtx) << rsLog;
@@ -1625,6 +1850,7 @@ Status syncRollback(OperationContext* opCtx,
 void rollback(OperationContext* opCtx,
               const OplogInterface& localOplog,
               const RollbackSource& rollbackSource,
+              const IndexBuilds& abortedIndexBuilds,
               int requiredRBID,
               ReplicationCoordinator* replCoord,
               ReplicationProcess* replicationProcess,
@@ -1659,8 +1885,13 @@ void rollback(OperationContext* opCtx,
     }
 
     try {
-        auto status = syncRollback(
-            opCtx, localOplog, rollbackSource, requiredRBID, replCoord, replicationProcess);
+        auto status = syncRollback(opCtx,
+                                   localOplog,
+                                   rollbackSource,
+                                   abortedIndexBuilds,
+                                   requiredRBID,
+                                   replCoord,
+                                   replicationProcess);
 
         // Aborts only when syncRollback detects we are in a unrecoverable state.
         // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK

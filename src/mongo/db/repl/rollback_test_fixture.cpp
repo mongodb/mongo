@@ -334,6 +334,7 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
                            OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                            rollbackSource,
                            {},
+                           {},
                            _coordinator,
                            _replicationProcess.get()));
 

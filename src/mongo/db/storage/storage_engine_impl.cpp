@@ -462,7 +462,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 // Insert in the map if a build has not already been registered.
                 auto existingIt = ret.indexBuildsToRestart.find(buildUUID);
                 if (existingIt == ret.indexBuildsToRestart.end()) {
-                    ret.indexBuildsToRestart.insert({buildUUID, IndexBuildToRestart(*collUUID)});
+                    ret.indexBuildsToRestart.insert({buildUUID, IndexBuildDetails(*collUUID)});
                     existingIt = ret.indexBuildsToRestart.find(buildUUID);
                 }
 
@@ -837,12 +837,6 @@ bool StorageEngineImpl::supportsTwoPhaseIndexBuild() const {
 
     if (serverGlobalParams.featureCompatibility.getVersion() !=
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return false;
-    }
-
-    // TODO(SERVER-39452): remove this condition when rollback via refetch supports two phase index
-    // builds.
-    if (!supportsReadConcernMajority()) {
         return false;
     }
 

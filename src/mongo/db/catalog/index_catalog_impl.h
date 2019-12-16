@@ -207,7 +207,8 @@ public:
 
 
     Status dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) override;
-
+    Status dropUnfinishedIndex(OperationContext* const opCtx,
+                               const IndexDescriptor* const desc) override;
 
     Status dropIndexEntry(OperationContext* opCtx, IndexCatalogEntry* entry) override;
 
