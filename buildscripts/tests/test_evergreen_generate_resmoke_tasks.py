@@ -825,3 +825,53 @@ class GenerateSubSuitesTest(unittest.TestCase):
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[0], filtered_list)
             self.assertEqual(2, len(filtered_list))
+
+
+class TestShouldTasksBeGenerated(unittest.TestCase):
+    def test_during_first_execution(self):
+        evg_api = MagicMock()
+        task_id = "task_id"
+        evg_api.task_by_id.return_value.execution = 0
+
+        self.assertTrue(under_test.should_tasks_be_generated(evg_api, task_id))
+        evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)
+
+    def test_after_successful_execution(self):
+        evg_api = MagicMock()
+        task_id = "task_id"
+        task = evg_api.task_by_id.return_value
+        task.execution = 1
+        task.get_execution.return_value.is_success.return_value = True
+
+        self.assertFalse(under_test.should_tasks_be_generated(evg_api, task_id))
+        evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)
+
+    def test_after_multiple_successful_execution(self):
+        evg_api = MagicMock()
+        task_id = "task_id"
+        task = evg_api.task_by_id.return_value
+        task.execution = 5
+        task.get_execution.return_value.is_success.return_value = True
+
+        self.assertFalse(under_test.should_tasks_be_generated(evg_api, task_id))
+        evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)
+
+    def test_after_failed_execution(self):
+        evg_api = MagicMock()
+        task_id = "task_id"
+        task = evg_api.task_by_id.return_value
+        task.execution = 1
+        task.get_execution.return_value.is_success.return_value = False
+
+        self.assertTrue(under_test.should_tasks_be_generated(evg_api, task_id))
+        evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)
+
+    def test_after_multiple_failed_execution(self):
+        evg_api = MagicMock()
+        task_id = "task_id"
+        task = evg_api.task_by_id.return_value
+        task.execution = 5
+        task.get_execution.return_value.is_success.return_value = False
+
+        self.assertTrue(under_test.should_tasks_be_generated(evg_api, task_id))
+        evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)

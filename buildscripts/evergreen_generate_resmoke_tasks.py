@@ -365,6 +365,28 @@ def calculate_timeout(avg_runtime, scaling_factor):
     return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime)) * scaling_factor
 
 
+def should_tasks_be_generated(evg_api, task_id):
+    """
+    Determine if we should attempt to generate tasks.
+
+    If an evergreen task that calls 'generate.tasks' is restarted, the 'generate.tasks' command
+    will no-op. So, if we are in that state, we should avoid generating new configuration files
+    that will just be confusing to the user (since that would not be used).
+
+    :param evg_api: Evergreen API object.
+    :param task_id: Id of the task being run.
+    :return: Boolean of whether to generate tasks.
+    """
+    task = evg_api.task_by_id(task_id, fetch_all_executions=True)
+    # If any previous execution was successful, do not generate more tasks.
+    for i in range(task.execution):
+        task_execution = task.get_execution(i)
+        if task_execution.is_success():
+            return False
+
+    return True
+
+
 class EvergreenConfigGenerator(object):
     """Generate evergreen configurations."""
 
@@ -701,6 +723,10 @@ class GenerateSubSuites(object):
     def run(self):
         """Generate resmoke suites that run within a specified target execution time."""
         LOGGER.debug("config options", config_options=self.config_options)
+
+        if not should_tasks_be_generated(self.evergreen_api, self.config_options.task_id):
+            LOGGER.info("Not generating configuration due to previous successful generation.")
+            return
 
         end_date = datetime.datetime.utcnow().replace(microsecond=0)
         start_date = end_date - datetime.timedelta(days=LOOKBACK_DURATION_DAYS)
