@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -211,7 +211,6 @@ private:
                                                                      StringData dbName,
                                                                      UUID collectionUUID);
 
-    DBDirectClient _client;
     std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
 
     // Object which contains a JavaScript Scope, used for executing JS in pipeline stages and
