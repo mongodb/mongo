@@ -19,22 +19,29 @@ class IndexBuildTest {
      * Accepts optional filter that can be used to customize the db.currentOp() query.
      */
     static getIndexBuildOpId(database, collectionName, indexName, filter) {
-        const result = database.currentOp(filter || true);
-        assert.commandWorked(result);
+        let pipeline = [{$currentOp: {allUsers: true}}];
+        if (filter) {
+            pipeline.push({$match: filter});
+        }
+        const result = database.getSiblingDB("admin")
+                           .aggregate(pipeline, {readConcern: {level: "local"}})
+                           .toArray();
         let indexBuildOpId = -1;
         let indexBuildObj = {};
         let indexBuildNamespace = "";
 
-        result.inprog.forEach(function(op) {
+        result.forEach(function(op) {
             if (op.op != 'command') {
                 return;
             }
-            if (op.command.createIndexes === undefined) {
+            const cmdBody = op.command;
+
+            if (cmdBody.createIndexes === undefined) {
                 return;
             }
             // If no collection is provided, return any index build.
-            if (!collectionName || op.command.createIndexes === collectionName) {
-                op.command.indexes.forEach((index) => {
+            if (!collectionName || cmdBody.createIndexes === collectionName) {
+                cmdBody.indexes.forEach((index) => {
                     if (!indexName || index.name === indexName) {
                         indexBuildOpId = op.opid;
                         indexBuildObj = index;
