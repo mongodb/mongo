@@ -320,7 +320,6 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
 
 void Pipeline::detachFromOperationContext() {
     pCtx->opCtx = nullptr;
-    pCtx->mongoProcessInterface->setOperationContext(nullptr);
 
     for (auto&& source : _sources) {
         source->detachFromOperationContext();
@@ -329,7 +328,6 @@ void Pipeline::detachFromOperationContext() {
 
 void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     pCtx->opCtx = opCtx;
-    pCtx->mongoProcessInterface->setOperationContext(opCtx);
 
     for (auto&& source : _sources) {
         source->reattachToOperationContext(opCtx);

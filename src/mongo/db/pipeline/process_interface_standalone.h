@@ -54,7 +54,6 @@ public:
 
     virtual ~MongoInterfaceStandalone() = default;
 
-    void setOperationContext(OperationContext* opCtx) final;
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
 
