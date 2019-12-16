@@ -129,14 +129,14 @@ private:
 
 // MSVC does not have any of N4810 yet. (see
 // https://developercommunity.visualstudio.com/idea/354069/implement-c-library-fundamentals-ts-v2.html)
-#define MONGO_SOURCE_LOCATION() SourceLocation(__LINE__, 0ul, __FILE__, __func__)
-#define MONGO_SOURCE_LOCATION_NO_FUNC() SourceLocation(__LINE__, 0ul, __FILE__, "")
+#define MONGO_SOURCE_LOCATION() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, __func__)
+#define MONGO_SOURCE_LOCATION_NO_FUNC() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, "")
 
 #elif defined(__clang__)  // windows -> clang
 
 // Clang got __builtin_FILE et al as of 8.0.1 (see https://reviews.llvm.org/D37035)
-#define MONGO_SOURCE_LOCATION() SourceLocation(__LINE__, 0ul, __FILE__, __func__)
-#define MONGO_SOURCE_LOCATION_NO_FUNC() SourceLocation(__LINE__, 0ul, __FILE__, "")
+#define MONGO_SOURCE_LOCATION() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, __func__)
+#define MONGO_SOURCE_LOCATION_NO_FUNC() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, "")
 
 #elif defined(__GNUG__)  // clang -> gcc
 
@@ -145,9 +145,10 @@ constexpr auto toSourceLocation(std::experimental::source_location loc) {
     return SourceLocation(loc.line(), loc.column(), loc.file_name(), loc.function_name());
 }
 
-#define MONGO_SOURCE_LOCATION() toSourceLocation(std::experimental::source_location::current())
+#define MONGO_SOURCE_LOCATION() \
+    ::mongo::toSourceLocation(std::experimental::source_location::current())
 #define MONGO_SOURCE_LOCATION_NO_FUNC() \
-    toSourceLocation(std::experimental::source_location::current())
+    ::mongo::toSourceLocation(std::experimental::source_location::current())
 
 #else  // gcc -> ?
 

@@ -63,6 +63,6 @@ TEST(MutexTest, Macros) {
 
     // Verify the global named latch
     static_assert(std::is_same_v<decltype(gMutex), Mutex>);
-    ASSERT_EQ(gMutex.getName(), Mutex::kAnonymousMutexStr);
+    ASSERT_EQ(gMutex.getName(), latch_detail::kAnonymousName);
 }
 }  // namespace mongo

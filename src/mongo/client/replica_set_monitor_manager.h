@@ -106,7 +106,7 @@ private:
 
     // Protects access to the replica set monitors
     mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ReplicaSetMonitorManager::_mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "ReplicaSetMonitorManager::_mutex");
 
     // Executor for monitoring replica sets.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
