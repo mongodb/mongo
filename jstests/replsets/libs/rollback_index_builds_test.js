@@ -92,12 +92,15 @@ class RollbackIndexBuildsTest {
                         createdColl = true;
                         break;
                     case "start":
+                        if (!createdColl) {
+                            assert.commandWorked(
+                                collection.insert({a: "created collection with start"}));
+                            createdColl = true;
+                        }
                         IndexBuildTest.pauseIndexBuilds(primary);
-                        // Create collection implicitly if not already.
                         IndexBuildTest.startIndexBuild(
                             primary, collection.getFullName(), indexSpec);
                         IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
-                        createdColl = true;
                         break;
                     case "commit":
                         IndexBuildTest.resumeIndexBuilds(primary);
