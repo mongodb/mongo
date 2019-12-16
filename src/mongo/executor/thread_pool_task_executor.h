@@ -189,8 +189,9 @@ private:
     std::shared_ptr<ThreadPoolInterface> _pool;
 
     // Mutex guarding all remaining fields.
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "ThreadPoolTaskExecutor::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH(
+        // This is sadly held for a subset of task execution HierarchicalAcquisitionLevel(1),
+        "ThreadPoolTaskExecutor::_mutex");
 
     // Queue containing all items currently scheduled into the thread pool but not yet completed.
     WorkQueue _poolInProgressQueue;

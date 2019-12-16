@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,22 +29,71 @@
 
 #pragma once
 
+#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+
 namespace mongo {
 
+/**
+ * LatchAnalyzer is a ServiceContext decoration that aggregates latch events
+ *
+ * This class is intended to provide a platform for hierarchical analysis on latches. To that end,
+ * onContention(), onAcquire(), and onRelease() are currently called by a Mutex::LockListener
+ * subclass defined in source. This class does much more work for each event when the
+ * enableLatchAnalysis failpoint is set to "alwaysOn". This failpoint provides a wealth of data for
+ * future analysis, but involves additional mutexes and mapping structures that may prove too costly
+ * for production usage at the least.
+ */
 class LatchAnalyzer {
-
 public:
+    static LatchAnalyzer& get(ServiceContext* serviceContext);
+    static LatchAnalyzer& get(Client* client);
     static LatchAnalyzer& get();
 
-    void setEnabled(bool isEnabled) {
-        enabled.store(isEnabled);
-    }
-    bool isEnabled() {
-        return enabled.load();
-    }
+    // Handler function for a failed latch acquire
+    void onContention(const latch_detail::Identity& id);
+
+    // Handler function for a successful latch acquire
+    void onAcquire(const latch_detail::Identity& id);
+
+    // Handler function for a latch release
+    void onRelease(const latch_detail::Identity& id);
+
+    // Append the current statistics in a form appropriate for server status to a BOB
+    void appendToBSON(mongo::BSONObjBuilder& result) const;
+
+    // Log the current statistics in JSON form to INFO
+    void dump();
+
+    void setAllowExitOnViolation(bool allowExitOnViolation);
+    bool allowExitOnViolation();
 
 private:
-    AtomicWord<bool> enabled{true};
+    struct HierarchyStats {
+        const latch_detail::Identity* identity = nullptr;
+
+        int acquiredAfter = 0;
+        int releasedBefore = 0;
+    };
+
+    using SingleLatchHierarchy = stdx::unordered_map<int64_t, HierarchyStats>;
+
+    struct HierarchicalAcquisitionLevelViolation {
+        int onAcquire = 0;
+        int onRelease = 0;
+    };
+
+    AtomicWord<bool> _allowExitOnViolation{true};
+
+    mutable stdx::mutex _mutex;  // NOLINT
+    stdx::unordered_map<int64_t, SingleLatchHierarchy> _hierarchies;
+    stdx::unordered_map<int64_t, HierarchicalAcquisitionLevelViolation> _violations;
 };
 
 class LatchAnalyzerDisabledBlock {

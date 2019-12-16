@@ -31,24 +31,33 @@
 
 namespace mongo {
 
+Mutex::Mutex(std::shared_ptr<latch_detail::Data> data) : _data{std::move(data)} {
+    invariant(_data);
+
+    _data->counts().created.fetchAndAdd(1);
+}
+
 Mutex::~Mutex() {
     invariant(!_isLocked);
+
+    _data->counts().destroyed.fetchAndAdd(1);
 }
 
 void Mutex::lock() {
     if (_mutex.try_lock()) {
         _isLocked = true;
-        _onQuickLock(_id);
+        _onQuickLock();
         return;
     }
 
-    _onContendedLock(_id);
+    _onContendedLock();
     _mutex.lock();
     _isLocked = true;
-    _onSlowLock(_id);
+    _onSlowLock();
 }
+
 void Mutex::unlock() {
-    _onUnlock(_id);
+    _onUnlock();
     _isLocked = false;
     _mutex.unlock();
 }
@@ -58,41 +67,53 @@ bool Mutex::try_lock() {
     }
 
     _isLocked = true;
-    _onQuickLock(_id);
+    _onQuickLock();
     return true;
+}
+
+StringData Mutex::getName() const {
+    return StringData(_data->identity().name());
 }
 
 void Mutex::addLockListener(LockListener* listener) {
     auto& state = _getListenerState();
 
-    state.list.push_back(listener);
+    state.list.add(listener);
 }
 
-void Mutex::_onContendedLock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onContendedLock(id);
+void Mutex::_onContendedLock() noexcept {
+    _data->counts().contended.fetchAndAdd(1);
+
+    auto it = _getListenerState().list.iter();
+    while (auto listener = it.next()) {
+        listener->onContendedLock(_data->identity());
     }
 }
 
-void Mutex::_onQuickLock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onQuickLock(id);
+void Mutex::_onQuickLock() noexcept {
+    _data->counts().acquired.fetchAndAdd(1);
+
+    auto it = _getListenerState().list.iter();
+    while (auto listener = it.next()) {
+        listener->onQuickLock(_data->identity());
     }
 }
 
-void Mutex::_onSlowLock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onSlowLock(id);
+void Mutex::_onSlowLock() noexcept {
+    _data->counts().acquired.fetchAndAdd(1);
+
+    auto it = _getListenerState().list.iter();
+    while (auto listener = it.next()) {
+        listener->onSlowLock(_data->identity());
     }
 }
 
-void Mutex::_onUnlock(const Identity& id) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onUnlock(id);
+void Mutex::_onUnlock() noexcept {
+    _data->counts().released.fetchAndAdd(1);
+
+    auto it = _getListenerState().list.iter();
+    while (auto listener = it.next()) {
+        listener->onUnlock(_data->identity());
     }
 }
 

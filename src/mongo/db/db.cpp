@@ -167,6 +167,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fast_clock_source_factory.h"
+#include "mongo/util/latch_analyzer.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -1050,6 +1051,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     log(LogComponent::kControl) << "now exiting";
 
     audit::logShutdown(client);
+
+    LatchAnalyzer::get(serviceContext).dump();
 }
 
 int mongoDbMain(int argc, char* argv[], char** envp) {

@@ -132,7 +132,7 @@ private:
 
     stdx::thread _thread;
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SessionKiller::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "SessionKiller::_mutex");
     stdx::condition_variable _callerCV;
     stdx::condition_variable _killerCV;
 
