@@ -144,9 +144,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void createIndexes(OperationContext* opCtx,
-                       const NamespaceString& ns,
-                       const std::vector<BSONObj>& indexSpecs) final {
+    void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const std::vector<BSONObj>& indexSpecs) final {
         MONGO_UNREACHABLE;
     }
 

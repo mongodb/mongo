@@ -135,9 +135,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void createIndexes(OperationContext* opCtx,
-                       const NamespaceString& ns,
-                       const std::vector<BSONObj>& indexSpecs) override {
+    void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const std::vector<BSONObj>& indexSpecs) override {
         MONGO_UNREACHABLE;
     }
     void dropCollection(OperationContext* opCtx, const NamespaceString& ns) override {

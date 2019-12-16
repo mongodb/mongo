@@ -248,9 +248,9 @@ public:
      * Runs createIndexes on the given database for the given index specs. If running on a shardsvr
      * this targets the primary shard of the database part of 'ns'.
      */
-    virtual void createIndexes(OperationContext* opCtx,
-                               const NamespaceString& ns,
-                               const std::vector<BSONObj>& indexSpecs) = 0;
+    virtual void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                                const NamespaceString& ns,
+                                                const std::vector<BSONObj>& indexSpecs) = 0;
 
     virtual void dropCollection(OperationContext* opCtx, const NamespaceString& collection) = 0;
 
