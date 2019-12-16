@@ -99,9 +99,9 @@ public:
     void createCollection(OperationContext* opCtx,
                           const std::string& dbName,
                           const BSONObj& cmdObj) final;
-    void createIndexes(OperationContext* opCtx,
-                       const NamespaceString& ns,
-                       const std::vector<BSONObj>& indexSpecs) final;
+    void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const std::vector<BSONObj>& indexSpecs) final;
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final;
 };
 

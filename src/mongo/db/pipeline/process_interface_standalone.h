@@ -107,9 +107,9 @@ public:
     void createCollection(OperationContext* opCtx,
                           const std::string& dbName,
                           const BSONObj& cmdObj);
-    void createIndexes(OperationContext* opCtx,
-                       const NamespaceString& ns,
-                       const std::vector<BSONObj>& indexSpecs);
+    void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const std::vector<BSONObj>& indexSpecs);
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,

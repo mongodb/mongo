@@ -182,7 +182,8 @@ void DocumentSourceOut::initialize() {
     try {
         std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
                                               std::end(_originalIndexes)};
-        pExpCtx->mongoProcessInterface->createIndexes(pExpCtx->opCtx, _tempNs, tempNsIndexes);
+        pExpCtx->mongoProcessInterface->createIndexesOnEmptyCollection(
+            pExpCtx->opCtx, _tempNs, tempNsIndexes);
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;

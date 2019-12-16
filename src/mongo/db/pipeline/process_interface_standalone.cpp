@@ -409,9 +409,8 @@ void MongoInterfaceStandalone::createCollection(OperationContext* opCtx,
     uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
 }
 
-void MongoInterfaceStandalone::createIndexes(OperationContext* opCtx,
-                                             const NamespaceString& ns,
-                                             const std::vector<BSONObj>& indexSpecs) {
+void MongoInterfaceStandalone::createIndexesOnEmptyCollection(
+    OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     AutoGetCollection autoColl(opCtx, ns, MODE_X);
     writeConflictRetry(
         opCtx, "MongoInterfaceStandalone::createIndexesOnEmptyCollection", ns.ns(), [&] {

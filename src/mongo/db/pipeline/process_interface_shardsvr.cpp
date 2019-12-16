@@ -300,9 +300,8 @@ void MongoInterfaceShardServer::createCollection(OperationContext* opCtx,
                                    << "write concern failed while running command " << finalCmdObj);
 }
 
-void MongoInterfaceShardServer::createIndexes(OperationContext* opCtx,
-                                              const NamespaceString& ns,
-                                              const std::vector<BSONObj>& indexSpecs) {
+void MongoInterfaceShardServer::createIndexesOnEmptyCollection(
+    OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     BSONObjBuilder newCmdBuilder;
