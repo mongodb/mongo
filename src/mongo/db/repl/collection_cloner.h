@@ -83,6 +83,11 @@ public:
 
     virtual ~CollectionCloner() = default;
 
+    /**
+     * Waits for any database work to finish or fail.
+     */
+    void waitForDatabaseWorkToComplete();
+
     Stats getStats() const;
 
     std::string toString() const;
@@ -196,12 +201,14 @@ private:
     std::vector<BSONObj> _indexSpecs;                   // (X) Except for _id_
     BSONObj _idIndexSpec;                               // (X)
     std::unique_ptr<CollectionBulkLoader> _collLoader;  // (X)
-    TaskRunner _dbWorkTaskRunner;                       // (R)
     //  Function for scheduling database work using the executor.
     ScheduleDbWorkFn _scheduleDbWorkFn;  // (R)
     // Documents read from source to insert.
     std::vector<BSONObj> _documentsToInsert;  // (M)
     Stats _stats;                             // (M)
+    // Putting _dbWorkTaskRunner last ensures anything the database work threads depend on,
+    // like _documentsToInsert, is destroyed after those threads exit.
+    TaskRunner _dbWorkTaskRunner;  // (R)
 };
 
 }  // namespace repl
