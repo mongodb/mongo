@@ -57,7 +57,9 @@ class RollbackIndexBuildsTest {
             const primary = self.rollbackTest.getPrimary();
             const primaryDB = primary.getDB('test');
             const collection = primaryDB.getCollection(collName);
-            collection.insert({a: "this is a test"});
+
+            let transitionedToSteadyState = false;
+            let createdColl = false;
 
             schedule.forEach(function(op) {
                 print("Running operation: " + op);
@@ -70,11 +72,32 @@ class RollbackIndexBuildsTest {
                         const curPrimary = self.rollbackTest.transitionToRollbackOperations();
                         assert.eq(curPrimary, primary);
                         break;
+                    case "transitionToSteadyState":
+                        self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+
+                        // After transitioning to rollback, allow the index build to complete on
+                        // the rolling-back node so that rollback can finish.
+                        IndexBuildTest.resumeIndexBuilds(primary);
+
+                        self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+
+                        // To speed up the test, defer data validation until the fixture shuts down.
+                        self.rollbackTest.transitionToSteadyStateOperations(
+                            {skipDataConsistencyChecks: true});
+                        transitionedToSteadyState = true;
+                        break;
+                    case "createColl":
+                        assert.commandWorked(
+                            collection.insert({a: "created collection explicitly"}));
+                        createdColl = true;
+                        break;
                     case "start":
                         IndexBuildTest.pauseIndexBuilds(primary);
+                        // Create collection implicitly if not already.
                         IndexBuildTest.startIndexBuild(
                             primary, collection.getFullName(), indexSpec);
                         IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
+                        createdColl = true;
                         break;
                     case "commit":
                         IndexBuildTest.resumeIndexBuilds(primary);
@@ -94,16 +117,17 @@ class RollbackIndexBuildsTest {
                 }
             });
 
-            self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-            self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-            try {
+            if (!transitionedToSteadyState) {
+                self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+                self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+
                 // To speed up the test, defer data validation until the fixture shuts down.
                 self.rollbackTest.transitionToSteadyStateOperations(
                     {skipDataConsistencyChecks: true});
-            } finally {
-                assert.commandWorked(
-                    primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
             }
+
+            assert.commandWorked(
+                primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
             i++;
         });
     }

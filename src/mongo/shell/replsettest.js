@@ -2250,6 +2250,35 @@ var ReplSetTest = function(opts) {
                         });
                     });
 
+                    // Treats each array as a set and returns true if the contents match. Assumes
+                    // the contents of each array are unique.
+                    const compareSets = function(leftArr, rightArr) {
+                        if (leftArr === undefined) {
+                            return rightArr === undefined;
+                        }
+
+                        const map = {};
+                        leftArr.forEach(key => {
+                            map[key] = 1;
+                        });
+
+                        rightArr.forEach(key => {
+                            if (map[key] === undefined) {
+                                map[key] = -1;
+                            } else {
+                                delete map[key];
+                            }
+                        });
+
+                        // The map is empty when both sets match.
+                        for (let key in map) {
+                            if (map.hasOwnProperty(key)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+
                     // Check that the following collection stats are the same across replica set
                     // members:
                     //  capped
@@ -2267,33 +2296,43 @@ var ReplSetTest = function(opts) {
                             primaryCollInfos.print(collectionPrinted, collName);
                             secondaryCollInfos.print(collectionPrinted, collName);
                             success = false;
-                        } else if (primaryCollStats.capped !== secondaryCollStats.capped ||
-                                   (hasSecondaryIndexes &&
-                                    primaryCollStats.nindexes !== secondaryCollStats.nindexes) ||
-                                   primaryCollStats.ns !== secondaryCollStats.ns) {
-                            // Provide hint on where to look within stats.
-                            let reasons = [];
-                            if (primaryCollStats.capped !== secondaryCollStats.capped) {
-                                reasons.push('capped');
-                            }
-                            if (hasSecondaryIndexes &&
-                                primaryCollStats.nindexes !== secondaryCollStats.nindexes) {
-                                reasons.push('indexes');
-                            }
-                            if (primaryCollStats.ns !== secondaryCollStats.ns) {
-                                reasons.push('ns');
-                            }
-                            print(msgPrefix +
-                                  ', the primary and secondary have different stats for the ' +
-                                  'collection ' + dbName + '.' + collName + ': ' +
-                                  reasons.join(', '));
-                            DataConsistencyChecker.dumpCollectionDiff(this,
-                                                                      collectionPrinted,
-                                                                      primaryCollInfos,
-                                                                      secondaryCollInfos,
-                                                                      collName);
-                            success = false;
+                            return;
                         }
+
+                        // Provide hint on where to look within stats.
+                        let reasons = [];
+                        if (primaryCollStats.capped !== secondaryCollStats.capped) {
+                            reasons.push('capped');
+                        }
+
+                        if (primaryCollStats.ns !== secondaryCollStats.ns) {
+                            reasons.push('ns');
+                        }
+
+                        if (hasSecondaryIndexes &&
+                            primaryCollStats.nindexes !== secondaryCollStats.nindexes) {
+                            reasons.push('indexes');
+                        }
+
+                        const indexBuildsMatch = compareSets(primaryCollStats.indexBuilds,
+                                                             secondaryCollStats.indexBuilds);
+                        if (hasSecondaryIndexes && !indexBuildsMatch) {
+                            reasons.push('indexBuilds');
+                        }
+
+                        if (reasons.length === 0) {
+                            return;
+                        }
+
+                        print(msgPrefix +
+                              ', the primary and secondary have different stats for the ' +
+                              'collection ' + dbName + '.' + collName + ': ' + reasons.join(', '));
+                        DataConsistencyChecker.dumpCollectionDiff(this,
+                                                                  collectionPrinted,
+                                                                  primaryCollInfos,
+                                                                  secondaryCollInfos,
+                                                                  collName);
+                        success = false;
                     });
 
                     if (nonCappedCollNames.length === primaryCollections.length) {

@@ -892,6 +892,20 @@ Status IndexCatalogImpl::dropIndex(OperationContext* opCtx, const IndexDescripto
     return dropIndexEntry(opCtx, entry);
 }
 
+Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
+
+    IndexCatalogEntry* entry = _buildingIndexes.find(desc);
+
+    if (!entry)
+        return Status(ErrorCodes::InternalError, "cannot find index to delete");
+
+    if (entry->isReady(opCtx))
+        return Status(ErrorCodes::InternalError, "expected unfinished index, but it is ready");
+
+    return dropIndexEntry(opCtx, entry);
+}
+
 namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:

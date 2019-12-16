@@ -326,7 +326,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                                                            const std::vector<BSONObj>& specs,
                                                            const UUID& buildUUID,
                                                            IndexBuildProtocol protocol) {
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
@@ -351,38 +351,64 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         WriteUnitOfWork wuow(opCtx);
 
         for (size_t i = 0; i < indexNames.size(); i++) {
-            const bool includeUnfinished = false;
+            bool includeUnfinished = false;
             auto descriptor =
                 indexCatalog->findIndexByName(opCtx, indexNames[i], includeUnfinished);
-            if (!descriptor) {
-                const auto durableBuildUUID = DurableCatalog::get(opCtx)->getIndexBuildUUID(
-                    opCtx, collection->getCatalogId(), indexNames[i]);
+            if (descriptor) {
+                Status s = indexCatalog->dropIndex(opCtx, descriptor);
+                if (!s.isOK()) {
+                    return s;
+                }
+                continue;
+            }
 
-                // A build UUID is present if and only if we are rebuilding a two-phase build.
-                invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
-                          durableBuildUUID.is_initialized());
-                // When a buildUUID is present, it must match the build UUID parameter to this
-                // function.
-                invariant(!durableBuildUUID || *durableBuildUUID == buildUUID,
-                          str::stream() << "durable build UUID: " << durableBuildUUID
-                                        << "buildUUID: " << buildUUID);
+            // If the index is not present in the catalog, then we are trying to drop an already
+            // aborted index. This may happen when rollback-via-refetch restarts an index build
+            // after an abort has been rolled back.
+            if (!DurableCatalog::get(opCtx)->isIndexPresent(
+                    opCtx, collection->getCatalogId(), indexNames[i])) {
+                log() << "The index for build " << buildUUID
+                      << " was not found while trying to drop the index during recovery: "
+                      << indexNames[i];
+                continue;
+            }
 
-                // If it's unfinished index, drop it directly via removeIndex.
+            const auto durableBuildUUID = DurableCatalog::get(opCtx)->getIndexBuildUUID(
+                opCtx, collection->getCatalogId(), indexNames[i]);
+
+            // A build UUID is present if and only if we are rebuilding a two-phase build.
+            invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
+                      durableBuildUUID.is_initialized());
+            // When a buildUUID is present, it must match the build UUID parameter to this
+            // function.
+            invariant(!durableBuildUUID || *durableBuildUUID == buildUUID,
+                      str::stream() << "durable build UUID: " << durableBuildUUID
+                                    << "buildUUID: " << buildUUID);
+
+            // If the unfinished index is in the IndexCatalog, drop it through there, otherwise drop
+            // it from the DurableCatalog. Rollback-via-refetch does not clear any in-memory state,
+            // so we should do it manually here.
+            includeUnfinished = true;
+            descriptor = indexCatalog->findIndexByName(opCtx, indexNames[i], includeUnfinished);
+            if (descriptor) {
+                Status s = indexCatalog->dropUnfinishedIndex(opCtx, descriptor);
+                if (!s.isOK()) {
+                    return s;
+                }
+            } else {
                 Status status = DurableCatalog::get(opCtx)->removeIndex(
                     opCtx, collection->getCatalogId(), indexNames[i]);
                 if (!status.isOK()) {
                     return status;
                 }
-                continue;
-            }
-            Status s = indexCatalog->dropIndex(opCtx, descriptor);
-            if (!s.isOK()) {
-                return s;
             }
         }
 
-        // We need to initialize the collection to rebuild the indexes.
-        collection->init(opCtx);
+        // We need to initialize the collection to rebuild the indexes. The collection may already
+        // be initialized when rebuilding indexes with rollback-via-refetch.
+        if (!collection->isInitialized()) {
+            collection->init(opCtx);
+        }
 
         auto dbName = nss.db().toString();
         auto replIndexBuildState =
@@ -570,18 +596,31 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp - "_sd, onIndexBuild);
 }
 
-void IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
+IndexBuilds IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
     log() << "IndexBuildsCoordinator::onRollback - this node is entering the rollback state";
+
+    IndexBuilds buildsAborted;
+
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [this](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [this, &buildsAborted](std::shared_ptr<ReplIndexBuildState> replState) {
         const std::string reason = "rollback";
         _indexBuildsManager.abortIndexBuild(replState->buildUUID, reason);
 
         stdx::unique_lock<Latch> lk(replState->mutex);
         if (!replState->aborted) {
+
+            IndexBuildDetails aborted{replState->collectionUUID};
+            // Record the index builds aborted due to rollback. This allows any rollback algorithm
+            // to efficiently restart all unfinished index builds without having to scan all indexes
+            // in all collections.
+            for (auto spec : replState->indexSpecs) {
+                aborted.indexSpecs.emplace_back(spec.getOwned());
+            }
+            buildsAborted.insert({replState->buildUUID, aborted});
+
             // Leave abort timestamp as null. This will unblock the index build and allow it to
             // complete using a ghost timestamp. Subsequently, the rollback algorithm can decide how
-            // undo the index build depending on the state of the oplog.
+            // to undo the index build depending on the state of the oplog.
             invariant(replState->abortTimestamp.isNull(), replState->buildUUID.toString());
             invariant(!replState->aborted, replState->buildUUID.toString());
             replState->aborted = true;
@@ -590,11 +629,11 @@ void IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
         }
     };
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onRollback - "_sd, onIndexBuild);
+    return buildsAborted;
 }
 
-void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
-    OperationContext* opCtx,
-    const std::map<UUID, StorageEngine::IndexBuildToRestart>& buildsToRestart) {
+void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opCtx,
+                                                           const IndexBuilds& buildsToRestart) {
     for (auto& [buildUUID, build] : buildsToRestart) {
         boost::optional<NamespaceString> nss =
             CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, build.collUUID);
@@ -1729,8 +1768,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexRebuildForRecovery(
     OperationContext* opCtx, Collection* collection, const UUID& buildUUID) noexcept {
-    // Index builds in recovery mode have the global write lock.
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     auto replState = invariant(_getIndexBuild(buildUUID));
 

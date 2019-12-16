@@ -168,6 +168,11 @@ public:
         return Status::OK();
     }
 
+    Status dropUnfinishedIndex(OperationContext* const opCtx,
+                               const IndexDescriptor* const desc) override {
+        return Status::OK();
+    }
+
     Status dropIndexEntry(OperationContext* opCtx, IndexCatalogEntry* entry) override {
         return Status::OK();
     }

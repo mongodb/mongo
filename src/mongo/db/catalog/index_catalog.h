@@ -365,6 +365,14 @@ public:
     virtual Status dropIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) = 0;
 
     /**
+     * Drops an unfinished index given its descriptor.
+     *
+     * The caller must hold the collection X lock.
+     */
+    virtual Status dropUnfinishedIndex(OperationContext* const opCtx,
+                                       const IndexDescriptor* const desc) = 0;
+
+    /**
      * Drops the index given its catalog entry.
      *
      * The caller must hold the collection X lock.
