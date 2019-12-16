@@ -231,6 +231,22 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
         return shardIdsForGaps[indx++ % shardIdsForGaps.size()];
     };
 
+    auto nextShardIdForTag = [&, tagToIndx = StringMap<size_t>() ](const auto& tag) mutable {
+        const auto it = tagToShards.find(tag.getTag());
+        invariant(it != tagToShards.end());
+        const auto& shardIdsForTag = it->second;
+        uassert(50973,
+                str::stream()
+                    << "Cannot shard collection "
+                    << nss.ns()
+                    << " due to zone "
+                    << tag.getTag()
+                    << " which is not assigned to a shard. Please assign this zone to a shard.",
+                !shardIdsForTag.empty());
+        const auto nextShardIndx = tagToIndx[tag.getTag()]++;
+        return shardIdsForTag[nextShardIndx % shardIdsForTag.size()];
+    };
+
     std::vector<ChunkType> chunks;
 
     ChunkVersion version(1, 0, OID::gen());
@@ -249,24 +265,12 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
         }
 
         // Create chunk for the actual tag - [tag.getMinKey, tag.getMaxKey)
-        const auto it = tagToShards.find(tag.getTag());
-        invariant(it != tagToShards.end());
-        const auto& shardIdsForChunk = it->second;
-        uassert(50973,
-                str::stream()
-                    << "Cannot shard collection "
-                    << nss.ns()
-                    << " due to zone "
-                    << tag.getTag()
-                    << " which is not assigned to a shard. Please assign this zone to a shard.",
-                !shardIdsForChunk.empty());
-
         appendChunk(nss,
                     tag.getMinKey(),
                     tag.getMaxKey(),
                     &version,
                     validAfter,
-                    shardIdsForChunk[0],
+                    nextShardIdForTag(tag),
                     &chunks);
         lastChunkMax = tag.getMaxKey();
     }

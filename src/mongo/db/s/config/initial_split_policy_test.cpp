@@ -420,6 +420,60 @@ TEST_F(GenerateShardCollectionInitialZonedChunksTest, NumRemainingChunksGreaterT
     checkGeneratedInitialZoneChunks(tags, 2, expectedChunkRanges, expectedShardIds);
 }
 
+TEST_F(GenerateShardCollectionInitialZonedChunksTest, MultipleChunksToOneZoneWithMultipleShards) {
+    const auto zone0 = zoneName("Z0");
+
+    const std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),   // zone0
+        ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),     // gap
+        ChunkRange(BSON(shardKey() << 10), BSON(shardKey() << 20)),    // zone0
+        ChunkRange(BSON(shardKey() << 20), keyPattern().globalMax()),  // zone0
+    };
+    const std::vector<TagsType> tags = {
+        makeTag(expectedChunkRanges.at(0), zone0),
+        makeTag(expectedChunkRanges.at(2), zone0),
+        makeTag(expectedChunkRanges.at(3), zone0),
+    };
+    const StringMap<std::vector<ShardId>> tagToShards = {{zone0, {{"S0"}, {"S1"}}}};
+    const std::vector<ShardId> shardIdsForGaps = {{"G0"}};
+    const std::vector<ShardId> expectedShardIds = {{"S0"}, {"G0"}, {"S1"}, {"S0"}};
+    const auto shardCollectionConfig =
+        InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
+            nss(), shardKeyPattern(), timeStamp(), tags, tagToShards, shardIdsForGaps);
+
+    const std::vector<ChunkType> expectedChunks = makeChunks(expectedChunkRanges, expectedShardIds);
+    assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
+};
+
+TEST_F(GenerateShardCollectionInitialZonedChunksTest,
+       MultipleChunksToInterleavedZonesWithMultipleShards) {
+    const auto zone0 = zoneName("Z0");
+    const auto zone1 = zoneName("Z1");
+
+    const std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),   // zone0
+        ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),     // zone1
+        ChunkRange(BSON(shardKey() << 10), BSON(shardKey() << 20)),    // gap
+        ChunkRange(BSON(shardKey() << 20), keyPattern().globalMax()),  // zone0
+    };
+    const std::vector<TagsType> tags = {
+        makeTag(expectedChunkRanges.at(0), zone0),
+        makeTag(expectedChunkRanges.at(1), zone1),
+        makeTag(expectedChunkRanges.at(3), zone0),
+    };
+    const StringMap<std::vector<ShardId>> tagToShards = {
+        {zone0, {{"Z0-S0"}, {"Z0-S1"}}}, {zone1, {{"Z1-S0"}, {"Z1-S1"}}},
+    };
+    const std::vector<ShardId> shardIdsForGaps = {{"G0"}};
+    const std::vector<ShardId> expectedShardIds = {{"Z0-S0"}, {"Z1-S0"}, {"G0"}, {"Z0-S1"}};
+    const auto shardCollectionConfig =
+        InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
+            nss(), shardKeyPattern(), timeStamp(), tags, tagToShards, shardIdsForGaps);
+
+    const std::vector<ChunkType> expectedChunks = makeChunks(expectedChunkRanges, expectedShardIds);
+    assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
+};
+
 TEST_F(GenerateShardCollectionInitialZonedChunksTest, ZoneNotAssociatedWithAnyShardShouldFail) {
     const auto zone1 = zoneName("0");
     const auto zone2 = zoneName("1");
