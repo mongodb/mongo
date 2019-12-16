@@ -554,9 +554,10 @@ private:
 
 /**
  * A subclass of Command that only cares about the BSONObj body and doesn't need access to document
- * sequences.
+ * sequences. Commands should implement this class if they require access to the
+ * ReplyBuilderInterface (e.g. to set the next invocation for an exhaust command).
  */
-class BasicCommand : public Command {
+class BasicCommandWithReplyBuilderInterface : public Command {
 private:
     class Invocation;
 
@@ -576,15 +577,12 @@ public:
     //
 
     /**
-     * run the given command
-     * implement this...
-     *
-     * return value is true if succeeded.  if false, set errmsg text.
+     * Runs the given command. Returns true upon success.
      */
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) = 0;
+    virtual bool runWithReplyBuilder(OperationContext* opCtx,
+                                     const std::string& db,
+                                     const BSONObj& cmdObj,
+                                     rpc::ReplyBuilderInterface* replyBuilder) = 0;
 
     /**
      * Commands which can be explained override this method. Any operation which has a query
@@ -686,6 +684,30 @@ private:
                                        std::vector<Privilege>* out) const {
         // The default implementation of addRequiredPrivileges should never be hit.
         fassertFailed(16940);
+    }
+};
+
+/**
+ * Commands should implement this class if they do not require access to the ReplyBuilderInterface.
+ */
+class BasicCommand : public BasicCommandWithReplyBuilderInterface {
+public:
+    using BasicCommandWithReplyBuilderInterface::BasicCommandWithReplyBuilderInterface;
+
+    /**
+     * Runs the given command. Returns true upon success.
+     */
+    virtual bool run(OperationContext* opCtx,
+                     const std::string& db,
+                     const BSONObj& cmdObj,
+                     BSONObjBuilder& result) = 0;
+
+    bool runWithReplyBuilder(OperationContext* opCtx,
+                             const std::string& db,
+                             const BSONObj& cmdObj,
+                             rpc::ReplyBuilderInterface* replyBuilder) final {
+        auto result = replyBuilder->getBodyBuilder();
+        return run(opCtx, db, cmdObj, result);
     }
 };
 

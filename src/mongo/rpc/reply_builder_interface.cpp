@@ -89,5 +89,19 @@ ReplyBuilderInterface& ReplyBuilderInterface::setCommandReply(Status nonOKStatus
     return setRawCommandReply(augmentReplyWithStatus(nonOKStatus, std::move(extraErrorInfo)));
 }
 
+bool ReplyBuilderInterface::shouldRunAgainForExhaust() const {
+    return _shouldRunAgainForExhaust;
+}
+
+
+boost::optional<BSONObj> ReplyBuilderInterface::getNextInvocation() const {
+    return _nextInvocation;
+}
+
+void ReplyBuilderInterface::setNextInvocation(boost::optional<BSONObj> nextInvocation) {
+    _shouldRunAgainForExhaust = true;
+    _nextInvocation = nextInvocation;
+}
+
 }  // namespace rpc
 }  // namespace mongo

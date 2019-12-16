@@ -873,6 +873,8 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
     }
 
     DbResponse dbResponse;
+    dbResponse.shouldRunAgainForExhaust = reply->shouldRunAgainForExhaust();
+    dbResponse.nextInvocation = reply->getNextInvocation();
     if (OpMsg::isFlagSet(m, OpMsg::kExhaustSupported)) {
         auto responseObj = reply->getBodyBuilder().asTempObj();
         auto cursorObj = responseObj.getObjectField("cursor");

@@ -395,6 +395,20 @@ public:
         return _comment ? boost::optional<BSONElement>(_comment->firstElement()) : boost::none;
     }
 
+    /**
+     * Sets whether this operation is an exhaust command.
+     */
+    void setExhaust(bool exhaust) {
+        _exhaust = exhaust;
+    }
+
+    /**
+     * Returns whether this operation is an exhaust command.
+     */
+    bool isExhaust() const {
+        return _exhaust;
+    }
+
 private:
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
@@ -528,6 +542,9 @@ private:
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.
     boost::optional<BSONObj> _comment;
+
+    // Whether this operation is an exhaust command.
+    bool _exhaust = false;
 };
 
 namespace repl {
