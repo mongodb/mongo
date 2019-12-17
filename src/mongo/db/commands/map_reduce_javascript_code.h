@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -63,6 +64,46 @@ public:
 
 private:
     std::string code;
+};
+
+/**
+ * Same as above, but allows for null. This is required for older versions of the Java driver which
+ * send finalize: null if the argument is omitted by the user.
+ */
+class MapReduceJavascriptCodeOrNull {
+public:
+    static MapReduceJavascriptCodeOrNull parseFromBSON(const BSONElement& element) {
+        if (element.type() == jstNULL) {
+            return MapReduceJavascriptCodeOrNull(boost::none);
+        }
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "'" << element.fieldNameStringData()
+                              << "' must be of string or code type",
+                element.type() == String || element.type() == Code);
+        return MapReduceJavascriptCodeOrNull(boost::make_optional(element._asCode()));
+    }
+
+    MapReduceJavascriptCodeOrNull() = default;
+    MapReduceJavascriptCodeOrNull(boost::optional<std::string> code) : code(code) {}
+
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+        if (code == boost::none) {
+            (*builder) << fieldName << "null";
+        } else {
+            (*builder) << fieldName << code.get();
+        }
+    }
+
+    auto getCode() const {
+        return code;
+    }
+
+    bool hasCode() const {
+        return code != boost::none;
+    }
+
+private:
+    boost::optional<std::string> code;
 };
 
 }  // namespace mongo

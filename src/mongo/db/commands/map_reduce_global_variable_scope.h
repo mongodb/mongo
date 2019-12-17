@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -41,25 +43,31 @@ namespace mongo {
 class MapReduceGlobalVariableScope {
 public:
     static MapReduceGlobalVariableScope parseFromBSON(const BSONElement& element) {
+        if (element.type() == jstNULL) {
+            return MapReduceGlobalVariableScope();
+        }
         uassert(ErrorCodes::BadValue, "'scope' must be an object", element.type() == Object);
         return MapReduceGlobalVariableScope(element.embeddedObject());
     }
 
     MapReduceGlobalVariableScope() = default;
-    MapReduceGlobalVariableScope(const BSONObj& obj) : obj(obj.getOwned()) {}
+    MapReduceGlobalVariableScope(const BSONObj& obj) : obj(boost::make_optional(obj.getOwned())) {}
 
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-        builder->append(fieldName, obj);
+        if (obj == boost::none) {
+            builder->append(fieldName, "null");
+        }
+        builder->append(fieldName, obj.get());
     }
 
-    BSONObj getObj() const {
+    boost::optional<BSONObj> getObj() const {
         return obj;
     }
 
 private:
     // Initializers for global variables. These will be directly executed as Javascript. This is
     // left as a BSONObj for that API.
-    BSONObj obj;
+    boost::optional<BSONObj> obj;
 };
 
 }  // namespace mongo
