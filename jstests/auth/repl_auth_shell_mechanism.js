@@ -29,7 +29,7 @@ const rsName = connString.substr(0, slash);
 const rsHosts = connString.substr(slash + 1);
 
 // Connect with shell using connString.
-const csShell = runMongoProgram('./mongo',
+const csShell = runMongoProgram('mongo',
                                 '--host',
                                 connString,
                                 '-u',
@@ -43,7 +43,7 @@ const csShell = runMongoProgram('./mongo',
 assert.eq(csShell, 0, 'Failed to connect using connection string');
 
 // Connect with shell explicitly specifying mechanism.
-const csShellMech = runMongoProgram('./mongo',
+const csShellMech = runMongoProgram('mongo',
                                     '--host',
                                     connString,
                                     '-u',
@@ -60,12 +60,12 @@ assert.eq(csShellMech, 0, 'Failed to connect using connection string');
 
 // Connect with shell using URI.
 const uriString = 'mongodb://admin:password@' + rsHosts + '/admin?replicaSet=' + rsName;
-const uriShell = runMongoProgram('./mongo', uriString, '--eval', ';');
+const uriShell = runMongoProgram('mongo', uriString, '--eval', ';');
 assert.eq(uriShell, 0, 'Failed to connect using URI');
 
 // Connect with shell using URI and explcit mechanism.
 const uriShellMech =
-    runMongoProgram('./mongo', uriString + '&authMechanism=SCRAM-SHA-256', '--eval', ';');
+    runMongoProgram('mongo', uriString + '&authMechanism=SCRAM-SHA-256', '--eval', ';');
 assert.eq(uriShellMech, 0, 'Failed to connect using URI');
 
 rsTest.stopSet();

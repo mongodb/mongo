@@ -30,7 +30,7 @@ var assertCmdFound = function(db, cmdName) {
     }
 };
 
-jsTest.setOption('enableTestCommands', false);
+TestData.enableTestCommands = false;
 
 var conn = MongoRunner.runMongod({});
 for (i in testOnlyCommands) {
@@ -39,7 +39,7 @@ for (i in testOnlyCommands) {
 MongoRunner.stopMongod(conn);
 
 // Now enable the commands
-jsTest.setOption('enableTestCommands', true);
+TestData.enableTestCommands = true;
 
 var conn = MongoRunner.runMongod({});
 for (i in testOnlyCommands) {

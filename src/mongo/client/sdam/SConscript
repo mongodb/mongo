@@ -28,6 +28,7 @@ sdam_json_test = env.Program(
     source=[
         'sdam_json_test_runner.cpp',
         env.Idlc('sdam_json_test_runner_cli_options.idl')[0]],
+    AIB_COMPONENT="sdam-json-test",
     LIBDEPS=[
         'sdam',
         'sdam_test',
@@ -36,7 +37,6 @@ sdam_json_test = env.Program(
         '$BUILD_DIR/mongo/util/options_parser/options_parser'],
 )[0]
 env.RegisterUnitTest(sdam_json_test)
-env.Alias("sdam_json_test_runner", str(sdam_json_test))
 
 env.Library(
     target='sdam_test',

@@ -482,6 +482,7 @@ mongod = env.Program(
         "core",
         "default",
         "dist",
+        "dist-test",
         "servers",
     ],
 )
@@ -587,6 +588,7 @@ mongos = env.Program(
     AIB_COMPONENTS_EXTRA=[
         "core",
         "dist",
+        "dist-test",
         "servers"
     ]
 )
@@ -683,6 +685,7 @@ if not has_option('noshell') and usemozjs:
         AIB_COMPONENTS_EXTRA=[
             "core",
             "dist",
+            "dist-test",
             "shell",
         ],
     )
@@ -811,7 +814,7 @@ if hygienic:
         target='$DESTDIR',
         source=env.get('MODULE_BANNERS', []),
         AIB_COMPONENT='common',
-        AIB_COMPONENTS_EXTRA=['dist'],
+        AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
         AIB_ROLE='base',
     )
 

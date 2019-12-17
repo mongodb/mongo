@@ -25,14 +25,14 @@ configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
 configRS.initiate();
 
 // Setting a failpoint via --setParameter fails if enableTestCommands is not on.
-jsTest.setOption('enableTestCommands', false);
+TestData.enableTestCommands = false;
 assertStartupFails(
     MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}));
 assertStartupFails(MongoRunner.runMongos({
     setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
     configdb: configRS.getURL()
 }));
-jsTest.setOption('enableTestCommands', true);
+TestData.enableTestCommands = true;
 
 // Passing an invalid failpoint payload fails.
 assertStartupFails(
@@ -108,7 +108,7 @@ MongoRunner.stopMongos(mongos);
 // Failpoint server parameters do not show up in the output of getParameter when not running
 // with enableTestCommands=1.
 
-jsTest.setOption('enableTestCommands', false);
+TestData.enableTestCommands = false;
 TestData.roleGraphInvalidationIsFatal = false;
 
 mongod = MongoRunner.runMongod();

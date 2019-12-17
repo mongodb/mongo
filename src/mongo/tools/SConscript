@@ -30,7 +30,5 @@ mongobridge = env.Program(
         '$BUILD_DIR/mongo/util/signal_handlers',
     ],
     AIB_COMPONENT='tools',
+    AIB_COMPONENTS_EXTRA=["dist-test"],
 )
-
-install_mongobridge = env.Install("#/", mongobridge)
-env.Alias("install-tools", [install_mongobridge[0]])

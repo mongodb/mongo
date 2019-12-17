@@ -18,13 +18,13 @@ function runTest(client, restartCommand) {
     mkdir(path);
 
     if (!jsTest.isMongos(client)) {
-        setJsTestOption("enableTestCommands", 0);
+        TestData.enableTestCommands = false;
         client = restartCommand({
             trafficRecordingDirectory: path,
             AlwaysRecordTraffic: "notARealPath",
             enableTestCommands: 0,
         });
-        setJsTestOption("enableTestCommands", 1);
+        TestData.enableTestCommands = true;
         assert.eq(null, client, "AlwaysRecordTraffic and not enableTestCommands should fail");
     }
 

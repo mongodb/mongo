@@ -861,6 +861,11 @@ env_vars.Add('OBJCOPY',
     help='Sets the path to objcopy',
     default=WhereIs('objcopy'))
 
+
+env_vars.Add('PKGDIR',
+    help='Directory in which to build packages and archives',
+    default='$VARIANT_DIR/pkgs')
+
 env_vars.Add('PREFIX',
     help='Final installation location of files, will be made into a sub dir of $DESTDIR',
     default='')
@@ -1046,21 +1051,28 @@ envDict = dict(BUILD_ROOT=buildDir,
                ARCHIVE_ADDITIONS=[],
                PYTHON="$( {} $)".format(sys.executable),
                SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
-               UNITTEST_ALIAS='unittests',
+               UNITTEST_ALIAS='install-unittests',
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
                # changes to MCI.
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
-               LIBFUZZER_TEST_ALIAS='libfuzzer_tests',
+               LIBFUZZER_TEST_ALIAS='install-fuzzertests',
                LIBFUZZER_TEST_LIST='$BUILD_ROOT/libfuzzer_tests.txt',
-               INTEGRATION_TEST_ALIAS='integration_tests',
+               INTEGRATION_TEST_ALIAS='install-integration-tests',
                INTEGRATION_TEST_LIST='$BUILD_ROOT/integration_tests.txt',
-               BENCHMARK_ALIAS='benchmarks',
+               BENCHMARK_ALIAS='install-benchmarks',
                BENCHMARK_LIST='$BUILD_ROOT/benchmarks.txt',
                CONFIGUREDIR='$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp',
                CONFIGURELOG='$BUILD_ROOT/scons/config.log',
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
                )
+
+# TODO: Remove these when hygienic builds are default.
+if get_option('install-mode') != 'hygienic':
+    envDict["UNITTEST_ALIAS"] = "unittests"
+    envDict["INTEGRATION_TEST_ALIAS"] = "integration_tests"
+    envDict["LIBFUZZER_TEST_ALIAS"] = "libfuzzer_tests"
+    envDict["BENCHMARK_ALIAS"] = "benchmarks"
 
 env = Environment(variables=env_vars, **envDict)
 
@@ -3874,7 +3886,7 @@ if get_option('ninja') == 'true':
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
 
-    if get_option('separate-debug') == "on":
+    if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
         env.Tool('separate_debug')
 
     env["AIB_TARBALL_SUFFIX"] = "tgz"
@@ -3918,18 +3930,24 @@ if get_option('install-mode') == 'hygienic':
         meta_role="meta",
     )
 
+    def _aib_debugdir(source, target, env, for_signature):
+        for s in source:
+            origin = getattr(s.attributes, "debug_file_for", None)
+            oentry = env.Entry(origin)
+            osuf = oentry.get_suffix()
+            map_entry = env["AIB_SUFFIX_MAP"].get(osuf)
+            if map_entry:
+                return map_entry[0]
+
+        return "Unable to find debuginfo for {}".format(str(source))
+
+    env["PREFIX_DEBUGDIR"] = _aib_debugdir
+
     env.AddSuffixMapping({
         "$PROGSUFFIX": env.SuffixMap(
             directory="$PREFIX_BINDIR",
             default_roles=[
                 "runtime",
-            ]
-        ),
-
-        "$LIBSUFFIX": env.SuffixMap(
-            directory="$PREFIX_LIBDIR",
-            default_roles=[
-                "dev",
             ]
         ),
 
@@ -3967,13 +3985,61 @@ if get_option('install-mode') == 'hygienic':
     env.AddPackageNameAlias(
         component="dist",
         role="runtime",
-        name="${SERVER_DIST_BASENAME}",
+        name="mongodb-dist",
     )
 
     env.AddPackageNameAlias(
         component="dist",
         role="debug",
-        name="${SERVER_DIST_BASENAME}-debugsymbols",
+        name="mongodb-dist-debugsymbols",
+    )
+
+    env.AddPackageNameAlias(
+        component="dist-test",
+        role="runtime",
+        name="mongodb-binaries",
+    )
+
+    env.AddPackageNameAlias(
+        component="dist-test",
+        role="debug",
+        name="mongo-debugsymbols",
+    )
+
+    env.AddPackageNameAlias(
+        component="dbtest",
+        role="runtime",
+        name="dbtest-binary",
+    )
+
+    env.AddPackageNameAlias(
+        component="dbtest",
+        role="debug",
+        name="dbtest-debugsymbols",
+    )
+
+    env.AddPackageNameAlias(
+        component="shell",
+        role="runtime",
+        name="mongodb-shell",
+    )
+
+    env.AddPackageNameAlias(
+        component="shell",
+        role="debug",
+        name="mongodb-shell-debugsymbols",
+    )
+
+    env.AddPackageNameAlias(
+        component="mongocryptd",
+        role="runtime",
+        name="mongodb-cryptd",
+    )
+
+    env.AddPackageNameAlias(
+        component="mongocryptd",
+        role="debug",
+        name="mongodb-cryptd-debugsymbols",
     )
 
     env.AddPackageNameAlias(
@@ -3982,7 +4048,7 @@ if get_option('install-mode') == 'hygienic':
         # TODO: we should be able to move this to where the mqlrun binary is
         # defined when AIB correctly uses environments instead of hooking into
         # the first environment used.
-        name="${MH_DIST_BASENAME}-binaries",
+        name="mh-binaries",
     )
 
     env.AddPackageNameAlias(
@@ -3991,7 +4057,7 @@ if get_option('install-mode') == 'hygienic':
         # TODO: we should be able to move this to where the mqlrun binary is
         # defined when AIB correctly uses environments instead of hooking into
         # the first environment used.
-        name="${MH_DIST_BASENAME}-debugsymbols",
+        name="mh-debugsymbols",
     )
 
     if env['PLATFORM'] == 'posix':
@@ -4256,17 +4322,19 @@ if get_option("ninja") == "false":
         r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb")
     vcxproj = env.Alias("vcxproj", vcxprojFile)
 
-distSrc = env.DistSrc("mongodb-src-${MONGO_VERSION}.tar")
+# TODO: maybe make these work like the other archive- hygienic aliases
+# even though they aren't piped through AIB?
+distSrc = env.DistSrc("distsrc.tar")
 env.NoCache(distSrc)
 env.Alias("distsrc-tar", distSrc)
 
 distSrcGzip = env.GZip(
-    target="mongodb-src-${MONGO_VERSION}.tgz",
+    target="distsrc.tgz",
     source=[distSrc])
 env.NoCache(distSrcGzip)
 env.Alias("distsrc-tgz", distSrcGzip)
 
-distSrcZip = env.DistSrc("mongodb-src-${MONGO_VERSION}.zip")
+distSrcZip = env.DistSrc("distsrc.zip")
 env.NoCache(distSrcZip)
 env.Alias("distsrc-zip", distSrcZip)
 
@@ -4420,18 +4488,7 @@ env.Alias('cache-prune', cachePrune)
 
 if get_option('install-mode') == 'hygienic':
     env.FinalizeInstallDependencies()
-    # TODO: Remove once hygienic is driving all builds and we can make
-    # the evergreen.yml make this decision
-    if env.TargetOSIs("windows"):
-        env.Alias("archive-dist", "zip-dist")
-        env.Alias("archive-dist-debug", "zip-dist-debug")
-        env.Alias("archive-mh", "zip-mh")
-        env.Alias("archive-mh-debug", "zip-mh-debug")
-    else:
-        env.Alias("archive-dist", "tar-dist")
-        env.Alias("archive-dist-debug", "tar-dist-debug")
-        env.Alias("archive-mh", "tar-mh")
-        env.Alias("archive-mh-debug", "tar-mh-debug")
+
 
 # We don't want installing files to cause them to flow into the cache,
 # since presumably we can re-install them from the origin if needed.

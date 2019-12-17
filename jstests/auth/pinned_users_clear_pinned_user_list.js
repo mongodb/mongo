@@ -1,7 +1,7 @@
 (function() {
 'use strict';
 
-jsTest.setOption("enableTestCommands", true);
+TestData.enableTestCommands = true;
 
 // Start a mongod with the user cache size set to zero, so we know that users who have logged out
 // always get fetched cleanly from disk.

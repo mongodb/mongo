@@ -11,7 +11,7 @@
 // A testing exemption was made to allow transactions on shard server even if
 // writeConcernMajorityJournalDefault = false. So we need to disable the exemption in this test
 // in order to test the behavior.
-jsTest.setOption('enableTestCommands', false);
+TestData.enableTestCommands = false;
 
 // The following two options by default do not support enableTestCommands=false, change them
 // accordingly so this test can run.

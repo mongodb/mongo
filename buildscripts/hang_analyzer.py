@@ -533,9 +533,7 @@ class DebugExtractor(object):
         out = []
         for ext in ['debug', 'dSYM', 'pdb']:
             for file in ['mongo', 'mongod', 'mongos']:
-                # need to glob because it untar's to a directory that looks like
-                # mongodb-linux-x86_64-enterprise-rhel62-4.3.0-1823-gb9c13fa-patch-5daa05630ae60652f0890f76
-                haystack = os.path.join('mongodb*', 'bin', '{file}.{ext}'.format(
+                haystack = os.path.join('dist-test', 'bin', '{file}.{ext}'.format(
                     file=file, ext=ext))
                 for needle in glob.glob(haystack):
                     out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))

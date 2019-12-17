@@ -28,7 +28,7 @@ requireSSLProvider('windows', function() {
     const testWithCert = function(certSelector) {
         jsTest.log(`Testing with SSL cert ${certSelector}`);
         const argv = [
-            './mongo',
+            'mongo',
             '--ssl',
             '--sslCertificateSelector',
             certSelector,

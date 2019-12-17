@@ -32,7 +32,7 @@ var nodeList = replTest.nodeList().join();
 var checkShellOkay = function(url) {
     // Should not be able to authenticate with x509.
     // Authenticate call will return 1 on success, 0 on error.
-    var argv = ['./mongo', url, '--eval', ('db.runCommand({replSetGetStatus: 1})')];
+    var argv = ['mongo', url, '--eval', ('db.runCommand({replSetGetStatus: 1})')];
     if (!_isWindows()) {
         // On Linux we override the default path to the system CA store to point to our
         // "trusted" CA. On Windows, this CA will have been added to the user's trusted CA list

@@ -172,11 +172,12 @@ if not has_option('noshell') and usemozjs:
             "mocklib",
             "testframework",
         ],
-        AIB_COMPONENT="dbtests",
+        AIB_COMPONENT="dbtest",
         AIB_COMPONENTS_EXTRA=[
             "tests",
         ],
     )
+
     hygienic = get_option('install-mode') == 'hygienic'
     if not hygienic:
         install_dbtest = env.Install('#/', dbtest)

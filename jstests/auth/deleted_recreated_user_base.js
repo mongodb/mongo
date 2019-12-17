@@ -33,7 +33,7 @@ function runTest(s0, s1) {
     // Perform administrative commands via separate shell.
     function evalCmd(cmd) {
         const uri = 'mongodb://admin:pass@localhost:' + s1.port + '/admin';
-        const result = runMongoProgram('./mongo', uri, '--eval', cmd);
+        const result = runMongoProgram('mongo', uri, '--eval', cmd);
         assert.eq(result, 0, "Command failed");
     }
     evalCmd('db.dropUser("user"); ');

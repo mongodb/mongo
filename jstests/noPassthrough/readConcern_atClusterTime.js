@@ -116,7 +116,7 @@ rst.stopSet();
 
 // readConcern with 'atClusterTime' should succeed regardless of value of 'enableTestCommands'.
 {
-    jsTest.setOption('enableTestCommands', false);
+    TestData.enableTestCommands = false;
     let rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
@@ -130,7 +130,7 @@ rst.stopSet();
     session.endSession();
     rst.stopSet();
 
-    jsTest.setOption('enableTestCommands', true);
+    TestData.enableTestCommands = true;
     rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();

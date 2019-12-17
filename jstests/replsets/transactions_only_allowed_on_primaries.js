@@ -9,7 +9,8 @@
 // In 4.0, we allow read-only transactions on secondaries when test commands are enabled, so we
 // disable them in this test, to test that transactions on secondaries will be disallowed
 // for production users.
-jsTest.setOption('enableTestCommands', false);
+
+TestData.enableTestCommands = false;
 TestData.roleGraphInvalidationIsFatal = false;
 TestData.authenticationDatabase = "local";
 

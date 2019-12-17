@@ -14,7 +14,7 @@ if (!_isWindows()) {
         "'var database = db.getMongo().getDB(" + database + "); database.auth(" + user + ");'";
 
     const binshell = '/bin/sh';
-    const mongo = './mongo';
+    const mongo = 'mongo';
     const host = conn.host;
     const port = conn.port;
     const ret = runProgram(

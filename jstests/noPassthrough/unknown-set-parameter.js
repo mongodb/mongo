@@ -3,9 +3,11 @@
 (function() {
 'use strict';
 
+TestData.enableTestCommands = false;
+
 function tryRun(arg) {
     // runMongoProgram helpfully makes certain that we pass a port when invoking mongod.
-    return runMongoProgram('./mongod', '--port', 0, '--setParameter', arg, '--outputConfig');
+    return runMongoProgram('mongod', '--port', 0, '--setParameter', arg, '--outputConfig');
 }
 
 // Positive case, valid setparam.

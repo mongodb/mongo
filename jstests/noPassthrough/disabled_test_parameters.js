@@ -13,7 +13,7 @@ function assertStarts(opts) {
     MongoRunner.stopMongod(mongod);
 }
 
-setJsTestOption('enableTestCommands', false);
+TestData.enableTestCommands = false;
 
 // enableTestCommands not specified.
 assertFails({

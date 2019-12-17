@@ -10,7 +10,7 @@ const BINDIPALL = 'jstests/noPassthrough/libs/net.bindIpAll.yaml';
 function runTest(config, opt, expectStar, expectLocalhost) {
     clearRawMongoProgramOutput();
     const mongod =
-        runMongoProgram('./mongod', '--port', port, '--config', config, opt, '--outputConfig');
+        runMongoProgram('mongod', '--port', port, '--config', config, opt, '--outputConfig');
     assert.eq(mongod, 0);
     const output = rawMongoProgramOutput();
     assert.eq(output.search(/bindIp: "\*"/) >= 0, expectStar, output);

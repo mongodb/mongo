@@ -97,11 +97,15 @@ TargetBuild = namedtuple("TargetBuild", [
 ])
 
 
-def executable_name(pathname):
+def executable_name(pathname, destdir=""):
     """Return the executable name."""
     # Ensure that executable files on Windows have a ".exe" extension.
     if _IS_WINDOWS and os.path.splitext(pathname)[1] != ".exe":
-        return "{}.exe".format(pathname)
+        pathname = "{}.exe".format(pathname)
+
+    if destdir:
+        return os.path.join(destdir, "bin", pathname)
+
     return pathname
 
 
@@ -339,9 +343,9 @@ def fetch_artifacts(build: Build, revision: str):
                 raise ValueError("No artifacts were found for the current task")
             # Need to extract certain files from the pre-existing artifacts.tgz.
             extract_files = [
-                executable_name("mongobridge"),
-                executable_name("mongotmock"),
-                executable_name("wt"),
+                executable_name("mongobridge", destdir=os.getenv("DESTDIR")),
+                executable_name("mongotmock", destdir=os.getenv("DESTDIR")),
+                executable_name("wt", destdir=os.getenv("DESTDIR")),
             ]
             with tarfile.open(filename, "r:gz") as tar:
                 # The repo/ directory contains files needed by the package task. May

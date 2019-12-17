@@ -37,10 +37,10 @@ function expectSnapshotReadConcernIsSupported() {
 }
 
 // Snapshot readConcern should succeed when 'enableTestCommands' is set to false.
-jsTest.setOption("enableTestCommands", false);
+TestData.enableTestCommands = false;
 expectSnapshotReadConcernIsSupported();
 
 // Snapshot readConcern should succeed when 'enableTestCommands' is set to true.
-jsTest.setOption("enableTestCommands", true);
+TestData.enableTestCommands = true;
 expectSnapshotReadConcernIsSupported();
 }());

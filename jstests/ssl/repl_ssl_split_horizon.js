@@ -117,7 +117,7 @@ var checkExpectedHorizon = function(url, memberIndex, expectedHostname) {
         'env',
         "HOSTALIASES=" + hostsFile,
         "SSL_CERT_FILE=jstests/libs/splithorizon-ca.pem",
-        './mongo',
+        'mongo',
         url,
         '--eval',
         assertion

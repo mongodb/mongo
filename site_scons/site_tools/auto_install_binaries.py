@@ -89,6 +89,7 @@ if __name__ == "__main__":
         archive = zipfile.ZipFile(archive_name, mode='w', compression=zipfile.ZIP_DEFLATED)
         add_file = archive.write
     else:
+        print("WARNING: tar not found in $PATH, install the tar utility to greatly improve archive creation speed.")
         import tarfile
         archive = tarfile.open(archive_name, mode='w:gz')
         add_file = archive.add
@@ -476,7 +477,7 @@ def auto_install(env, target, source, **kwargs):
         setattr(s.attributes, COMPONENTS, components)
         setattr(s.attributes, ROLES, roles)
 
-        # We must do an eearly subst here so that the _aib_debugdir
+        # We must do an early subst here so that the _aib_debugdir
         # generator has a chance to run while seeing 'source'.
         #
         # TODO: Find a way to not need this early subst.
@@ -547,14 +548,13 @@ def finalize_install_dependencies(env):
             pkg_name = get_package_name(env, component, role)
 
             for fmt in ("zip", "tar"):
-                # TODO: $PKGDIR support
                 if fmt == "zip":
                     pkg_suffix = "$AIB_ZIP_SUFFIX"
                 else:
                     pkg_suffix = "$AIB_TARBALL_SUFFIX"
 
                 archive = env.__AibArchive(
-                    target="#{}.{}".format(pkg_name, pkg_suffix),
+                    target="$PKGDIR/{}.{}".format(pkg_name, pkg_suffix),
                     source=[make_archive_script] + info.alias,
                     __AIB_ARCHIVE_TYPE=fmt,
                     __AIB_INSTALLED_SET=installed,
@@ -562,12 +562,17 @@ def finalize_install_dependencies(env):
                     AIB_ROLE=role,
                 )
 
-                # TODO: perhaps caching of packages / tarballs should be
-                # configurable? It's possible someone would want to do it.
-                env.NoCache(archive)
+                if not env.get("AIB_CACHE_ARCHIVES", False):
+                    env.NoCache(archive)
 
-                archive_alias = generate_alias(env, component, role, target=fmt)
-                env.Alias(archive_alias, archive)
+                compression_alias = generate_alias(env, component, role, target=fmt)
+                env.Alias(compression_alias, archive)
+
+            default_fmt = "zip" if env["PLATFORM"] == "win32" else "tar"
+            archive_alias = generate_alias(env, component, role, target="archive")
+            default_compression_alias = generate_alias(env, component, role, target=default_fmt)
+            env.Alias(archive_alias, default_compression_alias)
+                
 
 
 def auto_install_emitter(target, source, env):
@@ -679,15 +684,6 @@ def dest_dir_generator(initial_value=None):
     return generator
 
 
-def _aib_debugdir(source, target, env, for_signature):
-    for s in source:
-        # TODO: We shouldn't need to reach into the attributes of the debug tool like this.
-        origin = getattr(s.attributes, "debug_file_for", None)
-        oentry = env.Entry(origin)
-        osuf = oentry.get_suffix()
-        return env[SUFFIX_MAP].get(osuf)[0]
-
-
 def exists(_env):
     """Always activate this tool."""
     return True
@@ -696,7 +692,7 @@ def exists(_env):
 def list_components(env, **kwargs):
     """List registered components for env."""
     print("Known AIB components:")
-    for key in env[ALIAS_MAP]:
+    for key in sorted(env[ALIAS_MAP]):
         print("\t", key)
 
 
@@ -728,7 +724,7 @@ def generate(env):  # pylint: disable=too-many-statements
     env["PREFIX_SHAREDIR"] = env.get("PREFIX_SHAREDIR", "$DESTDIR/share")
     env["PREFIX_DOCDIR"] = env.get("PREFIX_DOCDIR", "$PREFIX_SHAREDIR/doc")
     env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$DESTDIR/include")
-    env["PREFIX_DEBUGDIR"] = env.get("PREFIX_DEBUGDIR", _aib_debugdir)
+    env["PKGDIR"] = env.get("PKGDIR", "$VARIANT_DIR/pkgs")
     env[SUFFIX_MAP] = {}
     env[PACKAGE_ALIAS_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)

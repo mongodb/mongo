@@ -64,7 +64,7 @@ const subShellCommandFormatter = function(replSet) {
 const subShellArgs = [
     "env",
     "SSL_CERT_FILE=jstests/libs/trusted-ca.pem",
-    './mongo',
+    'mongo',
     '--nodb',
     '--eval',
     subShellCommandFormatter(rst)

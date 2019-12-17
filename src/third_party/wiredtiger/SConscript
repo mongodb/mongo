@@ -231,10 +231,7 @@ wtbin = wtbinEnv.Program(
     AIB_COMPONENT="tools",
 )
 
-hygienic = get_option("install-mode") == "hygienic"
-wtbin_install = wtbinEnv.Install("#/", wtbin)
-if hygienic:
-    # TODO: remove this once hygienic drives all tarball creation
-    wtbinEnv.Alias("install-tools", wtbin_install[0])
-else:
+hygienic = get_option('install-mode') == 'hygienic'
+if not hygienic:
+    wtbin_install = wtbinEnv.Install("#/", wtbin)
     wtbinEnv.Alias("tools", wtbin_install)

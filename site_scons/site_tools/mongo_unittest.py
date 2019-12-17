@@ -23,7 +23,11 @@ def register_unit_test(env, test):
     Some SConscripts called RegisterUnitTest directly.
     """
     env.RegisterTest("$UNITTEST_LIST", test)
-    env.Alias("$UNITTEST_ALIAS", test)
+    aib_install_actions = getattr(test.attributes, "AIB_INSTALL_ACTIONS", [])
+    if aib_install_actions:
+        env.Alias("$UNITTEST_ALIAS", aib_install_actions)
+    else:
+        env.Alias("$UNITTEST_ALIAS", test)
 
 
 def exists(env):
@@ -36,8 +40,11 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 
     kwargs["LIBDEPS"] = libdeps
     unit_test_components = {"tests", "unittests"}
-    if "AIB_COMPONENT" in kwargs and not kwargs["AIB_COMPONENT"].endswith("-test"):
-        kwargs["AIB_COMPONENT"] += "-test"
+    primary_component = kwargs.get("AIB_COMPONENT", env.get("AIB_COMPONENT", ""))
+    if primary_component and not primary_component.endswith("-test"):
+        kwargs["AIB_COMPONENT"] = primary_component + "-test"
+    elif primary_component:
+        kwargs["AIB_COMPONENT"] = primary_component
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
         kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(

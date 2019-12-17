@@ -4,6 +4,7 @@ selector:
   root: build/integration_tests.txt
   exclude_files:
   - build/**/mongo/client/client_dbclient_connection_integration_test* # Needs sleep command
+  - build/install/bin/client_dbclient_connection_integration_test* # Needs sleep command
 
 executor:
   archive:

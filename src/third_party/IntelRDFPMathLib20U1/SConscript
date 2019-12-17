@@ -5,6 +5,7 @@ import sys
 Import("env")
 Import("has_option")
 Import("debugBuild")
+Import("get_option")
 
 env = env.Clone()
 
@@ -367,12 +368,30 @@ readtest = env.Program(
         'intel_decimal128',
     ],
     LIBS=libs,
+    AIB_COMPONENT="intel-test",
+    AIB_COMPONENTS_EXTRA=[
+        "unittests",
+        "tests",
+    ]
 )
 
-readtest_input = env.Install(
-    target='.',
-    source=['TESTS/readtest.in'],
-)
+if get_option("install-mode") == "hygienic":
+    readtest_input = env.AutoInstall(
+        target="$PREFIX_BINDIR",
+        source=["TESTS/readtest.in"],
+        AIB_ROLE="runtime",
+        AIB_COMPONENT="intel-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+        ],
+    )
+else:
+    readtest_input = env.Install(
+        target='.',
+        source=['TESTS/readtest.in'],
+    )
+
 env.Depends(readtest_input, readtest)
 
 readtest_dict = {
@@ -395,7 +414,36 @@ if env.TargetOSIs('windows'):
         SUBST_DICT=readtest_dict,
     )
     env.Depends(readtest_wrapper_bat, readtest_wrapper)
-    env.RegisterUnitTest(readtest_wrapper_bat[0])
+
+    if get_option("install-mode") == "hygienic":
+        readtest_wrapper_bat_install = env.AutoInstall(
+            target="$PREFIX_BINDIR",
+            source=readtest_wrapper_bat,
+            AIB_ROLE="runtime",
+            AIB_COMPONENT="intel-test",
+            AIB_COMPONENTS_EXTRA=[
+                "unittests",
+                "tests",
+            ],
+        )
+        env.RegisterUnitTest(readtest_wrapper_bat_install[0])
+    else:
+        env.RegisterUnitTest(readtest_wrapper_bat[0])
 else:
+
+    if get_option("install-mode") == "hygienic":
+        readtest_wrapper_install = env.AutoInstall(
+            target="$PREFIX_BINDIR",
+            source=readtest_wrapper,
+            AIB_ROLE="runtime",
+            AIB_COMPONENT="intel-test",
+            AIB_COMPONENTS_EXTRA=[
+                "unittests",
+                "tests",
+            ],
+        )
+        env.RegisterUnitTest(readtest_wrapper_install[0])
+    else:
+        env.RegisterUnitTest(readtest_wrapper[0])
+
     env.AddPostAction(readtest_wrapper[0], Chmod(readtest_wrapper[0], 'oug+x'))
-    env.RegisterUnitTest(readtest_wrapper[0])

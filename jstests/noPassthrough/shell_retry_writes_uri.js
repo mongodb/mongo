@@ -58,7 +58,7 @@ function runShellScript(uri, cmdArgs, insertShouldHaveTxnNumber, shellFn) {
     script += shellFn.toString();
     script += ")";
 
-    let args = ["./mongo", uri, "--eval", script].concat(cmdArgs);
+    let args = ["mongo", uri, "--eval", script].concat(cmdArgs);
     let exitCode = runMongoProgram(...args);
     assert.eq(exitCode, 0, `shell script "${shellFn.name}" exited with ${exitCode}`);
 }

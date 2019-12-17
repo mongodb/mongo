@@ -28,7 +28,7 @@ function testWithCerts(prefix) {
         {sslMode: 'allowSSL', sslPEMKeyFile: 'jstests/libs/' + prefix + 'server.pem'});
 
     let argv = [
-        './mongo',
+        'mongo',
         '--ssl',
         '--port',
         conn.port,

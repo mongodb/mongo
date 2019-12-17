@@ -3,7 +3,7 @@
 (function() {
 "use strict";
 
-jsTest.setOption("enableTestCommands", false);
+TestData.enableTestCommands = false;
 TestData.authenticationDatabase = "local";
 
 const dbName = "test";

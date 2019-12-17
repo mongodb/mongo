@@ -3,6 +3,7 @@ import os
 import os.path
 from . import interface
 from ... import core
+from ... import config
 from ... import utils
 from ...utils import globstar
 from ... import errors
@@ -12,7 +13,10 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
     """Server Discovery and Monitoring JSON test case."""
 
     REGISTERED_NAME = "sdam_json_test"
-    EXECUTABLE_BUILD_PATH = "build/**/mongo/client/sdam/sdam_json_test"
+    if config.INSTALL_DIR is not None:
+        EXECUTABLE_BUILD_PATH = os.path.join(config.INSTALL_DIR, "sdam_json_test")
+    else:
+        EXECUTABLE_BUILD_PATH = "build/**/mongo/client/sdam/sdam_json_test"
     TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests")
 
     def __init__(self, logger, json_test_file, program_options=None):
