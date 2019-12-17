@@ -1,7 +1,13 @@
 /**
  * This test enables TLA+ Trace Checking and ensures that it succeeds.
  *
- * @tags: [requires_fcv_44]
+ * @tags: [
+ *     requires_fcv_44,
+ *     requires_journaling,
+ *     requires_persistence,
+ *     requires_replication,
+ *     requires_wiredtiger,
+ * ]
  */
 
 (function() {
