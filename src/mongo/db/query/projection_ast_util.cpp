@@ -31,54 +31,42 @@
 
 #include "mongo/db/query/projection_ast_util.h"
 
+#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/projection_ast_walker.h"
 
 namespace mongo::projection_ast {
 namespace {
 struct BSONVisitorContext {
-    std::stack<std::list<std::string>> fieldNames;
     std::stack<BSONObjBuilder> builders;
-
-    BSONObjBuilder& builder() {
-        return builders.top();
-    }
 };
 
 class BSONPreVisitor : public ProjectionASTConstVisitor {
 public:
-    BSONPreVisitor(BSONVisitorContext* context) : _context(context) {}
+    BSONPreVisitor(PathTrackingVisitorContext<BSONVisitorContext>* context)
+        : _context(context), _builders(context->data().builders) {}
 
     virtual void visit(const MatchExpressionASTNode* node) {
         static_cast<const MatchExpressionASTNode*>(node)->matchExpression()->serialize(
-            &_context->builder(), true);
-        _context->fieldNames.top().pop_front();
+            &_builders.top(), true);
     }
 
     virtual void visit(const ProjectionPathASTNode* node) {
         if (!node->parent()) {
             // No root of the tree, thus this node has no field name.
-            _context->builders.push(BSONObjBuilder());
+            _builders.push(BSONObjBuilder());
         } else {
-            _context->builders.push(_context->builder().subobjStart(getFieldName()));
+            _builders.push(_builders.top().subobjStart(getFieldName()));
         }
-
-        // Push all of the field names onto a new layer on the field name stack.
-        _context->fieldNames.push(
-            std::list<std::string>(node->fieldNames().begin(), node->fieldNames().end()));
     }
 
     virtual void visit(const ProjectionPositionalASTNode* node) {
         // ProjectionPositional always has the original query's match expression node as its
         // child. Serialize as: {"positional.projection.field.$": <original match expression>}.
-        _context->builders.push(_context->builder().subobjStart(getFieldName() + ".$"));
-        // Since match expressions serialize their own field name, this is not actually used. It's
-        // pushed since when a MatchExpressionASTNode is visited it expects a field name to have
-        // been put on the stack (just like every other node), and will pop it.
-        _context->fieldNames.push({"<dummy>"});
+        _context->data().builders.push(_builders.top().subobjStart(getFieldName() + ".$"));
     }
 
     virtual void visit(const ProjectionSliceASTNode* node) {
-        BSONObjBuilder sub(_context->builder().subobjStart(getFieldName()));
+        BSONObjBuilder sub(_builders.top().subobjStart(getFieldName()));
         if (node->skip()) {
             sub.appendArray("$slice", BSON_ARRAY(*node->skip() << node->limit()));
         } else {
@@ -91,23 +79,20 @@ public:
     }
 
     virtual void visit(const ExpressionASTNode* node) {
-        node->expression()->serialize(false).addToBsonObj(&_context->builder(), getFieldName());
+        node->expression()->serialize(false).addToBsonObj(&_builders.top(), getFieldName());
     }
 
     virtual void visit(const BooleanConstantASTNode* node) {
-        _context->builders.top().append(getFieldName(), node->value());
+        _builders.top().append(getFieldName(), node->value());
     }
 
 private:
     std::string getFieldName() {
-        invariant(!_context->fieldNames.empty());
-        invariant(!_context->fieldNames.top().empty());
-        auto ret = _context->fieldNames.top().front();
-        _context->fieldNames.top().pop_front();
-        return ret;
+        return _context->childPath();
     }
 
-    BSONVisitorContext* _context;
+    PathTrackingVisitorContext<BSONVisitorContext>* _context;
+    std::stack<BSONObjBuilder>& _builders;
 };
 
 class BSONPostVisitor : public ProjectionASTConstVisitor {
@@ -120,15 +105,10 @@ public:
             // Pop the BSONObjBuilder that was added in the pre visitor.
             _context->builders.pop();
         }
-
-        // Make sure all of the children were serialized.
-        invariant(_context->fieldNames.top().empty());
-        _context->fieldNames.pop();
     }
 
     virtual void visit(const ProjectionPositionalASTNode* node) {
         _context->builders.pop();
-        _context->fieldNames.pop();
     }
 
     virtual void visit(const MatchExpressionASTNode* node) {}
@@ -140,43 +120,17 @@ public:
 private:
     BSONVisitorContext* _context;
 };
-
-class BSONWalker {
-public:
-    BSONWalker() : _preVisitor(&_context), _postVisitor(&_context) {}
-
-    void preVisit(const ASTNode* node) {
-        node->acceptVisitor(&_preVisitor);
-    }
-
-    void postVisit(const ASTNode* node) {
-        node->acceptVisitor(&_postVisitor);
-    }
-
-    void inVisit(long count, const ASTNode* node) {
-        // No op.
-    }
-
-    BSONObjBuilder done() {
-        invariant(_context.fieldNames.empty());
-        invariant(_context.builders.size() == 1);
-
-        auto ret = std::move(_context.builders.top());
-        return ret;
-    }
-
-private:
-    BSONVisitorContext _context;
-    BSONPreVisitor _preVisitor;
-    BSONPostVisitor _postVisitor;
-};
 }  // namespace
 
 BSONObj astToDebugBSON(const ASTNode* root) {
-    BSONWalker walker;
+    PathTrackingVisitorContext<BSONVisitorContext> context;
+    BSONPreVisitor preVisitor{&context};
+    BSONPostVisitor postVisitor{&context.data()};
+    PathTrackingWalker walker{&context, {&preVisitor}, {&postVisitor}};
+
     projection_ast_walker::walk(&walker, root);
 
-    BSONObjBuilder bob = walker.done();
-    return bob.obj();
+    invariant(context.data().builders.size() == 1);
+    return context.data().builders.top().obj();
 }
 }  // namespace mongo::projection_ast
