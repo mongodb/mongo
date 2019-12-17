@@ -148,26 +148,39 @@ def generate(env):
     if 'ICECC_SCHEDULER' in env:
         env['ENV']['USE_SCHEDULER'] = env['ICECC_SCHEDULER']
 
+    # Make sure it is a file node so that we can call `.abspath` on it
+    # below. We must defer the abspath and realpath calls until after
+    # the tool has completed and we have begun building, since we need
+    # the real toolchain tarball to get created first on disk as part
+    # of the DAG walk.
+    env['ICECC_VERSION'] = env.File('$ICECC_VERSION')
+
     # Not all platforms have the readlink utility, so create our own
     # generator for that.
     def icecc_version_gen(target, source, env, for_signature):
-        f = env.File('$ICECC_VERSION')
-        if not f.islink():
-            return f
-        return env.File(os.path.realpath(f.abspath))
+        # Be careful here. If we are running with the ninja tool, many things
+        # may have been monkey patched away. Rely only on `os`, not things
+        # that may try to stat. The abspath appears to be ok.
+        return os.path.realpath(env['ICECC_VERSION'].abspath)
     env['ICECC_VERSION_GEN'] = icecc_version_gen
 
-    def icecc_version_arch_gen(target, source, env, for_signature):
-        if 'ICECC_VERSION_ARCH' in env:
-            return "${ICECC_VERSION_ARCH}:"
-        return str()
-    env['ICECC_VERSION_ARCH_GEN'] = icecc_version_arch_gen
+    # Build up the string we will stick at the front of the compile
+    # line. We wrap it in the magic "don't consider this part of the
+    # build signature" sigils in the hope that enabling and disabling
+    # icecream won't cause rebuilds. This is unlikely to really work,
+    # since above we have maybe changed compiler flags (things like
+    # -fdirectives-only), but we still try to do the right thing.
+    icecc_version_string = '${ICECC_VERSION_GEN}'
+    if 'ICECC_VERSION_ARCH' in env:
+        icecc_version_string = '${ICECC_VERSION_ARCH}:' + icecc_version_string
+    icecc_version_string = '$( ICECC_VERSION={value} $ICECC $)'.format(value=icecc_version_string)
 
-    # Make compile jobs flow through icecc
-    env['CCCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['CCCOM']
-    env['CXXCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['CXXCOM']
-    env['SHCCCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['SHCCCOM']
-    env['SHCXXCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['SHCXXCOM']
+    # Amend the various C compilation command strings to start with
+    # the icecream prelude.
+    env['CCCOM'] = ' '.join([icecc_version_string, env['CCCOM']])
+    env['CXXCOM'] = ' '.join([icecc_version_string, env['CXXCOM']])
+    env['SHCCCOM'] = ' '.join([icecc_version_string, env['SHCCCOM']])
+    env['SHCXXCOM'] = ' '.join([icecc_version_string, env['SHCXXCOM']])
 
     # Make link like jobs flow through icerun so we don't kill the
     # local machine.
