@@ -57,10 +57,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                                    const HostAndPort& source,
                                    DBClientConnection* client,
                                    StorageInterface* storageInterface,
-                                   ThreadPool* dbPool,
-                                   ClockSource* clock)
-    : BaseCloner(
-          "CollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool, clock),
+                                   ThreadPool* dbPool)
+    : BaseCloner("CollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
       _sourceDbAndUuid(NamespaceString("UNINITIALIZED")),
@@ -102,12 +100,12 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
 
 void CollectionCloner::preStage() {
     stdx::lock_guard<Latch> lk(_mutex);
-    _stats.start = getClock()->now();
+    _stats.start = getSharedData()->getClock()->now();
 }
 
 void CollectionCloner::postStage() {
     stdx::lock_guard<Latch> lk(_mutex);
-    _stats.end = getClock()->now();
+    _stats.end = getSharedData()->getClock()->now();
 }
 
 // Collection cloner stages exit normally if the collection is not found.

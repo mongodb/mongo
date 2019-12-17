@@ -949,7 +949,11 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // This is where the flow of control starts to split into two parallel tracks:
     // - oplog fetcher
     // - data cloning and applier
-    _sharedData = std::make_unique<InitialSyncSharedData>(version, _rollbackChecker->getBaseRBID());
+    _sharedData = std::make_unique<InitialSyncSharedData>(
+        version,
+        _rollbackChecker->getBaseRBID(),
+        Seconds(initialSyncTransientErrorRetryPeriodSeconds.load()),
+        getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
     _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(
         _sharedData.get(), _syncSource, _client.get(), _storage, _writerPool));

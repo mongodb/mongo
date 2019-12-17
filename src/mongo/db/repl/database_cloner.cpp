@@ -46,9 +46,8 @@ DatabaseCloner::DatabaseCloner(const std::string& dbName,
                                const HostAndPort& source,
                                DBClientConnection* client,
                                StorageInterface* storageInterface,
-                               ThreadPool* dbPool,
-                               ClockSource* clock)
-    : BaseCloner("DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool, clock),
+                               ThreadPool* dbPool)
+    : BaseCloner("DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage) {
     invariant(!dbName.empty());
@@ -66,7 +65,7 @@ CollectionOptions DatabaseCloner::parseCollectionOptions(const BSONObj& obj) {
 
 void DatabaseCloner::preStage() {
     stdx::lock_guard<Latch> lk(_mutex);
-    _stats.start = getClock()->now();
+    _stats.start = getSharedData()->getClock()->now();
 }
 
 BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
@@ -134,8 +133,7 @@ void DatabaseCloner::postStage() {
                                                                           getSource(),
                                                                           getClient(),
                                                                           getStorageInterface(),
-                                                                          getDBPool(),
-                                                                          getClock());
+                                                                          getDBPool());
         }
         auto collStatus = _currentCollectionCloner->run();
         if (collStatus.isOK()) {
@@ -161,7 +159,7 @@ void DatabaseCloner::postStage() {
         }
     }
     stdx::lock_guard<Latch> lk(_mutex);
-    _stats.end = getClock()->now();
+    _stats.end = getSharedData()->getClock()->now();
 }
 
 DatabaseCloner::Stats DatabaseCloner::getStats() const {

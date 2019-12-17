@@ -42,15 +42,8 @@ AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                                      const HostAndPort& source,
                                      DBClientConnection* client,
                                      StorageInterface* storageInterface,
-                                     ThreadPool* dbPool,
-                                     ClockSource* clockSource)
-    : BaseCloner("AllDatabaseCloner"_sd,
-                 sharedData,
-                 source,
-                 client,
-                 storageInterface,
-                 dbPool,
-                 clockSource),
+                                     ThreadPool* dbPool)
+    : BaseCloner("AllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage) {}
 
@@ -109,8 +102,7 @@ void AllDatabaseCloner::postStage() {
                                                                       getSource(),
                                                                       getClient(),
                                                                       getStorageInterface(),
-                                                                      getDBPool(),
-                                                                      getClock());
+                                                                      getDBPool());
         }
         auto dbStatus = _currentDatabaseCloner->run();
         if (dbStatus.isOK()) {

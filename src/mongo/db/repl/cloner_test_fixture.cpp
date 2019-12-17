@@ -70,7 +70,10 @@ void ClonerTestFixture::setUp() {
     _mockClient = std::unique_ptr<DBClientConnection>(
         new MockDBClientConnection(_mockServer.get(), autoReconnect));
     _sharedData = std::make_unique<InitialSyncSharedData>(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44, kInitialRollbackId);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44,
+        kInitialRollbackId,
+        Days(1),
+        &_clock);
 }
 
 void ClonerTestFixture::tearDown() {

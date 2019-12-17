@@ -33,30 +33,46 @@
 
 namespace mongo {
 namespace repl {
-int InitialSyncSharedData::incrementRetryingOperations(WithLock lk, ClockSource* clock) {
+int InitialSyncSharedData::incrementRetryingOperations(WithLock lk) {
     if (_retryingOperationsCount++ == 0) {
-        _syncSourceUnreachableSince = clock->now();
+        _syncSourceUnreachableSince = _clock->now();
     }
     return _retryingOperationsCount;
 }
 
-int InitialSyncSharedData::decrementRetryingOperations(WithLock lk, ClockSource* clock) {
+int InitialSyncSharedData::decrementRetryingOperations(WithLock lk) {
     invariant(_retryingOperationsCount > 0);
     if (--_retryingOperationsCount == 0) {
-        _totalTimeUnreachable += (clock->now() - _syncSourceUnreachableSince);
+        _totalTimeUnreachable += (_clock->now() - _syncSourceUnreachableSince);
         _syncSourceUnreachableSince = Date_t();
     }
     return _retryingOperationsCount;
 }
 
-Milliseconds InitialSyncSharedData::getTotalTimeUnreachable(WithLock lk, ClockSource* clock) {
+bool InitialSyncSharedData::shouldRetryOperation(WithLock lk, RetryableOperation* retryableOp) {
+    if (!*retryableOp) {
+        retryableOp->emplace(this);
+        incrementRetryingOperations(lk);
+    }
+    invariant((**retryableOp)._sharedData == this);
+    auto outageDuration = getCurrentOutageDuration(lk);
+    if (outageDuration <= _allowedOutageDuration) {
+        incrementTotalRetries(lk);
+        return true;
+    } else {
+        (**retryableOp).release(lk);
+        *retryableOp = boost::none;
+        return false;
+    }
+}
+Milliseconds InitialSyncSharedData::getTotalTimeUnreachable(WithLock lk) {
     return _totalTimeUnreachable +
-        ((_retryingOperationsCount > 0) ? clock->now() - _syncSourceUnreachableSince
+        ((_retryingOperationsCount > 0) ? _clock->now() - _syncSourceUnreachableSince
                                         : Milliseconds::zero());
 }
 
-Milliseconds InitialSyncSharedData::getCurrentOutageDuration(WithLock lk, ClockSource* clock) {
-    return ((_retryingOperationsCount > 0) ? clock->now() - _syncSourceUnreachableSince
+Milliseconds InitialSyncSharedData::getCurrentOutageDuration(WithLock lk) {
+    return ((_retryingOperationsCount > 0) ? _clock->now() - _syncSourceUnreachableSince
                                            : Milliseconds::min());
 }
 

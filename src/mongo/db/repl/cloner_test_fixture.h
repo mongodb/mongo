@@ -35,6 +35,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -61,6 +62,7 @@ protected:
     std::unique_ptr<MockRemoteDBServer> _mockServer;
     std::unique_ptr<DBClientConnection> _mockClient;
     std::unique_ptr<InitialSyncSharedData> _sharedData;
+    ClockSourceMock _clock;
 
 private:
     static constexpr int kInitialRollbackId = 1;

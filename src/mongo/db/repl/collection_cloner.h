@@ -78,8 +78,7 @@ public:
                      const HostAndPort& source,
                      DBClientConnection* client,
                      StorageInterface* storageInterface,
-                     ThreadPool* dbPool,
-                     ClockSource* clock = SystemClockSource::get());
+                     ThreadPool* dbPool);
 
     virtual ~CollectionCloner() = default;
 

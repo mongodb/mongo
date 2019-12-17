@@ -40,9 +40,20 @@
 namespace mongo {
 namespace repl {
 class InitialSyncSharedData {
+private:
+    class RetryingOperation;
+
 public:
-    InitialSyncSharedData(ServerGlobalParams::FeatureCompatibility::Version FCV, int rollBackId)
-        : _FCV(FCV), _rollBackId(rollBackId) {}
+    typedef boost::optional<RetryingOperation> RetryableOperation;
+
+    InitialSyncSharedData(ServerGlobalParams::FeatureCompatibility::Version FCV,
+                          int rollBackId,
+                          Milliseconds allowedOutageDuration,
+                          ClockSource* clock)
+        : _FCV(FCV),
+          _rollBackId(rollBackId),
+          _clock(clock),
+          _allowedOutageDuration(allowedOutageDuration) {}
 
     ServerGlobalParams::FeatureCompatibility::Version getFCV() const {
         return _FCV;
@@ -50,6 +61,10 @@ public:
 
     int getRollBackId() const {
         return _rollBackId;
+    }
+
+    ClockSource* getClock() const {
+        return _clock;
     }
 
     /**
@@ -81,34 +96,32 @@ public:
     }
 
     /**
-     * Increment the number of retrying operations, set syncSourceUnreachableSince if this is the
-     * only retrying operation. This should be used when an operation starts retrying.
-     *
-     * Returns the new number of retrying operations.
-     */
-    int incrementRetryingOperations(WithLock lk, ClockSource* clock);
-
-    /**
-     * Decrement the number of retrying operations.  If now zero, clear syncSourceUnreachableSince
-     * and update _totalTimeUnreachable.
-     * Returns the new number of retrying operations.
-     */
-    int decrementRetryingOperations(WithLock lk, ClockSource* clock);
-
-    void incrementTotalRetries(WithLock lk) {
-        _totalRetries++;
-    }
-
-    /**
      * Returns the total time the sync source has been unreachable, including any current outage.
      */
-    Milliseconds getTotalTimeUnreachable(WithLock lk, ClockSource* clock);
+    Milliseconds getTotalTimeUnreachable(WithLock lk);
 
     /**
      * Returns the total time the sync source has been unreachable in the current outage.
      * Returns Milliseconds::min() if there is no current outage.
      */
-    Milliseconds getCurrentOutageDuration(WithLock lk, ClockSource* clock);
+    Milliseconds getCurrentOutageDuration(WithLock lk);
+
+    /**
+     * Returns the total time the sync source may be unreachable in a single outage before
+     * shouldRetryOperation() returns false.
+     */
+    Milliseconds getAllowedOutageDuration(WithLock lk) {
+        return _allowedOutageDuration;
+    }
+
+    /**
+     * shouldRetryOperation() is the interface for retries.  For each retryable operation, declare a
+     * RetryableOperation which is passed to this method.  When the operation succeeds, destroy the
+     * RetryableOperation (outside the lock) or assign boost::none to it.
+     *
+     * Returns true if the operation should be retried, false if it has timed out.
+     */
+    bool shouldRetryOperation(WithLock lk, RetryableOperation* retryableOp);
 
     /**
      * BasicLockable C++ methods; they merely delegate to the mutex.
@@ -123,7 +136,61 @@ public:
         _mutex.unlock();
     }
 
+    void setAllowedOutageDuration_forTest(WithLock, Milliseconds allowedOutageDuration) {
+        _allowedOutageDuration = allowedOutageDuration;
+    }
+
 private:
+    class RetryingOperation {
+    public:
+        RetryingOperation(InitialSyncSharedData* sharedData) : _sharedData(sharedData) {}
+        // This class is a non-copyable RAII class.
+        RetryingOperation(const RetryingOperation&) = delete;
+        RetryingOperation(RetryingOperation&&) = delete;
+        ~RetryingOperation() {
+            if (_sharedData) {
+                stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+                release(lk);
+            }
+        }
+
+        RetryingOperation& operator=(const RetryingOperation&) = delete;
+        RetryingOperation& operator=(RetryingOperation&&) = default;
+
+    private:
+        friend class InitialSyncSharedData;
+
+        /**
+         * release() is used by shouldRetryOperation to allow destroying a RetryingOperation
+         * while holding the lock.
+         */
+        void release(WithLock lk) {
+            _sharedData->decrementRetryingOperations(lk);
+            _sharedData = nullptr;
+        }
+
+        InitialSyncSharedData* _sharedData;
+    };
+
+    /**
+     * Increment the number of retrying operations, set syncSourceUnreachableSince if this is the
+     * only retrying operation. This is used when an operation starts retrying.
+     *
+     * Returns the new number of retrying operations.
+     */
+    int incrementRetryingOperations(WithLock lk);
+
+    /**
+     * Decrements the number of retrying operations.  If now zero, clear syncSourceUnreachableSince
+     * and update _totalTimeUnreachable.
+     * Returns the new number of retrying operations.
+     */
+    int decrementRetryingOperations(WithLock lk);
+
+    void incrementTotalRetries(WithLock lk) {
+        _totalRetries++;
+    }
+
     // The const members above the mutex may be accessed without the mutex.
 
     // Sync source FCV at start of initial sync.
@@ -132,8 +199,14 @@ private:
     // Rollback ID at start of initial sync
     const int _rollBackId;
 
+    // Clock source used for timing outages
+    ClockSource* const _clock;
+
     // This mutex controls access to all members below it.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("InitialSyncSharedData::_mutex"_sd);
+
+    // Time allowed for an outage before "shouldRetryOperation" returns false.
+    Milliseconds _allowedOutageDuration;
 
     // Status of the entire initial sync.  All initial sync tasks should exit if this becomes
     // non-OK.
