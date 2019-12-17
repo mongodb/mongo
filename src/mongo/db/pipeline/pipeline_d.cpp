@@ -450,6 +450,11 @@ getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
 }
 
 boost::optional<long long> extractLimitForPushdown(Pipeline* pipeline) {
+    // If the disablePipelineOptimization failpoint is enabled, then do not attempt the limit
+    // pushdown optimization.
+    if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
+        return boost::none;
+    }
     auto&& sources = pipeline->getSources();
     auto limit = DocumentSourceSort::extractLimitForPushdown(sources.begin(), &sources);
     if (limit) {
