@@ -53,6 +53,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -216,6 +217,20 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     return requests;
 }
 
+void updateNumHostsTargetedMetrics(OperationContext* opCtx,
+                                   const CachedCollectionRoutingInfo& routingInfo,
+                                   int nTargetedShards) {
+    int nShardsOwningChunks = 0;
+    if (routingInfo.cm()) {
+        nShardsOwningChunks = routingInfo.cm()->getNShardsOwningChunks();
+    }
+
+    auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
+        opCtx, nTargetedShards, nShardsOwningChunks);
+    NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(
+        NumHostsTargetedMetrics::QueryType::kFindCmd, targetType);
+}
+
 CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
@@ -355,6 +370,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // allocate a cursor id.
     if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
         CurOp::get(opCtx)->debug().cursorExhausted = true;
+
+        if (shardIds.size() > 0) {
+            updateNumHostsTargetedMetrics(opCtx, routingInfo, shardIds.size());
+        }
         return CursorId(0);
     }
 
@@ -371,6 +390,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     // Record the cursorID in CurOp.
     CurOp::get(opCtx)->debug().cursorid = cursorId;
+
+    if (shardIds.size() > 0) {
+        updateNumHostsTargetedMetrics(opCtx, routingInfo, shardIds.size());
+    }
+
     return cursorId;
 }
 

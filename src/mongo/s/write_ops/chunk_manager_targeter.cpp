@@ -761,6 +761,14 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
     MONGO_UNREACHABLE;
 }
 
+int ChunkManagerTargeter::getNShardsOwningChunks() const {
+    if (_routingInfo->cm()) {
+        return _routingInfo->cm()->getNShardsOwningChunks();
+    }
+
+    return 0;
+}
+
 Status ChunkManagerTargeter::_refreshNow(OperationContext* opCtx) {
     Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(*_routingInfo));
 

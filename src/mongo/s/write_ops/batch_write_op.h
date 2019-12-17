@@ -190,6 +190,8 @@ public:
      */
     int numWriteOpsIn(WriteOpState state) const;
 
+    boost::optional<int> getNShardsOwningChunks();
+
 private:
     /**
      * Maintains the batch execution statistics when a response is received.
@@ -228,6 +230,8 @@ private:
     int _numMatched{0};
     int _numModified{0};
     int _numDeleted{0};
+
+    boost::optional<int> _nShardsOwningChunks;
 };
 
 /**

@@ -43,6 +43,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_explain.h"
@@ -119,6 +120,30 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         error->recordDelete(response.getN());
     }
+}
+
+void updateHostsTargetedMetrics(OperationContext* opCtx,
+                                BatchedCommandRequest::BatchType batchType,
+                                int nShardsOwningChunks,
+                                int nShardsTargeted) {
+    NumHostsTargetedMetrics::QueryType writeType;
+    switch (batchType) {
+        case BatchedCommandRequest::BatchType_Insert:
+            writeType = NumHostsTargetedMetrics::QueryType::kInsertCmd;
+            break;
+        case BatchedCommandRequest::BatchType_Update:
+            writeType = NumHostsTargetedMetrics::QueryType::kUpdateCmd;
+            break;
+        case BatchedCommandRequest::BatchType_Delete:
+            writeType = NumHostsTargetedMetrics::QueryType::kDeleteCmd;
+            break;
+
+            MONGO_UNREACHABLE;
+    }
+
+    auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
+        opCtx, nShardsTargeted, nShardsOwningChunks);
+    NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(writeType, targetType);
 }
 
 /**
@@ -299,6 +324,12 @@ private:
 
         // Record the number of shards targeted by this write.
         CurOp::get(opCtx)->debug().nShards = stats.getTargetedShards().size();
+
+        if (stats.getNumShardsOwningChunks().is_initialized())
+            updateHostsTargetedMetrics(opCtx,
+                                       _batchedRequest.getBatchType(),
+                                       stats.getNumShardsOwningChunks().get(),
+                                       stats.getTargetedShards().size());
 
         result.appendElements(response.toBSON());
         return response.getOk();

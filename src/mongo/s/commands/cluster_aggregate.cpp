@@ -59,6 +59,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/commands/pipeline_s.h"
@@ -924,6 +925,54 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
     appendEmptyResultSet(opCtx, *result, status, nss.ns());
 }
 
+void updateHostsTargetedMetrics(OperationContext* opCtx,
+                                const NamespaceString& executionNss,
+                                boost::optional<CachedCollectionRoutingInfo> executionNsRoutingInfo,
+                                stdx::unordered_set<NamespaceString> involvedNamespaces) {
+    if (!executionNsRoutingInfo)
+        return;
+
+    // Create a set of ShardIds that own a chunk belonging to any of the collections involved in
+    // this pipeline. This will be used to determine whether the pipeline targeted all of the shards
+    // that own chunks for any collection involved or not.
+    std::set<ShardId> shardsOwningChunks = [&]() {
+        std::set<ShardId> shardsIds;
+
+        if (executionNsRoutingInfo->cm()) {
+            std::set<ShardId> shardIdsForNs;
+            executionNsRoutingInfo->cm()->getAllShardIds(&shardIdsForNs);
+            for (const auto& shardId : shardIdsForNs) {
+                shardsIds.insert(shardId);
+            }
+        }
+
+        for (const auto& nss : involvedNamespaces) {
+            if (nss == executionNss)
+                continue;
+
+            const auto resolvedNsRoutingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            if (resolvedNsRoutingInfo.cm()) {
+                std::set<ShardId> shardIdsForNs;
+                resolvedNsRoutingInfo.cm()->getAllShardIds(&shardIdsForNs);
+                for (const auto& shardId : shardIdsForNs) {
+                    shardsIds.insert(shardId);
+                }
+            }
+        }
+
+        return shardsIds;
+    }();
+
+    auto nShardsTargeted = CurOp::get(opCtx)->debug().nShards;
+    if (nShardsTargeted > 0) {
+        auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
+            opCtx, nShardsTargeted, shardsOwningChunks.size());
+        NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(
+            NumHostsTargetedMetrics::QueryType::kAggregateCmd, targetType);
+    }
+}
+
 }  // namespace
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -968,73 +1017,91 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If we don't have a routing table, then this is a $changeStream which must run on all shards.
     invariant(routingInfo || (mustRunOnAll && litePipe.hasChangeStream()));
 
-    // If this pipeline is not on a sharded collection, is allowed to be forwarded to shards, does
-    // not need to run on all shards, and doesn't need to go through DocumentSource::serialize(),
-    // then go ahead and pass it through to the owning shard unmodified. Note that we first call
-    // resolveInvolvedNamespaces to validate that none of the namespaces are sharded.
-    if (routingInfo && !routingInfo->cm() && !mustRunOnAll &&
-        litePipe.allowedToForwardFromMongos() && litePipe.allowedToPassthroughFromMongos()) {
-        resolveInvolvedNamespaces(opCtx, litePipe);
-        const auto primaryShardId = routingInfo->db().primary()->getId();
-        return aggPassthrough(opCtx, namespaces, primaryShardId, cmdObj, request, litePipe, result);
-    }
+    auto status = [&]() {
+        // If this pipeline is not on a sharded collection, is allowed to be forwarded to shards,
+        // does not need to run on all shards, and doesn't need to go through
+        // DocumentSource::serialize(), then go ahead and pass it through to the owning shard
+        // unmodified. Note that we first call resolveInvolvedNamespaces to validate that none of
+        // the namespaces are sharded.
+        if (routingInfo && !routingInfo->cm() && !mustRunOnAll &&
+            litePipe.allowedToForwardFromMongos() && litePipe.allowedToPassthroughFromMongos()) {
+            resolveInvolvedNamespaces(opCtx, litePipe);
+            const auto primaryShardId = routingInfo->db().primary()->getId();
+            return aggPassthrough(
+                opCtx, namespaces, primaryShardId, cmdObj, request, litePipe, result);
+        }
 
-    // Populate the collection UUID and the appropriate collation to use.
-    auto collInfo = getCollationAndUUID(routingInfo, namespaces.executionNss, request, litePipe);
-    BSONObj collationObj = collInfo.first;
-    boost::optional<UUID> uuid = collInfo.second;
+        // Populate the collection UUID and the appropriate collation to use.
+        auto collInfo =
+            getCollationAndUUID(routingInfo, namespaces.executionNss, request, litePipe);
+        BSONObj collationObj = collInfo.first;
+        boost::optional<UUID> uuid = collInfo.second;
 
-    // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
-    // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by the
-    // pipeline's stages.
-    auto expCtx = makeExpressionContext(opCtx, request, litePipe, collationObj, uuid);
+        // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
+        // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by
+        // the pipeline's stages.
+        auto expCtx = makeExpressionContext(opCtx, request, litePipe, collationObj, uuid);
 
-    // Parse and optimize the full pipeline.
-    auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
-    pipeline->optimizePipeline();
+        // Parse and optimize the full pipeline.
+        auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
+        pipeline->optimizePipeline();
 
-    // Check whether the entire pipeline must be run on mongoS.
-    if (pipeline->requiredToRunOnMongos()) {
-        return runPipelineOnMongoS(
-            expCtx, namespaces, request, cmdObj, litePipe, std::move(pipeline), {}, result);
-    }
+        // Check whether the entire pipeline must be run on mongoS.
+        if (pipeline->requiredToRunOnMongos()) {
+            return runPipelineOnMongoS(
+                expCtx, namespaces, request, cmdObj, litePipe, std::move(pipeline), {}, result);
+        }
 
-    // If not, split the pipeline as necessary and dispatch to the relevant shards.
-    auto shardDispatchResults = dispatchShardPipeline(expCtx,
-                                                      namespaces.executionNss,
-                                                      cmdObj,
-                                                      request,
-                                                      litePipe,
-                                                      std::move(pipeline),
-                                                      collationObj);
+        // If not, split the pipeline as necessary and dispatch to the relevant shards.
+        auto shardDispatchResults = dispatchShardPipeline(expCtx,
+                                                          namespaces.executionNss,
+                                                          cmdObj,
+                                                          request,
+                                                          litePipe,
+                                                          std::move(pipeline),
+                                                          collationObj);
 
-    // If the operation is an explain, then we verify that it succeeded on all targeted shards,
-    // write the results to the output builder, and return immediately.
-    if (expCtx->explain) {
-        uassertAllShardsSupportExplain(shardDispatchResults.remoteExplainOutput);
-        return appendExplainResults(std::move(shardDispatchResults.remoteExplainOutput),
-                                    expCtx,
-                                    shardDispatchResults.pipelineForTargetedShards,
-                                    shardDispatchResults.pipelineForMerging,
-                                    result);
-    }
+        // If the operation is an explain, then we verify that it succeeded on all targeted shards,
+        // write the results to the output builder, and return immediately.
+        if (expCtx->explain) {
+            uassertAllShardsSupportExplain(shardDispatchResults.remoteExplainOutput);
+            return appendExplainResults(std::move(shardDispatchResults.remoteExplainOutput),
+                                        expCtx,
+                                        shardDispatchResults.pipelineForTargetedShards,
+                                        shardDispatchResults.pipelineForMerging,
+                                        result);
+        }
 
-    // If this isn't an explain, then we must have established cursors on at least one shard.
-    invariant(shardDispatchResults.remoteCursors.size() > 0);
+        // If this isn't an explain, then we must have established cursors on at least one shard.
+        invariant(shardDispatchResults.remoteCursors.size() > 0);
 
-    // If we sent the entire pipeline to a single shard, store the remote cursor and return.
-    if (!shardDispatchResults.pipelineForTargetedShards->isSplitForShards()) {
-        invariant(shardDispatchResults.remoteCursors.size() == 1);
-        auto& remoteCursor = shardDispatchResults.remoteCursors.front();
-        const auto reply = uassertStatusOK(storePossibleCursor(
-            opCtx, namespaces.requestedNss, remoteCursor, expCtx->tailableMode));
-        return appendCursorResponseToCommandResult(
-            remoteCursor.getShardId().toString(), reply, result);
-    }
+        // If we sent the entire pipeline to a single shard, store the remote cursor and return.
+        if (!shardDispatchResults.pipelineForTargetedShards->isSplitForShards()) {
+            invariant(shardDispatchResults.remoteCursors.size() == 1);
+            auto& remoteCursor = shardDispatchResults.remoteCursors.front();
+            const auto reply = uassertStatusOK(storePossibleCursor(
+                opCtx, namespaces.requestedNss, remoteCursor, expCtx->tailableMode));
+            return appendCursorResponseToCommandResult(
+                remoteCursor.getShardId().toString(), reply, result);
+        }
 
-    // If we reach here, we have a merge pipeline to dispatch.
-    return dispatchMergingPipeline(
-        expCtx, namespaces, request, cmdObj, litePipe, routingInfo, shardDispatchResults, result);
+        // If we reach here, we have a merge pipeline to dispatch.
+        return dispatchMergingPipeline(expCtx,
+                                       namespaces,
+                                       request,
+                                       cmdObj,
+                                       litePipe,
+                                       routingInfo,
+                                       shardDispatchResults,
+                                       result);
+
+    }();
+
+    if (status.isOK())
+        updateHostsTargetedMetrics(
+            opCtx, namespaces.executionNss, routingInfo, litePipe.getInvolvedNamespaces());
+
+    return status;
 }
 
 void ClusterAggregate::uassertAllShardsSupportExplain(

@@ -91,9 +91,11 @@ public:
 
     void noteWriteAt(const HostAndPort& host, repl::OpTime opTime, const OID& electionId);
     void noteTargetedShard(const ShardId& shardId);
+    void noteNumShardsOwningChunks(const int nShardsOwningChunks);
 
     const std::set<ShardId>& getTargetedShards() const;
     const HostOpTimeMap& getWriteOpTimes() const;
+    const boost::optional<int> getNumShardsOwningChunks() const;
 
     // Expose via helpers if this gets more complex
 
@@ -109,6 +111,7 @@ public:
 private:
     std::set<ShardId> _targetedShards;
     HostOpTimeMap _writeOpTimes;
+    boost::optional<int> _numShardsOwningChunks;
 };
 
 }  // namespace mongo

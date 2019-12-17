@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
@@ -81,8 +82,11 @@ public:
                             const BSONElement& configElement) const override {
         auto const grid = Grid::get(opCtx);
         auto const catalogCache = grid->catalogCache();
+        auto& numHostsTargetedMetrics = NumHostsTargetedMetrics::get(opCtx);
 
         BSONObjBuilder result;
+
+        numHostsTargetedMetrics.appendSection(&result);
         catalogCache->report(&result);
         return result.obj();
     }

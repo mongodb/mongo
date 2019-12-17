@@ -130,6 +130,11 @@ public:
         return Status::OK();
     }
 
+    int getNShardsOwningChunks() const override {
+        // No-op
+        return 0;
+    }
+
 private:
     static ChunkRange _parseRange(const BSONObj& query) {
         const StringData fieldName(query.firstElement().fieldName());

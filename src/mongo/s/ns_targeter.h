@@ -160,6 +160,11 @@ public:
      * Returns !OK with message if could not refresh
      */
     virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
+
+    /**
+     * Returns the number of shards that own one or more chunks for the targeted collection.
+     */
+    virtual int getNShardsOwningChunks() const = 0;
 };
 
 }  // namespace mongo

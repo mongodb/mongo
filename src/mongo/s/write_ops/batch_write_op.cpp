@@ -36,6 +36,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
@@ -377,6 +378,8 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         invariant(targetedBatches->find(batch->getEndpoint().shardName) == targetedBatches->end());
         targetedBatches->emplace(batch->getEndpoint().shardName, batch);
     }
+
+    _nShardsOwningChunks = targeter.getNShardsOwningChunks();
 
     return Status::OK();
 }
@@ -748,6 +751,10 @@ int BatchWriteOp::numWriteOpsIn(WriteOpState opState) const {
         _writeOps.begin(), _writeOps.end(), 0, [opState](int sum, const WriteOp& writeOp) {
             return sum + (writeOp.getWriteState() == opState ? 1 : 0);
         });
+}
+
+boost::optional<int> BatchWriteOp::getNShardsOwningChunks() {
+    return _nShardsOwningChunks;
 }
 
 void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {

@@ -100,6 +100,8 @@ public:
      */
     Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override;
 
+    int getNShardsOwningChunks() const override;
+
 private:
     using ShardVersionMap = std::map<ShardId, ChunkVersion>;
 
