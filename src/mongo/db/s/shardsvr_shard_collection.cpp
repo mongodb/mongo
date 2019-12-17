@@ -84,7 +84,6 @@ struct ShardCollectionTargetState {
     bool collectionIsEmpty;
     std::vector<BSONObj> splitPoints;
     int numContiguousChunksPerShard;
-    bool fromMapReduce;
 };
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
@@ -489,17 +488,6 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
     auto uuid = getOrGenerateUUID(opCtx, nss, request);
 
     const bool isEmpty = checkIfCollectionIsEmpty(opCtx, nss);
-    const bool fromMapReduce = bool(request.getInitialSplitPoints());
-
-    // Map/reduce with output to an empty collection assumes it has full control of the
-    // output collection and it would be an unsupported operation if the collection is
-    // being concurrently written
-    if (fromMapReduce) {
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Map reduce with sharded output to a new collection found "
-                              << nss.ns() << " to be non-empty which is not supported.",
-                isEmpty);
-    }
 
     int numShards = getNumShards(opCtx);
 
@@ -542,7 +530,6 @@ void logStartShardCollection(OperationContext* opCtx,
         collectionDetail.append("collection", nss.ns());
         prerequisites.uuid.appendToBuilder(&collectionDetail, "uuid");
         collectionDetail.append("empty", prerequisites.collectionIsEmpty);
-        collectionDetail.append("fromMapReduce", prerequisites.fromMapReduce);
         collectionDetail.append("primary", primaryShard->toString());
         collectionDetail.append("numChunks",
                                 static_cast<int>(prerequisites.splitPoints.size() + 1));
@@ -763,13 +750,8 @@ UUID shardCollection(OperationContext* opCtx,
                 targetState->collectionIsEmpty,
                 targetState->numContiguousChunksPerShard);
 
-            // If we are coming from mapReduce, we will have created chunks with a distribution
-            // such that all reduce writes end up being local. In that case, we do not need to
-            // create the chunk on other shards.
-            if (!targetState->fromMapReduce) {
-                createCollectionOnShardsReceivingChunks(
-                    opCtx, nss, initialChunks.chunks, dbPrimaryShardId);
-            }
+            createCollectionOnShardsReceivingChunks(
+                opCtx, nss, initialChunks.chunks, dbPrimaryShardId);
 
             writeChunkDocumentsAndRefreshShards(*targetState, initialChunks);
         }

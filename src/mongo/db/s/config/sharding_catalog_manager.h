@@ -330,31 +330,6 @@ public:
                           const BSONObj& passthroughFields);
 
     /**
-     * Shards collection with namespace 'nss' and implicitly assumes that the database is enabled
-     * for sharding (i.e., doesn't check whether enableSharding has been called previously).
-     *
-     * uuid - the collection's UUID. Optional because new in 3.6.
-     * fieldsAndOrder - shard key pattern to use.
-     * defaultCollation - the default collation for the collection, excluding the shard key. If
-     *  empty, defaults to simple binary comparison. Note that the shard key collation will always
-     *  be simple binary comparison, even if the collection default collation is non-simple.
-     * unique - if true, ensure underlying index enforces a unique constraint.
-     * initPoints - create chunks based on a set of specified split points.
-     * isFromMapReduce - whether this request comes from map/reduce, in which case the generated
-     *  chunks can be spread across shards. Otherwise they will stay on the primary shard.
-     */
-    void shardCollection(OperationContext* opCtx,
-                         const NamespaceString& nss,
-                         const boost::optional<UUID> uuid,
-                         const ShardKeyPattern& fieldsAndOrder,
-                         const BSONObj& defaultCollation,
-                         bool unique,
-                         const std::vector<BSONObj>& initPoints,
-                         bool isFromMapReduce,
-                         const ShardId& dbPrimaryShardId);
-
-
-    /**
      * Iterates through each entry in config.collections that does not have a UUID, generates a UUID
      * for the collection, and updates the entry with the generated UUID.
      *

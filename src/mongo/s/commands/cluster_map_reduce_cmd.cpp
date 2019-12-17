@@ -33,9 +33,6 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_command_base.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/commands/cluster_map_reduce.h"
 #include "mongo/s/commands/cluster_map_reduce_agg.h"
 
 namespace mongo {

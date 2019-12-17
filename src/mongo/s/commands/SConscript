@@ -62,7 +62,6 @@ env.Library(
         'cluster_killcursors_cmd.cpp',
         'cluster_list_databases_cmd.cpp',
         'cluster_list_shards_cmd.cpp',
-        'cluster_map_reduce.cpp',
         'cluster_map_reduce_agg.cpp',
         'cluster_map_reduce_cmd.cpp',
         'cluster_merge_chunks_cmd.cpp',
