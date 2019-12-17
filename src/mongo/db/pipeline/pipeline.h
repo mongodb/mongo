@@ -57,6 +57,13 @@ class OperationContext;
 class PipelineDeleter;
 
 /**
+ * Enabling the disablePipelineOptimization fail point will stop the aggregate command from
+ * attempting to optimize the pipeline or the pipeline stages. Neither DocumentSource::optimizeAt()
+ * nor DocumentSource::optimize() will be attempted.
+ */
+extern FailPoint disablePipelineOptimization;
+
+/**
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
  * pipeline.
  */

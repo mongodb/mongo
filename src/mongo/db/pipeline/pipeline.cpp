@@ -70,11 +70,6 @@ Value appendExecStats(Value docSource, const CommonStats& stats) {
 }
 }  // namespace
 
-/**
- * Enabling the disablePipelineOptimization fail point will stop the aggregate command from
- * attempting to optimize the pipeline or the pipeline stages. Neither DocumentSource::optimizeAt()
- * nor DocumentSource::optimize() will be attempted.
- */
 MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
 
 using boost::intrusive_ptr;

@@ -56,10 +56,14 @@ for (let verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
     pipeline = [{$sort: {a: 1}}, {$project: {_id: 1}}];
     checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity);
 
+    const res = db.adminCommand({getParameter: 1, "failpoint.disablePipelineOptimization": 1});
+    assert.commandWorked(res);
+    const optimizeDisabled = res["failpoint.disablePipelineOptimization"].mode;
+
     pipeline = [{$project: {a: 1}}, {$limit: 5}, {$sort: {a: 1}}];
-    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, 5);
+    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, optimizeDisabled ? 10 : 5);
 
     pipeline = [{$project: {_id: 1}}, {$limit: 5}];
-    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, 5);
+    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, optimizeDisabled ? 10 : 5);
 }
 })();
