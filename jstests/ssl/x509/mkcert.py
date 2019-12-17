@@ -373,6 +373,7 @@ def convert_cert_to_pkcs12(cert):
 def create_cert(cert):
     """Create a new X509 certificate."""
     x509 = OpenSSL.crypto.X509()
+    x509.set_version(2)
     key = make_key(cert)
     x509.set_pubkey(key)
 
