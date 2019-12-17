@@ -237,7 +237,8 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfFirstDocHasWrongResumeToken) {
     Timestamp doc2Timestamp(101, 1);
     addDocument(doc1Timestamp, "1");
     addDocument(doc2Timestamp, "2");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldIgnoreChangeWithEarlierTimestamp) {
@@ -255,7 +256,8 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "1", resumeTokenUUID);
     auto otherUUID = UUID::gen();
     addDocument(resumeTimestamp, "1", otherUUID);
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
@@ -304,7 +306,8 @@ TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoes
     addDocument(Timestamp(100, 1), {{"x"_sd, 0}, {"_id"_sd, 0}});
     addDocument(Timestamp(100, 2), {{"x"_sd, 0}, {"_id"_sd, 2}});
 
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumentKeyFields) {
@@ -321,7 +324,8 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumen
     addDocument(Timestamp(100, 1), {{"x"_sd, 0}, {"y"_sd, -1}, {"_id"_sd, 1}});
     addDocument(Timestamp(100, 2), {{"x"_sd, 0}, {"y"_sd, -1}, {"_id"_sd, 2}});
 
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject) {
@@ -336,7 +340,8 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject)
     addDocument(Timestamp(100, 1), {{"x"_sd, 0}, {"_id"_sd, 1}});
     addDocument(Timestamp(100, 2), {{"x"_sd, 0}, {"_id"_sd, 2}});
 
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
@@ -352,7 +357,8 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
     addDocument(Timestamp(100, 1), {{"x"_sd, 0}, {"y"_sd, -1}});
     addDocument(Timestamp(100, 2), {{"x"_sd, 0}, {"y"_sd, -1}});
 
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest,
@@ -420,7 +426,8 @@ TEST_F(CheckResumeTokenTest,
     addDocument(resumeTimestamp, {{"_id"_sd, 0}}, uuids[1]);
     addDocument(resumeTimestamp, {{"_id"_sd, 1}}, uuids[0]);
 
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldSwallowInvalidateFromEachShardForStartAfterInvalidate) {
@@ -693,7 +700,8 @@ TEST_F(ShardCheckResumabilityTest,
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
-    ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
+    ASSERT_THROWS_CODE(
+        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldSucceedWithNoDocumentsInPipelineAndOplogIsEmpty) {
@@ -732,7 +740,8 @@ TEST_F(ShardCheckResumabilityTest,
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
-    ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
+    ASSERT_THROWS_CODE(
+        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
