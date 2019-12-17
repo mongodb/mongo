@@ -26,8 +26,8 @@ if (gle.err === null) {
     assert.eq(gle.code, 2);
 }
 
-gle = mdb.getLastErrorObj(1, 50);
-print('Trying w=1, 50ms timeout');
+gle = mdb.getLastErrorObj(1, 2000);
+print('Trying w=1, 2000ms timeout');
 printjson(gle);
 assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
