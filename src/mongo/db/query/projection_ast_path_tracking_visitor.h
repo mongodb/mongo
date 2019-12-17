@@ -66,6 +66,10 @@ public:
         return _basePath;
     }
 
+    const std::string& childPath() const {
+        return _fieldNames.top().front();
+    }
+
     void setBasePath(boost::optional<FieldPath> path) {
         _basePath = std::move(path);
     }
@@ -196,6 +200,16 @@ private:
  *
  * The visitors specified in the 'preVisitors' and 'postVisitors' parameters will be visited in
  * the same order as they were added to the vector.
+ *
+ * A note about the order the visitors are executed in: There are two special "path tracking"
+ * visitors, which are responsible for maintaining state about which fields are being visited. The
+ * path tracking pre-visitor is responsible for setting up the field name state for child nodes.
+ * That is, when a ProjectionPathASTNode is encountered, the pre-visitor sets up the field name
+ * state for the ProjectionPathASTNode's first child. After a leaf node has been visited, the
+ * post-visitor is responsible for setting up the path state for its next sibling (if there is
+ * one). This means that the order the path tracking visitors are executed in is significant: They
+ * must both be run after the user-specified visitors.
+ *
  */
 template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
 class PathTrackingWalker final {
@@ -207,7 +221,7 @@ public:
           _pathTrackingPostVisitor{context},
           _preVisitors{std::move(preVisitors)},
           _postVisitors{std::move(postVisitors)} {
-        _preVisitors.insert(_preVisitors.begin(), &_pathTrackingPreVisitor);
+        _preVisitors.push_back(&_pathTrackingPreVisitor);
         _postVisitors.push_back(&_pathTrackingPostVisitor);
     }
 
