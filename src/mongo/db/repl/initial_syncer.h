@@ -258,6 +258,12 @@ public:
      */
     Date_t getWallClockTime_forTest() const;
 
+    /**
+     * Sets the allowed outage duration in _sharedData.
+     * For testing only.
+     */
+    void setAllowedOutageDuration_forTest(Milliseconds allowedOutageDuration);
+
 private:
     /**
      * Returns true if we are still processing initial sync tasks (_state is either Running or
@@ -555,6 +561,19 @@ private:
         const stdx::lock_guard<Latch>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
+     * Check if a status is one which means there's a network error and we should retry the current
+     * operation, and records whether an operation is currently being retried.  Note this can only
+     * handle one operation at a time (i.e. it should not be used in both parts of the "split"
+     * section of Initial Sync)
+     */
+    bool _shouldRetryNetworkError(WithLock lk, Status status);
+
+    /**
+     * Indicates we are no longer handling a network error.
+     */
+    void _clearNetworkError(WithLock lk);
+
+    /**
      * Checks the given status (or embedded status inside the callback args) and current data
      * replicator shutdown state. If the given status is not OK or if we are shutting down, returns
      * a new error status that should be passed to _finishCallback. The reason in the new error
@@ -650,6 +669,9 @@ private:
     // Handle to currently scheduled _getNextApplierBatchCallback() task.
     executor::TaskExecutor::CallbackHandle _getNextApplierBatchHandle;  // (M)
 
+    // The operation, if any, currently being retried because of a network error.
+    InitialSyncSharedData::RetryableOperation _retryingOperation;  // (M)
+
     std::unique_ptr<InitialSyncState> _initialSyncState;   // (M)
     std::unique_ptr<OplogFetcher> _oplogFetcher;           // (S)
     std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;  // (S)
@@ -679,6 +701,10 @@ private:
 
     // Data shared by cloners and fetcher.  Follow InitialSyncSharedData synchronization rules.
     std::unique_ptr<InitialSyncSharedData> _sharedData;  // (S)
+
+    // Amount of time an outage is allowed to continue before the initial sync attempt is marked
+    // as failed.
+    Milliseconds _allowedOutageDuration;  // (M)
 };
 
 }  // namespace repl
