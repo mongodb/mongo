@@ -158,7 +158,8 @@ TEST(MapReduceAggTest, testFeatureLadenTranslate) {
     mr.setSort(BSON("foo" << 1));
     mr.setQuery(BSON("foo"
                      << "fooval"));
-    mr.setFinalize(boost::make_optional(MapReduceJavascriptCode{finalizeJavascript.toString()}));
+    mr.setFinalize(
+        boost::make_optional(MapReduceJavascriptCodeOrNull{finalizeJavascript.toString()}));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
     auto& sources = pipeline->getSources();

@@ -136,26 +136,29 @@ auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string
                                        boost::none);
 }
 
-auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
-    auto jsExpression = ExpressionInternalJs::create(
-        expCtx,
-        ExpressionArray::create(
+auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx,
+                       MapReduceJavascriptCodeOrNull codeObj) {
+    return codeObj.getCode().map([&](auto&& code) {
+        auto jsExpression = ExpressionInternalJs::create(
             expCtx,
-            make_vector<boost::intrusive_ptr<Expression>>(
-                ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState),
-                ExpressionFieldPath::parse(expCtx, "$value", expCtx->variablesParseState))),
-        code);
-    auto node = std::make_unique<projection_executor::InclusionNode>(
-        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
-    node->addProjectionForPath(FieldPath{"_id"s});
-    node->addExpressionForPath(FieldPath{"value"s}, std::move(jsExpression));
-    auto inclusion = std::unique_ptr<TransformerInterface>{
-        std::make_unique<projection_executor::InclusionProjectionExecutor>(
-            expCtx,
-            ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId},
-            std::move(node))};
-    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
-        expCtx, std::move(inclusion), DocumentSourceProject::kStageName, false);
+            ExpressionArray::create(
+                expCtx,
+                make_vector<boost::intrusive_ptr<Expression>>(
+                    ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState),
+                    ExpressionFieldPath::parse(expCtx, "$value", expCtx->variablesParseState))),
+            code);
+        auto node = std::make_unique<projection_executor::InclusionNode>(
+            ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
+        node->addProjectionForPath(FieldPath{"_id"s});
+        node->addExpressionForPath(FieldPath{"value"s}, std::move(jsExpression));
+        auto inclusion = std::unique_ptr<TransformerInterface>{
+            std::make_unique<projection_executor::InclusionProjectionExecutor>(
+                expCtx,
+                ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId},
+                std::move(node))};
+        return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+            expCtx, std::move(inclusion), DocumentSourceProject::kStageName, false);
+    });
 }
 
 auto translateOutReplace(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -177,7 +180,7 @@ auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx, Namespace
 auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                         NamespaceString targetNss,
                         std::string reduceCode,
-                        boost::optional<MapReduceJavascriptCode> finalizeCode) {
+                        boost::optional<MapReduceJavascriptCodeOrNull> finalizeCode) {
     // Because of communication for sharding, $merge must hold on to a serializable BSON object
     // at the moment so we reparse here. Note that the reduce function signature expects 2
     // arguments, the first being the key and the second being the array of values to reduce.
@@ -191,10 +194,10 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
     auto pipelineSpec = boost::make_optional(std::vector<BSONObj>{reduceSpec});
 
     // Build finalize $project stage if given.
-    if (finalizeCode) {
+    if (finalizeCode && finalizeCode->hasCode()) {
         auto finalizeObj = BSON("args" << BSON_ARRAY("$_id"
                                                      << "$value")
-                                       << "eval" << finalizeCode->getCode());
+                                       << "eval" << finalizeCode->getCode().get());
         auto finalizeSpec =
             BSON(DocumentSourceProject::kStageName
                  << BSON("value" << BSON(ExpressionInternalJs::kExpressionName << finalizeObj)));
@@ -215,7 +218,7 @@ auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
                   const OutputType outputType,
                   NamespaceString targetNss,
                   std::string reduceCode,
-                  boost::optional<MapReduceJavascriptCode> finalizeCode) {
+                  boost::optional<MapReduceJavascriptCodeOrNull> finalizeCode) {
     switch (outputType) {
         case OutputType::Replace:
             return boost::make_optional(translateOutReplace(expCtx, targetNss));
@@ -384,9 +387,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 translateMap(expCtx, parsedMr.getMap().getCode()),
                 DocumentSourceUnwind::create(expCtx, "emits", false, boost::none),
                 translateReduce(expCtx, parsedMr.getReduce().getCode()),
-                parsedMr.getFinalize().map([&](auto&& finalize) {
-                    return translateFinalize(expCtx, parsedMr.getFinalize()->getCode());
-                }),
+                parsedMr.getFinalize().flat_map(
+                    [&](auto&& finalize) { return translateFinalize(expCtx, finalize); }),
                 translateOut(expCtx,
                              outType,
                              std::move(outNss),
