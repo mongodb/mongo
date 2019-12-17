@@ -207,7 +207,7 @@ DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() 
             pExpCtx, (documentFromResumedStream = nextInput.getDocument()), _tokenFromClient);
     }
 
-    uassert(40585,
+    uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream()
                 << "resume of change stream was not possible, as the resume token was not found. "
                 << documentFromResumedStream["_id"].getDocument().toString(),
@@ -304,14 +304,14 @@ void DocumentSourceShardCheckResumability::_assertOplogHasEnoughHistory(
         const bool isNewRS =
             Value::compare(firstOplogEntry["o"]["msg"], Value("initiating set"_sd), nullptr) == 0 &&
             Value::compare(firstOplogEntry["op"], Value("n"_sd), nullptr) == 0;
-        uassert(40576,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 "Resume of change stream was not possible, as the resume point may no longer be in "
                 "the oplog. ",
                 isNewRS || firstOplogEntry["ts"].getTimestamp() < _tokenFromClient.clusterTime);
     } else {
         // Very unusual case: the oplog is empty.  We can always resume. However, it should never be
         // possible to have obtained a document that matched the filter if the oplog is empty.
-        uassert(51087,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 "Oplog was empty but found an event in the change stream pipeline. It should not "
                 "be possible for this to happen",
                 nextInput.isEOF());
