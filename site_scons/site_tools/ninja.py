@@ -750,8 +750,21 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         if cmd.endswith("&&"):
             cmd = cmd[0:-2].strip()
 
+    outputs = get_outputs(node)
+    if rule == "CMD_W_DEPS":
+        # When using a depfile Ninja can only have a single output but
+        # SCons will usually have emitted an output for every thing a
+        # command will create because it's caching is much more
+        # complex than Ninja's. This includes things like DWO
+        # files. Here we make sure that Ninja only ever sees one
+        # target when using a depfile. It will still have a command
+        # that will create all of the outputs but most targets don't
+        # depend direclty on DWO files and so this assumption is
+        # safe to make.
+        outputs = outputs[0:1]
+
     return {
-        "outputs": get_outputs(node),
+        "outputs": outputs,
         "implicit": implicit,
         "rule": rule,
         "variables": {"cmd": cmd},
