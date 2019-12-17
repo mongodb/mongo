@@ -79,20 +79,11 @@ selector:
   # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
   # incorrect on sharded collections.
   - jstests/core/explain_count.js
-  # TODO: Remove after implementing SERVER-42677. Legacy mapReduce behaves unpredictably when the
-  # out collection is sharded on anything other than {_id: 1}.
   # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
   - jstests/core/expr_index_use.js
   - jstests/core/index_multikey.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
-  # mapReduce requires sharded output collections to be sharded by {_id: 1}. {_id: "hashed"} is not
-  # supported.
-  - jstests/core/mr_correctness.js
-  - jstests/core/mr_fail_invalid_js.js
-  - jstests/core/mr_preserve_indexes.js
-  - jstests/core/mr_scope.js
-  - jstests/core/mr_use_this_object.js
 
   # The tests below use applyOps, SERVER-1439.
   - jstests/core/list_collections1.js
