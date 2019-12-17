@@ -1296,6 +1296,7 @@ env.CppUnitTest(
         'oplog_interface_remote',
         'optime',
         'repl_coordinator_impl',
+        'repl_server_parameters',
         'replica_set_messages',
         'replication_consistency_markers_impl',
         'replication_process',

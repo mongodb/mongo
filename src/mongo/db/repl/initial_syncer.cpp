@@ -297,6 +297,8 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
 
     _shutdownComponent_inlock(_oplogFetcher);
     if (_sharedData) {
+        // We actually hold the required lock, but the lock object itself is not passed through.
+        _clearNetworkError(WithLock::withoutLock());
         stdx::lock_guard<InitialSyncSharedData> lock(*_sharedData);
         _sharedData->setInitialSyncStatusIfOK(
             lock, Status{ErrorCodes::CallbackCanceled, "Initial sync attempt canceled"});
@@ -323,6 +325,15 @@ InitialSyncer::State InitialSyncer::getState_forTest() const {
 Date_t InitialSyncer::getWallClockTime_forTest() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _lastApplied.wallTime;
+}
+
+void InitialSyncer::setAllowedOutageDuration_forTest(Milliseconds allowedOutageDuration) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _allowedOutageDuration = allowedOutageDuration;
+    if (_sharedData) {
+        stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+        _sharedData->setAllowedOutageDuration_forTest(lk, allowedOutageDuration);
+    }
 }
 
 bool InitialSyncer::_isShuttingDown() const {
@@ -430,6 +441,8 @@ void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initial
     _stats.initialSyncStart = _exec->now();
     _stats.maxFailedInitialSyncAttempts = initialSyncMaxAttempts;
     _stats.failedInitialSyncAttempts = 0;
+
+    _allowedOutageDuration = Seconds(initialSyncTransientErrorRetryPeriodSeconds.load());
 }
 
 void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
@@ -949,11 +962,11 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // This is where the flow of control starts to split into two parallel tracks:
     // - oplog fetcher
     // - data cloning and applier
-    _sharedData = std::make_unique<InitialSyncSharedData>(
-        version,
-        _rollbackChecker->getBaseRBID(),
-        Seconds(initialSyncTransientErrorRetryPeriodSeconds.load()),
-        getGlobalServiceContext()->getFastClockSource());
+    _sharedData =
+        std::make_unique<InitialSyncSharedData>(version,
+                                                _rollbackChecker->getBaseRBID(),
+                                                _allowedOutageDuration,
+                                                getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
     _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(
         _sharedData.get(), _syncSource, _client.get(), _storage, _writerPool));
@@ -1347,6 +1360,12 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
     stdx::lock_guard<Latch> lock(_mutex);
     auto status = _checkForShutdownAndConvertStatus_inlock(result.getStatus(),
                                                            "error while getting last rollback ID");
+    if (_shouldRetryNetworkError(lock, status)) {
+        LOG(1) << "Retrying rollback checker because of network error " << status;
+        _scheduleRollbackCheckerCheckForRollback_inlock(lock, onCompletionGuard);
+        return;
+    }
+
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
@@ -1615,6 +1634,21 @@ void InitialSyncer::_scheduleRollbackCheckerCheckForRollback_inlock(
 
     _getLastRollbackIdHandle = scheduleResult.getValue();
     return;
+}
+
+bool InitialSyncer::_shouldRetryNetworkError(WithLock lk, Status status) {
+    if (ErrorCodes::isNetworkError(status)) {
+        stdx::lock_guard<InitialSyncSharedData> sharedDataLock(*_sharedData);
+        return _sharedData->shouldRetryOperation(sharedDataLock, &_retryingOperation);
+    }
+    // The status was OK or some error other than a network error, so clear the network error
+    // state and indicate that we should not retry.
+    _clearNetworkError(lk);
+    return false;
+}
+
+void InitialSyncer::_clearNetworkError(WithLock lk) {
+    _retryingOperation = boost::none;
 }
 
 Status InitialSyncer::_checkForShutdownAndConvertStatus_inlock(
