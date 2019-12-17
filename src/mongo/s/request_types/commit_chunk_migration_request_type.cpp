@@ -52,13 +52,28 @@ StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
     if (!status.isOK())
         return status;
 
-    auto rangeWith = ChunkRange::fromBSON(fieldElement.Obj());
+    const auto fieldObj = fieldElement.Obj();
+
+    auto rangeWith = ChunkRange::fromBSON(fieldObj);
     if (!rangeWith.isOK())
         return rangeWith.getStatus();
+
+    ChunkVersion version;
+    auto swVersion = ChunkVersion::parseLegacyWithField(fieldObj, ChunkType::lastmod());
+    if (swVersion == ErrorCodes::NoSuchKey) {
+        // TODO (SERVER-45194): Require a ChunkVersion to be present once v4.4 is last stable.
+    } else if (!swVersion.isOK()) {
+        return swVersion.getStatus();
+    } else {
+        version = swVersion.getValue();
+    }
 
     ChunkType chunk;
     chunk.setMin(rangeWith.getValue().getMin());
     chunk.setMax(rangeWith.getValue().getMax());
+    if (version.isSet()) {
+        chunk.setVersion(version);
+    }
     return chunk;
 }
 

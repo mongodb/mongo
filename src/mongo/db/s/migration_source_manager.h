@@ -238,6 +238,9 @@ private:
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
+    // The version of the chunk at the time the migration started.
+    ChunkVersion _chunkVersion;
+
     // The version of the collection at the time migration started.
     OID _collectionEpoch;
 

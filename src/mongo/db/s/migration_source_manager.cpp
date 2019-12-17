@@ -58,6 +58,7 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
+#include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
@@ -203,6 +204,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                str::stream() << "Unable to move chunk with arguments '"
                                              << redact(_args.toString()));
 
+    _chunkVersion = collectionMetadata->getChunkManager()
+                        ->findIntersectingChunkWithSimpleCollation(_args.getMinKey())
+                        .getLastmod();
     _collectionEpoch = collectionVersion.epoch();
     _collectionUuid = std::get<1>(collectionMetadataAndUUID);
 }
@@ -397,6 +401,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         ChunkType migratedChunkType;
         migratedChunkType.setMin(_args.getMinKey());
         migratedChunkType.setMax(_args.getMaxKey());
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            migratedChunkType.setVersion(_chunkVersion);
+        }
 
         CommitChunkMigrationRequest::appendAsCommand(
             &builder,
@@ -433,56 +441,114 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
     if (!migrationCommitStatus.isOK()) {
-        // Need to get the latest optime in case the refresh request goes to a secondary --
-        // otherwise the read won't wait for the write that _configsvrCommitChunkMigration may have
-        // done
-        log() << "Error occurred while committing the migration. Performing a majority write "
-                 "against the config server to obtain its latest optime"
-              << causedBy(redact(migrationCommitStatus));
+        switch (serverGlobalParams.featureCompatibility.getVersion()) {
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42: {
+                // Need to get the latest optime in case the refresh request goes to a secondary --
+                // otherwise the read won't wait for the write that _configsvrCommitChunkMigration
+                // may have done
+                log()
+                    << "Error occurred while committing the migration. Performing a majority write "
+                       "against the config server to obtain its latest optime"
+                    << causedBy(redact(migrationCommitStatus));
 
-        Status status = ShardingLogging::get(_opCtx)->logChangeChecked(
-            _opCtx,
-            "moveChunk.validating",
-            getNss().ns(),
-            BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                       << _args.getFromShardId() << "to" << _args.getToShardId()),
-            ShardingCatalogClient::kMajorityWriteConcern);
+                Status status = ShardingLogging::get(_opCtx)->logChangeChecked(
+                    _opCtx,
+                    "moveChunk.validating",
+                    getNss().ns(),
+                    BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
+                               << _args.getFromShardId() << "to" << _args.getToShardId()),
+                    ShardingCatalogClient::kMajorityWriteConcern);
 
-        if ((ErrorCodes::isInterruption(status.code()) ||
-             ErrorCodes::isShutdownError(status.code()) ||
-             status == ErrorCodes::CallbackCanceled) &&
-            globalInShutdownDeprecated()) {
-            // Since the server is already doing a clean shutdown, this call will just join the
-            // previous shutdown call
-            shutdown(waitForShutdown());
+                if ((ErrorCodes::isInterruption(status.code()) ||
+                     ErrorCodes::isShutdownError(status.code()) ||
+                     status == ErrorCodes::CallbackCanceled) &&
+                    globalInShutdownDeprecated()) {
+                    // Since the server is already doing a clean shutdown, this call will just join
+                    // the previous shutdown call
+                    shutdown(waitForShutdown());
+                }
+
+                // If we failed to get the latest config optime because we stepped down as primary,
+                // then it is safe to fail without crashing because the new primary will fetch the
+                // latest optime when it recovers the sharding state recovery document, as long as
+                // we also clear the metadata for this collection, forcing subsequent callers to do
+                // a full refresh. Check if this node can accept writes for this collection as a
+                // proxy for it being primary.
+                if (!status.isOK()) {
+                    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+                    AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
+                    if (!repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(_opCtx,
+                                                                                       getNss())) {
+                        CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
+                        uassertStatusOK(status.withContext(
+                            str::stream()
+                            << "Unable to verify migration commit for chunk: "
+                            << redact(_args.toString())
+                            << " because the node's replication role changed. Metadata was cleared "
+                               "for: "
+                            << getNss().ns()
+                            << ", so it will get a full refresh when accessed again."));
+                    }
+                }
+
+                fassert(40137,
+                        status.withContext(str::stream()
+                                           << "Failed to commit migration for chunk "
+                                           << _args.toString() << " due to "
+                                           << redact(migrationCommitStatus)
+                                           << ". Updating the optime with a write before "
+                                              "refreshing the metadata also failed"));
+            } break;
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44: {
+                // Send _configsvrEnsureShardVersionIsGreaterThan until hearing success to ensure
+                // that if the migration commit has not occurred yet, it will never occur. This
+                // makes it safe for the shard to refresh to find out if the migration commit
+                // succeeded.
+
+                ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
+                ensureChunkVersionIsGreaterThanRequest.setDbName(NamespaceString::kAdminDb);
+                ensureChunkVersionIsGreaterThanRequest.setMinKey(_args.getMinKey());
+                ensureChunkVersionIsGreaterThanRequest.setMaxKey(_args.getMaxKey());
+                ensureChunkVersionIsGreaterThanRequest.setVersion(_chunkVersion);
+                const auto ensureChunkVersionIsGreaterThanRequestBSON =
+                    ensureChunkVersionIsGreaterThanRequest.toBSON({});
+
+                for (int attempts = 1;; attempts++) {
+                    const auto ensureChunkVersionIsGreaterThanResponse =
+                        Grid::get(_opCtx)
+                            ->shardRegistry()
+                            ->getConfigShard()
+                            ->runCommandWithFixedRetryAttempts(
+                                _opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                "admin",
+                                ensureChunkVersionIsGreaterThanRequestBSON,
+                                Shard::RetryPolicy::kIdempotent);
+                    const auto ensureChunkVersionIsGreaterThanStatus =
+                        Shard::CommandResponse::getEffectiveStatus(
+                            ensureChunkVersionIsGreaterThanResponse);
+                    if (ensureChunkVersionIsGreaterThanStatus.isOK()) {
+                        break;
+                    }
+
+                    if ((ErrorCodes::isInterruption(ensureChunkVersionIsGreaterThanStatus.code()) ||
+                         ErrorCodes::isShutdownError(
+                             ensureChunkVersionIsGreaterThanStatus.code()) ||
+                         ensureChunkVersionIsGreaterThanStatus == ErrorCodes::CallbackCanceled) &&
+                        globalInShutdownDeprecated()) {
+                        // Since the server is already doing a clean shutdown, this call will just
+                        // join the previous shutdown call.
+                        shutdown(waitForShutdown());
+                    }
+
+                    LOG(0) << "_configsvrEnsureChunkVersionIsGreaterThan failed after " << attempts
+                           << " attempts " << causedBy(ensureChunkVersionIsGreaterThanStatus)
+                           << " . Will try again.";
+                }
+            } break;
+            default:
+                MONGO_UNREACHABLE;
         }
-
-        // If we failed to get the latest config optime because we stepped down as primary, then it
-        // is safe to fail without crashing because the new primary will fetch the latest optime
-        // when it recovers the sharding state recovery document, as long as we also clear the
-        // metadata for this collection, forcing subsequent callers to do a full refresh. Check if
-        // this node can accept writes for this collection as a proxy for it being primary.
-        if (!status.isOK()) {
-            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-            AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
-            if (!repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(_opCtx, getNss())) {
-                CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
-                uassertStatusOK(status.withContext(
-                    str::stream() << "Unable to verify migration commit for chunk: "
-                                  << redact(_args.toString())
-                                  << " because the node's replication role changed. Metadata "
-                                     "was cleared for: "
-                                  << getNss().ns()
-                                  << ", so it will get a full refresh when accessed again."));
-            }
-        }
-
-        fassert(40137,
-                status.withContext(str::stream()
-                                   << "Failed to commit migration for chunk " << _args.toString()
-                                   << " due to " << redact(migrationCommitStatus)
-                                   << ". Updating the optime with a write before refreshing the "
-                                   << "metadata also failed"));
     }
 
     // Incrementally refresh the metadata before leaving the critical section.
