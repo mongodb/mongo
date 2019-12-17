@@ -39,6 +39,8 @@
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -129,6 +131,13 @@ TEST_F(LockerImplTest, ConflictUpgradeWithTimeout) {
 }
 
 TEST_F(LockerImplTest, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+
+    auto newClient = getServiceContext()->makeClient("userClient", session);
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = cc().makeOperationContext();
+
     LockerImpl locker1;
     locker1.lockGlobal(MODE_IX);
 
@@ -137,32 +146,42 @@ TEST_F(LockerImplTest, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImm
 
         // MODE_S attempt.
         LockerImpl locker2;
-        ASSERT_THROWS_CODE(locker2.lockGlobal(MODE_S), DBException, ErrorCodes::LockTimeout);
+        ASSERT_THROWS_CODE(
+            locker2.lockGlobal(newOpCtx.get(), MODE_S), DBException, ErrorCodes::LockTimeout);
 
         // MODE_X attempt.
         LockerImpl locker3;
-        ASSERT_THROWS_CODE(locker3.lockGlobal(MODE_X), DBException, ErrorCodes::LockTimeout);
+        ASSERT_THROWS_CODE(
+            locker3.lockGlobal(newOpCtx.get(), MODE_X), DBException, ErrorCodes::LockTimeout);
     }
 
     locker1.unlockGlobal();
 }
 
 TEST_F(LockerImplTest, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+
+    auto newClient = getServiceContext()->makeClient("userClient", session);
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = cc().makeOperationContext();
+
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
     const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
 
     LockerImpl locker1;
-    locker1.lockGlobal(MODE_IX);
-    locker1.lock(resId, MODE_X);
+    locker1.lockGlobal(newOpCtx.get(), MODE_IX);
+    locker1.lock(newOpCtx.get(), resId, MODE_X);
 
     {
         FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
 
         // MODE_S attempt.
         LockerImpl locker2;
-        locker2.lockGlobal(MODE_IS);
-        ASSERT_THROWS_CODE(
-            locker2.lock(resId, MODE_S, Date_t::max()), DBException, ErrorCodes::LockTimeout);
+        locker2.lockGlobal(newOpCtx.get(), MODE_IS);
+        ASSERT_THROWS_CODE(locker2.lock(newOpCtx.get(), resId, MODE_S, Date_t::max()),
+                           DBException,
+                           ErrorCodes::LockTimeout);
 
         // The timed out MODE_S attempt shouldn't be present in the map of lock requests because it
         // won't ever be granted.
@@ -171,9 +190,10 @@ TEST_F(LockerImplTest, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediate
 
         // MODE_X attempt.
         LockerImpl locker3;
-        locker3.lockGlobal(MODE_IX);
-        ASSERT_THROWS_CODE(
-            locker3.lock(resId, MODE_X, Date_t::max()), DBException, ErrorCodes::LockTimeout);
+        locker3.lockGlobal(newOpCtx.get(), MODE_IX);
+        ASSERT_THROWS_CODE(locker3.lock(newOpCtx.get(), resId, MODE_X, Date_t::max()),
+                           DBException,
+                           ErrorCodes::LockTimeout);
 
         // The timed out MODE_X attempt shouldn't be present in the map of lock requests because it
         // won't ever be granted.
