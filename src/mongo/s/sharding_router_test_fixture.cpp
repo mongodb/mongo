@@ -59,6 +59,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
@@ -139,6 +140,8 @@ ShardingTestFixture::ShardingTestFixture() {
     std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
         std::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
     catalogClient->startup();
+
+    NumHostsTargetedMetrics::get(service).startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "configRS", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});

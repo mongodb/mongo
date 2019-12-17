@@ -59,6 +59,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -136,6 +137,54 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
         status = {ErrorCodes::NamespaceNotFound, status.reason()};
     }
     appendEmptyResultSet(opCtx, *result, status, nss.ns());
+}
+
+void updateHostsTargetedMetrics(OperationContext* opCtx,
+                                const NamespaceString& executionNss,
+                                boost::optional<CachedCollectionRoutingInfo> executionNsRoutingInfo,
+                                stdx::unordered_set<NamespaceString> involvedNamespaces) {
+    if (!executionNsRoutingInfo)
+        return;
+
+    // Create a set of ShardIds that own a chunk belonging to any of the collections involved in
+    // this pipeline. This will be used to determine whether the pipeline targeted all of the shards
+    // that own chunks for any collection involved or not.
+    std::set<ShardId> shardsOwningChunks = [&]() {
+        std::set<ShardId> shardsIds;
+
+        if (executionNsRoutingInfo->cm()) {
+            std::set<ShardId> shardIdsForNs;
+            executionNsRoutingInfo->cm()->getAllShardIds(&shardIdsForNs);
+            for (const auto& shardId : shardIdsForNs) {
+                shardsIds.insert(shardId);
+            }
+        }
+
+        for (const auto& nss : involvedNamespaces) {
+            if (nss == executionNss)
+                continue;
+
+            const auto resolvedNsRoutingInfo =
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            if (resolvedNsRoutingInfo.cm()) {
+                std::set<ShardId> shardIdsForNs;
+                resolvedNsRoutingInfo.cm()->getAllShardIds(&shardIdsForNs);
+                for (const auto& shardId : shardIdsForNs) {
+                    shardsIds.insert(shardId);
+                }
+            }
+        }
+
+        return shardsIds;
+    }();
+
+    auto nShardsTargeted = CurOp::get(opCtx)->debug().nShards;
+    if (nShardsTargeted > 0) {
+        auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
+            opCtx, nShardsTargeted, shardsOwningChunks.size());
+        NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(
+            NumHostsTargetedMetrics::QueryType::kAggregateCmd, targetType);
+    }
 }
 
 }  // namespace
@@ -243,50 +292,60 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         explain_common::generateServerInfo(result);
     }
 
-    switch (targeter.policy) {
-        case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
-            // A pipeline with $changeStream should never be allowed to passthrough.
-            invariant(!hasChangeStream);
-            return sharded_agg_helpers::runPipelineOnPrimaryShard(expCtx,
-                                                                  namespaces,
-                                                                  targeter.routingInfo->db(),
-                                                                  request.getExplain(),
-                                                                  request.serializeToCommandObj(),
-                                                                  privileges,
-                                                                  result);
-        }
-
-        case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kMongosRequired: {
-            // If this is an explain write the explain output and return.
-            auto expCtx = targeter.pipeline->getContext();
-            if (expCtx->explain) {
-                *result << "splitPipeline" << BSONNULL << "mongos"
-                        << Document{
-                               {"host", getHostNameCachedAndPort()},
-                               {"stages", targeter.pipeline->writeExplainOps(*expCtx->explain)}};
-                return Status::OK();
+    auto status = [&]() {
+        switch (targeter.policy) {
+            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
+                // A pipeline with $changeStream should never be allowed to passthrough.
+                invariant(!hasChangeStream);
+                return sharded_agg_helpers::runPipelineOnPrimaryShard(
+                    expCtx,
+                    namespaces,
+                    targeter.routingInfo->db(),
+                    request.getExplain(),
+                    request.serializeToCommandObj(),
+                    privileges,
+                    result);
             }
 
-            return sharded_agg_helpers::runPipelineOnMongoS(namespaces,
-                                                            request.getBatchSize(),
-                                                            std::move(targeter.pipeline),
-                                                            result,
-                                                            privileges);
-        }
+            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kMongosRequired: {
+                // If this is an explain write the explain output and return.
+                auto expCtx = targeter.pipeline->getContext();
+                if (expCtx->explain) {
+                    *result << "splitPipeline" << BSONNULL << "mongos"
+                            << Document{{"host", getHostNameCachedAndPort()},
+                                        {"stages",
+                                         targeter.pipeline->writeExplainOps(*expCtx->explain)}};
+                    return Status::OK();
+                }
 
-        case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kAnyShard: {
-            return sharded_agg_helpers::dispatchPipelineAndMerge(opCtx,
-                                                                 std::move(targeter),
-                                                                 request.serializeToCommandObj(),
-                                                                 request.getBatchSize(),
-                                                                 namespaces,
-                                                                 privileges,
-                                                                 result,
-                                                                 hasChangeStream);
-        }
-    }
+                return sharded_agg_helpers::runPipelineOnMongoS(namespaces,
+                                                                request.getBatchSize(),
+                                                                std::move(targeter.pipeline),
+                                                                result,
+                                                                privileges);
+            }
 
-    MONGO_UNREACHABLE;
+            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kAnyShard: {
+                return sharded_agg_helpers::dispatchPipelineAndMerge(
+                    opCtx,
+                    std::move(targeter),
+                    request.serializeToCommandObj(),
+                    request.getBatchSize(),
+                    namespaces,
+                    privileges,
+                    result,
+                    hasChangeStream);
+            }
+
+                MONGO_UNREACHABLE;
+        }
+        MONGO_UNREACHABLE;
+    }();
+
+    if (status.isOK())
+        updateHostsTargetedMetrics(opCtx, namespaces.executionNss, routingInfo, involvedNamespaces);
+
+    return status;
 }
 
 Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,

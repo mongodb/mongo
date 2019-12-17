@@ -455,6 +455,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         }
     }
 
+    auto nShardsOwningChunks = batchOp.getNShardsOwningChunks();
+    if (nShardsOwningChunks.is_initialized())
+        stats->noteNumShardsOwningChunks(nShardsOwningChunks.get());
+
     batchOp.buildClientResponse(clientResponse);
 
     LOG(4) << "Finished execution of write batch"
@@ -476,12 +480,20 @@ void BatchWriteExecStats::noteWriteAt(const HostAndPort& host,
     _writeOpTimes[ConnectionString(host)] = HostOpTime(opTime, electionId);
 }
 
+void BatchWriteExecStats::noteNumShardsOwningChunks(const int nShardsOwningChunks) {
+    _numShardsOwningChunks.emplace(nShardsOwningChunks);
+}
+
 const std::set<ShardId>& BatchWriteExecStats::getTargetedShards() const {
     return _targetedShards;
 }
 
 const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
     return _writeOpTimes;
+}
+
+const boost::optional<int> BatchWriteExecStats::getNumShardsOwningChunks() const {
+    return _numShardsOwningChunks;
 }
 
 }  // namespace mongo

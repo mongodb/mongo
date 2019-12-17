@@ -234,6 +234,10 @@ void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
                    [](const ShardVersionMap::value_type& pair) { return pair.first; });
 }
 
+int RoutingTableHistory::getNShardsOwningChunks() const {
+    return _shardVersions.size();
+}
+
 std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator>
 RoutingTableHistory::overlappingRanges(const BSONObj& min,
                                        const BSONObj& max,
