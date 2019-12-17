@@ -73,11 +73,6 @@ if (resultWithNonExistent.ok) {
 }
 
 // Test that you can't use a regex as the namespace.
-// TODO SERVER-42677 We should be able to expect a single error code here once the parsing logic
-// is shared across mongos and mongod. For each of the remaining assertions it looks like there
-// are two possible error codes: one for mongos and one for mongod, and each of these are likely
-// different than the code we will use once we switch over to the IDL parser, so we'll avoid
-// asserting on the error code.
 assert.commandFailed(db.runCommand(
     {mapReduce: /bar/, map: mapFunc, reduce: reduceFunc, out: {replace: "foo", db: "test"}}));
 
