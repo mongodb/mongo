@@ -29,11 +29,29 @@
 
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/read_write_concern_defaults.h"
+
 namespace mongo {
+namespace {
+
+BSONObj getPersistedDefaultRWConcernDocument(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    return client.findOne(NamespaceString::kConfigSettingsNamespace.toString(),
+                          QUERY("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
+}
+
+}  // namespace
 
 boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
     OperationContext* opCtx) {
-    return boost::none;
+    // Note that a default constructed RWConcern is returned if no document is found instead of
+    // boost::none. This is to avoid excessive lookups when there is no defaults document, because
+    // otherwise every attempt to get the defaults from the RWC cache would trigger a lookup.
+    return RWConcernDefault::parse(
+        IDLParserErrorContext("ReadWriteConcernDefaultsCacheLookupMongoD"),
+        getPersistedDefaultRWConcernDocument(opCtx));
 }
 
 }  // namespace mongo

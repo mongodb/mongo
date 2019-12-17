@@ -79,13 +79,10 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc)
             !(wc.wMode.empty() && wc.wNumNodes < 1));
 }
 
-void ReadWriteConcernDefaults::_setDefault(RWConcernDefault&& rwc) {
-    _defaults.revalidate(Type::kReadWriteConcernEntry, std::move(rwc));
-}
-
-RWConcernDefault ReadWriteConcernDefaults::setConcerns(OperationContext* opCtx,
-                                                       const boost::optional<ReadConcern>& rc,
-                                                       const boost::optional<WriteConcern>& wc) {
+RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(
+    OperationContext* opCtx,
+    const boost::optional<ReadConcern>& rc,
+    const boost::optional<WriteConcern>& wc) {
     uassert(ErrorCodes::BadValue,
             str::stream() << "At least one of the \""
                           << RWConcernDefault::kDefaultReadConcernFieldName << "\" or \""
@@ -106,7 +103,6 @@ RWConcernDefault ReadWriteConcernDefaults::setConcerns(OperationContext* opCtx,
     rwc.setEpoch(epoch);
     auto now = opCtx->getServiceContext()->getFastClockSource()->now();
     rwc.setSetTime(now);
-    rwc.setLocalSetTime(now);
 
     auto current = _getDefault(opCtx);
     if (!rc && current) {
@@ -115,8 +111,8 @@ RWConcernDefault ReadWriteConcernDefaults::setConcerns(OperationContext* opCtx,
     if (!wc && current) {
         rwc.setDefaultWriteConcern(current->getDefaultWriteConcern());
     }
-    _setDefault(std::move(rwc));
-    return *_getDefault(opCtx);
+
+    return rwc;
 }
 
 void ReadWriteConcernDefaults::invalidate() {
