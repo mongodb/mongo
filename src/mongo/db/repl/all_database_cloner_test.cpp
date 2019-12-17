@@ -52,15 +52,12 @@ protected:
                                                    _source,
                                                    _mockClient.get(),
                                                    &_storageInterface,
-                                                   _dbWorkThreadPool.get(),
-                                                   &_clock);
+                                                   _dbWorkThreadPool.get());
     }
 
     std::vector<std::string> getDatabasesFromCloner(AllDatabaseCloner* cloner) {
         return cloner->_databases;
     }
-
-    ClockSourceMock _clock;
 };
 
 TEST_F(AllDatabaseClonerTest, RetriesConnect) {
@@ -127,7 +124,7 @@ TEST_F(AllDatabaseClonerTest, RetriesConnect) {
     // Total retries and outage time should be available.
     ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
     ASSERT_EQ(2, _sharedData->getTotalRetries(WithLock::withoutLock()));
-    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock()));
 }
 
 TEST_F(AllDatabaseClonerTest, RetriesConnectButFails) {
@@ -162,8 +159,7 @@ TEST_F(AllDatabaseClonerTest, RetriesConnectButFails) {
     // Total retries and outage time should be available.
     ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
     ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
-    ASSERT_EQ(Days(1) + Seconds(1),
-              _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+    ASSERT_EQ(Days(1) + Seconds(1), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock()));
 }
 
 // Note that the code for retrying listDatabases is the same for all stages except connect, so
@@ -243,7 +239,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabases) {
     // Total retries and outage time should be available.
     ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
     ASSERT_EQ(2, _sharedData->getTotalRetries(WithLock::withoutLock()));
-    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock()));
 }
 
 TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButRollBackIdChanges) {
@@ -291,7 +287,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButRollBackIdChanges) {
     // Total retries and outage time should be available.
     ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
     ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
-    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+    ASSERT_EQ(Minutes(60), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock()));
 }
 
 TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButTimesOut) {
@@ -334,8 +330,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButTimesOut) {
     // Total retries and outage time should be available.
     ASSERT_EQ(0, _sharedData->getRetryingOperationsCount(WithLock::withoutLock()));
     ASSERT_EQ(1, _sharedData->getTotalRetries(WithLock::withoutLock()));
-    ASSERT_EQ(Days(1) + Seconds(1),
-              _sharedData->getTotalTimeUnreachable(WithLock::withoutLock(), &_clock));
+    ASSERT_EQ(Days(1) + Seconds(1), _sharedData->getTotalTimeUnreachable(WithLock::withoutLock()));
 }
 
 TEST_F(AllDatabaseClonerTest, FailsOnListDatabases) {

@@ -78,8 +78,7 @@ protected:
                                                 _source,
                                                 _mockClient.get(),
                                                 &_storageInterface,
-                                                _dbWorkThreadPool.get(),
-                                                &_clock);
+                                                _dbWorkThreadPool.get());
     }
 
     BSONObj createListCollectionsResponse(const std::vector<BSONObj>& collections) {
@@ -108,7 +107,6 @@ protected:
     std::map<NamespaceString, CollectionCloneInfo> _collections;
 
     static std::string _dbName;
-    ClockSourceMock _clock;
 };
 
 /* static */

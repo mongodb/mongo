@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -55,15 +54,13 @@ BaseCloner::BaseCloner(StringData clonerName,
                        HostAndPort source,
                        DBClientConnection* client,
                        StorageInterface* storageInterface,
-                       ThreadPool* dbPool,
-                       ClockSource* clock)
+                       ThreadPool* dbPool)
     : _clonerName(clonerName),
       _sharedData(sharedData),
       _client(client),
       _storageInterface(storageInterface),
       _dbPool(dbPool),
-      _source(source),
-      _clock(clock) {
+      _source(source) {
     invariant(sharedData);
     invariant(!source.empty());
     invariant(client);
@@ -162,11 +159,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
 }
 
 void BaseCloner::clearRetryingState() {
-    if (_retrying) {
-        stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-        _sharedData->decrementRetryingOperations(lk, getClock());
-        _retrying = false;
-    }
+    _retryableOp = boost::none;
 }
 
 Status BaseCloner::checkRollBackIdIsUnchanged() {
@@ -217,25 +210,16 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                     isThisStageFailPoint);
                 log() << "Initial Sync retrying " << getClonerName() << " stage "
                       << stage->getName() << " due to " << lastError;
-                auto retryPeriod = Seconds(initialSyncTransientErrorRetryPeriodSeconds.load());
-                Milliseconds outageDuration;
-                {
+                bool shouldRetry = [&] {
                     stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-                    if (!_retrying) {
-                        _retrying = true;
-                        // This is the first retry for this stage in this run, so we start the
-                        // clock on the outage by incrementing the retrying operations counter.
-                        _sharedData->incrementRetryingOperations(lk, getClock());
-                    }
-                    outageDuration = _sharedData->getCurrentOutageDuration(lk, getClock());
-                    if (outageDuration <= retryPeriod) {
-                        _sharedData->incrementTotalRetries(lk);
-                    }
-                }
-                if (outageDuration > retryPeriod) {
+                    return _sharedData->shouldRetryOperation(lk, &_retryableOp);
+                }();
+                if (!shouldRetry) {
                     auto status = lastError.withContext(
-                        str::stream() << ": Exceeded initialSyncTransientErrorRetryPeriodSeconds "
-                                      << retryPeriod);
+                        str::stream()
+                        << ": Exceeded initialSyncTransientErrorRetryPeriodSeconds "
+                        << _sharedData->getAllowedOutageDuration(
+                               stdx::lock_guard<InitialSyncSharedData>(*_sharedData)));
                     setInitialSyncFailedStatus(status);
                     uassertStatusOK(status);
                 }
