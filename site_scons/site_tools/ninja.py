@@ -385,9 +385,21 @@ class NinjaState:
                     if sys.platform == "win32"
                     else "ln -s $in $out"
                 ),
-                "description": "symlink $in -> $out",
+                "description": "Symlink $in -> $out",
             },
-            "INSTALL": {"command": "$COPY $in $out", "description": "Install $out"},
+            "INSTALL": {
+                "command": "$COPY $in $out",
+                "description": "Install $out",
+                # On Windows cmd.exe /c copy does not always correctly
+                # update the timestamp on the output file. This leads
+                # to a stuck constant timestamp in the Ninja database
+                # and needless rebuilds.
+                #
+                # Adding restat here ensures that Ninja always checks
+                # the copy updated the timestamp and that Ninja has
+                # the correct information.
+                "restat": 1,
+            },
             "TEMPLATE": {
                 "command": "$SCONS_INVOCATION $out",
                 "description": "Rendering $out",
