@@ -893,9 +893,10 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
         _unlockImpl(&it);
     });
 
-    // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
-    // Testing-only.
-    if (!_uninterruptibleLocksRequested &&
+    // This failpoint is used to time out non-intent locks if they cannot be granted immediately
+    // for user operations. Testing-only.
+    const bool isUserOperation = opCtx && opCtx->getClient()->isFromUserConnection();
+    if (!_uninterruptibleLocksRequested && isUserOperation &&
         MONGO_unlikely(failNonIntentLocksIfWaitNeeded.shouldFail())) {
         uassert(ErrorCodes::LockTimeout,
                 str::stream() << "Cannot immediately acquire lock '" << resId.toString()
