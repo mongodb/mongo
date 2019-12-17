@@ -110,7 +110,9 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            // TODO SERVER-43720 Implement inMemory option.
+            if (request().getInMemory()) {
+                return ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+            }
 
             GetDefaultRWConcern configsvrRequest;
             configsvrRequest.setDbName(request().getDbName());

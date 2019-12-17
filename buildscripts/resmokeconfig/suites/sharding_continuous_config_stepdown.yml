@@ -200,6 +200,8 @@ selector:
   - jstests/sharding/mongos_no_detect_sharding.js
   # Aggregation with $merge will fail until SERVER-41949 is finished.
   - jstests/sharding/merge_with_move_primary.js
+  # Runs commands directly on the config server primary and is not robust to the primary changing.
+  - jstests/sharding/read_write_concern_defaults_commands_api.js
 
 executor:
   config:

@@ -33,13 +33,41 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rw_concern_default_gen.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+/**
+ * Replaces the persisted default read/write concern document with a new one representing the given
+ * defaults. Waits for the write concern on the given operation context to be satisfied before
+ * returning.
+ */
+void updatePersistedDefaultRWConcernDocument(OperationContext* opCtx, const RWConcernDefault& rw) {
+    DBDirectClient client(opCtx);
+    const auto commandResponse = client.runCommand([&] {
+        write_ops::Update updateOp(NamespaceString::kConfigSettingsNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
+            // Note the _id is propagated from the query into the upserted document.
+            entry.setU(rw.toBSON());
+            entry.setUpsert(true);
+            return entry;
+        }()});
+        return updateOp.serialize(
+            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+    }());
+    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
+}
 
 void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdName) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -78,10 +106,20 @@ public:
             assertNotStandaloneOrShardServer(opCtx, SetDefaultRWConcern::kCommandName);
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            auto newDefaults = rwcDefaults.setConcerns(
+            auto newDefaults = rwcDefaults.generateNewConcerns(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
-            log() << "successfully set RWC defaults to " << newDefaults.toBSON();
-            return newDefaults;
+
+            // TODO SERVER-44890 Remove this check once this command can only run on a primary node.
+            if (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                repl::MemberState::RS_PRIMARY) {
+                // TODO SERVER-44890: Make this update invalidate the RWC cache through an
+                // OpObserver so setting the new values below is safe to be best effort.
+                updatePersistedDefaultRWConcernDocument(opCtx, newDefaults);
+            }
+
+            // Force a refresh to find the newly set defaults, then return them.
+            rwcDefaults.refreshIfNecessary(opCtx);
+            return rwcDefaults.getDefault(opCtx);
         }
 
     private:
@@ -121,9 +159,13 @@ public:
         auto typedRun(OperationContext* opCtx) {
             assertNotStandaloneOrShardServer(opCtx, GetDefaultRWConcern::kCommandName);
 
-            // TODO SERVER-43720 Implement inMemory option.
-
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
+            if (request().getInMemory()) {
+                return rwcDefaults.getDefault(opCtx);
+            }
+
+            // Force a refresh to find the most recent defaults, then return them.
+            rwcDefaults.refreshIfNecessary(opCtx);
             return rwcDefaults.getDefault(opCtx);
         }
 

@@ -58,6 +58,9 @@ public:
     static constexpr StringData readConcernFieldName = ReadConcern::kReadConcernFieldName;
     static constexpr StringData writeConcernFieldName = WriteConcern::kWriteConcernField;
 
+    // The _id of the persisted default read/write concern document.
+    static constexpr StringData kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
+
     static ReadWriteConcernDefaults& get(ServiceContext* service);
     static ReadWriteConcernDefaults& get(ServiceContext& service);
     static void create(ServiceContext* service, LookupFn lookupFn);
@@ -79,14 +82,15 @@ public:
     static void checkSuitabilityAsDefault(const WriteConcern& wc);
 
     /**
-     * Interface when an admin has run the command to change the defaults.
+     * Generates a new read and write concern default to be persisted on disk, without updating the
+     * cached value.
      * At least one of the `rc` or `wc` params must be set.
      * Will generate and use a new epoch and setTime for the updated defaults, which are returned.
      * Validates the supplied read and write concerns can serve as defaults.
      */
-    RWConcernDefault setConcerns(OperationContext* opCtx,
-                                 const boost::optional<ReadConcern>& rc,
-                                 const boost::optional<WriteConcern>& wc);
+    RWConcernDefault generateNewConcerns(OperationContext* opCtx,
+                                         const boost::optional<ReadConcern>& rc,
+                                         const boost::optional<WriteConcern>& wc);
 
     /**
      * Invalidates the cached RWC defaults, causing them to be refreshed.
@@ -111,7 +115,6 @@ public:
 private:
     enum class Type { kReadWriteConcernEntry };
 
-    void _setDefault(RWConcernDefault&& rwc);
     boost::optional<RWConcernDefault> _getDefault(OperationContext* opCtx);
 
     class Cache : public DistCache<Type, RWConcernDefault> {

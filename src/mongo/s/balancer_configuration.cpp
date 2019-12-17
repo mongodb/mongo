@@ -42,6 +42,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -77,8 +78,6 @@ const char kActiveWindow[] = "activeWindow";
 const char kWaitForDelete[] = "_waitForDelete";
 const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
 
-const NamespaceString kSettingsNamespace("config", "settings");
-
 }  // namespace
 
 const char BalancerSettingsType::kKey[] = "balancer";
@@ -105,7 +104,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
                                               BalancerSettingsType::BalancerMode mode) {
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
-        kSettingsNamespace,
+        NamespaceString::kConfigSettingsNamespace,
         BSON("_id" << BalancerSettingsType::kKey),
         BSON("$set" << BSON(kStopped << (mode == BalancerSettingsType::kOff) << kMode
                                      << BalancerSettingsType::kBalancerModes[mode])),
@@ -129,7 +128,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
 Status BalancerConfiguration::enableAutoSplit(OperationContext* opCtx, bool enable) {
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
-        kSettingsNamespace,
+        NamespaceString::kConfigSettingsNamespace,
         BSON("_id" << AutoSplitSettingsType::kKey),
         BSON("$set" << BSON(kEnabled << enable)),
         true,
