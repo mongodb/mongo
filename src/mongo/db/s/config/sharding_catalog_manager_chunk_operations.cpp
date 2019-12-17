@@ -165,14 +165,14 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
     return preCond.arr();
 }
 
-Status checkChunkIsOnShard(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const BSONObj& min,
-                           const BSONObj& max,
-                           const ShardId& shard) {
+Status checkChunkMatchesRequest(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ChunkType& requestedChunk,
+                                const ShardId& shard) {
     BSONObj chunkQuery =
-        BSON(ChunkType::ns() << nss.ns() << ChunkType::min() << min << ChunkType::max() << max
-                             << ChunkType::shard() << shard);
+        BSON(ChunkType::ns() << nss.ns() << ChunkType::min() << requestedChunk.getMin()
+                             << ChunkType::max() << requestedChunk.getMax() << ChunkType::shard()
+                             << shard);
 
     // Must use local read concern because we're going to perform subsequent writes.
     auto findResponseWith =
@@ -193,6 +193,29 @@ Status checkChunkIsOnShard(OperationContext* opCtx,
                 str::stream()
                     << "Could not find the chunk (" << chunkQuery.toString()
                     << ") on the shard. Cannot execute the migration commit with invalid chunks."};
+    }
+
+    const auto currentChunk =
+        uassertStatusOK(ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front()));
+
+    // In the FCV 4.4 protocol, additionally check that the chunk's version matches what's in the
+    // request.
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Config server rejecting commitChunkMigration request that does not have a "
+                "ChunkVersion because config server is in feature compatibility version 4.4",
+                requestedChunk.getVersion().isSet() && requestedChunk.getVersion().epoch().isSet());
+
+        if (requestedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
+            requestedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
+            return {ErrorCodes::ConflictingOperationInProgress,
+                    str::stream()
+                        << "Rejecting migration request because the version of the requested chunk "
+                        << requestedChunk.toConfigBSON()
+                        << " is older than the version of the current chunk "
+                        << currentChunk.toConfigBSON()};
+        }
     }
 
     return Status::OK();
@@ -815,9 +838,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                               << migratedChunk.getRange().toString() << ")."};
     }
 
-    // Check that migratedChunk is where it should be, on fromShard.
-    auto migratedOnShard =
-        checkChunkIsOnShard(opCtx, nss, migratedChunk.getMin(), migratedChunk.getMax(), fromShard);
+    // Check that migratedChunk has not been modified since the migration started.
+    auto migratedOnShard = checkChunkMatchesRequest(opCtx, nss, migratedChunk, fromShard);
     if (!migratedOnShard.isOK()) {
         return migratedOnShard;
     }
