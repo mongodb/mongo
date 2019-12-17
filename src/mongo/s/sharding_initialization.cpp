@@ -57,6 +57,7 @@
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_identity_loader.h"
@@ -178,6 +179,9 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     auto executorPool = makeShardingTaskExecutorPool(
         std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);
     executorPool->startup();
+
+    auto& numHostsTargetedMetrics = NumHostsTargetedMetrics::get(opCtx);
+    numHostsTargetedMetrics.startup();
 
     const auto service = opCtx->getServiceContext();
     auto const grid = Grid::get(service);

@@ -201,6 +201,8 @@ public:
      */
     int numWriteOpsIn(WriteOpState state) const;
 
+    boost::optional<int> getNShardsOwningChunks();
+
 private:
     /**
      * Maintains the batch execution statistics when a response is received.
@@ -242,6 +244,8 @@ private:
 
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};
+
+    boost::optional<int> _nShardsOwningChunks;
 };
 
 /**

@@ -132,6 +132,11 @@ public:
     void getAllShardIds(std::set<ShardId>* all) const;
 
     /**
+     * Returns the number of shards on which the collection has any chunks
+     */
+    int getNShardsOwningChunks() const;
+
+    /**
      * Returns true if, for this shard, the chunks are identical in both chunk managers
      */
     bool compatibleWith(const RoutingTableHistory& other, const ShardId& shard) const;
@@ -359,6 +364,13 @@ public:
      */
     void getAllShardIds(std::set<ShardId>* all) const {
         _rt->getAllShardIds(all);
+    }
+
+    /**
+     * Returns the number of shards on which the collection has any chunks
+     */
+    int getNShardsOwningChunks() {
+        return _rt->getNShardsOwningChunks();
     }
 
     // Transforms query into bounds for each field in the shard key
