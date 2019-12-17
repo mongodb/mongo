@@ -297,27 +297,6 @@ TEST_F(MongodbCAPITest, CreateTTLIndex) {
     ASSERT(output.getField("ok").numberDouble() != 1.0);
 }
 
-TEST_F(MongodbCAPITest, TrimMemory) {
-    // create the client object
-    auto client = createClient();
-
-    // craft the isMaster message
-    mongo::BSONObj inputObj = mongo::fromjson("{trimMemory: 'aggressive'}");
-    auto inputOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", inputObj);
-    performRpc(client, inputOpMsg);
-}
-
-TEST_F(MongodbCAPITest, BatteryLevel) {
-    // create the client object
-    auto client = createClient();
-
-    // craft the isMaster message
-    mongo::BSONObj inputObj = mongo::fromjson("{setBatteryLevel: 'low'}");
-    auto inputOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", inputObj);
-    performRpc(client, inputOpMsg);
-}
-
-
 TEST_F(MongodbCAPITest, InsertDocument) {
     auto client = createClient();
 
@@ -604,11 +583,9 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "repairDatabase",
         "resetError",
         "serverStatus",
-        "setBatteryLevel",
         "setParameter",
         "sleep",
         "startSession",
-        "trimMemory",
         "update",
         "validate",
     };
