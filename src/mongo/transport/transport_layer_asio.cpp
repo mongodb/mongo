@@ -740,9 +740,7 @@ Status TransportLayerASIO::setup() {
             _listenerPort = endpointToHostAndPort(endpoint).port();
         }
 
-        sockaddr_storage sa;
-        memcpy(&sa, addr->data(), addr->size());
-        _acceptors.emplace_back(SockAddr(sa, addr->size()), std::move(acceptor));
+        _acceptors.emplace_back(SockAddr(addr->data(), addr->size()), std::move(acceptor));
     }
 
     if (_acceptors.empty() && _listenerOptions.isIngress()) {

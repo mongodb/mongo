@@ -49,9 +49,7 @@ namespace mongo {
 namespace transport {
 
 inline SockAddr endpointToSockAddr(const asio::generic::stream_protocol::endpoint& endPoint) {
-    struct sockaddr_storage sa = {};
-    memcpy(&sa, endPoint.data(), endPoint.size());
-    SockAddr wrappedAddr(sa, endPoint.size());
+    SockAddr wrappedAddr(endPoint.data(), endPoint.size());
     return wrappedAddr;
 }
 

@@ -186,17 +186,14 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
     memset(&storage, 0, sizeof(storage));
     for (const auto* addrs = addrErr.second.get(); addrs; addrs = addrs->ai_next) {
         fassert(40594, static_cast<size_t>(addrs->ai_addrlen) <= sizeof(struct sockaddr_storage));
-        // Make a temp copy in a local sockaddr_storage so that the
-        // SockAddr constructor below can copy the entire buffer
-        // without over-running addrinfo's storage
-        memcpy(&storage, addrs->ai_addr, addrs->ai_addrlen);
-        ret.emplace(storage, addrs->ai_addrlen);
+        ret.emplace(addrs->ai_addr, addrs->ai_addrlen);
     }
     return std::vector<SockAddr>(ret.begin(), ret.end());
 }
 
-SockAddr::SockAddr(const sockaddr_storage& other, socklen_t size)
-    : addressSize(size), _hostOrIp(), sa(other), _isValid(true) {
+SockAddr::SockAddr(const sockaddr* other, socklen_t size)
+    : addressSize(size), _hostOrIp(), sa(), _isValid(true) {
+    memcpy(&sa, other, size);
     _hostOrIp = toString(true);
 }
 
