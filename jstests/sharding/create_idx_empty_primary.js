@@ -26,7 +26,7 @@ assert.commandWorked(res);
 const isLastStableMongos = (jsTestOptions().mongosBinVersion === "last-stable");
 
 var indexes = testDB.user.getIndexes();
-assert.eq(isLastStableMongos ? 2 : 1, indexes.length);
+assert.eq(2, indexes.length);
 
 indexes = st.rs0.getPrimary().getDB('test').user.getIndexes();
 assert.eq(2, indexes.length);

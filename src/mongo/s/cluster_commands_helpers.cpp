@@ -422,6 +422,28 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     return std::move(responses.front());
 }
 
+AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy) {
+
+    const auto query = routingInfo.cm()
+        ? routingInfo.cm()->getShardKeyPattern().getKeyPattern().globalMin()
+        : BSONObj();
+
+    auto responses =
+        gatherResponses(opCtx,
+                        nss.db(),
+                        readPref,
+                        retryPolicy,
+                        buildVersionedRequestsForTargetedShards(
+                            opCtx, nss, routingInfo, cmdObj, query, BSONObj() /* collation */));
+    return std::move(responses.front());
+}
+
 bool appendRawResponses(OperationContext* opCtx,
                         std::string* errmsg,
                         BSONObjBuilder* output,

@@ -187,6 +187,20 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     Shard::RetryPolicy retryPolicy);
 
 /**
+ * Utility for dispatching commands against the shard with the MinKey chunk for the namespace and
+ * attaching the appropriate shard version.
+ *
+ * Does not retry on StaleConfigException.
+ */
+AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
  * Attaches each shard's response or error status by the shard's connection string in a top-level
  * field called 'raw' in 'output'.
  *
