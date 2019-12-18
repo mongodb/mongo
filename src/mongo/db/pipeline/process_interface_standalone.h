@@ -155,6 +155,11 @@ public:
                                          const NamespaceString& nss,
                                          const std::set<FieldPath>& fieldPaths) const;
 
+    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss) const final {
+        return boost::none;  // Nothing is sharded here.
+    }
     virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const NamespaceString& nss,
                                               ChunkVersion targetCollectionVersion) const override {

@@ -256,7 +256,7 @@ TEST(MapReduceAggTest, testSourceDestinationCollectionsNotEqualMergeDoesNotFail)
     ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
 }
 
-TEST(MapReduceAggTest, testShardedTrueWithReplaceActionFailsOnMongos) {
+TEST(MapReduceAggTest, testShardedTrueWithReplaceActionIsNotAllowed) {
     auto nss = NamespaceString{"db", "coll"};
     auto mr = MapReduce{
         nss,
@@ -264,20 +264,8 @@ TEST(MapReduceAggTest, testShardedTrueWithReplaceActionFailsOnMongos) {
         MapReduceJavascriptCode{reduceJavascript.toString()},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Replace, true}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    expCtx->inMongos = true;
-    ASSERT_THROWS_CODE(map_reduce_common::translateFromMR(mr, expCtx), DBException, 31327);
-}
-
-
-TEST(MapReduceAggTest, testShardedTrueWithReplaceActionDoesNotFailOnMongod) {
-    auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
-        nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
-        MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Replace, true}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
+    ASSERT_THROWS_CODE(
+        map_reduce_common::translateFromMR(mr, expCtx), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST(MapReduceAggTest, testErrorMessagesTranslated) {

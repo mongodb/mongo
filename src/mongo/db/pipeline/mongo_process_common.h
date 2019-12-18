@@ -65,7 +65,7 @@ public:
 
     boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const final;
+        const NamespaceString& nss) const override;
 
     std::string getHostAndPort(OperationContext* opCtx) const override;
 
