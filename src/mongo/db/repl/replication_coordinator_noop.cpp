@@ -279,11 +279,6 @@ Status ReplicationCoordinatorNoOp::processReplSetGetStatus(BSONObjBuilder*,
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::fillIsMasterForReplSet(IsMasterResponse*,
-                                                        const SplitHorizon::Parameters&) {
-    MONGO_UNREACHABLE;
-}
-
 void ReplicationCoordinatorNoOp::appendSlaveInfoData(BSONObjBuilder*) {
     MONGO_UNREACHABLE;
 }
@@ -470,8 +465,8 @@ void ReplicationCoordinatorNoOp::updateAndLogStateTransitionMetrics(
 std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMasterResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,
-    TopologyVersion previous,
-    Date_t deadline) {
+    boost::optional<TopologyVersion> clientTopologyVersion,
+    boost::optional<Date_t> deadline) const {
     MONGO_UNREACHABLE;
 }
 

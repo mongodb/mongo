@@ -513,6 +513,17 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     return false;
 }
 
+void ReplicationCoordinatorImpl::_createHorizonTopologyChangePromiseMapping(WithLock) {
+    auto horizonMappings = _rsConfig.getMemberAt(_selfIndex).getHorizonMappings();
+    // Create a new horizon to promise mapping since it is possible for the horizons
+    // to change after a replica set reconfig.
+    _horizonToPromiseMap.clear();
+    for (auto const& [horizon, hostAndPort] : horizonMappings) {
+        _horizonToPromiseMap.emplace(
+            horizon, std::make_shared<SharedPromise<std::shared_ptr<const IsMasterResponse>>>());
+    }
+}
+
 void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& localConfig,
@@ -1813,33 +1824,76 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
 }
 
 std::shared_ptr<IsMasterResponse> ReplicationCoordinatorImpl::_makeIsMasterResponse(
-    const SplitHorizon::Parameters& horizonParams) {
+    const StringData horizonString, WithLock lock) const {
     auto response = std::make_shared<IsMasterResponse>();
-    fillIsMasterForReplSet(response.get(), horizonParams);
+    invariant(getSettings().usingReplSets());
+    _topCoord->fillIsMasterForReplSet(response, horizonString);
+
+    OpTime lastOpTime = _getMyLastAppliedOpTime_inlock();
+    response->setLastWrite(lastOpTime, lastOpTime.getTimestamp().getSecs());
+    if (_currentCommittedSnapshot) {
+        response->setLastMajorityWrite(_currentCommittedSnapshot->opTime,
+                                       _currentCommittedSnapshot->opTime.getTimestamp().getSecs());
+    }
+
+    if (response->isMaster() && !_readWriteAbility->canAcceptNonLocalWrites(lock)) {
+        // Report that we are secondary to ismaster callers until drain completes.
+        response->setIsMaster(false);
+        response->setIsSecondary(true);
+    }
+
+    if (_inShutdown) {
+        response->setIsMaster(false);
+        response->setIsSecondary(false);
+    }
     return response;
 }
 
 std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMasterResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,
-    TopologyVersion previous,
-    Date_t deadline) {
+    boost::optional<TopologyVersion> clientTopologyVersion,
+    boost::optional<Date_t> deadline) const {
+    stdx::unique_lock lk(_mutex);
 
-    TopologyVersion topologyVersion;
-    SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> future;
-    {
-        stdx::lock_guard lk(_mutex);
-        topologyVersion = _topCoord->getTopologyVersion();
-        future = _topologyChangePromise.getFuture();
+    const MemberState myState = _topCoord->getMemberState();
+    if (!_rsConfig.isInitialized() || myState.removed()) {
+        // It is possible the SplitHorizon mappings have not been initialized yet for a member
+        // config. We also clear the horizon mappings for nodes that are no longer part of the
+        // config.
+        auto response = std::make_shared<IsMasterResponse>();
+        response->setTopologyVersion(_topCoord->getTopologyVersion());
+        response->markAsNoConfig();
+        return response;
     }
 
-    if (previous.getProcessId() != topologyVersion.getProcessId()) {
+    const auto& self = _rsConfig.getMemberAt(_selfIndex);
+    // determineHorizon falls back to kDefaultHorizon if the server does not know of the given
+    // horizon.
+    const StringData horizonString = self.determineHorizon(horizonParams);
+    if (!clientTopologyVersion) {
+        // The client is not using awaitable isMaster so we respond immediately.
+        return _makeIsMasterResponse(horizonString, lk);
+    }
+
+    // If clientTopologyVersion is not none, deadline must also be not none.
+    invariant(deadline);
+
+    // Each awaitable isMaster will wait on their specific horizon. We always expect horizonString
+    // to exist in _horizonToPromiseMap.
+    auto horizonIter = _horizonToPromiseMap.find(horizonString);
+    invariant(horizonIter != end(_horizonToPromiseMap));
+    SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> future =
+        horizonIter->second->getFuture();
+
+    const TopologyVersion topologyVersion = _topCoord->getTopologyVersion();
+    if (clientTopologyVersion->getProcessId() != topologyVersion.getProcessId()) {
         // Getting a different process id indicates that the server has restarted so we return
         // immediately with the updated process id.
-        return _makeIsMasterResponse(horizonParams);
+        return _makeIsMasterResponse(horizonString, lk);
     }
 
-    auto prevCounter = previous.getCounter();
+    auto prevCounter = clientTopologyVersion->getCounter();
     auto topologyVersionCounter = topologyVersion.getCounter();
     uassert(31382,
             str::stream() << "Received a topology version with counter: " << prevCounter
@@ -1850,18 +1904,23 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     if (prevCounter < topologyVersionCounter) {
         // The received isMaster command contains a stale topology version so we respond
         // immediately with a more current topology version.
-        return _makeIsMasterResponse(horizonParams);
+        return _makeIsMasterResponse(horizonString, lk);
     }
 
+    lk.unlock();
+
     // Wait for a topology change with timeout set to deadline.
+    LOG(1) << "Waiting for an isMaster response from a topology change or until deadline: "
+           << deadline.get() << ". Current TopologyVersion counter is " << topologyVersionCounter;
     auto statusWithIsMaster =
-        futureGetNoThrowWithDeadline(opCtx, future, deadline, opCtx->getTimeoutError());
+        futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
     auto status = statusWithIsMaster.getStatus();
 
     if (status == ErrorCodes::ExceededTimeLimit) {
         // Return an IsMasterResponse with the current topology version on timeout when waiting for
         // a topology change.
-        return _makeIsMasterResponse(horizonParams);
+        stdx::lock_guard lk(_mutex);
+        return _makeIsMasterResponse(horizonString, lk);
     }
 
     uassertStatusOK(status);
@@ -2446,32 +2505,6 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
     return result;
 }
 
-void ReplicationCoordinatorImpl::fillIsMasterForReplSet(
-    IsMasterResponse* response, const SplitHorizon::Parameters& horizonParams) {
-    invariant(getSettings().usingReplSets());
-
-    stdx::lock_guard<Latch> lk(_mutex);
-    _topCoord->fillIsMasterForReplSet(response, horizonParams);
-
-    OpTime lastOpTime = _getMyLastAppliedOpTime_inlock();
-    response->setLastWrite(lastOpTime, lastOpTime.getTimestamp().getSecs());
-    if (_currentCommittedSnapshot) {
-        response->setLastMajorityWrite(_currentCommittedSnapshot->opTime,
-                                       _currentCommittedSnapshot->opTime.getTimestamp().getSecs());
-    }
-
-    if (response->isMaster() && !_readWriteAbility->canAcceptNonLocalWrites(lk)) {
-        // Report that we are secondary to ismaster callers until drain completes.
-        response->setIsMaster(false);
-        response->setIsSecondary(true);
-    }
-
-    if (_inShutdown) {
-        response->setIsMaster(false);
-        response->setIsSecondary(false);
-    }
-}
-
 void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
     stdx::lock_guard<Latch> lock(_mutex);
     _topCoord->fillMemberData(result);
@@ -2882,6 +2915,18 @@ void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
     }
 }
 
+void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(OperationContext* opCtx,
+                                                               WithLock lock) {
+    _topCoord->incrementTopologyVersion();
+    // Create an isMaster response for each horizon the server is knowledgeable about.
+    for (auto iter = _horizonToPromiseMap.begin(); iter != _horizonToPromiseMap.end(); iter++) {
+        auto response = _makeIsMasterResponse(iter->first, lock);
+        // Fulfill the promise and replace with a new one for future waiters.
+        iter->second->emplaceValue(response);
+        iter->second = std::make_shared<SharedPromise<std::shared_ptr<const IsMasterResponse>>>();
+    }
+}
+
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk,
                                                                       OperationContext* opCtx) {
@@ -2893,7 +2938,17 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _readWriteAbility->setCanAcceptNonLocalWrites(lk, opCtx, canAcceptWrites);
     }
 
+    // We want to respond to any waiting isMasters even if our current and target state are the
+    // same as it is possible writes have been disabled during a stepDown but the primary has yet
+    // to transition to SECONDARY state.
+    ON_BLOCK_EXIT([&] {
+        if (_rsConfig.isInitialized()) {
+            _fulfillTopologyChangePromise(opCtx, lk);
+        }
+    });
+
     const MemberState newState = _topCoord->getMemberState();
+
     if (newState == _memberState) {
         if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
             invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
@@ -3337,7 +3392,16 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
         _startHeartbeats_inlock();
+
+        if (_horizonToPromiseMap.empty()) {
+            // We should only create a new horizon-to-promise mapping for nodes that are members of
+            // the config.
+            // TODO (SERVER-45039): Create a new horizon to promise mapping after each reconfig
+            // that changes the horizon.
+            _createHorizonTopologyChangePromiseMapping(lk);
+        }
     }
+
     _updateLastCommittedOpTimeAndWallTime(lk);
     _wakeReadyWaiters(lk);
 

@@ -144,10 +144,11 @@ TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
     ASSERT(TopologyCoordinator::UpdateTermResult::kTriggerStepDown == updateTermResult);
 
     // Test that "ismaster" is immediately false, although "secondary" is not yet true.
-    IsMasterResponse response;
-    replCoord->fillIsMasterForReplSet(&response, {});
-    ASSERT_TRUE(response.isConfigSet());
-    BSONObj responseObj = response.toBSON();
+    auto opCtx = makeOperationContext();
+    const auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_TRUE(response->isConfigSet());
+    BSONObj responseObj = response->toBSON();
     ASSERT_FALSE(responseObj["ismaster"].Bool());
     ASSERT_FALSE(responseObj["secondary"].Bool());
     ASSERT_FALSE(responseObj.hasField("isreplicaset"));
@@ -1483,8 +1484,10 @@ TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
         ASSERT_EQUALS(OID::fromTerm(term), electionId);
     }
 
-    const auto opCtx = makeOperationContext();
-    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+    {
+        const auto opCtx = makeOperationContext();
+        getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+    }
 
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
@@ -2503,10 +2506,11 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // We should not indicate that we are master, nor that we are secondary.
-    IsMasterResponse response;
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
-    ASSERT_FALSE(response.isMaster());
-    ASSERT_FALSE(response.isSecondary());
+    auto opCtx = makeOperationContext();
+    auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
 
     // Interrupt the ongoing stepdown command.
     {
@@ -2519,13 +2523,12 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // We should now report that we are master.
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
-    ASSERT_TRUE(response.isMaster());
-    ASSERT_FALSE(response.isSecondary());
+    response = getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_TRUE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
 
     // This is the important check, that we stepped back up when aborting the stepdown command
     // attempt.
-    const auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
@@ -2555,10 +2558,12 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // We should not indicate that we are master, nor that we are secondary.
-    IsMasterResponse response;
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
-    ASSERT_FALSE(response.isMaster());
-    ASSERT_FALSE(response.isSecondary());
+    auto opCtx = makeOperationContext();
+    auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ;
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
 
     // Interrupt the ongoing stepdown command.
     {
@@ -2568,7 +2573,6 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
 
     // Now while the first stepdown request is waiting for secondaries to catch up, force an
     // unconditional stepdown.
-    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(opCtx.get(), 2));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
@@ -2581,8 +2585,8 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     // We should still be indicating that we are not master.
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
-    ASSERT_FALSE(response.isMaster());
+    response = getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(response->isMaster());
 
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
@@ -3042,7 +3046,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsCurrentTopologyVersionOnTimeOu
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
     stdx::thread getIsMasterThread([&] {
-        auto response = getReplCoord()->awaitIsMasterResponse(
+        const auto response = getReplCoord()->awaitIsMasterResponse(
             opCtx.get(), {}, expectedTopologyVersion, deadline);
         auto topologyVersion = response->getTopologyVersion();
         // Assert that on timeout, the returned IsMasterResponse contains the same TopologyVersion.
@@ -3165,20 +3169,141 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseFailsOnRequestWithFutureTopologyVersi
         31382);
 }
 
+TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    // Become primary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto opCtx = makeOperationContext();
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+        auto expectedProcessId = currentTopologyVersion.getProcessId();
+        // A topology change should increment the TopologyVersion counter.
+        auto expectedCounter = currentTopologyVersion.getCounter() + 1;
+
+        const auto responseAfterDisablingWrites = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+        const auto topologyVersionAfterDisablingWrites =
+            responseAfterDisablingWrites->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersionAfterDisablingWrites->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersionAfterDisablingWrites->getProcessId(), expectedProcessId);
+        // We expect the server to increment the TopologyVersion and respond to waiting IsMasters
+        // once we disable writes on the node that is stepping down from primary. At this time,
+        // isMaster will be false but the node will have yet to transition to secondary.
+        ASSERT_FALSE(responseAfterDisablingWrites->isMaster());
+        ASSERT_FALSE(responseAfterDisablingWrites->isSecondary());
+        ASSERT_EQUALS(responseAfterDisablingWrites->getPrimary().host(), "node1");
+
+        // The server TopologyVersion will increment a second time once the old primary has
+        // completed its transition to secondary. An isMaster request with
+        // 'topologyVersionAfterDisablingWrites' should get a response immediately since that
+        // TopologyVersion is now stale.
+        expectedCounter = topologyVersionAfterDisablingWrites->getCounter() + 1;
+        deadline = getNet()->now() + maxAwaitTime;
+        const auto responseStepdownComplete = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, topologyVersionAfterDisablingWrites, deadline);
+        const auto topologyVersionStepDownComplete = responseStepdownComplete->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersionStepDownComplete->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersionStepDownComplete->getProcessId(), expectedProcessId);
+        ASSERT_FALSE(responseStepdownComplete->isMaster());
+        ASSERT_TRUE(responseStepdownComplete->isSecondary());
+        ASSERT_FALSE(responseStepdownComplete->hasPrimary());
+    });
+
+    // A topology change should cause the server to respond to the waiting IsMasterResponse.
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+    ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
+    getIsMasterThread.join();
+}
+
+TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionTimeout) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    // Become primary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    // Wait for an isMaster with deadline past the election timeout.
+    auto electionTimeout = getReplCoord()->getConfig().getElectionTimeoutPeriod();
+    auto maxAwaitTime = electionTimeout + Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+    auto electionTimeoutDate = getNet()->now() + electionTimeout;
+
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    auto expectedProcessId = currentTopologyVersion.getProcessId();
+    // A topology change should increment the TopologyVersion counter.
+    auto expectedCounter = currentTopologyVersion.getCounter() + 1;
+    auto opCtx = makeOperationContext();
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        const auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+        auto topologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
+
+        ASSERT_FALSE(response->isMaster());
+        ASSERT_TRUE(response->isSecondary());
+        ASSERT_FALSE(response->hasPrimary());
+    });
+
+    getNet()->enterNetwork();
+    // Primary steps down after not receiving a response within the election timeout.
+    getNet()->advanceTime(electionTimeoutDate);
+    getIsMasterThread.join();
+    exitNetwork();
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+}
+
 TEST_F(ReplCoordTest, IsMasterResponseMentionsLackOfReplicaSetConfig) {
     start();
-    IsMasterResponse response;
 
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
-    ASSERT_FALSE(response.isConfigSet());
-    BSONObj responseObj = response.toBSON();
+    auto opCtx = makeOperationContext();
+    const auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(response->isConfigSet());
+    BSONObj responseObj = response->toBSON();
     ASSERT_FALSE(responseObj["ismaster"].Bool());
     ASSERT_FALSE(responseObj["secondary"].Bool());
     ASSERT_TRUE(responseObj["isreplicaset"].Bool());
     ASSERT_EQUALS("Does not have a valid replica set config", responseObj["info"].String());
 
     IsMasterResponse roundTripped;
-    ASSERT_OK(roundTripped.initialize(response.toBSON()));
+    ASSERT_OK(roundTripped.initialize(response->toBSON()));
 }
 
 TEST_F(ReplCoordTest, IsMaster) {
@@ -3207,22 +3332,23 @@ TEST_F(ReplCoordTest, IsMaster) {
     OpTime opTime = OpTime(Timestamp(lastWriteDate, 2), 1);
     replCoordSetMyLastAppliedOpTime(opTime, Date_t() + Seconds(100));
 
-    IsMasterResponse response;
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
+    auto opCtx = makeOperationContext();
+    const auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
 
-    ASSERT_EQUALS("mySet", response.getReplSetName());
-    ASSERT_EQUALS(2, response.getReplSetVersion());
-    ASSERT_FALSE(response.isMaster());
-    ASSERT_TRUE(response.isSecondary());
+    ASSERT_EQUALS("mySet", response->getReplSetName());
+    ASSERT_EQUALS(2, response->getReplSetVersion());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_TRUE(response->isSecondary());
     // TODO(spencer): test that response includes current primary when there is one.
-    ASSERT_FALSE(response.isArbiterOnly());
-    ASSERT_TRUE(response.isPassive());
-    ASSERT_FALSE(response.isHidden());
-    ASSERT_TRUE(response.shouldBuildIndexes());
-    ASSERT_EQUALS(Seconds(0), response.getSlaveDelay());
-    ASSERT_EQUALS(h4, response.getMe());
+    ASSERT_FALSE(response->isArbiterOnly());
+    ASSERT_TRUE(response->isPassive());
+    ASSERT_FALSE(response->isHidden());
+    ASSERT_TRUE(response->shouldBuildIndexes());
+    ASSERT_EQUALS(Seconds(0), response->getSlaveDelay());
+    ASSERT_EQUALS(h4, response->getMe());
 
-    std::vector<HostAndPort> hosts = response.getHosts();
+    std::vector<HostAndPort> hosts = response->getHosts();
     ASSERT_EQUALS(2U, hosts.size());
     if (hosts[0] == h1) {
         ASSERT_EQUALS(h2, hosts[1]);
@@ -3230,22 +3356,22 @@ TEST_F(ReplCoordTest, IsMaster) {
         ASSERT_EQUALS(h2, hosts[0]);
         ASSERT_EQUALS(h1, hosts[1]);
     }
-    std::vector<HostAndPort> passives = response.getPassives();
+    std::vector<HostAndPort> passives = response->getPassives();
     ASSERT_EQUALS(1U, passives.size());
     ASSERT_EQUALS(h4, passives[0]);
-    std::vector<HostAndPort> arbiters = response.getArbiters();
+    std::vector<HostAndPort> arbiters = response->getArbiters();
     ASSERT_EQUALS(1U, arbiters.size());
     ASSERT_EQUALS(h3, arbiters[0]);
 
-    stdx::unordered_map<std::string, std::string> tags = response.getTags();
+    stdx::unordered_map<std::string, std::string> tags = response->getTags();
     ASSERT_EQUALS(2U, tags.size());
     ASSERT_EQUALS("value1", tags["key1"]);
     ASSERT_EQUALS("value2", tags["key2"]);
-    ASSERT_EQUALS(opTime, response.getLastWriteOpTime());
-    ASSERT_EQUALS(lastWriteDate, response.getLastWriteDate());
+    ASSERT_EQUALS(opTime, response->getLastWriteOpTime());
+    ASSERT_EQUALS(lastWriteDate, response->getLastWriteDate());
 
     IsMasterResponse roundTripped;
-    ASSERT_OK(roundTripped.initialize(response.toBSON()));
+    ASSERT_OK(roundTripped.initialize(response->toBSON()));
 }
 
 TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
@@ -3269,13 +3395,13 @@ TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
     replCoordSetMyLastDurableOpTime(opTime, Date_t() + Seconds(100));
     ASSERT_EQUALS(majorityOpTime, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
-    IsMasterResponse response;
-    getReplCoord()->fillIsMasterForReplSet(&response, {});
+    const auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
 
-    ASSERT_EQUALS(opTime, response.getLastWriteOpTime());
-    ASSERT_EQUALS(lastWriteDate, response.getLastWriteDate());
-    ASSERT_EQUALS(majorityOpTime, response.getLastMajorityWriteOpTime());
-    ASSERT_EQUALS(majorityWriteDate, response.getLastMajorityWriteDate());
+    ASSERT_EQUALS(opTime, response->getLastWriteOpTime());
+    ASSERT_EQUALS(lastWriteDate, response->getLastWriteDate());
+    ASSERT_EQUALS(majorityOpTime, response->getLastMajorityWriteOpTime());
+    ASSERT_EQUALS(majorityWriteDate, response->getLastMajorityWriteDate());
 }
 
 TEST_F(ReplCoordTest, IsMasterInShutdown) {
@@ -3290,18 +3416,18 @@ TEST_F(ReplCoordTest, IsMasterInShutdown) {
     auto opCtx = makeOperationContext();
     runSingleNodeElection(opCtx.get());
 
-    IsMasterResponse responseBeforeShutdown;
-    getReplCoord()->fillIsMasterForReplSet(&responseBeforeShutdown, {});
-    ASSERT_TRUE(responseBeforeShutdown.isMaster());
-    ASSERT_FALSE(responseBeforeShutdown.isSecondary());
+    const auto responseBeforeShutdown =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_TRUE(responseBeforeShutdown->isMaster());
+    ASSERT_FALSE(responseBeforeShutdown->isSecondary());
 
     shutdown(opCtx.get());
 
     // Must not report ourselves as master while we're in shutdown.
-    IsMasterResponse responseAfterShutdown;
-    getReplCoord()->fillIsMasterForReplSet(&responseAfterShutdown, {});
-    ASSERT_FALSE(responseAfterShutdown.isMaster());
-    ASSERT_FALSE(responseBeforeShutdown.isSecondary());
+    const auto responseAfterShutdown =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(responseAfterShutdown->isMaster());
+    ASSERT_FALSE(responseBeforeShutdown->isSecondary());
 }
 
 
@@ -3555,6 +3681,59 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node3:12345")));
     *status = replCoord->processReplSetReconfig(opCtx.get(), args, &garbage);
+}
+
+TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfig) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    // Become primary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    auto expectedProcessId = currentTopologyVersion.getProcessId();
+    // A topology change should increment the TopologyVersion counter.
+    auto expectedCounter = currentTopologyVersion.getCounter() + 1;
+    auto opCtx = makeOperationContext();
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        const auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+        auto topologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
+
+        // Ensure the isMasterResponse contains the newly added node.
+        const auto hosts = response->getHosts();
+        ASSERT_EQUALS(3, hosts.size());
+        ASSERT_EQUALS("node3", hosts[2].host());
+    });
+
+    // Do a reconfig to add a third node to the replica set. A reconfig should cause the server to
+    // respond to the waiting IsMasterResponse.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status); });
+    replyToReceivedHeartbeatV1();
+    reconfigThread.join();
+    ASSERT_OK(status);
+    getIsMasterThread.join();
 }
 
 TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {

@@ -163,9 +163,6 @@ public:
 
     Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle) override;
 
-    void fillIsMasterForReplSet(repl::IsMasterResponse*,
-                                const repl::SplitHorizon::Parameters& horizon) override;
-
     void appendSlaveInfoData(BSONObjBuilder*) override;
 
     repl::ReplSetConfig getConfig() const override;
@@ -267,8 +264,8 @@ public:
     std::shared_ptr<const repl::IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const repl::SplitHorizon::Parameters& horizonParams,
-        repl::TopologyVersion previous,
-        Date_t deadline) override;
+        boost::optional<repl::TopologyVersion> previous,
+        boost::optional<Date_t> deadline) const override;
 
 private:
     // Back pointer to the ServiceContext that has started the instance.

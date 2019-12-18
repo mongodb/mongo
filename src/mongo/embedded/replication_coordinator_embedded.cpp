@@ -304,11 +304,6 @@ Status ReplicationCoordinatorEmbedded::processReplSetGetStatus(BSONObjBuilder*,
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::fillIsMasterForReplSet(IsMasterResponse*,
-                                                            const SplitHorizon::Parameters&) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::appendSlaveInfoData(BSONObjBuilder*) {
     UASSERT_NOT_IMPLEMENTED;
 }
@@ -496,8 +491,8 @@ void ReplicationCoordinatorEmbedded::updateAndLogStateTransitionMetrics(
 std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::awaitIsMasterResponse(
     OperationContext* opCtx,
     const repl::SplitHorizon::Parameters& horizonParams,
-    repl::TopologyVersion previous,
-    Date_t deadline) {
+    boost::optional<repl::TopologyVersion> previous,
+    boost::optional<Date_t> deadline) const {
     UASSERT_NOT_IMPLEMENTED;
 };
 

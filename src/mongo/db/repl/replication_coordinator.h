@@ -583,13 +583,6 @@ public:
     virtual Status resyncData(OperationContext* opCtx, bool waitUntilCompleted) = 0;
 
     /**
-     * Handles an incoming isMaster command for a replica set node.  Should not be
-     * called on a standalone node.
-     */
-    virtual void fillIsMasterForReplSet(IsMasterResponse* result,
-                                        const SplitHorizon::Parameters& horizonParams) = 0;
-
-    /**
      * Adds to "result" a description of the slaveInfo data structure used to map RIDs to their
      * last known optimes.
      */
@@ -941,18 +934,16 @@ public:
 
     /**
      * Constructs and returns an IsMasterResponse. Will block until the given deadline waiting for a
-     * significant topology change if the 'counter' field of 'previous' is equal to the current
-     * TopologyVersion 'counter' from the TopologyCoordinator.
-     * Returns immediately if 'previous' < TopologyVersion of the TopologyCoordinator or if
-     * the processId differs.
-     * TODO(SERVER-44514): Make this method 'const' when we remove fillIsMasterForReplSet from the
-     * ReplicationCoordinator API.
+     * significant topology change if the 'counter' field of 'clientTopologyVersion' is equal to the
+     * current TopologyVersion 'counter' from the TopologyCoordinator. Returns immediately if
+     * 'clientTopologyVersion' < TopologyVersion of the TopologyCoordinator or if the processId
+     * differs.
      */
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
-        TopologyVersion previous,
-        Date_t deadline) = 0;
+        boost::optional<TopologyVersion> clientTopologyVersion,
+        boost::optional<Date_t> deadline) const = 0;
 
     /**
      * Trace a replication event for the RaftMongo.tla spec.

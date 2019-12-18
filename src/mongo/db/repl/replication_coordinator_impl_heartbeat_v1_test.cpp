@@ -152,6 +152,98 @@ TEST_F(ReplCoordHBV1Test,
     ASSERT_TRUE(getExternalState()->threadsStarted());
 }
 
+TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    // Become primary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    auto expectedProcessId = currentTopologyVersion.getProcessId();
+    // A reconfig should increment the TopologyVersion counter.
+    auto expectedCounter = currentTopologyVersion.getCounter() + 1;
+    auto opCtx = makeOperationContext();
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+        auto topologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
+
+        // Ensure the isMasterResponse contains the newly added node.
+        const auto hosts = response->getHosts();
+        ASSERT_EQUALS(3, hosts.size());
+        ASSERT_EQUALS("node3", hosts[2].host());
+    });
+
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    ReplSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "mySet"
+                                << "version" << 3 << "protocolVersion" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "node1:12345"
+                                                         << "priority" << 3)
+                                              << BSON("_id" << 1 << "host"
+                                                            << "node2:12345")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "node3:12345"))));
+    const Date_t startDate = getNet()->now();
+
+    enterNetwork();
+    NetworkInterfaceMock* net = getNet();
+    ASSERT_FALSE(net->hasReadyRequests());
+    exitNetwork();
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("node2", 12345));
+
+    enterNetwork();
+    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfig(rsConfig);
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    net->scheduleResponse(
+        noi, startDate + Milliseconds(200), makeResponseStatus(responseBuilder.obj()));
+    assertRunUntil(startDate + Milliseconds(200));
+
+    // Because the new config is stored using an out-of-band thread, we need to perform some
+    // extra synchronization to let the executor finish the heartbeat reconfig.  We know that
+    // after the out-of-band thread completes, it schedules new heartbeats.  We assume that no
+    // other network operations get scheduled during or before the reconfig, though this may
+    // cease to be true in the future.
+    noi = net->getNextReadyRequest();
+
+    exitNetwork();
+    getIsMasterThread.join();
+}
+
 TEST_F(ReplCoordHBV1Test,
        ArbiterJoinsExistingReplSetWhenReceivingAConfigContainingTheArbiterViaHeartbeat) {
     setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
