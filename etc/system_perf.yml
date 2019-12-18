@@ -905,7 +905,7 @@ buildvariants:
   modules:
     - enterprise
     - genny
-  batchtime: 525600 # temporarily disabling
+  batchtime: 1440 # 24 hours
   expansions: &compile-expansions
     platform: linux
     project_dir: &project_dir dsi
@@ -938,7 +938,7 @@ buildvariants:
   display_name: Compile for Atlas-like
   modules:
   - enterprise
-  batchtime: 525600 # temporarily disabling
+  batchtime: 1440 # 24 hours
   expansions:
     <<: *compile-expansions
     compile_flags: >-
@@ -958,7 +958,7 @@ buildvariants:
 #######################################
 - name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: &modules
     - dsi
     - genny
@@ -1004,7 +1004,7 @@ buildvariants:
 
 - name: linux-standalone
   display_name: Linux Standalone
-  batchtime: 525600 # temporarily disabling
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
     setup: standalone
@@ -1042,7 +1042,7 @@ buildvariants:
 
 - name: linux-standalone-audit
   display_name: Linux Standalone Audit
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: standalone-audit
@@ -1067,7 +1067,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-fle
   display_name: Linux 1-Node ReplSet FLE
-  batchtime: 525600 # temporarily disabling
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
     setup: single-replica-fle
@@ -1092,7 +1092,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-ese-cbc
   display_name: Linux 1-Node ReplSet ESE CBC
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-ese-cbc
@@ -1116,7 +1116,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-ese-gcm
   display_name: Linux 1-Node ReplSet ESE GCM
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-ese-gcm
@@ -1140,7 +1140,7 @@ buildvariants:
 
 - name: linux-1-node-15gbwtcache
   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
-  batchtime: 525600 # temporarily disabling
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
     setup: single-replica-15gbwtcache
@@ -1164,7 +1164,7 @@ buildvariants:
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: shard
@@ -1199,7 +1199,7 @@ buildvariants:
 
 - name: linux-shard-lite
   display_name: Linux Shard Lite Cluster
-  batchtime: 525600 # temporarily disabling
+  batchtime: 2880  # 48 hours
   modules: *modules
   expansions:
     setup: shard-lite
@@ -1240,7 +1240,7 @@ buildvariants:
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 525600 # temporarily disabling
+  batchtime: 2880  # 48 hours
   modules: *modules
   expansions:
     setup: replica
@@ -1288,7 +1288,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080  # 7 days
   modules: *modules
   expansions:
     setup: replica-noflowcontrol
@@ -1321,7 +1321,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-ssl
   display_name: Linux 3-Node ReplSet (SSL)
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: replica-ssl
@@ -1345,7 +1345,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080  # 7 days
   modules: *modules
   expansions:
     setup: replica-2node
@@ -1371,7 +1371,7 @@ buildvariants:
 
 - name: linux-replSet-initialsync-logkeeper
   display_name: Linux ReplSet Initial Sync LogKeeper
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: initialsync-logkeeper
@@ -1400,7 +1400,7 @@ buildvariants:
 #######################################
 - name: atlas-like-M60
   display_name: M60-Like 3-Node ReplSet
-  batchtime: 525600 # temporarily disabling
+  batchtime: 2880  # 48 hours
   modules: *modules
   expansions:
     setup: atlas-like-replica
@@ -1451,7 +1451,7 @@ buildvariants:
 #######################################
 - name: wtdevelop-1-node-replSet
   display_name: WT Develop 1-Node ReplSet
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica
@@ -1472,7 +1472,7 @@ buildvariants:
 
 - name: wtdevelop-standalone
   display_name: WT Develop Standalone
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: standalone
@@ -1493,7 +1493,7 @@ buildvariants:
 
 - name: wtdevelop-3-node-replSet
   display_name: WT Develop 3-Node ReplSet
-  batchtime: 525600 # temporarily disabling
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: replica
