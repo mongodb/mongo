@@ -435,7 +435,7 @@ commands.push({
         otherDB.createCollection("foo");
         otherDB.adminCommand({enablesharding: otherDB.toString()});
         assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
-        st.shardColl(db.foo, {_id: "hashed"}, false);
+        st.shardColl(otherDB.foo, {_id: "hashed"}, false);
         coll.insert({x: -3, tags: ["a", "b"]});
         coll.insert({x: -7, tags: ["b", "c"]});
         coll.insert({x: 23, tags: ["c", "a"]});

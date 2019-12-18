@@ -324,7 +324,6 @@ selector:
   - jstests/sharding/read_does_not_create_namespaces.js
   - jstests/sharding/ismaster.js
   - jstests/sharding/balancer_shell_commands.js
-  - jstests/sharding/forget_mr_temp_ns.js
   - jstests/sharding/auth_sharding_cmd_metadata.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js
   - jstests/sharding/read_after_optime.js
