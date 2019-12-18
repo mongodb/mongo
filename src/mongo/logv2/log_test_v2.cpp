@@ -209,7 +209,7 @@ TEST_F(LogTestV2, Types) {
         return BSONObj(bson.back().data()).getField(kAttributesFieldName).Obj().getField("name"_sd);
     };
 
-    auto testNumeric = [&](auto dummy) {
+    auto testIntegral = [&](auto dummy) {
         using T = decltype(dummy);
 
         auto test = [&](auto value) {
@@ -242,6 +242,30 @@ TEST_F(LogTestV2, Types) {
         test(static_cast<T>(10));
     };
 
+    auto testFloatingPoint = [&](auto dummy) {
+        using T = decltype(dummy);
+
+        auto test = [&](auto value) {
+            text.clear();
+            LOGV2("{}", "name"_attr = value);
+            // Floats are formatted as double
+            ASSERT_EQUALS(text.back(), fmt::format("{}", static_cast<double>(value)));
+            validateJSON(value);
+            ASSERT_EQUALS(lastBSONElement().Number(), value);
+        };
+
+        test(std::numeric_limits<T>::max());
+        test(std::numeric_limits<T>::min());
+        test(std::numeric_limits<T>::lowest());
+        test(static_cast<T>(-10));
+        test(static_cast<T>(-2));
+        test(static_cast<T>(-1));
+        test(static_cast<T>(0));
+        test(static_cast<T>(1));
+        test(static_cast<T>(2));
+        test(static_cast<T>(10));
+    };
+
     bool b = true;
     LOGV2("bool {}", "name"_attr = b);
     ASSERT_EQUALS(text.back(), "bool true");
@@ -255,21 +279,21 @@ TEST_F(LogTestV2, Types) {
         c));  // cast, boost property_tree will try and parse as ascii otherwise
     ASSERT(lastBSONElement().Number() == c);
 
-    testNumeric(static_cast<signed char>(0));
-    testNumeric(static_cast<unsigned char>(0));
-    testNumeric(static_cast<short>(0));
-    testNumeric(static_cast<unsigned short>(0));
-    testNumeric(0);
-    testNumeric(0u);
-    testNumeric(0l);
-    testNumeric(0ul);
-    testNumeric(0ll);
-    testNumeric(0ull);
-    testNumeric(static_cast<int64_t>(0));
-    testNumeric(static_cast<uint64_t>(0));
-    testNumeric(static_cast<size_t>(0));
-    testNumeric(0.0f);
-    testNumeric(0.0);
+    testIntegral(static_cast<signed char>(0));
+    testIntegral(static_cast<unsigned char>(0));
+    testIntegral(static_cast<short>(0));
+    testIntegral(static_cast<unsigned short>(0));
+    testIntegral(0);
+    testIntegral(0u);
+    testIntegral(0l);
+    testIntegral(0ul);
+    testIntegral(0ll);
+    testIntegral(0ull);
+    testIntegral(static_cast<int64_t>(0));
+    testIntegral(static_cast<uint64_t>(0));
+    testIntegral(static_cast<size_t>(0));
+    testFloatingPoint(0.0f);
+    testFloatingPoint(0.0);
 
     // long double is prohibited, we don't use this type and favors Decimal128 instead.
 
@@ -511,6 +535,15 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     };
     validateMsgReconstruction(mongo::fromjson(lines.back()));
     validateMsgReconstruction(BSONObj(linesBson.back().data()));
+
+    LOGV2("test {: <4}", "name"_attr = 2);
+    auto validateMsgReconstruction2 = [](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "test {name: <4}");
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().nFields(), 1);
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().getField("name").Int(), 2);
+    };
+    validateMsgReconstruction2(mongo::fromjson(lines.back()));
+    validateMsgReconstruction2(BSONObj(linesBson.back().data()));
 
 
     LOGV2_OPTIONS({LogTag::kStartupWarnings}, "warning");
