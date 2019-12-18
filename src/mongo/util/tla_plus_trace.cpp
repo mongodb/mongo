@@ -58,6 +58,6 @@ void logTlaPlusTraceEvent(const TlaPlusTraceEvent& event) {
     }
 
     invariant(afterTime > beforeTime, "Clock went backwards");
-    log() << event.toBSON().jsonString();
+    log() << event.toBSON().jsonString(JsonStringFormat::LegacyStrict);
 }
 }  // namespace mongo

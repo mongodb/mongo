@@ -255,13 +255,7 @@ inline StringBuilder& operator<<(StringBuilder& s, const OID& o) {
     See <http://dochub.mongodb.org/core/mongodbextendedjson>
     for details.
 */
-enum JsonStringFormat {
-    /** strict RFC format */
-    Strict,
-    /** 10gen format, which is close to JS format.  This form is understandable by
-        javascript running inside the Mongo server via $where, mr, etc... */
-    TenGen,
-};
+enum JsonStringFormat { ExtendedCanonicalV2_0_0, ExtendedRelaxedV2_0_0, LegacyStrict };
 
 inline bool operator==(const OID& lhs, const OID& rhs) {
     return lhs.compare(rhs) == 0;

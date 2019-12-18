@@ -62,7 +62,7 @@ static BSONObj native_tostrictjson(const mongo::BSONObj& args, void* data) {
     if (args.nFields() == 2) {
         prettyPrint = args["1"].boolean();
     }
-    return BSON("" << tojson(args.firstElement().embeddedObject(), Strict, prettyPrint));
+    return BSON("" << tojson(args.firstElement().embeddedObject(), LegacyStrict, prettyPrint));
 }
 
 // ---------------------------------

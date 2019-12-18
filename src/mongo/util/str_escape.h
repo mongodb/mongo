@@ -31,9 +31,13 @@
 
 #include "mongo/base/string_data.h"
 
+#include <fmt/format.h>
 #include <string>
 
-namespace mongo::logv2 {
+namespace mongo::str {
+void escapeForText(fmt::memory_buffer& buffer, StringData str);
 std::string escapeForText(StringData str);
+
+void escapeForJSON(fmt::memory_buffer& buffer, StringData str);
 std::string escapeForJSON(StringData str);
-}  // namespace mongo::logv2
+}  // namespace mongo::str

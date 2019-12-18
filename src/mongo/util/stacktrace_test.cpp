@@ -145,7 +145,7 @@ public:
 
 private:
     void doPrint(std::ostream& os) const override {
-        os << tojson(obj, Strict, /*pretty=*/true);
+        os << tojson(obj, ExtendedRelaxedV2_0_0, /*pretty=*/true);
     }
     const BSONObj& obj;
 };

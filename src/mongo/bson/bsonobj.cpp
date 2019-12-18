@@ -34,6 +34,9 @@
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/generator_extended_canonical_2_0_0.h"
+#include "mongo/bson/generator_extended_relaxed_2_0_0.h"
+#include "mongo/bson/generator_legacy_strict.h"
 #include "mongo/db/json.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/hex.h"
@@ -140,39 +143,76 @@ BSONObj BSONObj::getOwned(const BSONObj& obj) {
     return obj.getOwned();
 }
 
-std::string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) const {
-    std::stringstream s;
-    BSONObj::jsonStringStream(format, pretty, isArray, s);
-    return s.str();
-}
-
-void BSONObj::jsonStringStream(JsonStringFormat format,
-                               int pretty,
-                               bool isArray,
-                               std::stringstream& s) const {
+template <typename Generator>
+void BSONObj::_jsonStringGenerator(const Generator& g,
+                                   int pretty,
+                                   bool isArray,
+                                   fmt::memory_buffer& buffer) const {
     if (isEmpty()) {
-        s << (isArray ? "[]" : "{}");
+        fmt::format_to(buffer, "{}", isArray ? "[]" : "{}");
         return;
     }
-    s << (isArray ? "[ " : "{ ");
+    buffer.push_back(isArray ? '[' : '{');
+
     BSONObjIterator i(*this);
     BSONElement e = i.next();
     if (!e.eoo())
         while (1) {
-            e.jsonStringStream(format, !isArray, pretty ? pretty + 1 : 0, s);
+            e.jsonStringGenerator(g, !isArray, pretty, buffer);
             e = i.next();
-            if (e.eoo())
+            if (e.eoo()) {
+                g.writePadding(buffer);
                 break;
-            s << ",";
+            }
+            buffer.push_back(',');
             if (pretty) {
-                s << '\n';
-                for (int x = 0; x < pretty; x++)
-                    s << "  ";
-            } else {
-                s << " ";
+                fmt::format_to(buffer, "{: <{}}", '\n', pretty * 2);
             }
         }
-    s << (isArray ? " ]" : " }");
+
+    buffer.push_back(isArray ? ']' : '}');
+}
+
+void BSONObj::jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
+                                  int pretty,
+                                  bool isArray,
+                                  fmt::memory_buffer& buffer) const {
+    _jsonStringGenerator(generator, pretty, isArray, buffer);
+}
+void BSONObj::jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                  int pretty,
+                                  bool isArray,
+                                  fmt::memory_buffer& buffer) const {
+    _jsonStringGenerator(generator, pretty, isArray, buffer);
+}
+void BSONObj::jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                  int pretty,
+                                  bool isArray,
+                                  fmt::memory_buffer& buffer) const {
+    _jsonStringGenerator(generator, pretty, isArray, buffer);
+}
+
+std::string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) const {
+    fmt::memory_buffer buffer;
+    jsonStringBuffer(format, pretty, isArray, buffer);
+    return fmt::to_string(buffer);
+}
+
+void BSONObj::jsonStringBuffer(JsonStringFormat format,
+                               int pretty,
+                               bool isArray,
+                               fmt::memory_buffer& buffer) const {
+    auto withGenerator = [&](auto&& gen) { jsonStringGenerator(gen, pretty, isArray, buffer); };
+
+    if (format == ExtendedCanonicalV2_0_0) {
+        withGenerator(ExtendedCanonicalV200Generator());
+    } else if (format == ExtendedRelaxedV2_0_0) {
+        withGenerator(ExtendedRelaxedV200Generator());
+    } else if (format == LegacyStrict) {
+        withGenerator(LegacyStrictGenerator());
+    } else {
+        MONGO_UNREACHABLE;
+    }
 }
 
 bool BSONObj::valid(BSONVersion version) const {

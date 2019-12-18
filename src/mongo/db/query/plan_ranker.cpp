@@ -95,7 +95,8 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> PlanRanker::pickBestPlan(
         if (!candidates[i].failed) {
             LOG(5) << "Scoring plan " << i << ":" << endl
                    << redact(candidates[i].solution->toString()) << "Stats:\n"
-                   << redact(Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true));
+                   << redact(Explain::statsToBSON(*statTrees[i])
+                                 .jsonString(ExtendedRelaxedV2_0_0, true));
             LOG(2) << "Scoring query plan: " << Explain::getPlanSummary(candidates[i].root)
                    << " planHitEOF=" << statTrees[i]->common.isEOF;
 

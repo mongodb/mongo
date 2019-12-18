@@ -29,7 +29,6 @@
 
 #include "mongo/logv2/bson_formatter.h"
 
-#include <boost/container/small_vector.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
 
@@ -41,6 +40,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/name_extractor.h"
 #include "mongo/logv2/named_arg_formatter.h"
 #include "mongo/util/time_support.h"
 
@@ -50,17 +50,6 @@ namespace mongo {
 namespace logv2 {
 
 namespace {
-struct NameExtractor {
-    template <typename T>
-    void operator()(StringData name, const T& value) {
-        name_args.push_back(fmt::internal::make_arg<fmt::format_context>(name));
-    }
-
-    boost::container::small_vector<fmt::basic_format_arg<fmt::format_context>,
-                                   constants::kNumStaticAttrs>
-        name_args;
-};
-
 struct BSONValueExtractor {
     BSONValueExtractor(BSONObjBuilder& builder)
         : _builder(builder.subobjStart(constants::kAttributesFieldName)) {}
@@ -126,7 +115,7 @@ void BSONFormatter::operator()(boost::log::record_view const& rec,
         builder.append(constants::kStableIdFieldName, stable_id);
     }
 
-    NameExtractor nameExtractor;
+    detail::NameExtractor nameExtractor;
     attrs.apply(nameExtractor);
 
     // Insert the attribute names back into the message string using a special formatter
@@ -134,8 +123,8 @@ void BSONFormatter::operator()(boost::log::record_view const& rec,
     fmt::vformat_to<detail::NamedArgFormatter, char>(
         buffer,
         extract<StringData>(attributes::message(), rec).get().toString(),
-        fmt::basic_format_args<fmt::format_context>(nameExtractor.name_args.data(),
-                                                    nameExtractor.name_args.size()));
+        fmt::basic_format_args<fmt::format_context>(nameExtractor.nameArgs.data(),
+                                                    nameExtractor.nameArgs.size()));
     builder.append(constants::kMessageFieldName, fmt::to_string(buffer));
 
     if (!attrs.empty()) {

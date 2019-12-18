@@ -1610,7 +1610,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONObj schema,
     bool ignoreUnknownKeywords) {
-    LOG(5) << "Parsing JSON Schema: " << schema.jsonString();
+    LOG(5) << "Parsing JSON Schema: " << schema.jsonString(JsonStringFormat::LegacyStrict);
     try {
         auto translation = _parse(expCtx, ""_sd, schema, ignoreUnknownKeywords);
         if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {

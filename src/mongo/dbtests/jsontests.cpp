@@ -35,9 +35,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 #include <fmt/format.h>
 #include <fmt/printf.h>
 #include <limits>
+#include <sstream>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -46,7 +49,21 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
+
 namespace {
+std::string makeJsonEquvalent(const std::string& json) {
+    boost::property_tree::ptree tree;
+
+    std::istringstream in(json);
+    boost::property_tree::read_json(in, tree);
+
+    std::ostringstream out;
+    boost::property_tree::write_json(out, tree);
+
+    return out.str();
+}
+
+#define ASSERT_JSON_EQUALS(a, b) ASSERT_EQUALS(makeJsonEquvalent(a), makeJsonEquvalent(b))
 
 using B = BSONObjBuilder;
 using Arr = BSONArrayBuilder;
@@ -54,13 +71,15 @@ using Arr = BSONArrayBuilder;
 // Tests of the BSONObj::jsonString member function.
 namespace JsonStringTests {
 
-void checkJsonString(const BSONObj& bson, const std::string& json) {
-    ASSERT_EQUALS(bson.jsonString(Strict), json);
-}
-
 void checkJsonStringEach(const std::vector<std::pair<BSONObj, std::string>>& pairs) {
     for (const auto& pair : pairs) {
-        checkJsonString(pair.first, pair.second);
+        ASSERT_JSON_EQUALS(pair.first.jsonString(ExtendedCanonicalV2_0_0), pair.second);
+        ASSERT_JSON_EQUALS(pair.first.jsonString(ExtendedRelaxedV2_0_0), pair.second);
+
+        // Use ASSERT_EQUALS instead of ASSERT_JSON_EQUALS for LegacyStrict.
+        // LegacyStrict that not produce valid JSON in all cases (which makes boost::property_tree
+        // throw) and we have other tests elsewhere that checks for exact strings.
+        ASSERT_EQUALS(pair.first.jsonString(LegacyStrict), pair.second);
     }
 }
 
@@ -73,129 +92,168 @@ TEST(JsonStringTest, BasicTest) {
         // per http://www.ietf.org/rfc/rfc4627.txt, control characters are
         // (U+0000 through U+001F).  U+007F is not mentioned as a control character.
         {B().append("a", "\x1 \x1f").obj(),
-         R"({ "a" : "\u0001 \u001f" })"},                         // AdditionalControlCharacters
-        {B().append("a", "\x80").obj(), "{ \"a\" : \"\x80\" }"},  // ExtendedAscii
-        {B().append("\t", "b").obj(), R"({ "\t" : "b" })"},       // EscapeFieldName
-        {B().append("a", 1).obj(), R"({ "a" : 1 })"},             // SingleIntMember
+         R"({ "a" : "\u0001 \u001f" })"},                    // AdditionalControlCharacters
+        {B().append("\t", "b").obj(), R"({ "\t" : "b" })"},  // EscapeFieldName
     });
 }
+
+TEST(JsonStringTest, UnicodeTest) {
+    // Extended Canonical/Relaxed escapes invalid UTF-8 while LegacyStricts treats it as Extended
+    // Ascii
+    ASSERT_JSON_EQUALS(B().append("a", "\x80").obj().jsonString(ExtendedCanonicalV2_0_0),
+                       R"({ "a" : "\u0080" })");
+    ASSERT_JSON_EQUALS(B().append("a", "\x80").obj().jsonString(ExtendedRelaxedV2_0_0),
+                       R"({ "a" : "\u0080" })");
+    // Can't use ASSERT_JSON_EQUALS because property_tree does not allow invalid unicode
+    ASSERT_EQUALS(B().append("a", "\x80").obj().jsonString(LegacyStrict), "{ \"a\" : \"\x80\" }");
+}
+
 
 TEST(JsonStringTest, NumbersTest) {
     const double qNaN = std::numeric_limits<double>::quiet_NaN();
     const double sNaN = std::numeric_limits<double>::signaling_NaN();
     // Note there is no NaN in the JSON RFC but what would be the alternative?
-    ASSERT(str::contains(B().append("a", qNaN).obj().jsonString(Strict), "NaN"));
-    ASSERT(str::contains(B().append("a", sNaN).obj().jsonString(Strict), "NaN"));
+    ASSERT(str::contains(B().append("a", qNaN).obj().jsonString(ExtendedCanonicalV2_0_0), "NaN"));
+    ASSERT(str::contains(B().append("a", sNaN).obj().jsonString(ExtendedCanonicalV2_0_0), "NaN"));
 
-    checkJsonStringEach({
-        {B().append("a", 1.5).obj(), R"({ "a" : 1.5 })"},              // SingleNumberMember
-        {B().append("a", 123456789).obj(), R"({ "a" : 123456789 })"},  // NumberPrecision
-        {B().append("a", -1).obj(), R"({ "a" : -1 })"},                // NegativeNumber
-    });
+    ASSERT_JSON_EQUALS(B().append("a", 1).obj().jsonString(ExtendedCanonicalV2_0_0),
+                       R"({ "a" : {"$numberInt": 1 }})");
+    ASSERT_JSON_EQUALS(B().append("a", 1).obj().jsonString(ExtendedRelaxedV2_0_0),
+                       R"({ "a" : 1 })");
+    ASSERT_EQUALS(B().append("a", 1).obj().jsonString(LegacyStrict), R"({ "a" : 1 })");
+
+    ASSERT_JSON_EQUALS(B().append("a", -1).obj().jsonString(ExtendedCanonicalV2_0_0),
+                       R"({ "a" : {"$numberInt": -1 }})");
+    ASSERT_JSON_EQUALS(B().append("a", -1).obj().jsonString(ExtendedRelaxedV2_0_0),
+                       R"({ "a" : -1 })");
+    ASSERT_EQUALS(B().append("a", -1).obj().jsonString(LegacyStrict), R"({ "a" : -1 })");
+
+    ASSERT_JSON_EQUALS(B().append("a", 1.5).obj().jsonString(ExtendedCanonicalV2_0_0),
+                       R"({ "a" : {"$numberDouble": 1.5 }})");
+    ASSERT_JSON_EQUALS(B().append("a", 1.5).obj().jsonString(ExtendedRelaxedV2_0_0),
+                       R"({ "a" : 1.5 })");
+    ASSERT_EQUALS(B().append("a", 1.5).obj().jsonString(LegacyStrict), R"({ "a" : 1.5 })");
 }
 
 TEST(JsonStringTest, NumberLongStrictZero) {
     BSONObjBuilder b;
     b.append("a", 0LL);
-    ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"0\" } }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS("{ \"a\" : { \"$numberLong\" : \"0\" } }",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS("{ \"a\" : 0 }", b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"0\" } }", b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, NumberLongStrict) {
     BSONObjBuilder b;
     b.append("a", 20000LL);
-    ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"20000\" } }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS("{ \"a\" : { \"$numberLong\" : \"20000\" } }",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS("{ \"a\" : 20000 }", b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"20000\" } }", b.done().jsonString(LegacyStrict));
 }
 
 // Test a NumberLong that is too big to fit into a 32 bit integer
 TEST(JsonStringTest, NumberLongStrictLarge) {
     BSONObjBuilder b;
     b.append("a", 9223372036854775807LL);
+    ASSERT_JSON_EQUALS("{ \"a\" : { \"$numberLong\" : \"9223372036854775807\" } }",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS("{ \"a\" : 9223372036854775807 }",
+                       b.done().jsonString(ExtendedRelaxedV2_0_0));
     ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"9223372036854775807\" } }",
-                  b.done().jsonString(Strict));
+                  b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, NumberLongStrictNegative) {
     BSONObjBuilder b;
     b.append("a", -20000LL);
-    ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"-20000\" } }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS("{ \"a\" : { \"$numberLong\" : \"-20000\" } }",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS("{ \"a\" : -20000 }", b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"-20000\" } }",
+                  b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, NumberDecimal) {
-    BSONObjBuilder b;
-    b.append("a", mongo::Decimal128("123456789.12345"));
-    ASSERT_EQUALS("{ \"a\" : NumberDecimal(\"123456789.12345\") }", b.done().jsonString(TenGen));
-}
-
-TEST(JsonStringTest, NumberDecimalStrict) {
-    BSONObjBuilder b;
-    b.append("a", mongo::Decimal128("123456789.12345"));
-    ASSERT_EQUALS("{ \"a\" : { \"$numberDecimal\" : \"123456789.12345\" } }",
-                  b.done().jsonString(Strict));
+    checkJsonStringEach({{B().append("a", mongo::Decimal128("123456789.12345")).obj(),
+                          "{ \"a\" : { \"$numberDecimal\" : \"123456789.12345\" } }"}});
 }
 
 TEST(JsonStringTest, NumberDoubleNaN) {
     BSONObjBuilder b;
     b.append("a", std::numeric_limits<double>::quiet_NaN());
-    ASSERT_EQUALS("{ \"a\" : NaN }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$numberDouble": "NaN" }})",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$numberDouble": "NaN" }})",
+                       b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : NaN })", b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, NumberDoubleInfinity) {
     BSONObjBuilder b;
     b.append("a", std::numeric_limits<double>::infinity());
-    ASSERT_EQUALS("{ \"a\" : Infinity }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$numberDouble": "Infinity" }})",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$numberDouble": "Infinity" }})",
+                       b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : Infinity })", b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, NumberDoubleNegativeInfinity) {
     BSONObjBuilder b;
     b.append("a", -std::numeric_limits<double>::infinity());
-    ASSERT_EQUALS("{ \"a\" : -Infinity }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$numberDouble": "-Infinity" }})",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$numberDouble": "-Infinity" }})",
+                       b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : -Infinity })", b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, SingleBoolMember) {
-    ASSERT_EQUALS(R"({ "a" : true })", B().appendBool("a", true).obj().jsonString(Strict));
-    ASSERT_EQUALS(R"({ "a" : false })", B().appendBool("a", false).obj().jsonString(Strict));
+    checkJsonStringEach({{B().appendBool("a", true).obj(), R"({ "a" : true })"},
+                         {B().appendBool("a", false).obj(), R"({ "a" : false })"}});
 }
 
 TEST(JsonStringTest, SingleNullMember) {
-    BSONObjBuilder b;
-    b.appendNull("a");
-    ASSERT_EQUALS("{ \"a\" : null }", b.done().jsonString(Strict));
+    checkJsonStringEach({{B().appendNull("a").obj(), R"({ "a" : null })"}});
 }
 
 TEST(JsonStringTest, SingleUndefinedMember) {
-    BSONObjBuilder b;
-    b.appendUndefined("a");
-    ASSERT_EQUALS("{ \"a\" : { \"$undefined\" : true } }", b.done().jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : undefined }", b.done().jsonString(TenGen));
+    checkJsonStringEach({{B().appendUndefined("a").obj(), R"({ "a" : { "$undefined" : true } })"}});
 }
 
 TEST(JsonStringTest, SingleObjectMember) {
-    BSONObjBuilder b, c;
-    b.append("a", c.done());
-    ASSERT_EQUALS("{ \"a\" : {} }", b.done().jsonString(Strict));
+    BSONObjBuilder c;
+    checkJsonStringEach({{B().append("a", c.done()).obj(), R"({ "a" : {} })"}});
 }
 
 TEST(JsonStringTest, TwoMembers) {
     BSONObjBuilder b;
     b.append("a", 1);
     b.append("b", 2);
-    ASSERT_EQUALS("{ \"a\" : 1, \"b\" : 2 }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : {"$numberInt" : 1}, "b" : {"$numberInt" : 2} })",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : 1, "b" : 2 })", b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : 1, "b" : 2 })", b.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, EmptyArray) {
     std::vector<int> arr;
     BSONObjBuilder b;
     b.append("a", arr);
-    ASSERT_EQUALS("{ \"a\" : [] }", b.done().jsonString(Strict));
+
+    checkJsonStringEach({{b.done(), R"({ "a" : [] })"}});
 }
 
 TEST(JsonStringTest, Array) {
-    std::vector<int> arr;
-    arr.push_back(1);
-    arr.push_back(2);
+    std::vector<std::string> arr;
+    arr.push_back("1");
+    arr.push_back("2");
     BSONObjBuilder b;
     b.append("a", arr);
-    ASSERT_EQUALS("{ \"a\" : [ 1, 2 ] }", b.done().jsonString(Strict));
+
+    checkJsonStringEach({{b.done(), R"({ "a" : [ "1", "2" ] })"}});
 }
 
 TEST(JsonStringTest, DBRef) {
@@ -204,12 +262,9 @@ TEST(JsonStringTest, DBRef) {
     OID oid = OID::from(OIDbytes);
     BSONObjBuilder b;
     b.appendDBRef("a", "namespace", oid);
-    BSONObj built = b.done();
-    ASSERT_EQUALS(
-        "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-        built.jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
-                  built.jsonString(TenGen));
+
+    checkJsonStringEach(
+        {{b.done(), R"({ "a" : { "$ref" : "namespace", "$id" : "ffffffffffffffffffffffff" } })"}});
 }
 
 TEST(JsonStringTest, DBRefZero) {
@@ -218,9 +273,9 @@ TEST(JsonStringTest, DBRefZero) {
     OID oid = OID::from(OIDbytes);
     BSONObjBuilder b;
     b.appendDBRef("a", "namespace", oid);
-    ASSERT_EQUALS(
-        "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"000000000000000000000000\" } }",
-        b.done().jsonString(Strict));
+
+    checkJsonStringEach(
+        {{b.done(), R"({ "a" : { "$ref" : "namespace", "$id" : "000000000000000000000000" } })"}});
 }
 
 TEST(JsonStringTest, ObjectId) {
@@ -230,9 +285,8 @@ TEST(JsonStringTest, ObjectId) {
     BSONObjBuilder b;
     b.appendOID("a", &oid);
     BSONObj built = b.done();
-    ASSERT_EQUALS("{ \"a\" : { \"$oid\" : \"ffffffffffffffffffffffff\" } }",
-                  built.jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : ObjectId( \"ffffffffffffffffffffffff\" ) }", built.jsonString(TenGen));
+
+    checkJsonStringEach({{b.done(), R"({ "a" : { "$oid" : "ffffffffffffffffffffffff" } })"}});
 }
 
 TEST(JsonStringTest, BinData) {
@@ -243,25 +297,40 @@ TEST(JsonStringTest, BinData) {
     BSONObjBuilder b;
     b.appendBinData("a", 3, BinDataGeneral, z);
 
-    std::string o = b.done().jsonString(Strict);
-
-    ASSERT_EQUALS("{ \"a\" : { \"$binary\" : \"YWJj\", \"$type\" : \"00\" } }", o);
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$binary" : { "base64": "YWJj", "subType" : "0" } } })",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$binary" : { "base64": "YWJj", "subType" : "0" } } })",
+                       b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : { "$binary" : "YWJj", "$type" : "00" } })",
+                  b.done().jsonString(LegacyStrict));
 
     BSONObjBuilder c;
     c.appendBinData("a", 2, BinDataGeneral, z);
-    ASSERT_EQUALS("{ \"a\" : { \"$binary\" : \"YWI=\", \"$type\" : \"00\" } }",
-                  c.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$binary" : { "base64": "YWI=", "subType" : "0" } } })",
+                       c.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$binary" : { "base64": "YWI=", "subType" : "0" } } })",
+                       c.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : { "$binary" : "YWI=", "$type" : "00" } })",
+                  c.done().jsonString(LegacyStrict));
 
     BSONObjBuilder d;
     d.appendBinData("a", 1, BinDataGeneral, z);
-    ASSERT_EQUALS("{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"00\" } }",
-                  d.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$binary" : { "base64": "YQ==", "subType" : "0" } } })",
+                       d.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$binary" : { "base64": "YQ==", "subType" : "0" } } })",
+                       d.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : { "$binary" : "YQ==", "$type" : "00" } })",
+                  d.done().jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, Symbol) {
     BSONObjBuilder b;
     b.appendSymbol("a", "b");
-    ASSERT_EQUALS("{ \"a\" : \"b\" }", b.done().jsonString(Strict));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$symbol": "b" } })",
+                       b.done().jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$symbol": "b" } })",
+                       b.done().jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : "b" })", b.done().jsonString(LegacyStrict));
 }
 
 #ifdef _WIN32
@@ -321,94 +390,115 @@ TEST(JsonStringTest, Date) {
     BSONObjBuilder b;
     b.appendDate("a", Date_t());
     BSONObj built = b.done();
-    ASSERT_EQUALS("{ \"a\" : { \"$date\" : \"1969-12-31T19:00:00.000-0500\" } }",
-                  built.jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : Date( 0 ) }", built.jsonString(TenGen));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$date" : { "$numberLong" : "0" } } })",
+                       built.jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$date" : "1969-12-31T19:00:00.000-0500" } })",
+                       built.jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : { "$date" : "1969-12-31T19:00:00.000-0500" } })",
+                  built.jsonString(LegacyStrict));
 
     // Test dates above our maximum formattable date.  See SERVER-13760.
     BSONObjBuilder b2;
     b2.appendDate("a", Date_t::fromMillisSinceEpoch(32535262800000LL));
-    BSONObj built2 = b2.done();
-    ASSERT_EQUALS("{ \"a\" : { \"$date\" : { \"$numberLong\" : \"32535262800000\" } } }",
-                  built2.jsonString(Strict));
+
+    checkJsonStringEach(
+        {{b2.done(), R"({ "a" : { "$date" : { "$numberLong" : "32535262800000" } } })"}});
 }
 
 TEST(JsonStringTest, DateNegative) {
     BSONObjBuilder b;
     b.appendDate("a", Date_t::fromMillisSinceEpoch(-1));
-    BSONObj built = b.done();
-    ASSERT_EQUALS("{ \"a\" : { \"$date\" : { \"$numberLong\" : \"-1\" } } }",
-                  built.jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : Date( -1 ) }", built.jsonString(TenGen));
+
+    checkJsonStringEach({{b.done(), R"({ "a" : { "$date" : { "$numberLong" : "-1" } } })"}});
 }
 
 TEST(JsonStringTest, Regex) {
     BSONObj built = B().appendRegex("a", "abc", "i").obj();
-    ASSERT_EQUALS(R"({ "a" : { "$regex" : "abc", "$options" : "i" } })", built.jsonString(Strict));
-    ASSERT_EQUALS(R"({ "a" : /abc/i })", built.jsonString(TenGen));
+    ASSERT_JSON_EQUALS(
+        R"({ "a" : { "$regularExpression" : { "pattern" : "abc", "options" : "i" } } })",
+        built.jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(
+        R"({ "a" : { "$regularExpression" : { "pattern" : "abc", "options" : "i" } } })",
+        built.jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : { "$regex" : "abc", "$options" : "i" } })",
+                  built.jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, RegexEscape) {
     BSONObjBuilder b;
     b.appendRegex("a", "/\"", "i");
     BSONObj built = b.done();
-    ASSERT_EQUALS("{ \"a\" : { \"$regex\" : \"/\\\"\", \"$options\" : \"i\" } }",
-                  built.jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : /\\/\\\"/i }", built.jsonString(TenGen));
+
+    // These raw string literal breaks the Visual Studio preprocessor
+    const char* expected =
+        R"({ "a" : { "$regularExpression" : { "pattern" : "/\"", "options" : "i" } } })";
+    const char* expectedLegacy = R"({ "a" : { "$regex" : "/\"", "$options" : "i" } })";
+    ASSERT_JSON_EQUALS(expected, built.jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(expected, built.jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(expectedLegacy, built.jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, RegexManyOptions) {
     BSONObjBuilder b;
     b.appendRegex("a", "z", "abcgimx");
     BSONObj built = b.done();
-    ASSERT_EQUALS("{ \"a\" : { \"$regex\" : \"z\", \"$options\" : \"abcgimx\" } }",
-                  built.jsonString(Strict));
-    ASSERT_EQUALS("{ \"a\" : /z/gim }", built.jsonString(TenGen));
+    ASSERT_JSON_EQUALS(
+        R"({ "a" : { "$regularExpression" : { "pattern" : "z", "options" : "abcgimx" } } })",
+        built.jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(
+        R"({ "a" : { "$regularExpression" : { "pattern" : "z", "options" : "abcgimx" } } })",
+        built.jsonString(ExtendedRelaxedV2_0_0));
+    ASSERT_EQUALS(R"({ "a" : { "$regex" : "z", "$options" : "abcgimx" } })",
+                  built.jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, RegexValidOption) {
     BSONObj built = B().appendRegex("a", "sometext", "ms").obj();
+    ASSERT_JSON_EQUALS(
+        R"({ "a" : { "$regularExpression" : { "pattern" : "sometext", "options" : "ms" } } })",
+        built.jsonString(ExtendedCanonicalV2_0_0));
+    ASSERT_JSON_EQUALS(
+        R"({ "a" : { "$regularExpression" : { "pattern" : "sometext", "options" : "ms" } } })",
+        built.jsonString(ExtendedRelaxedV2_0_0));
     ASSERT_EQUALS(R"({ "a" : { "$regex" : "sometext", "$options" : "ms" } })",
-                  built.jsonString(Strict));
-    ASSERT_EQUALS(R"({ "a" : /sometext/ms })", built.jsonString(TenGen));
+                  built.jsonString(LegacyStrict));
 }
 
 TEST(JsonStringTest, CodeTests) {
     BSONObjBuilder b;
     b.appendCode("x", "function(arg){ var string = \"\\n\"; return 1; }");
-    BSONObj o = b.obj();
-    ASSERT_EQUALS(
-        "{ \"x\" : \"function(arg){ var string = \\\"\\\\n\\\"; "
-        "return 1; }\" }",
-        o.jsonString());
+
+    checkJsonStringEach({{b.done(),
+                          "{ \"x\" : { \"$code\" : \"function(arg){ var string = \\\"\\\\n\\\"; "
+                          "return 1; }\" } }"}});
 }
 
 TEST(JsonStringTest, CodeWScopeTests) {
     BSONObjBuilder b;
-    b.appendCodeWScope("x", "function(arg){ var string = \"\\n\"; return x; }", BSON("x" << 1));
-    BSONObj o = b.obj();
-    ASSERT_EQUALS(
-        "{ \"x\" : "
-        "{ \"$code\" : "
-        "\"function(arg){ var string = \\\"\\\\n\\\"; return x; }\" , "
-        "\"$scope\" : { \"x\" : 1 } } }",
-        o.jsonString());
+    b.appendCodeWScope("x",
+                       "function(arg){ var string = \"\\n\"; return x; }",
+                       BSON("x"
+                            << "1"));
+
+    checkJsonStringEach({{b.done(),
+                          "{ \"x\" : "
+                          "{ \"$code\" : "
+                          "\"function(arg){ var string = \\\"\\\\n\\\"; return x; }\", "
+                          "\"$scope\" : { \"x\" : \"1\" } } }"}});
 }
 
 TEST(JsonStringTest, TimestampTests) {
     BSONObjBuilder b;
     b.append("x", Timestamp(4, 10));
-    BSONObj o = b.obj();
-    ASSERT_EQUALS("{ \"x\" : { \"$timestamp\" : { \"t\" : 4, \"i\" : 10 } } }",
-                  o.jsonString(Strict));
-    ASSERT_EQUALS("{ \"x\" : Timestamp( 4, 10 ) }", o.jsonString(TenGen));
+
+    checkJsonStringEach({{b.done(), R"({ "x" : { "$timestamp" : { "t" : 4, "i" : 10 } } })"}});
 }
 
 TEST(JsonStringTest, NullString) {
     BSONObjBuilder b;
     b.append("x", "a\0b", 4);
-    BSONObj o = b.obj();
-    ASSERT_EQUALS("{ \"x\" : \"a\\u0000b\" }", o.jsonString());
+
+    checkJsonStringEach({{b.done(), "{ \"x\" : \"a\\u0000b\" }"}});
 }
 
 TEST(JsonStringTest, AllTypesTest) {
@@ -439,7 +529,9 @@ TEST(JsonStringTest, AllTypesTest) {
     b.appendMaxKey("v");
 
     BSONObj o = b.obj();
-    o.jsonString();
+    o.jsonString(ExtendedCanonicalV2_0_0);
+    o.jsonString(ExtendedRelaxedV2_0_0);
+    o.jsonString(LegacyStrict);
 }
 
 }  // namespace JsonStringTests
@@ -468,8 +560,9 @@ void checkEquivalence(const std::string& json, const BSONObj& bson) {
     ASSERT(fromjson(json).valid(BSONVersion::kLatest));
     assertEquals(json, bson, fromjson(json), "mode: json-to-bson");
     assertEquals(json, bson, fromjson(tojson(bson)), "mode: <default>");
-    assertEquals(json, bson, fromjson(tojson(bson, Strict)), "mode: strict");
-    assertEquals(json, bson, fromjson(tojson(bson, TenGen)), "mode: tengen");
+    assertEquals(json, bson, fromjson(tojson(bson, LegacyStrict)), "mode: strict");
+    assertEquals(json, bson, fromjson(tojson(bson, ExtendedCanonicalV2_0_0)), "mode: canonical");
+    assertEquals(json, bson, fromjson(tojson(bson, ExtendedRelaxedV2_0_0)), "mode: relaxed");
 }
 
 void checkRejection(const std::string& json) {
