@@ -193,6 +193,8 @@ public:
 
     std::string toString() const;
 
+    void serialize(BSONObjBuilder* builder) const;
+
     /**
      * May only be called if the status is *not OK*. Serializes the code, code name and reason in
      * the canonical code/codeName/errmsg format used in the server command responses.

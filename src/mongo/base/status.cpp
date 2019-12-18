@@ -143,6 +143,15 @@ std::string Status::toString() const {
     return sb.str();
 }
 
+void Status::serialize(BSONObjBuilder* builder) const {
+    if (isOK()) {
+        builder->append("code", code());
+        builder->append("codeName", ErrorCodes::errorString(code()));
+    } else {
+        serializeErrorToBSON(builder);
+    }
+}
+
 void Status::serializeErrorToBSON(BSONObjBuilder* builder) const {
     invariant(!isOK());
 
