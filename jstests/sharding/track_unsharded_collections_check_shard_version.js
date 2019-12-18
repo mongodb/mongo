@@ -201,7 +201,6 @@ let testCases = {
     listIndexes: {
         whenNamespaceDoesNotExistFailsWith: ErrorCodes.NamespaceNotFound,
         whenNamespaceIsViewFailsWith: ErrorCodes.CommandNotSupportedOnView,
-        doesNotCheckShardVersion: true,
         command: collName => {
             return {listIndexes: collName};
         },

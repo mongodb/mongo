@@ -10,53 +10,7 @@
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/libs/sharded_index_util.js");
-
-/*
- * Returns the metadata for the collection in the shard's catalog cache.
- */
-function getMetadataOnShard(shard, ns) {
-    let res = shard.adminCommand({getShardVersion: ns, fullMetadata: true});
-    assert.commandWorked(res);
-    return res.metadata;
-}
-
-/*
- * Asserts that the collection version for the collection in the shard's catalog cache
- * is equal to the given collection version.
- */
-function assertCollectionVersionEquals(shard, ns, collectionVersion) {
-    assert.eq(getMetadataOnShard(shard, ns).collVersion, collectionVersion);
-}
-
-/*
- * Asserts that the collection version for the collection in the shard's catalog cache
- * is older than the given collection version.
- */
-function assertCollectionVersionOlderThan(shard, ns, collectionVersion) {
-    let shardCollectionVersion = getMetadataOnShard(shard, ns).collVersion;
-    if (shardCollectionVersion != undefined) {
-        assert.lt(shardCollectionVersion.t, collectionVersion.t);
-    }
-}
-
-/*
- * Asserts that the shard version of the shard in its catalog cache is equal to the
- * given shard version.
- */
-function assertShardVersionEquals(shard, ns, shardVersion) {
-    assert.eq(getMetadataOnShard(shard, ns).shardVersion, shardVersion);
-}
-
-/*
- * Moves the chunk that matches the given query to toShard. Forces fromShard to skip the
- * recipient metadata refresh post-migration commit.
- */
-function moveChunkNotRefreshRecipient(mongos, ns, fromShard, toShard, findQuery) {
-    let failPoint = configureFailPoint(fromShard, "doNotRefreshRecipientAfterCommit");
-    assert.commandWorked(mongos.adminCommand(
-        {moveChunk: ns, find: findQuery, to: toShard.shardName, _waitForDelete: true}));
-    failPoint.off();
-}
+load("jstests/sharding/libs/shard_versioning_util.js");
 
 /*
  * Runs the command after performing chunk operations to make the primary shard (shard0) not own
@@ -70,23 +24,23 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     const ns = dbName + "." + collName;
 
     // Move the initial chunk out of the primary shard.
-    moveChunkNotRefreshRecipient(st.s, ns, st.shard0, st.shard1, {_id: MinKey});
+    ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard0, st.shard1, {_id: MinKey});
 
     // Split the chunk to create two chunks on shard1. Move one of the chunks to shard2.
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-    moveChunkNotRefreshRecipient(st.s, ns, st.shard1, st.shard2, {_id: 0});
+    ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard1, st.shard2, {_id: 0});
 
     // Assert that primary shard does not have any chunks for the collection.
-    assertShardVersionEquals(st.shard0, ns, Timestamp(0, 0));
+    ShardVersioningUtil.assertShardVersionEquals(st.shard0, ns, Timestamp(0, 0));
 
     const mongosCollectionVersion = st.s.adminCommand({getShardVersion: ns}).version;
 
     // Assert that besides the latest donor shard (shard1), all shards have stale collection
     // version.
-    assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
-    assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
-    assertCollectionVersionOlderThan(st.shard2, ns, mongosCollectionVersion);
-    assertCollectionVersionOlderThan(st.shard3, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard3, ns, mongosCollectionVersion);
 
     if (testCase.setUpFuncForCheckShardVersionTest) {
         testCase.setUpFuncForCheckShardVersionTest();
@@ -96,12 +50,12 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     // Assert that primary shard still has stale collection version after the command is run
     // because both the shard version in the command and in the shard's cache are UNSHARDED
     // (no chunks).
-    assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
 
     // Assert that the other shards have the latest collection version after the command is run.
-    assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
-    assertCollectionVersionEquals(st.shard2, ns, mongosCollectionVersion);
-    assertCollectionVersionEquals(st.shard3, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard3, ns, mongosCollectionVersion);
 }
 
 /*
