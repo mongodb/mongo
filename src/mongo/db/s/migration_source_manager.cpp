@@ -745,7 +745,7 @@ void MigrationSourceManager::_cleanup() {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
         auto* const csr = CollectionShardingRuntime::get(_opCtx, getNss());
-        auto csrLock = CollectionShardingState::CSRLock::lockExclusive(_opCtx, csr);
+        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
 
         if (_state != kCreated) {
             invariant(msmForCsr(csr));

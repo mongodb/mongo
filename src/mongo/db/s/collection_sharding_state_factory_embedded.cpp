@@ -37,24 +37,59 @@
 namespace mongo {
 namespace {
 
+class UnshardedCollection : public ScopedCollectionMetadata::Impl {
+public:
+    UnshardedCollection() = default;
+
+    const CollectionMetadata& get() override {
+        return _metadata;
+    }
+
+private:
+    CollectionMetadata _metadata;
+};
+
+const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
+
+class CollectionShardingStateStandalone final : public CollectionShardingState {
+public:
+    ScopedCollectionMetadata getOrphansFilter(OperationContext*, bool) override {
+        return {kUnshardedCollection};
+    }
+
+    ScopedCollectionMetadata getCurrentMetadata() override {
+        return {kUnshardedCollection};
+    }
+
+    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown() override {
+        return boost::none;
+    }
+    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override {
+        return boost::none;
+    }
+
+    void checkShardVersionOrThrow(OperationContext*, bool) override {}
+
+    Status checkShardVersionNoThrow(OperationContext*, bool) noexcept override {
+        return Status::OK();
+    }
+
+    void enterCriticalSectionCatchUpPhase(OperationContext*) override{};
+    void enterCriticalSectionCommitPhase(OperationContext*) override{};
+    void exitCriticalSection(OperationContext*) override{};
+    std::shared_ptr<Notification<void>> getCriticalSectionSignal(
+        ShardingMigrationCriticalSection::Operation) const override {
+        return nullptr;
+    }
+};
+
 class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
 public:
     CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext)
         : CollectionShardingStateFactory(serviceContext) {}
 
-    std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override {
-        class CollectionShardingStateStandalone final : public CollectionShardingState {
-        public:
-            CollectionShardingStateStandalone(NamespaceString nss) : CollectionShardingState(nss) {}
-
-        private:
-            boost::optional<ScopedCollectionMetadata> _getMetadata(
-                const boost::optional<mongo::LogicalTime>& atClusterTime) override {
-                return boost::none;
-            }
-        };
-
-        return std::make_unique<CollectionShardingStateStandalone>(nss);
+    std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
+        return std::make_unique<CollectionShardingStateStandalone>();
     }
 };
 

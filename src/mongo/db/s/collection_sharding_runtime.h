@@ -47,13 +47,15 @@ extern AtomicWord<int> migrationLockAcquisitionMaxWaitMS;
  */
 class CollectionShardingRuntime final : public CollectionShardingState,
                                         public Decorable<CollectionShardingRuntime> {
-    CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
-    CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
-
 public:
     CollectionShardingRuntime(ServiceContext* sc,
                               NamespaceString nss,
                               executor::TaskExecutor* rangeDeleterExecutor);
+
+    CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
+    CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
+
+    using CSRLock = ShardingStateLock<CollectionShardingRuntime>;
 
     /**
      * Obtains the sharding runtime state for the specified collection. If it does not exist, it
@@ -70,6 +72,36 @@ public:
      */
     static CollectionShardingRuntime* get_UNSAFE(ServiceContext* svcCtx,
                                                  const NamespaceString& nss);
+
+    /**
+     * Tracks deletion of any documents within the range, returning when deletion is complete.
+     * Throws if the collection is dropped while it sleeps.
+     */
+    static Status waitForClean(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               OID const& epoch,
+                               ChunkRange orphanRange);
+
+    ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx, bool isCollection) override;
+
+    ScopedCollectionMetadata getCurrentMetadata() override;
+
+    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown() override;
+
+    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override;
+
+    void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection) override;
+
+    Status checkShardVersionNoThrow(OperationContext* opCtx, bool isCollection) noexcept override;
+
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx) override;
+
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx) override;
+
+    void exitCriticalSection(OperationContext* opCtx) override;
+
+    std::shared_ptr<Notification<void>> getCriticalSectionSignal(
+        ShardingMigrationCriticalSection::Operation op) const override;
 
     /**
      * Updates the collection's filtering metadata based on changes received from the config server
@@ -122,15 +154,6 @@ public:
     CleanupNotification cleanUpRange(ChunkRange const& range, CleanWhen when);
 
     /**
-     * Tracks deletion of any documents within the range, returning when deletion is complete.
-     * Throws if the collection is dropped while it sleeps.
-     */
-    static Status waitForClean(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               OID const& epoch,
-                               ChunkRange orphanRange);
-
-    /**
      * Reports whether any range still scheduled for deletion overlaps the argument range. If so,
      * it returns a notification n such that n->get(opCtx) will wake when the newest overlapping
      * range's deletion (possibly the one of interest) completes or fails. This should be called
@@ -153,6 +176,8 @@ public:
     }
 
 private:
+    friend CSRLock;
+
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         OperationContext*,
         NamespaceString const&,
@@ -160,14 +185,28 @@ private:
         int,
         CollectionRangeDeleter*);
 
+    /**
+     * Returns the latest version of collection metadata with filtering configured for
+     * atClusterTime if specified.
+     */
+    boost::optional<ScopedCollectionMetadata> _getMetadataWithVersionCheckAt(
+        OperationContext* opCtx,
+        const boost::optional<mongo::LogicalTime>& atClusterTime,
+        bool isCollection);
+
+    // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects held
+    // within (including the MigrationSourceManager, which is a decoration on the CSR). Use only the
+    // CSRLock to lock this mutex.
+    Lock::ResourceMutex _stateChangeMutex;
+
     // Namespace this state belongs to.
     const NamespaceString _nss;
 
+    // Tracks the migration critical section state for this collection.
+    ShardingMigrationCriticalSection _critSec;
+
     // Contains all the metadata associated with this collection.
     std::shared_ptr<MetadataManager> _metadataManager;
-
-    boost::optional<ScopedCollectionMetadata> _getMetadata(
-        const boost::optional<mongo::LogicalTime>& atClusterTime) override;
 };
 
 /**

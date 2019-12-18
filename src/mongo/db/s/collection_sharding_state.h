@@ -38,27 +38,33 @@
 namespace mongo {
 
 /**
- * Each collection on a mongod instance is dynamically assigned two pieces of information for the
- * duration of its lifetime:
- *  CollectionShardingState - this is a passive data-only state, which represents what is the
- * shard's knowledge of its the shard version and the set of chunks that it owns.
- *  CollectionShardingRuntime (missing from the embedded mongod) - this is the heavyweight machinery
- * which implements the sharding protocol functions and is what controls the data-only state.
+ * Each collection on a mongod instance is dynamically assigned an implementation of
+ * CollectionShardingState for the duration of its lifetime, which represents the
+ * shard's knowledge of its the shard version and the set of chunks that it owns, as well as
+ * functions for updating and tracking this state.
  *
- * The CollectionShardingStateFactory class below is used in order to allow for the collection
- * runtime to be instantiated separately from the sharding state.
+ * On shard servers, the implementation used is CollectionShardingRuntime.
+ *
+ * On embedded or non-shard servers, the implementation used is CollectionShardingStateStandalone,
+ * which is a mostly empty implementation.
+ *
+ * This separation was required for linking reasons and the difference between sharded and not
+ * sharded clusters.
+ *
+ * The CollectionShardingStateFactory class below is used to instantiate the correct subclass of
+ * CollectionShardingState at runtime.
  *
  * Synchronization rule: In order to obtain an instance of this object, the caller must have some
- * lock on the respective collection.
+ * lock on the respective collection. Different functions require different lock levels though, so
+ * be sure to check the function-level comments for details.
  */
 class CollectionShardingState {
+public:
+    CollectionShardingState() = default;
+    virtual ~CollectionShardingState() = default;
+
     CollectionShardingState(const CollectionShardingState&) = delete;
     CollectionShardingState& operator=(const CollectionShardingState&) = delete;
-
-public:
-    using CSRLock = ShardingStateLock<CollectionShardingState>;
-
-    virtual ~CollectionShardingState() = default;
 
     /**
      * Obtains the sharding state for the specified collection. If it does not exist, it will be
@@ -97,12 +103,13 @@ public:
      *
      * The returned object is safe to access even after the collection lock has been dropped.
      */
-    ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx, bool isCollection);
+    virtual ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx,
+                                                      bool isCollection) = 0;
 
     /**
      * See the comments for 'getOrphansFilter' above for more information on this method.
      */
-    ScopedCollectionMetadata getCurrentMetadata();
+    virtual ScopedCollectionMetadata getCurrentMetadata() = 0;
 
     /**
      * Returns boost::none if the filtering metadata for the collection is not known yet. Otherwise
@@ -112,80 +119,47 @@ public:
      * be used for cases such as checking whether a particular config server update has taken
      * effect.
      */
-    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown();
-    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown();
+    virtual boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown() = 0;
+    virtual boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() = 0;
 
     /**
      * Checks whether the shard version in the operation context is compatible with the shard
      * version of the collection and if not, throws StaleConfigException populated with the received
      * and wanted versions.
      */
-    void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection);
+    virtual void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection) = 0;
 
     /**
      * Similar to checkShardVersionOrThrow but returns a status instead of throwing.
      */
-    Status checkShardVersionNoThrow(OperationContext* opCtx, bool isCollection) noexcept;
+    virtual Status checkShardVersionNoThrow(OperationContext* opCtx,
+                                            bool isCollection) noexcept = 0;
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called
-     * with both the collection lock and CollectionShardingRuntimeLock held in exclusive mode.
+     * with both the collection lock and CSRLock held in exclusive mode.
      *
-     * In these methods, the CollectionShardingRuntimeLock ensures concurrent access to the
+     * In these methods, the CSRLock ensures concurrent access to the
      * critical section.
      */
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, CSRLock&);
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx, CSRLock&);
-
+    virtual void enterCriticalSectionCatchUpPhase(OperationContext* opCtx) = 0;
+    virtual void enterCriticalSectionCommitPhase(OperationContext* opCtx) = 0;
 
     /**
      * Method to control the collection's critical secion. Method listed below must be called with
-     * the collection lock in IX mode and the CollectionShardingRuntimeLock in exclusive mode.
+     * the collection lock in IX mode and the CSRLock in exclusive mode.
      *
-     * In this method, the CollectionShardingRuntimeLock ensures concurrent access to the
+     * In this method, the CSRLock ensures concurrent access to the
      * critical section.
      */
-    void exitCriticalSection(OperationContext* opCtx, CSRLock&);
+    virtual void exitCriticalSection(OperationContext* opCtx) = 0;
 
     /**
      * If the collection is currently in a critical section, returns the critical section signal to
      * be waited on. Otherwise, returns nullptr.
      */
-    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
-        return _critSec.getSignal(op);
-    }
-
-protected:
-    CollectionShardingState(NamespaceString nss);
-
-private:
-    friend CSRLock;
-
-    /**
-     * Returns the latest version of collection metadata with filtering configured for
-     * atClusterTime if specified.
-     */
-    boost::optional<ScopedCollectionMetadata> _getMetadataWithVersionCheckAt(
-        OperationContext* opCtx,
-        const boost::optional<mongo::LogicalTime>& atClusterTime,
-        bool isCollection);
-
-    // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects
-    // held within. Use only the CollectionShardingRuntimeLock to lock this mutex.
-    Lock::ResourceMutex _stateChangeMutex;
-
-    // Namespace this state belongs to.
-    const NamespaceString _nss;
-
-    // Tracks the migration critical section state for this collection.
-    ShardingMigrationCriticalSection _critSec;
-
-    /**
-     * Obtains the current metadata for the collection or boost::none if the metadata is not yet
-     * known
-     */
-    virtual boost::optional<ScopedCollectionMetadata> _getMetadata(
-        const boost::optional<mongo::LogicalTime>& atClusterTime) = 0;
+    virtual std::shared_ptr<Notification<void>> getCriticalSectionSignal(
+        ShardingMigrationCriticalSection::Operation op) const = 0;
 };
 
 /**
