@@ -7,6 +7,8 @@
 --------------------------------- MODULE RaftMongoWithRaftReconfig --------------------------------
 \* This is the formal specification for the Raft consensus algorithm in MongoDB.
 \* It allows reconfig using the protocol for single server membership changes described in Raft.
+\* Note that we did not choose to implement the protocol for single server membership changes
+\* described in Raft. This specification was for exploratory purposes only.
 
 EXTENDS Naturals, FiniteSets, Sequences, TLC
 
