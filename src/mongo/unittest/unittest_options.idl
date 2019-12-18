@@ -44,6 +44,9 @@ configs:
     filter:
         description: 'Test case name filter. Specify the substring of the test names.'
         arg_vartype: String
+    fileNameFilter:
+        description: 'Filter test cases by source file name.'
+        arg_vartype: String
     repeat:
         description: 'Specifies the number of runs for each test.'
         arg_vartype: Int

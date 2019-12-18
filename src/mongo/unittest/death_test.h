@@ -74,7 +74,7 @@
     private:                                                                                   \
         void _doTest() override;                                                               \
         static inline const RegistrationAgent<::mongo::unittest::DeathTest<TEST_TYPE>> _agent{ \
-            #SUITE_NAME, #TEST_NAME};                                                          \
+            #SUITE_NAME, #TEST_NAME, __FILE__};                                                \
     };                                                                                         \
     void TEST_TYPE::_doTest()
 

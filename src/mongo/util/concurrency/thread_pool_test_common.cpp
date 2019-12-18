@@ -231,6 +231,7 @@ void addTestsForThreadPool(const std::string& suiteName, ThreadPoolFactory makeT
     auto& suite = unittest::Suite::getSuite(suiteName);
     for (auto testCase : threadPoolTestCaseRegistry()) {
         suite.add(str::stream() << suiteName << "::" << testCase.first,
+                  __FILE__,
                   [testCase, makeThreadPool] { testCase.second(makeThreadPool)->run(); });
     }
 }

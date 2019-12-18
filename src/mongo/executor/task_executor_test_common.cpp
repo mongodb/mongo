@@ -525,6 +525,7 @@ void addTestsForExecutor(const std::string& suiteName, ExecutorFactory makeExecu
     auto& suite = unittest::Suite::getSuite(suiteName);
     for (auto testCase : executorTestCaseRegistry()) {
         suite.add(str::stream() << suiteName << "::" << testCase.first,
+                  __FILE__,
                   [testCase, makeExecutor] { testCase.second(makeExecutor)->run(); });
     }
 }
