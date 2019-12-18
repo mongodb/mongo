@@ -230,16 +230,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         }
     }
 
-    // The sort can specify $natural as well. The sort direction should override the hint
-    // direction if both are specified.
-    const BSONObj& sortObj = query.getQueryRequest().getSort();
-    if (!sortObj.isEmpty()) {
-        BSONElement natural = dps::extractElementAtPath(sortObj, "$natural");
-        if (!natural.eoo()) {
-            csn->direction = natural.numberInt() >= 0 ? 1 : -1;
-        }
-    }
-
     // Extract and assign the 'requestResumeToken' field.
     csn->requestResumeToken = query.getQueryRequest().getRequestResumeToken();
 

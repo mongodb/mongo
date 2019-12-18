@@ -390,5 +390,63 @@ TEST(CanonicalQueryTest, NorWithOneChildNormalizedAfterNormalizingChild) {
     ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());
 }
 
+void assertValidSortOrder(BSONObj sort, BSONObj filter = BSONObj{}) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = std::make_unique<QueryRequest>(nss);
+    qr->setFilter(filter);
+    qr->setSort(sort);
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx.get(),
+                                     std::move(qr),
+                                     nullptr,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_OK(statusWithCQ.getStatus());
+}
+
+TEST(CanonicalQueryTest, ValidSortOrdersCanonicalizeSuccessfully) {
+    assertValidSortOrder(fromjson("{}"));
+    assertValidSortOrder(fromjson("{a: 1}"));
+    assertValidSortOrder(fromjson("{a: -1}"));
+    assertValidSortOrder(fromjson("{a: {$meta: \"textScore\"}}"),
+                         fromjson("{$text: {$search: 'keyword'}}"));
+    assertValidSortOrder(fromjson("{a: {$meta: \"randVal\"}}"));
+}
+
+void assertInvalidSortOrder(BSONObj sort) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = std::make_unique<QueryRequest>(nss);
+    qr->setSort(sort);
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    ASSERT_NOT_OK(statusWithCQ.getStatus());
+}
+
+TEST(CanonicalQueryTest, InvalidSortOrdersFailToCanonicalize) {
+    assertInvalidSortOrder(fromjson("{a: 100}"));
+    assertInvalidSortOrder(fromjson("{a: 0}"));
+    assertInvalidSortOrder(fromjson("{a: -100}"));
+    assertInvalidSortOrder(fromjson("{a: Infinity}"));
+    assertInvalidSortOrder(fromjson("{a: -Infinity}"));
+    assertInvalidSortOrder(fromjson("{a: true}"));
+    assertInvalidSortOrder(fromjson("{a: false}"));
+    assertInvalidSortOrder(fromjson("{a: null}"));
+    assertInvalidSortOrder(fromjson("{a: {}}"));
+    assertInvalidSortOrder(fromjson("{a: {b: 1}}"));
+    assertInvalidSortOrder(fromjson("{a: []}"));
+    assertInvalidSortOrder(fromjson("{a: [1, 2, 3]}"));
+    assertInvalidSortOrder(fromjson("{a: \"\"}"));
+    assertInvalidSortOrder(fromjson("{a: \"bb\"}"));
+    assertInvalidSortOrder(fromjson("{a: {$meta: 1}}"));
+    assertInvalidSortOrder(fromjson("{a: {$meta: \"image\"}}"));
+    assertInvalidSortOrder(fromjson("{a: {$world: \"textScore\"}}"));
+    assertInvalidSortOrder(fromjson("{a: {$meta: \"textScore\", b: 1}}"));
+    assertInvalidSortOrder(fromjson("{'': 1}"));
+    assertInvalidSortOrder(fromjson("{'': -1}"));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -123,7 +123,10 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
     // With sort
     testComputeKey("{}", "{a: 1}", "{}", "an~aa");
     testComputeKey("{}", "{a: -1}", "{}", "an~da");
-    testComputeKey("{}", "{a: {$meta: 'textScore'}}", "{a: {$meta: 'textScore'}}", "an~ta");
+    testComputeKey("{$text: {$search: 'search keywords'}}",
+                   "{a: {$meta: 'textScore'}}",
+                   "{a: {$meta: 'textScore'}}",
+                   "te_fts~ta");
     testComputeKey("{a: 1}", "{b: 1}", "{}", "eqa~ab");
 
     // With projection

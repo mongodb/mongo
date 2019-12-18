@@ -38,6 +38,7 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 
@@ -102,6 +103,20 @@ public:
      * Returns true if "query" describes an exact-match query on _id.
      */
     static bool isSimpleIdQuery(const BSONObj& query);
+
+    /**
+     * Validates the match expression 'root' as well as the query specified by 'request', checking
+     * for illegal combinations of operators. Returns a non-OK status if any such illegal
+     * combination is found.
+     *
+     * On success, returns a bitset indicating which types of metadata are *unavailable*. For
+     * example, if 'root' does not contain a $text predicate, then the returned metadata bitset will
+     * indicate that text score metadata is unavailable. This means that if subsequent
+     * $meta:"textScore" expressions are found during analysis of the query, we should raise in an
+     * error.
+     */
+    static StatusWith<QueryMetadataBitSet> isValid(MatchExpression* root,
+                                                   const QueryRequest& request);
 
     const NamespaceString& nss() const {
         return _qr->nss();
@@ -172,17 +187,6 @@ public:
     std::string toStringShort() const;
 
     /**
-     * Validates match expression, checking for certain
-     * combinations of operators in match expression and
-     * query options in QueryRequest.
-     * Since 'root' is derived from 'filter' in QueryRequest,
-     * 'filter' is not validated.
-     *
-     * TODO: Move this to query_validator.cpp
-     */
-    static Status isValid(MatchExpression* root, const QueryRequest& parsed);
-
-    /**
      * Traverses expression tree post-order.
      * Sorts children at each non-leaf node by (MatchType, path(), children, number of children)
      */
@@ -222,6 +226,12 @@ private:
                 std::unique_ptr<CollatorInterface> collator,
                 const ProjectionPolicies& projectionPolicies);
 
+    // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
+    //
+    // Throws a UserException if the sort is illegal, or if any metadata type in
+    // 'unavailableMetadata' is required.
+    void initSortPattern(QueryMetadataBitSet unavailableMetadata);
+
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     std::unique_ptr<QueryRequest> _qr;
@@ -230,6 +240,8 @@ private:
     std::unique_ptr<MatchExpression> _root;
 
     boost::optional<projection_ast::Projection> _proj;
+
+    boost::optional<SortPattern> _sortPattern;
 
     // Keeps track of what metadata has been explicitly requested.
     QueryMetadataBitSet _metadataDeps;

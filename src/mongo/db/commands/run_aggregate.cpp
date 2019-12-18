@@ -112,8 +112,7 @@ bool canOptimizeAwayPipeline(const Pipeline* pipeline,
         pipeline->getSources().empty() &&
         // For exchange we will create a number of pipelines consisting of a single
         // DocumentSourceExchange stage, so cannot not optimize it away.
-        !request.getExchangeSpec() &&
-        !QueryPlannerCommon::hasNode(exec->getCanonicalQuery()->root(), MatchExpression::TEXT);
+        !request.getExchangeSpec();
 }
 
 /**

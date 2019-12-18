@@ -1,5 +1,9 @@
 // Test that queries with a sort on text metadata return results in the correct order in a sharded
 // collection.
+//
+// Require all nodes to be 4.4, since validation around $meta:"textScore" was relaxed in that
+// version, and the new behavior is tested here.
+// @tags: [requires_fcv_44]
 
 var st = new ShardingTest({shards: 2});
 st.stopBalancer();
@@ -31,7 +35,7 @@ assert.commandWorked(coll.ensureIndex({a: "text"}));
 //
 // Execute query with sort on document score, verify results are in correct order.
 //
-var results = coll.find({$text: {$search: "pizza"}}, {s: {$meta: "textScore"}})
+let results = coll.find({$text: {$search: "pizza"}}, {s: {$meta: "textScore"}})
                   .sort({s: {$meta: "textScore"}})
                   .toArray();
 assert.eq(results.length, 4, results);
@@ -40,33 +44,32 @@ assert.eq(results[1]._id, 2, results);
 assert.eq(results[2]._id, -1, results);
 assert.eq(results[3]._id, 1, results);
 
-//
-// Verify that mongos requires the text metadata sort to be specified in the projection.
-//
-
 // Projection not specified at all.
-cursor = coll.find({$text: {$search: "pizza"}}).sort({s: {$meta: "textScore"}});
-assert.throws(function() {
-    cursor.next();
-});
+results = coll.find({$text: {$search: "pizza"}}).sort({s: {$meta: "textScore"}}).toArray();
+assert.eq(results, [
+    {_id: -2, a: "pizza pizza pizza pizza"},
+    {_id: 2, a: "pizza pizza pizza"},
+    {_id: -1, a: "pizza pizza"},
+    {_id: 1, a: "pizza"}
+]);
 
-// Projection specified with incorrect field name.
-cursor = coll.find({$text: {$search: "pizza"}}, {t: {$meta: "textScore"}}).sort({
-    s: {$meta: "textScore"}
-});
-assert.throws(function() {
-    cursor.next();
-});
+// Projection and sort specified with different field names.
+results = coll.find({$text: {$search: "pizza"}}, {t: {$meta: "textScore"}})
+              .sort({s: {$meta: "textScore"}})
+              .toArray();
+assert.eq(results, [
+    {_id: -2, a: "pizza pizza pizza pizza", t: 1.875},
+    {_id: 2, a: "pizza pizza pizza", t: 1.75},
+    {_id: -1, a: "pizza pizza", t: 1.5},
+    {_id: 1, a: "pizza", t: 1.1}
+]);
 
-// Projection specified on correct field but with wrong sort.
-cursor = coll.find({$text: {$search: "pizza"}}, {s: 1}).sort({s: {$meta: "textScore"}});
-assert.throws(function() {
-    cursor.next();
-});
-cursor = coll.find({$text: {$search: "pizza"}}, {s: -1}).sort({s: {$meta: "textScore"}});
-assert.throws(function() {
-    cursor.next();
-});
+// $meta-sort on the same field name that is included in the projection without the $meta operator.
+results = coll.find({$text: {$search: "pizza"}}, {s: 1}).sort({s: {$meta: "textScore"}}).toArray();
+assert.eq(results, [{_id: -2}, {_id: 2}, {_id: -1}, {_id: 1}]);
+
+results = coll.find({$text: {$search: "pizza"}}, {s: -1}).sort({s: {$meta: "textScore"}}).toArray();
+assert.eq(results, [{_id: -2}, {_id: 2}, {_id: -1}, {_id: 1}]);
 
 //
 // Execute query with a compound sort that includes the text score along with a multikey field.
