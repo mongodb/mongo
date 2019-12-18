@@ -56,7 +56,11 @@ void transitionMemberToOwnedObj(Document&& doc, WorkingSetMember* member) {
 }
 
 void transitionMemberToOwnedObj(const BSONObj& bo, WorkingSetMember* member) {
-    transitionMemberToOwnedObj(Document{bo}, member);
+    // Use the DocumentStorage that already exists on the WorkingSetMember's document
+    // field if possible.
+    MutableDocument md(std::move(member->doc.value()));
+    md.reset(bo, false);
+    transitionMemberToOwnedObj(md.freeze(), member);
 }
 
 /**
