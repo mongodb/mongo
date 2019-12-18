@@ -456,7 +456,7 @@ const StackTraceAddressMetadata& StackTraceAddressMetadataGenerator::load(void* 
 void printStackTrace(StackTraceSink& sink) {
 #if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND
     stack_trace_detail::Options options{};
-    static constexpr bool kUseUnwindSteps = true;
+    static constexpr bool kUseUnwindSteps = false;
     if (kUseUnwindSteps) {
         stack_trace_detail::LibunwindStepIteration iteration(sink);
         printStackTraceGeneric(sink, iteration, options);
