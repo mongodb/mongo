@@ -513,10 +513,8 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
     auto beforeExhaustCommand = tickSource->getTicks();
     ASSERT(conn->call(request, reply));
     auto afterFirstResponse = tickSource->getTicks();
-    // TODO SERVER-44514: Change the following assertion to use ASSERT_LT once the server responds
-    // immediately on a topologyVersion with a different processId.
     // Allow for clock skew when testing the response time.
-    ASSERT_GT(tickSource->ticksTo<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
+    ASSERT_LT(tickSource->ticksTo<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
               Milliseconds(50));
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;

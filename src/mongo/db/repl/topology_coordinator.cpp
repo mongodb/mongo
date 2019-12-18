@@ -1721,14 +1721,11 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
     }
 }
 
-void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* const response,
-                                                 const SplitHorizon::Parameters& horizonParams) {
+void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterResponse> response,
+                                                 const StringData& horizonString) const {
+    invariant(_rsConfig.isInitialized());
     response->setTopologyVersion(getTopologyVersion());
     const MemberState myState = getMemberState();
-    if (!_rsConfig.isInitialized()) {
-        response->markAsNoConfig();
-        return;
-    }
 
     response->setReplSetName(_rsConfig.getReplSetName());
     if (myState.removed()) {
@@ -1738,15 +1735,11 @@ void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* const respons
 
     invariant(!_rsConfig.members().empty());
 
-    const auto& self = _rsConfig.members()[_selfIndex];
-
-    const auto horizon = self.determineHorizon(horizonParams);
-
     for (const auto& member : _rsConfig.members()) {
         if (member.isHidden() || member.getSlaveDelay() > Seconds{0}) {
             continue;
         }
-        auto hostView = member.getHostAndPort(horizon);
+        auto hostView = member.getHostAndPort(horizonString);
 
         if (member.isElectable()) {
             response->addHost(std::move(hostView));
@@ -1766,7 +1759,7 @@ void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* const respons
 
     const MemberConfig* curPrimary = _currentPrimaryMember();
     if (curPrimary) {
-        response->setPrimary(curPrimary->getHostAndPort(horizon));
+        response->setPrimary(curPrimary->getHostAndPort(horizonString));
     }
 
     const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);

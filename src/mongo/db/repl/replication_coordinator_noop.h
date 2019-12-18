@@ -157,8 +157,6 @@ public:
 
     Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle) final;
 
-    void fillIsMasterForReplSet(IsMasterResponse*, const SplitHorizon::Parameters& horizon) final;
-
     void appendSlaveInfoData(BSONObjBuilder*) final;
 
     ReplSetConfig getConfig() const final;
@@ -259,8 +257,8 @@ public:
     std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
-        TopologyVersion previous,
-        Date_t deadline) final;
+        boost::optional<TopologyVersion> clientTopologyVersion,
+        boost::optional<Date_t> deadline) const final;
 
 private:
     ServiceContext* const _service;

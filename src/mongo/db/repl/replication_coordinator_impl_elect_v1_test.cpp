@@ -159,14 +159,15 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     auto& opCtx = *opCtxPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
-    IsMasterResponse imResponse;
-    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
-    ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
-    ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+    auto imResponse =
+        getReplCoord()->awaitIsMasterResponse(opCtxPtr.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(imResponse->isMaster()) << imResponse->toBSON().toString();
+    ASSERT_TRUE(imResponse->isSecondary()) << imResponse->toBSON().toString();
     signalDrainComplete(&opCtx);
-    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
-    ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
-    ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+    imResponse =
+        getReplCoord()->awaitIsMasterResponse(opCtxPtr.get(), {}, boost::none, boost::none);
+    ASSERT_TRUE(imResponse->isMaster()) << imResponse->toBSON().toString();
+    ASSERT_FALSE(imResponse->isSecondary()) << imResponse->toBSON().toString();
 }
 
 TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
@@ -215,14 +216,15 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     auto& opCtx = *opCtxPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
-    IsMasterResponse imResponse;
-    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
-    ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
-    ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+    auto imResponse =
+        getReplCoord()->awaitIsMasterResponse(opCtxPtr.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(imResponse->isMaster()) << imResponse->toBSON().toString();
+    ASSERT_TRUE(imResponse->isSecondary()) << imResponse->toBSON().toString();
     signalDrainComplete(&opCtx);
-    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
-    ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
-    ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+    imResponse =
+        getReplCoord()->awaitIsMasterResponse(opCtxPtr.get(), {}, boost::none, boost::none);
+    ASSERT_TRUE(imResponse->isMaster()) << imResponse->toBSON().toString();
+    ASSERT_FALSE(imResponse->isSecondary()) << imResponse->toBSON().toString();
 
     // Check that only the 'numCatchUpsSkipped' primary catchup conclusion reason was incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsSucceeded_forTesting());
@@ -2167,10 +2169,11 @@ protected:
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateSuccessfulV1Voting();
-        IsMasterResponse imResponse;
-        getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
-        ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
-        ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+        const auto opCtx = makeOperationContext();
+        auto imResponse =
+            getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+        ASSERT_FALSE(imResponse->isMaster()) << imResponse->toBSON().toString();
+        ASSERT_TRUE(imResponse->isSecondary()) << imResponse->toBSON().toString();
 
         return config;
     }

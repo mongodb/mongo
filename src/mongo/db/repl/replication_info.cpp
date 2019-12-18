@@ -80,21 +80,24 @@ namespace {
  * was included in the response.
  * TODO SERVER-44813: Always return a topology version, including on standalones.
  */
-boost::optional<TopologyVersion> appendReplicationInfo(OperationContext* opCtx,
-                                                       BSONObjBuilder& result,
-                                                       int level) {
+boost::optional<TopologyVersion> appendReplicationInfo(
+    OperationContext* opCtx,
+    BSONObjBuilder& result,
+    int level,
+    boost::optional<TopologyVersion> clientTopologyVersion,
+    boost::optional<Date_t> deadline) {
     TopologyVersion topologyVersion;
-
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
         const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
-        IsMasterResponse isMasterResponse;
-        replCoord->fillIsMasterForReplSet(&isMasterResponse, horizonParams);
-        result.appendElements(isMasterResponse.toBSON());
+
+        auto isMasterResponse =
+            replCoord->awaitIsMasterResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
+        result.appendElements(isMasterResponse->toBSON());
         if (level) {
             replCoord->appendSlaveInfoData(&result);
         }
-        return isMasterResponse.getTopologyVersion();
+        return isMasterResponse->getTopologyVersion();
     }
 
     result.appendBool("ismaster",
@@ -184,7 +187,11 @@ public:
         int level = configElement.numberInt();
 
         BSONObjBuilder result;
-        appendReplicationInfo(opCtx, result, level);
+        appendReplicationInfo(opCtx,
+                              result,
+                              level,
+                              boost::none /* clientTopologyVersion */,
+                              boost::none /* deadline */);
 
         auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
         if (ReplicationProcess::kUninitializedRollbackId != rbid) {
@@ -377,6 +384,8 @@ public:
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
         boost::optional<TopologyVersion> clientTopologyVersion;
+        boost::optional<Date_t> deadline;
+        long long maxAwaitTimeMS;
         if (topologyVersionElement && maxAwaitTimeMSField) {
             clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
                                                            topologyVersionElement.Obj());
@@ -384,16 +393,12 @@ public:
                     "topologyVersion must have a non-negative counter",
                     clientTopologyVersion->getCounter() >= 0);
 
-            long long maxAwaitTimeMS;
             uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
             uassert(31373, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMS >= 0);
 
             LOG(3) << "Using maxAwaitTimeMS for awaitable isMaster protocol.";
-
-            // Wait for maxAwaitTimeMS.
-            if (maxAwaitTimeMS > 0) {
-                opCtx->sleepFor(Milliseconds(maxAwaitTimeMS));
-            }
+            deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                Milliseconds(maxAwaitTimeMS);
         } else {
             uassert(31368,
                     (topologyVersionElement
@@ -403,7 +408,8 @@ public:
         }
 
         auto result = replyBuilder->getBodyBuilder();
-        auto currentTopologyVersion = appendReplicationInfo(opCtx, result, 0);
+        auto currentTopologyVersion =
+            appendReplicationInfo(opCtx, result, 0, clientTopologyVersion, deadline);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;

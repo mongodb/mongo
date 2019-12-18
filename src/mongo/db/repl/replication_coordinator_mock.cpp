@@ -344,16 +344,6 @@ Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder*,
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result,
-                                                        const SplitHorizon::Parameters&) {
-    result->setReplSetVersion(_getConfigReturnValue.getConfigVersion());
-    result->setIsMaster(true);
-    result->setIsSecondary(false);
-    result->setMe(_getConfigReturnValue.getMemberAt(0).getHostAndPort());
-    result->setElectionId(OID::gen());
-    result->setTopologyVersion(TopologyVersion(repl::instanceId, 0));
-}
-
 void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
 
 void ReplicationCoordinatorMock::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
@@ -564,9 +554,16 @@ void ReplicationCoordinatorMock::updateAndLogStateTransitionMetrics(
 std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMasterResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,
-    TopologyVersion previous,
-    Date_t deadline) {
-    MONGO_UNREACHABLE;
+    boost::optional<TopologyVersion> clientTopologyVersion,
+    boost::optional<Date_t> deadline) const {
+    auto response = std::make_shared<IsMasterResponse>();
+    response->setReplSetVersion(_getConfigReturnValue.getConfigVersion());
+    response->setIsMaster(true);
+    response->setIsSecondary(false);
+    response->setMe(_getConfigReturnValue.getMemberAt(0).getHostAndPort());
+    response->setElectionId(OID::gen());
+    response->setTopologyVersion(TopologyVersion(repl::instanceId, 0));
+    return response;
 }
 
 }  // namespace repl

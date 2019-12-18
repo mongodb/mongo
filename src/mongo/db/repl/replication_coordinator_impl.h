@@ -212,9 +212,6 @@ public:
     virtual Status processReplSetGetStatus(BSONObjBuilder* result,
                                            ReplSetGetStatusResponseStyle responseStyle) override;
 
-    virtual void fillIsMasterForReplSet(IsMasterResponse* result,
-                                        const SplitHorizon::Parameters& horizonParams) override;
-
     virtual void appendSlaveInfoData(BSONObjBuilder* result) override;
 
     virtual ReplSetConfig getConfig() const override;
@@ -343,8 +340,8 @@ public:
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
-        TopologyVersion previous,
-        Date_t deadline) override;
+        boost::optional<TopologyVersion> clientTopologyVersion,
+        boost::optional<Date_t> deadline) const override;
 
     void tlaPlusRaftMongoEvent(
         OperationContext* opCtx,
@@ -452,6 +449,8 @@ private:
 
     using ScheduleFn = std::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         const executor::TaskExecutor::CallbackFn& work)>;
+
+    using SharedPromiseOfIsMasterResponse = SharedPromise<std::shared_ptr<const IsMasterResponse>>;
 
     class LoseElectionGuardV1;
     class LoseElectionDryRunGuardV1;
@@ -989,6 +988,12 @@ private:
     void _setConfigState_inlock(ConfigState newState);
 
     /**
+     * Fulfills the promises that are waited on by awaitable isMaster requests. This increments the
+     * server TopologyVersion.
+     */
+    void _fulfillTopologyChangePromise(OperationContext* opCtx, WithLock);
+
+    /**
      * Updates the cached value, _memberState, to match _topCoord's reported
      * member state, from getMemberState().
      *
@@ -1133,8 +1138,8 @@ private:
     /**
      * Fills an IsMasterResponse with the appropriate replication related fields.
      */
-    std::shared_ptr<IsMasterResponse> _makeIsMasterResponse(
-        const SplitHorizon::Parameters& horizonParams);
+    std::shared_ptr<IsMasterResponse> _makeIsMasterResponse(const StringData horizonString,
+                                                            WithLock) const;
 
     /**
      * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
@@ -1358,6 +1363,13 @@ private:
                                         boost::optional<Date_t> deadline);
 
     /**
+     * Initializes a horizon name to promise mapping. Each awaitable isMaster request will block on
+     * the promise mapped to by the horizon name determined from this map. This map should be
+     * cleared and reinitialized after any reconfig that will change the SplitHorizon.
+     */
+    void _createHorizonTopologyChangePromiseMapping(WithLock);
+
+    /**
      * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).
      */
     int64_t _nextRandomInt64_inlock(int64_t limit);
@@ -1422,8 +1434,8 @@ private:
     // Waiters in this list are checked and notified on self's lastApplied opTime updates.
     WaiterList _opTimeWaiterList;  // (M)
 
-    // Communicates the IsMasterResponse to all callers waiting on the associated SharedSemiFuture.
-    SharedPromise<std::shared_ptr<const IsMasterResponse>> _topologyChangePromise;  // (M)
+    // Maps a horizon name to the promise waited on by exhaust isMaster requests.
+    StringMap<std::shared_ptr<SharedPromiseOfIsMasterResponse>> _horizonToPromiseMap;  // (M)
 
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)

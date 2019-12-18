@@ -176,9 +176,6 @@ public:
 
     virtual Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle);
 
-    void fillIsMasterForReplSet(IsMasterResponse* result,
-                                const SplitHorizon::Parameters& horizon) override;
-
     virtual void appendSlaveInfoData(BSONObjBuilder* result);
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
@@ -323,8 +320,8 @@ public:
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
-        TopologyVersion previous,
-        Date_t deadline) override;
+        boost::optional<TopologyVersion> clientTopologyVersion,
+        boost::optional<Date_t> deadline) const override;
 
 private:
     ServiceContext* const _service;
