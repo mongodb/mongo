@@ -304,6 +304,12 @@ TEST_F(LogTestV2, Types) {
     validateJSON(std::string(c_str));
     ASSERT_EQUALS(lastBSONElement().String(), c_str);
 
+    char* c_str2 = const_cast<char*>("non-const");
+    LOGV2("c string {}", "name"_attr = c_str2);
+    ASSERT_EQUALS(text.back(), "c string non-const");
+    validateJSON(std::string(c_str2));
+    ASSERT_EQUALS(lastBSONElement().String(), c_str2);
+
     std::string str = "a std::string";
     LOGV2("std::string {}", "name"_attr = str);
     ASSERT_EQUALS(text.back(), "std::string a std::string");

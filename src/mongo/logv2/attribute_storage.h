@@ -95,6 +95,7 @@ public:
     NamedAttribute(StringData n, StringData val) : name(n), value(val) {}
     NamedAttribute(StringData n, BSONObj const& val) : name(n), value(&val) {}
     NamedAttribute(StringData n, const char* val) : NamedAttribute(n, StringData(val)) {}
+    NamedAttribute(StringData n, char* val) : NamedAttribute(n, static_cast<const char*>(val)) {}
     NamedAttribute(StringData n, float val) : NamedAttribute(n, static_cast<double>(val)) {}
     NamedAttribute(StringData n, std::string const& val) : NamedAttribute(n, StringData(val)) {}
     NamedAttribute(StringData n, long double val) = delete;
