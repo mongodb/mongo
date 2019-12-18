@@ -29,30 +29,31 @@
 
 #pragma once
 
+#include <fmt/format.h>
 #include <sstream>
 #include <string>
 
 #include "mongo/base/string_data.h"
 
-namespace mongo {
-namespace base64 {
+namespace mongo::base64 {
 
-void encode(std::stringstream& ss, const char* data, int size);
-std::string encode(const char* data, int size);
-std::string encode(const std::string& s);
+std::string encode(StringData in);
+std::string decode(StringData in);
 
-void decode(std::stringstream& ss, const std::string& s);
-std::string decode(const std::string& s);
+void encode(std::stringstream& ss, StringData in);
+void decode(std::stringstream& ss, StringData in);
 
-bool validate(StringData);
+void encode(fmt::memory_buffer& buffer, StringData in);
+void decode(fmt::memory_buffer& buffer, StringData in);
+
+bool validate(StringData s);
 
 /**
  * Calculate how large a given input would expand to.
  * Effectively: ceil(inLen * 4 / 3)
  */
-constexpr size_t encodedLength(size_t inLen) {
-    return static_cast<size_t>((inLen + 2.5) / 3) * 4;
+constexpr std::size_t encodedLength(std::size_t inLen) {
+    return (inLen + 2) / 3 * 4;
 }
 
-}  // namespace base64
-}  // namespace mongo
+}  // namespace mongo::base64

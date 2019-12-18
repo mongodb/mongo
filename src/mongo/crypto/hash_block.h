@@ -250,7 +250,8 @@ public:
      * Base64 encoding of the sha block as a string.
      */
     std::string toString() const {
-        return base64::encode(reinterpret_cast<const char*>(_hash.data()), _hash.size());
+        return base64::encode(
+            StringData(reinterpret_cast<const char*>(_hash.data()), _hash.size()));
     }
 
     bool operator==(const HashBlock& other) const {

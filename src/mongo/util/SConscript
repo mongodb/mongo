@@ -638,6 +638,11 @@ if env.TargetOSIs('windows'):
         ],
     )
 
+env.Benchmark(
+    target='base64_bm',
+    source='base64_bm.cpp',
+)
+
 stacktraceEnv = env.Clone()
 if use_libunwind:
     stacktraceEnv.InjectThirdParty(libraries=['unwind'])

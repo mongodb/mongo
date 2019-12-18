@@ -166,7 +166,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
     uassertKmsRequest(kms_request_add_header_field(
         request.get(),
         kMongoServerNonceHeader.rawData(),
-        base64::encode(serverNonce.data(), serverNonce.length()).c_str()));
+        base64::encode(StringData(serverNonce.data(), serverNonce.length())).c_str()));
 
     uassertKmsRequest(kms_request_add_header_field(
         request.get(), kMongoGS2CBHeader.rawData(), kMongoDefaultGS2CBFlag.rawData()));

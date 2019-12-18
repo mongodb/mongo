@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 
@@ -36,56 +38,88 @@ namespace mongo {
 namespace {
 
 TEST(Base64Test, transcode) {
-    const struct {
-        std::string plain;
-        std::string encoded;
-    } tests[] = {
-        {"", ""},
-        {"a", "YQ=="},
-        {"aa", "YWE="},
-        {"aaa", "YWFh"},
-        {"aaaa", "YWFhYQ=="},
+    struct {
+        int line;
+        StringData plain;
+        StringData encoded;
+    } const tests[] = {
+        {__LINE__, "", ""},
+        {__LINE__, "a", "YQ=="},
+        {__LINE__, "aa", "YWE="},
+        {__LINE__, "aaa", "YWFh"},
+        {__LINE__, "aaaa", "YWFhYQ=="},
 
-        {"A", "QQ=="},
-        {"AA", "QUE="},
-        {"AAA", "QUFB"},
-        {"AAAA", "QUFBQQ=="},
+        {__LINE__, "A", "QQ=="},
+        {__LINE__, "AA", "QUE="},
+        {__LINE__, "AAA", "QUFB"},
+        {__LINE__, "AAAA", "QUFBQQ=="},
 
-        {"The quick brown fox jumped over the lazy dog.",
+        {__LINE__,
+         "The quick brown fox jumped over the lazy dog.",
          "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wZWQgb3ZlciB0aGUgbGF6eSBkb2cu"},
-        {std::string("\0\1\2\3\4\5\6\7", 8), "AAECAwQFBgc="},
-        {std::string("\0\277\1\276\2\275", 6), "AL8BvgK9"},
+        {__LINE__, "\0\1\2\3\4\5\6\7"_sd, "AAECAwQFBgc="},
+        {__LINE__, "\0\277\1\276\2\275"_sd, "AL8BvgK9"},
     };
 
-    for (auto const& t : tests) {
-        ASSERT_TRUE(base64::validate(t.encoded));
+    for (const auto& t : tests) {
+        ASSERT_TRUE(base64::validate(std::string{t.encoded})) << t.line;
+        ASSERT_EQUALS(base64::encode(std::string{t.plain}), t.encoded)
+            << "line: " << t.line << ", plain: '" << t.plain << "'";
+        ASSERT_EQUALS(base64::decode(std::string{t.encoded}), t.plain)
+            << "line: " << t.line << ", encoded: '" << t.encoded << "'";
+    }
+}
 
-        ASSERT_EQUALS(base64::encode(t.plain), t.encoded);
-        ASSERT_EQUALS(base64::decode(t.encoded), t.plain);
+static constexpr bool kSuperVerbose = false;  // devel instrumentation
+
+TEST(Base64Test, encodeAllPossibleGroups) {
+    std::string buf;
+    for (int sz = 1; sz < 3; ++sz) {
+        buf.resize(sz);
+        for (std::uint32_t q = 0; q < (1u << (8 * sz)); ++q) {
+            for (int k = 0; k < sz; ++k) {
+                buf[k] = (q >> (8 * k)) & 0xff;
+            }
+            std::string s = base64::encode(buf);
+            ASSERT_EQ(s.size(), 4);
+            if (kSuperVerbose) {
+                auto lobj = unittest::log();
+                lobj << "buf=[";
+                for (int nn = 0; nn < sz; ++nn) {
+                    lobj << format(FMT_STRING("{:02x} "), (unsigned char)buf[nn]);
+                }
+                lobj << format(FMT_STRING("], s=`{}`"), s);
+            }
+            std::string recovered = base64::decode(s);
+            ASSERT_EQ(buf, recovered);
+        }
     }
 }
 
 TEST(Base64Test, parseFail) {
-    const struct {
-        std::string encoded;
-        int code;
-    } tests[] = {
-        {"BadLength", 10270},
-        {"Has Whitespace==", 40537},
-        {"Hasbadchar$=", 40537},
-        {"Hasbadchar\xFF=", 40537},
-        {"Hasbadcahr\t=", 40537},
-        {"too=soon", 40538},
+    struct {
+        int line;
+        StringData encoded;
+        boost::optional<int> code;
+    } const tests[] = {
+        {__LINE__, "BadLength", 10270},
+        {__LINE__, "Has Whitespace==", 40537},
+        {__LINE__, "Hasbadchar$=", 40537},
+        {__LINE__, "Hasbadchar\xFF=", 40537},
+        {__LINE__, "Hasbadcahr\t=", 40537},
+        {__LINE__, "too=soon", {}},  // fail, don't care how
     };
 
-    for (auto const& t : tests) {
-        ASSERT_FALSE(base64::validate(t.encoded));
+    for (const auto& t : tests) {
+        ASSERT_FALSE(base64::validate(t.encoded)) << t.line;
 
         try {
             base64::decode(t.encoded);
-            ASSERT_TRUE(false);
+            ASSERT_TRUE(false) << t.line;
         } catch (const AssertionException& e) {
-            ASSERT_EQ(e.code(), t.code);
+            if (t.code) {
+                ASSERT_EQ(e.code(), *t.code) << t.line << " e: " << e.toString();
+            }
         }
     }
 }
