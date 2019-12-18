@@ -3,19 +3,23 @@ import socket
 import json
 import argparse
 
+exception_ciphers = {}
 
 def enumerate_tls_ciphers(protocol_options, host, port, cert, cafile):
     root_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
     root_context.options |= protocol_options
     root_context.set_ciphers('ALL:COMPLEMENTOFALL:-PSK:-SRP')
 
-    ciphers = set([cipher['name'] for cipher in root_context.get_ciphers()])
+    ciphers = {cipher['name'] for cipher in root_context.get_ciphers()}
 
     accepted_ciphers = []
 
     for cipher_name in ciphers:
         context = ssl.SSLContext(root_context.protocol)
-        context.set_ciphers(cipher_name)
+        try:
+            context.set_ciphers(cipher_name)
+        except ssl.SSLError as error:
+            exception_ciphers[cipher_name] = str(error)
         context.options = root_context.options
         context.load_verify_locations(cafile=cafile)
         context.load_cert_chain(certfile=cert)
@@ -73,6 +77,11 @@ if __name__ == '__main__':
                                    cafile=args.cafile, cert=args.cert)
         for key, proto in suites.items()
     }
+
+    if exception_ciphers:
+        print("System could not process the following ciphers")
+        for cipher, error in exception_ciphers.items():
+            print(cipher + '\tError: ' + error)
 
     with open(args.outfile, 'w+') as outfile:
         json.dump(results, outfile)
