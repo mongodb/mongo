@@ -64,7 +64,7 @@ public:
         return _value & other._value;
     }
 
-    BSONArray toBSON();
+    BSONArray toBSONArray();
 
 private:
     uint64_t _value;

@@ -34,7 +34,7 @@
 namespace mongo {
 namespace logv2 {
 
-BSONArray LogTag::toBSON() {
+BSONArray LogTag::toBSONArray() {
     BSONArrayBuilder builder;
     if (_value | kStartupWarnings) {
         builder.append("startupWarnings"_sd);

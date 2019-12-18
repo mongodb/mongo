@@ -67,6 +67,8 @@ struct BSONValueExtractor {
             BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
             val.BSONSerialize(subObjBuilder);
             subObjBuilder.done();
+        } else if (val.toBSONArray) {
+            _builder.append(name, val.toBSONArray());
         } else if (val.stringSerialize) {
             fmt::memory_buffer buffer;
             val.stringSerialize(buffer);
@@ -78,6 +80,10 @@ struct BSONValueExtractor {
 
     // BSONObj is coming as a pointer, the generic one handles references
     void operator()(StringData name, const BSONObj* val) {
+        _builder.append(name, *val);
+    }
+
+    void operator()(StringData name, const BSONArray* val) {
         _builder.append(name, *val);
     }
 
@@ -141,7 +147,7 @@ void BSONFormatter::operator()(boost::log::record_view const& rec,
     }
     LogTag tags = extract<LogTag>(attributes::tags(), rec).get();
     if (tags != LogTag::kNone) {
-        builder.append(constants::kTagsFieldName, tags.toBSON());
+        builder.append(constants::kTagsFieldName, tags.toBSONArray());
     }
 
     BSONObj obj = builder.obj();

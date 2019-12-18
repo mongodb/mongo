@@ -70,6 +70,11 @@ struct JSONValueExtractor {
             val.BSONSerialize(builder);
             builder.done().jsonStringBuffer(
                 JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, _buffer);
+        } else if (val.toBSONArray) {
+            // This is a JSON subarray, no quotes needed
+            storeUnquoted(name);
+            val.toBSONArray().jsonStringBuffer(
+                JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, _buffer);
         } else if (val.stringSerialize) {
             storeUnquoted(name);
             _buffer.push_back('"');
@@ -85,6 +90,12 @@ struct JSONValueExtractor {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
         val->jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, _buffer);
+    }
+
+    void operator()(StringData name, const BSONArray* val) {
+        // This is a JSON subobject, no quotes needed
+        storeUnquoted(name);
+        val->jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, _buffer);
     }
 
     void operator()(StringData name, StringData value) {
@@ -140,10 +151,10 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
     std::string tag;
     LogTag tags = extract<LogTag>(attributes::tags(), rec).get();
     if (tags != LogTag::kNone) {
-        tag =
-            fmt::format(",\"{}\":{}",
-                        constants::kTagsFieldName,
-                        tags.toBSON().jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
+        tag = fmt::format(
+            ",\"{}\":{}",
+            constants::kTagsFieldName,
+            tags.toBSONArray().jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
     }
 
     fmt::memory_buffer buffer;
