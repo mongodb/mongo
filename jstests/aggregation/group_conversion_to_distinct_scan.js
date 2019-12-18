@@ -44,7 +44,7 @@ assert.commandWorked(coll.insert([
     {_id: 3, a: 1, b: 3, c: 2},
     {_id: 4, a: 2, b: 2, c: 2},
     {_id: 5, b: 1, c: 1},
-    {_id: 6, a: null, b: 1, c: 1},
+    {_id: 6, a: null, b: 1, c: 1.5},
 
     {_id: 7, aa: 1, mkB: 2, bb: 2},
     {_id: 8, aa: 1, mkB: [1, 3], bb: 1},
@@ -224,9 +224,9 @@ assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
 // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when a $first accumulator needs the
 // entire document.
 //
-pipeline = [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}];
+pipeline = [{$sort: {a: -1, b: -1, c: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}];
 assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
-    {_id: null, accum: {_id: 6, a: null, b: 1, c: 1}},
+    {_id: null, accum: {_id: 6, a: null, b: 1, c: 1.5}},
     {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
     {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
 ]);
