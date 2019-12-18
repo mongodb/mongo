@@ -79,7 +79,9 @@ bool isArray(StringData str);
  * @param format The JSON format (TenGen, Strict).
  * @param pretty Enables pretty output.
  */
-std::string tojson(const BSONArray& arr, JsonStringFormat format = Strict, bool pretty = false);
+std::string tojson(const BSONArray& arr,
+                   JsonStringFormat format = ExtendedCanonicalV2_0_0,
+                   bool pretty = false);
 
 /**
  * Convert a BSONObj to a JSON string.
@@ -88,7 +90,9 @@ std::string tojson(const BSONArray& arr, JsonStringFormat format = Strict, bool 
  * @param format The JSON format (JS, TenGen, Strict).
  * @param pretty Enables pretty output.
  */
-std::string tojson(const BSONObj& obj, JsonStringFormat format = Strict, bool pretty = false);
+std::string tojson(const BSONObj& obj,
+                   JsonStringFormat format = ExtendedCanonicalV2_0_0,
+                   bool pretty = false);
 
 /**
  * Parser class.  A BSONObj is constructed incrementally by passing a
@@ -209,6 +213,16 @@ private:
     Status regexObject(StringData fieldName, BSONObjBuilder&);
 
     /*
+     *     NOTE: the rules for the body of the regex are different here,
+     *     since it is quoted instead of surrounded by slashes.
+     * REGEXOBJECT :
+     *     { FIELD("$regularExpression") : {
+     *         FIELD("pattern") : <string representing body of regex>,
+     *         FIELD("options") : <string representing regex options> } }
+     */
+    Status regexObjectCanonical(StringData fieldName, BSONObjBuilder&);
+
+    /*
      * REFOBJECT :
      *     { FIELD("$ref") : <string representing collection name>,
      *          FIELD("$id") : <24 character hex std::string> }
@@ -224,10 +238,22 @@ private:
     Status undefinedObject(StringData fieldName, BSONObjBuilder&);
 
     /*
+     * NUMBERINTOBJECT :
+     *     { FIELD("$numberInt") : "<number>" }
+     */
+    Status numberIntObject(StringData fieldName, BSONObjBuilder&);
+
+    /*
      * NUMBERLONGOBJECT :
      *     { FIELD("$numberLong") : "<number>" }
      */
     Status numberLongObject(StringData fieldName, BSONObjBuilder&);
+
+    /*
+     * NUMBERDOUBLEOBJECT :
+     *     { FIELD("$numberDouble") : "<number>" }
+     */
+    Status numberDoubleObject(StringData fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERDECIMALOBJECT :

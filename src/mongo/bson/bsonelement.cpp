@@ -39,6 +39,9 @@
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/generator_extended_canonical_2_0_0.h"
+#include "mongo/bson/generator_extended_relaxed_2_0_0.h"
+#include "mongo/bson/generator_legacy_strict.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/base64.h"
@@ -63,280 +66,146 @@ using std::string;
 const double BSONElement::kLongLongMaxPlusOneAsDouble =
     scalbn(1, std::numeric_limits<long long>::digits);
 
-string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, int pretty) const {
-    std::stringstream s;
-    BSONElement::jsonStringStream(format, includeFieldNames, pretty, s);
-    return s.str();
+std::string BSONElement::jsonString(JsonStringFormat format,
+                                    bool includeFieldNames,
+                                    int pretty) const {
+    fmt::memory_buffer buffer;
+    jsonStringBuffer(format, includeFieldNames, pretty, buffer);
+    return fmt::to_string(buffer);
 }
 
-void BSONElement::jsonStringStream(JsonStringFormat format,
+void BSONElement::jsonStringBuffer(JsonStringFormat format,
                                    bool includeFieldNames,
                                    int pretty,
-                                   std::stringstream& s) const {
-    if (includeFieldNames)
-        s << '"' << str::escape(fieldName()) << "\" : ";
+                                   fmt::memory_buffer& buffer) const {
+    auto withGenerator = [&](auto&& gen) {
+        jsonStringGenerator(gen, includeFieldNames, pretty, buffer);
+    };
+    if (format == ExtendedCanonicalV2_0_0)
+        withGenerator(ExtendedCanonicalV200Generator());
+    else if (format == ExtendedRelaxedV2_0_0)
+        withGenerator(ExtendedRelaxedV200Generator());
+    else if (format == LegacyStrict) {
+        withGenerator(LegacyStrictGenerator());
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
+
+template <typename Generator>
+void BSONElement::_jsonStringGenerator(const Generator& g,
+                                       bool includeFieldNames,
+                                       int pretty,
+                                       fmt::memory_buffer& buffer) const {
+    if (includeFieldNames) {
+        g.writePadding(buffer);
+        g.writeString(buffer, fieldName());
+        g.writePadding(buffer);
+        buffer.push_back(':');
+    }
+
+    g.writePadding(buffer);
+
     switch (type()) {
         case mongo::String:
+            g.writeString(buffer, StringData(valuestr(), valuestrsize() - 1));
+            break;
         case Symbol:
-            s << '"' << str::escape(string(valuestr(), valuestrsize() - 1)) << '"';
+            g.writeSymbol(buffer, StringData(valuestr(), valuestrsize() - 1));
             break;
         case NumberLong:
-            if (format == TenGen) {
-                s << "NumberLong(" << _numberLong() << ")";
-            } else {
-                s << "{ \"$numberLong\" : \"" << _numberLong() << "\" }";
-            }
+            g.writeInt64(buffer, _numberLong());
             break;
         case NumberInt:
-            if (format == TenGen) {
-                s << "NumberInt(" << _numberInt() << ")";
-                break;
-            }
+            g.writeInt32(buffer, _numberInt());
+            break;
         case NumberDouble:
-            if (number() >= -std::numeric_limits<double>::max() &&
-                number() <= std::numeric_limits<double>::max()) {
-                auto origPrecision = s.precision();
-                auto guard = makeGuard([&s, origPrecision]() { s.precision(origPrecision); });
-                s.precision(16);
-                s << number();
-            }
-            // This is not valid JSON, but according to RFC-4627, "Numeric values that cannot be
-            // represented as sequences of digits (such as Infinity and NaN) are not permitted." so
-            // we are accepting the fact that if we have such values we cannot output valid JSON.
-            else if (std::isnan(number())) {
-                s << "NaN";
-            } else if (std::isinf(number())) {
-                s << (number() > 0 ? "Infinity" : "-Infinity");
-            } else {
-                StringBuilder ss;
-                ss << "Number " << number() << " cannot be represented in JSON";
-                string message = ss.str();
-                massert(10311, message.c_str(), false);
-            }
+            g.writeDouble(buffer, number());
             break;
         case NumberDecimal:
-            if (format == TenGen)
-                s << "NumberDecimal(\"";
-            else
-                s << "{ \"$numberDecimal\" : \"";
-            // Recognize again that this is not valid JSON according to RFC-4627.
-            // Also, treat -NaN and +NaN as the same thing for MongoDB.
-            if (numberDecimal().isNaN()) {
-                s << "NaN";
-            } else if (numberDecimal().isInfinite()) {
-                s << (numberDecimal().isNegative() ? "-Infinity" : "Infinity");
-            } else {
-                s << numberDecimal().toString();
-            }
-            if (format == TenGen)
-                s << "\")";
-            else
-                s << "\" }";
+            g.writeDecimal128(buffer, numberDecimal());
             break;
         case mongo::Bool:
-            s << (boolean() ? "true" : "false");
+            g.writeBool(buffer, boolean());
             break;
         case jstNULL:
-            s << "null";
+            g.writeNull(buffer);
             break;
         case Undefined:
-            if (format == Strict) {
-                s << "{ \"$undefined\" : true }";
-            } else {
-                s << "undefined";
-            }
+            g.writeUndefined(buffer);
             break;
         case Object:
-            embeddedObject().jsonStringStream(format, pretty, false, s);
+            embeddedObject().jsonStringGenerator(g, pretty ? pretty + 1 : 0, false, buffer);
             break;
-        case mongo::Array: {
-            if (embeddedObject().isEmpty()) {
-                s << "[]";
-                break;
-            }
-            s << "[ ";
-            BSONObjIterator i(embeddedObject());
-            BSONElement e = i.next();
-            if (!e.eoo()) {
-                int count = 0;
-                while (1) {
-                    if (pretty) {
-                        s << '\n';
-                        for (int x = 0; x < pretty; x++)
-                            s << "  ";
-                    }
-
-                    long index;
-                    if (NumberParser::strToAny(10)(e.fieldName(), &index).isOK() && index > count) {
-                        s << "undefined";
-                    } else {
-                        // print the element if its index is being printed or if the index it
-                        // belongs to could not be parsed
-                        e.jsonStringStream(format, false, pretty ? pretty + 1 : 0, s);
-                        e = i.next();
-                    }
-                    count++;
-                    if (e.eoo())
-                        break;
-                    s << ", ";
-                }
-            }
-            s << " ]";
+        case mongo::Array:
+            embeddedObject().jsonStringGenerator(g, pretty ? pretty + 1 : 0, true, buffer);
             break;
-        }
-        case DBRef: {
-            if (format == TenGen)
-                s << "Dbref( ";
-            else
-                s << "{ \"$ref\" : ";
-            s << '"' << valuestr() << "\", ";
-            if (format != TenGen)
-                s << "\"$id\" : ";
-            s << '"' << mongo::OID::from(valuestr() + valuestrsize()) << "\" ";
-            if (format == TenGen)
-                s << ')';
-            else
-                s << '}';
+        case DBRef:
+            // valuestrsize() returns the size including the null terminator
+            g.writeDBRef(buffer,
+                         StringData(valuestr(), valuestrsize() - 1),
+                         OID::from(valuestr() + valuestrsize()));
             break;
-        }
         case jstOID:
-            if (format == TenGen) {
-                s << "ObjectId( ";
-            } else {
-                s << "{ \"$oid\" : ";
-            }
-            s << '"' << __oid() << '"';
-            if (format == TenGen) {
-                s << " )";
-            } else {
-                s << " }";
-            }
+            g.writeOID(buffer, __oid());
             break;
         case BinData: {
             ConstDataCursor reader(value());
             const int len = reader.readAndAdvance<LittleEndian<int>>();
             BinDataType type = static_cast<BinDataType>(reader.readAndAdvance<uint8_t>());
-
-            s << "{ \"$binary\" : \"";
-            base64::encode(s, StringData(reader.view(), len));
-
-            auto origFill = s.fill();
-            auto origFmtF = s.flags();
-            auto origWidth = s.width();
-            auto guard = makeGuard([&s, origFill, origFmtF, origWidth] {
-                s.fill(origFill);
-                s.setf(origFmtF);
-                s.width(origWidth);
-            });
-
-            s.setf(std::ios_base::hex, std::ios_base::basefield);
-
-            s << "\", \"$type\" : \"";
-            s.width(2);
-            s.fill('0');
-            s << type;
-            s << "\" }";
-            break;
+            g.writeBinData(buffer, StringData(reader.view(), len), type);
         }
-        case mongo::Date:
-            if (format == Strict) {
-                Date_t d = date();
-                s << "{ \"$date\" : ";
-                // The two cases in which we cannot convert Date_t::millis to an ISO Date string are
-                // when the date is too large to format (SERVER-13760), and when the date is before
-                // the epoch (SERVER-11273).  Since Date_t internally stores millis as an unsigned
-                // long long, despite the fact that it is logically signed (SERVER-8573), this check
-                // handles both the case where Date_t::millis is too large, and the case where
-                // Date_t::millis is negative (before the epoch).
-                if (d.isFormattable()) {
-                    s << "\"" << dateToISOStringLocal(date()) << "\"";
-                } else {
-                    s << "{ \"$numberLong\" : \"" << d.toMillisSinceEpoch() << "\" }";
-                }
-                s << " }";
-            } else {
-                s << "Date( ";
-                if (pretty) {
-                    Date_t d = date();
-                    // The two cases in which we cannot convert Date_t::millis to an ISO Date string
-                    // are when the date is too large to format (SERVER-13760), and when the date is
-                    // before the epoch (SERVER-11273).  Since Date_t internally stores millis as an
-                    // unsigned long long, despite the fact that it is logically signed
-                    // (SERVER-8573), this check handles both the case where Date_t::millis is too
-                    // large, and the case where Date_t::millis is negative (before the epoch).
-                    if (d.isFormattable()) {
-                        s << "\"" << dateToISOStringLocal(date()) << "\"";
-                    } else {
-                        // FIXME: This is not parseable by the shell, since it may not fit in a
-                        // float
-                        s << d.toMillisSinceEpoch();
-                    }
-                } else {
-                    s << date().asInt64();
-                }
-                s << " )";
-            }
-            break;
-        case RegEx:
-            if (format == Strict) {
-                s << "{ \"$regex\" : \"" << str::escape(regex());
-                s << "\", \"$options\" : \"" << regexFlags() << "\" }";
-            } else {
-                s << "/" << str::escape(regex(), true) << "/";
-                // FIXME Worry about alpha order?
-                for (const char* f = regexFlags(); *f; ++f) {
-                    switch (*f) {
-                        case 'g':
-                        case 'i':
-                        case 'm':
-                        case 's':
-                            s << *f;
-                        default:
-                            break;
-                    }
-                }
-            }
-            break;
 
+        break;
+        case mongo::Date:
+            g.writeDate(buffer, date());
+            break;
+        case RegEx: {
+            StringData pattern(regex());
+            g.writeRegex(buffer, pattern, StringData(pattern.rawData() + pattern.size() + 1));
+        } break;
         case CodeWScope: {
             BSONObj scope = codeWScopeObject();
             if (!scope.isEmpty()) {
-                s << "{ \"$code\" : \"" << str::escape(_asCode()) << "\" , "
-                  << "\"$scope\" : " << scope.jsonString() << " }";
+                g.writeCodeWithScope(buffer, _asCode(), scope);
                 break;
             }
+            // fall through if scope is empty
         }
-
         case Code:
-            s << "\"" << str::escape(_asCode()) << "\"";
+            g.writeCode(buffer, _asCode());
             break;
-
         case bsonTimestamp:
-            if (format == TenGen) {
-                s << "Timestamp( " << durationCount<Seconds>(timestampTime().toDurationSinceEpoch())
-                  << ", " << timestampInc() << " )";
-            } else {
-                s << "{ \"$timestamp\" : { \"t\" : "
-                  << durationCount<Seconds>(timestampTime().toDurationSinceEpoch())
-                  << ", \"i\" : " << timestampInc() << " } }";
-            }
+            g.writeTimestamp(buffer, timestamp());
             break;
-
         case MinKey:
-            s << "{ \"$minKey\" : 1 }";
+            g.writeMinKey(buffer);
             break;
-
         case MaxKey:
-            s << "{ \"$maxKey\" : 1 }";
+            g.writeMaxKey(buffer);
             break;
-
         default:
-            StringBuilder ss;
-            ss << "Cannot create a properly formatted JSON string with "
-               << "element: " << toString() << " of type: " << type();
-            string message = ss.str();
-            massert(10312, message.c_str(), false);
+            MONGO_UNREACHABLE;
     }
+}
+
+void BSONElement::jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
+                                      bool includeFieldNames,
+                                      int pretty,
+                                      fmt::memory_buffer& buffer) const {
+    _jsonStringGenerator(generator, includeFieldNames, pretty, buffer);
+}
+void BSONElement::jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                      bool includeFieldNames,
+                                      int pretty,
+                                      fmt::memory_buffer& buffer) const {
+    _jsonStringGenerator(generator, includeFieldNames, pretty, buffer);
+}
+void BSONElement::jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                      bool includeFieldNames,
+                                      int pretty,
+                                      fmt::memory_buffer& buffer) const {
+    _jsonStringGenerator(generator, includeFieldNames, pretty, buffer);
 }
 
 namespace {

@@ -67,7 +67,7 @@ using namespace fmt::literals;
 
 // Size hints given to char vectors
 enum {
-    ID_RESERVE_SIZE = 64,
+    ID_RESERVE_SIZE = 24,
     PAT_RESERVE_SIZE = 4096,
     OPT_RESERVE_SIZE = 64,
     FIELD_RESERVE_SIZE = 4096,
@@ -76,7 +76,9 @@ enum {
     BINDATATYPE_RESERVE_SIZE = 4096,
     NS_RESERVE_SIZE = 64,
     DB_RESERVE_SIZE = 64,
-    NUMBERLONG_RESERVE_SIZE = 64,
+    NUMBERINT_RESERVE_SIZE = 16,
+    NUMBERLONG_RESERVE_SIZE = 20,
+    NUMBERDOUBLE_RESERVE_SIZE = 64,
     NUMBERDECIMAL_RESERVE_SIZE = 64,
     DATE_RESERVE_SIZE = 64
 };
@@ -253,6 +255,14 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
         if (ret != Status::OK()) {
             return ret;
         }
+    } else if (firstField == "$regularExpression") {
+        if (!subObject) {
+            return parseError("Reserved field name in base object: $regularExpression");
+        }
+        Status ret = regexObjectCanonical(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
     } else if (firstField == "$ref") {
         if (!subObject) {
             return parseError("Reserved field name in base object: $ref");
@@ -269,11 +279,28 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
         if (ret != Status::OK()) {
             return ret;
         }
+    } else if (firstField == "$numberInt") {
+        if (!subObject) {
+            return parseError("Reserved field name in base object: $numberInt");
+        }
+        Status ret = numberIntObject(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
     } else if (firstField == "$numberLong") {
         if (!subObject) {
             return parseError("Reserved field name in base object: $numberLong");
         }
         Status ret = numberLongObject(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+
+    } else if (firstField == "$numberDouble") {
+        if (!subObject) {
+            return parseError("Reserved field name in base object: $numberDouble");
+        }
+        Status ret = numberDoubleObject(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -367,37 +394,73 @@ Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
     }
     std::string binDataString;
     binDataString.reserve(BINDATA_RESERVE_SIZE);
-    Status dataRet = quotedString(&binDataString);
-    if (dataRet != Status::OK()) {
-        return dataRet;
+
+    std::string binDataType;
+    binDataType.reserve(BINDATATYPE_RESERVE_SIZE);
+
+    if (peekToken(LBRACE)) {
+        readToken(LBRACE);
+
+        if (!readField("base64")) {
+            return parseError("Expected field name: \"base64\", in \"$binary\" object");
+        }
+        if (!readToken(COLON)) {
+            return parseError("Expecting ':'");
+        }
+
+        Status dataRet = quotedString(&binDataString);
+        if (dataRet != Status::OK()) {
+            return dataRet;
+        }
+        if (!readToken(COMMA)) {
+            return parseError("Expected ','");
+        }
+        if (!readField("subType")) {
+            return parseError("Expected field name: \"subType\", in \"$binary\" object");
+        }
+        if (!readToken(COLON)) {
+            return parseError("Expected ':'");
+        }
+        Status typeRet = quotedString(&binDataType);
+        if (typeRet != Status::OK()) {
+            return typeRet;
+        }
+        if (binDataType.size() == 1)
+            binDataType = "0" + binDataType;
+        readToken(RBRACE);
+    } else {
+        Status dataRet = quotedString(&binDataString);
+        if (dataRet != Status::OK()) {
+            return dataRet;
+        }
+        if (!readToken(COMMA)) {
+            return parseError("Expected ','");
+        }
+        if (!readField("$type")) {
+            return parseError("Expected second field name: \"$type\", in \"$binary\" object");
+        }
+        if (!readToken(COLON)) {
+            return parseError("Expected ':'");
+        }
+
+        Status typeRet = quotedString(&binDataType);
+        if (typeRet != Status::OK()) {
+            return typeRet;
+        }
     }
+
     if (binDataString.size() % 4 != 0) {
         return parseError("Invalid length base64 encoded string");
     }
     if (!isBase64String(binDataString)) {
         return parseError("Invalid character in base64 encoded string");
     }
-    const std::string& binData = base64::decode(binDataString);
-    if (!readToken(COMMA)) {
-        return parseError("Expected ','");
-    }
+    std::string binData = base64::decode(binDataString);
 
-    if (!readField("$type")) {
-        return parseError("Expected second field name: \"$type\", in \"$binary\" object");
-    }
-    if (!readToken(COLON)) {
-        return parseError("Expected ':'");
-    }
-    std::string binDataType;
-    binDataType.reserve(BINDATATYPE_RESERVE_SIZE);
-    Status typeRet = quotedString(&binDataType);
-    if (typeRet != Status::OK()) {
-        return typeRet;
-    }
     if ((binDataType.size() != 2) || !isHexString(binDataType)) {
         return parseError(
-            "Argument of $type in $bindata object must be a hex string representation of a single "
-            "byte");
+            "Argument of $type in $bindata object must be a hex string representation of a "
+            "single byte");
     }
 
     // The fromHex function returns a signed char, but the highest
@@ -459,6 +522,8 @@ Status JParse::dateObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!ret.isOK()) {
             return ret;
         }
+
+        readToken(RBRACE);
         date = Date_t::fromMillisSinceEpoch(numberLong);
     } else {
         StatusWith<Date_t> parsedDate = parseDate();
@@ -564,6 +629,47 @@ Status JParse::regexObject(StringData fieldName, BSONObjBuilder& builder) {
     return Status::OK();
 }
 
+Status JParse::regexObjectCanonical(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+    readToken(LBRACE);
+    if (!readField("pattern")) {
+        return parseError("Expected field name: \"pattern\", in \"$regularExpression\" object");
+    }
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+    std::string pat;
+    pat.reserve(PAT_RESERVE_SIZE);
+    Status patRet = quotedString(&pat);
+    if (patRet != Status::OK()) {
+        return patRet;
+    }
+    if (!readToken(COMMA)) {
+        return parseError("Expected ','");
+    }
+    if (!readField("options")) {
+        return parseError("Expected field name: \"pattern\", in \"$regularExpression\" object");
+    }
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+    std::string opt;
+    opt.reserve(OPT_RESERVE_SIZE);
+    Status optRet = quotedString(&opt);
+    if (optRet != Status::OK()) {
+        return optRet;
+    }
+    Status optCheckRet = regexOptCheck(opt);
+    if (optCheckRet != Status::OK()) {
+        return optCheckRet;
+    }
+    readToken(RBRACE);
+    builder.appendRegex(fieldName, pat, opt);
+    return Status::OK();
+}
+
 Status JParse::dbRefObject(StringData fieldName, BSONObjBuilder& builder) {
     BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
 
@@ -645,6 +751,53 @@ Status JParse::numberLongObject(StringData fieldName, BSONObjBuilder& builder) {
     }
 
     builder.append(fieldName, numberLong);
+    return Status::OK();
+}
+
+Status JParse::numberIntObject(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+
+    // The number must be a quoted string, since large long numbers could overflow a double and
+    // thus may not be valid JSON
+    std::string numberIntString;
+    numberIntString.reserve(NUMBERINT_RESERVE_SIZE);
+    Status ret = quotedString(&numberIntString);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    int numberInt;
+    ret = NumberParser{}(numberIntString, &numberInt);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    builder.append(fieldName, numberInt);
+    return Status::OK();
+}
+
+Status JParse::numberDoubleObject(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+    // The number must be a quoted string, since large double numbers could overflow other types
+    // and thus may not be valid JSON
+    std::string numberDoubleString;
+    numberDoubleString.reserve(NUMBERDOUBLE_RESERVE_SIZE);
+    Status ret = quotedString(&numberDoubleString);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    double numberDouble;
+    ret = NumberParser{}(numberDoubleString, &numberDouble);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    builder.append(fieldName, numberDouble);
     return Status::OK();
 }
 

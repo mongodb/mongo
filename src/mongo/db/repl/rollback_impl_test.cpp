@@ -116,7 +116,7 @@ protected:
         log() << "Simulating writing a rollback file for namespace " << nss.ns() << " with uuid "
               << uuid;
         for (auto&& id : idSet) {
-            log() << "Looking up " << id.jsonString();
+            log() << "Looking up " << id.jsonString(JsonStringFormat::LegacyStrict);
             auto document = _findDocumentById(opCtx, uuid, nss, id.firstElement());
             if (document) {
                 _uuidToObjsMap[uuid].push_back(*document);
@@ -1562,12 +1562,12 @@ public:
         auto search = uuidToIdMap.find(uuid);
         ASSERT(search != uuidToIdMap.end())
             << "map is unexpectedly missing an entry for uuid " << uuid.toString()
-            << " containing object " << bson.jsonString();
+            << " containing object " << bson.jsonString(JsonStringFormat::LegacyStrict);
         const auto& idObjSet = search->second;
         const auto iter = idObjSet.find(bson);
-        ASSERT(iter != idObjSet.end())
-            << "_id object set is unexpectedly missing object " << bson.jsonString()
-            << " in namespace with uuid " << uuid.toString();
+        ASSERT(iter != idObjSet.end()) << "_id object set is unexpectedly missing object "
+                                       << bson.jsonString(JsonStringFormat::LegacyStrict)
+                                       << " in namespace with uuid " << uuid.toString();
     }
 
 

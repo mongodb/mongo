@@ -31,6 +31,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <fmt/format.h>
 #include <string.h>  // strlen
 #include <string>
 #include <vector>
@@ -52,6 +53,9 @@ class BSONObj;
 class BSONElement;
 class BSONObjBuilder;
 class Timestamp;
+class ExtendedCanonicalV200Generator;
+class ExtendedRelaxedV200Generator;
+class LegacyStrictGenerator;
 
 typedef BSONElement be;
 typedef BSONObj bo;
@@ -211,10 +215,23 @@ public:
                            bool includeFieldNames = true,
                            int pretty = 0) const;
 
-    void jsonStringStream(JsonStringFormat format,
+    void jsonStringBuffer(JsonStringFormat format,
                           bool includeFieldNames,
                           int pretty,
-                          std::stringstream& s) const;
+                          fmt::memory_buffer& buffer) const;
+
+    void jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
+                             bool includeFieldNames,
+                             int pretty,
+                             fmt::memory_buffer& buffer) const;
+    void jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                             bool includeFieldNames,
+                             int pretty,
+                             fmt::memory_buffer& buffer) const;
+    void jsonStringGenerator(LegacyStrictGenerator const& generator,
+                             bool includeFieldNames,
+                             int pretty,
+                             fmt::memory_buffer& buffer) const;
 
     operator std::string() const {
         return toString();
@@ -741,6 +758,12 @@ public:
     static const double kLongLongMaxPlusOneAsDouble;
 
 private:
+    template <typename Generator>
+    void _jsonStringGenerator(const Generator& g,
+                              bool includeFieldNames,
+                              int pretty,
+                              fmt::memory_buffer& buffer) const;
+
     const char* data;
     int fieldNameSize_;  // internal size includes null terminator
     int totalSize;

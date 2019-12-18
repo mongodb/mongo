@@ -300,7 +300,8 @@ TEST_F(LogTestV2, Types) {
     builder.append("str"_sd, str_data);
     BSONObj bsonObj = builder.obj();
     LOGV2("bson {}", "name"_attr = bsonObj);
-    ASSERT(text.back() == std::string("bson ") + bsonObj.jsonString());
+    ASSERT(text.back() ==
+           std::string("bson ") + bsonObj.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0));
     ASSERT(mongo::fromjson(json.back())
                .getField(kAttributesFieldName)
                .Obj()
@@ -448,7 +449,8 @@ TEST_F(LogTestV2, TextFormat) {
     ASSERT(lines.back().rfind(t.toString() + " custom formatting") != std::string::npos);
 
     LOGV2("{} bson", "name"_attr = t.toBSON());
-    ASSERT(lines.back().rfind(t.toBSON().jsonString() + " bson") != std::string::npos);
+    ASSERT(lines.back().rfind(t.toBSON().jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0) +
+                              " bson") != std::string::npos);
 
     TypeWithoutBSON t2(1.0, 2.0);
     LOGV2("{} custom formatting, no bson", "name"_attr = t2);

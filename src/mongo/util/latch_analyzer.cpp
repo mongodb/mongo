@@ -345,7 +345,8 @@ void LatchAnalyzer::dump() {
 
     auto obj = bob.done();
     log().setIsTruncatable(false) << "=====LATCHES=====\n"
-                                  << obj.jsonString() << "\n===END LATCHES===";
+                                  << obj.jsonString(JsonStringFormat::LegacyStrict)
+                                  << "\n===END LATCHES===";
 }
 
 LatchAnalyzerDisabledBlock::LatchAnalyzerDisabledBlock() {

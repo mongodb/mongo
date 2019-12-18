@@ -86,7 +86,8 @@ protected:
      */
     auto fromBSONForAPI(const uint8_t* bson) {
         return mongo::tojson(
-            mongo::BSONObj(static_cast<const char*>(static_cast<const void*>(bson))));
+            mongo::BSONObj(static_cast<const char*>(static_cast<const void*>(bson))),
+            mongo::JsonStringFormat::LegacyStrict);
     }
 
     auto checkMatch(const char* filterJSON,
