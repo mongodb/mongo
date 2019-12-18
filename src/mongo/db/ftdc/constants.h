@@ -34,6 +34,7 @@
 namespace mongo {
 
 extern const char kFTDCInterimFile[];
+extern const char kFTDCInterimTempFile[];
 extern const char kFTDCArchiveFile[];
 
 extern const char kFTDCIdField[];
