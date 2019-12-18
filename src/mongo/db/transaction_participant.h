@@ -33,6 +33,7 @@
 #include <iostream>
 #include <map>
 
+#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
@@ -218,6 +219,7 @@ public:
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
+        std::shared_ptr<UncommittedCollections::UncommittedCollectionsMap> _uncommittedCollections;
     };
 
     /**

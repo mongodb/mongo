@@ -50,7 +50,7 @@ UncommittedCollections& UncommittedCollections::get(OperationContext* opCtx) {
 void UncommittedCollections::addToTxn(OperationContext* opCtx,
                                       std::unique_ptr<Collection> coll,
                                       Timestamp createTime) {
-    UncommittedCollections* collList = &getUncommittedCollections(opCtx);
+    auto collList = getUncommittedCollections(opCtx).getResources().lock();
     auto existingColl = collList->_collections.find(coll->uuid());
     uassert(31370,
             str::stream() << "collection already exists. ns: " << coll->ns(),
@@ -62,18 +62,21 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx,
     collList->_collections[uuid] = std::move(coll);
     collList->_nssIndex.insert({nss, uuid});
 
+    auto collListUnowned = getUncommittedCollections(opCtx).getResources();
+
     opCtx->recoveryUnit()->registerPreCommitHook(
-        [collList, uuid, createTime](OperationContext* opCtx) {
-            collList->commit(opCtx, uuid, createTime);
+        [collListUnowned, uuid, createTime](OperationContext* opCtx) {
+            UncommittedCollections::commit(opCtx, uuid, createTime, collListUnowned.lock().get());
         });
     opCtx->recoveryUnit()->onCommit(
-        [collList, collPtr, createTime](boost::optional<Timestamp> commitTs) {
+        [collListUnowned, collPtr, createTime](boost::optional<Timestamp> commitTs) {
             // Verify that the collection was given a minVisibleTimestamp equal to the transactions
             // commit timestamp.
             invariant(collPtr->getMinimumVisibleSnapshot() == createTime);
-            collList->clear();
+            UncommittedCollections::clear(collListUnowned.lock().get());
         });
-    opCtx->recoveryUnit()->onRollback([collList]() { collList->clear(); });
+    opCtx->recoveryUnit()->onRollback(
+        [collListUnowned]() { UncommittedCollections::clear(collListUnowned.lock().get()); });
 }
 
 Collection* UncommittedCollections::getForTxn(OperationContext* opCtx,
@@ -86,39 +89,42 @@ Collection* UncommittedCollections::getForTxn(OperationContext* opCtx,
 }
 
 Collection* UncommittedCollections::getForTxn(OperationContext* opCtx, const NamespaceString& nss) {
-    auto& collList = getUncommittedCollections(opCtx);
-    auto it = collList._nssIndex.find(nss);
-    if (it == collList._nssIndex.end()) {
+    auto collList = getUncommittedCollections(opCtx).getResources().lock();
+    auto it = collList->_nssIndex.find(nss);
+    if (it == collList->_nssIndex.end()) {
         return nullptr;
     }
 
-    return collList._collections[it->second].get();
+    return collList->_collections[it->second].get();
 }
 
 Collection* UncommittedCollections::getForTxn(OperationContext* opCtx, const UUID& uuid) {
-    auto& collList = getUncommittedCollections(opCtx);
-    auto it = collList._collections.find(uuid);
-    if (it == collList._collections.end()) {
+    auto collList = getUncommittedCollections(opCtx).getResources().lock();
+    auto it = collList->_collections.find(uuid);
+    if (it == collList->_collections.end()) {
         return nullptr;
     }
 
     return it->second.get();
 }
 
-void UncommittedCollections::commit(OperationContext* opCtx, UUID uuid, Timestamp createTs) {
-    if (_collections.count(uuid) == 0) {
+void UncommittedCollections::commit(OperationContext* opCtx,
+                                    UUID uuid,
+                                    Timestamp createTs,
+                                    UncommittedCollectionsMap* map) {
+    if (map->_collections.count(uuid) == 0) {
         return;
     }
 
-    auto it = _collections.find(uuid);
+    auto it = map->_collections.find(uuid);
     // Invariant that a collection is found.
     invariant(it->second.get(), uuid.toString());
     it->second->setMinimumVisibleSnapshot(createTs);
 
     auto nss = it->second->ns();
     CollectionCatalog::get(opCtx).registerCollection(uuid, &(it->second));
-    _collections.erase(it);
-    _nssIndex.erase(nss);
+    map->_collections.erase(it);
+    map->_nssIndex.erase(nss);
 }
 
 bool UncommittedCollections::hasExclusiveAccessToCollection(OperationContext* opCtx,
@@ -127,7 +133,7 @@ bool UncommittedCollections::hasExclusiveAccessToCollection(OperationContext* op
         return true;
     }
 
-    if (_nssIndex.count(nss) == 1) {
+    if (_resourcesPtr->_nssIndex.count(nss) == 1) {
         // If the collection is found in the local catalog, the appropriate locks must have already
         // been taken.
         invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX), nss.toString());
