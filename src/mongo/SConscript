@@ -474,11 +474,12 @@ mongod = env.Program(
     LIBDEPS_PRIVATE=[
         'db/index/index_access_methods',
     ],
-    AIB_COMPONENT="servers",
+    AIB_COMPONENT="mongod",
     AIB_COMPONENTS_EXTRA=[
-        "dist",
-        "default",
         "core",
+        "default",
+        "dist",
+        "servers",
     ],
 )
 
@@ -581,10 +582,11 @@ mongos = env.Program(
         'util/options_parser/options_parser_init',
         'util/options_parser/options_parser',
     ],
-    AIB_COMPONENT="servers",
+    AIB_COMPONENT="mongos",
     AIB_COMPONENTS_EXTRA=[
-        "dist",
         "core",
+        "dist",
+        "servers"
     ]
 )
 
@@ -676,10 +678,11 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/client/connection_string",
             '$BUILD_DIR/mongo/util/net/ssl_options_client' if get_option('ssl') == 'on' else '',
         ],
-        AIB_COMPONENT="shell",
+        AIB_COMPONENT="mongo",
         AIB_COMPONENTS_EXTRA=[
-            "dist",
             "core",
+            "dist",
+            "shell",
         ],
     )
 
