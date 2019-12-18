@@ -133,6 +133,41 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 0 << "" << 3));
 }
 
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingField) {
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(BSON("b" << 1), nullptr);
+    auto sortKey = sortKeyGen->getSortKey(BSON("a" << 1), nullptr);
+    ASSERT_OK(sortKey.getStatus());
+    ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << BSONNULL));
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingFieldInCompoundSortPattern) {
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(BSON("a" << 1 << "b" << 1), nullptr);
+    auto sortKey = sortKeyGen->getSortKey(BSON("b" << 1), nullptr);
+    ASSERT_OK(sortKey.getStatus());
+    ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << BSONNULL << "" << 1));
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingFieldInEmbeddedDocument) {
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(BSON("a.b" << 1), nullptr);
+    auto sortKey = sortKeyGen->getSortKey(BSON("a" << BSON("c" << 1)), nullptr);
+    ASSERT_OK(sortKey.getStatus());
+    ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << BSONNULL));
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingFieldInArrayElement) {
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(BSON("a.b" << 1), nullptr);
+    auto sortKey = sortKeyGen->getSortKey(BSON("a" << BSON_ARRAY(BSONObj{})), nullptr);
+    ASSERT_OK(sortKey.getStatus());
+    ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << BSONNULL));
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForInvalidPath) {
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(BSON("a.b" << 1), nullptr);
+    auto sortKey = sortKeyGen->getSortKey(BSON("a" << 1), nullptr);
+    ASSERT_OK(sortKey.getStatus());
+    ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << BSONNULL));
+}
+
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithStringIsFatal,
            "Invariant failure elt.type() == BSONType::Object") {
