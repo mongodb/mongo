@@ -91,7 +91,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
         _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
 
     encodeSCRAMUsername(user);
-    _clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
+    _clientNonce =
+        base64::encode(StringData(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce)));
 
     // Append client-first-message-bare to authMessage
     _authMessage = "n=" + user + ",r=" + _clientNonce;

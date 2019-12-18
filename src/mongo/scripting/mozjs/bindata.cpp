@@ -90,7 +90,7 @@ void hexToBinData(JSContext* cx,
         data[i] = uassertStatusOK(fromHex(src + src_index));
     }
 
-    std::string encoded = base64::encode(data.get(), len);
+    std::string encoded = base64::encode(StringData(data.get(), len));
     JS::AutoValueArray<2> args(cx);
 
     args[0].setInt32(type);
@@ -135,7 +135,7 @@ void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
         uuid = uassertStatusOK(mongo::UUID::parse(str));
     };
     ConstDataRange cdr = uuid->toCDR();
-    std::string encoded = mongo::base64::encode(cdr.data(), cdr.length());
+    std::string encoded = mongo::base64::encode(StringData(cdr.data(), cdr.length()));
 
     JS::AutoValueArray<2> newArgs(cx);
     newArgs[0].setInt32(newUUID);

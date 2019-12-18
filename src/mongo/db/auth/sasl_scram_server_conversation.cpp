@@ -241,8 +241,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
 
     SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
 
-    _nonce =
-        clientNonce + base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
+    _nonce = clientNonce +
+        base64::encode(StringData(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce)));
     StringBuilder sb;
     sb << "r=" << _nonce << ",s=" << scramCredentials.salt
        << ",i=" << scramCredentials.iterationCount;

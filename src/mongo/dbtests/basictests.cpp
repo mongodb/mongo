@@ -86,7 +86,7 @@ public:
 
     void roundTrip(const unsigned char* _data, int len) {
         const char* data = (const char*)_data;
-        string s = base64::encode(data, len);
+        string s = base64::encode(StringData(data, len));
         string out = base64::decode(s);
         ASSERT_EQUALS(out.size(), static_cast<size_t>(len));
         bool broke = false;
@@ -109,12 +109,12 @@ public:
     }
 
     void run() {
-        ASSERT_EQUALS("ZWxp", base64::encode("eli", 3));
-        ASSERT_EQUALS("ZWxpb3Rz", base64::encode("eliots", 6));
+        ASSERT_EQUALS("ZWxp", base64::encode("eli"_sd));
+        ASSERT_EQUALS("ZWxpb3Rz", base64::encode("eliots"_sd));
         ASSERT_EQUALS("ZWxpb3Rz", base64::encode("eliots"));
 
-        ASSERT_EQUALS("ZQ==", base64::encode("e", 1));
-        ASSERT_EQUALS("ZWw=", base64::encode("el", 2));
+        ASSERT_EQUALS("ZQ==", base64::encode("e"_sd));
+        ASSERT_EQUALS("ZWw=", base64::encode("el"_sd));
 
         roundTrip("e");
         roundTrip("el");

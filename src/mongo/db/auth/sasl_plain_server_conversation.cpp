@@ -61,8 +61,8 @@ StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pw
                                       decodedSalt.size()),
         scram.iterationCount));
     if (scram.storedKey !=
-        base64::encode(reinterpret_cast<const char*>(secrets.storedKey().data()),
-                       secrets.storedKey().size())) {
+        base64::encode(StringData(reinterpret_cast<const char*>(secrets.storedKey().data()),
+                                  secrets.storedKey().size()))) {
         return Status(ErrorCodes::AuthenticationFailed,
                       str::stream() << "Incorrect user name or password");
     }

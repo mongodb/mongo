@@ -284,7 +284,7 @@ public:
         Secrets<HashBlock, MemoryPolicy> secrets(
             Presecrets<HashBlock>(password, salt, iterationCount));
         const auto encodedSalt =
-            base64::encode(reinterpret_cast<const char*>(salt.data()), salt.size());
+            base64::encode(StringData(reinterpret_cast<const char*>(salt.data()), salt.size()));
         return BSON(kIterationCountFieldName
                     << iterationCount << kSaltFieldName << encodedSalt << kStoredKeyFieldName
                     << secrets.storedKey().toString() << kServerKeyFieldName

@@ -136,7 +136,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             int len;
             const char* data = elem.binData(len);
             std::stringstream ss;
-            base64::encode(ss, data, len);
+            base64::encode(ss, StringData(data, len));
 
             JS::AutoValueArray<2> args(_context);
 
