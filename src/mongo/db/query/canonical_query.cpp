@@ -427,12 +427,12 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
 
     if (sortNaturalElt && sortObj.nFields() != 1) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Cannot include '$natural' in compoound sort: " << sortObj);
+                      str::stream() << "Cannot include '$natural' in compound sort: " << sortObj);
     }
 
     if (hintNaturalElt && hintObj.nFields() != 1) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Cannot include '$natural' in compoound hint: " << hintObj);
+                      str::stream() << "Cannot include '$natural' in compound hint: " << hintObj);
     }
 
     // NEAR cannot have a $natural sort or $natural hint.
