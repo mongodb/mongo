@@ -43,8 +43,12 @@ class TypeErasedAttributeStorage;
 
 // Custom type, storage for how to call its formatters
 struct CustomAttributeValue {
-    std::function<BSONObj()> toBSON;
+    std::function<void(BSONObjBuilder&)> BSONSerialize;
     std::function<void(BSONObjBuilder&, StringData)> BSONAppend;
+
+    // Have both serialize and toString available, using toString() with a serialize interface is
+    // inefficient.
+    std::function<void(fmt::memory_buffer&)> stringSerialize;
     std::function<std::string()> toString;
 };
 
@@ -58,6 +62,14 @@ struct HasToBSON : std::false_type {};
 template <class T>
 struct HasToBSON<T, std::void_t<decltype(std::declval<T>().toBSON())>> : std::true_type {};
 
+template <class T, class = void>
+struct HasBSONSerialize : std::false_type {};
+
+template <class T>
+struct HasBSONSerialize<
+    T,
+    std::void_t<decltype(std::declval<T>().serialize(std::declval<BSONObjBuilder*>()))>>
+    : std::true_type {};
 
 template <class T, class = void>
 struct HasBSONBuilderAppend : std::false_type {};
@@ -68,6 +80,14 @@ struct HasBSONBuilderAppend<T,
                                 std::declval<StringData>(), std::declval<T>()))>> : std::true_type {
 };
 
+template <class T, class = void>
+struct HasStringSerialize : std::false_type {};
+
+template <class T>
+struct HasStringSerialize<
+    T,
+    std::void_t<decltype(std::declval<T>().serialize(std::declval<fmt::memory_buffer&>()))>>
+    : std::true_type {};
 
 template <class T, class = void>
 struct HasToString : std::false_type {};
@@ -102,7 +122,9 @@ public:
 
     NamedAttribute(StringData n, BSONElement const& val) : name(n) {
         CustomAttributeValue custom;
-        custom.toBSON = [&val]() { return val.wrap(); };
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+            builder.appendElements(val.wrap());
+        };
         custom.toString = [&val]() { return val.toString(); };
         value = std::move(custom);
     }
@@ -126,7 +148,9 @@ public:
     template <typename T,
               typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>
     NamedAttribute(StringData n, const T& val) : name(n) {
-        static_assert(HasToString<T>::value, "custom type needs toString() implementation");
+        static_assert(
+            HasToString<T>::value || HasStringSerialize<T>::value,
+            "custom type needs toString() or serialize(fmt::memory_buffer&) implementation");
 
         CustomAttributeValue custom;
         if constexpr (HasBSONBuilderAppend<T>::value) {
@@ -134,10 +158,18 @@ public:
                 builder.append(fieldName, val);
             };
         }
-        if constexpr (HasToBSON<T>::value) {
-            custom.toBSON = [&val]() { return val.toBSON(); };
+        if constexpr (HasBSONSerialize<T>::value) {
+            custom.BSONSerialize = [&val](BSONObjBuilder& builder) { val.serialize(&builder); };
+        } else if constexpr (HasToBSON<T>::value) {
+            custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+                builder.appendElements(val.toBSON());
+            };
         }
-        if constexpr (HasToString<T>::value) {
+        if constexpr (HasStringSerialize<T>::value) {
+            custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
+                return val.serialize(buffer);
+            };
+        } else if constexpr (HasToString<T>::value) {
             custom.toString = [&val]() { return val.toString(); };
         }
 

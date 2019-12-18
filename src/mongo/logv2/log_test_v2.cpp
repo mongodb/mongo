@@ -78,6 +78,30 @@ struct TypeWithoutBSON {
     }
 };
 
+struct TypeWithOnlyStringSerialize {
+    TypeWithOnlyStringSerialize() {}
+    TypeWithOnlyStringSerialize(double x, double y) : _x(x), _y(y) {}
+
+    double _x{0.0};
+    double _y{0.0};
+
+    void serialize(fmt::memory_buffer& buffer) const {
+        fmt::format_to(buffer, "(x: {}, y: {})", _x, _y);
+    }
+};
+
+struct TypeWithBothStringFormatters {
+    TypeWithBothStringFormatters() {}
+
+    std::string toString() const {
+        return fmt::format("toString");
+    }
+
+    void serialize(fmt::memory_buffer& buffer) const {
+        fmt::format_to(buffer, "serialize");
+    }
+};
+
 struct TypeWithBSON : public TypeWithoutBSON {
     using TypeWithoutBSON::TypeWithoutBSON;
 
@@ -86,6 +110,26 @@ struct TypeWithBSON : public TypeWithoutBSON {
         builder.append("x"_sd, _x);
         builder.append("y"_sd, _y);
         return builder.obj();
+    }
+};
+
+struct TypeWithBSONSerialize : public TypeWithoutBSON {
+    using TypeWithoutBSON::TypeWithoutBSON;
+
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("x"_sd, _x);
+        builder->append("y"_sd, _y);
+        builder->append("type"_sd, "serialize"_sd);
+    }
+};
+
+struct TypeWithBothBSONFormatters : public TypeWithBSON {
+    using TypeWithBSON::TypeWithBSON;
+
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("x"_sd, _x);
+        builder->append("y"_sd, _y);
+        builder->append("type"_sd, "serialize"_sd);
     }
 };
 
@@ -137,37 +181,53 @@ TEST_F(LogTestV2, Basic) {
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
+    BSONObjBuilder builder;
+    fmt::memory_buffer buffer;
+
     LOGV2("test");
-    ASSERT(lines.back() == "test");
+    ASSERT_EQUALS(lines.back(), "test");
 
     LOGV2_DEBUG(-2, "test debug");
-    ASSERT(lines.back() == "test debug");
+    ASSERT_EQUALS(lines.back(), "test debug");
 
     LOGV2("test {}", "name"_attr = 1);
-    ASSERT(lines.back() == "test 1");
+    ASSERT_EQUALS(lines.back(), "test 1");
 
     LOGV2("test {:d}", "name"_attr = 2);
-    ASSERT(lines.back() == "test 2");
+    ASSERT_EQUALS(lines.back(), "test 2");
 
     LOGV2("test {}", "name"_attr = "char*");
-    ASSERT(lines.back() == "test char*");
+    ASSERT_EQUALS(lines.back(), "test char*");
 
     LOGV2("test {}", "name"_attr = std::string("std::string"));
-    ASSERT(lines.back() == "test std::string");
+    ASSERT_EQUALS(lines.back(), "test std::string");
 
     LOGV2("test {}", "name"_attr = "StringData"_sd);
-    ASSERT(lines.back() == "test StringData");
+    ASSERT_EQUALS(lines.back(), "test StringData");
 
     LOGV2_OPTIONS({LogTag::kStartupWarnings}, "test");
-    ASSERT(lines.back() == "test");
+    ASSERT_EQUALS(lines.back(), "test");
 
     TypeWithBSON t(1.0, 2.0);
     LOGV2("{} custom formatting", "name"_attr = t);
-    ASSERT(lines.back() == t.toString() + " custom formatting");
+    ASSERT_EQUALS(lines.back(), t.toString() + " custom formatting");
 
     TypeWithoutBSON t2(1.0, 2.0);
     LOGV2("{} custom formatting, no bson", "name"_attr = t2);
-    ASSERT(lines.back() == t.toString() + " custom formatting, no bson");
+    ASSERT_EQUALS(lines.back(), t.toString() + " custom formatting, no bson");
+
+    TypeWithOnlyStringSerialize t3(1.0, 2.0);
+    LOGV2("{}", "name"_attr = t3);
+    buffer.clear();
+    t3.serialize(buffer);
+    ASSERT_EQUALS(lines.back(), fmt::to_string(buffer));
+
+    // Serialize should be preferred when both are available
+    TypeWithBothStringFormatters t4;
+    LOGV2("{}", "name"_attr = t4);
+    buffer.clear();
+    t4.serialize(buffer);
+    ASSERT_EQUALS(lines.back(), fmt::to_string(buffer));
 }
 
 TEST_F(LogTestV2, Types) {
@@ -606,6 +666,35 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     };
     validateCustomAttrWithoutBSON(mongo::fromjson(lines.back()));
     validateCustomAttrWithoutBSON(BSONObj(linesBson.back().data()));
+
+    TypeWithBSONSerialize t3(1.0, 2.0);
+    LOGV2("{}", "name"_attr = t3);
+    auto validateCustomAttrBSONSerialize = [&t3](const BSONObj& obj) {
+        BSONObjBuilder builder;
+        t3.serialize(&builder);
+        ASSERT(obj.getField(kAttributesFieldName)
+                   .Obj()
+                   .getField("name")
+                   .Obj()
+                   .woCompare(builder.done()) == 0);
+    };
+    validateCustomAttrBSONSerialize(mongo::fromjson(lines.back()));
+    validateCustomAttrBSONSerialize(BSONObj(linesBson.back().data()));
+
+
+    TypeWithBothBSONFormatters t4(1.0, 2.0);
+    LOGV2("{}", "name"_attr = t4);
+    auto validateCustomAttrBSONBothFormatters = [&t4](const BSONObj& obj) {
+        BSONObjBuilder builder;
+        t4.serialize(&builder);
+        ASSERT(obj.getField(kAttributesFieldName)
+                   .Obj()
+                   .getField("name")
+                   .Obj()
+                   .woCompare(builder.done()) == 0);
+    };
+    validateCustomAttrBSONBothFormatters(mongo::fromjson(lines.back()));
+    validateCustomAttrBSONBothFormatters(BSONObj(linesBson.back().data()));
 }
 
 TEST_F(LogTestV2, Unicode) {
