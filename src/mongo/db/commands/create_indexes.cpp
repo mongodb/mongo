@@ -812,8 +812,8 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                     runCreateIndexesOnNewCollection(opCtx, ns, specs, commitQuorum);
                 // No further sources of WriteConflicts can occur at this point, so it is safe to
                 // append elements to `result` inside the writeConflictRetry loop.
-                result.appendElements(createIndexesResult);
                 result.appendBool(kCreateCollectionAutomaticallyFieldName, true);
+                result.appendElements(createIndexesResult);
                 return true;
             }
 

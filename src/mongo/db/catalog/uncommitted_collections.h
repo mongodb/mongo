@@ -41,8 +41,37 @@
 namespace mongo {
 class UncommittedCollections {
 public:
-    UncommittedCollections() = default;
+    /**
+     * Wrapper class for the resources used by UncommittedCollections
+     */
+    class UncommittedCollectionsMap {
+        friend class UncommittedCollections;
+
+    private:
+        bool empty() {
+            return _collections.empty() && _nssIndex.empty();
+        }
+        std::map<UUID, std::unique_ptr<Collection>> _collections;
+        std::map<NamespaceString, UUID> _nssIndex;
+    };
+
+    UncommittedCollections() {
+        _resourcesPtr = std::make_shared<UncommittedCollectionsMap>();
+    }
     ~UncommittedCollections() = default;
+
+    std::weak_ptr<UncommittedCollectionsMap> getResources() {
+        return std::weak_ptr<UncommittedCollectionsMap>(_resourcesPtr);
+    }
+
+    std::shared_ptr<UncommittedCollectionsMap> shareResources() {
+        return _resourcesPtr;
+    }
+
+    void receiveResources(std::shared_ptr<UncommittedCollectionsMap> resources) {
+        invariant(_resourcesPtr->empty());
+        _resourcesPtr = resources;
+    }
 
     static UncommittedCollections& get(OperationContext* opCtx);
 
@@ -58,17 +87,19 @@ public:
      * Registers any uncommitted collections with the CollectionCatalog. If registering a collection
      * name conflicts with an existing entry, this method will throw a `WriteConflictException`.
      */
-    void commit(OperationContext* opCtx, UUID uuid, Timestamp createTs);
+    static void commit(OperationContext* opCtx,
+                       UUID uuid,
+                       Timestamp createTs,
+                       UncommittedCollectionsMap* map);
 
     bool hasExclusiveAccessToCollection(OperationContext* opCtx, const NamespaceString& nss) const;
 
-    void clear() {
-        _collections.clear();
-        _nssIndex.clear();
+    static void clear(UncommittedCollectionsMap* map) {
+        map->_collections.clear();
+        map->_nssIndex.clear();
     }
 
 private:
-    std::map<UUID, std::unique_ptr<Collection>> _collections;
-    std::map<NamespaceString, UUID> _nssIndex;
+    std::shared_ptr<UncommittedCollectionsMap> _resourcesPtr;
 };
 }  // namespace mongo
