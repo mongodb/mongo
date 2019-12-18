@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Command line utility for determining what jstests have been added or modified."""
 
-from __future__ import absolute_import
-
 import collections
 import copy
 import json
@@ -12,7 +10,7 @@ import subprocess
 import re
 import shlex
 import sys
-import urlparse
+import urllib.parse
 
 import requests
 import yaml
@@ -104,7 +102,7 @@ def find_last_activated_task(revisions, variant, branch_name):
     evg_cfg = read_evg_config()
     if evg_cfg is not None and "api_server_host" in evg_cfg:
         api_server = "{url.scheme}://{url.netloc}".format(
-            url=urlparse.urlparse(evg_cfg["api_server_host"]))
+            url=urllib.parse.urlparse(evg_cfg["api_server_host"]))
     else:
         api_server = API_SERVER_DEFAULT
 

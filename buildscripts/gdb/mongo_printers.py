@@ -1,5 +1,4 @@
 """GDB Pretty-printers for MongoDB."""
-from __future__ import print_function
 
 import struct
 import sys
@@ -124,7 +123,7 @@ class BSONObjPrinter(object):
         options = CodecOptions(document_class=collections.OrderedDict)
         bsondoc = bson.BSON.decode(buf, codec_options=options)
 
-        for key, val in bsondoc.items():
+        for key, val in list(bsondoc.items()):
             yield 'key', key
             yield 'value', bson.json_util.dumps(val)
 

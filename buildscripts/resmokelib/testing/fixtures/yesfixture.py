@@ -1,7 +1,5 @@
 """Fixture for generating lots of log messages."""
 
-from __future__ import absolute_import
-
 import signal
 
 from . import interface

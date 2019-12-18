@@ -1,7 +1,5 @@
 """Enable running tests simultaneously by processing them from a multi-consumer queue."""
 
-from __future__ import absolute_import
-
 import sys
 
 from .. import config
@@ -110,8 +108,8 @@ class Job(object):
                     test.short_description())
                 self.report.setFailure(test, return_code=2)
                 # Always fail fast if the fixture fails.
-                raise errors.StopExecution("%s not running after %s" % (self.fixture,
-                                                                        test.short_description()))
+                raise errors.StopExecution(
+                    "%s not running after %s" % (self.fixture, test.short_description()))
         finally:
             success = self.report.find_test_info(test).status == "pass"
             if self.archival:

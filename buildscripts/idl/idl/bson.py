@@ -31,8 +31,6 @@ BSON Type Information.
 Utilities for validating bson types, etc.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 from typing import Dict, List
 
 # Dictionary of BSON type Information
@@ -78,39 +76,39 @@ _BINDATA_SUBTYPE = {
 
 
 def is_valid_bson_type(name):
-    # type: (unicode) -> bool
+    # type: (str) -> bool
     """Return True if this is a valid bson type."""
     return name in _BSON_TYPE_INFORMATION
 
 
 def is_scalar_bson_type(name):
-    # type: (unicode) -> bool
+    # type: (str) -> bool
     """Return True if this bson type is a scalar."""
     assert is_valid_bson_type(name)
     return _BSON_TYPE_INFORMATION[name]['scalar']  # type: ignore
 
 
 def cpp_bson_type_name(name):
-    # type: (unicode) -> unicode
+    # type: (str) -> str
     """Return the C++ type name for a bson type."""
     assert is_valid_bson_type(name)
     return _BSON_TYPE_INFORMATION[name]['bson_type_enum']  # type: ignore
 
 
 def list_valid_types():
-    # type: () -> List[unicode]
+    # type: () -> List[str]
     """Return a list of supported bson types."""
-    return [a for a in _BSON_TYPE_INFORMATION.iterkeys()]
+    return [a for a in _BSON_TYPE_INFORMATION.keys()]
 
 
 def is_valid_bindata_subtype(name):
-    # type: (unicode) -> bool
+    # type: (str) -> bool
     """Return True if this bindata subtype is valid."""
     return name in _BINDATA_SUBTYPE
 
 
 def cpp_bindata_subtype_type_name(name):
-    # type: (unicode) -> unicode
+    # type: (str) -> str
     """Return the C++ type name for a bindata subtype."""
     assert is_valid_bindata_subtype(name)
     return _BINDATA_SUBTYPE[name]['bindata_enum']  # type: ignore

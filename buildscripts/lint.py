@@ -1,8 +1,5 @@
 """Lint module."""
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import codecs
 import os
 import sys
@@ -35,7 +32,7 @@ class CheckForConfigH(object):
                   'MONGO_CONFIG define used without prior inclusion of config.h.')
 
 
-def run_lint(paths, nudge_on=False):
+def run_lint(paths, nudge_on=False):  # pylint: disable=too-many-statements
     """Run lint."""
     # errors are as of 10/14
     # idea is not to let it any new type of error

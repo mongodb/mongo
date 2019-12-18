@@ -1,5 +1,4 @@
 """Test hook that periodically makes the primary of a replica set step down."""
-from __future__ import absolute_import
 
 import collections
 import os.path
@@ -363,7 +362,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
         self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
-        self._is_stopped_evt = threading.Event()
+        self.__is_stopped_evt = threading.Event()
         # Event set when the thread is not performing stepdowns.
         self._is_idle_evt = threading.Event()
         self._is_idle_evt.set()
@@ -409,7 +408,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
     def stop(self):
         """Stop the thread."""
         self.__lifecycle.stop()
-        self._is_stopped_evt.set()
+        self.__is_stopped_evt.set()
         # Unpause to allow the thread to finish.
         self.resume()
         self.join()
@@ -435,7 +434,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
     def _wait(self, timeout):
         # Wait until stop or timeout.
-        self._is_stopped_evt.wait(timeout)
+        self.__is_stopped_evt.wait(timeout)
 
     def _await_primaries(self):
         for fixture in self._rs_fixtures:

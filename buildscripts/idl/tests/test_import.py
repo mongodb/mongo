@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #
 # Copyright (C) 2018-present MongoDB, Inc.
 #
@@ -28,8 +28,6 @@
 # it in the license file.
 #
 """Test cases for IDL binder."""
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import io
 import textwrap
@@ -67,7 +65,7 @@ class DictionaryImportResolver(idl.parser.ImportResolverBase):
         return "imported_%s" % (imported_file_name)
 
     def open(self, resolved_file_name):
-        # type: (unicode) -> Any
+        # type: (str) -> Any
         """Return an io.Stream for the requested file."""
         assert resolved_file_name.startswith("imported_")
         imported_file_name = resolved_file_name.replace("imported_", "")

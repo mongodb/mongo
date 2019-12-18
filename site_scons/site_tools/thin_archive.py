@@ -17,6 +17,7 @@ import SCons
 import re
 import subprocess
 
+
 def exists(env):
     if not 'AR' in env:
         return False
@@ -30,10 +31,9 @@ def exists(env):
     if not "rc" in env['ARFLAGS']:
         return False
 
-    pipe = SCons.Action._subproc(env, SCons.Util.CLVar(ar) + ['--version'],
-                                 stdin = 'devnull',
-                                 stderr = 'devnull',
-                                 stdout = subprocess.PIPE)
+    pipe = SCons.Action._subproc(env,
+                                 SCons.Util.CLVar(ar) + ['--version'], stdin='devnull',
+                                 stderr='devnull', stdout=subprocess.PIPE)
     if pipe.wait() != 0:
         return False
 
@@ -41,7 +41,7 @@ def exists(env):
     for line in pipe.stdout:
         if found:
             continue  # consume all data
-        found = re.search(r'^GNU ar|^LLVM', line)
+        found = re.search(r'^GNU ar|^LLVM', line.decode('utf-8'))
 
     return bool(found)
 
@@ -56,6 +56,7 @@ def _add_emitter(builder):
     new_emitter = SCons.Builder.ListEmitter([base_emitter, new_emitter])
     builder.emitter = new_emitter
 
+
 def _add_scanner(builder):
     old_scanner = builder.target_scanner
     path_function = old_scanner.path_function
@@ -69,13 +70,16 @@ def _add_scanner(builder):
                 new_results.extend(base.children())
         return new_results
 
-    builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner, path_function=path_function)
+    builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner,
+                                                   path_function=path_function)
+
 
 def generate(env):
     if not exists(env):
         return
 
-    env['ARFLAGS'] = SCons.Util.CLVar([arflag if arflag != "rc" else "rcsTD" for arflag in env['ARFLAGS']])
+    env['ARFLAGS'] = SCons.Util.CLVar(
+        [arflag if arflag != "rc" else "rcsTD" for arflag in env['ARFLAGS']])
 
     def noop_action(env, target, source):
         pass

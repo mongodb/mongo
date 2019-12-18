@@ -1,7 +1,5 @@
 """Unit tests for the evergreen_task_timeout script."""
 
-from __future__ import absolute_import
-
 import unittest
 
 from buildscripts import evergreen_task_timeout as ett

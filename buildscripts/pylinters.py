@@ -1,7 +1,5 @@
 #!/usr/bin/env python2
 """Extensible script to run one or more Python Linters across a subset of files in parallel."""
-from __future__ import absolute_import
-from __future__ import print_function
 
 import argparse
 import logging
@@ -135,7 +133,8 @@ def _fix_files(linters, config_dict, file_names):
         sys.exit(1)
 
     for linter in linter_instances:
-        run_linter = lambda param1: lint_runner.run(linter.cmd_path + linter.linter.get_fix_cmd_args(param1))  # pylint: disable=cell-var-from-loop
+        run_linter = lambda param1: lint_runner.run(linter.cmd_path + linter.linter.  # pylint: disable=cell-var-from-loop
+                                                    get_fix_cmd_args(param1))  # pylint: disable=cell-var-from-loop
 
         lint_clean = parallel.parallel_process([os.path.abspath(f) for f in file_names], run_linter)
 

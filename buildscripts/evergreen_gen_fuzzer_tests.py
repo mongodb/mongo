@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate fuzzer tests to run in evergreen in parallel."""
 
-from __future__ import absolute_import
+
 
 import argparse
 import math
@@ -15,8 +15,8 @@ from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
 
-import util.read_config as read_config
-import util.taskname as taskname
+import buildscripts.util.read_config as read_config
+import buildscripts.util.taskname as taskname
 
 CONFIG_DIRECTORY = "generated_resmoke_config"
 

@@ -1,6 +1,6 @@
 # -*- mode: python; -*-
 
-import md5
+import hashlib
 
 # Default and alternative generator definitions go here.
 
@@ -15,21 +15,68 @@ import md5
 # want to define them.
 def default_buildinfo_environment_data():
     return (
-        ('distmod', '$MONGO_DISTMOD', True, True,),
-        ('distarch', '$MONGO_DISTARCH', True, True,),
-        ('cc', '$CC_VERSION', True, False,),
-        ('ccflags', '$CCFLAGS', True, False,),
-        ('cxx', '$CXX_VERSION', True, False,),
-        ('cxxflags', '$CXXFLAGS', True, False,),
-        ('linkflags', '$LINKFLAGS', True, False,),
-        ('target_arch', '$TARGET_ARCH', True, True,),
-        ('target_os', '$TARGET_OS', True, False,),
+        (
+            'distmod',
+            '$MONGO_DISTMOD',
+            True,
+            True,
+        ),
+        (
+            'distarch',
+            '$MONGO_DISTARCH',
+            True,
+            True,
+        ),
+        (
+            'cc',
+            '$CC_VERSION',
+            True,
+            False,
+        ),
+        (
+            'ccflags',
+            '$CCFLAGS',
+            True,
+            False,
+        ),
+        (
+            'cxx',
+            '$CXX_VERSION',
+            True,
+            False,
+        ),
+        (
+            'cxxflags',
+            '$CXXFLAGS',
+            True,
+            False,
+        ),
+        (
+            'linkflags',
+            '$LINKFLAGS',
+            True,
+            False,
+        ),
+        (
+            'target_arch',
+            '$TARGET_ARCH',
+            True,
+            True,
+        ),
+        (
+            'target_os',
+            '$TARGET_OS',
+            True,
+            False,
+        ),
     )
+
 
 # If you want buildInfo and --version to be relatively empty, set
 # MONGO_BUILDINFO_ENVIRONMENT_DATA = empty_buildinfo_environment_data()
 def empty_buildinfo_environment_data():
     return ()
+
 
 def default_variant_dir_generator(target, source, env, for_signature):
 
@@ -44,11 +91,11 @@ def default_variant_dir_generator(target, source, env, for_signature):
 
     # Hash the named options and their values, and take the first 8 characters of the hash as
     # the variant name
-    hasher = md5.md5()
+    hasher = hashlib.md5()
     for option in variant_options:
-        hasher.update(option)
-        hasher.update(str(env.GetOption(option)))
-    variant_dir = hasher.hexdigest()[0:8]
+        hasher.update(option.encode('utf-8'))
+        hasher.update(str(env.GetOption(option)).encode('utf-8'))
+    variant_dir = str(hasher.hexdigest()[0:8])
 
     # If our option hash yields a well known hash, replace it with its name.
     known_variant_hashes = {

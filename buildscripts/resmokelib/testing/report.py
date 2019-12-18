@@ -3,8 +3,6 @@
 This is used to support additional test status and timing information for the report.json file.
 """
 
-from __future__ import absolute_import
-
 import copy
 import threading
 import time

@@ -38,7 +38,7 @@ def symbolize_frames(  # pylint: disable=too-many-locals
 
         The somap_list is a list of dictionaries describing individual loaded libraries.
         """
-        return {so_entry["b"]: so_entry for so_entry in somap_list if so_entry.has_key("b")}
+        return {so_entry["b"]: so_entry for so_entry in somap_list if "b" in so_entry}
 
     base_addr_map = make_base_addr_map(trace_doc["processInfo"]["somap"])
 
@@ -52,7 +52,7 @@ def symbolize_frames(  # pylint: disable=too-many-locals
             addr_base = frame["b"]
         else:
             addr_base = soinfo.get("vmaddr", "0")
-        addr = long(addr_base, 16) + long(frame["o"], 16)
+        addr = int(addr_base, 16) + int(frame["o"], 16)
         # addr currently points to the return address which is the one *after* the call. x86 is
         # variable length so going backwards is difficult. However llvm-symbolizer seems to do the
         # right thing if we just subtract 1 byte here. This has the downside of also adjusting the
@@ -152,8 +152,8 @@ class S3BuildidDbgFileResolver(object):
         """Download debug symbols from S3."""
         subprocess.check_call(
             ['wget',
-             'https://s3.amazonaws.com/%s/%s.debug.gz' %
-             (self._s3_bucket, build_id)], cwd=self._cache_dir)
+             'https://s3.amazonaws.com/%s/%s.debug.gz' % (self._s3_bucket, build_id)],
+            cwd=self._cache_dir)
         subprocess.check_call(['gunzip', build_id + ".debug.gz"], cwd=self._cache_dir)
 
 

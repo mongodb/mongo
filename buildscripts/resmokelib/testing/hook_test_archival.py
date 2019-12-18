@@ -1,7 +1,5 @@
 """Enable support for archiving tests or hooks."""
 
-from __future__ import absolute_import
-
 import os
 import threading
 

@@ -28,7 +28,7 @@ import itertools
 # compilation database can access the complete list, and also so that the writer has easy
 # access to write all of the files. But it seems clunky. How can the emitter and the scanner
 # communicate more gracefully?
-__COMPILATION_DB_ENTRIES=[]
+__COMPILATION_DB_ENTRIES = []
 
 # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
 # we could obtain this from SCons.
@@ -39,6 +39,7 @@ if not SCons.Util.case_sensitive_suffixes('.c', '.C'):
 _CXXSuffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++']
 if SCons.Util.case_sensitive_suffixes('.c', '.C'):
     _CXXSuffixes.append('.C')
+
 
 # We make no effort to avoid rebuilding the entries. Someday, perhaps we could and even
 # integrate with the cache, but there doesn't seem to be much call for it.
@@ -77,11 +78,8 @@ def makeEmitCompilationDbEntry(comstr):
         dbtarget = __CompilationDbNode(source)
 
         entry = env.__COMPILATIONDB_Entry(
-            target=dbtarget,
-            source=[],
-            __COMPILATIONDB_UTARGET=target,
-            __COMPILATIONDB_USOURCE=source,
-            __COMPILATIONDB_UACTION=user_action,
+            target=dbtarget, source=[], __COMPILATIONDB_UTARGET=target,
+            __COMPILATIONDB_USOURCE=source, __COMPILATIONDB_UACTION=user_action,
             __COMPILATIONDB_ENV=env)
 
         # TODO: Technically, these next two lines should not be required: it should be fine to
@@ -112,11 +110,11 @@ def CompilationDbEntryAction(target, source, env, **kw):
     command = env['__COMPILATIONDB_UACTION'].strfunction(
         target=env['__COMPILATIONDB_UTARGET'],
         source=env['__COMPILATIONDB_USOURCE'],
-        env=env['__COMPILATIONDB_ENV'],)
+        env=env['__COMPILATIONDB_ENV'],
+    )
 
     entry = {
-        "directory": env.Dir('#').abspath,
-        "command": command,
+        "directory": env.Dir('#').abspath, "command": command,
         "file": str(env['__COMPILATIONDB_USOURCE'][0])
     }
 
@@ -130,21 +128,19 @@ def WriteCompilationDb(target, source, env):
         entries.append(s.read())
 
     with open(str(target[0]), 'w') as target_file:
-        json.dump(entries, target_file,
-                  sort_keys=True,
-                  indent=4,
-                  separators=(',', ': '))
+        json.dump(entries, target_file, sort_keys=True, indent=4, separators=(',', ': '))
 
 
 def ScanCompilationDb(node, env, path):
     return __COMPILATION_DB_ENTRIES
 
+
 def generate(env, **kwargs):
 
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
 
-    env['COMPILATIONDB_COMSTR'] = kwargs.get(
-        'COMPILATIONDB_COMSTR', 'Building compilation database $TARGET')
+    env['COMPILATIONDB_COMSTR'] = kwargs.get('COMPILATIONDB_COMSTR',
+                                             'Building compilation database $TARGET')
 
     components_by_suffix = itertools.chain(
         itertools.product(_CSuffixes, [
@@ -163,28 +159,20 @@ def generate(env, **kwargs):
 
         # Assumes a dictionary emitter
         emitter = builder.emitter[suffix]
-        builder.emitter[suffix] = SCons.Builder.ListEmitter(
-            [
-                emitter,
-                makeEmitCompilationDbEntry(command),
-            ]
-        )
+        builder.emitter[suffix] = SCons.Builder.ListEmitter([
+            emitter,
+            makeEmitCompilationDbEntry(command),
+        ])
 
     env['BUILDERS']['__COMPILATIONDB_Entry'] = SCons.Builder.Builder(
-        action=SCons.Action.Action(CompilationDbEntryAction, None),
-    )
+        action=SCons.Action.Action(CompilationDbEntryAction, None), )
 
     env['BUILDERS']['__COMPILATIONDB_Database'] = SCons.Builder.Builder(
         action=SCons.Action.Action(WriteCompilationDb, "$COMPILATIONDB_COMSTR"),
-        target_scanner=SCons.Scanner.Scanner(
-            function=ScanCompilationDb,
-            node_class=None)
-    )
+        target_scanner=SCons.Scanner.Scanner(function=ScanCompilationDb, node_class=None))
 
     def CompilationDatabase(env, target):
-        result = env.__COMPILATIONDB_Database(
-            target=target,
-            source=[])
+        result = env.__COMPILATIONDB_Database(target=target, source=[])
 
         env.AlwaysBuild(result)
         env.NoCache(result)
@@ -192,6 +180,7 @@ def generate(env, **kwargs):
         return result
 
     env.AddMethod(CompilationDatabase, 'CompilationDatabase')
+
 
 def exists(env):
     return True

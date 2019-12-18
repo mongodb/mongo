@@ -96,14 +96,14 @@ def make_tar_archive(opts):
         enclosing_file_directory = os.path.dirname(temp_file_location)
         if not os.path.exists(enclosing_file_directory):
             os.makedirs(enclosing_file_directory)
-        print "copying %s => %s" % (input_filename, temp_file_location)
+        print("copying %s => %s" % (input_filename, temp_file_location))
         if os.path.isdir(input_filename):
             shutil.copytree(input_filename, temp_file_location)
         else:
             shutil.copy2(input_filename, temp_file_location)
         tar_command.append(preferred_filename)
 
-    print " ".join(tar_command)
+    print(" ".join(tar_command))
     # execute the full tar command
     run_directory = os.path.join(os.getcwd(), enclosing_archive_directory)
     proc = Popen(tar_command, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=run_directory)
@@ -137,10 +137,10 @@ def parse_options(args):
     parser = optparse.OptionParser()
     parser.add_option('-o', dest='output_filename', default=None,
                       help='Name of the archive to output.', metavar='FILE')
-    parser.add_option('--format', dest='archive_format', default=None, choices=('zip', 'tar',
-                                                                                'tgz'),
-                      help=('Format of archive to create.  '
-                            'If omitted, use the suffix of the output filename to decide.'))
+    parser.add_option(
+        '--format', dest='archive_format', default=None, choices=('zip', 'tar', 'tgz'),
+        help=('Format of archive to create.  '
+              'If omitted, use the suffix of the output filename to decide.'))
     parser.add_option('--transform', action='append', dest='transformations', default=[])
 
     (opts, input_filenames) = parser.parse_args(args)
@@ -171,7 +171,7 @@ def parse_options(args):
             xform.replace(os.path.altsep or os.path.sep, os.path.sep).split('=', 1)
             for xform in opts.transformations
         ]
-    except Exception, err:  # pylint: disable=broad-except
+    except Exception as err:  # pylint: disable=broad-except
         parser.error(err)
 
     return opts

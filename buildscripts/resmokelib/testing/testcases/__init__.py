@@ -1,7 +1,5 @@
 """Package containing subclasses of unittest.TestCase."""
 
-from __future__ import absolute_import
-
 from .interface import make_test_case
 from ...utils import autoloader as _autoloader
 

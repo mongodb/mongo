@@ -1,8 +1,6 @@
 #!/usr/bin/env python2
 """Scons module."""
 
-from __future__ import print_function
-
 import os
 import sys
 

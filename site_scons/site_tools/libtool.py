@@ -1,5 +1,6 @@
 import SCons
 
+
 def generate(env):
 
     env['AR'] = 'libtool'
@@ -12,6 +13,7 @@ def generate(env):
     # Disable running ranlib, since we added 's' above
     env['RANLIBCOM'] = noop_action
     env['RANLIBCOMSTR'] = 'Skipping ranlib for libtool generated target $TARGET'
+
 
 def exists(env):
     return env.detect('libtool')

@@ -1,24 +1,26 @@
 import SCons
 
+
 def exists(env):
     return True
+
 
 def generate(env):
 
     env.Tool('install')
 
     suffix_map = {
-        env.subst('$PROGSUFFIX') : 'bin',
-        '.dylib' : 'lib',
+        env.subst('$PROGSUFFIX'): 'bin',
+        '.dylib': 'lib',
         # TODO: These 'lib' answers are incorrect. The location for the debug info
         # should be the same as the target itself, which might be bin or lib. We need
         # a solution for that. When that is fixed, add 'Program' back into the list
         # of separate debug targets in the separate_debug.py tool.
-        '.dSYM' : 'lib',
-        '.debug' : 'lib',
-        '.so' : 'lib',
-        '.dll' : 'bin',
-        '.lib' : 'lib',
+        '.dSYM': 'lib',
+        '.debug': 'lib',
+        '.so': 'lib',
+        '.dll': 'bin',
+        '.lib': 'lib',
     }
 
     def auto_install(env, target, source, **kwargs):
@@ -67,7 +69,8 @@ def generate(env):
             if auto_install_location:
                 tentry_install_tags = env.get('INSTALL_ALIAS', [])
                 setattr(tentry.attributes, 'INSTALL_ALIAS', tentry_install_tags)
-                install = env.AutoInstall(auto_install_location, tentry, INSTALL_ALIAS=tentry_install_tags)
+                install = env.AutoInstall(auto_install_location, tentry,
+                                          INSTALL_ALIAS=tentry_install_tags)
         return (target, source)
 
     def add_emitter(builder):
@@ -99,7 +102,7 @@ def generate(env):
 
     from SCons.Tool import install
     base_install_builder = install.BaseInstallBuilder
-    assert(base_install_builder.target_scanner == None)
+    assert (base_install_builder.target_scanner == None)
 
     base_install_builder.target_scanner = SCons.Scanner.Scanner(
         function=scan_for_transitive_install,

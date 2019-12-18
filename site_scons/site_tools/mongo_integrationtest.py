@@ -12,10 +12,10 @@ def register_integration_test(env, test):
     env.Alias('$INTEGRATION_TEST_ALIAS', installed_test)
 
 def integration_test_list_builder_action(env, target, source):
-    ofile = open(str(target[0]), 'wb')
+    ofile = open(str(target[0]), 'w')
     try:
         for s in _integration_tests:
-            print '\t' + str(s)
+            print('\t' + str(s))
             ofile.write('%s\n' % s)
     finally:
         ofile.close()
@@ -31,9 +31,10 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     env.RegisterIntegrationTest(result[0])
     return result
 
+
 def generate(env):
     env.Command('$INTEGRATION_TEST_LIST', env.Value(_integration_tests),
-            Action(integration_test_list_builder_action, "Generating $TARGET"))
+                Action(integration_test_list_builder_action, "Generating $TARGET"))
     env.AddMethod(register_integration_test, 'RegisterIntegrationTest')
     env.AddMethod(build_cpp_integration_test, 'CppIntegrationTest')
     env.Alias('$INTEGRATION_TEST_ALIAS', '$INTEGRATION_TEST_LIST')

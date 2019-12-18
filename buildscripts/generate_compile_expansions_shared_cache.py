@@ -6,8 +6,6 @@ Invoke by specifying an output file.
 $ python generate_compile_expansions.py --out compile_expansions.yml
 """
 
-from __future__ import print_function
-
 import argparse
 import json
 import os

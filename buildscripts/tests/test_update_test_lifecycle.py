@@ -2,8 +2,6 @@
 Tests for buildscripts/update_test_lifecycle.py.
 """
 
-from __future__ import absolute_import
-
 import collections
 import copy
 import datetime
@@ -391,10 +389,10 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             test_fail_rates=self.CONFIG.test_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js", ["unreliable"]),
-                                                    ]))
+        self.transition_from_reliable_to_unreliable(
+            config, collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable"]),
+            ]))
 
     def test_transition_task_from_reliable_to_unreliable(self):
         """
@@ -405,11 +403,10 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             task_fail_rates=self.CONFIG.task_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js",
-                                                         ["unreliable|jsCore_WT"]),
-                                                    ]))
+        self.transition_from_reliable_to_unreliable(
+            config, collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable|jsCore_WT"]),
+            ]))
 
     def test_transition_variant_from_reliable_to_unreliable(self):
         """
@@ -420,11 +417,11 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js",
-                                                         ["unreliable|jsCore_WT|linux-64"]),
-                                                    ]))
+        self.transition_from_reliable_to_unreliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64"]),
+            ]))
 
     def test_transition_distro_from_reliable_to_unreliable(self):
         """
@@ -435,11 +432,11 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js",
-                                                         ["unreliable|jsCore_WT|linux-64|rhel62"]),
-                                                    ]))
+        self.transition_from_reliable_to_unreliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64|rhel62"]),
+            ]))
 
     def test_transition_from_reliable_to_unreliable(self):
         """
@@ -452,15 +449,16 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(unacceptable=0.1),
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js", [
-                                                            "unreliable",
-                                                            "unreliable|jsCore_WT",
-                                                            "unreliable|jsCore_WT|linux-64",
-                                                            "unreliable|jsCore_WT|linux-64|rhel62",
-                                                        ]),
-                                                    ]))
+        self.transition_from_reliable_to_unreliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", [
+                    "unreliable",
+                    "unreliable|jsCore_WT",
+                    "unreliable|jsCore_WT|linux-64",
+                    "unreliable|jsCore_WT|linux-64|rhel62",
+                ]),
+            ]))
 
     def transition_from_unreliable_to_reliable(self, config, initial_tags):
         """
@@ -530,9 +528,10 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         # The tags for variant and distro have been removed.
-        self.assertEqual(updated_tags,
-                         collections.OrderedDict([("jstests/core/all.js",
-                                                   ["unreliable", "unreliable|jsCore_WT"])]))
+        self.assertEqual(
+            updated_tags,
+            collections.OrderedDict([("jstests/core/all.js", ["unreliable",
+                                                              "unreliable|jsCore_WT"])]))
 
     def test_non_running_at_all_is_reliable(self):
         """
@@ -574,10 +573,10 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             test_fail_rates=self.CONFIG.test_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js", ["unreliable"]),
-                                                    ]))
+        self.transition_from_unreliable_to_reliable(
+            config, collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable"]),
+            ]))
 
     def test_transition_task_from_unreliable_to_reliable(self):
         """
@@ -588,11 +587,10 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             task_fail_rates=self.CONFIG.task_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js",
-                                                         ["unreliable|jsCore_WT"]),
-                                                    ]))
+        self.transition_from_unreliable_to_reliable(
+            config, collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable|jsCore_WT"]),
+            ]))
 
     def test_transition_variant_from_unreliable_to_reliable(self):
         """
@@ -603,11 +601,11 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js",
-                                                         ["unreliable|jsCore_WT|linux-64"]),
-                                                    ]))
+        self.transition_from_unreliable_to_reliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64"]),
+            ]))
 
     def test_transition_distro_from_unreliable_to_reliable(self):
         """
@@ -618,11 +616,11 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
         config = self.CONFIG._replace(
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js",
-                                                         ["unreliable|jsCore_WT|linux-64|rhel62"]),
-                                                    ]))
+        self.transition_from_unreliable_to_reliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64|rhel62"]),
+            ]))
 
     def test_transition_from_unreliable_to_reliable(self):
         """
@@ -636,15 +634,16 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(acceptable=0.9),
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js", [
-                                                            "unreliable",
-                                                            "unreliable|jsCore_WT",
-                                                            "unreliable|jsCore_WT|linux-64",
-                                                            "unreliable|jsCore_WT|linux-64|rhel62",
-                                                        ]),
-                                                    ]))
+        self.transition_from_unreliable_to_reliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", [
+                    "unreliable",
+                    "unreliable|jsCore_WT",
+                    "unreliable|jsCore_WT|linux-64",
+                    "unreliable|jsCore_WT|linux-64|rhel62",
+                ]),
+            ]))
 
     def test_remain_reliable(self):
         """
@@ -728,15 +727,16 @@ class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-meth
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9),
             reliable_min_runs=100)
 
-        self.transition_from_unreliable_to_reliable(config,
-                                                    collections.OrderedDict([
-                                                        ("jstests/core/all.js", [
-                                                            "unreliable",
-                                                            "unreliable|jsCore_WT",
-                                                            "unreliable|jsCore_WT|linux-64",
-                                                            "unreliable|jsCore_WT|linux-64|rhel62",
-                                                        ]),
-                                                    ]))
+        self.transition_from_unreliable_to_reliable(
+            config,
+            collections.OrderedDict([
+                ("jstests/core/all.js", [
+                    "unreliable",
+                    "unreliable|jsCore_WT",
+                    "unreliable|jsCore_WT|linux-64",
+                    "unreliable|jsCore_WT|linux-64|rhel62",
+                ]),
+            ]))
 
     def test_obeys_reliable_time_period(self):
         """
@@ -964,7 +964,7 @@ class MockEvergreenConfig(object):
     def __init__(self, tasks, variants):
         self.task_names = tasks
         self.variants = {}
-        for name, fields in variants.items():
+        for name, fields in list(variants.items()):
             self.variants[name] = MockVariant(fields["tasks"], fields["distros"])
 
     def get_variant(self, variant_name):

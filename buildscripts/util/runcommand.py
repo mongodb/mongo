@@ -1,28 +1,12 @@
 """Utility to support running a command in a subprocess."""
 
-from __future__ import print_function
-
 import os
 import pipes
 import shlex
 import sys
+import subprocess
 
 from . import fileops
-
-# The subprocess32 module is untested on Windows and thus isn't recommended for use, even when it's
-# installed. See https://github.com/google/python-subprocess32/blob/3.2.7/README.md#usage.
-if os.name == "posix" and sys.version_info[0] == 2:
-    try:
-        import subprocess32 as subprocess
-    except ImportError:
-        import warnings
-        warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
-                       " available. When using the subprocess module, a child process may"
-                       " trigger an invalid free(). See SERVER-22219 for more details."),
-                      RuntimeWarning)
-        import subprocess  # type: ignore
-else:
-    import subprocess
 
 
 class RunCommand(object):
@@ -75,7 +59,7 @@ class RunCommand(object):
 
     def execute_with_output(self):
         """Execute the command, return result as a string."""
-        return subprocess.check_output(self._cmd_list())
+        return subprocess.check_output(self._cmd_list()).decode('utf-8')
 
     def execute_save_output(self):
         """Execute the command, save result in 'self.output_file' and return returncode."""

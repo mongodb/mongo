@@ -7,9 +7,6 @@ Usage:
     python buildscsripts/fetch_test_lifecycle.py evergreen-project revision
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import logging
 import optparse
 import os
@@ -138,38 +135,44 @@ def main():
     parser = optparse.OptionParser(
         description=textwrap.dedent(main.__doc__), usage="Usage: %prog [options] evergreen-project")
 
-    parser.add_option("--revision", dest="revision", metavar="<revision>", default="HEAD",
-                      help=("The project revision for which to retrieve the test lifecycle tags"
-                            " file."))
+    parser.add_option(
+        "--revision", dest="revision", metavar="<revision>", default="HEAD",
+        help=("The project revision for which to retrieve the test lifecycle tags"
+              " file."))
 
-    parser.add_option("--metadataRepo", dest="metadata_repo_url", metavar="<metadata-repo-url>",
-                      default="git@github.com:mongodb/mongo-test-metadata.git",
-                      help=("The URL to the metadata repository that contains the test lifecycle"
-                            " tags file."))
+    parser.add_option(
+        "--metadataRepo", dest="metadata_repo_url", metavar="<metadata-repo-url>",
+        default="git@github.com:mongodb/mongo-test-metadata.git",
+        help=("The URL to the metadata repository that contains the test lifecycle"
+              " tags file."))
 
-    parser.add_option("--lifecycleFile", dest="lifecycle_file", metavar="<lifecycle-file>",
-                      default="etc/test_lifecycle.yml",
-                      help=("The path to the test lifecycle tags file, relative to the root of the"
-                            " metadata repository. Defaults to '%default'."))
+    parser.add_option(
+        "--lifecycleFile", dest="lifecycle_file", metavar="<lifecycle-file>",
+        default="etc/test_lifecycle.yml",
+        help=("The path to the test lifecycle tags file, relative to the root of the"
+              " metadata repository. Defaults to '%default'."))
 
-    parser.add_option("--referencesFile", dest="references_file", metavar="<references-file>",
-                      default="references.yml",
-                      help=("The path to the metadata references file, relative to the root of the"
-                            " metadata repository. Defaults to '%default'."))
+    parser.add_option(
+        "--referencesFile", dest="references_file", metavar="<references-file>",
+        default="references.yml",
+        help=("The path to the metadata references file, relative to the root of the"
+              " metadata repository. Defaults to '%default'."))
 
-    parser.add_option("--destinationFile", dest="destination_file", metavar="<destination-file>",
-                      default="etc/test_lifecycle.yml",
-                      help=("The path where the lifecycle file should be available when this script"
-                            " completes successfully. This path is absolute or relative to the"
-                            " current working directory. Defaults to '%default'."))
+    parser.add_option(
+        "--destinationFile", dest="destination_file", metavar="<destination-file>",
+        default="etc/test_lifecycle.yml",
+        help=("The path where the lifecycle file should be available when this script"
+              " completes successfully. This path is absolute or relative to the"
+              " current working directory. Defaults to '%default'."))
 
     parser.add_option("--logLevel", dest="log_level", metavar="<log-level>",
                       choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO",
                       help="The log level: DEBUG, INFO, WARNING or ERROR. Defaults to '%default'.")
 
-    parser.add_option("--logFile", dest="log_file", metavar="<log-file>", default=None,
-                      help=("The destination file for the logs. If not set the script will log to"
-                            " the standard output"))
+    parser.add_option(
+        "--logFile", dest="log_file", metavar="<log-file>", default=None,
+        help=("The destination file for the logs. If not set the script will log to"
+              " the standard output"))
 
     options, args = parser.parse_args()
 

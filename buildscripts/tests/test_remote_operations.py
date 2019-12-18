@@ -4,8 +4,6 @@
    Note - Tests require sshd to be enabled on localhost with paswordless login
    and can fail otherwise."""
 
-from __future__ import absolute_import
-
 import os
 import shutil
 import tempfile

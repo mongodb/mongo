@@ -1,5 +1,4 @@
 """Unit tests for the buildscripts.ciconfig.tags module."""
-from __future__ import absolute_import
 
 import os
 import unittest
@@ -157,7 +156,9 @@ class TestTagsConfig(unittest.TestCase):
         test_pattern = "jstests/core/example.js"
 
         def custom_cmp(tag_a, tag_b):
-            return cmp(tag_a.split("|"), tag_b.split("|"))
+            a_split = tag_a.split("|")
+            b_split = tag_b.split("|")
+            return (a_split > b_split) - (a_split < b_split)
 
         conf = _tags.TagsConfig.from_file(TEST_FILE_PATH, cmp_func=custom_cmp)
         tags = conf.get_tags(test_kind, test_pattern)

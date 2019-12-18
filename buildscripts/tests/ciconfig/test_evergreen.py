@@ -1,7 +1,5 @@
 """Unit tests for the buildscripts.ciconfig.evergreen module."""
 
-from __future__ import absolute_import
-
 import datetime
 import os
 import unittest

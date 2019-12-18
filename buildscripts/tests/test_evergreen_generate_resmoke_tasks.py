@@ -1,7 +1,5 @@
 """Unit tests for the generate_resmoke_suite script."""
 
-from __future__ import absolute_import
-
 import datetime
 import math
 import os
@@ -346,7 +344,8 @@ class RenderSuites(unittest.TestCase):
 
         suites = [create_suite(start=3 * i) for i in range(size)]
         expected = [
-            self.EXPECTED_FORMAT.format(*range(3 * i, 3 * (i + 1))) for i in range(len(suites))
+            self.EXPECTED_FORMAT.format(*list(range(3 * i, 3 * (i + 1))))
+            for i in range(len(suites))
         ]
 
         m = mock_open(read_data=yaml.dump({"selector": {"roots": [], "excludes": ["fixed"]}}))
@@ -355,7 +354,7 @@ class RenderSuites(unittest.TestCase):
         handle = m()
 
         # The other writes are for the headers.
-        self.assertEquals(len(suites) * 2, handle.write.call_count)
+        self.assertEqual(len(suites) * 2, handle.write.call_count)
         handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
         calls = [
             call(os.path.join(under_test.TEST_SUITE_DIR, "suite_name.yml"), "r")
@@ -387,7 +386,7 @@ class RenderMiscSuites(unittest.TestCase):
         handle = m()
 
         # The other writes are for the headers.
-        self.assertEquals(2, handle.write.call_count)
+        self.assertEqual(2, handle.write.call_count)
         handle.write.assert_any_call("""selector:
   exclude_files:
   - test0

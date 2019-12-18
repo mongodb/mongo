@@ -548,9 +548,9 @@ functions:
           chmod 0600 ${private_key_file|/dev/null}
         fi
 
-        if [ ! -d ~.aws ]; then
-          mkdir -p ~/.aws
-        fi
+        # Ensure a clean aws configuration state
+        rm -rf ~/.aws
+        mkdir -p ~/.aws
 
         # If ${aws_profile_remote} is not specified then the config & credentials are
         # stored in the 'default' profile.
@@ -658,7 +658,7 @@ functions:
             set -o errexit
             set -o verbose
             if [ "${build_openssl|}" = "true" ]; then
-                bash buildscripts/fetch_and_build_openssl.sh "${python|python}" "${openssl_make_flags|}" "${openssl_config_flags|}"
+                bash buildscripts/fetch_and_build_openssl.sh "${python|python3}" "${openssl_make_flags|}" "${openssl_config_flags|}"
             fi
 
   "umount shared scons directory" :

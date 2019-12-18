@@ -1,7 +1,5 @@
 """Fixture for executing JSTests against."""
 
-from __future__ import absolute_import
-
 from .interface import NoOpFixture as _NoOpFixture
 from .interface import make_fixture
 from ...utils import autoloader as _autoloader

@@ -1,7 +1,5 @@
 """Unit tests for the buildscripts.git module."""
 
-from __future__ import absolute_import
-
 import subprocess
 import unittest
 
@@ -49,7 +47,7 @@ class TestRepository(unittest.TestCase):
     def _check_gito_command(self, method, command, params):
         # Initialize subprocess mock.
         self.subprocess.call_output_args = None  # pylint: disable=attribute-defined-outside-init
-        self.subprocess.call_output = str(method)
+        self.subprocess.call_output = str(method).encode("utf-8")
         self.subprocess.call_returncode = 0
         # Call method.
         value = method(params)
@@ -80,7 +78,7 @@ class MockSubprocess(object):
     def __init__(self):
         self.call_args = None
         self.call_returncode = 0
-        self.call_output = ""
+        self.call_output = b""
 
     def Popen(self, args, **kwargs):  # pylint: disable=invalid-name,unused-argument
         self.call_args = args
@@ -93,4 +91,4 @@ class MockProcess(object):
         self._output = output
 
     def communicate(self):
-        return self._output, ""
+        return self._output, b""

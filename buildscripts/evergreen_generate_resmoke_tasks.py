@@ -6,7 +6,7 @@ Analyze the evergreen history for tests run under the given task and create new 
 to attempt to keep the task runtime under a specified amount.
 """
 
-from __future__ import absolute_import
+
 
 import datetime
 from datetime import timedelta
@@ -593,7 +593,7 @@ class TestStats(object):
     def get_tests_runtimes(self):
         """Return the list of (test_file, runtime_in_secs) tuples ordered by decreasing runtime."""
         tests = []
-        for test_file, runtime_info in self._runtime_by_test.items():
+        for test_file, runtime_info in list(self._runtime_by_test.items()):
             duration = runtime_info["duration"]
             test_name = testname.get_short_name_from_test_file(test_file)
             for _, hook_runtime_info in self._hook_runtime_by_test[test_name].items():

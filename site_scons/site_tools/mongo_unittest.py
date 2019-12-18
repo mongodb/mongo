@@ -11,10 +11,10 @@ def register_unit_test(env, test):
     env.Alias('$UNITTEST_ALIAS', test)
 
 def unit_test_list_builder_action(env, target, source):
-    ofile = open(str(target[0]), 'wb')
+    ofile = open(str(target[0]), 'w')
     try:
         for s in _unittests:
-            print '\t' + str(s)
+            print('\t' + str(s))
             ofile.write('%s\n' % s)
     finally:
         ofile.close()
@@ -33,9 +33,10 @@ def build_cpp_unit_test(env, target, source, **kwargs):
         env.Install("#/build/unittests/", result[0])
     return result
 
+
 def generate(env):
     env.Command('$UNITTEST_LIST', env.Value(_unittests),
-            Action(unit_test_list_builder_action, "Generating $TARGET"))
+                Action(unit_test_list_builder_action, "Generating $TARGET"))
     env.AddMethod(register_unit_test, 'RegisterUnitTest')
     env.AddMethod(build_cpp_unit_test, 'CppUnitTest')
     env.Alias('$UNITTEST_ALIAS', '$UNITTEST_LIST')

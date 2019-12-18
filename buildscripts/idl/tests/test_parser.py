@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #
 # Copyright (C) 2018-present MongoDB, Inc.
 #
@@ -29,8 +29,6 @@
 #
 """Test cases for IDL parser."""
 # pylint: disable=too-many-lines
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import textwrap
 import unittest

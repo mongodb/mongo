@@ -10,7 +10,7 @@ There is also a -d mode that assumes you only want to run one copy of ESLint per
 parameter supplied. This lets ESLint search for candidate files to lint.
 """
 
-from __future__ import print_function
+
 
 import os
 import shutil
@@ -20,7 +20,7 @@ import sys
 import tarfile
 import tempfile
 import threading
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
 
@@ -57,7 +57,7 @@ ESLINT_SOURCE_TAR_BASE = string.Template(ESLINT_PROGNAME + "-$platform-$arch")
 
 def callo(args):
     """Call a program, and capture its output."""
-    return subprocess.check_output(args)
+    return subprocess.check_output(args).decode('utf-8')
 
 
 def extract_eslint(tar_path, target_file):
@@ -84,7 +84,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
 
     # Download the file
     print("Downloading ESLint %s from %s, saving to %s" % (ESLINT_VERSION, url, temp_tar_file))
-    urllib.urlretrieve(url, temp_tar_file)
+    urllib.request.urlretrieve(url, temp_tar_file)
 
     eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
     extract_eslint(temp_tar_file, eslint_distfile)

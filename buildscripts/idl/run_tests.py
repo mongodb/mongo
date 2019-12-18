@@ -32,7 +32,6 @@ IDL Unit Test runner.
 
 Generates a file called results.xml in the XUnit format.
 """
-from __future__ import absolute_import, print_function
 
 import sys
 import unittest

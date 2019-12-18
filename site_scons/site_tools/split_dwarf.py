@@ -26,6 +26,7 @@ _CXXSuffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++']
 if SCons.Util.case_sensitive_suffixes('.c', '.C'):
     _CXXSuffixes.append('.C')
 
+
 def _dwo_emitter(target, source, env):
     new_targets = []
     for t in target:
@@ -40,6 +41,7 @@ def _dwo_emitter(target, source, env):
     targets = target + new_targets
     return (targets, source)
 
+
 def generate(env):
     suffixes = []
     if _splitDwarfFlag in env['CCFLAGS']:
@@ -52,7 +54,7 @@ def generate(env):
 
     for object_builder in SCons.Tool.createObjBuilders(env):
         emitterdict = object_builder.builder.emitter
-        for suffix in emitterdict.iterkeys():
+        for suffix in emitterdict.keys():
             if not suffix in suffixes:
                 continue
             base = emitterdict[suffix]
@@ -60,6 +62,7 @@ def generate(env):
                 base,
                 _dwo_emitter,
             ])
+
 
 def exists(env):
     return any(_splitDwarfFlag in env[f] for f in ['CCFLAGS', 'CFLAGS', 'CXXFLAGS'])

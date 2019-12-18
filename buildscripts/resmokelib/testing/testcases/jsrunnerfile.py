@@ -1,7 +1,5 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
 
-from __future__ import absolute_import
-
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import core
 from buildscripts.resmokelib import utils

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Install multiple versions of MongoDB on a machine."""
 
-from __future__ import print_function
-
 import contextlib
 import errno
 import json
@@ -16,7 +14,7 @@ import tarfile
 import tempfile
 import threading
 import traceback
-import urlparse
+import urllib.parse
 import zipfile
 
 import requests
@@ -32,7 +30,7 @@ def dump_stacks(_signal_num, _frame):  # pylint: disable=unused-argument
 
     print("Total Threads: {:d}".format(len(threads)))
 
-    for tid, stack in sys._current_frames().items():  # pylint: disable=protected-access
+    for tid, stack in list(sys._current_frames().items()):  # pylint: disable=protected-access
         print("Thread {:d}".format(tid))
         print("".join(traceback.format_stack(stack)))
     print("======================================")
@@ -205,7 +203,7 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
 
         urls = []
         requested_version_parts = get_version_parts(version)
-        for link_version, link_url in self.links.iteritems():
+        for link_version, link_url in self.links.items():
             link_version_parts = get_version_parts(link_version)
             if link_version_parts[:len(requested_version_parts)] == requested_version_parts:
                 # The 'link_version' is a candidate for the requested 'version' if
@@ -222,9 +220,10 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
                 urls.append((link_version, link_url))
 
         if not urls:
-            print("Cannot find a link for version {}, versions {} found.".format(
-                version, self.links), file=sys.stderr)
-            for ver, generic_url in self.generic_links.iteritems():
+            print(
+                "Cannot find a link for version {}, versions {} found.".format(version, self.links),
+                file=sys.stderr)
+            for ver, generic_url in self.generic_links.items():
                 parts = get_version_parts(ver)
                 if parts[:len(requested_version_parts)] == requested_version_parts:
                     if "-" in version and ver != version:
@@ -236,11 +235,11 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
             else:
                 print("Falling back to generic architecture.")
 
-        urls.sort(key=lambda (version, _): get_version_parts(version, for_sorting=True))
+        urls.sort(key=lambda link: get_version_parts(link[0], for_sorting=True))
         full_version = urls[-1][0]
         url = urls[-1][1]
         extract_dir = url.split("/")[-1][:-4]
-        file_suffix = os.path.splitext(urlparse.urlparse(url).path)[1]
+        file_suffix = os.path.splitext(urllib.parse.urlparse(url).path)[1]
 
         # Only download if we don't already have the directory.
         # Note, we cannot detect if 'latest' has already been downloaded, as the name
@@ -402,25 +401,30 @@ we'll pull the highest non-rc version compatible with the version specified.
 
     parser.add_option("-i", "--installDir", dest="install_dir",
                       help="Directory to install the download archive. [REQUIRED]", default=None)
-    parser.add_option("-l", "--linkDir", dest="link_dir",
-                      help=("Directory to contain links to all binaries for each version in"
-                            " the install directory. [REQUIRED]"), default=None)
+    parser.add_option(
+        "-l", "--linkDir", dest="link_dir",
+        help=("Directory to contain links to all binaries for each version in"
+              " the install directory. [REQUIRED]"), default=None)
     editions = ["base", "enterprise", "targeted"]
-    parser.add_option("-e", "--edition", dest="edition", choices=editions,
-                      help=("Edition of the build to download, choose from {}, [default:"
-                            " '%default'].".format(editions)), default="base")
-    parser.add_option("-p", "--platform", dest="platform",
-                      help=("Platform to download [REQUIRED]. Examples include: 'linux',"
-                            " 'osx', 'rhel62', 'windows'."), default=None)
-    parser.add_option("-a", "--architecture", dest="architecture",
-                      help=("Architecture to download, [default: '%default']. Examples include:"
-                            " 'arm64', 'ppc64le', 's390x' and 'x86_64'."), default="x86_64")
-    parser.add_option("-u", "--useLatest", dest="use_latest", action="store_true",
-                      help=("If specified, the latest (nightly) version will be downloaded,"
-                            " if it exists, for the version specified. For example, if specifying"
-                            " version 3.2 for download, the nightly version for 3.2 will be"
-                            " downloaded if it exists, otherwise the 'highest' version will be"
-                            " downloaded, i.e., '3.2.17'"), default=False)
+    parser.add_option(
+        "-e", "--edition", dest="edition", choices=editions,
+        help=("Edition of the build to download, choose from {}, [default:"
+              " '%default'].".format(editions)), default="base")
+    parser.add_option(
+        "-p", "--platform", dest="platform",
+        help=("Platform to download [REQUIRED]. Examples include: 'linux',"
+              " 'osx', 'rhel62', 'windows'."), default=None)
+    parser.add_option(
+        "-a", "--architecture", dest="architecture",
+        help=("Architecture to download, [default: '%default']. Examples include:"
+              " 'arm64', 'ppc64le', 's390x' and 'x86_64'."), default="x86_64")
+    parser.add_option(
+        "-u", "--useLatest", dest="use_latest", action="store_true",
+        help=("If specified, the latest (nightly) version will be downloaded,"
+              " if it exists, for the version specified. For example, if specifying"
+              " version 3.2 for download, the nightly version for 3.2 will be"
+              " downloaded if it exists, otherwise the 'highest' version will be"
+              " downloaded, i.e., '3.2.17'"), default=False)
 
     options, versions = parser.parse_args()
 

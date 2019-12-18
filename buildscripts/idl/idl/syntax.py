@@ -33,8 +33,6 @@ It maps 1-1 to the YAML file, and has not been checked if
 it follows the rules of the IDL, etc.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import itertools
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -70,7 +68,7 @@ class IDLSpec(object):
 
 
 def parse_array_type(name):
-    # type: (unicode) -> unicode
+    # type: (str) -> str
     """Parse a type name of the form 'array<type>' and extract type."""
     if not name.startswith("array<") and not name.endswith(">"):
         return None
@@ -94,8 +92,7 @@ def _zip_scalar(items, obj):
 def _item_and_type(dic):
     # type: (Dict[Any, List[Any]]) -> Iterator[Tuple[Any, Any]]
     """Return an Iterator of (key, value) pairs from a dictionary."""
-    return itertools.chain.from_iterable(
-        (_zip_scalar(value, key) for (key, value) in dic.viewitems()))
+    return itertools.chain.from_iterable((_zip_scalar(value, key) for (key, value) in dic.items()))
 
 
 class SymbolTable(object):
@@ -115,7 +112,7 @@ class SymbolTable(object):
         self.types = []  # type: List[Type]
 
     def _is_duplicate(self, ctxt, location, name, duplicate_class_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> bool
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> bool
         """Return true if the given item already exist in the symbol table."""
         for (item, entity_type) in _item_and_type({
                 "command": self.commands,
@@ -179,12 +176,12 @@ class SymbolTable(object):
             self.add_type(ctxt, idltype)
 
     def resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Optional[Union[Command, Enum, Struct, Type]]
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         return self._resolve_field_type(ctxt, location, field_name, type_name)
 
     def _resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Optional[Union[Command, Enum, Struct, Type]]
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         # pylint: disable=too-many-return-statements
 
@@ -226,10 +223,10 @@ class Global(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Global."""
-        self.cpp_namespace = None  # type: unicode
-        self.cpp_includes = []  # type: List[unicode]
+        self.cpp_namespace = None  # type: str
+        self.cpp_includes = []  # type: List[str]
         super(Global, self).__init__(file_name, line, column)
 
 
@@ -237,15 +234,15 @@ class Import(common.SourceLocation):
     """IDL imports object."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Imports section."""
-        self.imports = []  # type: List[unicode]
+        self.imports = []  # type: List[str]
 
         # These are not part of the IDL syntax but are produced by the parser.
         # List of imports with structs.
-        self.resolved_imports = []  # type: List[unicode]
+        self.resolved_imports = []  # type: List[str]
         # All imports directly or indirectly included
-        self.dependencies = []  # type: List[unicode]
+        self.dependencies = []  # type: List[str]
 
         super(Import, self).__init__(file_name, line, column)
 
@@ -262,16 +259,16 @@ class Type(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Type."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.cpp_type = None  # type: unicode
-        self.bson_serialization_type = None  # type: List[unicode]
-        self.bindata_subtype = None  # type: unicode
-        self.serializer = None  # type: unicode
-        self.deserializer = None  # type: unicode
-        self.default = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.cpp_type = None  # type: str
+        self.bson_serialization_type = None  # type: List[str]
+        self.bindata_subtype = None  # type: str
+        self.serializer = None  # type: str
+        self.deserializer = None  # type: str
+        self.default = None  # type: str
 
         super(Type, self).__init__(file_name, line, column)
 
@@ -288,15 +285,15 @@ class Field(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Field."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.type = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
+        self.description = None  # type: str
+        self.type = None  # type: str
         self.ignore = False  # type: bool
         self.optional = False  # type: bool
-        self.default = None  # type: unicode
+        self.default = None  # type: str
         self.supports_doc_sequence = False  # type: bool
         self.comparison_order = -1  # type: int
         self.non_const_getter = False  # type: bool
@@ -316,10 +313,10 @@ class ChainedStruct(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Type."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
 
         super(ChainedStruct, self).__init__(file_name, line, column)
 
@@ -332,10 +329,10 @@ class ChainedType(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Type."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
 
         super(ChainedType, self).__init__(file_name, line, column)
 
@@ -350,10 +347,10 @@ class Struct(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Struct."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
         self.strict = True  # type: bool
         self.immutable = False  # type: bool
         self.inline_chained_structs = True  # type: bool
@@ -363,14 +360,14 @@ class Struct(common.SourceLocation):
         self.fields = None  # type: List[Field]
 
         # Command only property
-        self.cpp_name = None  # type: unicode
+        self.cpp_name = None  # type: str
 
         # Internal property that is not represented as syntax. An imported struct is read from an
         # imported file, and no code is generated for it.
         self.imported = False  # type: bool
 
         # Internal property: cpp_namespace from globals section
-        self.cpp_namespace = None  # type: unicode
+        self.cpp_namespace = None  # type: str
 
         super(Struct, self).__init__(file_name, line, column)
 
@@ -383,10 +380,10 @@ class Command(Struct):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Command."""
-        self.namespace = None  # type: unicode
-        self.type = None  # type: unicode
+        self.namespace = None  # type: str
+        self.type = None  # type: str
 
         super(Command, self).__init__(file_name, line, column)
 
@@ -399,10 +396,10 @@ class EnumValue(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Enum."""
-        self.name = None  # type: unicode
-        self.value = None  # type: unicode
+        self.name = None  # type: str
+        self.value = None  # type: str
 
         super(EnumValue, self).__init__(file_name, line, column)
 
@@ -415,11 +412,11 @@ class Enum(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Enum."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.type = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.type = None  # type: str
         self.values = None  # type: List[EnumValue]
 
         # Internal property that is not represented as syntax. An imported enum is read from an
@@ -427,6 +424,6 @@ class Enum(common.SourceLocation):
         self.imported = False  # type: bool
 
         # Internal property: cpp_namespace from globals section
-        self.cpp_namespace = None  # type: unicode
+        self.cpp_namespace = None  # type: str
 
         super(Enum, self).__init__(file_name, line, column)

@@ -1,7 +1,5 @@
 """Test hook for verifying data consistency across a replica set."""
 
-from __future__ import absolute_import
-
 import os.path
 
 from . import jsfile

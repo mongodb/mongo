@@ -1,18 +1,10 @@
 """Mongo lock module."""
 
-from __future__ import print_function
-
 import re
 import sys
 
 import gdb
 import gdb.printing
-
-if sys.version_info[0] >= 3:
-    # GDB only permits converting a gdb.Value instance to its numerical address when using the
-    # long() constructor in Python 2 and not when using the int() constructor. We define the
-    # 'long' class as an alias for the 'int' class in Python 3 for compatibility.
-    long = int  # pylint: disable=redefined-builtin,invalid-name
 
 
 class NonExecutingThread(object):
@@ -238,7 +230,7 @@ class Graph(object):
 
 def find_thread(thread_dict, search_thread_id):
     """Find thread."""
-    for (_, thread) in thread_dict.items():
+    for (_, thread) in list(thread_dict.items()):
         if thread.thread_id == search_thread_id:
             return thread
     return None
@@ -305,8 +297,8 @@ def find_mutex_holder(graph, thread_dict, show):
         print("Mutex at {} held by {} waited on by {}".format(mutex_value, mutex_holder,
                                                               mutex_waiter))
     if graph:
-        graph.add_edge(mutex_waiter, Lock(long(mutex_value), "Mutex"))
-        graph.add_edge(Lock(long(mutex_value), "Mutex"), mutex_holder)
+        graph.add_edge(mutex_waiter, Lock(int(mutex_value), "Mutex"))
+        graph.add_edge(Lock(int(mutex_value), "Mutex"), mutex_holder)
 
 
 def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-many-locals
@@ -341,8 +333,8 @@ def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-
             print("MongoDB Lock at {} ({}) held by {} waited on by {}".format(
                 lock_head, lock_request["mode"], lock_holder, lock_waiter))
         if graph:
-            graph.add_edge(lock_waiter, Lock(long(lock_head), "MongoDB lock"))
-            graph.add_edge(Lock(long(lock_head), "MongoDB lock"), lock_holder)
+            graph.add_edge(lock_waiter, Lock(int(lock_head), "MongoDB lock"))
+            graph.add_edge(Lock(int(lock_head), "MongoDB lock"), lock_holder)
         lock_request_ptr = lock_request["next"]
 
 

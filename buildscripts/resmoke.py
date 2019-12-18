@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Command line utility for executing MongoDB tests of all kinds."""
 
-from __future__ import absolute_import
-
 import os.path
 import random
 import sys

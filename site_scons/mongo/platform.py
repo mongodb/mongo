@@ -1,5 +1,4 @@
 # -*- mode: python; -*-
-
 """
 Support code related to OS detection in general. System specific facilities or customization
 hooks live in mongo_platform_<PLATFORM>.py files.
@@ -11,6 +10,7 @@ import os
 #
 # This needs to precede the options section so that we can only offer some options on certain
 # operating systems.
+
 
 # This function gets the running OS as identified by Python
 # It should only be used to set up defaults for options/variables, because
@@ -59,6 +59,7 @@ def is_os_raw(target_os, os_list_to_check):
 # command-line. Treat this output as the value of HOST_OS
 def is_running_os(*os_list):
     return is_os_raw(get_running_os_name(), os_list)
+
 
 def env_os_is_wrapper(self, *os_list):
     return is_os_raw(self['TARGET_OS'], os_list)

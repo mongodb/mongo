@@ -1,7 +1,5 @@
 """Module for retrieving the configuration of resmoke.py test suites."""
 
-from __future__ import absolute_import
-
 import collections
 import optparse
 import os
@@ -109,6 +107,6 @@ def _get_yaml_config(kind, pathname):
         pathname = resmokeconfig.NAMED_SUITES[pathname]  # Expand 'pathname' to full path.
 
     if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
-        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'" % (kind,
-                                                                                     pathname))
+        raise optparse.OptionValueError(
+            "Expected a %s YAML config, but got '%s'" % (kind, pathname))
     return utils.load_yaml_file(pathname)

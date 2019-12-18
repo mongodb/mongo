@@ -63,7 +63,7 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
     @property
     def task_names(self):
         """Get the list of task names."""
-        return self._tasks_by_name.keys()
+        return list(self._tasks_by_name.keys())
 
     def get_task(self, task_name):
         """Return the task with the given name as a Task instance."""
@@ -72,7 +72,7 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
     @property
     def task_group_names(self):
         """Get the list of task_group names."""
-        return self._task_groups_by_name.keys()
+        return list(self._task_groups_by_name.keys())
 
     def get_task_group(self, task_group_name):
         """Return the task_group with the given name as a Task instance."""
@@ -94,7 +94,7 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
     @property
     def variant_names(self):
         """Get the list of build variant names."""
-        return self._variants_by_name.keys()
+        return list(self._variants_by_name.keys())
 
     def get_variant(self, variant_name):
         """Return the variant with the given name as a Variant instance."""

@@ -22,6 +22,7 @@ from pkg_resources import parse_version
 
 icecream_version_min = '1.1rc2'
 
+
 def generate(env):
 
     if not exists(env):
@@ -31,14 +32,16 @@ def generate(env):
     env['ICECC'] = env.WhereIs('$ICECC')
 
     if not 'ICERUN' in env:
-         env['ICERUN'] = env.File('$ICECC').File('icerun')
+        env['ICERUN'] = env.File('$ICECC').File('icerun')
 
     # Absoluteify, for parity with ICECC
     env['ICERUN'] = env.WhereIs('$ICERUN')
 
     # We can't handle sanitizer blacklist files, so disable icecc then, and just flow through
     # icerun to prevent slamming the local system with a huge -j value.
-    if any(f.startswith("-fsanitize-blacklist=") for fs in ['CCFLAGS', 'CFLAGS', 'CXXFLAGS'] for f in env[fs]):
+    if any(
+            f.startswith("-fsanitize-blacklist=") for fs in ['CCFLAGS', 'CFLAGS', 'CXXFLAGS']
+            for f in env[fs]):
         env['ICECC'] = '$ICERUN'
 
     # Make CC and CXX absolute paths too. It is better for icecc.
@@ -46,7 +49,7 @@ def generate(env):
     env['CXX'] = env.WhereIs('$CXX')
 
     # Make a predictable name for the toolchain
-    icecc_version_target_filename=env.subst('$CC$CXX').replace('/', '_')
+    icecc_version_target_filename = env.subst('$CC$CXX').replace('/', '_')
     icecc_version = env.Dir('$BUILD_ROOT/scons/icecc').File(icecc_version_target_filename)
 
     # Make an isolated environment so that our setting of ICECC_VERSION in the environment
@@ -63,12 +66,9 @@ def generate(env):
         env['ENV']['ICECC_CLANG_REMOTE_CPP'] = 1
     else:
         toolchain = toolchain_env.Command(
-            target=icecc_version,
-            source=['$ICECC_CREATE_ENV', '$CC', '$CXX'],
-            action=[
+            target=icecc_version, source=['$ICECC_CREATE_ENV', '$CC', '$CXX'], action=[
                 "${SOURCES[0]} --gcc ${SOURCES[1].abspath} ${SOURCES[2].abspath} $TARGET",
-            ]
-        )
+            ])
         env.AppendUnique(CCFLAGS=['-fdirectives-only'])
 
     # Add ICECC_VERSION to the environment, pointed at the generated
@@ -99,7 +99,7 @@ def generate(env):
     suffixes = _CSuffixes + _CXXSuffixes
     for object_builder in SCons.Tool.createObjBuilders(env):
         emitterdict = object_builder.builder.emitter
-        for suffix in emitterdict.iterkeys():
+        for suffix in emitterdict.keys():
             if not suffix in suffixes:
                 continue
             base = emitterdict[suffix]
@@ -128,6 +128,7 @@ def generate(env):
     # env['ENV']['ICECC_DEBUG'] = 'debug'
     # env['ENV']['ICECC_LOGFILE'] = 'icecc.log'
 
+
 def exists(env):
 
     icecc = env.get('ICECC', False)
@@ -135,10 +136,9 @@ def exists(env):
         return False
     icecc = env.WhereIs(icecc)
 
-    pipe = SCons.Action._subproc(env, SCons.Util.CLVar(icecc) + ['--version'],
-                                 stdin = 'devnull',
-                                 stderr = 'devnull',
-                                 stdout = subprocess.PIPE)
+    pipe = SCons.Action._subproc(env,
+                                 SCons.Util.CLVar(icecc) + ['--version'], stdin='devnull',
+                                 stderr='devnull', stdout=subprocess.PIPE, text=True)
 
     if pipe.wait() != 0:
         return False

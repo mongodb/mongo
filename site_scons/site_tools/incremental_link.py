@@ -14,9 +14,11 @@
 
 import SCons
 
+
 def _tag_as_precious(target, source, env):
     env.Precious(target)
     return target, source
+
 
 def generate(env):
     builders = env['BUILDERS']
@@ -26,6 +28,7 @@ def generate(env):
             emitter,
             _tag_as_precious,
         ])
+
 
 def exists(env):
     # By default, the windows linker is incremental, so unless

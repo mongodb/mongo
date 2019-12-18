@@ -21,6 +21,7 @@ import sys
 
 import SCons
 
+
 def idlc_emitter(target, source, env):
     """For each input IDL file, the tool produces a .cpp and .h file."""
     first_source = str(source[0])
@@ -43,7 +44,7 @@ IDLCAction = SCons.Action.Action('$IDLCCOM', '$IDLCCOMSTR')
 def idl_scanner(node, env, path):
     # Use the import scanner mode of the IDL compiler to file imported files
     cmd = [sys.executable, "buildscripts/idl/idlc.py",  '--include','src', str(node), '--write-dependencies']
-    deps_str = subprocess.check_output(cmd)
+    deps_str = subprocess.check_output(cmd).decode('utf-8')
 
     deps_list = deps_str.splitlines()
 

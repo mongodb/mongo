@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Unit tests for the resmokelib.testing.hooks.combine_benchmark_results module."""
 
-from __future__ import absolute_import
-
 import datetime
 import unittest
 
@@ -76,7 +74,7 @@ class TestCombineBenchmarkResults(CombineBenchmarkResultsFixture):
     def test_generate_reports(self):
         report = self.cbr_hook._generate_perf_plugin_report()
 
-        self.assertEqual(len(report.keys()), 4)
+        self.assertEqual(len(list(report.keys())), 4)
         self.assertEqual(len(report["results"]), 2)
 
         self.assertDictEqual(report["results"][0]["context"], _BM_CONTEXT)
@@ -124,13 +122,13 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
             self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_REPORT["name"]),
             _BM_MULTITHREAD_REPORT)
 
-        self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
+        self.assertEqual(len(list(self.bm_threads_report.thread_benchmark_map.keys())), 1)
 
         report = self.bm_threads_report.generate_perf_plugin_dict()
 
-        self.assertEqual(len(report.keys()), 1)
-        self.assertIn("10", report.keys())
-        self.assertNotIn("10_median", report.keys())
+        self.assertEqual(len(list(report.keys())), 1)
+        self.assertIn("10", list(report.keys()))
+        self.assertNotIn("10_median", list(report.keys()))
 
         self.assertEqual(len(report["10"]["error_values"]), 1)
         self.assertEqual(len(report["10"]["ops_per_sec_values"]), 1)
@@ -143,10 +141,10 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_REPORT_2["name"]), _BM_REPORT_2)
 
-        self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
+        self.assertEqual(len(list(self.bm_threads_report.thread_benchmark_map.keys())), 1)
 
         report = self.bm_threads_report.generate_perf_plugin_dict()
 
-        self.assertEqual(len(report.keys()), 1)
-        self.assertIn("1", report.keys())
-        self.assertNotIn("1_mean", report.keys())
+        self.assertEqual(len(list(report.keys())), 1)
+        self.assertIn("1", list(report.keys()))
+        self.assertNotIn("1_mean", list(report.keys()))

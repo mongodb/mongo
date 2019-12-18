@@ -5,7 +5,7 @@ import logging
 
 import SCons
 
-import dagger
+from . import dagger
 
 def generate(env, **kwargs):
     """The entry point for our tool. However, the builder for
@@ -14,25 +14,22 @@ def generate(env, **kwargs):
     to the native builders for object/libraries.
     """
 
-    env.Replace(LIBEMITTER=SCons.Builder.ListEmitter([env['LIBEMITTER'],
-                                                      dagger.emit_lib_db_entry]))
+    env.Replace(LIBEMITTER=SCons.Builder.ListEmitter([env['LIBEMITTER'], dagger.emit_lib_db_entry]))
     running_os = os.sys.platform
 
     if not (running_os.startswith('win') or running_os.startswith('sun')):
-        env.Replace(PROGEMITTER=SCons.Builder.ListEmitter([env['PROGEMITTER'],
-        dagger.emit_prog_db_entry]))
+        env.Replace(
+            PROGEMITTER=SCons.Builder.ListEmitter([env['PROGEMITTER'], dagger.emit_prog_db_entry]))
 
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
     suffixes = ['.c', '.cc', '.cxx', '.cpp']
     obj_builders = [static_obj, shared_obj]
-    default_emitters = [SCons.Defaults.StaticObjectEmitter,
-                        SCons.Defaults.SharedObjectEmitter]
+    default_emitters = [SCons.Defaults.StaticObjectEmitter, SCons.Defaults.SharedObjectEmitter]
 
     for suffix in suffixes:
         for i in range(len(obj_builders)):
-            obj_builders[i].add_emitter(suffix, SCons.Builder.ListEmitter([
-                dagger.emit_obj_db_entry, default_emitters[i]
-            ]))
+            obj_builders[i].add_emitter(
+                suffix, SCons.Builder.ListEmitter([dagger.emit_obj_db_entry, default_emitters[i]]))
 
     env['BUILDERS']['__OBJ_DATABASE'] = SCons.Builder.Builder(
         action=SCons.Action.Action(dagger.write_obj_db, None))

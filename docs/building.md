@@ -10,7 +10,7 @@ To build MongoDB, you will need:
 * On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
     * Fedora/RHEL - dnf install libcurl-devel
     * Ubuntu/Debian - apt-get install libcurl-dev
-* Python 2.7.x and Pip modules:
+* Python 3.7.x and Pip modules:
   * pyyaml
   * typing
 
@@ -29,13 +29,13 @@ The source for the tools is now available at [mongodb/mongo-tools](https://githu
 Python Prerequisites
 ---------------
 
-In order to build MongoDB, Python 2.7.x is required, and several Python modules. To install
+In order to build MongoDB, Python 3.7.x is required, and several Python modules. To install
 the required Python modules, run:
 
-    $ pip2 install -r buildscripts/requirements.txt
+    $ pip3 install -r buildscripts/requirements.txt
 
-Note: If the `pip2` command is not available, `pip` without a suffix may be the pip command
-associated with Python 2.7.x.
+Note: If the `pip3` command is not available, `pip` without a suffix may be the pip command
+associated with Python 3.7.x.
 
 SCons
 ---------------
@@ -44,15 +44,15 @@ For detail information about building, please see [the build manual](https://git
 
 If you want to build everything (mongod, mongo, tests, etc):
 
-    $ python2 buildscripts/scons.py all
+    $ python3 buildscripts/scons.py all
 
 If you only want to build the database:
 
-    $ python2 buildscripts/scons.py mongod
+    $ python3 buildscripts/scons.py mongod
 
 To install
 
-    $ python2 buildscripts/scons.py --prefix=/opt/mongo install
+    $ python3 buildscripts/scons.py --prefix=/opt/mongo install
 
 Please note that prebuilt binaries are available on [mongodb.org](http://www.mongodb.org/downloads) and may be the easiest way to get started.
 
@@ -72,7 +72,7 @@ See [the windows build manual](https://github.com/mongodb/mongo/wiki/Build-Mongo
 
 Build requirements:
 * Visual Studio 2015 Update 2 or newer
-* Python 2.7, ActiveState ActivePython 2.7.x Community Edition for Windows is recommended
+* Python 3.7
 
 If using VS 2015 Update 3, two hotfixes are required to build. For details, see:
 * https://support.microsoft.com/en-us/help/3207317/visual-c-optimizer-fixes-for-visual-studio-2015-update-3

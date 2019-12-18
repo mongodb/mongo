@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """ Unit tests for utils.rmtree. """
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import os
 import shutil
 import sys
@@ -41,7 +38,7 @@ def string_for_ascii_filesystem_encoding(path):
 
     Some file system encodings are set to ASCII if LANG=C or LC_ALL=C is specified.
     """
-    if ascii_filesystemencoding() and isinstance(path, unicode):
+    if ascii_filesystemencoding() and isinstance(path, str):
         return path.encode("utf-8")
     return path
 
@@ -66,15 +63,15 @@ class RmtreeTestCase(unittest.TestCase):
 
     def test_unicode(self):
         # Unicode name
-        self.do_test(u"unicode")
+        self.do_test("unicode")
 
     def test_greek(self):
         # Name with Greek
-        self.do_test(string_for_ascii_filesystem_encoding(u"ελληνικά"))
+        self.do_test(string_for_ascii_filesystem_encoding("ελληνικά"))
 
     def test_japanese(self):
         # Name with Japanese
-        self.do_test(string_for_ascii_filesystem_encoding(u"会社案"))
+        self.do_test(string_for_ascii_filesystem_encoding("会社案"))
 
 
 class RmtreeFileTests(RmtreeTestCase):
@@ -104,23 +101,3 @@ class RmtreeDirectoryWithNonAsciiTests(RmtreeTestCase):
         create_file(name)
         os.chdir(self.temp_dir_root)
         self.assertTrue(rmtree(name))
-
-
-class ShutilWindowsRmtreeFileTests(RmtreeFileTests):
-    def do_test(self, file_name):
-        """Execute file test that are known to fail in shutil.rmtree."""
-        if not utils.is_windows():
-            print("Skipping ShutilWindowsRmtreeFileTests on non-Windows platforms")
-            return
-        temp_dir = tempfile.mkdtemp(dir=self.temp_dir_root)
-        os.chdir(temp_dir)
-        create_file(file_name)
-        os.chdir(self.temp_dir_root)
-        with self.assertRaises(WindowsError):  # pylint: disable=undefined-variable
-            shutil.rmtree(temp_dir)
-
-    def test_ascii(self):
-        pass
-
-    def test_unicode(self):
-        pass

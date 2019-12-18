@@ -51,14 +51,9 @@ def render_template(template_path, **kw):
        returns the result as a string'''
 
     template = Template.compile(
-            file=template_path,
-            compilerSettings=dict(
-                directiveStartToken="//#",
-                directiveEndToken="//#",
-                commentStartToken="//##"
-            ),
-            baseclass=dict,
-            useCache=False)
+        file=template_path,
+        compilerSettings=dict(directiveStartToken="//#", directiveEndToken="//#",
+                              commentStartToken="//##"), baseclass=dict, useCache=False)
     return str(template(**kw))
 
 class ErrorCode:
@@ -99,7 +94,7 @@ def main(argv):
                 categories=error_classes,
                 )
 
-        with open(output, 'wb') as outfile:
+        with open(output, 'w') as outfile:
             outfile.write(text)
 
 def die(message=None):
@@ -139,16 +134,16 @@ def has_duplicate_error_codes(error_codes):
     prev = sorted_by_name[0]
     for curr in sorted_by_name[1:]:
         if curr.name == prev.name:
-            sys.stdout.write('Duplicate name %s with codes %s and %s\n'
-                    % (curr.name, curr.code, prev.code))
+            sys.stdout.write(
+                'Duplicate name %s with codes %s and %s\n' % (curr.name, curr.code, prev.code))
             failed = True
         prev = curr
 
     prev = sorted_by_code[0]
     for curr in sorted_by_code[1:]:
         if curr.code == prev.code:
-            sys.stdout.write('Duplicate code %s with names %s and %s\n'
-                    % (curr.code, curr.name, prev.name))
+            sys.stdout.write(
+                'Duplicate code %s with names %s and %s\n' % (curr.code, curr.name, prev.name))
             failed = True
         prev = curr
 

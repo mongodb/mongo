@@ -1,7 +1,5 @@
 """Unit test for the util.testname module."""
 
-from __future__ import absolute_import
-
 import unittest
 
 import util.testname as testname_utils

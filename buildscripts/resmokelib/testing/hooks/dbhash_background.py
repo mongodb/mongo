@@ -4,8 +4,6 @@ Unlike dbhash.py, this version of the hook runs continously in a background thre
 running.
 """
 
-from __future__ import absolute_import
-
 import os.path
 import sys
 import threading
@@ -32,13 +30,14 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
         client = self.fixture.mongo_client()
         server_status = client.admin.command("serverStatus")
         if not server_status["storageEngine"].get("supportsSnapshotReadConcern", False):
-            self.logger.info("Not enabling the background thread because '%s' storage engine"
-                             " doesn't support snapshot reads.",
-                             server_status["storageEngine"]["name"])
+            self.logger.info(
+                "Not enabling the background thread because '%s' storage engine"
+                " doesn't support snapshot reads.", server_status["storageEngine"]["name"])
             return
         if not server_status["storageEngine"].get("persistent", False):
-            self.logger.info("Not enabling the background thread because '%s' storage engine"
-                             " is not persistent.", server_status["storageEngine"]["name"])
+            self.logger.info(
+                "Not enabling the background thread because '%s' storage engine"
+                " is not persistent.", server_status["storageEngine"]["name"])
             return
 
         self._background_job = _BackgroundJob()

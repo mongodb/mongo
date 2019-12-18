@@ -27,8 +27,6 @@
 #
 """Provide code generation information for structs and commands in a polymorphic way."""
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List
 
@@ -42,7 +40,7 @@ class ArgumentInfo(object):
     """Class that encapsulates information about an argument to a method."""
 
     def __init__(self, arg):
-        # type: (unicode) -> None
+        # type: (str) -> None
         """Create a instance of the ArgumentInfo class by parsing the argument string."""
         parts = arg.split(' ')
         self.type = ' '.join(parts[0:-1])
@@ -59,7 +57,7 @@ class MethodInfo(object):
 
     def __init__(self, class_name, method_name, args, return_type=None, static=False, const=False,
                  explicit=False):
-        # type: (unicode, unicode, List[unicode], unicode, bool, bool, bool) -> None
+        # type: (str, str, List[str], str, bool, bool, bool) -> None
         # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
         self.class_name = class_name
@@ -71,7 +69,7 @@ class MethodInfo(object):
         self.explicit = explicit
 
     def get_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get a declaration for a method."""
         pre_modifiers = ''
         post_modifiers = ''
@@ -95,7 +93,7 @@ class MethodInfo(object):
             args=', '.join([str(arg) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_definition(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get a definition for a method."""
         pre_modifiers = ''
         post_modifiers = ''
@@ -114,7 +112,7 @@ class MethodInfo(object):
                 [str(arg) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_call(self, obj):
-        # type: (Optional[unicode]) -> unicode
+        # type: (Optional[str]) -> str
         """Generate a simply call to the method using the defined args list."""
 
         args = ', '.join([arg.name for arg in self.args])
@@ -203,7 +201,7 @@ class StructTypeInfoBase(object):
 
     @abstractmethod
     def gen_namespace_check(self, indented_writer, db_name, element):
-        # type: (writer.IndentedTextWriter, unicode, unicode) -> None
+        # type: (writer.IndentedTextWriter, str, str) -> None
         """Generate the namespace check predicate for a command."""
         pass
 
@@ -270,7 +268,7 @@ class _StructTypeInfo(StructTypeInfoBase):
         pass
 
     def gen_namespace_check(self, indented_writer, db_name, element):
-        # type: (writer.IndentedTextWriter, unicode, unicode) -> None
+        # type: (writer.IndentedTextWriter, str, str) -> None
         pass
 
 
@@ -333,7 +331,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
         indented_writer.write_line('builder->append("%s", 1);' % (self._command.name))
 
     def gen_namespace_check(self, indented_writer, db_name, element):
-        # type: (writer.IndentedTextWriter, unicode, unicode) -> None
+        # type: (writer.IndentedTextWriter, str, str) -> None
         pass
 
 
@@ -391,7 +389,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
         raise NotImplementedError
 
     def gen_namespace_check(self, indented_writer, db_name, element):
-        # type: (writer.IndentedTextWriter, unicode, unicode) -> None
+        # type: (writer.IndentedTextWriter, str, str) -> None
         # TODO: should the name of the first element be validated??
         raise NotImplementedError
 
@@ -445,7 +443,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):
-        # type: (writer.IndentedTextWriter, unicode, unicode) -> None
+        # type: (writer.IndentedTextWriter, str, str) -> None
         # TODO: should the name of the first element be validated??
         indented_writer.write_line('invariant(_nss.isEmpty());')
         indented_writer.write_line('_nss = ctxt.parseNSCollectionRequired(%s, %s);' % (db_name,
