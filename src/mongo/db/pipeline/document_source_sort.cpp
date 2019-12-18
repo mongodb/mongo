@@ -430,7 +430,7 @@ StatusWith<Value> DocumentSourceSort::extractKeyPart(const Document& doc,
         plainKey = patternPart.expression->evaluate(doc, &pExpCtx->variables);
     }
 
-    return getCollationComparisonKey(plainKey);
+    return plainKey.missing() ? Value{BSONNULL} : getCollationComparisonKey(plainKey);
 }
 
 StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const {
