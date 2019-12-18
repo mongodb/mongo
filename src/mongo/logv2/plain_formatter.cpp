@@ -65,6 +65,11 @@ struct TextValueExtractor {
         operator()(name, _storage.back());
     }
 
+    void operator()(StringData name, const BSONArray* val) {
+        _storage.push_back(val->jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
+        operator()(name, _storage.back());
+    }
+
     void operator()(StringData name, StringData val) {
         _storage.push_back(str::escapeForText(val));
         operator()(name, _storage.back());

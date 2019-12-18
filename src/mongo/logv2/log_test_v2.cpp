@@ -133,6 +133,18 @@ struct TypeWithBothBSONFormatters : public TypeWithBSON {
     }
 };
 
+struct TypeWithBSONArray {
+    std::string toString() const {
+        return "first, second";
+    }
+    BSONArray toBSONArray() const {
+        BSONArrayBuilder builder;
+        builder.append("first"_sd);
+        builder.append("second"_sd);
+        return builder.arr();
+    }
+};
+
 class LogTestBackend
     : public boost::log::sinks::
           basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
@@ -400,6 +412,23 @@ TEST_F(LogTestV2, Types) {
                .woCompare(bsonObj) == 0);
     ASSERT(lastBSONElement().Obj().woCompare(bsonObj) == 0);
 
+    // BSONArray
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append("first"_sd);
+    arrBuilder.append("second"_sd);
+    arrBuilder.append("third"_sd);
+    BSONArray bsonArr = arrBuilder.arr();
+    LOGV2("{}", "name"_attr = bsonArr);
+    ASSERT_EQUALS(text.back(),
+                  bsonArr.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
+    ASSERT(mongo::fromjson(json.back())
+               .getField(kAttributesFieldName)
+               .Obj()
+               .getField("name")
+               .Obj()
+               .woCompare(bsonArr) == 0);
+    ASSERT(lastBSONElement().Obj().woCompare(bsonArr) == 0);
+
     // BSONElement
     LOGV2("bson element {}", "name"_attr = bsonObj.getField("int32"_sd));
     ASSERT(text.back() == std::string("bson element ") + bsonObj.getField("int32"_sd).toString());
@@ -616,7 +645,8 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     auto validateTags = [](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "warning");
         ASSERT_EQUALS(
-            obj.getField("tags"_sd).Obj().woCompare(LogTag(LogTag::kStartupWarnings).toBSON()), 0);
+            obj.getField("tags"_sd).Obj().woCompare(LogTag(LogTag::kStartupWarnings).toBSONArray()),
+            0);
     };
     validateTags(mongo::fromjson(lines.back()));
     validateTags(BSONObj(linesBson.back().data()));
@@ -695,6 +725,20 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     };
     validateCustomAttrBSONBothFormatters(mongo::fromjson(lines.back()));
     validateCustomAttrBSONBothFormatters(BSONObj(linesBson.back().data()));
+
+    TypeWithBSONArray t5;
+    LOGV2("{}", "name"_attr = t5);
+    auto validateCustomAttrBSONArray = [&t5](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().getField("name").type(),
+                      BSONType::Array);
+        ASSERT(obj.getField(kAttributesFieldName)
+                   .Obj()
+                   .getField("name")
+                   .Obj()
+                   .woCompare(t5.toBSONArray()) == 0);
+    };
+    validateCustomAttrBSONArray(mongo::fromjson(lines.back()));
+    validateCustomAttrBSONArray(BSONObj(linesBson.back().data()));
 }
 
 TEST_F(LogTestV2, Unicode) {

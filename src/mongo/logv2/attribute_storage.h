@@ -44,6 +44,7 @@ class TypeErasedAttributeStorage;
 // Custom type, storage for how to call its formatters
 struct CustomAttributeValue {
     std::function<void(BSONObjBuilder&)> BSONSerialize;
+    std::function<BSONArray()> toBSONArray;
     std::function<void(BSONObjBuilder&, StringData)> BSONAppend;
 
     // Have both serialize and toString available, using toString() with a serialize interface is
@@ -61,6 +62,13 @@ struct HasToBSON : std::false_type {};
 
 template <class T>
 struct HasToBSON<T, std::void_t<decltype(std::declval<T>().toBSON())>> : std::true_type {};
+
+template <class T, class = void>
+struct HasToBSONArray : std::false_type {};
+
+template <class T>
+struct HasToBSONArray<T, std::void_t<decltype(std::declval<T>().toBSONArray())>> : std::true_type {
+};
 
 template <class T, class = void>
 struct HasBSONSerialize : std::false_type {};
@@ -114,6 +122,7 @@ public:
     NamedAttribute(StringData n, bool val) : name(n), value(val) {}
     NamedAttribute(StringData n, StringData val) : name(n), value(val) {}
     NamedAttribute(StringData n, BSONObj const& val) : name(n), value(&val) {}
+    NamedAttribute(StringData n, BSONArray const& val) : name(n), value(&val) {}
     NamedAttribute(StringData n, const char* val) : NamedAttribute(n, StringData(val)) {}
     NamedAttribute(StringData n, char* val) : NamedAttribute(n, static_cast<const char*>(val)) {}
     NamedAttribute(StringData n, float val) : NamedAttribute(n, static_cast<double>(val)) {}
@@ -164,6 +173,8 @@ public:
             custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
                 builder.appendElements(val.toBSON());
             };
+        } else if constexpr (HasToBSONArray<T>::value) {
+            custom.toBSONArray = [&val]() { return val.toBSONArray(); };
         }
         if constexpr (HasStringSerialize<T>::value) {
             custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
@@ -185,6 +196,7 @@ public:
                   double,
                   StringData,
                   const BSONObj*,
+                  const BSONArray*,
                   CustomAttributeValue>
         value;
 };
