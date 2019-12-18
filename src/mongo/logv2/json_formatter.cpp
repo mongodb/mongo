@@ -54,6 +54,8 @@ struct JSONValueExtractor {
     JSONValueExtractor(fmt::memory_buffer& buffer) : _buffer(buffer) {}
 
     void operator()(StringData name, CustomAttributeValue const& val) {
+        // Try to format as BSON first if available. Prefer BSONAppend if available as we might only
+        // want the value and not the whole element.
         if (val.BSONAppend) {
             BSONObjBuilder builder;
             val.BSONAppend(builder, name);
@@ -61,11 +63,18 @@ struct JSONValueExtractor {
             storeUnquoted(name);
             builder.done().getField(name).jsonStringBuffer(
                 JsonStringFormat::ExtendedRelaxedV2_0_0, false, 0, _buffer);
-        } else if (val.toBSON) {
+        } else if (val.BSONSerialize) {
             // This is a JSON subobject, no quotes needed
             storeUnquoted(name);
-            val.toBSON().jsonStringBuffer(
+            BSONObjBuilder builder;
+            val.BSONSerialize(builder);
+            builder.done().jsonStringBuffer(
                 JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, _buffer);
+        } else if (val.stringSerialize) {
+            storeUnquoted(name);
+            _buffer.push_back('"');
+            val.stringSerialize(_buffer);
+            _buffer.push_back('"');
         } else {
             // This is a string, surround value with quotes
             storeQuoted(name, val.toString());
