@@ -6,6 +6,8 @@
 //   # be routed to the primary.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//   # TODO: Handle JSON logs. See SERVER-45140
+//   requires_text_logs,
 // ]
 
 (function() {

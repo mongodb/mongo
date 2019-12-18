@@ -63,6 +63,7 @@
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/console.h"
+#include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/text_formatter.h"
@@ -193,8 +194,9 @@ public:
 /**
  * Formatter to provide specialized formatting for logs from javascript engine
  */
-class ShellFormatter final : private logv2::TextFormatter {
+class ShellFormatter final : private logv2::TextFormatter, private logv2::JSONFormatter {
 public:
+    ShellFormatter(bool isJson) : _isJson(isJson) {}
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) {
         using namespace logv2;
         using boost::log::extract;
@@ -202,9 +204,16 @@ public:
         if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kPlainShell)) {
             PlainFormatter::operator()(rec, strm);
         } else {
-            TextFormatter::operator()(rec, strm);
+            if (_isJson) {
+                JSONFormatter::operator()(rec, strm);
+            } else {
+                TextFormatter::operator()(rec, strm);
+            }
         }
     }
+
+private:
+    bool _isJson;
 };
 
 }  // namespace
@@ -771,7 +780,8 @@ int _main(int argc, char* argv[], char** envp) {
         auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
         consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
                                                                lv2Manager.getGlobalSettings()));
-        consoleSink->set_formatter(ShellFormatter());
+        consoleSink->set_formatter(
+            ShellFormatter(shellGlobalParams.logFormat == logv2::LogFormat::kJson));
 
         consoleSink->locked_backend()->add_stream(
             boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));

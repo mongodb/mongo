@@ -1,5 +1,9 @@
 /**
  * Test that verifies client metadata is logged as part of slow query logging in MongoD.
+ * TODO: Handle JSON logs. See SERVER-45140
+ * @tags: [
+ *  requires_text_logs,
+ * ]
  */
 (function() {
 'use strict';

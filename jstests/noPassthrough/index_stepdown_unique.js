@@ -1,7 +1,8 @@
 /**
  * Confirms that unique index builds on a primary are aborted when the node steps down during the
  * collection scan phase. This applies to both two phase and single phase index builds.
- * @tags: [requires_replication]
+ * TODO: Handle JSON logs. See SERVER-45140
+ * @tags: [requires_replication, requires_text_logs]
  */
 (function() {
 "use strict";
