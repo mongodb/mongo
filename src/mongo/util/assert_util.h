@@ -87,6 +87,10 @@ public:
         return _status.toString();
     }
 
+    virtual void serialize(BSONObjBuilder* builder) const {
+        _status.serialize(builder);
+    }
+
     const std::string& reason() const {
         return _status.reason();
     }
