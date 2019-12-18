@@ -3367,7 +3367,7 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingOnTerminate_FailedCommit) {
 
 TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnUnknownCommitResult_WriteConcernError) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(kDummyResWithWriteConcernError, true /* expectRetries */);
+    runCommit(kDummyResWithWriteConcernError, false /* expectRetries */);
 
     assertDidNotPrintSlowLogLine();
 }

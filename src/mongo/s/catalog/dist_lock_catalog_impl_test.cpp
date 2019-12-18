@@ -1047,14 +1047,6 @@ TEST_F(DistLockCatalogTest, UnlockWriteConcernError) {
         return writeConcernFailedResponse;
     });
 
-    onCommand([&](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return writeConcernFailedResponse;
-    });
-
-    onCommand([&](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return writeConcernFailedResponse;
-    });
-
     future.default_timed_get();
 }
 

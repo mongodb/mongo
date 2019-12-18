@@ -220,9 +220,7 @@ void RemoteCommandRetryScheduler::_onComplete(
 }
 
 bool isMongosRetriableError(const ErrorCodes::Error& code) {
-    // TODO SERVER-44451: Investigate whether it is correct to retry on WriteConcernFailed.
-    return ErrorCodes::isRetriableError(code) || code == ErrorCodes::WriteConcernFailed ||
-        code == ErrorCodes::BalancerInterrupted;
+    return ErrorCodes::isRetriableError(code) || code == ErrorCodes::BalancerInterrupted;
 }
 
 }  // namespace mongo
