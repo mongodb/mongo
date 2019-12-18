@@ -1286,17 +1286,6 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
 
     Lock::CollectionLock collLock(opCtx, nss, MODE_X);
 
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().usingReplSets() && replCoord->canAcceptWritesFor(opCtx, nss)) {
-        // We are currently a primary node.
-        // TODO(SERVER-44723): Stop replicating abortIndexBuild for single-phase index builds. This
-        // is unnecessary for single-phase builds.
-        auto onCleanUpFn = [&] { onAbortIndexBuild(opCtx, nss, *replState, status); };
-        _indexBuildsManager.tearDownIndexBuild(
-            opCtx, collection, replState->buildUUID, onCleanUpFn);
-        return;
-    }
-
     // If we started the build as a primary and are now unable to accept writes, this build was
     // aborted due to a stepdown.
     _indexBuildsManager.tearDownIndexBuild(
