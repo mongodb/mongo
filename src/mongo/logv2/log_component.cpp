@@ -146,6 +146,8 @@ StringData LogComponent::toStringData() const {
             return "transaction"_sd;
         case kConnectionPool:
             return "connectionPool"_sd;
+        case kTlaPlusTrace:
+            return "tlaPlusTrace"_sd;
         case kNumLogComponents:
             return "total"_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
@@ -234,6 +236,8 @@ StringData LogComponent::getNameForLog() const {
             return "TXN"_sd;
         case kConnectionPool:
             return "CONNPOOL"_sd;
+        case kTlaPlusTrace:
+            return "TLA_PLUS"_sd;
         case kNumLogComponents:
             return "TOTAL"_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
