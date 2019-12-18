@@ -60,6 +60,10 @@ modify_repl_init(void)
         modify_repl[i] = "zyxwvutsrqponmlkjihgfedcba"[i % 26];
 }
 
+/*
+ * set_alarm --
+ *     Set a timer.
+ */
 static void
 set_alarm(void)
 {
@@ -73,6 +77,41 @@ set_alarm(void)
     timer_val.it_value.tv_nsec = 0;
     testutil_check(timer_settime(timer_id, 0, &timer_val, NULL));
 #endif
+}
+
+/*
+ * set_core_off --
+ *     Turn off core dumps.
+ */
+void
+set_core_off(void)
+{
+#ifdef HAVE_SETRLIMIT
+    struct rlimit rlim;
+
+    rlim.rlim_cur = rlim.rlim_max = 0;
+    testutil_check(setrlimit(RLIMIT_CORE, &rlim));
+#endif
+}
+
+/*
+ * random_failure --
+ *     Fail the process.
+ */
+static void
+random_failure(void)
+{
+    static char *core = NULL;
+
+    /* Let our caller know. */
+    printf("%s: aborting to test recovery\n", progname);
+    fflush(stdout);
+
+    /* Turn off core dumps. */
+    set_core_off();
+
+    /* Fail at a random moment. */
+    *core = 0;
 }
 
 TINFO **tinfo_list;
@@ -222,10 +261,8 @@ wts_ops(bool lastrun)
                 /*
                  * On the last execution, optionally drop core for recovery testing.
                  */
-                if (lastrun && g.c_abort) {
-                    static char *core = NULL;
-                    *core = 0;
-                }
+                if (lastrun && g.c_abort)
+                    random_failure();
                 tinfo->quit = true;
             }
         }
@@ -485,6 +522,8 @@ prepare_transaction(TINFO *tinfo)
     ts = __wt_atomic_addv64(&g.timestamp, 1);
     testutil_check(__wt_snprintf(buf, sizeof(buf), "prepare_timestamp=%" PRIx64, ts));
     ret = session->prepare_transaction(session, buf);
+
+    logop(session, "prepare ts=%" PRIu64, ts);
 
     testutil_check(pthread_rwlock_unlock(&g.ts_lock));
 

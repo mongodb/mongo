@@ -229,14 +229,16 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 #ifdef HAVE_DIAGNOSTIC
     /*
      * We have a mismatch. Try to print out as much information as we can. In doing so, we are
-     * calling into the debug code directly and that does not take locks. So it is possible that the
-     * calls may crash in some way.
-     *
-     * The most important information is the key/value mismatch information. Then try to dump out
-     * the other information. Right now we dump the entire lookaside table including what is on
-     * disk. That can potentially be very large. If it becomes a problem, this can be modified to
-     * just dump out the page this key is on.
+     * calling into the debug code directly and that does not take locks, so it's possible we will
+     * simply drop core. The most important information is the key/value mismatch information. Then
+     * try to dump out the other information. Right now we dump the entire lookaside table including
+     * what is on disk. That can potentially be very large. If it becomes a problem, this can be
+     * modified to just dump out the page this key is on. Write a failure message into the log file
+     * first so format.sh knows we failed, and turn off core dumps.
      */
+    fprintf(stderr, "\n%s: run FAILED\n", progname);
+    set_core_off();
+
     fprintf(stderr, "snapshot-isolation error: Dumping page to %s\n", g.home_pagedump);
     testutil_check(__wt_debug_cursor_page(cursor, g.home_pagedump));
     fprintf(stderr, "snapshot-isolation error: Dumping LAS to %s\n", g.home_lasdump);
@@ -244,16 +246,8 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
     if (g.logging)
         testutil_check(cursor->session->log_flush(cursor->session, "sync=off"));
 #endif
-    switch (g.type) {
-    case FIX:
-    case VAR:
-        testutil_die(ret, "snapshot-isolation: %" PRIu64 " search mismatch", keyno);
-    /* NOTREACHED */
-    case ROW:
-        testutil_die(
-          ret, "snapshot-isolation: %.*s search mismatch", (int)key->size, (char *)key->data);
-        /* NOTREACHED */
-    }
+
+    testutil_assert(0);
 
     /* NOTREACHED */
     return (1);

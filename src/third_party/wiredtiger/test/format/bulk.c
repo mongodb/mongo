@@ -57,6 +57,9 @@ bulk_commit_transaction(WT_SESSION *session)
     ts = __wt_atomic_addv64(&g.timestamp, 1);
     testutil_check(__wt_snprintf(buf, sizeof(buf), "commit_timestamp=%" PRIx64, ts));
     testutil_check(session->commit_transaction(session, buf));
+
+    /* Update the oldest timestamp, otherwise updates are pinned in memory. */
+    timestamp_once();
 }
 
 /*

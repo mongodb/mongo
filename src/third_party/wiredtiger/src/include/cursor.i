@@ -303,10 +303,10 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
  *     Return a page referenced key/value pair to the application.
  */
 static inline int
-__cursor_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__cursor_kv_return(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
-    WT_RET(__wt_key_return(session, cbt));
-    WT_RET(__wt_value_return(session, cbt, upd));
+    WT_RET(__wt_key_return(cbt));
+    WT_RET(__wt_value_return(cbt, upd));
 
     return (0);
 }
@@ -441,7 +441,7 @@ value:
      * (if any) is visible.
      */
     if (upd != NULL)
-        return (__wt_value_return(session, cbt, upd));
+        return (__wt_value_return(cbt, upd));
 
     /* Else, simple values have their location encoded in the WT_ROW. */
     if (__wt_row_leaf_value(page, rip, vb))

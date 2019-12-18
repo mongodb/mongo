@@ -572,24 +572,45 @@ checkpoint(void *arg)
 }
 
 /*
+ * timestamp_once --
+ *     Update the timestamp once.
+ */
+void
+timestamp_once(void)
+{
+    static const char *oldest_timestamp_str = "oldest_timestamp=";
+    WT_CONNECTION *conn;
+    WT_DECL_RET;
+    char buf[WT_TS_HEX_STRING_SIZE + 64];
+
+    conn = g.wts_conn;
+
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", oldest_timestamp_str));
+
+    /*
+     * Lock out transaction timestamp operations. The lock acts as a barrier ensuring we've checked
+     * if the workers have finished, we don't want that line reordered.
+     */
+    testutil_check(pthread_rwlock_wrlock(&g.ts_lock));
+
+    ret = conn->query_timestamp(conn, buf + strlen(oldest_timestamp_str), "get=all_durable");
+    testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+    if (ret == 0)
+        testutil_check(conn->set_timestamp(conn, buf));
+
+    testutil_check(pthread_rwlock_unlock(&g.ts_lock));
+}
+
+/*
  * timestamp --
  *     Periodically update the oldest timestamp.
  */
 WT_THREAD_RET
 timestamp(void *arg)
 {
-    WT_CONNECTION *conn;
-    WT_DECL_RET;
-    WT_SESSION *session;
-    char buf[WT_TS_HEX_STRING_SIZE + 64];
     bool done;
 
     (void)(arg);
-    conn = g.wts_conn;
-
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", "oldest_timestamp="));
 
     /* Update the oldest timestamp at least once every 15 seconds. */
     done = false;
@@ -603,21 +624,10 @@ timestamp(void *arg)
         else
             random_sleep(&g.rnd, 15);
 
-        /*
-         * Lock out transaction timestamp operations. The lock acts as a barrier ensuring we've
-         * checked if the workers have finished, we don't want that line reordered.
-         */
-        testutil_check(pthread_rwlock_wrlock(&g.ts_lock));
+        timestamp_once();
 
-        ret = conn->query_timestamp(conn, buf + strlen("oldest_timestamp="), "get=all_committed");
-        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
-        if (ret == 0)
-            testutil_check(conn->set_timestamp(conn, buf));
-
-        testutil_check(pthread_rwlock_unlock(&g.ts_lock));
     } while (!done);
 
-    testutil_check(session->close(session, NULL));
     return (WT_THREAD_RET_VALUE);
 }
 

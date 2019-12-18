@@ -134,6 +134,30 @@ functions:
         for i in $(seq ${times|1}); do
           ./t -1 -c ${config|../../../test/format/CONFIG.stress} ${extra_args|}
         done
+  "many dbs test":
+    command: shell.exec
+    parms:
+      working_dir: "wiredtiger/build_posix/test/manydbs"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./t ${many_db_args|}
+  "thread test":
+    command: shell.exec
+    parms:
+      working_dir: "wiredtiger/build_posix/test/thread"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./t ${thread_test_args|}
+  "random abort test":
+    command: shell.exec
+    parms:
+      working_dir: "wiredtiger/build_posix/test/csuite"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./test_random_abort ${random_abort_args|}
   "upload artifact":
     - command: archive.targz_pack
       params:
@@ -1579,9 +1603,8 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            # FIX ME Remove once BUILD-5025 is done
-            pip install gcovr --user
-            GCOV=/opt/mongodbtoolchain/v3/bin/gcov /home/ubuntu/.local/bin/gcovr -r .. -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' --html -o ../coverage_report.html
+
+            GCOV=/opt/mongodbtoolchain/v3/bin/gcov gcovr -r .. -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' --html -o ../coverage_report.html
       - command: s3.put
         params:
           aws_secret: ${aws_secret}
@@ -1638,6 +1661,111 @@ tasks:
               cp -rf WT_TEST WT_TEST_$file
             done
 
+  - name: ftruncate-test
+    commands: 
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: ac_cv_func_ftruncate=no
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} $(pwd)/../test/csuite/random_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../test/csuite/timestamp_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_truncated_log 2>&1
+
+  - name: long-test
+    commands:
+      - func: "get project"
+      - func: "configure wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-g -Werror"
+          posix_configure_flags: --enable-silent-rules --enable-diagnostic --disable-static
+      - func: "make wiredtiger"
+      
+      # Run the long version of make check, that includes the full csuite tests
+      - func: "make check all"
+        vars:
+          test_env_vars: ${test_env_vars} TESTUTIL_ENABLE_LONG_TESTS=1
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            WT3363_CHECKPOINT_OP_RACES=1 test/csuite/./test_wt3363_checkpoint_op_races 2>&1
+      
+      # Many dbs test - Run with:
+      # 1.  The defaults
+      - func: "many dbs test"
+      # 2.  Set idle flag to turn off operations.
+      - func: "many dbs test"
+        vars:
+          many_db_args: -I
+      # 3.  More dbs.
+      - func: "many dbs test"
+        vars:
+          many_db_args: -D 40
+      # 4.  With idle flag and more dbs.
+      - func: "many dbs test"
+        vars:
+          many_db_args: -I -D 40
+      
+      # extended test/thread runs
+      - func: "thread test"
+        vars: 
+          thread_test_args: -t f
+      - func: "thread test"
+        vars: 
+          thread_test_args: -S -F -n 100000 -t f
+      - func: "thread test"
+        vars: 
+          thread_test_args: -t r
+      - func: "thread test"
+        vars: 
+          thread_test_args: -S -F -n 100000 -t r
+      - func: "thread test"
+        vars: 
+          thread_test_args: -t v
+      - func: "thread test"
+        vars:
+          thread_test_args: -S -F -n 100000 -t v
+      
+      # random-abort - default (random time and number of threads)
+      - func: "random abort test"
+      # random-abort - minimum time, random number of threads
+      - func: "random abort test"
+        vars:
+          random_abort_args: -t 10
+      # random-abort - maximum time, random number of threads
+      - func: "random abort test"
+        vars:
+          random_abort_args: -t 40
+      
+      # truncated-log
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/csuite/"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ./test_truncated_log
+      
+      # format test
+      - func: "test format"
+        vars:
+          extra_args: file_type=fix
+      - func: "test format"
+        vars:
+          extra_args: file_type=row
+      
+      #FIXME: Add wtperf testing from Jenkin "wiredtiger-test-check-long" after fixing WT-5270
+
   - name: time-shift-sensitivity-test
     depends_on:
       - name: compile
@@ -1683,6 +1811,8 @@ buildvariants:
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
     - name: wtperf-test
+    - name: ftruncate-test
+    - name: long-test
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
