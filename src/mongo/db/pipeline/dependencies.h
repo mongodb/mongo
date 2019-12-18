@@ -162,10 +162,15 @@ struct DepsTracker {
     }
 
     /**
-     * Request that all metadata in the given QueryMetadataBitSet be added as dependencies.
+     * Request that all metadata in the given QueryMetadataBitSet be added as dependencies. Throws a
+     * UserException if any of the requested metadata fields have been marked as unavailable.
      */
     void requestMetadata(const QueryMetadataBitSet& metadata) {
-        _metadataDeps |= metadata;
+        for (size_t i = 1; i < DocumentMetadataFields::kNumFields; ++i) {
+            if (metadata[i]) {
+                setNeedsMetadata(static_cast<DocumentMetadataFields::MetaType>(i), true);
+            }
+        }
     }
 
     std::set<std::string> fields;    // Names of needed fields in dotted notation.

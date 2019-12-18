@@ -161,10 +161,12 @@ TEST(QueryRequestTest, ValidSortOrder) {
     ASSERT_OK(qr.validate());
 }
 
-TEST(QueryRequestTest, InvalidSortOrderString) {
+TEST(QueryRequestTest, DoesNotErrorOnInvalidSortPattern) {
     QueryRequest qr(testns);
     qr.setSort(fromjson("{a: \"\"}"));
-    ASSERT_NOT_OK(qr.validate());
+    // QueryRequest isn't responsible for validating the sort pattern, so it is considered valid
+    // even though the sort pattern {a: ""} is not well-formed.
+    ASSERT_OK(qr.validate());
 }
 
 TEST(QueryRequestTest, MinFieldsNotPrefixOfMax) {
@@ -239,28 +241,18 @@ TEST(QueryRequestTest, ValidSortProj) {
     ASSERT_OK(metaQR.validate());
 }
 
-TEST(QueryRequestTest, ForbidNonMetaSortOnFieldWithMetaProject) {
-    QueryRequest badQR(testns);
-    badQR.setProj(fromjson("{a: {$meta: \"textScore\"}}"));
-    badQR.setSort(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(badQR.validate());
-
-    QueryRequest goodQR(testns);
-    goodQR.setProj(fromjson("{a: {$meta: \"textScore\"}}"));
-    goodQR.setSort(fromjson("{b: 1}"));
-    ASSERT_OK(goodQR.validate());
+TEST(QueryRequestTest, TextScoreMetaSortOnFieldDoesNotRequireMetaProjection) {
+    QueryRequest qr(testns);
+    qr.setProj(fromjson("{b: 1}"));
+    qr.setSort(fromjson("{a: {$meta: 'textScore'}}"));
+    ASSERT_OK(qr.validate());
 }
 
-TEST(QueryRequestTest, ForbidMetaSortOnFieldWithoutMetaProject) {
-    QueryRequest qrMatching(testns);
-    qrMatching.setProj(fromjson("{a: 1}"));
-    qrMatching.setSort(fromjson("{a: {$meta: \"textScore\"}}"));
-    ASSERT_NOT_OK(qrMatching.validate());
-
-    QueryRequest qrNonMatching(testns);
-    qrNonMatching.setProj(fromjson("{b: 1}"));
-    qrNonMatching.setSort(fromjson("{a: {$meta: \"textScore\"}}"));
-    ASSERT_NOT_OK(qrNonMatching.validate());
+TEST(QueryRequestTest, TextScoreMetaProjectionDoesNotRequireTextScoreMetaSort) {
+    QueryRequest qr(testns);
+    qr.setProj(fromjson("{a: {$meta: \"textScore\"}}"));
+    qr.setSort(fromjson("{b: 1}"));
+    ASSERT_OK(qr.validate());
 }
 
 TEST(QueryRequestTest, RequestResumeTokenWithHint) {
@@ -377,46 +369,6 @@ TEST(QueryRequestTest, IsTextScoreMeta) {
     ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$meta: \"image\"}}"));
     ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$world: \"textScore\"}}"));
     ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$meta: \"textScore\", b: 1}}"));
-}
-
-//
-// Sort order validation
-// In a valid sort order, each element satisfies one of:
-// 1. a number with value 1
-// 2. a number with value -1
-// 3. isTextScoreMeta
-//
-
-TEST(QueryRequestTest, ValidateSortOrder) {
-    // Valid sorts
-    ASSERT(QueryRequest::isValidSortOrder(fromjson("{}")));
-    ASSERT(QueryRequest::isValidSortOrder(fromjson("{a: 1}")));
-    ASSERT(QueryRequest::isValidSortOrder(fromjson("{a: -1}")));
-    ASSERT(QueryRequest::isValidSortOrder(fromjson("{a: {$meta: \"textScore\"}}")));
-
-    // Invalid sorts
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: 100}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: 0}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: -100}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: Infinity}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: -Infinity}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: true}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: false}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: null}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: {}}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: {b: 1}}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: []}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: [1, 2, 3]}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: \"\"}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: \"bb\"}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: {$meta: 1}}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: {$meta: \"image\"}}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{a: {$world: \"textScore\"}}")));
-    ASSERT_FALSE(
-        QueryRequest::isValidSortOrder(fromjson("{a: {$meta: \"textScore\","
-                                                " b: 1}}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{'': 1}")));
-    ASSERT_FALSE(QueryRequest::isValidSortOrder(fromjson("{'': -1}")));
 }
 
 //
@@ -1152,7 +1104,7 @@ TEST(QueryRequestTest, ParseFromCommandMinMaxDifferentFieldsError) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(QueryRequestTest, ParseCommandForbidNonMetaSortOnFieldWithMetaProject) {
+TEST(QueryRequestTest, ParseCommandAllowNonMetaSortOnFieldWithMetaProject) {
     BSONObj cmdObj;
 
     cmdObj = fromjson(
@@ -1162,7 +1114,7 @@ TEST(QueryRequestTest, ParseCommandForbidNonMetaSortOnFieldWithMetaProject) {
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_OK(result.getStatus());
 
     cmdObj = fromjson(
         "{find: 'testns',"
@@ -1171,7 +1123,7 @@ TEST(QueryRequestTest, ParseCommandForbidNonMetaSortOnFieldWithMetaProject) {
     ASSERT_OK(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain).getStatus());
 }
 
-TEST(QueryRequestTest, ParseCommandForbidMetaSortOnFieldWithoutMetaProject) {
+TEST(QueryRequestTest, ParseCommandAllowMetaSortOnFieldWithoutMetaProject) {
     BSONObj cmdObj;
 
     cmdObj = fromjson(
@@ -1181,14 +1133,14 @@ TEST(QueryRequestTest, ParseCommandForbidMetaSortOnFieldWithoutMetaProject) {
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_OK(result.getStatus());
 
     cmdObj = fromjson(
         "{find: 'testns',"
         "projection: {b: 1},"
         "sort: {a: {$meta: 'textScore'}}}");
     result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_OK(result.getStatus());
 }
 
 TEST(QueryRequestTest, ParseCommandForbidExhaust) {

@@ -76,11 +76,13 @@ assertHasBlockingQuerySort([{$match: {_id: {$gte: 90}}}, {$sort: {x: 1}}], true)
 // A query of the same shape will use a non-blocking plan if the predicate is not selective.
 assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 0}}}, {$sort: {x: 1}}], true);
 
-// Meta-sort on "textScore" currently cannot be pushed down into the query layer. See SERVER-43816.
+// Verify that meta-sort on "textScore" can be pushed down into the query layer.
 assert.commandWorked(coll.createIndex({x: "text"}));
-assertDoesNotHaveQuerySort(
+assertHasBlockingQuerySort(
     [{$match: {$text: {$search: "test"}}}, {$sort: {key: {$meta: "textScore"}}}], false);
 
-// Meta-sort on "randVal" cannot be pushed into the query layer. See SERVER-43816.
-assertDoesNotHaveQuerySort([{$sort: {key: {$meta: "randVal"}}}], false);
+// Verify that meta-sort on "randVal" can be pushed into the query layer. Although "randVal" $meta
+// sort is currently a supported way to randomize the order of the data, it shouldn't preclude
+// pushdown of the sort into the plan stage layer.
+assertHasBlockingQuerySort([{$sort: {key: {$meta: "randVal"}}}], false);
 }());

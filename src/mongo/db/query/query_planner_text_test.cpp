@@ -524,4 +524,14 @@ TEST_F(QueryPlannerTest, ExprEqCanUseSuffixOfTextIndex) {
         "{text: {search: 'blah', prefix: {}, filter: {a: {$_internalExprEq: 3}}}}");
 }
 
+TEST_F(QueryPlannerTest, CantExplodeMetaSort) {
+    addIndex(BSON("a" << 1 << "b" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx" << 1));
+    runInvalidQuerySortProj(
+        fromjson("{$text: {$search: 'keyword'}, a: {$in: [1, 2]}, b: {$in: [3, 4]}}"),
+        fromjson("{c: {$meta: 'textScore'}}"),
+        fromjson("{c: {$meta: 'textScore'}}"));
+}
+
 }  // namespace

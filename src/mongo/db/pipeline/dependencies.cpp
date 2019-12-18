@@ -84,7 +84,7 @@ BSONObj DepsTracker::toProjectionWithoutMetadata() const {
 
 void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool required) {
     uassert(40218,
-            str::stream() << "pipeline requires " << type << " metadata, but it is not available",
+            str::stream() << "query requires " << type << " metadata, but it is not available",
             !required || !_unavailableMetadata[type]);
 
     // If the metadata type is not required, then it should not be recorded as a metadata

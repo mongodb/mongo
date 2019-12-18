@@ -629,41 +629,10 @@ Status QueryRequest::validate() const {
         }
     }
 
-    // Can't combine a normal sort and a $meta projection on the same field.
-    BSONObjIterator projIt(_proj);
-    while (projIt.more()) {
-        BSONElement projElt = projIt.next();
-        if (isTextScoreMeta(projElt)) {
-            BSONElement sortElt = _sort[projElt.fieldName()];
-            if (!sortElt.eoo() && !isTextScoreMeta(sortElt)) {
-                return Status(ErrorCodes::BadValue,
-                              "can't have a non-$meta sort on a $meta projection");
-            }
-        }
-    }
-
-    if (!isValidSortOrder(_sort)) {
-        return Status(ErrorCodes::BadValue, "bad sort specification");
-    }
-
-    // All fields with a $meta sort must have a corresponding $meta projection.
-    BSONObjIterator sortIt(_sort);
-    while (sortIt.more()) {
-        BSONElement sortElt = sortIt.next();
-        if (isTextScoreMeta(sortElt)) {
-            BSONElement projElt = _proj[sortElt.fieldName()];
-            if (projElt.eoo() || !isTextScoreMeta(projElt)) {
-                return Status(ErrorCodes::BadValue,
-                              "must have $meta projection for all $meta sort keys");
-            }
-        }
-    }
-
     if ((_limit || _batchSize) && _ntoreturn) {
         return Status(ErrorCodes::BadValue,
                       "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
     }
-
 
     if (_skip && *_skip < 0) {
         return Status(ErrorCodes::BadValue,
@@ -759,7 +728,6 @@ StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
     return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
 }
 
-// static
 bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     // elt must be foo: {$meta: "textScore"}
     if (mongo::Object != elt.type()) {
@@ -784,27 +752,6 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     // must have exactly 1 element
     if (metaIt.more()) {
         return false;
-    }
-    return true;
-}
-
-// static
-bool QueryRequest::isValidSortOrder(const BSONObj& sortObj) {
-    BSONObjIterator i(sortObj);
-    while (i.more()) {
-        BSONElement e = i.next();
-        // fieldNameSize() includes NULL terminator. For empty field name,
-        // we should be checking for 1 instead of 0.
-        if (1 == e.fieldNameSize()) {
-            return false;
-        }
-        if (isTextScoreMeta(e)) {
-            continue;
-        }
-        long long n = e.safeNumberLong();
-        if (!(e.isNumber() && (n == -1LL || n == 1LL))) {
-            return false;
-        }
     }
     return true;
 }

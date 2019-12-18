@@ -1,6 +1,13 @@
 /**
  * Tests the find command on views.
- * @tags: [requires_find_command, requires_getmore]
+ *
+ * @tags: [
+ *   requires_find_command,
+ *   requires_getmore,
+ *   # Includes tests for allowing $natural sort against a view, but support for this feature
+ *   # requires all nodes to be binary version 4.4.
+ *   requires_fcv_44,
+ * ]
  */
 (function() {
 "use strict";
@@ -62,8 +69,13 @@ assertFindResultEq({find: "identityView", sort: {_id: 1}}, allDocuments, doOrder
 assertFindResultEq(
     {find: "identityView", limit: 1, batchSize: 1, sort: {_id: 1}, projection: {_id: 1}},
     [{_id: "New York"}]);
-assert.commandFailedWithCode(viewsDB.runCommand({find: "identityView", sort: {$natural: 1}}),
-                             ErrorCodes.InvalidPipelineOperator);
+
+// $natural sort against a view is permitted, since it has the same meaning as $natural hint.
+// Likewise, $natural hint against a view is permitted.
+assertFindResultEq({find: "identityView", filter: {state: "NY"}, sort: {$natural: 1}},
+                   [{_id: "New York", state: "NY", pop: 7}]);
+assertFindResultEq({find: "identityView", filter: {state: "NY"}, hint: {$natural: 1}},
+                   [{_id: "New York", state: "NY", pop: 7}]);
 
 // Negative batch size and limit should fail.
 assert.commandFailed(viewsDB.runCommand({find: "identityView", batchSize: -1}));

@@ -237,16 +237,20 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     // Normalize, sort and validate tree.
     _root = MatchExpression::optimize(std::move(root));
     sortTree(_root.get());
-    Status validStatus = isValid(_root.get(), *_qr);
+    auto validStatus = isValid(_root.get(), *_qr);
     if (!validStatus.isOK()) {
-        return validStatus;
+        return validStatus.getStatus();
     }
+    auto unavailableMetadata = validStatus.getValue();
 
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
         try {
             _proj.emplace(projection_ast::parse(
                 expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), projectionPolicies));
+
+            // Fail if any of the projection's dependencies are unavailable.
+            DepsTracker{unavailableMetadata}.requestMetadata(_proj->metadataDeps());
         } catch (const DBException& e) {
             return e.toStatus();
         }
@@ -259,7 +263,34 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue, "cannot use sortKey $meta projection without a sort");
     }
 
+    // If there is a sort, parse it and add any metadata dependencies it induces.
+    try {
+        initSortPattern(unavailableMetadata);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
     return Status::OK();
+}
+
+void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
+    if (_qr->getSort().isEmpty()) {
+        return;
+    }
+
+    // A $natural sort is really a hint, and should be handled as such. Furthermore, the downstream
+    // sort handling code may not expect a $natural sort.
+    //
+    // We have already validated that if there is a $natural sort and a hint, that the hint
+    // also specifies $natural with the same direction. Therefore, it is safe to clear the $natural
+    // sort and rewrite it as a $natural hint.
+    if (_qr->getSort()["$natural"]) {
+        _qr->setHint(_qr->getSort());
+        _qr->setSort(BSONObj{});
+    }
+
+    _sortPattern = SortPattern{_qr->getSort(), _expCtx};
+    _metadataDeps |= _sortPattern->metadataDeps(unavailableMetadata);
 }
 
 void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
@@ -344,9 +375,9 @@ bool hasNodeInSubtree(MatchExpression* root,
     return false;
 }
 
-// static
-Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed) {
-    // Analysis below should be done after squashing the tree to make it clearer.
+StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
+                                                        const QueryRequest& request) {
+    QueryMetadataBitSet unavailableMetadata{};
 
     // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
     //
@@ -359,6 +390,9 @@ Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed
         if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::NOR)) {
             return Status(ErrorCodes::BadValue, "text expression not allowed in nor");
         }
+    } else {
+        // Text metadata is not available.
+        unavailableMetadata.set(DocumentMetadataFields::kTextScore);
     }
 
     // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root
@@ -381,13 +415,27 @@ Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed
         if (!topLevel) {
             return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
         }
+    } else {
+        // Geo distance and geo point metadata are unavailable.
+        unavailableMetadata |= DepsTracker::kAllGeoNearData;
+    }
+
+    const BSONObj& sortObj = request.getSort();
+    BSONElement sortNaturalElt = sortObj["$natural"];
+    const BSONObj& hintObj = request.getHint();
+    BSONElement hintNaturalElt = hintObj["$natural"];
+
+    if (sortNaturalElt && sortObj.nFields() != 1) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Cannot include '$natural' in compoound sort: " << sortObj);
+    }
+
+    if (hintNaturalElt && hintObj.nFields() != 1) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Cannot include '$natural' in compoound hint: " << hintObj);
     }
 
     // NEAR cannot have a $natural sort or $natural hint.
-    const BSONObj& sortObj = parsed.getSort();
-    BSONElement sortNaturalElt = sortObj["$natural"];
-    const BSONObj& hintObj = parsed.getHint();
-    BSONElement hintNaturalElt = hintObj["$natural"];
     if (numGeoNear > 0) {
         if (sortNaturalElt) {
             return Status(ErrorCodes::BadValue,
@@ -416,7 +464,7 @@ Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed
     }
 
     // TEXT and tailable are incompatible.
-    if (numText > 0 && parsed.isTailable()) {
+    if (numText > 0 && request.isTailable()) {
         return Status(ErrorCodes::BadValue, "text and tailable cursor not allowed in same query");
     }
 
@@ -433,7 +481,7 @@ Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed
         }
     }
 
-    return Status::OK();
+    return unavailableMetadata;
 }
 
 std::string CanonicalQuery::toString() const {

@@ -100,26 +100,6 @@ using write_ops::Insert;
 
 namespace {
 /**
- * Return whether the given sort spec can be used in a find() sort.
- */
-bool canSortBePushedDown(const SortPattern& sortPattern) {
-    for (auto&& patternPart : sortPattern) {
-        if (!patternPart.expression) {
-            continue;
-        }
-
-        // Technically sorting by {$meta: "textScore"} can be done in find() but requires a
-        // corresponding projection, so for simplicity we don't support pushing it down.
-        const auto metaType = patternPart.expression->getMetaType();
-        if (metaType == DocumentMetadataFields::kTextScore ||
-            metaType == DocumentMetadataFields::kRandVal) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
  * Returns a PlanExecutor which uses a random cursor to sample documents if successful. Returns {}
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
  * percentage of the collection.
@@ -671,7 +651,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // inside the inner PlanExecutor. We also remove the $sort stage from the Pipeline, since it
     // will be handled instead by PlanStage execution.
     BSONObj sortObj;
-    if (sortStage && canSortBePushedDown(sortStage->getSortKeyPattern())) {
+    if (sortStage) {
         sortObj = sortStage->getSortKeyPattern()
                       .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                       .toBson();

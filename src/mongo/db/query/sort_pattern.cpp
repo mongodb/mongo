@@ -79,17 +79,28 @@ SortPattern::SortPattern(const BSONObj& obj,
                 str::stream() << "Illegal key in $sort specification: " << keyField,
                 keyField.isNumber());
 
-        int sortOrder = keyField.numberInt();
+        const auto direction = keyField.safeNumberLong();
 
         uassert(15975,
                 "$sort key ordering must be 1 (for ascending) or -1 (for descending)",
-                ((sortOrder == 1) || (sortOrder == -1)));
+                ((direction == 1) || (direction == -1)));
 
         patternPart.fieldPath = FieldPath{fieldName};
-        patternPart.isAscending = (sortOrder > 0);
+        patternPart.isAscending = (direction > 0);
         _paths.insert(patternPart.fieldPath->fullPath());
         _sortPattern.push_back(std::move(patternPart));
     }
+}
+
+QueryMetadataBitSet SortPattern::metadataDeps(QueryMetadataBitSet unavailableMetadata) const {
+    DepsTracker depsTracker{unavailableMetadata};
+    for (auto&& part : _sortPattern) {
+        if (part.expression) {
+            part.expression->addDependencies(&depsTracker);
+        }
+    }
+
+    return depsTracker.metadataDeps();
 }
 
 Document SortPattern::serialize(SortKeySerialization serializationMode) const {

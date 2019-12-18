@@ -96,6 +96,16 @@ public:
         return _sortPattern.cend();
     }
 
+    /**
+     * Returns the types of metadata depended on by this sort.
+     *
+     * The caller can optionally supply a description of the types of metadata that are not
+     * available. In this case, throws a UserException if any unavailable metadata type is also a
+     * metadata dependency.
+     */
+    QueryMetadataBitSet metadataDeps(
+        QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{}) const;
+
 private:
     std::vector<SortPatternPart> _sortPattern;
 

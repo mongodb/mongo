@@ -562,19 +562,13 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         return {std::move(out)};
     }
 
-    // The hint or sort can be $natural: 1.  If this happens, output a collscan. If both
-    // a $natural hint and a $natural sort are specified, then the direction of the collscan
-    // is determined by the sign of the sort (not the sign of the hint).
-    if (!query.getQueryRequest().getHint().isEmpty() ||
-        !query.getQueryRequest().getSort().isEmpty()) {
+    // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect any $natural
+    // sort to have been normalized to a $natural hint upstream.
+    if (!query.getQueryRequest().getHint().isEmpty()) {
         BSONObj hintObj = query.getQueryRequest().getHint();
-        BSONObj sortObj = query.getQueryRequest().getSort();
         BSONElement naturalHint = dps::extractElementAtPath(hintObj, "$natural");
-        BSONElement naturalSort = dps::extractElementAtPath(sortObj, "$natural");
 
-        // A hint overrides a $natural sort. This means that we don't force a table
-        // scan if there is a $natural sort with a non-$natural hint.
-        if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
+        if (naturalHint) {
             LOG(5) << "Forcing a table scan due to hinted $natural";
             if (!canTableScan) {
                 return Status(ErrorCodes::NoQueryExecutionPlans,
