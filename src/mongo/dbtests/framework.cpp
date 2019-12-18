@@ -112,6 +112,7 @@ int runDbTests(int argc, char** argv) {
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,
+                                   "",
                                    frameworkGlobalParams.runsPerTest);
 
     // So everything shuts down cleanly

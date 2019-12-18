@@ -75,6 +75,8 @@ int main(int argc, char** argv, char** envp) {
     std::string filter;
     int repeat = 1;
     std::string verbose;
+    std::string fileNameFilter;
+
     // "list" and "repeat" will be assigned with default values, if not present.
     invariant(environment.get("list", &list));
     invariant(environment.get("repeat", &repeat));
@@ -82,6 +84,7 @@ int main(int argc, char** argv, char** envp) {
     environment.get("suite", &suites).ignore();
     environment.get("filter", &filter).ignore();
     environment.get("verbose", &verbose).ignore();
+    environment.get("fileNameFilter", &fileNameFilter).ignore();
 
     if (std::any_of(verbose.cbegin(), verbose.cend(), [](char ch) { return ch != 'v'; })) {
         std::cerr << "The string for the --verbose option cannot contain characters other than 'v'"
@@ -99,7 +102,7 @@ int main(int argc, char** argv, char** envp) {
         return EXIT_SUCCESS;
     }
 
-    auto result = ::mongo::unittest::Suite::run(suites, filter, repeat);
+    auto result = ::mongo::unittest::Suite::run(suites, filter, fileNameFilter, repeat);
 
     ret = ::mongo::runGlobalDeinitializers();
     if (!ret.isOK()) {

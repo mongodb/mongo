@@ -619,7 +619,7 @@ int main(const int argc, const char* const* const argv) {
         return EXIT_FAILURE;
     }
 
-    const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+    const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);
 
     // This is the standard exit path for Mongo processes. See the mongo::quickExit() declaration
     // for more information.

@@ -316,7 +316,8 @@
     class TEST_TYPE : public TEST_BASE {                                                       \
     private:                                                                                   \
         void _doTest() override;                                                               \
-        static inline const RegistrationAgent<TEST_TYPE> _agent{#FIXTURE_NAME, #TEST_NAME};    \
+        static inline const RegistrationAgent<TEST_TYPE> _agent{                               \
+            #FIXTURE_NAME, #TEST_NAME, __FILE__};                                              \
     };                                                                                         \
     void TEST_TYPE::_doTest()
 
@@ -351,6 +352,7 @@ class Suite : public std::enable_shared_from_this<Suite> {
 private:
     struct SuiteTest {
         std::string name;
+        std::string fileName;
         std::function<void()> fn;
     };
 
@@ -363,12 +365,15 @@ public:
     Suite(const Suite&) = delete;
     Suite& operator=(const Suite&) = delete;
 
-    void add(std::string name, std::function<void()> testFn);
+    void add(std::string name, std::string fileName, std::function<void()> testFn);
 
-    std::unique_ptr<Result> run(const std::string& filter, int runsPerTest);
+    std::unique_ptr<Result> run(const std::string& filter,
+                                const std::string& fileNameFilter,
+                                int runsPerTest);
 
     static int run(const std::vector<std::string>& suites,
                    const std::string& filter,
+                   const std::string& fileNameFilter,
                    int runsPerTest);
 
     /**
@@ -469,7 +474,7 @@ struct OldStyleSuiteInitializer {
         log() << "\t done setupTests" << std::endl;
         auto& suite = Suite::getSuite(suiteSpec.name());
         for (auto&& t : suiteSpec.tests()) {
-            suite.add(t.name, t.fn);
+            suite.add(t.name, "", t.fn);
         }
     }
 };
@@ -505,9 +510,11 @@ protected:
     template <typename T>
     class RegistrationAgent {
     public:
-        RegistrationAgent(std::string suiteName, std::string testName)
-            : _suiteName(std::move(suiteName)), _testName(std::move(testName)) {
-            Suite::getSuite(_suiteName).add(_testName, [] { T{}.run(); });
+        RegistrationAgent(std::string suiteName, std::string testName, std::string fileName)
+            : _suiteName(std::move(suiteName)),
+              _testName(std::move(testName)),
+              _fileName(std::move(fileName)) {
+            Suite::getSuite(_suiteName).add(_testName, _fileName, [] { T{}.run(); });
         }
 
         const std::string& getSuiteName() const {
@@ -518,9 +525,14 @@ protected:
             return _testName;
         }
 
+        const std::string& getFileName() const {
+            return _fileName;
+        }
+
     private:
         std::string _suiteName;
         std::string _testName;
+        std::string _fileName;
     };
 
     /**
