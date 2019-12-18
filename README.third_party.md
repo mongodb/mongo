@@ -26,7 +26,7 @@ a notice will be included in
 | [ASIO]                     | BSL-1.0           | 1.14.0           | b0926b61b0        |                      |                ✗                |
 | [benchmark]                | Apache-2.0        | 1.5.0            | 1.4.1             |                      |                                 |
 | [Boost]                    | BSL-1.0           | 1.71.0           | 1.70.0            |                      |                ✗                |
-| [fmt]                      | BSD-2-Clause      |                  | 018d8b57f6        |                      |                ✗                |
+| [fmt]                      | BSD-2-Clause      | 6.1.1            | 6.1.1             |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.7               |                      |                ✗                |
 | [ICU4]                     | ICU               | 64.2             | 57.1              |          ✗           |                ✗                |
 | [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 2     | 2.0 Update 1      |                      |                ✗                |

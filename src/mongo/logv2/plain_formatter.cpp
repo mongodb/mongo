@@ -88,7 +88,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     extractor.args.reserve(attrs.size());
     attrs.apply(extractor);
     fmt::memory_buffer buffer;
-    fmt::internal::vformat_to(
+    fmt::vformat_to(
         buffer,
         to_string_view(message),
         fmt::basic_format_args<fmt::format_context>(extractor.args.data(), extractor.args.size()));

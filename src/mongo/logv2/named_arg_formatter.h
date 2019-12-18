@@ -34,12 +34,12 @@
 
 namespace mongo::logv2::detail {
 
-class NamedArgFormatter : public fmt::arg_formatter<fmt::internal::buffer_range<char>> {
+class NamedArgFormatter : public fmt::arg_formatter<fmt::buffer_range<char>> {
 public:
-    typedef fmt::arg_formatter<fmt::internal::buffer_range<char>> arg_formatter;
+    typedef fmt::arg_formatter<fmt::buffer_range<char>> arg_formatter;
 
     NamedArgFormatter(fmt::format_context& ctx,
-                      fmt::basic_parse_context<char>* parse_ctx = nullptr,
+                      fmt::format_parse_context* parse_ctx = nullptr,
                       fmt::format_specs* spec = nullptr)
         : arg_formatter(ctx, parse_ctx, nullptr) {
         // Pretend that we have no format_specs, but store so we can re-construct the format
@@ -60,44 +60,52 @@ public:
         if (spec_) {
             char str[2] = {'\0', '\0'};
             write(":");
-            if (spec_->fill() != ' ') {
-                str[0] = static_cast<char>(spec_->fill());
+            if (spec_->align != fmt::align::none) {
+                str[0] = static_cast<char>(spec_->fill[0]);
                 write(str);
             }
 
-            switch (spec_->align()) {
-                case fmt::ALIGN_LEFT:
+            switch (spec_->align) {
+                case fmt::align::left:
                     write("<");
                     break;
-                case fmt::ALIGN_RIGHT:
+                case fmt::align::right:
                     write(">");
                     break;
-                case fmt::ALIGN_CENTER:
+                case fmt::align::center:
                     write("^");
                     break;
-                case fmt::ALIGN_NUMERIC:
+                case fmt::align::numeric:
                     write("=");
                     break;
                 default:
                     break;
             };
 
-            if (spec_->has(fmt::PLUS_FLAG))
-                write("+");
-            else if (spec_->has(fmt::MINUS_FLAG))
-                write("-");
-            else if (spec_->has(fmt::SIGN_FLAG))
-                write(" ");
-            else if (spec_->has(fmt::HASH_FLAG))
+            switch (spec_->sign) {
+                case fmt::sign::plus:
+                    write("+");
+                    break;
+                case fmt::sign::minus:
+                    write("-");
+                    break;
+                case fmt::sign::space:
+                    write(" ");
+                    break;
+                default:
+                    break;
+            };
+
+            if (spec_->alt)
                 write("#");
 
-            if (spec_->align() == fmt::ALIGN_NUMERIC && spec_->fill() == 0)
+            if (spec_->align == fmt::align::numeric && spec_->fill[0] == '0')
                 write("0");
 
-            if (spec_->width() > 0)
-                write(std::to_string(spec_->width()).c_str());
+            if (spec_->width > 0)
+                write(std::to_string(spec_->width).c_str());
 
-            if (spec_->has_precision()) {
+            if (spec_->precision >= 0) {
                 write(".");
                 write(std::to_string(spec_->precision).c_str());
             }
