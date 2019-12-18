@@ -3052,7 +3052,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         (newConfig.getWriteConcernMajorityShouldJournal() &&
          (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
         log() << startupWarningsLog;
-        log() << "** WARNING: This replica set is running without journaling enabled but the "
+        log() << "** WARNING: This replica set node is running without journaling enabled but the "
               << startupWarningsLog;
         log() << "**          writeConcernMajorityJournalDefault option to the replica set config "
               << startupWarningsLog;
@@ -3062,6 +3062,9 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
               << startupWarningsLog;
         log() << "**          or w:majority write concerns will never complete."
               << startupWarningsLog;
+        log() << "**          In addition, this node's memory consumption may increase until all"
+              << startupWarningsLog;
+        log() << "**          available free RAM is exhausted." << startupWarningsLog;
         log() << startupWarningsLog;
     }
 
@@ -3071,14 +3074,18 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         (newConfig.getWriteConcernMajorityShouldJournal() &&
          (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
         log() << startupWarningsLog;
-        log() << "** WARNING: This replica set is using in-memory (ephemeral) storage with the "
+        log() << "** WARNING: This replica set node is using in-memory (ephemeral) storage with the"
               << startupWarningsLog;
         log() << "**          writeConcernMajorityJournalDefault option to the replica set config "
               << startupWarningsLog;
         log() << "**          set to true. The writeConcernMajorityJournalDefault option to the "
               << startupWarningsLog;
-        log() << "**          replica set config is unsupported while using in-memory storage."
+        log() << "**          replica set config must be set to false " << startupWarningsLog;
+        log() << "**          or w:majority write concerns will never complete."
               << startupWarningsLog;
+        log() << "**          In addition, this node's memory consumption may increase until all"
+              << startupWarningsLog;
+        log() << "**          available free RAM is exhausted." << startupWarningsLog;
         log() << startupWarningsLog;
     }
 
