@@ -420,18 +420,23 @@ Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const Namespac
 
 StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
-    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-    auto collectionResult = getCollection(autoColl, nss, "Your oplog doesn't exist.");
-    if (!collectionResult.isOK()) {
-        return collectionResult.getStatus();
-    }
+    // This writeConflictRetry loop protects callers from WriteConflictExceptions thrown by the
+    // storage engine running out of cache space, despite this operation not performing any writes.
+    return writeConflictRetry(
+        opCtx, "StorageInterfaceImpl::getOplogMaxSize", nss.ns(), [&]() -> StatusWith<size_t> {
+            AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+            auto collectionResult = getCollection(autoColl, nss, "Your oplog doesn't exist.");
+            if (!collectionResult.isOK()) {
+                return collectionResult.getStatus();
+            }
 
-    const auto options = DurableCatalog::get(opCtx)->getCollectionOptions(
-        opCtx, collectionResult.getValue()->getCatalogId());
-    if (!options.capped)
-        return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
+            const auto options = DurableCatalog::get(opCtx)->getCollectionOptions(
+                opCtx, collectionResult.getValue()->getCatalogId());
+            if (!options.capped)
+                return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
 
-    return options.cappedSize;
+            return options.cappedSize;
+        });
 }
 
 Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
