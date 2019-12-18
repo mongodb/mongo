@@ -2666,6 +2666,11 @@ var ReplSetTest = function(opts) {
             options.binVersion = MongoRunner.versionIterator(options.binVersion);
         }
 
+        // Always set log format
+        if (options && options.logFormat) {
+            options.logFormat = jsTest.options().logFormat;
+        }
+
         // If restarting a node, use its existing options as the defaults.
         var baseOptions;
         if ((options && options.restart) || restart) {

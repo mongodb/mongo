@@ -62,6 +62,7 @@ DEFAULTS = {
     "include_with_any_tags": None,
     "install_dir": None,
     "jobs": 1,
+    "log_format": None,
     "mongo_executable": None,
     "mongod_executable": None,
     "mongod_set_parameters": None,
@@ -316,6 +317,10 @@ MONGOD_EXECUTABLE = None
 
 # The --setParameter options passed to mongod.
 MONGOD_SET_PARAMETERS = None
+
+# If set, the log format to use by all mongod's and mongo shells started by resmoke.py
+# Supported values are the same as what is supported in mongod/mongo shell: default, text, json
+LOG_FORMAT = None
 
 # The path to the mongos executable used by resmoke.py.
 MONGOS_EXECUTABLE = None
