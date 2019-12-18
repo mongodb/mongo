@@ -1723,7 +1723,8 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
                     sa->sin6_family = AF_INET6;
                     memcpy(&(sa->sin6_addr), ipAddrStruct->data, ipAddrStruct->length);
                 }
-                auto ipAddress = SockAddr(ss, sizeof(ss)).getAddr();
+                auto ipAddress =
+                    SockAddr(reinterpret_cast<struct sockaddr*>(&ss), sizeof(ss)).getAddr();
                 auto swIpAddress = CIDR::parse(ipAddress);
                 if (swCIDRRemoteHost.isOK() && swIpAddress.isOK() &&
                     swCIDRRemoteHost.getValue() == swIpAddress.getValue()) {
