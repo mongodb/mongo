@@ -235,6 +235,16 @@ public:
         _awaitDataTimeout = timeout;
     }
 
+    // Only used for tailable awaitData oplog fetching requests.
+    void setCurrentTermAndLastCommittedOpTime(
+        const boost::optional<long long>& term,
+        const boost::optional<repl::OpTime>& lastCommittedOpTime) {
+        invariant(tailableAwaitData());
+        invariant(ns == NamespaceString::kRsOplogNamespace);
+        _term = term;
+        _lastKnownCommittedOpTime = lastCommittedOpTime;
+    }
+
 protected:
     struct Batch {
         // TODO remove constructors after c++17 toolchain upgrade
@@ -288,6 +298,8 @@ private:
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;
     Milliseconds _awaitDataTimeout = Milliseconds{0};
+    boost::optional<long long> _term;
+    boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
 
     void dataReceived(const Message& reply) {
         bool retry;

@@ -754,6 +754,90 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     ASSERT_TRUE(conn.getLastSentMessage().empty());
 }
 
+TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
+    // This tests DBClientCursor supports oplog query with special fields in the command request.
+    // 1. Initial find command has "filter", "tailable", "awaitData", "oplogReplay", "maxTimeMS",
+    //    "batchSize", "term" and "readConcern" fields set.
+    // 2. A subsequent getMore command sets awaitData timeout and lastKnownCommittedOpTime
+    //    correctly.
+
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::kRsOplogNamespace;
+    const BSONObj filterObj = BSON("ts" << BSON("$gte" << Timestamp(123, 4)));
+    const BSONObj readConcernObj = BSON("afterClusterTime" << Timestamp(0, 1));
+    const long long maxTimeMS = 5000LL;
+    const long long term = 5;
+    const auto oplogQuery = QUERY("query" << filterObj << "readConcern" << readConcernObj
+                                          << "$maxTimeMS" << maxTimeMS << "term" << term);
+
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          oplogQuery.obj,
+                          0,
+                          0,
+                          nullptr,
+                          QueryOption_CursorTailable | QueryOption_AwaitData |
+                              QueryOption_OplogReplay,
+                          0);
+    cursor.setBatchSize(0);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {});
+
+    conn.setCallResponse(findResponseMsg);
+    ASSERT(cursor.init());
+
+    // --- Test 1 ---
+    // Verify that the initial 'find' request was sent.
+    auto m = conn.getLastSentMessage();
+    ASSERT_FALSE(m.empty());
+    auto msg = OpMsg::parse(m);
+    ASSERT_EQ(OpMsg::flags(m), OpMsg::kChecksumPresent);
+    ASSERT_EQ(msg.body.getStringField("find"), nss.coll()) << msg.body;
+    ASSERT_BSONOBJ_EQ(msg.body["filter"].Obj(), filterObj);
+    ASSERT_TRUE(msg.body.getBoolField("tailable")) << msg.body;
+    ASSERT_TRUE(msg.body.getBoolField("awaitData")) << msg.body;
+    ASSERT_TRUE(msg.body.getBoolField("oplogReplay")) << msg.body;
+    ASSERT_EQ(msg.body["maxTimeMS"].numberLong(), maxTimeMS) << msg.body;
+    ASSERT_EQ(msg.body["batchSize"].number(), 0) << msg.body;
+    ASSERT_EQ(msg.body["term"].numberLong(), term) << msg.body;
+    ASSERT_BSONOBJ_EQ(msg.body["readConcern"].Obj(), readConcernObj);
+
+    cursor.setAwaitDataTimeoutMS(Milliseconds{5000});
+    ASSERT_EQ(cursor.getAwaitDataTimeoutMS(), Milliseconds{5000});
+
+    cursor.setCurrentTermAndLastCommittedOpTime(term, repl::OpTime(Timestamp(123, 4), term));
+
+    // --- Test 2 ---
+    // Create a 'getMore' response with two documents and set it as the mock response.
+    cursor.setBatchSize(2);
+    auto getMoreResponseMsg = mockGetMoreResponse(nss, cursorId, {docObj(1), docObj(2)});
+    conn.setCallResponse(getMoreResponseMsg);
+
+    // Request more results. This call should trigger the first 'getMore' request.
+    conn.clearLastSentMessage();
+    ASSERT_TRUE(cursor.more());
+    m = conn.getLastSentMessage();
+    ASSERT_FALSE(m.empty());
+    msg = OpMsg::parse(m);
+    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore") << msg.body;
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong) << msg.body;
+    ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId) << msg.body;
+    // Make sure the correct awaitData timeout is sent.
+    ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000) << msg.body;
+    // Make sure the correct term is sent.
+    ASSERT_EQ(msg.body["term"].numberLong(), term) << msg.body;
+    // Make sure the correct lastKnownCommittedOpTime is sent.
+    ASSERT_EQ(msg.body["lastKnownCommittedOpTime"]["ts"].timestamp(), Timestamp(123, 4))
+        << msg.body;
+    ASSERT_EQ(msg.body["lastKnownCommittedOpTime"]["t"].numberLong(), term) << msg.body;
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+    ASSERT_FALSE(cursor.isDead());
+}
 
 }  // namespace
 }  // namespace mongo
