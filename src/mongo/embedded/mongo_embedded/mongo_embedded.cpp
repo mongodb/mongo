@@ -132,7 +132,7 @@ MongoEmbeddedStatusImpl* getStatusImpl(mongo_embedded_v1_status* status) {
     return status ? &status->statusImpl : nullptr;
 }
 
-using MobileException = ExceptionForAPI<mongo_embedded_v1_error>;
+using EmbeddedException = ExceptionForAPI<mongo_embedded_v1_error>;
 
 struct ServiceContextDestructor {
     void operator()(mongo::ServiceContext* const serviceContext) const noexcept {
@@ -160,7 +160,7 @@ struct mongo_embedded_v1_instance {
           // creating mock transport layer to be able to create sessions
           transportLayer(std::make_unique<mongo::transport::TransportLayerMock>()) {
         if (!this->serviceContext) {
-            throw ::mongo::MobileException{
+            throw ::mongo::EmbeddedException{
                 MONGO_EMBEDDED_V1_ERROR_DB_INITIALIZATION_FAILED,
                 "The MongoDB Embedded Library Failed to initialize the Service Context"};
         }
@@ -215,7 +215,7 @@ void registerLogCallback(mongo_embedded_v1_lib* const lib,
 
 mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params) try {
     if (library) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_LIBRARY_ALREADY_INITIALIZED,
             "Cannot initialize the MongoDB Embedded Library when it is already initialized."};
     }
@@ -257,27 +257,27 @@ mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params
 
 void capi_lib_fini(mongo_embedded_v1_lib* const lib) {
     if (!lib) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
             "Cannot close a `NULL` pointer referencing a MongoDB Embedded Library Instance"};
     }
 
     if (!library) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
             "Cannot close the MongoDB Embedded Library when it is not initialized"};
     }
 
     if (library.get() != lib) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
-                              "Invalid MongoDB Embedded Library handle."};
+        throw EmbeddedException{MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
+                                "Invalid MongoDB Embedded Library handle."};
     }
 
     // This check is not possible to 100% guarantee.  It is a best effort.  The documentation of
     // this API says that the behavior of closing a `lib` with open handles is undefined, but may
     // provide diagnostic errors in some circumstances.
     if (lib->databaseCount.load() > 0) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN,
             "Cannot close the MongoDB Embedded Library when it has database handles still open."};
     }
@@ -288,21 +288,21 @@ void capi_lib_fini(mongo_embedded_v1_lib* const lib) {
 mongo_embedded_v1_instance* instance_new(mongo_embedded_v1_lib* const lib,
                                          const char* const yaml_config) {
     if (!library) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot create a new database handle when the MongoDB Embedded "
-                              "Library is not yet initialized."};
+        throw EmbeddedException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+                                "Cannot create a new database handle when the MongoDB Embedded "
+                                "Library is not yet initialized."};
     }
 
     if (library.get() != lib) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
-                              "Cannot create a new database handle when the MongoDB Embedded "
-                              "Library is not yet initialized."};
+        throw EmbeddedException{MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
+                                "Cannot create a new database handle when the MongoDB Embedded "
+                                "Library is not yet initialized."};
     }
 
     if (lib->onlyDB) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN,
-                              "The maximum number of permitted database handles for the MongoDB "
-                              "Embedded Library have been opened."};
+        throw EmbeddedException{MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN,
+                                "The maximum number of permitted database handles for the MongoDB "
+                                "Embedded Library have been opened."};
     }
 
     lib->onlyDB = std::make_unique<mongo_embedded_v1_instance>(lib, yaml_config);
@@ -312,25 +312,26 @@ mongo_embedded_v1_instance* instance_new(mongo_embedded_v1_lib* const lib,
 
 void instance_destroy(mongo_embedded_v1_instance* const db) {
     if (!library) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot destroy a database handle when the MongoDB Embedded Library "
-                              "is not yet initialized."};
+        throw EmbeddedException{
+            MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+            "Cannot destroy a database handle when the MongoDB Embedded Library "
+            "is not yet initialized."};
     }
 
     if (!db) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
             "Cannot close a `NULL` pointer referencing a MongoDB Embedded Database"};
     }
 
     if (db != library->onlyDB.get()) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
             "Cannot close the specified MongoDB Embedded Database, as it is not a valid instance."};
     }
 
     if (db->clientCount.load() > 0) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN,
             "Cannot close a MongoDB Embedded Database instance while it has open clients"};
     }
@@ -340,21 +341,24 @@ void instance_destroy(mongo_embedded_v1_instance* const db) {
 
 mongo_embedded_v1_client* client_new(mongo_embedded_v1_instance* const db) {
     if (!library) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot create a new client handle when the MongoDB Embedded Library "
-                              "is not yet initialized."};
+        throw EmbeddedException{
+            MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+            "Cannot create a new client handle when the MongoDB Embedded Library "
+            "is not yet initialized."};
     }
 
     if (!db) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
-                              "Cannot use a `NULL` pointer referencing a MongoDB Embedded Database "
-                              "when creating a new client"};
+        throw EmbeddedException{
+            MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
+            "Cannot use a `NULL` pointer referencing a MongoDB Embedded Database "
+            "when creating a new client"};
     }
 
     if (db != library->onlyDB.get()) {
-        throw MobileException{MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
-                              "The specified MongoDB Embedded Database instance cannot be used to "
-                              "create a new client because it is invalid."};
+        throw EmbeddedException{
+            MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE,
+            "The specified MongoDB Embedded Database instance cannot be used to "
+            "create a new client because it is invalid."};
     }
 
     return new mongo_embedded_v1_client(db);
@@ -362,13 +366,14 @@ mongo_embedded_v1_client* client_new(mongo_embedded_v1_instance* const db) {
 
 void client_destroy(mongo_embedded_v1_client* const client) {
     if (!library) {
-        throw MobileException(MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
-                              "Cannot destroy a database handle when the MongoDB Embedded Library "
-                              "is not yet initialized.");
+        throw EmbeddedException(
+            MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+            "Cannot destroy a database handle when the MongoDB Embedded Library "
+            "is not yet initialized.");
     }
 
     if (!client) {
-        throw MobileException{
+        throw EmbeddedException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_CLIENT_HANDLE,
             "Cannot destroy a `NULL` pointer referencing a MongoDB Embedded Database Client"};
     }

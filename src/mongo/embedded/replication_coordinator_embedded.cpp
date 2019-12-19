@@ -154,7 +154,7 @@ void ReplicationCoordinatorEmbedded::appendConnectionStats(
 }
 
 MemberState ReplicationCoordinatorEmbedded::getMemberState() const {
-    UASSERT_NOT_IMPLEMENTED;
+    return MemberState::RS_PRIMARY;
 }
 
 std::vector<repl::MemberData> ReplicationCoordinatorEmbedded::getMemberData() const {

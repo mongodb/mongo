@@ -41,7 +41,6 @@ configs:
         description: 'What storage engine to use'
         short_name: storageEngine
         arg_vartype: String
-        default: mobile
 
     'storage.dbPath':
         description:
@@ -49,4 +48,3 @@ configs:
             is_constexpr: false
         short_name: dbpath
         arg_vartype: String
-

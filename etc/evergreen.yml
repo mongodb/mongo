@@ -4117,7 +4117,6 @@ tasks:
           --separate-debug
           --ssl=off
           --use-system-mongo-c=on
-          --wiredtiger=off
           DESTDIR='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
         task_compile_flags_extra: >-
