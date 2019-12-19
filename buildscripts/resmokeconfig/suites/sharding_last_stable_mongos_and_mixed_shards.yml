@@ -119,6 +119,8 @@ selector:
   - jstests/sharding/major_version_check.js
   # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.
   - jstests/sharding/explain_cmd.js
+  # Enable when SERVER-44733 is backported
+  - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
 
 executor:
   config:

@@ -107,7 +107,7 @@ DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() 
     }
 
     if (cannotResume) {
-        uasserted(40585,
+        uasserted(ErrorCodes::ChangeStreamFatalError,
                   str::stream() << "resume of change stream was not possible, as the resume "
                                    "token was not found. "
                                 << tokenFromSource.toDocument().toString());
@@ -166,7 +166,7 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
         uassertStatusOK(_mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx));
     if (auto first = pipeline->getNext()) {
         auto firstOplogEntry = Value(*first);
-        uassert(40576,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 "resume of change notification was not possible, as the resume point may no longer "
                 "be in the oplog. ",
                 firstOplogEntry["ts"].getTimestamp() < _token.getData().clusterTime);

@@ -58,7 +58,7 @@ std::pair<ShardId, ChunkVersion> getSingleTargetedShardForQuery(
     if (auto chunkMgr = routingInfo.cm()) {
         std::set<ShardId> shardIds;
         chunkMgr->getShardIdsForQuery(opCtx, query, CollationSpec::kSimpleSpec, &shardIds);
-        uassert(ErrorCodes::InternalError,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 str::stream() << "Unable to target lookup query to a single shard: "
                               << query.toString(),
                 shardIds.size() == 1u);
@@ -252,13 +252,13 @@ public:
         auto& batch = cursor.getBatch();
 
         // We should have at most 1 result, and the cursor should be exhausted.
-        uassert(ErrorCodes::InternalError,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 str::stream() << "Shard cursor was unexpectedly open after lookup: "
                               << shardResult.front().hostAndPort
                               << ", id: "
                               << cursor.getCursorId(),
                 cursor.getCursorId() == 0);
-        uassert(ErrorCodes::TooManyMatchingDocuments,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 str::stream() << "found more than one document matching " << filter.toString()
                               << " ["
                               << batch.begin()->toString()

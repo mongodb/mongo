@@ -182,7 +182,8 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfFirstDocHasWrongResumeToken) {
     Timestamp doc2Timestamp(101, 1);
     addDocument(doc1Timestamp, "1");
     addDocument(doc2Timestamp, "2");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldIgnoreChangeWithEarlierTimestamp) {
@@ -200,7 +201,8 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "1", resumeTokenUUID);
     auto otherUUID = UUID::gen();
     addDocument(resumeTimestamp, "1", otherUUID);
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
@@ -338,7 +340,8 @@ TEST_F(ShardCheckResumabilityTest,
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     shardCheckResumability->injectMongoProcessInterface(
         std::make_shared<MockMongoProcessInterface>(mockOplog));
-    ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
+    ASSERT_THROWS_CODE(
+        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldSucceedWithNoDocumentsInPipelineAndOplogIsEmpty) {
@@ -380,7 +383,8 @@ TEST_F(ShardCheckResumabilityTest,
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     shardCheckResumability->injectMongoProcessInterface(
         std::make_shared<MockMongoProcessInterface>(mockOplog));
-    ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
+    ASSERT_THROWS_CODE(
+        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {

@@ -239,7 +239,7 @@ error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
 error_code("KeyedExecutorRetry", 259);
 error_code("TooManyLogicalSessions", 261);
-
+error_code("ChangeStreamFatalError", 280)
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)
@@ -292,3 +292,5 @@ error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
                                                  "TooManyDocumentSequences"])
 
 error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])
+
+error_class("NonResumableChangeStreamError", ["ChangeStreamFatalError"])

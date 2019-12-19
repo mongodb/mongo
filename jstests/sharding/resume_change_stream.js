@@ -118,7 +118,7 @@
     ChangeStreamTest.assertChangeStreamThrowsCode({
         collection: mongosColl,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
-        expectedCode: 40576
+        expectedCode: ErrorCodes.ChangeStreamFatalError
     });
 
     // Test that the change stream can't resume if the resume token *is* present in the oplog, but
@@ -129,7 +129,7 @@
     ChangeStreamTest.assertChangeStreamThrowsCode({
         collection: mongosColl,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
-        expectedCode: 40576
+        expectedCode: ErrorCodes.ChangeStreamFatalError
     });
 
     // Drop the collection.
