@@ -11,9 +11,9 @@
 static int __backup_all(WT_SESSION_IMPL *);
 static int __backup_list_append(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_list_uri_append(WT_SESSION_IMPL *, const char *, bool *);
-static int __backup_start(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, bool, const char *[]);
+static int __backup_start(
+  WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, WT_CURSOR_BACKUP *, const char *[]);
 static int __backup_stop(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
-static int __backup_uri(WT_SESSION_IMPL *, const char *[], bool, bool *, bool *);
 
 /*
  * __curbackup_next --
@@ -28,6 +28,7 @@ __curbackup_next(WT_CURSOR *cursor)
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     CURSOR_API_CALL(cursor, session, next, NULL);
+    WT_CURSOR_BACKUP_CHECK_STOP(cb);
 
     if (cb->list == NULL || cb->list[cb->next] == NULL) {
         F_CLR(cursor, WT_CURSTD_KEY_SET);
@@ -57,12 +58,42 @@ __curbackup_reset(WT_CURSOR *cursor)
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
+    WT_CURSOR_BACKUP_CHECK_STOP(cb);
 
     cb->next = 0;
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:
     API_END_RET(session, ret);
+}
+
+/*
+ * __backup_incr_release --
+ *     Free all resources relating to incremental backup.
+ */
+static int
+__backup_incr_release(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool force)
+{
+    WT_BLKINCR *blk;
+    WT_CONNECTION_IMPL *conn;
+    u_int i;
+
+    WT_UNUSED(cb);
+    WT_UNUSED(force);
+    conn = S2C(session);
+    /*
+     * Clear flags. Remove file. Release any memory information.
+     */
+    F_CLR(conn, WT_CONN_INCR_BACKUP);
+    for (i = 0; i < WT_BLKINCR_MAX; ++i) {
+        blk = &conn->incr_backups[i];
+        F_CLR(blk, WT_BLKINCR_VALID);
+    }
+    /* __wt_block_backup_remove... */
+    conn->ckpt_incr_granularity = 0;
+    WT_RET(__wt_remove_if_exists(session, WT_BLKINCR_BACKUP, true));
+
+    return (0);
 }
 
 /*
@@ -79,6 +110,13 @@ __backup_free(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
             __wt_free(session, cb->list[i]);
         __wt_free(session, cb->list);
     }
+    if (cb->incr_file != NULL)
+        __wt_free(session, cb->incr_file);
+    if (cb->incr_src != NULL)
+        __wt_free(session, cb->incr_src);
+    if (cb->incr_this != NULL)
+        __wt_free(session, cb->incr_this);
+    __wt_curbackup_free_incr(session, cb);
 }
 
 /*
@@ -95,6 +133,12 @@ __curbackup_close(WT_CURSOR *cursor)
     cb = (WT_CURSOR_BACKUP *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 err:
+
+    if (F_ISSET(cb, WT_CURBACKUP_FORCE_STOP)) {
+        __wt_verbose(
+          session, WT_VERB_BACKUP, "%s", "Releasing resources from forced stop incremental");
+        __backup_incr_release(session, cb, true);
+    }
 
     /*
      * When starting a hot backup, we serialize hot backup cursors and set the connection's
@@ -147,7 +191,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
       __wt_cursor_reopen_notsup,                      /* reopen */
       __curbackup_close);                             /* close */
     WT_CURSOR *cursor;
-    WT_CURSOR_BACKUP *cb;
+    WT_CURSOR_BACKUP *cb, *othercb;
     WT_DECL_RET;
 
     WT_STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
@@ -157,19 +201,23 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     *cursor = iface;
     cursor->session = (WT_SESSION *)session;
     cursor->key_format = "S";  /* Return the file names as the key. */
-    cursor->value_format = ""; /* No value. */
+    cursor->value_format = ""; /* No value, for now. */
 
     session->bkp_cursor = cb;
+    othercb = (WT_CURSOR_BACKUP *)other;
+    if (othercb != NULL)
+        WT_CURSOR_BACKUP_CHECK_STOP(othercb);
 
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
      * view when creating a copy.
      */
     WT_WITH_CHECKPOINT_LOCK(
-      session, WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, other != NULL, cfg)));
+      session, WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, othercb, cfg)));
     WT_ERR(ret);
-
-    WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+    WT_ERR(cb->incr_file == NULL ?
+        __wt_cursor_init(cursor, uri, NULL, cfg, cursorp) :
+        __wt_curbackup_open_incr(session, uri, other, cursor, cfg, cursorp));
 
     if (0) {
 err:
@@ -178,6 +226,105 @@ err:
     }
 
     return (ret);
+}
+
+/*
+ * __backup_get_ckpt --
+ *     Get the most recent checkpoint information and store it in the structure.
+ *
+ * XXX - Currently set return to static void for the compiler, when this function has real content
+ *     it should be static int.
+ */
+static void
+__backup_get_ckpt(WT_SESSION_IMPL *session, WT_BLKINCR *incr)
+{
+    WT_UNUSED(session);
+    WT_UNUSED(incr);
+    /*
+     * Look up the most recent checkpoint and store information about it in incr.
+     *
+     * XXX When this function has content, return a real value. return (0);
+     */
+    return;
+}
+
+/*
+ * __backup_add_id --
+ *     Add the identifier for block based incremental backup.
+ */
+static int
+__backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
+{
+    WT_BLKINCR *blk;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    u_int i;
+
+    conn = S2C(session);
+    blk = NULL;
+    for (i = 0; i < WT_BLKINCR_MAX; ++i) {
+        blk = &conn->incr_backups[i];
+        /* If it isn't use, we can use it. */
+        if (!F_ISSET(blk, WT_BLKINCR_INUSE))
+            break;
+    }
+    /*
+     * We didn't find an entry. This should not happen.
+     */
+    if (i == WT_BLKINCR_MAX)
+        WT_PANIC_RET(session, WT_NOTFOUND, "Could not find an incremental backup slot to use");
+
+    /* Use the slot.  */
+    if (blk->id_str != NULL)
+        __wt_verbose(
+          session, WT_VERB_BACKUP, "Freeing and reusing backup slot with old id %s", blk->id_str);
+    /* Free any string that was there. */
+    __wt_free(session, blk->id_str);
+    WT_ERR(__wt_strndup(session, cval->str, cval->len, &blk->id_str));
+    __wt_verbose(session, WT_VERB_BACKUP, "Using backup slot %u for id %s", i, blk->id_str);
+    /*
+     * XXX This function can error in the future.
+     *
+     * WT_ERR(__backup_get_ckpt(session, blk));
+     */
+    __backup_get_ckpt(session, blk);
+    F_SET(blk, WT_BLKINCR_VALID);
+    return (0);
+
+err:
+    if (blk != NULL)
+        __wt_free(session, blk->id_str);
+    return (ret);
+}
+
+/*
+ * __backup_find_id --
+ *     Find the source identifier for block based incremental backup. Error if it is not a valid id.
+ */
+static int
+__backup_find_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_BLKINCR **incrp)
+{
+    WT_BLKINCR *blk;
+    WT_CONNECTION_IMPL *conn;
+    u_int i;
+
+    conn = S2C(session);
+    for (i = 0; i < WT_BLKINCR_MAX; ++i) {
+        blk = &conn->incr_backups[i];
+        /* If it isn't valid, skip it. */
+        if (!F_ISSET(blk, WT_BLKINCR_VALID))
+            continue;
+        if (WT_STRING_MATCH(blk->id_str, cval->str, cval->len)) {
+            if (F_ISSET(blk, WT_BLKINCR_INUSE))
+                WT_RET_MSG(session, EINVAL, "Incremental backup structure already in use");
+            if (incrp != NULL)
+                *incrp = blk;
+            __wt_verbose(session, WT_VERB_BACKUP, "Found backup slot %u for id %s", i, blk->id_str);
+            return (0);
+        }
+    }
+    __wt_verbose(session, WT_VERB_BACKUP, "Did not find %.*s", (int)cval->len, cval->str);
+    return (WT_NOTFOUND);
 }
 
 /*
@@ -208,21 +355,203 @@ err:
 }
 
 /*
+ * __backup_config --
+ *     Backup configuration.
+ */
+static int
+__backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[],
+  WT_CURSOR_BACKUP *othercb, bool *foundp, bool *log_only, bool *incr_only)
+{
+    WT_CONFIG targetconf;
+    WT_CONFIG_ITEM cval, k, v;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    const char *uri;
+    bool incremental_config, is_dup, log_config, target_list;
+
+    *foundp = *incr_only = *log_only = false;
+
+    conn = S2C(session);
+    incremental_config = log_config = false;
+    is_dup = othercb != NULL;
+
+    /*
+     * Per-file offset incremental hot backup configurations take a starting checkpoint and optional
+     * maximum transfer size, and the subsequent duplicate cursors take a file object.
+     */
+    WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.force_stop", &cval));
+    if (cval.val) {
+        /*
+         * If we're force stopping incremental backup, set the flag. The resources involved in
+         * incremental backup will be released on cursor close and that is the only expected usage
+         * for this cursor.
+         */
+        if (is_dup)
+            WT_RET_MSG(session, EINVAL,
+              "Incremental force stop can only be specified on a primary backup cursor");
+        F_SET(cb, WT_CURBACKUP_FORCE_STOP);
+        return (0);
+    }
+    WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.enabled", &cval));
+    if (cval.val) {
+        if (!F_ISSET(conn, WT_CONN_INCR_BACKUP)) {
+            WT_RET(__wt_config_gets(session, cfg, "incremental.granularity", &cval));
+            /* XXX may not need cb->incr_granularity */
+            if (conn->ckpt_incr_granularity != 0)
+                WT_RET_MSG(session, EINVAL, "Cannot change the incremental backup granularity");
+            conn->ckpt_incr_granularity = cb->incr_granularity = (uint64_t)cval.val;
+        }
+        /* XXX Granularity can only be set once at the beginning */
+        F_SET(conn, WT_CONN_INCR_BACKUP);
+        incremental_config = true;
+    }
+
+    /*
+     * Specifying an incremental file means we're opening a duplicate backup cursor.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "incremental.file", &cval));
+    if (cval.len != 0) {
+        if (!is_dup)
+            WT_RET_MSG(session, EINVAL,
+              "Incremental file name can only be specified on a duplicate backup cursor");
+        WT_RET(__wt_strndup(session, cval.str, cval.len, &cb->incr_file));
+        incremental_config = true;
+    }
+
+    /*
+     * See if we have a source identifier. We must process the source identifier before processing
+     * the 'this' identifier. That will mark which source is in use so that we can use any slot that
+     * is not in use as a new source starting point for this identifier.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "incremental.src_id", &cval));
+    if (cval.len != 0) {
+        if (is_dup)
+            WT_RET_MSG(session, EINVAL,
+              "Incremental source identifier can only be specified on a primary backup cursor");
+        WT_RET(__backup_find_id(session, &cval, &cb->incr));
+        /* XXX might not need this incr_src field */
+        WT_RET(__wt_strndup(session, cval.str, cval.len, &cb->incr_src));
+        F_SET(cb->incr, WT_BLKINCR_INUSE);
+        incremental_config = true;
+    }
+    /*
+     * Use WT_ERR from here out because we need to clear the in use flag on error now.
+     */
+
+    /*
+     * Look for a new checkpoint name to retain and mark as a starting point.
+     */
+    WT_ERR(__wt_config_gets(session, cfg, "incremental.this_id", &cval));
+    if (cval.len != 0) {
+        if (is_dup)
+            WT_ERR_MSG(session, EINVAL,
+              "Incremental identifier can only be specified on a primary backup cursor");
+        ret = __backup_find_id(session, &cval, NULL);
+        if (ret != WT_NOTFOUND)
+            WT_ERR_MSG(session, EINVAL, "Incremental identifier already exists");
+
+        WT_ERR(__backup_add_id(session, &cval));
+        /* XXX might not need this incr_this field */
+        WT_ERR(__wt_strndup(session, cval.str, cval.len, &cb->incr_this));
+        incremental_config = true;
+    }
+
+    /*
+     * If we find a non-empty target configuration string, we have a job, otherwise it's not our
+     * problem.
+     */
+    WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
+    __wt_config_subinit(session, &targetconf, &cval);
+    for (target_list = false; (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
+         target_list = true) {
+        /* If it is our first time through, allocate. */
+        if (!target_list) {
+            *foundp = true;
+            WT_ERR(__wt_scr_alloc(session, 512, &tmp));
+        }
+
+        WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
+        uri = tmp->data;
+        if (v.len != 0)
+            WT_ERR_MSG(session, EINVAL, "%s: invalid backup target: URIs may need quoting", uri);
+
+        /*
+         * Handle log targets. We do not need to go through the schema worker, just call the
+         * function to append them. Set log_only only if it is our only URI target.
+         */
+        if (WT_PREFIX_MATCH(uri, "log:")) {
+            log_config = true;
+            *log_only = !target_list;
+            WT_ERR(__backup_log_append(session, session->bkp_cursor, false));
+        } else if (is_dup)
+            WT_ERR_MSG(
+              session, EINVAL, "duplicate backup cursor cannot be used for non-log target");
+        else {
+            *log_only = false;
+
+            /*
+             * If backing up individual tables, we have to include indexes, which may involve
+             * opening those indexes. Acquire the table lock in write mode for that case.
+             */
+            WT_WITH_TABLE_WRITE_LOCK(session,
+              ret = __wt_schema_worker(session, uri, NULL, __backup_list_uri_append, cfg, 0));
+            WT_ERR(ret);
+        }
+    }
+    WT_ERR_NOTFOUND_OK(ret);
+
+    /*
+     * Compatibility checking.
+     *
+     * Log archive cannot mix with log-file based incremental backups (but if a duplicate cursor,
+     * archiving has been temporarily suspended).
+     *
+     * Duplicate backup cursors are only for log targets or block-based incremental backups. But log
+     * targets don't make sense with block-based incremental backup.
+     */
+    if (!is_dup && log_config && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE))
+        WT_ERR_MSG(session, EINVAL,
+          "incremental log file backup not possible when automatic log archival configured");
+    if (is_dup && (!incremental_config && !log_config))
+        WT_ERR_MSG(session, EINVAL,
+          "duplicate backup cursor must be for block-based incremental or logging backup");
+    if (incremental_config && (log_config || target_list))
+        WT_ERR_MSG(
+          session, EINVAL, "block-based incremental backup incompatible with a list of targets");
+
+    if (incremental_config) {
+        if (is_dup && !F_ISSET(othercb, WT_CURBACKUP_INCR))
+            WT_ERR_MSG(session, EINVAL,
+              "Incremental duplicate cursor must have an incremental primary backup cursor");
+        F_SET(cb, WT_CURBACKUP_INCR);
+    }
+err:
+    if (ret != 0 && cb->incr != NULL)
+        F_CLR(cb->incr, WT_BLKINCR_INUSE);
+    __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
  * __backup_start --
  *     Start a backup.
  */
 static int
-__backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, const char *cfg[])
+__backup_start(
+  WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, WT_CURSOR_BACKUP *othercb, const char *cfg[])
 {
+    WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_FSTREAM *srcfs;
     const char *dest;
-    bool exist, log_only, target_list;
+    bool exist, is_dup, is_incr, log_only, target_list;
 
     conn = S2C(session);
     srcfs = NULL;
     dest = NULL;
+    is_dup = othercb != NULL;
 
     cb->next = 0;
     cb->list = NULL;
@@ -239,6 +568,21 @@ __backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, cons
 
     if (F_ISSET(session, WT_SESSION_BACKUP_DUP) && is_dup)
         WT_RET_MSG(session, EINVAL, "there is already a duplicate backup cursor open");
+
+    /*
+     * We want to check for forced stopping early before we do anything else. If it is set, we just
+     * set a flag and we're done. Actions will be performed on cursor close.
+     */
+    WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.force_stop", &cval));
+    if (cval.val) {
+        /*
+         * If we're force stopping incremental backup, set the flag. The resources involved in
+         * incremental backup will be released on cursor close and that is the only expected usage
+         * for this cursor.
+         */
+        F_SET(cb, WT_CURBACKUP_FORCE_STOP);
+        return (0);
+    }
 
     if (!is_dup) {
         /*
@@ -260,10 +604,10 @@ __backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, cons
 
         /*
          * Create a temporary backup file. This must be opened before generating the list of targets
-         * in backup_uri. This file will later be renamed to the correct name depending on whether
-         * or not we're doing an incremental backup. We need a temp file so that if we fail or crash
-         * while filling it, the existence of a partial file doesn't confuse restarting in the
-         * source database.
+         * in backup_config. This file will later be renamed to the correct name depending on
+         * whether or not we're doing an incremental backup. We need a temp file so that if we fail
+         * or crash while filling it, the existence of a partial file doesn't confuse restarting in
+         * the source database.
          */
         WT_ERR(__wt_fopen(session, WT_BACKUP_TMP, WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &cb->bfs));
     }
@@ -273,14 +617,11 @@ __backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, cons
      * database objects and log files to the list.
      */
     target_list = false;
-    WT_ERR(__backup_uri(session, cfg, is_dup, &target_list, &log_only));
+    WT_ERR(__backup_config(session, cb, cfg, othercb, &target_list, &log_only, &is_incr));
     /*
-     * For a duplicate cursor, all the work is done in backup_uri. The only usage accepted is
-     * "target=("log:")" so error if not log only.
+     * For a duplicate cursor, all the work is done in backup_config.
      */
     if (is_dup) {
-        if (!log_only)
-            WT_ERR_MSG(session, EINVAL, "duplicate backup cursor must be for logs only");
         F_SET(cb, WT_CURBACKUP_DUP);
         F_SET(session, WT_SESSION_BACKUP_DUP);
         goto done;
@@ -317,12 +658,12 @@ __backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, cons
          * We also open an incremental backup source file so that we can detect a crash with an
          * incremental backup existing in the source directory versus an improper destination.
          */
-        dest = WT_INCREMENTAL_BACKUP;
-        WT_ERR(__wt_fopen(session, WT_INCREMENTAL_SRC, WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
-        WT_ERR(__backup_list_append(session, cb, WT_INCREMENTAL_BACKUP));
+        dest = WT_LOGINCR_BACKUP;
+        WT_ERR(__wt_fopen(session, WT_LOGINCR_SRC, WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
+        WT_ERR(__backup_list_append(session, cb, dest));
     } else {
         dest = WT_METADATA_BACKUP;
-        WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
+        WT_ERR(__backup_list_append(session, cb, dest));
         WT_ERR(__wt_fs_exist(session, WT_BASECONFIG, &exist));
         if (exist)
             WT_ERR(__backup_list_append(session, cb, WT_BASECONFIG));
@@ -372,6 +713,8 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     /* If it's not a dup backup cursor, make sure one isn't open. */
     WT_ASSERT(session, !F_ISSET(session, WT_SESSION_BACKUP_DUP));
     WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_list = NULL);
+    if (cb->incr != NULL)
+        F_CLR(cb->incr, WT_BLKINCR_INUSE);
     __backup_free(session, cb);
 
     /* Remove any backup specific file. */
@@ -396,75 +739,6 @@ __backup_all(WT_SESSION_IMPL *session)
 }
 
 /*
- * __backup_uri --
- *     Backup a list of objects.
- */
-static int
-__backup_uri(WT_SESSION_IMPL *session, const char *cfg[], bool is_dup, bool *foundp, bool *log_only)
-{
-    WT_CONFIG targetconf;
-    WT_CONFIG_ITEM cval, k, v;
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-    const char *uri;
-    bool target_list;
-
-    *foundp = *log_only = false;
-
-    /*
-     * If we find a non-empty target configuration string, we have a job, otherwise it's not our
-     * problem.
-     */
-    WT_RET(__wt_config_gets(session, cfg, "target", &cval));
-    __wt_config_subinit(session, &targetconf, &cval);
-    for (target_list = false; (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
-         target_list = true) {
-        /* If it is our first time through, allocate. */
-        if (!target_list) {
-            *foundp = true;
-            WT_ERR(__wt_scr_alloc(session, 512, &tmp));
-        }
-
-        WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
-        uri = tmp->data;
-        if (v.len != 0)
-            WT_ERR_MSG(session, EINVAL, "%s: invalid backup target: URIs may need quoting", uri);
-
-        /*
-         * Handle log targets. We do not need to go through the schema worker, just call the
-         * function to append them. Set log_only only if it is our only URI target.
-         */
-        if (WT_PREFIX_MATCH(uri, "log:")) {
-            /*
-             * Log archive cannot mix with incremental backup, don't let that happen. If we're a
-             * duplicate cursor archiving is already temporarily suspended.
-             */
-            if (!is_dup && FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ARCHIVE))
-                WT_ERR_MSG(session, EINVAL,
-                  "incremental backup not possible when "
-                  "automatic log archival configured");
-            *log_only = !target_list;
-            WT_ERR(__backup_log_append(session, session->bkp_cursor, false));
-        } else {
-            *log_only = false;
-
-            /*
-             * If backing up individual tables, we have to include indexes, which may involve
-             * opening those indexes. Acquire the table lock in write mode for that case.
-             */
-            WT_WITH_TABLE_WRITE_LOCK(session,
-              ret = __wt_schema_worker(session, uri, NULL, __backup_list_uri_append, cfg, 0));
-            WT_ERR(ret);
-        }
-    }
-    WT_ERR_NOTFOUND_OK(ret);
-
-err:
-    __wt_scr_free(session, &tmp);
-    return (ret);
-}
-
-/*
  * __wt_backup_file_remove --
  *     Remove the incremental and meta-data backup files.
  */
@@ -479,8 +753,8 @@ __wt_backup_file_remove(WT_SESSION_IMPL *session)
      * there's any chance of an incremental backup file existing.
      */
     WT_TRET(__wt_remove_if_exists(session, WT_BACKUP_TMP, true));
-    WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_BACKUP, true));
-    WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_SRC, true));
+    WT_TRET(__wt_remove_if_exists(session, WT_LOGINCR_BACKUP, true));
+    WT_TRET(__wt_remove_if_exists(session, WT_LOGINCR_SRC, true));
     WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP, true));
     return (ret);
 }

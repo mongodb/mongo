@@ -283,7 +283,7 @@ tasks:
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make check all"
         vars:
-          test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1
 
   - name: make-check-asan-test
     depends_on:
@@ -1784,6 +1784,20 @@ tasks:
 
             ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
 
+  - name: split-stress-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in {1..10}; do ${python_binary|python} split_stress.py; done
+
 buildvariants:
 - name: ubuntu1804
   display_name: Ubuntu 18.04
@@ -1813,6 +1827,7 @@ buildvariants:
     - name: wtperf-test
     - name: ftruncate-test
     - name: long-test
+    - name: split-stress-test
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
@@ -1965,3 +1980,4 @@ buildvariants:
   tasks:
   - name: compile
   - name: unit-test
+  - name: split-stress-test

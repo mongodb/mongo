@@ -14,10 +14,14 @@
 
 #define WT_USERCONFIG "WiredTiger.config" /* User configuration */
 
-#define WT_BACKUP_TMP "WiredTiger.backup.tmp"      /* Backup tmp file */
-#define WT_METADATA_BACKUP "WiredTiger.backup"     /* Hot backup file */
-#define WT_INCREMENTAL_BACKUP "WiredTiger.ibackup" /* Incremental backup */
-#define WT_INCREMENTAL_SRC "WiredTiger.isrc"       /* Incremental source */
+/*
+ * Backup related WiredTiger files.
+ */
+#define WT_BACKUP_TMP "WiredTiger.backup.tmp"       /* Backup tmp file */
+#define WT_BLKINCR_BACKUP "WiredTiger.backup.block" /* Block incremental durable file */
+#define WT_METADATA_BACKUP "WiredTiger.backup"      /* Hot backup file */
+#define WT_LOGINCR_BACKUP "WiredTiger.ibackup"      /* Log incremental backup */
+#define WT_LOGINCR_SRC "WiredTiger.isrc"            /* Log incremental source */
 
 #define WT_METADATA_TURTLE "WiredTiger.turtle"         /* Metadata metadata */
 #define WT_METADATA_TURTLE_SET "WiredTiger.turtle.set" /* Turtle temp file */
@@ -91,16 +95,20 @@ struct __wt_ckpt {
     wt_timestamp_t newest_stop_ts;
     uint64_t newest_stop_txn;
 
+    uint64_t *alloc_list; /* Checkpoint allocation list */
+    uint64_t alloc_list_entries;
+
     WT_ITEM addr; /* Checkpoint cookie string */
     WT_ITEM raw;  /* Checkpoint cookie raw */
 
     void *bpriv; /* Block manager private */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_CKPT_ADD 0x1u    /* Checkpoint to be added */
-#define WT_CKPT_DELETE 0x2u /* Checkpoint to be deleted */
-#define WT_CKPT_FAKE 0x4u   /* Checkpoint is a fake */
-#define WT_CKPT_UPDATE 0x8u /* Checkpoint requires update */
-                            /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_CKPT_ADD 0x01u        /* Checkpoint to be added */
+#define WT_CKPT_BLOCK_MODS 0x02u /* Return list of modified blocks */
+#define WT_CKPT_DELETE 0x04u     /* Checkpoint to be deleted */
+#define WT_CKPT_FAKE 0x08u       /* Checkpoint is a fake */
+#define WT_CKPT_UPDATE 0x10u     /* Checkpoint requires update */
+                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };

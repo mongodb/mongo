@@ -18,9 +18,10 @@ trap 'onintr' 2
 
 usage() {
 	echo "usage: $0 [-aFSv] [-c config] "
-	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
+	echo "    [-b format-binary] [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
 	echo
 	echo "    -a           abort/recovery testing (defaults to off)"
+	echo "    -b binary    format binary (defaults to "./t")"
 	echo "    -c config    format configuration file (defaults to CONFIG.stress)"
 	echo "    -F           quit on first failure (defaults to off)"
 	echo "    -h home      run directory (defaults to .)"
@@ -74,12 +75,16 @@ parallel_jobs=8
 smoke_test=0
 total_jobs=0
 verbose=0
+format_binary="./t"
 
 while :; do
 	case "$1" in
 	-a)
 		abort_test=1
 		shift ;;
+	-b)
+		format_binary="$2"
+		shift ; shift ;;
 	-c)
 		config="$2"
 		shift ; shift ;;
@@ -155,16 +160,17 @@ cd $(dirname $0) || exit 1
 # local.
 [[ $config_found -eq 0 ]] && [[ -f "$config" ]] && config="$PWD/$config"
 
-# Find the format binary. Builds are normally in the WiredTiger source tree, in which case it's
-# in the same directory as format.sh, else it's in the build_posix tree. If the build is in the
-# build_posix tree, move there, we have to run in the directory where the format binary lives
-# because the format binary "knows" the wt utility is two directory levels above it.
-format_binary="./t"
-[[ -x $format_binary ]] || {
+# Find the last part of format_binary, which is format binary file. Builds are normally in the
+# WiredTiger source tree, in which case it's in the same directory as format.sh, else it's in
+# the build_posix tree. If the build is in the build_posix tree, move there, we have to run in
+# the directory where the format binary lives because the format binary "knows" the wt utility
+# is two directory levels above it.
+
+[[ -x ${format_binary##* } ]] || {
 	build_posix_directory="../../build_posix/test/format"
 	[[ ! -d $build_posix_directory ]] || cd $build_posix_directory || exit 1
-	[[ -x $format_binary ]] || {
-		echo "$name: format program \"$format_binary\" not found"
+	[[ -x ${format_binary##* } ]] || {
+		echo "$name: format program \"${format_binary##* }\" not found"
 		exit 1
 	}
 }

@@ -1,4 +1,4 @@
-/*! @page devdoc-schema Schema operations
+/*! @page devdoc-schema Schema Operations
 
 A schema defines the format of the application data in WiredTiger. WiredTiger
 supports various types of schemas (See @ref schema for more

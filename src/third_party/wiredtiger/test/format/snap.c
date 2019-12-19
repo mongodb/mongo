@@ -397,6 +397,12 @@ snap_repeat_txn(WT_CURSOR *cursor, TINFO *tinfo)
         if (current->opid != tinfo->opid)
             break;
 
+        /*
+         * The transaction is not yet resolved, so the rules are as if the transaction has
+         * committed. Note we are NOT checking if reads are repeatable based on the chosen
+         * timestamp. This is because we expect snapshot isolation to work even in the presence of
+         * other threads of control committing in our past, until the transaction resolves.
+         */
         if (snap_repeat_ok_commit(tinfo, current))
             WT_RET(snap_verify(cursor, tinfo, current));
     }
