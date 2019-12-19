@@ -709,56 +709,6 @@ TEST_F(CheapJsonTest, Pretty) {
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 class PrintAllThreadStacksTest : public unittest::Test {
 public:
-    void doPrintAllThreadStacks(size_t numThreads) {
-        std::string dumped;
-        StringStackTraceSink sink{dumped};
-
-        struct Worker {
-            stdx::thread thread;
-            int tid;
-        };
-        std::vector<Worker> workers(numThreads);
-
-        Mutex mutex;
-        stdx::condition_variable cv;
-        bool endAll = false;
-
-        for (size_t i = 0; i < numThreads; ++i) {
-            workers[i] = {stdx::thread([&, i] {
-                stdx::unique_lock lock{mutex};
-                workers[i].tid = syscall(SYS_gettid);
-                cv.wait(lock, [&] { return endAll; });
-            })};
-        }
-        printAllThreadStacks(sink);
-        {
-            stdx::unique_lock lock{mutex};
-            endAll = true;
-        }
-        cv.notify_all();
-        for (auto& w : workers)
-            w.thread.join();
-
-        if (kSuperVerbose)
-            tlog() << dumped;
-
-        std::set<int> seenTids;
-
-        // Make some assertions about `dumped`.
-        BSONObj jsonObj = fromjson(dumped);
-        auto allInfoElement = jsonObj.getObjectField("threadInfo");
-        for (const auto& ti : allInfoElement) {
-            const BSONObj& obj = ti.Obj();
-            seenTids.insert(obj.getIntField("tid"));
-            ASSERT(obj.hasElement("backtrace"));
-        }
-
-        for (auto&& w : workers)
-            ASSERT(seenTids.find(w.tid) != seenTids.end()) << "missing tid:" << w.tid;
-    }
-};
-
-TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
     struct WatchInt {
         int v = 0;
         Mutex* m;
@@ -774,25 +724,14 @@ TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
             cond.wait(lock, [&] { return v == target; });
         }
     };
-    Mutex mutex;
-    WatchInt endAll{0, &mutex};
-    WatchInt pending{0, &mutex};
 
     struct Worker {
         stdx::thread thread;
         int tid;
-        bool blocks;
+        bool blocks = false;
     };
 
-    std::deque<Worker> workers;
-
-    auto killAllWorkers = [&] {
-        endAll.incr(1);
-        for (auto& w : workers)
-            w.thread.join();
-    };
-
-    auto spawnWorker = [&](bool blocksSignal) {
+    void spawnWorker(bool blocksSignal = false) {
         pending.incr(1);
         auto& ref = workers.emplace_back();
         ref.thread = stdx::thread([&, blocksSignal] {
@@ -807,13 +746,53 @@ TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
             pending.incr(-1);
             endAll.wait(1);
         });
-    };
+        pending.wait(0);
+    }
 
+    void reapWorkers() {
+        endAll.incr(1);
+        for (auto& w : workers)
+            w.thread.join();
+    }
+
+    void doPrintAllThreadStacks(size_t numThreads) {
+        for (size_t i = 0; i < numThreads; ++i)
+            spawnWorker();
+
+        std::string dumped;
+        StringStackTraceSink sink{dumped};
+        printAllThreadStacks(sink);
+        if (kSuperVerbose)
+            tlog() << dumped;
+
+        reapWorkers();
+
+        std::set<int> seenTids;
+
+        // Make some assertions about `dumped`.
+        BSONObj jsonObj = fromjson(dumped);
+        auto allInfoElement = jsonObj.getObjectField("threadInfo");
+        for (const auto& ti : allInfoElement) {
+            const BSONObj& obj = ti.Obj();
+            seenTids.insert(obj.getIntField("tid"));
+            ASSERT(obj.hasElement("backtrace"));
+        }
+
+        for (auto&& w : workers)
+            ASSERT(seenTids.find(w.tid) != seenTids.end()) << "missing tid:" << w.tid;
+    }
+
+    Mutex mutex;
+    WatchInt endAll{0, &mutex};
+    WatchInt pending{0, &mutex};
+    std::deque<Worker> workers;
+};
+
+TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
     for (int i = 0; i < 2; ++i)
         spawnWorker(true);
     for (int i = 0; i < 2; ++i)
         spawnWorker(false);
-    pending.wait(0);
 
     std::string dumped;
 
@@ -821,8 +800,15 @@ TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
         StringStackTraceSink sink{dumped};
         printAllThreadStacks(sink);
     });
-    sleep(1);
-    killAllWorkers();
+
+    // Give tracer some time to signal all the threads.
+    // We know the threads with the signal blocked will not respond.
+    // The dumper thread will poll until those are dead.
+    // There's no API to monitor its progress, so sleep a hefty chunk of time.
+    sleep(2);
+
+    reapWorkers();
+
     dumper.join();
 
     BSONObj jsonObj = fromjson(dumped);
@@ -837,7 +823,6 @@ TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
         const BSONObj& obj = ti.Obj();
         int tid = obj.getIntField("tid");
         mustSee.erase(tid);
-        // tlog() << format(FMT_STRING("  {} : {}"), tid, tojson(obj));
         auto witer =
             std::find_if(workers.begin(), workers.end(), [&](auto&& w) { return w.tid == tid; });
         if (witer == workers.end())
