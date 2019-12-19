@@ -106,7 +106,6 @@ void BM_Base64DecodeString(benchmark::State& state) {
     size_t len = state.range(0);
     size_t items = 0;
     std::string in = base64::encode(std::string(len, 'x'));
-    std::string out;
     for (auto _ : state) {
         benchmark::DoNotOptimize(base64::decode(in));
         items += in.size();
@@ -126,8 +125,8 @@ void BM_Base64DecodeStringStream(benchmark::State& state) {
     size_t len = state.range(0);
     size_t items = 0;
     std::string in = base64::encode(std::string(len, 'x'));
-    std::stringstream out;
     for (auto _ : state) {
+        std::stringstream out;
         base64::decode(out, in);
         items += in.size();
     }
@@ -146,15 +145,15 @@ void BM_Base64DecodeFmtMemoryBuffer(benchmark::State& state) {
     size_t len = state.range(0);
     size_t items = 0;
     std::string in = base64::encode(std::string(len, 'x'));
-    fmt::memory_buffer buffer;
     for (auto _ : state) {
+        fmt::memory_buffer buffer;
         base64::decode(buffer, in);
         items += in.size();
     }
     state.SetItemsProcessed(items);
 }
 
-BENCHMARK(BM_Base64DecodeStringStream)
+BENCHMARK(BM_Base64DecodeFmtMemoryBuffer)
     ->Arg(1)
     ->Arg(16)
     ->Arg(1 << 10)
