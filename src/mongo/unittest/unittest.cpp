@@ -344,7 +344,7 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
 
     r->_millis = timer.millis();
 
-    log() << "\t DONE running tests" << std::endl;
+    log() << "\t DONE running tests";
 
     return r;
 }
