@@ -228,7 +228,11 @@ function secondaryToStandaloneTest() {
 
     startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, /*writeConcern=*/2, secondaryDB);
 
+    // Don't validate data because the index build state will be inconsistent between primary and
+    // secondary.
+    TestData.skipCheckDBHashes = true;
     replSet.stopSet(/*signal=*/null, /*forRestart=*/true);
+    TestData.skipCheckDBHashes = false;
 
     let mongod = restartStandalone(secondary);
 
