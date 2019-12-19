@@ -369,5 +369,13 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
 
     store.update(opCtx, query, update);
 }
+
+void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+    store.remove(opCtx,
+                 QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
+                 {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
+}
 }  // namespace migrationutil
 }  // namespace mongo

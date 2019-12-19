@@ -152,5 +152,11 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
                                              const UUID& migrationId);
+
+/**
+ * Deletes the migration coordinator document with the specified id from
+ * config.migrationCoordinators without waiting for majority writeConcern.
+ */
+void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId);
 }  // namespace migrationutil
 }  // namespace mongo
