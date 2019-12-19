@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,55 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression_leaf.h"
-
 namespace mongo {
 
-namespace fts {
-class FTSQuery;
-}  // namespace fts
-
 /**
- * Common base class for $text match expression implementations.
+ * Asserts that the given MatchExpression 'match' serializes to the BSONObj 'expected'.
  */
-class TextMatchExpressionBase : public LeafMatchExpression {
-public:
-    struct TextParams {
-        std::string query;
-        std::string language;
-        bool caseSensitive;
-        bool diacriticSensitive;
-    };
-
-    static const bool kCaseSensitiveDefault;
-    static const bool kDiacriticSensitiveDefault;
-
-    explicit TextMatchExpressionBase(StringData path);
-    virtual ~TextMatchExpressionBase() {}
-
-    /**
-     * Returns a reference to the parsed text query that this TextMatchExpressionBase owns.
-     */
-    virtual const fts::FTSQuery& getFTSQuery() const = 0;
-
-    BSONObj getSerializedRightHandSide() const final {
-        MONGO_UNREACHABLE;
-    }
-
-    //
-    // Methods inherited from MatchExpression.
-    //
-
-    void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
-
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
-
-    bool equivalent(const MatchExpression* other) const final;
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-};
+#define ASSERT_SERIALIZES_TO(match, expected)   \
+    do {                                        \
+        BSONObjBuilder bob;                     \
+        match->serialize(&bob, true);           \
+        ASSERT_BSONOBJ_EQ(bob.obj(), expected); \
+    } while (false)
 
 }  // namespace mongo

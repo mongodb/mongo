@@ -61,7 +61,7 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
-    void serialize(BSONObjBuilder* out) const final;
+    void serialize(BSONObjBuilder* out, bool includePath) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 

@@ -102,7 +102,7 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
 
 BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide() const {
     BSONObjBuilder subBob;
-    _sub->serialize(&subBob);
+    _sub->serialize(&subBob, true);
     return BSON("$elemMatch" << subBob.obj());
 }
 
@@ -178,11 +178,8 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
 BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide() const {
     BSONObjBuilder emBob;
 
-    for (unsigned i = 0; i < _subs.size(); i++) {
-        BSONObjBuilder predicate;
-        _subs[i]->serialize(&predicate);
-        BSONObj predObj = predicate.obj();
-        emBob.appendElements(predObj.firstElement().embeddedObject());
+    for (auto&& child : _subs) {
+        child->serialize(&emBob, false);
     }
 
     return BSON("$elemMatch" << emBob.obj());
