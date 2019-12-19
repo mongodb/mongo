@@ -120,7 +120,6 @@ public:
     bool isElectionIdSet() const;
     OID getElectionId() const;
 
-    void setErrDetails(const std::vector<WriteErrorDetail*>& errDetails);
     // errDetails ownership is transferred to here.
     void addToErrDetails(WriteErrorDetail* errDetails);
     void unsetErrDetails();
