@@ -101,6 +101,15 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                     continue;
                 }
                 throw;  // Fail this loop.
+            } catch (const ExceptionFor<ErrorCodes::FailedToSatisfyReadPreference>&) {
+                // The errors marked as retriable errors are meant to correspond to the driver's
+                // spec (see SERVER-42908), but targeting a replica set shard can fail with
+                // FailedToSatisfyReadPreference, which is not a retriable error in the driver's
+                // spec, so we swallow it separately here if allowPartialResults is true.
+                if (allowPartialResults) {
+                    continue;
+                }
+                throw;  // Fail this loop.
             }
         }
         return remoteCursors;
