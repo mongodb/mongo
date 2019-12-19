@@ -80,6 +80,11 @@ public:
      */
     void abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
+    /**
+     * Deletes the persistent state for this migration from config.migrationCoordinators.
+     */
+    void forgetMigration(OperationContext* opCtx);
+
 private:
     MigrationCoordinatorDocument _migrationInfo;
 };

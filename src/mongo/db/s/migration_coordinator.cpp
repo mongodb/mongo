@@ -98,6 +98,11 @@ void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* o
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 }
 
+void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
+    LOG(0) << "Deleting migration coordinator document for migration " << _migrationInfo.getId();
+    migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
+}
+
 }  // namespace migrationutil
 
 }  // namespace mongo
