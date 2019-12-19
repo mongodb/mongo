@@ -104,6 +104,14 @@ public:
     void reportProjectedPaths(std::set<std::string>* preservedPaths) const;
 
     /**
+     * Return an optional number, x, which indicates that it is safe to stop reading the document
+     * being projected once x fields have been projected.
+     */
+    virtual boost::optional<size_t> maxFieldsToProject() const {
+        return boost::none;
+    }
+
+    /**
      * Recursively reports all computed paths in this projection, adding them into 'computedPaths'.
      *
      * Computed paths that are identified as the result of a simple rename are instead filled out in
@@ -184,6 +192,15 @@ private:
     // Returns nullptr if no such child exists.
     ProjectionNode* getChild(const std::string& field) const;
 
+    /**
+     * Indicates that metadata computed by previous calls to optimize() is now stale and must be
+     * recomputed. This must be called any time the tree is updated (an expression added or child
+     * node added).
+     */
+    void makeOptimizationsStale() {
+        _maxFieldsToProject = boost::none;
+    }
+
     // Our projection semantics are such that all field additions need to be processed in the order
     // specified. '_orderToProcessAdditionsAndChildren' tracks that order.
     //
@@ -193,5 +210,10 @@ private:
     // '_expressions', and "b.c" will be tracked as a child ProjectionNode in '_children'. For the
     // example above, '_orderToProcessAdditionsAndChildren' would be ["a", "b", "d"].
     std::vector<std::string> _orderToProcessAdditionsAndChildren;
+
+    // Maximum number of fields that need to be projected. This allows for an "early" return
+    // optimization which means we don't have to iterate over an entire document. The value is
+    // stored here to avoid re-computation for each document.
+    boost::optional<size_t> _maxFieldsToProject;
 };
 }  // namespace mongo::projection_executor
