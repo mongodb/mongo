@@ -79,40 +79,40 @@ Status checkFieldType(const BSONElement& el, BSONType type) {
     return Status::OK();
 }
 
+}  // namespace
+
 // Find command field names.
-const char kFilterField[] = "filter";
-const char kProjectionField[] = "projection";
-const char kSortField[] = "sort";
-const char kHintField[] = "hint";
-const char kCollationField[] = "collation";
-const char kSkipField[] = "skip";
-const char kLimitField[] = "limit";
-const char kBatchSizeField[] = "batchSize";
-const char kNToReturnField[] = "ntoreturn";
-const char kSingleBatchField[] = "singleBatch";
-const char kMaxField[] = "max";
-const char kMinField[] = "min";
-const char kReturnKeyField[] = "returnKey";
-const char kShowRecordIdField[] = "showRecordId";
-const char kTailableField[] = "tailable";
-const char kOplogReplayField[] = "oplogReplay";
-const char kNoCursorTimeoutField[] = "noCursorTimeout";
-const char kAwaitDataField[] = "awaitData";
-const char kPartialResultsField[] = "allowPartialResults";
-const char kRuntimeConstantsField[] = "runtimeConstants";
-const char kTermField[] = "term";
-const char kOptionsField[] = "options";
-const char kReadOnceField[] = "readOnce";
-const char kAllowSpeculativeMajorityReadField[] = "allowSpeculativeMajorityRead";
-const char kInternalReadAtClusterTimeField[] = "$_internalReadAtClusterTime";
-const char kRequestResumeTokenField[] = "$_requestResumeToken";
-const char kResumeAfterField[] = "$_resumeAfter";
-const char kUse44SortKeys[] = "_use44SortKeys";
+const char QueryRequest::kFilterField[] = "filter";
+const char QueryRequest::kProjectionField[] = "projection";
+const char QueryRequest::kSortField[] = "sort";
+const char QueryRequest::kHintField[] = "hint";
+const char QueryRequest::kCollationField[] = "collation";
+const char QueryRequest::kSkipField[] = "skip";
+const char QueryRequest::kLimitField[] = "limit";
+const char QueryRequest::kBatchSizeField[] = "batchSize";
+const char QueryRequest::kNToReturnField[] = "ntoreturn";
+const char QueryRequest::kSingleBatchField[] = "singleBatch";
+const char QueryRequest::kMaxField[] = "max";
+const char QueryRequest::kMinField[] = "min";
+const char QueryRequest::kReturnKeyField[] = "returnKey";
+const char QueryRequest::kShowRecordIdField[] = "showRecordId";
+const char QueryRequest::kTailableField[] = "tailable";
+const char QueryRequest::kOplogReplayField[] = "oplogReplay";
+const char QueryRequest::kNoCursorTimeoutField[] = "noCursorTimeout";
+const char QueryRequest::kAwaitDataField[] = "awaitData";
+const char QueryRequest::kPartialResultsField[] = "allowPartialResults";
+const char QueryRequest::kRuntimeConstantsField[] = "runtimeConstants";
+const char QueryRequest::kTermField[] = "term";
+const char QueryRequest::kOptionsField[] = "options";
+const char QueryRequest::kReadOnceField[] = "readOnce";
+const char QueryRequest::kAllowSpeculativeMajorityReadField[] = "allowSpeculativeMajorityRead";
+const char QueryRequest::kInternalReadAtClusterTimeField[] = "$_internalReadAtClusterTime";
+const char QueryRequest::kRequestResumeTokenField[] = "$_requestResumeToken";
+const char QueryRequest::kResumeAfterField[] = "$_resumeAfter";
+const char QueryRequest::kUse44SortKeys[] = "_use44SortKeys";
 
 // Field names for sorting options.
-const char kNaturalSortField[] = "$natural";
-
-}  // namespace
+const char QueryRequest::kNaturalSortField[] = "$natural";
 
 const char QueryRequest::kFindCommandName[] = "find";
 const char QueryRequest::kShardVersionField[] = "shardVersion";

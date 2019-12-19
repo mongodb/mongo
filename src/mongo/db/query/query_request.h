@@ -52,6 +52,37 @@ class StatusWith;
  */
 class QueryRequest {
 public:
+    static const char kFilterField[];
+    static const char kProjectionField[];
+    static const char kSortField[];
+    static const char kHintField[];
+    static const char kCollationField[];
+    static const char kSkipField[];
+    static const char kLimitField[];
+    static const char kBatchSizeField[];
+    static const char kNToReturnField[];
+    static const char kSingleBatchField[];
+    static const char kMaxField[];
+    static const char kMinField[];
+    static const char kReturnKeyField[];
+    static const char kShowRecordIdField[];
+    static const char kTailableField[];
+    static const char kOplogReplayField[];
+    static const char kNoCursorTimeoutField[];
+    static const char kAwaitDataField[];
+    static const char kPartialResultsField[];
+    static const char kRuntimeConstantsField[];
+    static const char kTermField[];
+    static const char kOptionsField[];
+    static const char kReadOnceField[];
+    static const char kAllowSpeculativeMajorityReadField[];
+    static const char kInternalReadAtClusterTimeField[];
+    static const char kRequestResumeTokenField[];
+    static const char kResumeAfterField[];
+    static const char kUse44SortKeys[];
+
+    static const char kNaturalSortField[];
+
     static const char kFindCommandName[];
     static const char kShardVersionField[];
 
