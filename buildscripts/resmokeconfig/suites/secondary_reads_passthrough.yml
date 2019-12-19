@@ -82,9 +82,6 @@ executor:
         # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
         # an oplog yet because it has not conducted its own initial sync yet.
         numInitialSyncAttempts: 10000000
-        # TODO SERVER-35156: Remove the following line to disable the periodic no-op
-        # writer.
-        writePeriodicNoops: true
     linear_chain: true
     num_nodes: 5
     use_replica_set_connection_string: true
