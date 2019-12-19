@@ -61,7 +61,7 @@ void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug, int 
 BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide() const {
     BSONObjBuilder objMatchBob;
     BSONObjBuilder subBob(objMatchBob.subobjStart(kName));
-    _sub->serialize(&subBob);
+    _sub->serialize(&subBob, true);
     subBob.doneFast();
     return objMatchBob.obj();
 }

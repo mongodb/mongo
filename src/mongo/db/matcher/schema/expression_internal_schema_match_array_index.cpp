@@ -48,7 +48,7 @@ void InternalSchemaMatchArrayIndexMatchExpression::debugString(StringBuilder& de
     _debugAddSpace(debug, level);
 
     BSONObjBuilder builder;
-    serialize(&builder);
+    serialize(&builder, true);
     debug << builder.obj().toString() << "\n";
 
     const auto* tag = getTag();
@@ -77,7 +77,7 @@ BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide
         matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder().value_or(""));
         {
             BSONObjBuilder subexprSubObj(matchArrayElemSubobj.subobjStart("expression"));
-            _expression->getFilter()->serialize(&subexprSubObj);
+            _expression->getFilter()->serialize(&subexprSubObj, true);
             subexprSubObj.doneFast();
         }
         matchArrayElemSubobj.doneFast();

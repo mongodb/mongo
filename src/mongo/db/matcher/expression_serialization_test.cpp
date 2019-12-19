@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -50,7 +51,7 @@ using std::unique_ptr;
 
 BSONObj serialize(MatchExpression* match) {
     BSONObjBuilder bob;
-    match->serialize(&bob);
+    match->serialize(&bob, true);
     return bob.obj();
 }
 
@@ -300,6 +301,61 @@ TEST(SerializeBasic, ExpressionElemMatchValueWithNotLessThanGreaterThanSerialize
     auto obj = fromjson("{x: [5]}");
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
+
+TEST(SerializeBasic, ExpressionElemMatchValueWithDoubleNotSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$elemMatch: {$not: {$not: {$eq: 10}}}}}"),
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$elemMatch: {$not: {$not: {$eq: 10}}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    auto obj = fromjson("{x: [10]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionElemMatchValueWithNotNESerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$elemMatch: {$not: {$ne: 10}}}}"),
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$elemMatch: {$not: {$not: {$eq: 10}}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    auto obj = fromjson("{x: [10]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionElemMatchValueWithTripleNotSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$elemMatch: {$not: {$not: {$not: {$eq: 10}}}}}}"),
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$elemMatch: {$not: {$not: {$not: {$eq: 10}}}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    auto obj = fromjson("{x: [10]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 
 TEST(SerializeBasic, ExpressionSizeSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -902,7 +958,8 @@ TEST(SerializeBasic, ExpressionNotWithMultipleChildrenSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$lt: 1, $gt: 3}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{$nor: [{$and: [{x:{$lt: 1}},{x: {$gt: 3}}]}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 2}");
@@ -1029,6 +1086,107 @@ TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
         "{x: {type: 'Polygon', coordinates: [[5.5, 5.5], [5.5, 6], [6, 6], [6, 5.5], [5.5, "
         "5.5]]}}");
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionNotWithDirectPathExpSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    // At the time of this writing, the MatchExpression parser does not ever create a NOT with a
+    // direct path expression child, instead creating a NOT -> AND -> path expression. This test
+    // manually constructs such an expression in case it ever turns up, since that should still be
+    // able to serialize.
+    auto originalBSON = fromjson("{a: {$not: {$eq: 2}}}}");
+    auto equalityRHSElem = originalBSON["a"]["$not"]["$eq"];
+    auto equalityExpression = std::make_unique<EqualityMatchExpression>("a"_sd, equalityRHSElem);
+
+    auto notExpression = std::make_unique<NotMatchExpression>(equalityExpression.release());
+    Matcher reserialized(serialize(notExpression.get()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), originalBSON);
+
+    auto obj = fromjson("{a: 2}");
+    ASSERT_EQ(notExpression->matchesBSON(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionNotNotDirectlySerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    // At the time of this writing, the MatchExpression parser does not ever create a NOT with a
+    // direct NOT child, instead creating a NOT -> AND -> NOT. This test manually constructs such an
+    // expression in case it ever turns up, since that should still be able to serialize to
+    // {$not: {$not: ...}}.
+    auto originalBSON = fromjson("{a: {$not: {$not: {$eq: 2}}}}");
+    auto equalityRHSElem = originalBSON["a"]["$not"]["$not"]["$eq"];
+    auto equalityExpression = std::make_unique<EqualityMatchExpression>("a"_sd, equalityRHSElem);
+
+    auto nestedNot = std::make_unique<NotMatchExpression>(equalityExpression.release());
+    auto topNot = std::make_unique<NotMatchExpression>(nestedNot.release());
+    Matcher reserialized(serialize(topNot.get()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{a: {$not: {$eq: 2}}}]}"));
+
+    auto obj = fromjson("{a: 2}");
+    ASSERT_EQ(topNot->matchesBSON(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionNotWithoutPathChildrenSerializesCorrectly) {
+    // The grammar only permits a $not under a given path. For example, {a: {$not: {$eq: 4}}} is OK
+    // but {$not: {a: 4}} is not OK). However, we sometimes use the NOT MatchExpression to negate
+    // clauses within a JSONSchema. In such circumstances we need to be able to serialize the tree
+    // and re-parse it but the parser will reject the NOT in the place it's in. As a result, we need
+    // to translate the NOT to a $nor.
+
+    // MatchExpression tree expected:
+    //  {$or: [
+    //    {$and: [
+    //      {foo: {$_internalSchemaType: [2]}},
+    //      {foo: {$not: {
+    //        // This whole $or represents the {maxLength: 4}, since the restriction only applies if
+    //        // the element is the right type.
+    //        $or: [
+    //          {$_internalSchemaMaxLength: 4},
+    //          {foo: {$not: {$_internalSchemaType: [2]}}}
+    //        ]
+    //      }}}
+    //    ]},
+    //    {foo: {$not: {$exists: true}}}
+    //  ]}
+    BSONObj query =
+        fromjson("{$jsonSchema: {properties: {foo: {type: 'string', not: {maxLength: 4}}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expression = unittest::assertGet(MatchExpressionParser::parse(query, expCtx));
+
+    Matcher reserialized(serialize(expression.get()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{$and: ["
+                               "  {$and: ["
+                               "    {$or: ["
+                               "      {foo: {$not: {$exists: true}}},"
+                               "      {$and: ["
+                               "        {$nor: ["  // <-- This is the interesting part of this test.
+                               "          {$or: ["
+                               "            {foo: {$not: {$_internalSchemaType: [2]}}},"
+                               "            {foo: {$_internalSchemaMaxLength: 4}}"
+                               "          ]}"
+                               "        ]},"
+                               "        {foo: {$_internalSchemaType: [2]}}"
+                               "      ]}"
+                               "    ]}"
+                               "  ]}"
+                               "]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{foo: 'abc'}");
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
+
+    obj = fromjson("{foo: 'acbdf'}");
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 }
 
 TEST(SerializeBasic, ExpressionNorSerializesCorrectly) {

@@ -58,7 +58,7 @@ public:
         _debugAddSpace(debug, level);
 
         BSONObjBuilder builder;
-        serialize(&builder);
+        serialize(&builder, true);
         debug << builder.obj().toString();
     }
 
@@ -102,11 +102,11 @@ public:
     /**
      * Serializes each subexpression sequentially in a BSONArray.
      */
-    void serialize(BSONObjBuilder* builder) const final {
+    void serialize(BSONObjBuilder* builder, bool includePath) const final {
         BSONArrayBuilder exprArray(builder->subarrayStart(name()));
         for (const auto& expr : _expressions) {
             BSONObjBuilder exprBuilder(exprArray.subobjStart());
-            expr->serialize(&exprBuilder);
+            expr->serialize(&exprBuilder, includePath);
             exprBuilder.doneFast();
         }
         exprArray.doneFast();

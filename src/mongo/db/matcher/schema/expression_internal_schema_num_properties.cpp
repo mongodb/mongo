@@ -38,11 +38,12 @@ void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debu
                                                              int level) const {
     _debugAddSpace(debug, level);
     BSONObjBuilder builder;
-    serialize(&builder);
+    serialize(&builder, true);
     debug << builder.obj().toString() << "\n";
 }
 
-void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out) const {
+void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out,
+                                                           bool includePath) const {
     out->append(_name, _numProperties);
 }
 

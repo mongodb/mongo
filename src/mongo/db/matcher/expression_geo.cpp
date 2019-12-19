@@ -378,7 +378,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
 
     BSONObjBuilder builder;
-    serialize(&builder);
+    serialize(&builder, true);
     debug << "GEO raw = " << builder.obj().toString();
 
     MatchExpression::TagData* td = getTag();

@@ -71,7 +71,7 @@ bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* de
     }
 }
 
-void ExprMatchExpression::serialize(BSONObjBuilder* out) const {
+void ExprMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {
     *out << "$expr" << _expression->serialize(false);
 }
 

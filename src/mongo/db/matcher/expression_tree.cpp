@@ -59,10 +59,10 @@ void ListOfMatchExpression::_debugList(StringBuilder& debug, int level) const {
         _expressions[i]->debugString(debug, level + 1);
 }
 
-void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
+void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out, bool includePath) const {
     for (unsigned i = 0; i < _expressions.size(); i++) {
         BSONObjBuilder childBob(out->subobjStart());
-        _expressions[i]->serialize(&childBob);
+        _expressions[i]->serialize(&childBob, includePath);
     }
     out->doneFast();
 }
@@ -224,7 +224,7 @@ void AndMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugList(debug, level);
 }
 
-void AndMatchExpression::serialize(BSONObjBuilder* out) const {
+void AndMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {
     if (!numChildren()) {
         // It is possible for an AndMatchExpression to have no children, resulting in the serialized
         // expression {$and: []}, which is not a valid query object.
@@ -232,7 +232,7 @@ void AndMatchExpression::serialize(BSONObjBuilder* out) const {
     }
 
     BSONArrayBuilder arrBob(out->subarrayStart("$and"));
-    _listToBSON(&arrBob);
+    _listToBSON(&arrBob, includePath);
     arrBob.doneFast();
 }
 
@@ -267,7 +267,7 @@ void OrMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugList(debug, level);
 }
 
-void OrMatchExpression::serialize(BSONObjBuilder* out) const {
+void OrMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {
     if (!numChildren()) {
         // It is possible for an OrMatchExpression to have no children, resulting in the serialized
         // expression {$or: []}, which is not a valid query object. An empty $or is logically
@@ -276,7 +276,7 @@ void OrMatchExpression::serialize(BSONObjBuilder* out) const {
         return;
     }
     BSONArrayBuilder arrBob(out->subarrayStart("$or"));
-    _listToBSON(&arrBob);
+    _listToBSON(&arrBob, includePath);
 }
 
 bool OrMatchExpression::isTriviallyFalse() const {
@@ -309,9 +309,9 @@ void NorMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugList(debug, level);
 }
 
-void NorMatchExpression::serialize(BSONObjBuilder* out) const {
+void NorMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {
     BSONArrayBuilder arrBob(out->subarrayStart("$nor"));
-    _listToBSON(&arrBob);
+    _listToBSON(&arrBob, includePath);
 }
 
 // -------
@@ -322,45 +322,11 @@ void NotMatchExpression::debugString(StringBuilder& debug, int level) const {
     _exp->debugString(debug, level + 1);
 }
 
-boost::optional<StringData> NotMatchExpression::getPathIfNotWithSinglePathMatchExpressionTree(
-    MatchExpression* exp) {
-    if (auto pathMatch = dynamic_cast<PathMatchExpression*>(exp)) {
-        if (dynamic_cast<TextMatchExpressionBase*>(exp)) {
-            // While TextMatchExpressionBase derives from PathMatchExpression, text match
-            // expressions cannot be serialized in the same manner as other PathMatchExpression
-            // derivatives. This is because the path for a TextMatchExpression is embedded within
-            // the $text object, whereas for other PathMatchExpressions it is on the left-hand-side,
-            // for example {x: {$eq: 1}}.
-            return boost::none;
-        }
-        return pathMatch->path();
-    }
-
-    if (exp->matchType() == MatchExpression::MatchType::AND && exp->numChildren() > 0) {
-        boost::optional<StringData> path;
-        for (size_t i = 0; i < exp->numChildren(); ++i) {
-            auto pathMatchChild = dynamic_cast<PathMatchExpression*>(exp->getChild(i));
-            if (!pathMatchChild || dynamic_cast<TextMatchExpressionBase*>(exp->getChild(i))) {
-                return boost::none;
-            }
-
-            if (path && path != pathMatchChild->path()) {
-                return boost::none;
-            } else if (!path) {
-                path = pathMatchChild->path();
-            }
-        }
-
-        invariant(path);
-        return path;
-    }
-
-    return boost::none;
-}
-
-void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp, BSONObjBuilder* out) {
+void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp,
+                                                     BSONObjBuilder* out,
+                                                     bool includePath) {
     BSONObjBuilder childBob;
-    exp->serialize(&childBob);
+    exp->serialize(&childBob, includePath);
     BSONObj tempObj = childBob.obj();
 
     BSONArrayBuilder tBob(out->subarrayStart("$nor"));
@@ -368,42 +334,49 @@ void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp, BSONO
     tBob.doneFast();
 }
 
-void NotMatchExpression::serialize(BSONObjBuilder* out) const {
+void NotMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {
     if (_exp->matchType() == MatchType::AND && _exp->numChildren() == 0) {
         out->append("$alwaysFalse", 1);
         return;
     }
 
-    // When a $not contains an expression that is not a PathMatchExpression tree representing a
-    // single path, we transform to a $nor.
-    // There are trees constructed to represent JSONSchema that require a nor representation to
-    // be valid. Here is an example:
-    // JSONSchema:
-    //    {properties: {foo: {type: "string", not: {maxLength: 4}}}}
-    // MatchExpression tree generated:
-    //    {foo: {$not: {$or: [{$not: {$_internalSchemaType: [ 2 ]}},
-    //                        {$_internalSchemaMaxLength: 4}]}}}
-    boost::optional<StringData> path = getPathIfNotWithSinglePathMatchExpressionTree(_exp.get());
-    if (!path) {
-        return serializeNotExpressionToNor(_exp.get(), out);
-    }
-
-    BSONObjBuilder pathBob(out->subobjStart(*path));
-
-    if (_exp->matchType() == MatchType::AND) {
-        BSONObjBuilder notBob(pathBob.subobjStart("$not"));
-        for (size_t x = 0; x < _exp->numChildren(); ++x) {
-            auto* pathMatchExpression = dynamic_cast<PathMatchExpression*>(_exp->getChild(x));
-            invariant(pathMatchExpression);
-            notBob.appendElements(pathMatchExpression->getSerializedRightHandSide());
+    if (!includePath) {
+        BSONObjBuilder notBob(out->subobjStart("$not"));
+        // Our parser does not accept a $and directly within a $not, instead expecting the direct
+        // notation like {x: {$not: {$gt: 5, $lt: 0}}}. We represent such an expression with an AND
+        // internally, so we un-nest it here to be able to re-parse it.
+        if (_exp->matchType() == MatchType::AND) {
+            for (size_t x = 0; x < _exp->numChildren(); ++x) {
+                _exp->getChild(x)->serialize(&notBob, includePath);
+            }
+        } else {
+            _exp->serialize(&notBob, includePath);
         }
-        notBob.doneFast();
-    } else {
-        auto* pathMatchExpression = dynamic_cast<PathMatchExpression*>(_exp.get());
-        invariant(pathMatchExpression);
-        pathBob.append("$not", pathMatchExpression->getSerializedRightHandSide());
+        return;
     }
-    pathBob.doneFast();
+
+    auto expressionToNegate = _exp.get();
+    if (_exp->matchType() == MatchType::AND && _exp->numChildren() == 1) {
+        expressionToNegate = _exp->getChild(0);
+    }
+
+    // It is generally easier to be correct if we just always serialize to a $nor, since this will
+    // delegate the path serialization to lower in the tree where we have the information on-hand.
+    // However, for legibility we preserve a $not with a single path-accepting child as a $not.
+    //
+    // One exception: while TextMatchExpressionBase derives from PathMatchExpression, text match
+    // expressions cannot be serialized in the same manner as other PathMatchExpression derivatives.
+    // This is because the path for a TextMatchExpression is embedded within the $text object,
+    // whereas for other PathMatchExpressions it is on the left-hand-side, for example {x: {$eq:
+    // 1}}.
+    auto pathMatch = dynamic_cast<PathMatchExpression*>(expressionToNegate);
+    if (pathMatch && !dynamic_cast<TextMatchExpressionBase*>(expressionToNegate)) {
+        const auto path = pathMatch->path();
+        BSONObjBuilder pathBob(out->subobjStart(path));
+        pathBob.append("$not", pathMatch->getSerializedRightHandSide());
+        return;
+    }
+    return serializeNotExpressionToNor(expressionToNegate, out, includePath);
 }
 
 bool NotMatchExpression::equivalent(const MatchExpression* other) const {
@@ -422,4 +395,4 @@ MatchExpression::ExpressionOptimizerFunc NotMatchExpression::getOptimizer() cons
         return expression;
     };
 }
-}
+}  // namespace mongo

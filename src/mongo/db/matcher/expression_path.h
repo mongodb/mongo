@@ -119,8 +119,12 @@ public:
         }
     }
 
-    void serialize(BSONObjBuilder* out) const override {
-        out->append(path(), getSerializedRightHandSide());
+    void serialize(BSONObjBuilder* out, bool includePath) const override {
+        if (includePath) {
+            out->append(path(), getSerializedRightHandSide());
+        } else {
+            out->appendElements(getSerializedRightHandSide());
+        }
     }
 
     /**

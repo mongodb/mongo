@@ -509,7 +509,7 @@ public:
     TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
-    void serialize(BSONObjBuilder* out) const final {
+    void serialize(BSONObjBuilder* out, bool includePath) const final {
         out->append("TwoDPtInAnnulusExpression", true);
     }
 

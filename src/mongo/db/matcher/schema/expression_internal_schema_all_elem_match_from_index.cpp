@@ -80,7 +80,7 @@ BSONObj InternalSchemaAllElemMatchFromIndexMatchExpression::getSerializedRightHa
     subArray.append(_index);
     {
         BSONObjBuilder eBuilder(subArray.subobjStart());
-        _expression->getFilter()->serialize(&eBuilder);
+        _expression->getFilter()->serialize(&eBuilder, true);
         eBuilder.doneFast();
     }
     subArray.doneFast();

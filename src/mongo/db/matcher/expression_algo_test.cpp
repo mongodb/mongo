@@ -825,11 +825,11 @@ TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
 
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
@@ -847,11 +847,11 @@ TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
 
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
@@ -869,7 +869,7 @@ TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{x: {$not: {$gt: 4}}}"));
     ASSERT_FALSE(splitExpr.second);
@@ -887,7 +887,7 @@ TEST(SplitMatchExpression, OrWithOnlyIndependentChildrenIsNotSplittable) {
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder bob;
-    splitExpr.second->serialize(&bob);
+    splitExpr.second->serialize(&bob, true);
 
     ASSERT_FALSE(splitExpr.first);
     ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
@@ -908,11 +908,11 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
 
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
     ASSERT_BSONOBJ_EQ(secondBob.obj(),
@@ -933,11 +933,11 @@ TEST(SplitMatchExpression, ShouldNotExtractPrefixOfDottedPathAsIndependent) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
 
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{'a.c': {$eq: 1}}"));
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$and: [{a: {$eq: 1}}, {'a.b': {$eq: 1}}]}"));
@@ -955,7 +955,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentLeafPredicateAcrossRename) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{b: {$eq: 1}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
@@ -973,7 +973,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentAndPredicateAcrossRename) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$and: [{c: {$eq: 1}}, {b: {$eq: 2}}]}"));
 
     ASSERT_FALSE(splitExpr.second.get());
@@ -991,12 +991,12 @@ TEST(SplitMatchExpression, ShouldSplitPartiallyDependentAndPredicateAcrossRename
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$eq: 1}}"));
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{b: {$eq: 2}}"));
 }
 
@@ -1012,12 +1012,12 @@ TEST(SplitMatchExpression, ShouldSplitPartiallyDependentComplexPredicateMultiple
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{d: {$eq: 2}}, {e: {$eq: 3}}]}"));
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$eq: 1}}"));
 }
 
@@ -1034,12 +1034,12 @@ TEST(SplitMatchExpression,
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{x: {$eq: 2}}, {y: {$eq: 3}}]}"));
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$eq: 1}}"));
 }
 
@@ -1057,7 +1057,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossRename) {
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$elemMatch: {b: {$eq: 3}}}}"));
 }
 
@@ -1075,7 +1075,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchValueAcrossRename) {
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$elemMatch: {$eq: 3}}}"));
 }
 
@@ -1091,7 +1091,7 @@ TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$type: [16]}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
@@ -1111,7 +1111,7 @@ TEST(SplitMatchExpression, ShouldNotMoveSizeAcrossRename) {
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$size: 3}}"));
 }
 
@@ -1129,7 +1129,7 @@ TEST(SplitMatchExpression, ShouldNotMoveMinItemsAcrossRename) {
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMinItems: 3}}"));
 }
 
@@ -1147,7 +1147,7 @@ TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
 
     ASSERT_TRUE(splitExpr.second.get());
     BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
+    splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
 }
 
@@ -1163,7 +1163,7 @@ TEST(SplitMatchExpression, ShouldMoveMinLengthAcrossRename) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$_internalSchemaMinLength: 3}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
@@ -1181,7 +1181,7 @@ TEST(SplitMatchExpression, ShouldMoveMaxLengthAcrossRename) {
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$_internalSchemaMaxLength: 3}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
@@ -1200,7 +1200,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentPredicateWhenThereAreMultipleRen
 
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob);
+    splitExpr.first->serialize(&firstBob, true);
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{x: {$eq: 3}}"));
 
     ASSERT_FALSE(splitExpr.second.get());

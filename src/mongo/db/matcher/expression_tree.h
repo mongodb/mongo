@@ -98,7 +98,7 @@ public:
 protected:
     void _debugList(StringBuilder& debug, int level) const;
 
-    void _listToBSON(BSONArrayBuilder* out) const;
+    void _listToBSON(BSONArrayBuilder* out, bool includePath) const;
 
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
@@ -130,7 +130,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
 
     bool isTriviallyTrue() const final;
 };
@@ -159,7 +159,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
 
     bool isTriviallyFalse() const final;
 };
@@ -188,7 +188,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
 };
 
 class NotMatchExpression final : public MatchExpression {
@@ -214,7 +214,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
 
     bool equivalent(const MatchExpression* other) const;
 
@@ -243,9 +243,9 @@ public:
     }
 
 private:
-    static boost::optional<StringData> getPathIfNotWithSinglePathMatchExpressionTree(
-        MatchExpression* exp);
-    static void serializeNotExpressionToNor(MatchExpression* exp, BSONObjBuilder* out);
+    static void serializeNotExpressionToNor(MatchExpression* exp,
+                                            BSONObjBuilder* out,
+                                            bool includePath);
 
     ExpressionOptimizerFunc getOptimizer() const final;
 

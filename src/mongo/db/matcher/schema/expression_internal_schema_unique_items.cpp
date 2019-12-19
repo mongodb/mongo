@@ -39,7 +39,7 @@ void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug,
     _debugAddSpace(debug, level);
 
     BSONObjBuilder builder;
-    serialize(&builder);
+    serialize(&builder, true);
     debug << builder.obj().toString() << "\n";
 
     const auto* tag = getTag();

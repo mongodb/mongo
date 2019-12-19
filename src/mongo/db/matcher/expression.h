@@ -270,9 +270,10 @@ public:
     /**
      * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
      * to be a valid query object, that, when parsed, produces a logically equivalent
-     * MatchExpression.
+     * MatchExpression. If 'includePath' is false then the serialization should assume it's in a
+     * context where the path has been serialized elsewhere, such as within an $elemMatch value.
      */
-    virtual void serialize(BSONObjBuilder* out) const = 0;
+    virtual void serialize(BSONObjBuilder* out, bool includePath = true) const = 0;
 
     /**
      * Returns true if this expression will always evaluate to false, such as an $or with no
