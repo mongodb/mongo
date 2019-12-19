@@ -71,6 +71,10 @@ public:
         }
     }
 
+    boost::optional<size_t> maxFieldsToProject() const override {
+        return _children.size() + _projectedFields.size();
+    }
+
 protected:
     // For inclusions, we can apply an optimization here by simply appending to the output document
     // via MutableDocument::addField, rather than always checking for existing fields via setField.

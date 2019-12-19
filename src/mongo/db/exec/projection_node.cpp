@@ -40,6 +40,7 @@ ProjectionNode::ProjectionNode(ProjectionPolicies policies, std::string pathToNo
     : _policies(policies), _pathToNode(std::move(pathToNode)) {}
 
 void ProjectionNode::addProjectionForPath(const FieldPath& path) {
+    makeOptimizationsStale();
     if (path.getPathLength() == 1) {
         _projectedFields.insert(path.fullPath());
         return;
@@ -50,6 +51,7 @@ void ProjectionNode::addProjectionForPath(const FieldPath& path) {
 
 void ProjectionNode::addExpressionForPath(const FieldPath& path,
                                           boost::intrusive_ptr<Expression> expr) {
+    makeOptimizationsStale();
     // If the computed fields policy is 'kBanComputedFields', we should never reach here.
     invariant(_policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
 
@@ -84,11 +86,13 @@ boost::intrusive_ptr<Expression> ProjectionNode::getExpressionForPath(const Fiel
 }
 
 ProjectionNode* ProjectionNode::addOrGetChild(const std::string& field) {
+    makeOptimizationsStale();
     auto child = getChild(field);
     return child ? child : addChild(field);
 }
 
 ProjectionNode* ProjectionNode::addChild(const std::string& field) {
+    makeOptimizationsStale();
     invariant(!str::contains(field, "."));
     _orderToProcessAdditionsAndChildren.push_back(field);
     auto insertedPair = _children.emplace(std::make_pair(field, makeChild(field)));
@@ -119,6 +123,8 @@ Document ProjectionNode::applyToDocument(const Document& inputDoc) const {
 void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument* outputDoc) const {
     // Iterate over the input document so that the projected document retains its field ordering.
     auto it = inputDoc.fieldIterator();
+    size_t projectedFields = 0;
+
     while (it.more()) {
         auto fieldName = it.fieldName();
         absl::string_view fieldNameKey{fieldName.rawData(), fieldName.size()};
@@ -126,11 +132,18 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
         if (_projectedFields.find(fieldNameKey) != _projectedFields.end()) {
             outputProjectedField(
                 fieldName, applyLeafProjectionToValue(it.next().second), outputDoc);
+            ++projectedFields;
         } else if (auto childIt = _children.find(fieldNameKey); childIt != _children.end()) {
             outputProjectedField(
                 fieldName, childIt->second->applyProjectionsToValue(it.next().second), outputDoc);
+            ++projectedFields;
         } else {
             it.advance();
+        }
+
+        // Check if we can avoid reading from the document any further.
+        if (_maxFieldsToProject && _maxFieldsToProject <= projectedFields) {
+            break;
         }
     }
 
@@ -249,6 +262,8 @@ void ProjectionNode::optimize() {
     for (auto&& childPair : _children) {
         childPair.second->optimize();
     }
+
+    _maxFieldsToProject = maxFieldsToProject();
 }
 
 Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
