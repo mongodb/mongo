@@ -1064,6 +1064,33 @@ struct __wt_session {
 	 * non-printing characters are hexadecimal encoded.  These formats are compatible with the
 	 * @ref util_dump and @ref util_load commands., a string\, chosen from the following
 	 * options: \c "hex"\, \c "json"\, \c "print"; default empty.}
+	 * @config{incremental = (, configure the cursor for block incremental backup usage.  These
+	 * formats are only compatible with the backup data source; see @ref backup., a set of
+	 * related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled,
+	 * whether to configure this backup as the starting point for a subsequent incremental
+	 * backup., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file, the
+	 * file name when opening a duplicate incremental backup cursor.  That duplicate cursor will
+	 * return the block modifications relevant to the given file name., a string; default
+	 * empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;force_stop, causes all block incremental backup
+	 * information to be released.  This is on an open_cursor call and the resources will be
+	 * released when this cursor is closed.  No other operations should be done on this open
+	 * cursor., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;granularity,
+	 * this setting manages the granularity of how WiredTiger maintains modification maps
+	 * internally.  The larger the granularity\, the smaller amount of information WiredTiger
+	 * need to maintain., an integer between 1MB and 2GB; default \c 16MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;src_id, a string that identifies a previous checkpoint
+	 * backup source as the source of this incremental backup.  This identifier must have
+	 * already been created by use of the 'this_id' configuration in an earlier backup.  A
+	 * source id is required to begin an incremental backup., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;this_id, a string that identifies the current system
+	 * state as a future backup source for an incremental backup via 'src_id'. This identifier
+	 * is required when opening an incremental backup cursor and an error will be returned if
+	 * one is not provided., a string; default empty.}
+	 * @config{ ),,}
 	 * @config{next_random, configure the cursor to return a pseudo-random record from the
 	 * object when the WT_CURSOR::next method is called; valid only for row-store cursors.  See
 	 * @ref cursor_random for details., a boolean flag; default \c false.}
@@ -2335,14 +2362,14 @@ struct __wt_connection {
 	 * ),,}
 	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
 	 * as <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the
-	 * following options: \c "api"\, \c "block"\, \c "checkpoint"\, \c "checkpoint_progress"\,
-	 * \c "compact"\, \c "compact_progress"\, \c "error_returns"\, \c "evict"\, \c
-	 * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c
-	 * "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
-	 * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\,
-	 * \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\,
-	 * \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
-	 * "write"; default empty.}
+	 * following options: \c "api"\, \c "backup"\, \c "block"\, \c "checkpoint"\, \c
+	 * "checkpoint_progress"\, \c "compact"\, \c "compact_progress"\, \c "error_returns"\, \c
+	 * "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c
+	 * "log"\, \c "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c
+	 * "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\,
+	 * \c "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
+	 * \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c
+	 * "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -3017,13 +3044,13 @@ struct __wt_connection {
  * information., a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a list\, such as
  * <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the following
- * options: \c "api"\, \c "block"\, \c "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c
- * "compact_progress"\, \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c
- * "fileops"\, \c "handleops"\, \c "log"\, \c "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c
- * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c
- * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c
- * "split"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c "verify"\,
- * \c "version"\, \c "write"; default empty.}
+ * options: \c "api"\, \c "backup"\, \c "block"\, \c "checkpoint"\, \c "checkpoint_progress"\, \c
+ * "compact"\, \c "compact_progress"\, \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c
+ * "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c "lookaside"\, \c
+ * "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\,
+ * \c "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c
+ * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\, \c
+ * "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files.  Ignored on
  * non-Windows systems.  Options are given as a list\, such as <code>"write_through=[data]"</code>.
  * Configuring \c write_through requires care\, see @ref tuning_system_buffer_cache_direct_io for
@@ -4787,6 +4814,18 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * @addtogroup wt
  * @{
  */
+/*!
+ * @name Incremental backup types
+ * @anchor backup_types
+ * @{
+ */
+/*! invalid type */
+#define WT_BACKUP_INVALID	0
+/*! whole file */
+#define WT_BACKUP_FILE		1
+/*! file range */
+#define WT_BACKUP_RANGE		2
+/*! @} */
 
 /*!
  * @name Log record and operation types

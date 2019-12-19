@@ -160,7 +160,7 @@ class TestSuiteConnection(object):
 class ExtensionList(list):
     skipIfMissing = False
     def extension(self, dirname, name, extarg=None):
-        if name != None and name != 'none':
+        if name and name != 'none':
             ext = '' if extarg == None else '=' + extarg
             self.append(dirname + '/' + name + ext)
 

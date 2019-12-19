@@ -602,9 +602,6 @@ connection_runtime_config = [
             merge LSM chunks where possible''',
             type='boolean')
         ]),
-    Config('lsm_merge', 'true', r'''
-        merge LSM chunks where possible (deprecated)''',
-        type='boolean', undoc=True),
     Config('operation_timeout_ms', '0', r'''
         when non-zero, a requested limit on the number of elapsed real time milliseconds
         application threads will take to complete database operations. Time is measured from the
@@ -680,6 +677,7 @@ connection_runtime_config = [
         list, such as <code>"verbose=[evictserver,read]"</code>''',
         type='list', choices=[
             'api',
+            'backup',
             'block',
             'checkpoint',
             'checkpoint_progress',
@@ -1208,6 +1206,38 @@ methods = {
         characters are hexadecimal encoded.  These formats are compatible
         with the @ref util_dump and @ref util_load commands''',
         choices=['hex', 'json', 'print']),
+    Config('incremental', '', r'''
+        configure the cursor for block incremental backup usage. These formats
+        are only compatible with the backup data source; see @ref backup''',
+        type='category', subconfig=[
+        Config('enabled', 'false', r'''
+            whether to configure this backup as the starting point for a subsequent
+            incremental backup''',
+            type='boolean'),
+        Config('file', '', r'''
+            the file name when opening a duplicate incremental backup cursor.
+            That duplicate cursor will return the block modifications relevant
+            to the given file name'''),
+        Config('force_stop', 'false', r'''
+            causes all block incremental backup information to be released. This is
+            on an open_cursor call and the resources will be released when this
+            cursor is closed. No other operations should be done on this open cursor''',
+            type='boolean'),
+        Config('granularity', '16MB', r'''
+            this setting manages the granularity of how WiredTiger maintains modification
+            maps internally. The larger the granularity, the smaller amount of information
+            WiredTiger need to maintain''',
+            min='1MB', max='2GB'),
+        Config('src_id', '', r'''
+            a string that identifies a previous checkpoint backup source as the source
+            of this incremental backup. This identifier must have already been created
+            by use of the 'this_id' configuration in an earlier backup. A source id is
+            required to begin an incremental backup'''),
+        Config('this_id', '', r'''
+            a string that identifies the current system state  as a future backup source
+            for an incremental backup via 'src_id'. This identifier is required when opening
+            an incremental backup cursor and an error will be returned if one is not provided'''),
+        ]),
     Config('next_random', 'false', r'''
         configure the cursor to return a pseudo-random record from the
         object when the WT_CURSOR::next method is called; valid only for

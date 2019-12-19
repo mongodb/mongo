@@ -95,6 +95,14 @@ copy_directory(const char *fromdir, const char *todir, bool directio)
         testutil_check(__wt_snprintf(fromfile, sizeof(fromfile), "%s/%s", fromdir, dp->d_name));
         testutil_check(__wt_snprintf(tofile, sizeof(tofile), "%s/%s", todir, dp->d_name));
         rfd = open(fromfile, O_RDONLY | openflags, 0);
+        /*
+         * The child process may have been stopped during a drop and WiredTiger drop will do an
+         * unlink call followed by syncing the directory. It is possible for the signal to have been
+         * delivered in between those calls so the file may no longer exist but reading the
+         * directory will still return its entry. Handle that case and skip the file if it happens.
+         */
+        if (rfd < 0 && errno == ENOENT)
+            continue;
         testutil_assertfmt(rfd >= 0, "Open of source %s failed with %d\n", fromfile, errno);
         wfd = open(tofile, O_WRONLY | O_CREAT, 0666);
         testutil_assertfmt(wfd >= 0, "Open of dest %s failed with %d\n", tofile, errno);

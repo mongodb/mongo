@@ -1428,9 +1428,6 @@ __conn_config_file(
     /* Check any version. */
     WT_ERR(__conn_config_check_version(session, cbuf->data));
 
-    /* Upgrade the configuration string. */
-    WT_ERR(__wt_config_upgrade(session, cbuf));
-
     /* Check the configuration information. */
     WT_ERR(__wt_config_check(session, is_user ? WT_CONFIG_REF(session, wiredtiger_open_usercfg) :
                                                 WT_CONFIG_REF(session, wiredtiger_open_basecfg),
@@ -1519,7 +1516,6 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 
     /* Upgrade the configuration string. */
     WT_ERR(__wt_buf_setstr(session, cbuf, env_config));
-    WT_ERR(__wt_config_upgrade(session, cbuf));
 
     /* Check the configuration information. */
     WT_ERR(__wt_config_check(session, WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
@@ -1825,14 +1821,15 @@ typedef struct {
 int
 __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-    static const WT_NAME_FLAG verbtypes[] = {{"api", WT_VERB_API}, {"block", WT_VERB_BLOCK},
-      {"checkpoint", WT_VERB_CHECKPOINT}, {"checkpoint_progress", WT_VERB_CHECKPOINT_PROGRESS},
-      {"compact", WT_VERB_COMPACT}, {"compact_progress", WT_VERB_COMPACT_PROGRESS},
-      {"error_returns", WT_VERB_ERROR_RETURNS}, {"evict", WT_VERB_EVICT},
-      {"evict_stuck", WT_VERB_EVICT_STUCK}, {"evictserver", WT_VERB_EVICTSERVER},
-      {"fileops", WT_VERB_FILEOPS}, {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG},
-      {"lookaside", WT_VERB_LOOKASIDE}, {"lookaside_activity", WT_VERB_LOOKASIDE_ACTIVITY},
-      {"lsm", WT_VERB_LSM}, {"lsm_manager", WT_VERB_LSM_MANAGER}, {"metadata", WT_VERB_METADATA},
+    static const WT_NAME_FLAG verbtypes[] = {{"api", WT_VERB_API}, {"backup", WT_VERB_BACKUP},
+      {"block", WT_VERB_BLOCK}, {"checkpoint", WT_VERB_CHECKPOINT},
+      {"checkpoint_progress", WT_VERB_CHECKPOINT_PROGRESS}, {"compact", WT_VERB_COMPACT},
+      {"compact_progress", WT_VERB_COMPACT_PROGRESS}, {"error_returns", WT_VERB_ERROR_RETURNS},
+      {"evict", WT_VERB_EVICT}, {"evict_stuck", WT_VERB_EVICT_STUCK},
+      {"evictserver", WT_VERB_EVICTSERVER}, {"fileops", WT_VERB_FILEOPS},
+      {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG}, {"lookaside", WT_VERB_LOOKASIDE},
+      {"lookaside_activity", WT_VERB_LOOKASIDE_ACTIVITY}, {"lsm", WT_VERB_LSM},
+      {"lsm_manager", WT_VERB_LSM_MANAGER}, {"metadata", WT_VERB_METADATA},
       {"mutex", WT_VERB_MUTEX}, {"overflow", WT_VERB_OVERFLOW}, {"read", WT_VERB_READ},
       {"rebalance", WT_VERB_REBALANCE}, {"reconcile", WT_VERB_RECONCILE},
       {"recovery", WT_VERB_RECOVERY}, {"recovery_progress", WT_VERB_RECOVERY_PROGRESS},

@@ -64,7 +64,6 @@ src/config/config_check.c
 src/config/config_collapse.c
 src/config/config_def.c
 src/config/config_ext.c
-src/config/config_upgrade.c
 src/conn/api_calc_modify.c
 src/conn/api_strerror.c
 src/conn/api_version.c
@@ -81,6 +80,7 @@ src/conn/conn_reconfig.c
 src/conn/conn_stat.c
 src/conn/conn_sweep.c
 src/cursor/cur_backup.c
+src/cursor/cur_backup_incr.c
 src/cursor/cur_bulk.c
 src/cursor/cur_config.c
 src/cursor/cur_ds.c

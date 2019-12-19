@@ -1568,6 +1568,7 @@ __rec_split_write_supd(
                 key->data = WT_INSERT_KEY(supd->ins);
                 key->size = WT_INSERT_KEY_SIZE(supd->ins);
             }
+            WT_ASSERT(session, next != NULL);
             WT_ERR(__wt_compare(session, btree->collator, key, &next->key, &cmp));
             if (cmp >= 0)
                 break;
