@@ -24,6 +24,7 @@ const expectedElectionTimeoutMillis = 24 * 60 * 60 * 1000;
 const originalPrimary = rst.getPrimary();
 let originalPrimaryReplSetGetStatus =
     assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+jsTestLog("Original primary status (1): " + tojson(originalPrimaryReplSetGetStatus));
 let originalPrimaryElectionCandidateMetrics =
     originalPrimaryReplSetGetStatus.electionCandidateMetrics;
 
@@ -71,6 +72,7 @@ ElectionHandoffTest.testElectionHandoff(rst, 0, 1);
 const newPrimary = rst.getPrimary();
 let newPrimaryReplSetGetStatus =
     assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
+jsTestLog("New primary status (1): " + tojson(newPrimaryReplSetGetStatus));
 let newPrimaryElectionCandidateMetrics = newPrimaryReplSetGetStatus.electionCandidateMetrics;
 
 // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response for the new
@@ -120,6 +122,7 @@ assert(!newPrimaryElectionParticipantMetrics,
 
 originalPrimaryReplSetGetStatus =
     assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+jsTestLog("Original primary status (2): " + tojson(originalPrimaryReplSetGetStatus));
 let originalPrimaryElectionParticipantMetrics =
     originalPrimaryReplSetGetStatus.electionParticipantMetrics;
 
@@ -173,6 +176,7 @@ ElectionHandoffTest.testElectionHandoff(rst, 1, 0);
 
 originalPrimaryReplSetGetStatus =
     assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+jsTestLog("Original primary status (3): " + tojson(originalPrimaryReplSetGetStatus));
 originalPrimaryElectionCandidateMetrics = originalPrimaryReplSetGetStatus.electionCandidateMetrics;
 
 // Check that the original primary's metrics are also being set properly after the second election.
@@ -185,6 +189,7 @@ assert.eq(originalPrimaryElectionCandidateMetrics.electionTimeoutMillis,
 assert.eq(originalPrimaryElectionCandidateMetrics.priorPrimaryMemberId, 1);
 
 newPrimaryReplSetGetStatus = assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
+jsTestLog("New primary status (2): " + tojson(newPrimaryReplSetGetStatus));
 newPrimaryElectionCandidateMetrics = newPrimaryReplSetGetStatus.electionCandidateMetrics;
 newPrimaryElectionParticipantMetrics = newPrimaryReplSetGetStatus.electionParticipantMetrics;
 
@@ -213,6 +218,7 @@ assert.commandFailedWithCode(newPrimary.adminCommand({replSetStepUp: 1}), ErrorC
 
 originalPrimaryReplSetGetStatus =
     assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+jsTestLog("Original primary status (4): " + tojson(originalPrimaryReplSetGetStatus));
 originalPrimaryElectionParticipantMetrics =
     originalPrimaryReplSetGetStatus.electionParticipantMetrics;
 
