@@ -171,7 +171,7 @@ TEST_F(QueryPlannerTest, TypeStringCannotBeCoveredWithCollator) {
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: {a:{$type:'string'}}, collation: "
         "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1}, filter: null, "
-        "bounds: {a: [['',{},true,true]]}}}}}}}");
+        "bounds: {a: [['',{},true,false]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NotWithStringBoundsCannotBeCoveredWithCollator) {

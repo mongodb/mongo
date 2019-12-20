@@ -54,9 +54,7 @@ BSONObjBuilder& BSONObjBuilder::appendMinForType(StringData fieldName, int t) {
             append(fieldName, "");
             return *this;
         case Date:
-            // min varies with V0 and V1 indexes, so we go one type lower.
-            appendBool(fieldName, true);
-            // appendDate( fieldName , numeric_limits<long long>::min() );
+            appendDate(fieldName, Date_t::min());
             return *this;
         case bsonTimestamp:
             appendTimestamp(fieldName, 0);
@@ -125,8 +123,7 @@ BSONObjBuilder& BSONObjBuilder::appendMaxForType(StringData fieldName, int t) {
             appendMinForType(fieldName, Object);
             return *this;
         case Date:
-            appendDate(fieldName,
-                       Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::max()));
+            appendDate(fieldName, Date_t::max());
             return *this;
         case bsonTimestamp:
             append(fieldName, Timestamp::max());

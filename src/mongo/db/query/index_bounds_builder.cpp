@@ -35,6 +35,7 @@
 #include <limits>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2.h"
 #include "mongo/db/index/expression_params.h"
@@ -379,6 +380,47 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     }
 }
 
+namespace {
+IndexBoundsBuilder::BoundsTightness computeTightnessForTypeSet(const MatcherTypeSet& typeSet,
+                                                               const IndexEntry& index) {
+    // The Array case will not be handled because a typeSet with Array should not reach this
+    // function
+    invariant(!typeSet.hasType(BSONType::Array));
+
+    // The String and Object types with collation require an inexact fetch.
+    if (index.collator != nullptr &&
+        (typeSet.hasType(BSONType::String) || typeSet.hasType(BSONType::Object))) {
+        return IndexBoundsBuilder::INEXACT_FETCH;
+    }
+
+    // Null and Undefined Types always require an inexact fetch.
+    if (typeSet.hasType(BSONType::jstNULL) || typeSet.hasType(BSONType::Undefined)) {
+        return IndexBoundsBuilder::INEXACT_FETCH;
+    }
+
+    const auto numberTypesIncluded = static_cast<int>(typeSet.hasType(BSONType::NumberInt)) +
+        static_cast<int>(typeSet.hasType(BSONType::NumberLong)) +
+        static_cast<int>(typeSet.hasType(BSONType::NumberDecimal)) +
+        static_cast<int>(typeSet.hasType(BSONType::NumberDouble));
+
+    // Checks that either all the number types are present or "number" is present in the type set.
+    const bool hasAllNumbers = (numberTypesIncluded == 4) || typeSet.allNumbers;
+    const bool hasAnyNumbers = numberTypesIncluded > 0;
+
+    if (hasAnyNumbers && !hasAllNumbers) {
+        return IndexBoundsBuilder::INEXACT_COVERED;
+    }
+
+    // This check is effectively typeSet.hasType(BSONType::String) XOR
+    // typeSet.hasType(BSONType::Symbol).
+    if ((typeSet.hasType(BSONType::String) != typeSet.hasType(BSONType::Symbol))) {
+        return IndexBoundsBuilder::INEXACT_COVERED;
+    }
+
+    return IndexBoundsBuilder::EXACT;
+}
+}  // namespace
+
 void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                              const BSONElement& elt,
                                              const IndexEntry& index,
@@ -702,15 +744,17 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             BSONObjBuilder bob;
             bob.appendMinForType("", type);
             bob.appendMaxForType("", type);
-            oilOut->intervals.push_back(
-                makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+
+            // Types with variable width use the smallest value of the next type as their upper
+            // bound, so the upper bound needs to be excluded.
+            auto boundInclusionRule = BoundInclusion::kIncludeBothStartAndEndKeys;
+            if (isVariableWidthType(type)) {
+                boundInclusionRule = BoundInclusion::kIncludeStartKeyOnly;
+            }
+            oilOut->intervals.push_back(makeRangeInterval(bob.obj(), boundInclusionRule));
         }
 
-        // If we're only matching the "number" type, then the bounds are exact. Otherwise, the
-        // bounds may be inexact.
-        *tightnessOut = (tme->typeSet().isSingleType() && tme->typeSet().allNumbers)
-            ? IndexBoundsBuilder::EXACT
-            : IndexBoundsBuilder::INEXACT_FETCH;
+        *tightnessOut = computeTightnessForTypeSet(tme->typeSet(), index);
 
         // Sort the intervals, and merge redundant ones.
         unionize(oilOut);

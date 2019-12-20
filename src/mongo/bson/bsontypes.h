@@ -152,6 +152,40 @@ inline bool isNumericBSONType(BSONType type) {
     }
 }
 
+/**
+ * Given a type, returns whether or not that type has a variable width.
+ **/
+inline bool isVariableWidthType(BSONType type) {
+    switch (type) {
+        case Array:
+        case BinData:
+        case Code:
+        case CodeWScope:
+        case DBRef:
+        case Object:
+        case RegEx:
+        case String:
+        case Symbol:
+            return true;
+        case Bool:
+        case bsonTimestamp:
+        case Date:
+        case EOO:
+        case jstNULL:
+        case jstOID:
+        case MaxKey:
+        case MinKey:
+        case NumberDecimal:
+        case NumberDouble:
+        case NumberInt:
+        case NumberLong:
+        case Undefined:
+            return false;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 /* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are
    opaque to the database.

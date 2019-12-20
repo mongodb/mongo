@@ -406,7 +406,7 @@ TEST_F(IndexBoundsBuilderTest, ExistsFalseWithMockCollatorIsInexactFetch) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
 }
 
-TEST_F(IndexBoundsBuilderTest, TypeStringIsInexactFetch) {
+TEST_F(IndexBoundsBuilderTest, TypeStringWithCollatorIsInexactFetch) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto testIndex = buildSimpleIndexEntry();
     testIndex.collator = &collator;
@@ -422,7 +422,7 @@ TEST_F(IndexBoundsBuilderTest, TypeStringIsInexactFetch) {
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, true)));
+                  oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
 }
 
