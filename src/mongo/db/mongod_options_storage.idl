@@ -56,7 +56,10 @@ configs:
         arg_vartype: Switch
 
     'storage.queryableBackupMode':
-        description: 'Enable read-only mode - if true the server will not accept writes'
+        description: >-
+            Enables queryable backup mode which starts the storage engine in read/write mode to
+            allow for replication recovery. After replication recovery the server above the
+            storage engine layer will be in read-only mode.
         short_name: queryableBackupMode
         arg_vartype: Switch
         hidden: true
