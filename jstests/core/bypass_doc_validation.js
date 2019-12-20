@@ -3,6 +3,7 @@
 //   requires_fastcount,
 //   requires_non_retryable_commands,
 //   uses_map_reduce_with_temp_collections,
+//   requires_fcv_44,
 // ]
 
 /**
