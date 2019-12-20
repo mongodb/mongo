@@ -63,7 +63,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // (see SERVER-33597 for details). So when the mongos version is v3.6, the command should
         // fail.
         jsTest.log(
-            "With 'allowPartialResults: true', if some shard down and mongos version is v4.2, find fails");
+            "With 'allowPartialResults: true', if some shard down and mongos version is v3.6, find fails");
         assert.commandFailedWithCode(coll.runCommand({find: collName, allowPartialResults: true}),
                                      ErrorCodes.FailedToSatisfyReadPreference);
     } else {
