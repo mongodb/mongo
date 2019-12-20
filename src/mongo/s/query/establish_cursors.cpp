@@ -87,15 +87,19 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                 cursor.setHostAndPort(*response.shardHostAndPort);
                 remoteCursors.push_back(std::move(cursor));
             } catch (const DBException& ex) {
-                // Retriable errors are swallowed if 'allowPartialResults' is true.
-                if (allowPartialResults &&
-                    std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
-                              RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
-                              ex.code()) !=
-                        RemoteCommandRetryScheduler::kAllRetriableErrors.end()) {
-                    continue;
+                // Retriable errors are swallowed if 'allowPartialResults' is true. Targeting shard
+                // replica sets can also throw FailedToSatisfyReadPreference, so we swallow it too.
+                bool isEligibleException =
+                    (std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
+                               RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
+                               ex.code()) !=
+                         RemoteCommandRetryScheduler::kAllRetriableErrors.end() ||
+                     ex.code() == ErrorCodes::FailedToSatisfyReadPreference);
+                // Fail if the exception is something other than a retriable or read preference
+                // error, or if the 'allowPartialResults' query parameter was not enabled.
+                if (!allowPartialResults || !isEligibleException) {
+                    throw;
                 }
-                throw;  // Fail this loop.
             }
         }
         return remoteCursors;
