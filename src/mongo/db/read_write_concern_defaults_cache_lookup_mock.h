@@ -47,8 +47,14 @@ public:
      */
     void setLookupCallReturnValue(RWConcernDefault&& value);
 
+    /**
+     * Set a status that lookup() should throw (or boost::none to not throw an exception).
+     */
+    void setLookupCallFailure(boost::optional<Status> status);
+
 private:
     boost::optional<RWConcernDefault> _value;
+    boost::optional<Status> _status;
 };
 
 }  // namespace mongo

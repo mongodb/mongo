@@ -1762,6 +1762,7 @@ envWithAsio.CppUnitTest(
         'operation_context_test.cpp',
         'operation_time_tracker_test.cpp',
         'range_arithmetic_test.cpp',
+        'read_write_concern_defaults_test.cpp',
         'record_id_test.cpp',
         'server_options_test.cpp',
         'session_catalog_mongod_test.cpp',
