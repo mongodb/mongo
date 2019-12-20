@@ -53,6 +53,9 @@ public:
     virtual void help(stringstream& help) const {
         help << "{ _isSelf : 1 } INTERNAL ONLY";
     }
+    bool requiresAuth() const override {
+        return false;
+    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
