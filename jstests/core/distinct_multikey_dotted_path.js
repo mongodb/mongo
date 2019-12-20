@@ -182,13 +182,16 @@ assert.commandWorked(coll.insert({a: {b: {c: []}}}));
     // only treat '0' as a field name (not array index).
 })();
 
-// Creating an index on "a.b.0" and doing a distinct on it should use an IXSCAN, as "a.b" is
-// multikey. See explanation above about why a DISTINCT_SCAN cannot be used when the path
-// given is multikey.
+// Inserting an array on "a", creating an index on "a.b.0", and doing a distinct on it should use an
+// IXSCAN, as "a" is now multikey. See explanation above about why a DISTINCT_SCAN cannot be used
+// when the path given is multikey.
 (function testDistinctWithPredOnNumericMultikeyPathWithIndex() {
     const pred = {"a.b.0": {$type: "object"}};
     const res = coll.distinct("a.b.0", pred);
     assert.sameMembers(res, [{c: 4}]);
+
+    // Make "a" multikey in order to ensure that a DISTINCT_SCAN plan on "a.b.0" is not legal.
+    assert.commandWorked(coll.insert({a: [1, 2, 3]}));
 
     const expl = coll.explain().distinct("a.b.0", pred);
     assert.eq(false, planHasStage(db, expl.queryPlanner.winningPlan, "DISTINCT_SCAN"), expl);

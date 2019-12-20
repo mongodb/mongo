@@ -254,7 +254,8 @@ TEST_F(IndexBoundsBuilderTest, TranslateLtNegativeInfinity) {
 
 TEST_F(IndexBoundsBuilderTest, TranslateLtDate) {
     auto testIndex = buildSimpleIndexEntry();
-    BSONObj obj = BSON("a" << LT << Date_t::fromMillisSinceEpoch(5000));
+    const auto date = Date_t::fromMillisSinceEpoch(5000);
+    BSONObj obj = BSON("a" << LT << date);
     auto expr = parseMatchExpression(obj);
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
@@ -262,9 +263,9 @@ TEST_F(IndexBoundsBuilderTest, TranslateLtDate) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(
-                      Interval(fromjson("{'': true, '': new Date(5000)}"), false, false)));
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(BSON("" << Date_t::min() << "" << date), true, false)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
@@ -1269,8 +1270,8 @@ TEST_F(IndexBoundsBuilderTest, TypeStringOrNumberHasCorrectBounds) {
         Interval::INTERVAL_EQUALS,
         oil.intervals[0].compare(Interval(fromjson("{'': NaN, '': Infinity}"), true, true)));
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[1].compare(Interval(fromjson("{'': '', '': {}}"), true, true)));
-    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+                  oil.intervals[1].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_COVERED);
 }
 
 TEST_F(IndexBoundsBuilderTest, RedundantTypeNumberHasCorrectBounds) {
@@ -1288,7 +1289,7 @@ TEST_F(IndexBoundsBuilderTest, RedundantTypeNumberHasCorrectBounds) {
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
         oil.intervals[0].compare(Interval(fromjson("{'': NaN, '': Infinity}"), true, true)));
-    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
 }
 
 TEST_F(IndexBoundsBuilderTest, CanUseCoveredMatchingForEqualityPredicate) {

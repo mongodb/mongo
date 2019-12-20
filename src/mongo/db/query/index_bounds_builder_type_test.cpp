@@ -82,8 +82,8 @@ TEST_F(IndexBoundsBuilderTest, CodeTypeBounds) {
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(Interval(expectedInterval, true, true)));
-    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+                  oil.intervals[0].compare(Interval(expectedInterval, true, false)));
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
 }
 
 // Test $type bounds for Code With Scoped BSON type.
@@ -107,8 +107,8 @@ TEST_F(IndexBoundsBuilderTest, CodeWithScopeTypeBounds) {
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(Interval(expectedInterval, true, true)));
-    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+                  oil.intervals[0].compare(Interval(expectedInterval, true, false)));
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
 }
 
 // Test $type bounds for double BSON type.
@@ -133,7 +133,7 @@ TEST_F(IndexBoundsBuilderTest, DoubleTypeBounds) {
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(expectedInterval, true, true)));
-    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_COVERED);
 }
 
 TEST_F(IndexBoundsBuilderTest, TypeArrayBounds) {
@@ -153,6 +153,98 @@ TEST_F(IndexBoundsBuilderTest, TypeArrayBounds) {
                   oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
     ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
 }
+
+TEST_F(IndexBoundsBuilderTest, TypeSymbolBounds) {
+    auto testIndex = buildSimpleIndexEntry();
+    BSONObj obj = fromjson("{a: {$type: 'symbol'}}");
+    auto expr = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    // Check the output of translate().
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_COVERED);
+}
+
+TEST_F(IndexBoundsBuilderTest, TypeStringWithoutCollatorBounds) {
+    auto testIndex = buildSimpleIndexEntry();
+
+    BSONObj obj = fromjson("{a: {$type: 'string'}}");
+    auto expr = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+}
+
+TEST_F(IndexBoundsBuilderTest, TypeSymbolAndStringBounds) {
+    auto testIndex = buildSimpleIndexEntry();
+    BSONObj obj = fromjson("{a: {$type: ['string', 'symbol']}}");
+    auto expr = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    // Check the output of translate().
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TypeNullBounds) {
+    auto testIndex = buildSimpleIndexEntry();
+    BSONObj obj = fromjson("{a: {$type: 'null'}}");
+    auto expr = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    // Check the output of translate().
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+}
+
+TEST_F(IndexBoundsBuilderTest, TypeUndefinedBounds) {
+    auto testIndex = buildSimpleIndexEntry();
+    BSONObj obj = fromjson("{a: {$type: 'undefined'}}");
+    auto expr = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    // Check the output of translate().
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': undefined, '': undefined}"), true, true)));
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+}
+
 
 }  // namespace
 }  // namespace mongo
