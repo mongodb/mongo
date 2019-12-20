@@ -170,8 +170,19 @@ function detectDefaultTLSProtocol() {
 
     MongoRunner.stopMongod(conn);
 
+    if (getBuildInfo().buildEnvironment.target_os === "osx") {
+        // OS X only supports TLS 1.0
+        assert.neq(0, res["1.0"]);
+        assert.eq(0, res["1.1"]);
+        assert.eq(0, res["unknown"]);
+        assert.eq(0, res["1.2"]);
+        assert.eq(0, res["1.3"]);
+
+        return "TLS1_0";
+    }
+
     // Verify that the default protocol is either TLS1.2 or TLS1.3.
-    // No supported platform should default to an older protocol version.
+    // No other platform should default to an older protocol version.
     assert.eq(0, res["1.0"]);
     assert.eq(0, res["1.1"]);
     assert.eq(0, res["unknown"]);

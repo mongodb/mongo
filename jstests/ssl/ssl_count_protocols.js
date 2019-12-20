@@ -96,13 +96,11 @@
     }
 
     runTestWithoutSubset("TLS1_0");
-    runTestWithoutSubset("TLS1_1");
-    runTestWithoutSubset("TLS1_2");
-    runTestWithoutSubset("TLS1_3");
 
     // OpenSSL 0.9.8 on macOS only supports TLS 1.0
     if (getBuildInfo().buildEnvironment.target_os !== "osx") {
         runTestWithoutSubset("TLS1_1");
         runTestWithoutSubset("TLS1_2");
+        runTestWithoutSubset("TLS1_3");
     }
 })();
