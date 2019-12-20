@@ -335,6 +335,12 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     invariant(!_sessionId);
     invariant(!_scopedReceiveChunk);
 
+    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
+    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44 ||
+        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42)
+        return Status(ErrorCodes::ConflictingOperationInProgress,
+                      "Can't receive chunk while FCV is upgrading/downgrading");
+
     _state = READY;
     _stateChangedCV.notify_all();
     _errmsg = "";

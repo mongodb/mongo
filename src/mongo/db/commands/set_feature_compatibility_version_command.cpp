@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_util.h"
@@ -65,6 +66,8 @@ MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingConfigMetadata);  // TODO SERVER-44034: Remove.
 MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingConfigMetadata);    // TODO SERVER-44034: Remove.
+MONGO_FAIL_POINT_DEFINE(failUpgrading);
+MONGO_FAIL_POINT_DEFINE(failDowngrading);
 
 /**
  * Sets the minimum allowed version for the cluster. If it is 4.2, then the node should not use 4.4
@@ -143,6 +146,8 @@ public:
         invariant(!opCtx->lockState()->isLocked());
         Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
+        MigrationBlockingGuard lock(opCtx, ActiveMigrationsRegistry::get(opCtx));
+
         const auto requestedVersion = uassertStatusOK(
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
         ServerGlobalParams::FeatureCompatibility::Version actualVersion =
@@ -177,6 +182,9 @@ public:
                 //     this.
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
+
+            if (failUpgrading.shouldFail())
+                return false;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 const auto shardingState = ShardingState::get(opCtx);
@@ -240,6 +248,9 @@ public:
                 //     this.
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
+
+            if (failDowngrading.shouldFail())
+                return false;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 LOG(0) << "Downgrade: dropping config.rangeDeletions collection";

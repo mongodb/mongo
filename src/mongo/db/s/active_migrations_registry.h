@@ -61,6 +61,15 @@ public:
     static ActiveMigrationsRegistry& get(OperationContext* opCtx);
 
     /**
+     * These methods can be used to block migrations temporarily. The lock() method will block if
+     * there is a migration operation in progress and will return once it is completed. Any
+     * subsequent migration operations will return ConflictingOperationInProgress until the unlock()
+     * method is called.
+     */
+    void lock(OperationContext* opCtx);
+    void unlock();
+
+    /**
      * If there are no migrations running on this shard, registers an active migration with the
      * specified arguments. Returns a ScopedDonateChunk, which must be signaled by the
      * caller before it goes out of scope.
@@ -153,12 +162,31 @@ private:
 
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("ActiveMigrationsRegistry::_mutex");
+    stdx::condition_variable _lockCond;
+
+    bool _migrationsBlocked{false};
 
     // If there is an active moveChunk operation, this field contains the original request
     boost::optional<ActiveMoveChunkState> _activeMoveChunkState;
 
     // If there is an active chunk receive operation, this field contains the original session id
     boost::optional<ActiveReceiveChunkState> _activeReceiveChunkState;
+};
+
+class MigrationBlockingGuard {
+public:
+    MigrationBlockingGuard(OperationContext* opCtx, ActiveMigrationsRegistry& registry)
+        : _opCtx(opCtx), _registry(registry) {
+        _registry.lock(_opCtx);
+    }
+
+    ~MigrationBlockingGuard() {
+        _registry.unlock();
+    }
+
+private:
+    OperationContext* _opCtx{nullptr};
+    ActiveMigrationsRegistry& _registry;
 };
 
 /**
