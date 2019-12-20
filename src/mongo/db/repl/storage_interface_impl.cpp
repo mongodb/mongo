@@ -217,28 +217,29 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
     documentValidationDisabled(opCtx.get()) = true;
 
-    std::unique_ptr<AutoGetCollection> autoColl;
     // Retry if WCE.
     Status status = writeConflictRetry(opCtx.get(), "beginCollectionClone", nss.ns(), [&] {
         UnreplicatedWritesBlock uwb(opCtx.get());
 
         // Get locks and create the collection.
-        AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_IX);
-        AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
+        AutoGetOrCreateDb autoDb(opCtx.get(), nss.db(), MODE_IX);
+        AutoGetCollection autoColl(
+            opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
 
-        if (coll.getCollection()) {
+        if (autoColl.getCollection()) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection " << nss.ns() << " already exists.");
         }
         {
             // Create the collection.
             WriteUnitOfWork wunit(opCtx.get());
-            fassert(40332, db.getDb()->createCollection(opCtx.get(), nss, options, false));
+            fassert(40332, autoDb.getDb()->createCollection(opCtx.get(), nss, options, false));
             wunit.commit();
         }
 
-        autoColl = std::make_unique<AutoGetCollection>(
-            opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+        Collection* coll =
+            CollectionCatalog::get(opCtx.get()).lookupCollectionByNamespace(opCtx.get(), nss);
+        invariant(coll);
 
         // Build empty capped indexes.  Capped indexes cannot be built by the MultiIndexBlock
         // because the cap might delete documents off the back while we are inserting them into
@@ -247,16 +248,14 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             WriteUnitOfWork wunit(opCtx.get());
             if (!idIndexSpec.isEmpty()) {
                 auto status =
-                    autoColl->getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                        opCtx.get(), idIndexSpec);
+                    coll->getIndexCatalog()->createIndexOnEmptyCollection(opCtx.get(), idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
             }
             for (auto&& spec : secondaryIndexSpecs) {
                 auto status =
-                    autoColl->getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                        opCtx.get(), spec);
+                    coll->getIndexCatalog()->createIndexOnEmptyCollection(opCtx.get(), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -270,6 +269,10 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     if (!status.isOK()) {
         return status;
     }
+
+    std::unique_ptr<AutoGetCollection> autoColl = std::make_unique<AutoGetCollection>(
+        opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+    invariant(autoColl->getCollection());
 
     // Move locks into loader, so it now controls their lifetime.
     auto loader =
