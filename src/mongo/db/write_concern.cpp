@@ -89,7 +89,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             // received by shard and config servers should always have WC explicitly specified.
             if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
-                !opCtx->getClient()->isInDirectClient()) {
+                !opCtx->inMultiDocumentTransaction() && !opCtx->getClient()->isInDirectClient()) {
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                      .getDefaultWriteConcern(opCtx);
                 if (wcDefault) {
@@ -98,7 +98,28 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                     return *wcDefault;
                 }
             }
-            return repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
+
+            auto getLastErrorDefault =
+                repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
+            // Since replication configs always include all fields (explicitly setting them to the
+            // default value if necessary), usedDefault and usedDefaultW are always false here, even
+            // if the getLastErrorDefaults has never actually been set (because the
+            // getLastErrorDefaults writeConcern has been explicitly read out of the replset
+            // config).
+            //
+            // In this case, where the getLastErrorDefault is "conceptually unset" (ie. identical to
+            // the implicit server default of { w: 1, wtimeout: 0 }), we would prefer if downstream
+            // code behaved as if no writeConcern had been applied (since in addition to "no"
+            // getLastErrorDefaults, there is no ReadWriteConcernDefaults writeConcern and the user
+            // did not specify a writeConcern).
+            //
+            // Therefore when the getLastErrorDefault is { w: 1, wtimeout: 0 } we force usedDefault
+            // and usedDefaultW to be true.
+            if (getLastErrorDefault.wNumNodes == 1 && getLastErrorDefault.wTimeout == 0) {
+                getLastErrorDefault.usedDefault = true;
+                getLastErrorDefault.usedDefaultW = true;
+            }
+            return getLastErrorDefault;
         })();
         if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
             writeConcern.wNumNodes = 1;
