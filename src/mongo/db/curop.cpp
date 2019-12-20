@@ -766,6 +766,17 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         s << " flowControl:" << flowControlObj.toString();
     }
 
+    {
+        const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+        if (readConcern.isSpecified()) {
+            s << " readConcern:" << readConcern.toBSONInner();
+        }
+    }
+
+    if (writeConcern && !writeConcern->usedDefault) {
+        s << " writeConcern:" << writeConcern->toBSON();
+    }
+
     if (storageStats) {
         s << " storage:" << storageStats->toBSON().toString();
     }
@@ -858,6 +869,17 @@ void OpDebug::append(OperationContext* opCtx,
         BSONObj flowControlMetrics = makeFlowControlObject(flowControlStats);
         BSONObjBuilder flowControlBuilder(b.subobjStart("flowControl"));
         flowControlBuilder.appendElements(flowControlMetrics);
+    }
+
+    {
+        const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+        if (readConcern.isSpecified()) {
+            readConcern.appendInfo(&b);
+        }
+    }
+
+    if (writeConcern && !writeConcern->usedDefault) {
+        b.append("writeConcern", writeConcern->toBSON());
     }
 
     if (storageStats) {

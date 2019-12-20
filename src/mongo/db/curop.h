@@ -35,6 +35,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/diagnostic_info.h"
 #include "mongo/util/progress_meter.h"
@@ -240,6 +241,10 @@ public:
     std::shared_ptr<StorageStats> storageStats;
 
     bool waitingForFlowControl{false};
+
+    // Records the WC that was waited on during the operation. (The WC in opCtx can't be used
+    // because it's only set while the Command itself executes.)
+    boost::optional<WriteConcernOptions> writeConcern;
 };
 
 /**

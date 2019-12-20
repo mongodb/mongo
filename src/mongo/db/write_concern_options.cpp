@@ -101,6 +101,8 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
     BSONElement wEl;
     int wTimeout = 0;
 
+    WriteConcernOptions writeConcern;
+
     for (auto e : obj) {
         const auto fieldName = e.fieldNameStringData();
         if (fieldName == kJFieldName) {
@@ -108,16 +110,20 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
             if (!jEl.isNumber() && jEl.type() != Bool) {
                 return Status(ErrorCodes::FailedToParse, "j must be numeric or a boolean value");
             }
+            writeConcern.usedDefault = false;
         } else if (fieldName == kFSyncFieldName) {
             fsyncEl = e;
             if (!fsyncEl.isNumber() && fsyncEl.type() != Bool) {
                 return Status(ErrorCodes::FailedToParse,
                               "fsync must be numeric or a boolean value");
             }
+            writeConcern.usedDefault = false;
         } else if (fieldName == kWFieldName) {
             wEl = e;
+            writeConcern.usedDefault = false;
         } else if (fieldName == kWTimeoutFieldName) {
             wTimeout = e.numberInt();
+            writeConcern.usedDefault = false;
         } else if (fieldName == kWElectionIdFieldName) {
             // Ignore.
         } else if (fieldName == kWOpTimeFieldName) {
@@ -135,8 +141,6 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
     if (j && fsync) {
         return Status(ErrorCodes::FailedToParse, "fsync and j options cannot be used together");
     }
-
-    WriteConcernOptions writeConcern;
 
     if (j) {
         writeConcern.syncMode = SyncMode::JOURNAL;
