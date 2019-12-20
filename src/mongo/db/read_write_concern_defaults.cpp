@@ -43,7 +43,39 @@ namespace {
 static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
     repl::ReadConcernLevel::kSnapshotReadConcern, repl::ReadConcernLevel::kLinearizableReadConcern};
 
-}
+/**
+ * Used to invalidate the cache on updates to the persisted defaults document.
+ */
+class OnUpdateCommitHandler final : public RecoveryUnit::Change {
+public:
+    // rwcDefaults must outlive instantiations of this class.
+    OnUpdateCommitHandler(ServiceContext* service,
+                          ReadWriteConcernDefaults* rwcDefaults,
+                          const boost::optional<BSONObj>& newDefaultsDoc)
+        : _service(service), _rwcDefaults(rwcDefaults) {
+        // Note this will throw if the document can't be parsed. In the case of a delete, there will
+        // be no new defaults document and the RWConcern will be default constructed, which  matches
+        // the behavior when lookup discovers a non-existent defaults document.
+        _rwc = newDefaultsDoc
+            ? RWConcernDefault::parse(IDLParserErrorContext("RWDefaultsWriteObserver"),
+                                      *newDefaultsDoc)
+            : RWConcernDefault();
+    }
+
+    void commit(boost::optional<Timestamp> timestamp) final {
+        _rwc.setLocalSetTime(_service->getFastClockSource()->now());
+        _rwcDefaults->setDefault(std::move(_rwc));
+    }
+
+    void rollback() final {}
+
+private:
+    ServiceContext* _service;
+    ReadWriteConcernDefaults* _rwcDefaults;
+    RWConcernDefault _rwc;
+};
+
+}  // namespace
 
 bool ReadWriteConcernDefaults::isSuitableReadConcernLevel(repl::ReadConcernLevel level) {
     for (auto bannedLevel : kReadConcernLevelsDisallowedAsDefault) {
@@ -115,8 +147,24 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(
     return rwc;
 }
 
+void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationContext* opCtx,
+                                                                  BSONElement idElem,
+                                                                  boost::optional<BSONObj> newDoc) {
+    if (idElem.str() != kPersistedDocumentId) {
+        // The affected document wasn't the read write concern defaults document.
+        return;
+    }
+
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<OnUpdateCommitHandler>(opCtx->getServiceContext(), this, newDoc));
+}
+
 void ReadWriteConcernDefaults::invalidate() {
     _defaults.invalidate(Type::kReadWriteConcernEntry);
+}
+
+void ReadWriteConcernDefaults::setDefault(RWConcernDefault&& rwc) {
+    _defaults.revalidate(Type::kReadWriteConcernEntry, std::move(rwc));
 }
 
 void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
@@ -129,7 +177,7 @@ void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
         (possibleNewDefaults->getEpoch() > (**currentDefaultsHandle)->getEpoch())) {
         // Use the new defaults if they have a higher epoch, or if there are currently no defaults.
         log() << "refreshed RWC defaults to " << possibleNewDefaults->toBSON();
-        _defaults.revalidate(Type::kReadWriteConcernEntry, std::move(*possibleNewDefaults));
+        setDefault(std::move(*possibleNewDefaults));
     }
 }
 
@@ -176,6 +224,10 @@ ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(ServiceContext* service)
 
 ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(ServiceContext& service) {
     return *getReadWriteConcernDefaults(service);
+}
+
+ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(OperationContext* opCtx) {
+    return *getReadWriteConcernDefaults(opCtx->getServiceContext());
 }
 
 void ReadWriteConcernDefaults::create(ServiceContext* service, LookupFn lookupFn) {

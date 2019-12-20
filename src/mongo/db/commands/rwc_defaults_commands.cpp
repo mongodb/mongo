@@ -83,10 +83,7 @@ void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdNam
 class SetDefaultRWConcernCommand : public TypedCommand<SetDefaultRWConcernCommand> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        // TODO SERVER-43126: Once CWRWC persistence and propagation have been implemented, this
-        // should change to AllowedOnSecondary::kNever to only allow setting the default on
-        // primaries.
-        return AllowedOnSecondary::kAlways;
+        return AllowedOnSecondary::kNever;
     }
     bool adminOnly() const override {
         return true;
@@ -109,15 +106,10 @@ public:
             auto newDefaults = rwcDefaults.generateNewConcerns(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
 
-            // TODO SERVER-44890 Remove this check once this command can only run on a primary node.
-            if (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-                repl::MemberState::RS_PRIMARY) {
-                // TODO SERVER-44890: Make this update invalidate the RWC cache through an
-                // OpObserver so setting the new values below is safe to be best effort.
-                updatePersistedDefaultRWConcernDocument(opCtx, newDefaults);
-            }
+            updatePersistedDefaultRWConcernDocument(opCtx, newDefaults);
+            log() << "successfully set RWC defaults to " << newDefaults.toBSON();
 
-            // Force a refresh to find the newly set defaults, then return them.
+            // Refresh to populate the cache with the latest defaults.
             rwcDefaults.refreshIfNecessary(opCtx);
             return rwcDefaults.getDefault(opCtx);
         }
@@ -160,7 +152,7 @@ public:
             assertNotStandaloneOrShardServer(opCtx, GetDefaultRWConcern::kCommandName);
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            if (request().getInMemory()) {
+            if (request().getInMemory() && *request().getInMemory()) {
                 return rwcDefaults.getDefault(opCtx);
             }
 

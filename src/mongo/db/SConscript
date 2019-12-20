@@ -704,6 +704,7 @@ env.Library(
         'catalog/database_holder',
         'op_observer',
         'op_observer_util',
+        'read_write_concern_defaults',
         'repl/oplog',
         's/sharding_api_d',
         'views/views_mongod',

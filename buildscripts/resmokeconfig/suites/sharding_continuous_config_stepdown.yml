@@ -202,6 +202,7 @@ selector:
   - jstests/sharding/merge_with_move_primary.js
   # Runs commands directly on the config server primary and is not robust to the primary changing.
   - jstests/sharding/read_write_concern_defaults_commands_api.js
+  - jstests/sharding/read_write_concern_defaults_propagation.js
 
 executor:
   config:

@@ -47,9 +47,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rw_concern_default_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -449,6 +451,11 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         for (auto it = first; it != last; it++) {
             MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, it->doc);
         }
+    } else if (nss == NamespaceString::kConfigSettingsNamespace) {
+        for (auto it = first; it != last; it++) {
+            ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
+                opCtx, it->doc["_id"], it->doc);
+        }
     }
 }
 
@@ -512,6 +519,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                !opTime.writeOpTime.isNull()) {
         MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx,
                                                                      args.updateArgs.updatedDoc);
+    } else if (args.nss == NamespaceString::kConfigSettingsNamespace) {
+        ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
+            opCtx, args.updateArgs.updatedDoc["_id"], args.updateArgs.updatedDoc);
     }
 }
 
@@ -572,6 +582,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, documentKey);
+    } else if (nss == NamespaceString::kConfigSettingsNamespace) {
+        ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
+            opCtx, documentKey["_id"], boost::none);
     }
 }
 
@@ -688,6 +701,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         DurableViewCatalog::onSystemViewsCollectionDrop(opCtx, collectionName);
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
         MongoDSessionCatalog::invalidateAllSessions(opCtx);
+    } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
+        ReadWriteConcernDefaults::get(opCtx).invalidate();
     }
 
     return {};

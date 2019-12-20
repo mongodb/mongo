@@ -14,9 +14,15 @@ rst.initiate();
 const primary = rst.getPrimary();
 const secondaries = rst.getSecondaries();
 
-// TODO: after SERVER-43720 is done, remove this line and uncomment the below line.
-ReadWriteConcernDefaultsPropagation.runTests(primary, [primary]);
-// ReadWriteConcernDefaultsPropagation.runTests(primary, secondaries);
+ReadWriteConcernDefaultsPropagation.runTests(primary, [primary, ...secondaries]);
+
+// Verify the in-memory defaults are updated correctly. This verifies the cache is invalidated
+// properly on secondaries when an update to the defaults document is replicated because the
+// in-memory value will only be updated after an invalidation.
+ReadWriteConcernDefaultsPropagation.runTests(
+    primary, [primary, ...secondaries], true /* inMemory */);
+
+ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(primary, [primary, ...secondaries]);
 
 rst.stopSet();
 })();
