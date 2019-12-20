@@ -37,11 +37,16 @@ ReadWriteConcernDefaults::LookupFn ReadWriteConcernDefaultsLookupMock::getLookup
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaultsLookupMock::lookup(
     OperationContext* opCtx) {
+    uassert(_status->code(), _status->reason(), !_status);
     return _value;
 }
 
 void ReadWriteConcernDefaultsLookupMock::setLookupCallReturnValue(RWConcernDefault&& rwc) {
     _value.emplace(rwc);
+}
+
+void ReadWriteConcernDefaultsLookupMock::setLookupCallFailure(boost::optional<Status> status) {
+    _status = status;
 }
 
 }  // namespace mongo
