@@ -103,7 +103,8 @@ class HookTestArchival(object):
         """Trigger archive of data files for a test or hook."""
 
         # We can still attempt archiving even if the teardown fails.
-        teardown_success = manager.teardown_fixture(logger, kill=True)
+        if not manager.teardown_fixture(logger, kill=True):
+            logger.warning("Error while killing test fixtures; data files may be invalid.")
         with self._lock:
             # Test repeat number is how many times the particular test has been archived.
             if test_name not in self._tests_repeat:
@@ -132,9 +133,5 @@ class HookTestArchival(object):
         else:
             logger.info("Archive succeeded for %s: %s", test_name, message)
 
-        setup_success = manager.setup_fixture(logger)
-        if not teardown_success:
-            raise errors.StopExecution(
-                "Error while killing test fixtures; data files may be invalid.")
-        if not setup_success:
+        if not manager.setup_fixture(logger):
             raise errors.StopExecution("Error while restarting test fixtures after archiving.")

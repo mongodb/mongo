@@ -200,7 +200,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             self.logger.warning("All members of the sharded cluster were expected to be running, "
                                 "but weren't.")
 
-        if self.enable_balancer:
+        # If we're just killing, shutting down the balancer fails for nonresponsive servers.
+        if self.enable_balancer and not kill:
             self.stop_balancer()
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
