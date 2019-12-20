@@ -157,7 +157,7 @@ assertEqAndDumpOpLog(1,
                      "Real delete of {_id: 4} on donor shard incorrectly set the " +
                          "fromMigrate flag in the oplog! Test #5 failed.");
 
-// Expect to see two oplog entries for {_id: 2} with 'fromMigrate: true', because this doc was
+// Expect to see two oplog entries for {_id: 2} with 'fromMigrate: true' because this doc was
 // cloned as part of the first failed migration as well as the second successful migration.
 var recipientOplogRes =
     recipientLocal.oplog.rs.find({op: 'i', fromMigrate: true, 'o._id': 2}).count();

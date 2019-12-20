@@ -595,8 +595,57 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         donorOptions = donorOptionsBob.obj();
     }
 
+    // 1. If this shard doesn't own any chunks for the collection to be cloned and the collection
+    // exists locally, we drop its indexes to guarantee that no stale indexes carry over.
+    bool dropNonDonorIndexes = [&]() -> bool {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
+        const auto optMetadata = css->getCurrentMetadataIfKnown();
+
+        // Only attempt to drop a collection's indexes if we have valid metadata and the
+        // collection is sharded.
+        if (optMetadata) {
+            const auto& metadata = optMetadata->get();
+            if (metadata.isSharded()) {
+                auto chunks = metadata.getChunks();
+                if (chunks.empty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }();
+
+    if (dropNonDonorIndexes) {
+        // Determine which indexes exist on the local collection that don't exist on the donor's
+        // collection.
+        DBDirectClient client(opCtx);
+        auto indexes = client.getIndexSpecs(nss);
+        for (auto&& recipientIndex : indexes) {
+            bool dropIndex = true;
+            for (auto&& donorIndex : donorIndexSpecs) {
+                if (recipientIndex.woCompare(donorIndex) == 0) {
+                    dropIndex = false;
+                    break;
+                }
+            }
+            // If the local index doesn't exist on the donor and isn't the _id index, drop it.
+            auto indexNameElem = recipientIndex[IndexDescriptor::kIndexNameFieldName];
+            if (indexNameElem.type() == BSONType::String && dropIndex &&
+                !IndexDescriptor::isIdIndexPattern(
+                    recipientIndex[IndexDescriptor::kKeyPatternFieldName].Obj())) {
+                BSONObj info;
+                if (!client.runCommand(
+                        nss.db().toString(),
+                        BSON("dropIndexes" << nss.coll() << "index" << indexNameElem),
+                        info))
+                    uassertStatusOK(getStatusFromCommandResult(info));
+            }
+        }
+    }
+
     {
-        // 1. Create the collection (if it doesn't already exist) and create any indexes we are
+        // 2. Create the collection (if it doesn't already exist) and create any indexes we are
         // missing (auto-heal indexes).
 
         // Checks that the collection's UUID matches the donor's.
