@@ -11,6 +11,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
 'use strict';
 
+// TODO (SERVER-45108): authutil.asCluster() only works with a keyFile and we are not
+// currently threading the x509 options through to the check indexes hook.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 var transitionToX509AllowSSL =
     Object.merge(allowSSL, {transitionToAuth: '', clusterAuthMode: 'x509'});
 var transitionToX509PreferSSL =

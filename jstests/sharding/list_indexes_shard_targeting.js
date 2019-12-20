@@ -9,6 +9,9 @@
 
 load("jstests/sharding/libs/shard_versioning_util.js");
 
+// This test makes shards have inconsistent indexes.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 const st = new ShardingTest({shards: 3});
 const dbName = "test";
 const collName = "user";

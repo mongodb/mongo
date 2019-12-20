@@ -4,6 +4,9 @@
 // there are.
 // @tags: [requires_sharding]
 
+// The config servers are not reachable at shutdown.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 var st = new ShardingTest({
     shards: 1,
     mongos: 1,

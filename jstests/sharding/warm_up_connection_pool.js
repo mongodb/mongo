@@ -2,8 +2,10 @@
  * @tags: [requires_fcv_44, multiversion_incompatible]
  */
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+// Checking UUID and index consistency involves talking to a shard node, which in this
+// test is shutdown.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 (function() {
 'use strict';

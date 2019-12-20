@@ -388,6 +388,7 @@ var ShardingTest = function(params) {
 
     this.stop = function(opts) {
         this.checkUUIDsConsistentAcrossCluster();
+        this.checkIndexesConsistentAcrossCluster();
 
         this.stopAllMongos(opts);
 
@@ -977,7 +978,7 @@ var ShardingTest = function(params) {
      *     otherParams.configOptions.binVersion, otherParams.shardOptions.binVersion,
      *     otherParams.mongosOptions.binVersion
      */
-    function _isMixedVersionCluster() {
+    this.isMixedVersionCluster = function() {
         var lastStableBinVersion = MongoRunner.getBinVersionFor('last-stable');
 
         // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an object
@@ -1039,7 +1040,7 @@ var ShardingTest = function(params) {
         }
 
         return false;
-    }
+    };
 
     /**
      * Returns if there is a new feature compatibility version for the "latest" version. This must
@@ -1150,7 +1151,7 @@ var ShardingTest = function(params) {
             jsTestOptions().networkMessageCompressors;
     }
 
-    var keyFile = otherParams.keyFile;
+    this.keyFile = otherParams.keyFile;
     var hostName = otherParams.host === undefined ? getHostName() : otherParams.host;
 
     this._testName = testName;
@@ -1303,7 +1304,7 @@ var ShardingTest = function(params) {
                 useHostName: otherParams.useHostname,
                 useBridge: otherParams.useBridge,
                 bridgeOptions: otherParams.bridgeOptions,
-                keyFile: keyFile,
+                keyFile: this.keyFile,
                 protocolVersion: protocolVersion,
                 waitForKeys: false,
                 settings: rsSettings,
@@ -1322,7 +1323,7 @@ var ShardingTest = function(params) {
                 pathOpts: Object.merge(pathOpts, {shard: i}),
                 dbpath: "$testName$shard",
                 shardsvr: '',
-                keyFile: keyFile
+                keyFile: this.keyFile
             };
 
             options.setParameter = options.setParameter || {};
@@ -1400,7 +1401,7 @@ var ShardingTest = function(params) {
         host: hostName,
         useBridge: otherParams.useBridge,
         bridgeOptions: otherParams.bridgeOptions,
-        keyFile: keyFile,
+        keyFile: this.keyFile,
         waitForKeys: false,
         name: testName + "-configRS",
         seedRandomNumberGenerator: !randomSeedAlreadySet,
@@ -1492,8 +1493,8 @@ var ShardingTest = function(params) {
         var rs = this._rs[i].test;
         rs.getPrimary().getDB("admin").foo.save({x: 1});
 
-        if (keyFile) {
-            authutil.asCluster(rs.nodes, keyFile, function() {
+        if (this.keyFile) {
+            authutil.asCluster(rs.nodes, this.keyFile, function() {
                 rs.awaitReplication();
             });
         }
@@ -1527,7 +1528,7 @@ var ShardingTest = function(params) {
             useHostname: otherParams.useHostname,
             pathOpts: Object.merge(pathOpts, {mongos: i}),
             verbose: mongosVerboseLevel,
-            keyFile: keyFile,
+            keyFile: this.keyFile,
         };
 
         if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion) {
@@ -1544,7 +1545,7 @@ var ShardingTest = function(params) {
     }
 
     const configRS = this.configRS;
-    if (_hasNewFeatureCompatibilityVersion() && _isMixedVersionCluster()) {
+    if (_hasNewFeatureCompatibilityVersion() && this.isMixedVersionCluster()) {
         function setFeatureCompatibilityVersion() {
             assert.commandWorked(
                 csrsPrimary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
@@ -1554,8 +1555,8 @@ var ShardingTest = function(params) {
             configRS.awaitReplication();
         }
 
-        if (keyFile) {
-            authutil.asCluster(this.configRS.nodes, keyFile, setFeatureCompatibilityVersion);
+        if (this.keyFile) {
+            authutil.asCluster(this.configRS.nodes, this.keyFile, setFeatureCompatibilityVersion);
         } else {
             setFeatureCompatibilityVersion();
         }
@@ -1572,8 +1573,8 @@ var ShardingTest = function(params) {
             configRS.awaitLastOpCommitted();
         }
 
-        if (keyFile) {
-            authutil.asCluster(csrsPrimary, keyFile, setChunkSize);
+        if (this.keyFile) {
+            authutil.asCluster(csrsPrimary, this.keyFile, setChunkSize);
         } else {
             setChunkSize();
         }
@@ -1645,8 +1646,8 @@ var ShardingTest = function(params) {
 
     // If auth is enabled for the test, login the mongos connections as system in order to configure
     // the instances and then log them out again.
-    if (keyFile) {
-        authutil.asCluster(this._mongos, keyFile, _configureCluster);
+    if (this.keyFile) {
+        authutil.asCluster(this._mongos, this.keyFile, _configureCluster);
     } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
         authutil.asCluster(this._mongos, mongosOptions[0].keyFile, _configureCluster);
     } else {
@@ -1730,13 +1731,13 @@ var ShardingTest = function(params) {
             for (let i = 0; i < numShards; i++) {
                 if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
                     const rs = this._rs[i].test;
-                    flushRT(rs.getPrimary(), rs.nodes, keyFile);
+                    flushRT(rs.getPrimary(), rs.nodes, this.keyFile);
                 } else {
                     // If specified, use the keyFile for the standalone shard.
                     const keyFileLocal = (otherParams.shards && otherParams.shards[i] &&
                                           otherParams.shards[i].keyFile)
                         ? otherParams.shards[i].keyFile
-                        : keyFile;
+                        : this.keyFile;
                     flushRT(this["shard" + i], this["shard" + i], keyFileLocal);
                 }
             }
@@ -1747,3 +1748,6 @@ var ShardingTest = function(params) {
 // Stub for a hook to check that collection UUIDs are consistent across shards and the config
 // server.
 ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {};
+
+// Stub for a hook to check that indexes are consistent across shards.
+ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {};

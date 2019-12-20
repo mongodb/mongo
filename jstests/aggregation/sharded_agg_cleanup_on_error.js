@@ -80,7 +80,7 @@ try {
         errCode: kDivideByZeroErrCode
     });
 } finally {
-    assert.commandWorked(shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
+    assert.commandWorked(shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
 }
 
 // Test that aggregations which fail to establish a merging shard cursor also cleanup the open

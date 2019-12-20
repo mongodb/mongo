@@ -3,9 +3,10 @@
  * are behind the majority opTime.
  */
 
-// Checking UUID consistency involves mongos being able to do a read from the config server, but
-// this test is designed to make mongos time out when reading from the config server.
+// Checking UUID and index consistency involves mongos being able to do a read from the config
+// server, but this test is designed to make mongos time out when reading from the config server.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 (function() {
 var st =

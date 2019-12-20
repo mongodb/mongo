@@ -315,6 +315,8 @@ jsTestOptions = function() {
             skipValidationNamespaces: TestData.skipValidationNamespaces || [],
             skipCheckingUUIDsConsistentAcrossCluster:
                 TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
+            skipCheckingIndexesConsistentAcrossCluster:
+                TestData.skipCheckingIndexesConsistentAcrossCluster || false,
             skipCheckingCatalogCacheConsistencyWithShardingCatalog:
                 TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
             skipAwaitingReplicationOnShardsBeforeCheckingUUIDs:

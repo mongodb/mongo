@@ -3,6 +3,10 @@
 (function() {
 'use strict';
 
+// TODO (SERVER-45108): authutil.asCluster() only works with a keyFile and we are not
+// currently threading the x509 options through to the check indexes hook.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 var x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",

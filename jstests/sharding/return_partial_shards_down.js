@@ -2,8 +2,9 @@
 // Tests that zero results are correctly returned with returnPartial and shards down
 //
 
-// Checking UUID consistency involves talking to shards, but this test shuts down shards.
+// Checking UUID and index consistency involves talking to shards, but this test shuts down shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 var checkDocCount = function(coll, returnPartialFlag, shardsDown, expectedCount) {
     if (jsTestOptions().mongosBinVersion == "last-stable" && shardsDown) {
