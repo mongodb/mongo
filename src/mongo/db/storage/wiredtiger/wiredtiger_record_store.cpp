@@ -94,6 +94,7 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
+MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
@@ -445,7 +446,11 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
     // each logical section.
     auto cursor = _rs->getRandomCursorWithOptions(opCtx, extraConfig);
     std::vector<RecordId> oplogEstimates;
+    auto lastProgressLog = Date_t::now();
     for (int i = 0; i < numSamples; ++i) {
+        auto samplingLogIntervalSeconds = gOplogSamplingLogIntervalSeconds.load();
+        slowOplogSamplingReads.execute(
+            [&](const BSONObj& dataObj) { sleepsecs(dataObj["delay"].numberInt()); });
         auto record = cursor->next();
         if (!record) {
             // This shouldn't really happen unless the size storer values are far off from reality.
@@ -455,8 +460,17 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
             return;
         }
         oplogEstimates.push_back(record->id);
+
+        const auto now = Date_t::now();
+        if (samplingLogIntervalSeconds > 0 &&
+            now - lastProgressLog >= Seconds(samplingLogIntervalSeconds)) {
+            log() << "Oplog sampling progress: " << (i + 1) << " of " << numSamples
+                  << " samples taken";
+            lastProgressLog = now;
+        }
     }
     std::sort(oplogEstimates.begin(), oplogEstimates.end());
+    log() << "Oplog sampling complete";
 
     for (int i = 1; i <= wholeStones; ++i) {
         // Use every (kRandomSamplesPerStone)th sample, starting with the
