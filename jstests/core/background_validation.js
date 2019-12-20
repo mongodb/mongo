@@ -15,7 +15,9 @@
  *   # A failpoint is set against the primary only.
  *   does_not_support_stepdowns,
  *   # Checkpoint cursors cannot be open in lsm.
- *   does_not_support_wiredtiger_lsm
+ *   does_not_support_wiredtiger_lsm,
+ *   # Background validation will be first available in v4.4.
+ *   requires_fcv_44
  * ]
  */
 
