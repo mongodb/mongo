@@ -204,6 +204,9 @@ selector:
   - jstests/sharding/read_write_concern_defaults_commands_api.js
   - jstests/sharding/read_write_concern_defaults_propagation.js
 
+  # This is expected to fail if the config server steps down during moveChunk.
+  - jstests/sharding/index_operations_abort_concurrent_outgoing_migrations.js
+
 executor:
   config:
     shell_options:
