@@ -227,6 +227,13 @@ Status CollectionBulkLoaderImpl::commit() {
             // constraints causing them to not be recorded.
             invariant(_secondaryIndexesBlock->checkConstraints(_opCtx.get()));
 
+            // Need to upgrade the collection lock to MODE_X to commit the index build.
+            if (!_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X)) {
+                _autoColl = std::make_unique<AutoGetCollection>(_opCtx.get(), _nss, MODE_X);
+                _collection = _autoColl->getCollection();
+                invariant(_collection);
+            }
+
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
@@ -288,6 +295,13 @@ Status CollectionBulkLoaderImpl::commit() {
                 return status;
             }
 
+            // Need to upgrade the collection lock to MODE_X to commit the index build.
+            if (!_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X)) {
+                _autoColl = std::make_unique<AutoGetCollection>(_opCtx.get(), _nss, MODE_X);
+                _collection = _autoColl->getCollection();
+                invariant(_collection);
+            }
+
             // Commit the _id index, there won't be any documents with duplicate _ids as they were
             // deleted prior to this.
             status = writeConflictRetry(
@@ -318,6 +332,15 @@ Status CollectionBulkLoaderImpl::commit() {
 
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
+
+    // Need to upgrade the collection lock to MODE_X to clean up the index build.
+    if (!_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X) &&
+        (_secondaryIndexesBlock || _idIndexBlock)) {
+        _autoColl = std::make_unique<AutoGetCollection>(_opCtx.get(), _nss, MODE_X);
+        _collection = _autoColl->getCollection();
+        invariant(_collection);
+    }
+
     if (_secondaryIndexesBlock) {
         _secondaryIndexesBlock->cleanUpAfterBuild(
             _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
