@@ -3,22 +3,6 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 (function() {
 "use strict";
 
-function makeDirectoryReadOnly(dir) {
-    if (_isWindows()) {
-        run("attrib", "+r", dir + "\\*.*", "/s");
-    } else {
-        run("chmod", "-R", "a-w", dir);
-    }
-}
-
-function makeDirectoryWritable(dir) {
-    if (_isWindows()) {
-        run("attrib", "-r", dir + "\\*.*", "/s");
-    } else {
-        run("chmod", "-R", "a+w", dir);
-    }
-}
-
 StandaloneFixture = function() {};
 
 StandaloneFixture.prototype.runLoadPhase = function runLoadPhase(test) {
@@ -31,20 +15,11 @@ StandaloneFixture.prototype.runLoadPhase = function runLoadPhase(test) {
 };
 
 StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
-    try {
-        makeDirectoryReadOnly(this.dbpath);
-
-        var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
-
-        this.mongod = MongoRunner.runMongod(options);
-        assert.neq(this.mongod, null);
-
-        test.exec(this.mongod.getDB("test")[test.name]);
-
-        MongoRunner.stopMongod(this.mongod);
-    } finally {
-        makeDirectoryWritable(this.dbpath);
-    }
+    var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
+    this.mongod = MongoRunner.runMongod(options);
+    assert.neq(this.mongod, null);
+    test.exec(this.mongod.getDB("test")[test.name]);
+    MongoRunner.stopMongod(this.mongod);
 };
 
 ShardedFixture = function() {
@@ -70,60 +45,41 @@ ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
 
 ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
     jsTest.log("restarting shards...");
-    try {
-        for (var i = 0; i < this.nShards; ++i) {
-            // Write the shard's shardIdentity to a config file under
-            // sharding._overrideShardIdentity, since the shardIdentity must be provided through
-            // overrideShardIdentity when running in queryableBackupMode, and is only allowed to
-            // be set via config file.
+    for (var i = 0; i < this.nShards; ++i) {
+        // Write the shard's shardIdentity to a config file under
+        // sharding._overrideShardIdentity, since the shardIdentity must be provided through
+        // overrideShardIdentity when running in queryableBackupMode, and is only allowed to
+        // be set via config file.
 
-            var shardIdentity =
-                this.shardingTest["d" + i].getDB("admin").getCollection("system.version").findOne({
-                    _id: "shardIdentity"
-                });
-            assert.neq(null, shardIdentity);
-
-            // Construct a string representation of the config file (replace all instances of
-            // multiple consecutive whitespace characters in the string representation of the
-            // shardIdentity JSON document, including newlines, with single white spaces).
-            var configFileStr = "sharding:\n  _overrideShardIdentity: '" +
-                tojson(shardIdentity).replace(/\s+/g, ' ') + "'";
-
-            // Use the os-specific path delimiter.
-            var delim = _isWindows() ? '\\' : '/';
-            var configFilePath = this.paths[i] + delim + "config-for-shard-" + i + ".yml";
-
-            writeFile(configFilePath, configFileStr);
-
-            var opts = {
-                config: configFilePath,
-                queryableBackupMode: "",
-                shardsvr: "",
-                dbpath: this.paths[i]
-            };
-
-            assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
-            this.shardingTest.restartMongod(i, opts, () => {
-                makeDirectoryReadOnly(this.paths[i]);
+        var shardIdentity =
+            this.shardingTest["d" + i].getDB("admin").getCollection("system.version").findOne({
+                _id: "shardIdentity"
             });
-        }
+        assert.neq(null, shardIdentity);
 
-        jsTest.log("restarting mongos...");
+        // Construct a string representation of the config file (replace all instances of
+        // multiple consecutive whitespace characters in the string representation of the
+        // shardIdentity JSON document, including newlines, with single white spaces).
+        var configFileStr = "sharding:\n  _overrideShardIdentity: '" +
+            tojson(shardIdentity).replace(/\s+/g, ' ') + "'";
 
-        this.shardingTest.restartMongos(0);
+        // Use the os-specific path delimiter.
+        var delim = _isWindows() ? '\\' : '/';
+        var configFilePath = this.paths[i] + delim + "config-for-shard-" + i + ".yml";
 
-        test.exec(this.shardingTest.getDB("test")[test.name]);
+        writeFile(configFilePath, configFileStr);
 
-        this.paths.forEach((path) => {
-            makeDirectoryWritable(path);
-        });
+        var opts =
+            {config: configFilePath, queryableBackupMode: "", shardsvr: "", dbpath: this.paths[i]};
 
-        this.shardingTest.stop();
-    } finally {
-        this.paths.forEach((path) => {
-            makeDirectoryWritable(path);
-        });
+        assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
+        this.shardingTest.restartMongod(i, opts);
     }
+
+    jsTest.log("restarting mongos...");
+    this.shardingTest.restartMongos(0);
+    test.exec(this.shardingTest.getDB("test")[test.name]);
+    this.shardingTest.stop();
 };
 
 runReadOnlyTest = function(test) {

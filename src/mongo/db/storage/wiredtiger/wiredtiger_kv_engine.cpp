@@ -714,10 +714,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
               ->getTableCreateConfig("system");
     ss << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
     ss << extraOpenOptions;
-    if (_readOnly) {
-        invariant(!_durable);
-        ss << ",readonly=true,";
-    }
+
     if (!_durable && !_readOnly) {
         // If we started without the journal, but previously used the journal then open with the
         // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
