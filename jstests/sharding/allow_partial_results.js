@@ -88,16 +88,8 @@ assert.commandFailed(coll.runCommand({find: collName}));
 jsTest.log("With 'allowPartialResults: false', if some shards are down, find fails.");
 assert.commandFailed(coll.runCommand({find: collName, allowPartialResults: false}));
 
-if (isLastStable) {
-    // In v4.4, mongos was updated to swallow FailedToSatisfyReadPreference errors if
-    // allowPartialResults is true, allowing allowPartialResults to work with replica set shards
-    // (see SERVER-33597 for details). So when the mongos version is v4.2, the command should
-    // fail.
-    jsTest.log(
-        "With 'allowPartialResults: true', if some shards are down and mongos is v4.2, find fails");
-    assert.commandFailedWithCode(coll.runCommand({find: collName, allowPartialResults: true}),
-                                 ErrorCodes.FailedToSatisfyReadPreference);
-} else {
+// TODO (SERVER-45273): Remove this mongos bin version check.
+if (!isLastStable) {
     nRemainingDocs = nDocs / 2;
 
     jsTest.log(
