@@ -58,9 +58,38 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
     return get(opCtx->getServiceContext());
 }
 
+void ActiveMigrationsRegistry::lock(OperationContext* opCtx) {
+    stdx::unique_lock<Latch> lock(_mutex);
+
+    // This wait is to hold back additional lock requests while there is already one in
+    // progress.
+    opCtx->waitForConditionOrInterrupt(_lockCond, lock, [this] { return !_migrationsBlocked; });
+
+    // Setting flag before condvar returns to block new migrations from starting. (Favoring writers)
+    _migrationsBlocked = true;
+
+    // Wait for any ongoing migrations to complete.
+    opCtx->waitForConditionOrInterrupt(
+        _lockCond, lock, [this] { return !(_activeMoveChunkState || _activeReceiveChunkState); });
+}
+
+void ActiveMigrationsRegistry::unlock() {
+    stdx::lock_guard<Latch> lock(_mutex);
+
+    _migrationsBlocked = false;
+
+    _lockCond.notify_all();
+}
+
 StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     const MoveChunkRequest& args) {
     stdx::lock_guard<Latch> lk(_mutex);
+
+    if (_migrationsBlocked)
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Unable to start new migration because this shard is currently "
+                                 "blocking all migrations."};
+
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
     }
@@ -81,6 +110,12 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
 StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const NamespaceString& nss, const ChunkRange& chunkRange, const ShardId& fromShardId) {
     stdx::lock_guard<Latch> lk(_mutex);
+
+    if (_migrationsBlocked)
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Unable to start new migration because this shard is currently "
+                                 "blocking all migrations."};
+
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
     }
@@ -135,12 +170,14 @@ void ActiveMigrationsRegistry::_clearDonateChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeMoveChunkState);
     _activeMoveChunkState.reset();
+    _lockCond.notify_all();
 }
 
 void ActiveMigrationsRegistry::_clearReceiveChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeReceiveChunkState);
     _activeReceiveChunkState.reset();
+    _lockCond.notify_all();
 }
 
 Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() const {

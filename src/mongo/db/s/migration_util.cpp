@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/write_concern.h"
@@ -275,8 +276,6 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
 }
 
 void submitOrphanRangesForCleanup(OperationContext* opCtx) {
-    // TODO(SERVER-45047): block incoming migrations
-
     auto& catalog = CollectionCatalog::get(opCtx);
     const auto& dbs = catalog.getAllDbNames();
 

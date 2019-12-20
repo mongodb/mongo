@@ -142,6 +142,12 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _stats(ShardingStatistics::get(_opCtx)) {
     invariant(!_opCtx->lockState()->isLocked());
 
+    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Can't donate chunk while FCV is upgrading/downgrading",
+            fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44 &&
+                fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42);
+
     // Disallow moving a chunk to ourselves
     uassert(ErrorCodes::InvalidOptions,
             "Destination shard cannot be the same as source",
