@@ -236,8 +236,8 @@ bool queryContainsMatchType(MatchExpression* root, MatchExpression::MatchType ma
     if (root->matchType() == match) {
         return false;
     } else if (root->numChildren() > 0) {
-        for (auto&& child : *(root->getChildVector())) {
-            if (!queryContainsMatchType(child, match)) {
+        for (size_t i = 0; i < root->numChildren(); i++) {
+            if (!queryContainsMatchType(root->getChild(i), match)) {
                 return false;
             }
         }
