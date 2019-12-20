@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/str.h"
 
@@ -615,7 +616,7 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
         const bool mustWriteToDisk =
             (constraints.diskRequirement == DiskUseRequirement::kWritesPersistentData);
         const bool mayWriteTmpDataAndDiskUseIsAllowed =
-            (pCtx->allowDiskUse &&
+            (pCtx->allowDiskUse && !storageGlobalParams.readOnly &&
              constraints.diskRequirement == DiskUseRequirement::kWritesTmpData);
         const bool needsDisk = (mustWriteToDisk || mayWriteTmpDataAndDiskUseIsAllowed);
 
