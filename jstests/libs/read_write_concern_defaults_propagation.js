@@ -13,20 +13,34 @@ var ReadWriteConcernDefaultsPropagation = (function() {
     const kExtraFields = [...kExtraSetFields, ...kExtraLocalFields];
     const kSetFields = [...kDefaultRWCFields, ...kExtraSetFields];
 
+    const timeoutSecs = 2 * 60;
+    const intervalSecs = 5;
+
     // Check that setting the defaults on setConn propagates correctly across checkConns.
-    function setDefaultsAndVerifyPropagation(setConn, checkConns) {
+    function setDefaultsAndVerifyPropagation(setConn, checkConns, inMemory) {
         // Get the current defaults from setConn.
         var initialSetConnDefaults =
             assert.commandWorked(setConn.adminCommand({getDefaultRWConcern: 1}));
 
-        // Ensure that all checkConns agree with this.
-        var initialCheckConnsDefaults = checkConns.map(
-            conn => assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})));
-        initialCheckConnsDefaults.forEach(
-            checkConnDefaults => kSetFields.forEach(
-                field => assert.eq(checkConnDefaults[field],
-                                   initialSetConnDefaults[field],
-                                   "RWC default field " + field + " does not match")));
+        // Ensure that all checkConns agree with this. Use a loop in case the initial defaults were
+        // recently set and have not yet propagated to all nodes.
+        var checkConnsDefaults = [];
+        var initialCheckConnsDefaults = [];
+        assert.soon(
+            () => {
+                initialCheckConnsDefaults = checkConns.map(
+                    conn => assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})));
+                return initialCheckConnsDefaults.every(
+                    checkConnDefaults =>
+                        kSetFields.every(field => friendlyEqual(checkConnDefaults[field],
+                                                                initialSetConnDefaults[field])));
+            },
+            () => "expected initial defaults to be present on all nodes within" + timeoutSecs +
+                " secs.  Expected defaults: " + tojson(initialSetConnDefaults) + ", checkConns: " +
+                tojson(checkConns) + ", current state: " + tojson(initialCheckConnsDefaults),
+            timeoutSecs * 1000,
+            intervalSecs * 1000,
+            {runHangAnalyzer: false});
 
         // Set new defaults on setConn.
         var newDefaults = {
@@ -67,14 +81,11 @@ var ReadWriteConcernDefaultsPropagation = (function() {
         });
 
         // Ensure that all checkConns agree with this.
-        const timeoutSecs = 2 * 60;
-        const intervalSecs = 5;
-        var checkConnsDefaults = [];
         assert.soon(
             function() {
                 // Get the defaults from all the connections.
-                checkConnsDefaults = checkConns.map(
-                    conn => assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})));
+                checkConnsDefaults = checkConns.map(conn => assert.commandWorked(conn.adminCommand(
+                                                        {getDefaultRWConcern: 1, inMemory})));
 
                 // Check if they all match the recently-set values.
                 for (var connDefault of checkConnsDefaults) {
@@ -94,8 +105,9 @@ var ReadWriteConcernDefaultsPropagation = (function() {
                 return true;
             },
             () => "updated defaults failed to propagate to all nodes within " + timeoutSecs +
-                " secs.  Expected defaults: " + tojson(newDefaultsRes) + ", checkConns: " +
-                tojson(checkConns) + ", current state: " + tojson(checkConnsDefaults),
+                " secs.  Expected defaults: " + tojson(newDefaults) +
+                ", checkConns: " + tojson(checkConns) +
+                ", current state: " + tojson(checkConnsDefaults) + ", inMemory: " + inMemory,
             timeoutSecs * 1000,
             intervalSecs * 1000,
             {runHangAnalyzer: false});
@@ -106,18 +118,54 @@ var ReadWriteConcernDefaultsPropagation = (function() {
      * setConn, and then each connection in the checkConns array is checked to ensure that it
      * becomes aware of the new defaults (within the acceptable window of 2 minutes).
      */
-    var runTests = function(setConn, checkConns) {
+    var runTests = function(setConn, checkConns, inMemory) {
         // Since these connections are on a brand new replset/cluster, this checks the propagation
         // of the initial setting of defaults.
-        setDefaultsAndVerifyPropagation(setConn, checkConns);
-
-        // TODO: remove this after SERVER-43720 is done.
-        // Do a dummy write, to bump clusterTime, so that epoch will increase.
-        setConn.getCollection("test.dummy").insert({});
+        setDefaultsAndVerifyPropagation(setConn, checkConns, inMemory);
 
         // Do it again to check that updating the defaults also propagates correctly.
-        setDefaultsAndVerifyPropagation(setConn, checkConns);
+        setDefaultsAndVerifyPropagation(setConn, checkConns, inMemory);
     };
 
-    return {runTests};
+    /**
+     * Asserts eventually all given nodes have no default RWC in their in-memory cache.
+     */
+    function verifyPropgationOfNoDefaults(checkConns) {
+        assert.soon(() => checkConns.every(checkConn => {
+            const defaultsRes = assert.commandWorked(
+                checkConn.adminCommand({getDefaultRWConcern: 1, inMemory: true}));
+
+            // Note localSetTime is generated by the in-memory cache, so it will be present
+            // even if there are no defaults
+            const unexpectedFields = kDefaultRWCFields.concat(kExtraSetFields);
+            return unexpectedFields.every(field => !defaultsRes.hasOwnProperty(field));
+        }),
+                    "deleted/dropped defaults failed to propagate to all nodes within " +
+                        timeoutSecs + " secs. checkConns: " + tojson(checkConns),
+                    timeoutSecs * 1000,
+                    intervalSecs * 1000,
+                    {runHangAnalyzer: false});
+    }
+
+    /**
+     * Tests that when the RWC defaults document is removed, either through a delete or drop of
+     * config.settings, the RWC defaults cache is invalidated.
+     */
+    var runDropAndDeleteTests = function(mainConn, checkConns) {
+        // Set the defaults to some value other than the implicit server defaults. Then remove the
+        // defaults document and verify the cache is invalidated on all nodes.
+        setDefaultsAndVerifyPropagation(mainConn, checkConns);
+        assert.commandWorked(
+            mainConn.getDB("config").settings.remove({_id: "ReadWriteConcernDefaults"}));
+        verifyPropgationOfNoDefaults(checkConns);
+
+        // Repeat with a drop of config.settings.
+        setDefaultsAndVerifyPropagation(mainConn, checkConns);
+        assert(mainConn.getDB("config").settings.drop());
+        verifyPropgationOfNoDefaults(checkConns);
+
+        assert.commandWorked(mainConn.getDB("config").createCollection("settings"));
+    };
+
+    return {runTests, runDropAndDeleteTests};
 })();

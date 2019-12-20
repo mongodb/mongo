@@ -63,6 +63,7 @@ public:
 
     static ReadWriteConcernDefaults& get(ServiceContext* service);
     static ReadWriteConcernDefaults& get(ServiceContext& service);
+    static ReadWriteConcernDefaults& get(OperationContext* opCtx);
     static void create(ServiceContext* service, LookupFn lookupFn);
 
     ReadWriteConcernDefaults() = delete;
@@ -80,6 +81,15 @@ public:
      */
     static void checkSuitabilityAsDefault(const ReadConcern& rc);
     static void checkSuitabilityAsDefault(const WriteConcern& wc);
+
+    /**
+     * Examines a document key affected by a write to config.settings and will register a WUOW
+     * onCommit handler that invalidates this cache when the operation commits if the write affects
+     * the read/write concern defaults document.
+     */
+    void observeDirectWriteToConfigSettings(OperationContext* opCtx,
+                                            BSONElement idElem,
+                                            boost::optional<BSONObj> newDoc);
 
     /**
      * Generates a new read and write concern default to be persisted on disk, without updating the
@@ -111,6 +121,11 @@ public:
     RWConcernDefault getDefault(OperationContext* opCtx);
     boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
     boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
+
+    /**
+     * Sets the given read write concern as the defaults in the cache.
+     */
+    void setDefault(RWConcernDefault&& rwc);
 
 private:
     enum class Type { kReadWriteConcernEntry };

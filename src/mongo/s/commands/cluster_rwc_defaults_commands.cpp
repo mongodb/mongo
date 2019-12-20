@@ -110,7 +110,7 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            if (request().getInMemory()) {
+            if (request().getInMemory() && *request().getInMemory()) {
                 return ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
             }
 

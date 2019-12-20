@@ -311,11 +311,12 @@ jsTestLog("Testing standalone replica set...");
     verifyDefaultRWCommandsInvalidInput(rst.getPrimary());
     verifyDefaultRWCommandsOnSuccess(rst.getPrimary());
 
-    // Secondary succeeds.
+    // Secondary can run getDefaultRWConcern, but not setDefaultRWConcern.
     assert.commandWorked(rst.getSecondary().adminCommand({getDefaultRWConcern: 1}));
-    // TODO SERVER-44890 Assert setDefaultRWConcern fails with NotMaster instead.
-    assert.commandWorked(rst.getSecondary().adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}));
+    assert.commandFailedWithCode(
+        rst.getSecondary().adminCommand(
+            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
+        ErrorCodes.NotMaster);
 
     rst.stopSet();
 }
@@ -332,18 +333,25 @@ jsTestLog("Testing sharded cluster...");
 
     // Shard node fails.
     verifyDefaultRWCommandsFailWithCode(st.rs0.getPrimary(), {failureCode: 51301});
-    verifyDefaultRWCommandsFailWithCode(st.rs0.getSecondary(), {failureCode: 51301});
+    assert.commandFailedWithCode(st.rs0.getSecondary().adminCommand({getDefaultRWConcern: 1}),
+                                 51301);
+    // Secondaries fail setDefaultRWConcern before executing the command.
+    assert.commandFailedWithCode(
+        st.rs0.getSecondary().adminCommand(
+            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
+        ErrorCodes.NotMaster);
 
     // Config server primary succeeds.
     verifyDefaultRWCommandsValidInput(st.configRS.getPrimary());
     verifyDefaultRWCommandsInvalidInput(st.configRS.getPrimary());
     verifyDefaultRWCommandsOnSuccess(st.configRS.getPrimary());
 
-    // Config server secondary succeeds.
+    // Config server secondary can run getDefaultRWConcern, but not setDefaultRWConcern.
     assert.commandWorked(st.configRS.getSecondary().adminCommand({getDefaultRWConcern: 1}));
-    // TODO SERVER-44890 Assert setDefaultRWConcern fails instead.
-    assert.commandWorked(st.configRS.getSecondary().adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}));
+    assert.commandFailedWithCode(
+        st.configRS.getSecondary().adminCommand(
+            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
+        ErrorCodes.NotMaster);
 
     st.stop();
 }

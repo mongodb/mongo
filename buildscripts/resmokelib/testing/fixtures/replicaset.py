@@ -397,8 +397,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             cmd["defaultReadConcern"] = self.default_read_concern
         if self.default_write_concern is not None:
             cmd["defaultWriteConcern"] = self.default_write_concern
-        for node in self.nodes:
-            node.mongo_client().admin.command(cmd)
+        primary = self.nodes[0]
+        primary.mongo_client().admin.command(cmd)
 
     def _do_teardown(self, kill=False):
         self.logger.info("Stopping all members of the replica set...")
