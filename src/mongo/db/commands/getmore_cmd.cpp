@@ -634,6 +634,12 @@ public:
 
             if (respondWithId) {
                 cursorFreer.dismiss();
+
+                if (opCtx->isExhaust()) {
+                    // Indicate that an exhaust message should be generated and the previous BSONObj
+                    // command parameters should be reused as the next BSONObj command parameters.
+                    reply->setNextInvocation(boost::none);
+                }
             }
         }
 

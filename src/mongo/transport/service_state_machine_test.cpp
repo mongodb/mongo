@@ -93,10 +93,8 @@ public:
         if (OpMsg::isFlagSet(request, OpMsg::kExhaustSupported)) {
             auto reply = OpMsg::parse(res);
             auto cursorObj = reply.body.getObjectField("cursor");
-            if (reply.body["ok"].trueValue() && !cursorObj.isEmpty()) {
-                dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
-                dbResponse.exhaustNS = cursorObj.getField("ns").String();
-            }
+            dbResponse.shouldRunAgainForExhaust = reply.body["ok"].trueValue() &&
+                !cursorObj.isEmpty() && (cursorObj.getField("id").numberLong() != 0);
         }
         dbResponse.response = res;
 
@@ -488,130 +486,6 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaust) {
     ASSERT(!OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
     ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
     ASSERT_EQ(firstResponseId, msg.header().getResponseToMsgId());
-}
-
-TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyResponseNamespace) {
-    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
-    const int32_t initRequestId = 1;
-    const long long cursorId = 42;
-    const std::string nss = "test.coll";
-    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
-
-    // Construct a 'getMore' response with an empty namespace.
-    BSONObj getMoreTerminalResBody = BSON("ok" << 1 << "cursor"
-                                               << BSON("id" << 42 << "ns"
-                                                            << ""
-                                                            << "nextBatch" << BSONArray()));
-    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
-
-    // Let the 'getMore' request be sourced from the network, processed in the database, and
-    // and the response sunk to the TransportLayer.
-    runSourceAndSinkTest(
-        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
-
-    // Check the last sunk message.
-    auto msg = _tl->getLastSunk();
-    ASSERT(!msg.empty());
-    auto reply = OpMsg::parse(msg);
-    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
-    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
-}
-
-TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyCursorObjectInResponse) {
-    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
-    const int32_t initRequestId = 1;
-    const long long cursorId = 42;
-    const std::string nss = "test.coll";
-    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
-
-    // Construct a 'getMore' response with an empty cursor object.
-    BSONObj getMoreTerminalResBody = BSON("ok" << 1 << "cursor" << BSONObj());
-    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
-
-    // Let the 'getMore' request be sourced from the network, processed in the database, and
-    // and the response sunk to the TransportLayer.
-    runSourceAndSinkTest(
-        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
-
-    // Check the last sunk message.
-    auto msg = _tl->getLastSunk();
-    ASSERT(!msg.empty());
-    auto reply = OpMsg::parse(msg);
-    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
-    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
-}
-
-TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNoCursorFieldInResponse) {
-    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
-    const int32_t initRequestId = 1;
-    const long long cursorId = 42;
-    const std::string nss = "test.coll";
-    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
-
-    // Construct a 'getMore' response with no 'cursor' field.
-    BSONObj getMoreTerminalResBody = BSON("ok" << 1);
-    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
-
-    // Let the 'getMore' request be sourced from the network, processed in the database, and
-    // and the response sunk to the TransportLayer.
-    runSourceAndSinkTest(
-        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
-
-    // Check the last sunk message.
-    auto msg = _tl->getLastSunk();
-    ASSERT(!msg.empty());
-    auto reply = OpMsg::parse(msg);
-    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
-    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
-}
-
-TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNonOKResponse) {
-    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
-    const int32_t initRequestId = 1;
-    const long long cursorId = 42;
-    const std::string nss = "test.coll";
-    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
-
-    // Construct a 'getMore' response with a non-ok response.
-    BSONObj getMoreTerminalResBody = BSON(
-        "ok" << 0 << "cursor" << BSON("id" << 42 << "ns" << nss << "nextBatch" << BSONArray()));
-    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
-
-    // Let the 'getMore' request be sourced from the network, processed in the database, and
-    // and the response sunk to the TransportLayer.
-    runSourceAndSinkTest(
-        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
-
-    // Check the last sunk message.
-    auto msg = _tl->getLastSunk();
-    ASSERT(!msg.empty());
-    auto reply = OpMsg::parse(msg);
-    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
-    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
-}
-
-
-TEST_F(ServiceStateMachineFixture, TestExhaustOnlySupportedForGetMoreCommand) {
-    // Construct a 'find' OP_MSG request with the exhaust flag set. We should ignore exhaust flags
-    // for non 'getMore' commands.
-    const std::string nss = "test.coll";
-    Message findWithExhaust = buildOpMsg(BSON("find" << nss));
-    OpMsg::setFlag(&findWithExhaust, OpMsg::kExhaustSupported);
-
-    // Construct an OK response.
-    Message findRes = buildOpMsg(BSON(
-        "ok" << 1 << "cursor" << BSON("id" << 42 << "ns" << nss << "firstBatch" << BSONArray())));
-
-    // Let the 'find' request be sourced from the network, processed in the database, and
-    // and the response sunk to the TransportLayer.
-    runSourceAndSinkTest(_tl, _sep, findWithExhaust, findRes, State::Process, State::Source);
-
-    // Check the last sunk message.
-    auto msg = _tl->getLastSunk();
-    ASSERT(!msg.empty());
-    auto reply = OpMsg::parse(msg);
-    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
-    ASSERT_EQ(1, reply.body.getIntField("ok"));
 }
 
 TEST_F(ServiceStateMachineFixture, TestThrowHandling) {

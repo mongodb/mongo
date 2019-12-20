@@ -98,11 +98,8 @@ Message getMore(OperationContext* opCtx,
                 bool* isCursorAuthorized);
 
 /**
- * Run the query 'q' and place the result in 'result'.
+ * Run the query 'q' and place the result in 'result'. Returns true if in exhaust mode.
  */
-std::string runQuery(OperationContext* opCtx,
-                     QueryMessage& q,
-                     const NamespaceString& ns,
-                     Message& result);
+bool runQuery(OperationContext* opCtx, QueryMessage& q, const NamespaceString& ns, Message& result);
 
 }  // namespace mongo

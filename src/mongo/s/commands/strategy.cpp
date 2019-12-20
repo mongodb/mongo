@@ -873,14 +873,11 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
     }
 
     DbResponse dbResponse;
-    dbResponse.shouldRunAgainForExhaust = reply->shouldRunAgainForExhaust();
-    dbResponse.nextInvocation = reply->getNextInvocation();
     if (OpMsg::isFlagSet(m, OpMsg::kExhaustSupported)) {
         auto responseObj = reply->getBodyBuilder().asTempObj();
-        auto cursorObj = responseObj.getObjectField("cursor");
-        if (responseObj.getField("ok").trueValue() && !cursorObj.isEmpty()) {
-            dbResponse.exhaustNS = cursorObj.getField("ns").String();
-            dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
+        if (responseObj.getField("ok").trueValue()) {
+            dbResponse.shouldRunAgainForExhaust = reply->shouldRunAgainForExhaust();
+            dbResponse.nextInvocation = reply->getNextInvocation();
         }
     }
     dbResponse.response = reply->done();
