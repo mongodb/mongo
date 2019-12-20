@@ -462,7 +462,8 @@ public:
 
             if (clientTopologyVersion->getProcessId() == currentTopologyVersion->getProcessId() &&
                 clientTopologyVersion->getCounter() == currentTopologyVersion->getCounter()) {
-                // Indicate that the previous invocation should be reused for the next invocation.
+                // Indicate that an exhaust message should be generated and the previous BSONObj
+                // command parameters should be reused as the next BSONObj command parameters.
                 replyBuilder->setNextInvocation(boost::none);
             } else {
                 BSONObjBuilder nextInvocationBuilder;

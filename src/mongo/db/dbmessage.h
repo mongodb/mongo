@@ -452,13 +452,6 @@ struct DbResponse {
     // The next invocation for an exhaust command. If this is boost::none, the previous invocation
     // should be reused for the next invocation.
     boost::optional<BSONObj> nextInvocation;
-
-    // TODO SERVER-44517: Remove 'exhaustNS' and 'exhaustCursorId'. Instead, GetMoreCmd::run()
-    // should set 'shouldRunAgainForExhaust'.
-    std::string exhaustNS;  // Namespace of cursor if exhaust mode, else "".
-    // Cursor ID when running on exhaust mode. Defaults to '0', indicating
-    // that the cursor is exhausted.
-    long long exhaustCursorId = 0;
 };
 
 /**

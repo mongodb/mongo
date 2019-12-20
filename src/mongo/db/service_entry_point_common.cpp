@@ -1181,17 +1181,12 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
     DbResponse dbResponse;
 
-    dbResponse.shouldRunAgainForExhaust = replyBuilder->shouldRunAgainForExhaust();
-    dbResponse.nextInvocation = replyBuilder->getNextInvocation();
-
-    // TODO SERVER-44517: This block can be removed once 'exhaustNS' and 'exhaustCursorId' are
-    // removed from DbResponse.
     if (OpMsg::isFlagSet(message, OpMsg::kExhaustSupported)) {
         auto responseObj = replyBuilder->getBodyBuilder().asTempObj();
-        auto cursorObj = responseObj.getObjectField("cursor");
-        if (responseObj.getField("ok").trueValue() && !cursorObj.isEmpty()) {
-            dbResponse.exhaustNS = cursorObj.getField("ns").String();
-            dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
+
+        if (responseObj.getField("ok").trueValue()) {
+            dbResponse.shouldRunAgainForExhaust = replyBuilder->shouldRunAgainForExhaust();
+            dbResponse.nextInvocation = replyBuilder->getNextInvocation();
         }
     }
 
@@ -1222,7 +1217,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
         audit::logQueryAuthzCheck(client, nss, q.query, status.code());
         uassertStatusOK(status);
 
-        dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
+        dbResponse.shouldRunAgainForExhaust = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
         behaviors.handleException(e, opCtx);
 
@@ -1384,7 +1379,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
 
     if (exhaust) {
         curop.debug().exhaust = true;
-        dbresponse.exhaustNS = ns;
+        dbresponse.shouldRunAgainForExhaust = true;
     }
 
     return dbresponse;

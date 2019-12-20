@@ -1918,9 +1918,7 @@ public:
         DbMessage dbMessage(message);
         QueryMessage queryMessage(dbMessage);
         Message result;
-        string exhaust = runQuery(&_opCtx, queryMessage, NamespaceString(ns()), result);
-        ASSERT(exhaust.size());
-        ASSERT_EQUALS(string(ns()), exhaust);
+        ASSERT_TRUE(runQuery(&_opCtx, queryMessage, NamespaceString(ns()), result));
     }
 };
 

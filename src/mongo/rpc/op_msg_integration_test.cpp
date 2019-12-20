@@ -295,7 +295,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
         unittest::getFixtureConnectionString().connect("integration_test", errMsg));
     uassert(ErrorCodes::SocketException, errMsg, conn);
 
-    // Only test exhaust against a single server.
+    // Only test exhaust against a standalone.
     if (conn->isReplicaSetMember() || conn->isMongos()) {
         return;
     }
@@ -312,10 +312,11 @@ void exhaustGetMoreTest(bool enableChecksum) {
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
-        conn->insert(nss.toString(), BSON("_id" << i), 0);
+        conn->insert(nss.toString(), BSON("_id" << i));
     }
 
-    // Issue a find request to open a cursor but return 0 documents.
+    // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
+    // guarantee their return order.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0 << "sort" << BSON("_id" << 1));
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
     auto request = opMsgRequest.serialize();
@@ -383,7 +384,144 @@ TEST(OpMsg, ServerHandlesExhaustGetMoreCorrectlyWithChecksum) {
     exhaustGetMoreTest(true);
 }
 
-void exhaustIsMasterTest(bool enableChecksum) {
+TEST(OpMsg, FindIgnoresExhaust) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    // Only test exhaust against a standalone.
+    if (conn->isReplicaSetMember() || conn->isMongos()) {
+        return;
+    }
+
+    NamespaceString nss("test", "coll");
+
+    conn->dropCollection(nss.toString());
+
+    // Insert a few documents.
+    for (int i = 0; i < 5; i++) {
+        conn->insert(nss.toString(), BSON("_id" << i));
+    }
+
+    // Issue a find request with exhaust flag. Returns 0 documents.
+    auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    ASSERT(res["cursor"]["firstBatch"].Array().empty());
+    // The response should not have set moreToCome. We only expect getMore response to set
+    // 'moreToCome'.
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+}
+
+TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    // Only test exhaust against a standalone.
+    if (conn->isReplicaSetMember() || conn->isMongos()) {
+        return;
+    }
+
+    NamespaceString nss("test", "coll");
+
+    conn->dropCollection(nss.toString());
+
+    // Insert a few documents.
+    for (int i = 0; i < 5; i++) {
+        conn->insert(nss.toString(), BSON("_id" << i));
+    }
+
+    // Issue a find request to open a cursor but return 0 documents.
+    auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    const long long cursorId = res["cursor"]["id"].numberLong();
+    ASSERT(res["cursor"]["firstBatch"].Array().empty());
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    // Drop the collection, so that the next getMore will error.
+    conn->dropCollection(nss.toString());
+
+    // Construct getMore request with exhaust flag.
+    int batchSize = 2;
+    GetMoreRequest gmr(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), gmr.toBSON());
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run getMore. This should not start an exhaust stream.
+    ASSERT(conn->call(request, reply));
+    // The response should not have set moreToCome.
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_NOT_OK(getStatusFromCommandResult(res));
+}
+
+TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    if (!conn->isMongos()) {
+        return;
+    }
+
+    NamespaceString nss("test", "coll");
+
+    conn->dropCollection(nss.toString());
+
+    // Insert a few documents.
+    for (int i = 0; i < 5; i++) {
+        conn->insert(nss.toString(), BSON("_id" << i));
+    }
+
+    // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
+    // guarantee their return order.
+    auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0 << "sort" << BSON("_id" << 1));
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    const long long cursorId = res["cursor"]["id"].numberLong();
+    ASSERT(res["cursor"]["firstBatch"].Array().empty());
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    // Construct getMore request with exhaust flag.
+    int batchSize = 2;
+    GetMoreRequest gmr(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), gmr.toBSON());
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run getMore. This should not start an exhaust stream.
+    ASSERT(conn->call(request, reply));
+    // The response should not have set moreToCome.
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+    ASSERT_EQ(res["cursor"]["id"].numberLong(), cursorId);
+    std::vector<BSONElement> nextBatch = res["cursor"]["nextBatch"].Array();
+    ASSERT_EQ(nextBatch.size(), 2U);
+    ASSERT_BSONOBJ_EQ(nextBatch[0].embeddedObject(), BSON("_id" << 0));
+    ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 1));
+}
+
+TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
     std::string errMsg;
     auto fixtureConn = std::unique_ptr<DBClientBase>(
         unittest::getFixtureConnectionString().connect("integration_test", errMsg));
@@ -399,12 +537,6 @@ void exhaustIsMasterTest(bool enableChecksum) {
     DBClientBase* conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
     ASSERT(conn);
 
-    if (!enableChecksum) {
-        disableClientChecksum();
-    }
-
-    ON_BLOCK_EXIT([&] { enableClientChecksum(); });
-
     auto tickSource = getGlobalServiceContext()->getTickSource();
 
     // Issue an isMaster command without a topology version.
@@ -418,8 +550,6 @@ void exhaustIsMasterTest(bool enableChecksum) {
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-    // Reply has checksum if and only if the request did.
-    ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
 
     // Construct isMaster command with topologyVersion, maxAwaitTimeMS, and exhaust.
     isMasterCmd =
@@ -436,7 +566,6 @@ void exhaustIsMasterTest(bool enableChecksum) {
     ASSERT_GT(tickSource->ticksTo<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
               Milliseconds(50));
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-    ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto nextTopologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -450,23 +579,12 @@ void exhaustIsMasterTest(bool enableChecksum) {
     ASSERT_GT(tickSource->ticksTo<Milliseconds>(afterSecondResponse - afterFirstResponse),
               Milliseconds(50));
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-    ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     nextTopologyVersion = res["topologyVersion"].Obj().getOwned();
     ASSERT_BSONOBJ_EQ(topologyVersion, nextTopologyVersion);
 
     // The exhaust stream would continue indefinitely.
-}
-
-TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
-    exhaustIsMasterTest(false);
-}
-
-// TODO SERVER-44517: The checksum logic will be unified for exhaust commands, so we don't need to
-// test checksum for both exhaust isMaster and exhaust getMore.
-TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectlyWithChecksum) {
-    exhaustIsMasterTest(true);
 }
 
 TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
@@ -576,7 +694,7 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
         unittest::getFixtureConnectionString().connect("integration_test", errMsg));
     uassert(ErrorCodes::SocketException, errMsg, conn);
 
-    // Only test exhaust against a single server.
+    // Only test exhaust against a standalone.
     if (conn->isReplicaSetMember() || conn->isMongos()) {
         return;
     }
@@ -588,7 +706,7 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     unittest::log() << "Inserting " << nDocs << " documents.";
     for (int i = 0; i < nDocs; i++) {
         auto doc = BSON("_id" << i);
-        conn->insert(nss.toString(), doc, 0);
+        conn->insert(nss.toString(), doc);
     }
 
     ASSERT_EQ(conn->count(nss), size_t(nDocs));

@@ -289,6 +289,8 @@ Message getMore(OperationContext* opCtx,
     uassertStatusOK(statusWithCursorPin.getStatus());
     auto cursorPin = std::move(statusWithCursorPin.getValue());
 
+    opCtx->setExhaust(cursorPin->queryOptions() & QueryOption_Exhaust);
+
     if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {
         if (!nss.isCollectionlessCursorNamespace()) {
             AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
@@ -534,7 +536,8 @@ Message getMore(OperationContext* opCtx,
         exec->detachFromOperationContext();
         LOG(5) << "getMore saving client cursor ended with state " << PlanExecutor::statestr(state);
 
-        *exhaust = cursorPin->queryOptions() & QueryOption_Exhaust;
+        // Set 'exhaust' if the client requested exhaust and the cursor is not exhausted.
+        *exhaust = opCtx->isExhaust();
 
         // We assume that cursors created through a DBDirectClient are always used from their
         // original OperationContext, so we do not need to move time to and from the cursor.
@@ -568,10 +571,10 @@ Message getMore(OperationContext* opCtx,
     return Message(bb.release());
 }
 
-std::string runQuery(OperationContext* opCtx,
-                     QueryMessage& q,
-                     const NamespaceString& nss,
-                     Message& result) {
+bool runQuery(OperationContext* opCtx,
+              QueryMessage& q,
+              const NamespaceString& nss,
+              Message& result) {
     CurOp& curOp = *CurOp::get(opCtx);
     curOp.ensureStarted();
 
@@ -609,6 +612,8 @@ std::string runQuery(OperationContext* opCtx,
     AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden);
     Collection* const collection = ctx.getCollection();
     const QueryRequest& qr = cq->getQueryRequest();
+
+    opCtx->setExhaust(qr.isExhaust());
 
     {
         // Allow the query to run on secondaries if the read preference permits it. If no read
@@ -649,7 +654,7 @@ std::string runQuery(OperationContext* opCtx,
         qr.setStartingFrom(0);
         qr.setNReturned(1);
         result.setData(bb.release());
-        return "";
+        return false;
     }
 
     // Handle query option $maxTimeMS (not used with commands).
@@ -744,8 +749,9 @@ std::string runQuery(OperationContext* opCtx,
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
                << " results";
 
-        // TODO document
-        if (qr.isExhaust()) {
+        // Set curOp.debug().exhaust if the client requested exhaust and the cursor is not
+        // exhausted.
+        if (opCtx->isExhaust()) {
             curOp.debug().exhaust = true;
         }
 
@@ -778,8 +784,9 @@ std::string runQuery(OperationContext* opCtx,
     // Add the results from the query into the output buffer.
     result.setData(bb.release());
 
-    // curOp.debug().exhaust is set above.
-    return curOp.debug().exhaust ? nss.ns() : "";
+    // curOp.debug().exhaust is set above if the client requested exhaust and the cursor is not
+    // exhausted.
+    return curOp.debug().exhaust;
 }
 
 }  // namespace mongo
