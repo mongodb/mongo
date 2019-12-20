@@ -6,6 +6,9 @@
 'use strict';
 load('jstests/ssl/libs/ssl_helpers.js');
 
+// Checking index consistency involves reconnecting to the mongos.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 let path = "jstests/libs/";
 let pemKeyFile = path + "server.pem";
 let caFile = path + "ca.pem";

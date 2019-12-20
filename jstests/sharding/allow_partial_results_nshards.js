@@ -15,8 +15,10 @@ TestData.disableImplicitSessions = true;
 // check would be lost.
 TestData.skipGossipingClusterTime = true;
 
-// Don't check for consistency across the cluster at the end, since the test shuts down a shard.
+// Don't check for UUID and index consistency across the cluster at the end, since the test shuts
+// down a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 // Set up a 2-shard single-node replicaset cluster.
 const st = new ShardingTest({name: jsTestName(), shards: 2, rs: {nodes: 1}});

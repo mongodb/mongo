@@ -309,6 +309,8 @@ results = adminDB.aggregate([{$currentOp: {'allUsers': true}}, {$match: filter}]
 jsTest.log(`Curop result(s): ${tojson(results)}`);
 assert.eq(1, results.length);
 assertCuropFields(coordinator, commitStartCutoff, 'inactive', [], null, null, results[0]);
+
+adminDB.logout();
 })();
 
 st.stop();

@@ -3,6 +3,9 @@
  * have the index and is not empty.
  */
 
+// This test runs dropIndex on one of the shards.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 var st = new ShardingTest({shards: 2});
 
 var testDB = st.s.getDB('test');

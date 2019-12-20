@@ -11,9 +11,10 @@
 // (connection connected after shard change).
 //
 
-// Checking UUID consistency involves talking to shard primaries, but by the end of this test, one
-// shard does not have a primary.
+// Checking UUID and index consistency involves talking to shard primaries, but by the end of this
+// test, one shard does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 (function() {
 'use strict';

@@ -2,9 +2,10 @@
  * Shuts down config server and shard replica set nodes one by one and ensures correct behaviour.
  */
 
-// Checking UUID consistency involves talking to the config servers, which are shut down in this
-// test.
+// Checking UUID and index consistency involves talking to the config servers, which are shut down
+// in this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 (function() {
 'use strict';
