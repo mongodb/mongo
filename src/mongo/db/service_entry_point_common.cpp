@@ -616,7 +616,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
                  serverGlobalParams.clusterRole == ClusterRole::ConfigServer) &&
                 !request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
-                // TODO: Disabled until after SERVER-43712, to avoid log spam.
+                // TODO: Disabled until after SERVER-44539, to avoid log spam.
                 // log() << "Missing writeConcern on " << command->getName();
             }
             extractedWriteConcern.emplace(
