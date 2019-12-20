@@ -3913,7 +3913,7 @@ tasks:
       params:
         working_dir: src
         shell: bash
-        script: ninja -f all.build.ninja
+        script: ninja -f new.build.ninja
 
 ## compile_all - build all scons targets ##
 - name: compile_all
