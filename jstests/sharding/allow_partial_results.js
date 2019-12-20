@@ -57,12 +57,12 @@ jsTest.log("With 'allowPartialResults: false', if some shard down, find fails.")
 assert.commandFailed(coll.runCommand({find: collName, allowPartialResults: false}));
 
 if (jsTestOptions().mongosBinVersion == "last-stable") {
-    // In v4.4, mongos was updated to swallow FailedToSatisfyReadPreference errors if
+    // In v4.2, mongos was updated to swallow FailedToSatisfyReadPreference errors if
     // allowPartialResults is true, allowing allowPartialResults to work with replica set shards
-    // (see SERVER-33597 for details). So when the mongos version is v4.2, the command should
+    // (see SERVER-33597 for details). So when the mongos version is v4.0, the command should
     // fail.
     jsTest.log(
-        "With 'allowPartialResults: true', if some shard down and mongos version is v4.2, find fails");
+        "With 'allowPartialResults: true', if some shard down and mongos version is v4.0, find fails");
     assert.commandFailedWithCode(coll.runCommand({find: collName, allowPartialResults: true}),
                                  ErrorCodes.FailedToSatisfyReadPreference);
 } else {
