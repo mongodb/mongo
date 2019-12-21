@@ -137,76 +137,61 @@ class ClangFormat(object):
         # pylint: disable=too-many-branches,too-many-statements
         """Initialize ClangFormat."""
         self.path = None
-        clang_format_progname_ext = ""
-
-        if sys.platform == "win32":
-            clang_format_progname_ext += ".exe"
 
         # Check the clang-format the user specified
         if path is not None:
-            if os.path.isfile(path):
-                self.path = path
-            else:
-                print("WARNING: Could not find clang-format %s" % (path))
-
-        # Check the environment variable
-        if "MONGO_CLANG_FORMAT" in os.environ:
-            self.path = os.environ["MONGO_CLANG_FORMAT"]
-
-            if self.path and not self._validate_version():
+            self.path = path
+            if not self._validate_version():
+                print("WARNING: Could not find clang-format in the user specified path %s" %
+                      (self.path))
                 self.path = None
 
-        # Check the users' PATH environment variable now
+        # Check the environment variable
         if self.path is None:
-            # Check for various versions staring with binaries with version specific suffixes in the
-            # user's path
-            programs = [
-                CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_VERSION,
-                CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_SHORT_VERSION,
-                CLANG_FORMAT_PROGNAME + CLANG_FORMAT_SHORTER_VERSION,
-                CLANG_FORMAT_PROGNAME,
-            ]
+            if "MONGO_CLANG_FORMAT" in os.environ:
+                self.path = os.environ["MONGO_CLANG_FORMAT"]
+                if not self._validate_version():
+                    self.path = None
 
-            if sys.platform == "win32":
-                for i, _ in enumerate(programs):
-                    programs[i] += '.exe'
-
-            # Check for the binary in the expected toolchain directory on non-windows systems.
+        # Check for the binary in the expected toolchain directory on non-windows systems
+        if self.path is None:
             if sys.platform != "win32":
                 if os.path.exists(CLANG_FORMAT_TOOLCHAIN_PATH):
                     self.path = CLANG_FORMAT_TOOLCHAIN_PATH
                     if not self._validate_version():
                         self.path = None
 
-            if self.path is None:
+        # Check the users' PATH environment variable now
+        if self.path is None:
+            # Check for various versions staring with binaries with version specific suffixes in the
+            # user's path
+            programs = list(
+                map(lambda program: program + ".exe" if sys.platform == "win32" else program, [
+                    CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_VERSION,
+                    CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_SHORT_VERSION,
+                    CLANG_FORMAT_PROGNAME + CLANG_FORMAT_SHORTER_VERSION,
+                    CLANG_FORMAT_PROGNAME,
+                ]))
+
+            for ospath in os.environ["PATH"].split(os.pathsep):
                 for program in programs:
-                    self.path = spawn.find_executable(program)
-
-                    if self.path:
-                        if not self._validate_version():
-                            self.path = None
-                        else:
-                            break
-
-        # If Windows, try to grab it from Program Files
-        # Check both native Program Files and WOW64 version
-        if self.path is None and sys.platform == "win32":
-            programfiles = [
-                os.environ["ProgramFiles"],
-                os.environ["ProgramFiles(x86)"],
-            ]
-
-            for programfile in programfiles:
-                win32bin = os.path.join(programfile, "LLVM\\bin\\clang-format.exe")
-                if os.path.exists(win32bin):
-                    self.path = win32bin
+                    self.path = os.path.join(ospath, program)
+                    if os.path.exists(self.path) and self._validate_version():
+                        break
+                    else:
+                        self.path = None
+                        continue
                     break
+                else:
+                    continue
+                break
 
         # Have not found it yet, download it from the web
         if self.path is None:
             if not os.path.isdir(cache_dir):
                 os.makedirs(cache_dir)
 
+            clang_format_progname_ext = ".exe" if sys.platform == "win32" else ""
             self.path = os.path.join(
                 cache_dir,
                 CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_VERSION + clang_format_progname_ext)
@@ -219,7 +204,7 @@ class ClangFormat(object):
                     get_clang_format_from_darwin_cache(self.path)
                 else:
                     print("ERROR: clang_format.py does not support downloading clang-format " +
-                          " on this platform, please install clang-format " + CLANG_FORMAT_VERSION)
+                          "on this platform, please install clang-format " + CLANG_FORMAT_VERSION)
 
         # Validate we have the correct version
         # We only can fail here if the user specified a clang-format binary and it is the wrong
@@ -237,8 +222,8 @@ class ClangFormat(object):
         if CLANG_FORMAT_VERSION in cf_version:
             return True
 
-        print("WARNING: clang-format found in path, but incorrect version found at " + self.path +
-              " with version: " + cf_version)
+        print("WARNING: clang-format with incorrect version found at " + self.path + " version: " +
+              cf_version)
 
         return False
 
