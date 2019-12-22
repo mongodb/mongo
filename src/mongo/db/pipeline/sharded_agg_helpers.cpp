@@ -126,6 +126,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
               << BSON(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
                       << startMonitoringAtTime
                       << DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName << true))});
+    aggReq.setUse44SortKeys(true);
     aggReq.setFromMongos(true);
     aggReq.setNeedsMerge(true);
     aggReq.setBatchSize(0);
