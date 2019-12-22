@@ -96,6 +96,11 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrAddShard can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "_configsvrAddShard must be called with majority writeConcern, got "
+                          << cmdObj,
+            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
@@ -110,11 +115,6 @@ public:
 
         auto validationStatus = parsedRequest.validate(rsConfig.isLocalHostAllowed());
         uassertStatusOK(validationStatus);
-
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "addShard must be called with majority writeConcern, got "
-                              << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         audit::logAddShard(Client::getCurrent(),
                            parsedRequest.hasName() ? parsedRequest.getName() : "",

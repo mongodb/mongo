@@ -93,6 +93,11 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrRemoveShard can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "_configsvrRemoveShard must be called with majority writeConcern, got "
+                          << cmdObj,
+            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
@@ -103,11 +108,6 @@ public:
                               << "' must be of type string",
                 cmdObj.firstElement().type() == BSONType::String);
         const std::string target = cmdObj.firstElement().str();
-
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "removeShard must be called with majority writeConcern, got "
-                              << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         const auto shard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target)));

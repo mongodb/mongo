@@ -7,7 +7,7 @@ assert.commandWorked(s.s0.adminCommand({enablesharding: "alleyinsider"}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "alleyinsider.foo", key: {num: 1}}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "alleyinsider.bar", key: {num: 1}}));
 
-var a = s._connections[0].getDB("admin");
+var a = s.shard0.getDB("admin");
 
 // Setup from one client
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.i, 0);

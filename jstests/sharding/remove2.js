@@ -5,7 +5,6 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
-load("jstests/replsets/rslib.js");
 
 // The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
 // test restarts a shard, so the cached connection is not usable.
@@ -13,6 +12,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 (function() {
 'use strict';
+load("jstests/replsets/rslib.js");
 
 function seedString(replTest) {
     var members = replTest.getReplSetConfig().members.map(function(elem) {

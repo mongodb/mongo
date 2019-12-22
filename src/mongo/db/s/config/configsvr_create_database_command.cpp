@@ -68,6 +68,10 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrCreateDatabase can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream()
+                        << "_configsvrCreateDatabase must be called with majority writeConcern",
+                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             // Set the operation context read concern level to local for reads into the config
             // database.
@@ -80,10 +84,6 @@ public:
                     str::stream() << "invalid db name specified: " << dbname,
                     NamespaceString::validDBName(dbname,
                                                  NamespaceString::DollarInDbNameBehavior::Allow));
-
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "createDatabase must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             // Make sure to force update of any stale metadata
             ON_BLOCK_EXIT(

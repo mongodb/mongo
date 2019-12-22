@@ -1,14 +1,9 @@
 (function() {
+'use strict';
 
-"use strict";
-
-var s = new ShardingTest({name: "features2", shards: 2, mongos: 1});
-
-s.adminCommand({enablesharding: "test"});
+var s = new ShardingTest({shards: 2, mongos: 1});
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard1.shardName);
-
-let a = s._connections[0].getDB("test");
-let b = s._connections[1].getDB("test");
 
 let db = s.getDB("test");
 
@@ -18,6 +13,9 @@ db.foo.save({x: 1});
 db.foo.save({x: 2});
 db.foo.save({x: 3});
 db.foo.ensureIndex({x: 1});
+
+let a = s.shard0.getDB("test");
+let b = s.shard1.getDB("test");
 
 assert.eq("1,2,3", db.foo.distinct("x"), "distinct 1");
 assert(a.foo.distinct("x").length == 3 || b.foo.distinct("x").length == 3, "distinct 2");
@@ -146,7 +144,7 @@ doMR("after extra split");
 let cmd = {mapreduce: "mr", map: "emit( ", reduce: "fooz + ", out: "broken1"};
 
 let x = db.runCommand(cmd);
-let y = s._connections[0].getDB("test").runCommand(cmd);
+let y = s.shard0.getDB("test").runCommand(cmd);
 
 printjson(x);
 printjson(y);
