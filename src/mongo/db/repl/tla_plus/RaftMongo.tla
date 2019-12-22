@@ -7,15 +7,29 @@
 --------------------------------- MODULE RaftMongo ---------------------------------
 \* This is the formal specification for the Raft consensus algorithm in MongoDB.
 
+\* INSTRUCTIONS FOR MODEL-CHECKING IN THE TLA+ TOOLBOX
+\* "What is the behavior spec?"
+\*     Temporal formula: Spec
+\* "What is the model?"
+\*     "Specify the value of declared constants"
+\*         MaxClientWriteSize = small number like 2 to limit state space
+\*         Servers = a set of your desired replica set size, e.g. {1, 2, 3}
+\* "What to check?"
+\*     Deadlock: checked
+\*     Invariants: NeverRollbackCommitted
+\* "Additional Spec Options"
+\*     "State Constraint"
+\*         Add a state constraint to limit the state space like:
+\*             /\ GlobalCurrentTerm <= 3
+\*             /\ \forall i \in Server: Len(log[i]) <= 5
+
 EXTENDS Integers, FiniteSets, Sequences, TLC
 
 \* The set of server IDs.
 CONSTANT Server
 
-\* The number of oplog entries that can be created on the primary at one time.
-\* For model-checking, this can be 1 or a small number. For model-based trace-
-\* checking, set this to the highest observed number of oplog entries that
-\* become visible on the primary at one time.
+\* The maximum number of oplog entries that can be created on the primary in one
+\* action. For model-checking, this can be 1 or a small number.
 CONSTANT MaxClientWriteSize
 
 ----
@@ -48,25 +62,28 @@ vars == <<serverVars, logVars>>
 ----
 \* Helpers
 
+\* Return the maximum value from a set, or undefined if the set is empty.
+Max(s) == CHOOSE x \in s : \A y \in s : x >= y
+
 \* The set of all quorums. This just calculates simple majorities, but the only
 \* important property is that every quorum overlaps with every other.
 Quorum == {i \in SUBSET(Server) : Cardinality(i) * 2 > Cardinality(Server)}
 
-\* The term of the last entry in a log, or 0 if the log is empty.
 GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
 
 \* Server i is allowed to sync from server j.
 CanSyncFrom(i, j) ==
-    /\ Len(log[i]) <= Len(log[j])
+    /\ Len(log[i]) < Len(log[j])
     /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
 
-\* Return the minimum value from a set, or undefined if the set is empty.
-Min(s) == CHOOSE x \in s : \A y \in s : x <= y
-\* Return the maximum value from a set, or undefined if the set is empty.
-Max(s) == CHOOSE x \in s : \A y \in s : x >= y
+\* Server "me" is ahead of or caught up to server j.
+NotBehind(me, j) == \/ LastTerm(log[me]) > LastTerm(log[j])
+                    \/ /\ LastTerm(log[me]) = LastTerm(log[j])
+                       /\ Len(log[me]) >= Len(log[j])
 
+\* The max term: 0 in initial state, leader's term once there's a leader.
 GlobalCurrentTerm ==
     LET terms == {term[i]: i \in Server}
      IN Max(terms)
@@ -85,22 +102,16 @@ CommitPointLessThan(i, j) ==
 
 IsCommitted(me, logIndex) ==
     /\ Agree(me, logIndex) \in Quorum
-    \* Committing log entries in older terms violates the safety properties of the spec.
-    \* [ P (2), S (), S ()]
-    \* [ S (2), S (), P (3)]
-    \* [ S (2), S (2), P (3)] ! the term 2 entry shouldn't be considered committed.
-    /\ \E leader \in Server:
-        /\ state[leader] = "Leader"
-        /\ LogTerm(me, logIndex) = GlobalCurrentTerm
+    /\ LogTerm(me, logIndex) = GlobalCurrentTerm
 
+\* Is it possible for node i's log to roll back based on j's log. If true, it
+\* implies that i's log should remove entries to become a prefix of j's.
 CanRollbackOplog(i, j) ==
     /\ Len(log[i]) > 0
-    /\ \* The log with later term is more up-to-date
-       LastTerm(log[i]) < LastTerm(log[j])
-    /\
-       \/ Len(log[i]) > Len(log[j])
-       \/ /\ Len(log[i]) <= Len(log[j])
-          /\ LastTerm(log[i]) /= LogTerm(j, Len(log[i]))
+    /\ Len(log[j]) > 0
+    \* The terms of the last entries of each log do not match. The term of node
+    \* j's last log entry is greater than that of node i's.
+    /\ LastTerm(log[j]) > LastTerm(log[i])
 
 RollbackCommitted(i) ==
     \E j \in Server:
@@ -111,28 +122,28 @@ RollbackCommitted(i) ==
 \* Define initial values for all variables
 
 InitServerVars == /\ state             = [i \in Server |-> "Follower"]
-                  /\ term              = [i \in Server |-> 0]
+                  /\ currentTerm       = [i \in Server |-> 0]
                   /\ commitPoint       = [i \in Server |-> [term |-> 0, index |-> 0]]
-InitLogVars == /\ log          = [i \in Server |-> << >>]
+InitLogVars ==    /\ log               = [i \in Server |-> << >>]
 Init == /\ InitServerVars
         /\ InitLogVars
 
 ----
 \* Message handlers
-\* i = recipient, j = sender, m = message
+\* i = recipient, j = sender
 
 \* Receive one or more oplog entries from j, and learn j's term.
 AppendOplog(i, j) ==
-    /\ Len(log[i]) < Len(log[j])
-    /\ LastTerm(log[i]) = LogTerm(j, Len(log[i]))
+    /\ CanSyncFrom(i, j)
     /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
         LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
         IN /\ log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
-           /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
+           /\ LearnTerm(i, j)
     /\ UNCHANGED <<state, commitPoint>>
 
+\* Node i learns j's term via heartbeat.
 LearnTermViaHeartbeat(i, j) ==
-    /\ term' = [term EXCEPT ![i] = Max({term[i], term[j]})]
+    /\ LearnTerm(i, j)
     /\ UNCHANGED <<state, commitPoint, logVars>>
 
 \* Node i learns the commit point from j via heartbeat.
@@ -150,24 +161,24 @@ RollbackOplog(i, j) ==
 
 \* ACTION
 \* i = the new primary node.
-BecomePrimaryByMagic(i) ==
-    LET notBehind(me, j) ==
-            \/ LastTerm(log[me]) > LastTerm(log[j])
-            \/ /\ LastTerm(log[me]) = LastTerm(log[j])
-               /\ Len(log[me]) >= Len(log[j])
-        ayeVoters(me) ==
-            { index \in Server : notBehind(me, index) }
-    IN /\ ayeVoters(i) \in Quorum
-       /\ state' = [index \in Server |-> IF index = i THEN "Leader" ELSE "Follower"]
-       /\ term' = [term EXCEPT ![i] = GlobalCurrentTerm + 1]
-       /\ UNCHANGED <<commitPoint, logVars>>
+BecomePrimaryByMagic(i, ayeVoters) ==
+    /\ \A j \in ayeVoters : /\ NotBehind(i, j)
+                            /\ currentTerm[j] <= currentTerm[i]
+    /\ ayeVoters \in Quorum
+    /\ state' = [index \in Server |-> IF index \notin ayeVoters
+                                      THEN state[index]
+                                      ELSE IF index = i THEN "Leader" ELSE "Follower"]
+    /\ currentTerm' = [index \in Server |-> IF index \in (ayeVoters \union {i})
+                                            THEN currentTerm[i] + 1
+                                            ELSE currentTerm[index]]
+    /\ UNCHANGED <<commitPoint, logVars>>
 
 \* ACTION
 \* Leader i receives a client request to add one or more entries to the log.
 ClientWrite(i) ==
     /\ state[i] = "Leader"
     /\ \E numEntries \in 1..MaxClientWriteSize :
-        LET entry == [term |-> term[i]]
+        LET entry == [term |-> currentTerm[i]]
             newEntries == [ j \in 1..numEntries |-> entry ]
             newLog == log[i] \o newEntries
         IN  log' = [log EXCEPT ![i] = newLog]
@@ -215,7 +226,7 @@ RollbackOplogAction ==
     \E i,j \in Server : RollbackOplog(i, j)
 
 BecomePrimaryByMagicAction ==
-    \E i \in Server : BecomePrimaryByMagic(i)
+    \E i \in Server : \E ayeVoters \in SUBSET(Server) : BecomePrimaryByMagic(i, ayeVoters)
 
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
@@ -271,16 +282,14 @@ Next ==
     \/ LearnCommitPointWithTermCheckAction
     \/ LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction
 
-Safety == Init /\ [][Next]_vars
+SpecBehavior == Init /\ [][Next]_vars
 
-\* Comment or uncomment the commit point learning actions here to match those in "Next".
 Liveness ==
     /\ SF_vars(AppendOplogAction)
     /\ SF_vars(LearnTermViaHeartbeatAction)
     /\ SF_vars(RollbackOplogAction)
     \* A new primary should eventually write one entry.
     /\ WF_vars(\E i \in Server : LastTerm(log[i]) # GlobalCurrentTerm /\ ClientWrite(i))
-    \* /\ WF_vars(ClientWriteAction)
     \*
     /\ WF_vars(AdvanceCommitPoint)
     /\ SF_vars(LearnCommitPointWithTermCheckAction)
@@ -288,7 +297,7 @@ Liveness ==
 
 \* The specification must start with the initial state and transition according
 \* to Next.
-Spec == Safety /\ Liveness
+Spec == SpecBehavior /\ Liveness
 
 \* Invariant for model-checking
 NeverRollbackCommitted ==
