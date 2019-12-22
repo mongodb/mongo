@@ -206,17 +206,17 @@ assert.eq(1, res.nModified, res.toString());
 
 // ---- move all to the secondary
 
-assert.eq(2, s.onNumShards("foo"), "on 2 shards");
+assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 
 secondary.foo.insert({num: -3});
 
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.foo", find: {num: -2}, to: secondary.getMongo().name, _waitForDelete: true}));
-assert.eq(1, s.onNumShards("foo"), "on 1 shards");
+assert.eq(1, s.onNumShards("test", "foo"), "on 1 shards");
 
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.foo", find: {num: -2}, to: primary.getMongo().name, _waitForDelete: true}));
-assert.eq(2, s.onNumShards("foo"), "on 2 shards again");
+assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards again");
 assert.eq(3, s.config.chunks.count({"ns": "test.foo"}), "only 3 chunks");
 
 print("YO : " + tojson(db.runCommand("serverStatus")));

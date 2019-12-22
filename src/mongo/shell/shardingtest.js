@@ -513,38 +513,21 @@ var ShardingTest = function(params) {
         print("ShardingTest " + out);
     };
 
-    this.sync = function() {
-        this.adminCommand("connpoolsync");
+    /**
+     * Returns the number of shards which contain the given dbName.collName collection
+     */
+    this.onNumShards = function(dbName, collName) {
+        return this.shardCounts(dbName, collName)
+            .reduce((total, currentValue) => total + (currentValue > 0 ? 1 : 0), 0);
     };
 
-    this.onNumShards = function(collName, dbName) {
-        dbName = dbName || "test";
-
-        // We should sync since we're going directly to mongod here
-        this.sync();
-
-        var num = 0;
-        for (var i = 0; i < this._connections.length; i++) {
-            if (this._connections[i].getDB(dbName).getCollection(collName).count() > 0) {
-                num++;
-            }
-        }
-
-        return num;
-    };
-
-    this.shardCounts = function(collName, dbName) {
-        dbName = dbName || "test";
-
-        // We should sync since we're going directly to mongod here
-        this.sync();
-
-        var counts = {};
-        for (var i = 0; i < this._connections.length; i++) {
-            counts[i] = this._connections[i].getDB(dbName).getCollection(collName).count();
-        }
-
-        return counts;
+    /**
+     * Returns an array of the size of numShards where each element is the number of documents on
+     * that particular shard
+     */
+    this.shardCounts = function(dbName, collName) {
+        return this._connections.map((connection) =>
+                                         connection.getDB(dbName).getCollection(collName).count());
     };
 
     this.chunkCounts = function(collName, dbName) {

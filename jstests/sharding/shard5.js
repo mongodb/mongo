@@ -54,7 +54,7 @@ assert.soon(function() {
     return 8 == s2.getDB("test").foo.find().toArray().length;
 }, "other B 2", 5000, 100);
 
-assert.eq(2, s.onNumShards("foo"), "on 2 shards");
+assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 
 s.stop();
 })();

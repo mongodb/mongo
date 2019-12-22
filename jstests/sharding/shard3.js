@@ -43,7 +43,7 @@ assert.eq(3, b.find().toArray().length, "other A");
 assert.eq(3, primary.count(), "p1");
 assert.eq(0, secondary.count(), "s1");
 
-assert.eq(1, s.onNumShards("foo"), "on 1 shards");
+assert.eq(1, s.onNumShards("test", "foo"), "on 1 shards");
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 2}}));
 assert.commandWorked(s.s0.adminCommand({
@@ -98,7 +98,7 @@ assert(!x, "idhack didn't obey chunk boundaries " + tojson(x));
 // --- move all to 1 ---
 print("MOVE ALL TO 1");
 
-assert.eq(2, s.onNumShards("foo"), "on 2 shards");
+assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 s.printCollectionInfo("test.foo");
 
 assert(a.findOne({num: 1}));
@@ -109,12 +109,12 @@ assert(a.findOne({num: 1}), "pre move 1");
 s.printCollectionInfo("test.foo");
 
 var myto = s.getOther(s.getPrimaryShard("test")).name;
-print("counts before move: " + tojson(s.shardCounts("foo")));
+print("counts before move: " + tojson(s.shardCounts("test,", "foo")));
 assert.commandWorked(
     s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: myto, _waitForDelete: true}));
-print("counts after move: " + tojson(s.shardCounts("foo")));
+print("counts after move: " + tojson(s.shardCounts("test", "foo")));
 s.printCollectionInfo("test.foo");
-assert.eq(1, s.onNumShards("foo"), "on 1 shard again");
+assert.eq(1, s.onNumShards("test", "foo"), "on 1 shard again");
 assert(a.findOne({num: 1}), "post move 1");
 assert(b.findOne({num: 1}), "post move 2");
 
@@ -175,7 +175,7 @@ dba.foo.save({num: 1});
 dba.foo.save({num: 2});
 dba.foo.save({num: 3});
 
-assert.eq(1, s.onNumShards("foo", "test2"), "B on 1 shards");
+assert.eq(1, s.onNumShards("test2", "foo"), "B on 1 shards");
 assert.eq(3, dba.foo.count(), "Ba");
 assert.eq(3, dbb.foo.count(), "Bb");
 
@@ -187,7 +187,7 @@ assert.commandWorked(s.s0.adminCommand({
     _waitForDelete: true
 }));
 
-assert.eq(2, s.onNumShards("foo", "test2"), "B on 2 shards");
+assert.eq(2, s.onNumShards("test2", "foo"), "B on 2 shards");
 printjson(dba.foo.stats());
 printjson(dbb.foo.stats());
 

@@ -103,28 +103,26 @@ public:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << cmdObj.firstElement().fieldName()
-                              << "' must be of type string",
-                cmdObj.firstElement().type() == BSONType::String);
-        const std::string target = cmdObj.firstElement().str();
-
-        const auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target)));
+        const auto shardId = [&] {
+            const auto shardIdOrUrl(cmdObj.firstElement().String());
+            auto shard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl));
+            return shard->getId();
+        }();
 
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
         const auto shardDrainingStatus = [&] {
             try {
-                return shardingCatalogManager->removeShard(opCtx, shard->getId());
+                return shardingCatalogManager->removeShard(opCtx, shardId);
             } catch (const DBException& ex) {
                 LOG(0) << "Failed to remove shard due to " << redact(ex);
                 throw;
             }
         }();
 
-        std::vector<std::string> databases =
-            uassertStatusOK(shardingCatalogManager->getDatabasesForShard(opCtx, shard->getId()));
+        const auto databases =
+            uassertStatusOK(shardingCatalogManager->getDatabasesForShard(opCtx, shardId));
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard
@@ -144,12 +142,11 @@ public:
             return dbInfoBuilder.obj();
         }();
 
-        // TODO: Standardize/separate how we append to the result object
         switch (shardDrainingStatus.status) {
             case RemoveShardProgress::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
-                result.append("shard", shard->getId().toString());
+                result.append("shard", shardId);
                 result.appendElements(dbInfo);
                 break;
             case RemoveShardProgress::ONGOING: {
@@ -166,7 +163,7 @@ public:
             case RemoveShardProgress::COMPLETED:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
-                result.append("shard", shard->getId().toString());
+                result.append("shard", shardId);
                 break;
         }
 

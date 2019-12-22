@@ -71,8 +71,8 @@ assert.commandWorked(
     testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 1}, to: st.shard1.shardName}));
 assert.commandWorked(
     testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 2}, to: st.shard2.shardName}));
-assert.eq(st.onNumShards('test'), 2);
-assert.eq(st.onNumShards('dummy'), NUM_SHARDS);
+assert.eq(st.onNumShards('test', 'test'), 2);
+assert.eq(st.onNumShards('test', 'dummy'), NUM_SHARDS);
 validate(true);
 
 // 4. Fail validation on one of the shards.
