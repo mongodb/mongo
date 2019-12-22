@@ -21,11 +21,11 @@ assert.eq("1,2,3", db.foo.distinct("x"), "distinct 1");
 assert(a.foo.distinct("x").length == 3 || b.foo.distinct("x").length == 3, "distinct 2");
 assert(a.foo.distinct("x").length == 0 || b.foo.distinct("x").length == 0, "distinct 3");
 
-assert.eq(1, s.onNumShards("foo"), "A1");
+assert.eq(1, s.onNumShards("test", "foo"), "A1");
 
 s.shardColl("foo", {x: 1}, {x: 2}, {x: 3}, null, true /* waitForDelete */);
 
-assert.eq(2, s.onNumShards("foo"), "A2");
+assert.eq(2, s.onNumShards("test", "foo"), "A2");
 
 assert.eq("1,2,3", db.foo.distinct("x"), "distinct 4");
 
@@ -58,7 +58,7 @@ db.foo2.save({_id: new ObjectId()});
 db.foo2.save({_id: new ObjectId()});
 db.foo2.save({_id: new ObjectId()});
 
-assert.eq(1, s.onNumShards("foo2"), "F1");
+assert.eq(1, s.onNumShards("test", "foo2"), "F1");
 
 printjson(db.foo2.getIndexes());
 s.adminCommand({shardcollection: "test.foo2", key: {_id: 1}});
@@ -129,9 +129,9 @@ let doMR = function(n) {
 
 doMR("before");
 
-assert.eq(1, s.onNumShards("mr"), "E1");
+assert.eq(1, s.onNumShards("test", "mr"), "E1");
 s.shardColl("mr", {x: 1}, {x: 2}, {x: 3}, null, true /* waitForDelete */);
-assert.eq(2, s.onNumShards("mr"), "E1");
+assert.eq(2, s.onNumShards("test", "mr"), "E1");
 
 doMR("after");
 

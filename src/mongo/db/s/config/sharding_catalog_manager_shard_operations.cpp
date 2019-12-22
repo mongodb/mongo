@@ -547,23 +547,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return existingShard.getValue()->getName();
     }
 
-    // Force a reload of the ShardRegistry to ensure that, in case this addShard is to re-add a
-    // replica set that has recently been removed, we have detached the ReplicaSetMonitor for the
-    // set with that setName from the ReplicaSetMonitorManager and will create a new
-    // ReplicaSetMonitor when targeting the set below.
-    // Note: This is necessary because as of 3.4, removeShard is performed by mongos (unlike
-    // addShard), so the ShardRegistry is not synchronously reloaded on the config server when a
-    // shard is removed.
-    if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
-        // If the first reload joined an existing one, call reload again to ensure the reload is
-        // fresh.
-        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-    }
-
-    // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shard{
         Grid::get(opCtx)->shardRegistry()->createConnection(shardConnectionString)};
-    invariant(shard);
     auto targeter = shard->getTargeter();
 
     auto stopMonitoringGuard = makeGuard([&] {
@@ -785,7 +770,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             ShardType::ConfigNS,
             BSON(ShardType::name() << name << ShardType::draining(true)))) > 0;
 
-    auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto* const catalogClient = Grid::get(opCtx)->catalogClient();
 
     if (!isShardCurrentlyDraining) {
@@ -809,8 +793,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                 false,
                                                 ShardingCatalogClient::kLocalWriteConcern),
             "error starting removeShard");
-
-        shardRegistry->reload(opCtx);
 
         return {RemoveShardProgress::STARTED,
                 boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
@@ -849,10 +831,11 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                              ShardingCatalogClient::kLocalWriteConcern),
         str::stream() << "error completing removeShard operation on: " << name);
 
+    // The shard which was just removed must be reflected in the shard registry, before the replica
+    // set monitor is removed, otherwise the shard would be referencing a dropped RSM
+    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
     shardConnectionPool.removeHost(name);
     ReplicaSetMonitor::remove(name);
-
-    shardRegistry->reload(opCtx);
 
     // Record finish in changelog
     ShardingLogging::get(opCtx)->logChange(

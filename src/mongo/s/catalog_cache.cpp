@@ -173,8 +173,9 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
                 dbEntry->mustLoadShardedCollections = false;
             }
 
-            auto primaryShard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt->getPrimary()));
+            auto primaryShard = uassertStatusOKWithContext(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt->getPrimary()),
+                str::stream() << "could not find the primary shard for database " << dbName);
             return {CachedDatabaseInfo(*dbEntry->dbt, std::move(primaryShard))};
         }
     } catch (const DBException& ex) {
