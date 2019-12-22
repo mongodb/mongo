@@ -53,7 +53,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -71,7 +70,6 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
@@ -866,40 +864,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {
     _executorForAddShard->appendConnectionStats(stats);
-}
-
-// static
-StatusWith<ShardId> ShardingCatalogManager::_selectShardForNewDatabase(
-    OperationContext* opCtx, ShardRegistry* shardRegistry) {
-    std::vector<ShardId> allShardIds;
-
-    shardRegistry->getAllShardIds(opCtx, &allShardIds);
-    if (allShardIds.empty()) {
-        return Status(ErrorCodes::ShardNotFound, "No shards found");
-    }
-
-    ShardId candidateShardId = allShardIds[0];
-
-    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(opCtx, candidateShardId);
-    if (!candidateSizeStatus.isOK()) {
-        return candidateSizeStatus.getStatus();
-    }
-
-    for (size_t i = 1; i < allShardIds.size(); i++) {
-        const ShardId shardId = allShardIds[i];
-
-        const auto sizeStatus = shardutil::retrieveTotalShardSize(opCtx, shardId);
-        if (!sizeStatus.isOK()) {
-            return sizeStatus.getStatus();
-        }
-
-        if (sizeStatus.getValue() < candidateSizeStatus.getValue()) {
-            candidateSizeStatus = sizeStatus;
-            candidateShardId = shardId;
-        }
-    }
-
-    return candidateShardId;
 }
 
 StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(OperationContext* opCtx,

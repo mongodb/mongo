@@ -1,14 +1,12 @@
 (function() {
+'use strict';
 
 var s = new ShardingTest({name: "version1", shards: 1});
 
-s.adminCommand({enablesharding: "alleyinsider"});
-s.adminCommand({shardcollection: "alleyinsider.foo", key: {num: 1}});
+assert.commandWorked(s.s0.adminCommand({enablesharding: "alleyinsider"}));
+assert.commandWorked(s.s0.adminCommand({shardcollection: "alleyinsider.foo", key: {num: 1}}));
 
-// alleyinsider.foo is supposed to have one chunk, version 1|0, in shard000
-s.printShardingStatus();
-
-a = s._connections[0].getDB("admin");
+var a = s.shard0.getDB("admin");
 
 assert.commandFailed(a.runCommand({setShardVersion: "alleyinsider.foo", configdb: s._configDB}));
 

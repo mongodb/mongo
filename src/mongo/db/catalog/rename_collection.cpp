@@ -63,11 +63,9 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(useRenameCollectionPathThroughConfigsvr);
-
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(useRenameCollectionPathThroughConfigsvr);
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {

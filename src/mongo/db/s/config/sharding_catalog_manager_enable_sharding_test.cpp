@@ -31,37 +31,28 @@
 
 #include "mongo/platform/basic.h"
 
-#include <pcrecpp.h>
-
-#include "mongo/bson/json.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
 
 using executor::RemoteCommandRequest;
-using std::vector;
 
 using EnableShardingTest = ConfigServerTestFixture;
 
@@ -70,12 +61,13 @@ TEST_F(EnableShardingTest, noDBExists) {
     shard.setName("shard0");
     shard.setHost("shard0:12");
 
-    setupShards(vector<ShardType>{shard});
+    setupShards({shard});
 
-    auto shardTargeter = RemoteCommandTargeterMock::get(
-        uassertStatusOK(shardRegistry()->getShard(operationContext(), ShardId("shard0")))
-            ->getTargeter());
-    shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
+    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort{shard.getHost()}), [&] {
+        auto targeter = std::make_unique<RemoteCommandTargeterMock>();
+        targeter->setFindHostReturnValue(HostAndPort{shard.getHost()});
+        return targeter;
+    }());
 
     auto future = launchAsync([&] {
         ThreadClient tc("Test", getGlobalServiceContext());
@@ -115,7 +107,7 @@ TEST_F(EnableShardingTest, dbExistsWithDifferentCase) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-    setupShards(vector<ShardType>{shard});
+    setupShards({shard});
     setupDatabase("Db3", shard.getName(), false);
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
                            ->enableSharding(operationContext(), "db3", ShardId()),
@@ -127,7 +119,7 @@ TEST_F(EnableShardingTest, dbExists) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-    setupShards(vector<ShardType>{shard});
+    setupShards({shard});
     setupDatabase("db4", shard.getName(), false);
     ShardingCatalogManager::get(operationContext())
         ->enableSharding(operationContext(), "db4", ShardId());
@@ -137,7 +129,7 @@ TEST_F(EnableShardingTest, succeedsWhenTheDatabaseIsAlreadySharded) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-    setupShards(vector<ShardType>{shard});
+    setupShards({shard});
     setupDatabase("db5", shard.getName(), true);
     ShardingCatalogManager::get(operationContext())
         ->enableSharding(operationContext(), "db5", ShardId());
@@ -147,8 +139,7 @@ TEST_F(EnableShardingTest, dbExistsInvalidFormat) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-
-    setupShards(vector<ShardType>{shard});
+    setupShards({shard});
 
     // Set up database with bad type for primary field.
     ASSERT_OK(

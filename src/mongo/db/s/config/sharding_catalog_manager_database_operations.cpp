@@ -45,46 +45,68 @@
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
+
+/**
+ * Selects an optimal shard on which to place a newly created database from the set of available
+ * shards. Will return ShardNotFound if shard could not be found.
+ */
+ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardRegistry) {
+    std::vector<ShardId> allShardIds;
+
+    shardRegistry->getAllShardIds(opCtx, &allShardIds);
+    uassert(ErrorCodes::ShardNotFound, "No shards found", !allShardIds.empty());
+
+    ShardId candidateShardId = allShardIds[0];
+
+    auto candidateSize =
+        uassertStatusOK(shardutil::retrieveTotalShardSize(opCtx, candidateShardId));
+
+    for (size_t i = 1; i < allShardIds.size(); i++) {
+        const ShardId shardId = allShardIds[i];
+
+        const auto currentSize = uassertStatusOK(shardutil::retrieveTotalShardSize(opCtx, shardId));
+
+        if (currentSize < candidateSize) {
+            candidateSize = currentSize;
+            candidateShardId = shardId;
+        }
+    }
+
+    return candidateShardId;
+}
 
 }  // namespace
 
 DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                                     StringData dbName,
-                                                    ShardId primaryShard) {
+                                                    const ShardId& primaryShard) {
     invariant(nsIsDbOnly(dbName));
 
     // The admin and config databases should never be explicitly created. They "just exist",
     // i.e. getDatabase will always return an entry for them.
-    if (dbName == "admin" || dbName == "config") {
+    if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb) {
         uasserted(ErrorCodes::InvalidOptions,
                   str::stream() << "cannot manually create database '" << dbName << "'");
     }
-    const auto shardPtr = !primaryShard.isValid()
-        ? nullptr
-        : uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShard));
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Invalid shard name: " << primaryShard.toString(),
-            (primaryShard.isValid() && shardPtr != nullptr) ||
-                (!primaryShard.isValid() && shardPtr == nullptr));
+
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Check if a database already exists with the same name (case sensitive), and if so, return the
     // existing entry.
 
     BSONObjBuilder queryBuilder;
-    queryBuilder.appendRegex(
-        DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$", "i");
+    queryBuilder.appendRegex(DatabaseType::name(),
+                             (std::string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$",
+                             "i");
 
-    auto docs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->_exhaustiveFindOnConfig(
+    auto docs = uassertStatusOK(catalogClient->_exhaustiveFindOnConfig(
                                     opCtx,
                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                     repl::ReadConcernLevel::kLocalReadConcern,
@@ -118,21 +140,19 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     }
 
     // The database does not exist. Insert an entry for the new database into the sharding catalog.
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto shardPtr = uassertStatusOK(shardRegistry->getShard(
+        opCtx,
+        primaryShard.isValid() ? primaryShard : selectShardForNewDatabase(opCtx, shardRegistry)));
 
     // Pick a primary shard for the new database.
-    const ShardId primaryShardId = shardPtr == nullptr
-        ? uassertStatusOK(_selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry()))
-        : shardPtr->getId();
-
-    // Insert an entry for the new database into the sharding catalog.
-    DatabaseType db(
-        dbName.toString(), std::move(primaryShardId), false, databaseVersion::makeNew());
+    DatabaseType db(dbName.toString(), shardPtr->getId(), false, databaseVersion::makeNew());
 
     log() << "Registering new database " << db << " in sharding catalog";
 
     // Do this write with majority writeConcern to guarantee that the shard sees the write when it
     // receives the _flushDatabaseCacheUpdates.
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
+    uassertStatusOK(catalogClient->insertConfigDocument(
         opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
 
     // Note, making the primary shard refresh its databaseVersion here is not required for
@@ -148,14 +168,12 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     // would fail with StaleDbVersion. Making the primary shard refresh here allows that first
     // transaction to succeed. This allows our transaction passthrough suites and transaction demos
     // to succeed without additional special logic.
-    const auto shard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, db.getPrimary()));
-    auto cmdResponse = uassertStatusOK(
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
-                                                BSON("_flushDatabaseCacheUpdates" << dbName),
-                                                Shard::RetryPolicy::kIdempotent));
+    auto cmdResponse = uassertStatusOK(shardPtr->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        BSON("_flushDatabaseCacheUpdates" << dbName),
+        Shard::RetryPolicy::kIdempotent));
 
     // If the shard had binary version v4.2 when it received the _flushDatabaseCacheUpdates, it will
     // have responded with NamespaceNotFound, because the shard does not have the database (see
@@ -171,13 +189,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
 void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
                                             StringData dbName,
-                                            ShardId primaryShard) {
-    invariant(nsIsDbOnly(dbName));
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Enabling sharding on the admin database is not allowed",
-            dbName != NamespaceString::kAdminDb);
-
+                                            const ShardId& primaryShard) {
     // Sharding is enabled automatically on the config db.
     if (dbName == NamespaceString::kConfigDb) {
         return;
@@ -201,6 +213,7 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
                             &unusedResult));
 
     log() << "Enabling sharding for database [" << dbName << "] in config db";
+
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
         DatabaseType::ConfigNS,

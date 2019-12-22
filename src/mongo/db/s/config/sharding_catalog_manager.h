@@ -128,6 +128,10 @@ public:
      */
     void shutDown();
 
+    //
+    // Sharded cluster initialization logic
+    //
+
     /**
      * Checks if this is the first start of a newly instantiated config server and if so pre-creates
      * the catalog collections and their indexes. Also generates and persists the cluster's
@@ -180,6 +184,12 @@ public:
     Status removeKeyRangeFromZone(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const ChunkRange& range);
+
+    /**
+     * Exposes the zone operations mutex to external callers in order to allow them to synchronize
+     * with any changes to the zones.
+     */
+    Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
 
     //
     // Chunk Operations
@@ -256,15 +266,16 @@ public:
      *
      * Throws DatabaseDifferCase if the database already exists with a different case.
      */
-    DatabaseType createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
+    DatabaseType createDatabase(OperationContext* opCtx,
+                                StringData dbName,
+                                const ShardId& primaryShard);
 
     /**
      * Creates a ScopedLock on the database name in _namespaceSerializer. This is to prevent
      * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same db.
      */
-    auto serializeCreateOrDropDatabase(OperationContext* opCtx, StringData dbName) {
-        return _namespaceSerializer.lock(opCtx, dbName);
-    }
+    NamespaceSerializer::ScopedLock serializeCreateOrDropDatabase(OperationContext* opCtx,
+                                                                  StringData dbName);
 
     /**
      * Creates the database if it does not exist, then marks its entry in config.databases as
@@ -272,7 +283,7 @@ public:
      *
      * Throws DatabaseDifferCase if the database already exists with a different case.
      */
-    void enableSharding(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
+    void enableSharding(OperationContext* opCtx, StringData dbName, const ShardId& primaryShard);
 
     /**
      * Retrieves all databases for a shard.
@@ -361,9 +372,8 @@ public:
      * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same
      * collection.
      */
-    auto serializeCreateOrDropCollection(OperationContext* opCtx, const NamespaceString& ns) {
-        return _namespaceSerializer.lock(opCtx, ns.ns());
-    }
+    NamespaceSerializer::ScopedLock serializeCreateOrDropCollection(OperationContext* opCtx,
+                                                                    const NamespaceString& nss);
 
     //
     // Shard Operations
@@ -407,6 +417,14 @@ public:
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
+    /**
+     * Changes the _id format of all documents in config.chunks and config.tags to use either the
+     * format introduced in 4.4 or the format expected by a 4.2 binary.
+     *
+     * TODO SERVER-44034: Remove this method.
+     */
+    void upgradeOrDowngradeChunksAndTags(OperationContext* opCtx, ConfigUpgradeType upgradeType);
+
     //
     // For Diagnostics
     //
@@ -421,16 +439,6 @@ public:
      * service context, so that 'create' can be called again.
      */
     static void clearForTests(ServiceContext* serviceContext);
-
-    /**
-     * Changes the _id format of all documents in config.chunks and config.tags to use either the
-     * format introduced in 4.4 or the format expected by a 4.2 binary.
-     *
-     * TODO SERVER-44034: Remove this method.
-     */
-    void upgradeOrDowngradeChunksAndTags(OperationContext* opCtx, ConfigUpgradeType upgradeType);
-
-    Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
 
 private:
     /**
@@ -503,13 +511,6 @@ private:
                                                               RemoteCommandTargeter* targeter,
                                                               StringData dbName,
                                                               const BSONObj& cmdObj);
-
-    /**
-     * Selects an optimal shard on which to place a newly created database from the set of
-     * available shards. Will return ShardNotFound if shard could not be found.
-     */
-    static StatusWith<ShardId> _selectShardForNewDatabase(OperationContext* opCtx,
-                                                          ShardRegistry* shardRegistry);
 
     /**
      * Helper method for running a count command against the config server with appropriate error
@@ -596,6 +597,10 @@ private:
      */
     Lock::ResourceMutex _kShardMembershipLock;
 
+    /**
+     * Optimization for DDL operations, which might be tried concurrently by multiple threads.
+     * Avoids convoying and timeouts on the database/collection distributed lock.
+     */
     NamespaceSerializer _namespaceSerializer;
 };
 
