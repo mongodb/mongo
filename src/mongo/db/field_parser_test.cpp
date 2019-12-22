@@ -27,12 +27,14 @@
  *    it in the license file.
  */
 
+#include <limits>
 #include <map>
 #include <string>
 #include <vector>
 
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -466,4 +468,70 @@ TEST(EdgeCases, EmbeddedNullStrings) {
     ASSERT_EQUALS(errMsg, "");
 }
 
+TEST(ExtractNumber, IntCases) {
+    const int initialNum = 123;
+    const int defaultNum = 42;
+    const int minNum = INT_MIN;
+    const int maxNum = INT_MAX;
+    const auto decimalNum = mongo::Decimal128("-1.50");
+    auto numbers = BSON("tooSmall" << LLONG_MIN << "tooLarge" << (1LL << 31) << "infinity"
+                                   << std::numeric_limits<double>::infinity() << "minusInfinity"
+                                   << -std::numeric_limits<double>::infinity() << "NaN"
+                                   << std::numeric_limits<double>::quiet_NaN() << "hugeDouble"
+                                   << 9.9E+99 << "decimal" << decimalNum << "int" << defaultNum);
+
+    int num = initialNum;
+    auto tooSmallField = BSONField<int>("tooSmall");
+    auto tooLargeField = BSONField<int>("tooLarge");
+    auto infinityField = BSONField<int>("infinity");
+    auto minusInfinityField = BSONField<int>("minusInfinity");
+    auto NaNField = BSONField<int>("NaN");
+    auto hugeField = BSONField<int>("hugeDouble");
+    auto decimalField = BSONField<int>("decimal");
+    auto intField = BSONField<int>("int");
+    auto missingField = BSONField<int>("missing");
+    auto defaultedField = BSONField<int>("defaulted", defaultNum);
+
+    // Failure case.
+    FieldParser::FieldState fs = FieldParser::extractNumber(numbers, missingField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_NONE);
+    ASSERT_EQ(num, initialNum);
+
+    // Success cases.
+    fs = FieldParser::extractNumber(numbers, defaultedField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_DEFAULT);
+    ASSERT_EQ(num, defaultNum);
+
+    fs = FieldParser::extractNumber(numbers, tooSmallField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, minNum);
+
+    fs = FieldParser::extractNumber(numbers, tooLargeField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, maxNum);
+
+    fs = FieldParser::extractNumber(numbers, hugeField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, maxNum);
+
+    fs = FieldParser::extractNumber(numbers, minusInfinityField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, minNum);
+
+    fs = FieldParser::extractNumber(numbers, infinityField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, maxNum);
+
+    fs = FieldParser::extractNumber(numbers, intField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, defaultNum);
+
+    fs = FieldParser::extractNumber(numbers, NaNField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, 0);
+
+    fs = FieldParser::extractNumber(numbers, decimalField, &num);
+    ASSERT_EQ(fs, FieldParser::FieldState::FIELD_SET);
+    ASSERT_EQ(num, -2);
+}
 }  // unnamed namespace

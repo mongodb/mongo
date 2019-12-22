@@ -294,7 +294,10 @@ FieldParser::FieldState FieldParser::extractNumber(BSONElement elem,
     }
 
     if (elem.isNumber()) {
-        *out = elem.numberInt();
+        auto num = std::clamp(elem.safeNumberLong(),
+                              static_cast<long long>(std::numeric_limits<int>::min()),
+                              static_cast<long long>(std::numeric_limits<int>::max()));
+        *out = static_cast<int>(num);
         return FIELD_SET;
     }
 
@@ -352,7 +355,7 @@ FieldParser::FieldState FieldParser::extractNumber(BSONElement elem,
     }
 
     if (elem.isNumber()) {
-        *out = elem.numberLong();
+        *out = elem.safeNumberLong();
         return FIELD_SET;
     }
 
