@@ -147,14 +147,26 @@ void NetworkCounter::hitLogicalOut(long long bytes) {
     }
 }
 
+void NetworkCounter::acceptedTFOIngress() {
+    _tfo.accepted.fetchAndAddRelaxed(1);
+}
+
 void NetworkCounter::append(BSONObjBuilder& b) {
     b.append("bytesIn", static_cast<long long>(_together.logicalBytesIn.loadRelaxed()));
     b.append("bytesOut", static_cast<long long>(_logicalBytesOut.loadRelaxed()));
     b.append("physicalBytesIn", static_cast<long long>(_physicalBytesIn.loadRelaxed()));
     b.append("physicalBytesOut", static_cast<long long>(_physicalBytesOut.loadRelaxed()));
     b.append("numRequests", static_cast<long long>(_together.requests.loadRelaxed()));
-}
 
+    BSONObjBuilder tfo;
+#ifdef __linux__
+    tfo.append("kernelSetting", _tfo.kernelSetting);
+#endif
+    tfo.append("serverSupported", _tfo.kernelSupportServer);
+    tfo.append("clientSupported", _tfo.kernelSupportClient);
+    tfo.append("accepted", _tfo.accepted.loadRelaxed());
+    b.append("tcpFastOpen", tfo.obj());
+}
 
 OpCounters globalOpCounters;
 OpCounters replOpCounters;
