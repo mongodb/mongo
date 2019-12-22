@@ -20,7 +20,7 @@
 \* "Additional Spec Options"
 \*     "State Constraint"
 \*         Add a state constraint to limit the state space like:
-\*             /\ GlobalCurrentTerm <= 3
+\*             /\ globalCurrentTerm <= 3
 \*             /\ \forall i \in Server: Len(log[i]) <= 5
 
 EXTENDS Integers, FiniteSets, Sequences, TLC
@@ -32,19 +32,19 @@ CONSTANT Server
 \* action. For model-checking, this can be 1 or a small number.
 CONSTANT MaxClientWriteSize
 
+\* The maximum term known by any server.
+VARIABLE globalCurrentTerm
+
 ----
 \* The following variables are all per server (functions with domain Server).
 
 \* The server's state ("Follower", "Candidate", or "Leader").
 VARIABLE state
 
-\* The term learned by each server.
-VARIABLE term
-
 \* The commit point learned by each server.
 VARIABLE commitPoint
 
-electionVars == <<state, term>>
+electionVars == <<globalCurrentTerm, state>>
 serverVars == <<electionVars, commitPoint>>
 
 \* A Sequence of log entries. The index into this sequence is the index of the
@@ -62,9 +62,6 @@ vars == <<serverVars, logVars>>
 ----
 \* Helpers
 
-\* Return the maximum value from a set, or undefined if the set is empty.
-Max(s) == CHOOSE x \in s : \A y \in s : x >= y
-
 \* The set of all quorums. This just calculates simple majorities, but the only
 \* important property is that every quorum overlaps with every other.
 Quorum == {i \in SUBSET(Server) : Cardinality(i) * 2 > Cardinality(Server)}
@@ -72,6 +69,9 @@ Quorum == {i \in SUBSET(Server) : Cardinality(i) * 2 > Cardinality(Server)}
 GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
+
+\* Return the maximum value from a set, or undefined if the set is empty.
+Max(s) == CHOOSE x \in s : \A y \in s : x >= y
 
 \* Server i is allowed to sync from server j.
 CanSyncFrom(i, j) ==
@@ -82,11 +82,6 @@ CanSyncFrom(i, j) ==
 NotBehind(me, j) == \/ LastTerm(log[me]) > LastTerm(log[j])
                     \/ /\ LastTerm(log[me]) = LastTerm(log[j])
                        /\ Len(log[me]) >= Len(log[j])
-
-\* The max term: 0 in initial state, leader's term once there's a leader.
-GlobalCurrentTerm ==
-    LET terms == {term[i]: i \in Server}
-     IN Max(terms)
 
 \* The set of nodes that has log[me][logIndex] in their oplog
 Agree(me, logIndex) ==
@@ -102,9 +97,9 @@ CommitPointLessThan(i, j) ==
 
 IsCommitted(me, logIndex) ==
     /\ Agree(me, logIndex) \in Quorum
-    /\ LogTerm(me, logIndex) = GlobalCurrentTerm
+    /\ LogTerm(me, logIndex) = globalCurrentTerm
 
-\* Is it possible for node i's log to roll back based on j's log. If true, it
+\* Is it possible for node i's log to roll back based on j's log? If true, it
 \* implies that i's log should remove entries to become a prefix of j's.
 CanRollbackOplog(i, j) ==
     /\ Len(log[i]) > 0
@@ -121,8 +116,8 @@ RollbackCommitted(i) ==
 ----
 \* Define initial values for all variables
 
-InitServerVars == /\ state             = [i \in Server |-> "Follower"]
-                  /\ currentTerm       = [i \in Server |-> 0]
+InitServerVars == /\ globalCurrentTerm = 0
+                  /\ state             = [i \in Server |-> "Follower"]
                   /\ commitPoint       = [i \in Server |-> [term |-> 0, index |-> 0]]
 InitLogVars ==    /\ log               = [i \in Server |-> << >>]
 Init == /\ InitServerVars
@@ -132,19 +127,13 @@ Init == /\ InitServerVars
 \* Message handlers
 \* i = recipient, j = sender
 
-\* Receive one or more oplog entries from j, and learn j's term.
+\* Receive one or more oplog entries from j.
 AppendOplog(i, j) ==
     /\ CanSyncFrom(i, j)
     /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
         LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
-        IN /\ log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
-           /\ LearnTerm(i, j)
-    /\ UNCHANGED <<state, commitPoint>>
-
-\* Node i learns j's term via heartbeat.
-LearnTermViaHeartbeat(i, j) ==
-    /\ LearnTerm(i, j)
-    /\ UNCHANGED <<state, commitPoint, logVars>>
+         IN log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
+    /\ UNCHANGED <<serverVars>>
 
 \* Node i learns the commit point from j via heartbeat.
 LearnCommitPoint(i, j) ==
@@ -163,14 +152,11 @@ RollbackOplog(i, j) ==
 \* i = the new primary node.
 BecomePrimaryByMagic(i, ayeVoters) ==
     /\ \A j \in ayeVoters : /\ NotBehind(i, j)
-                            /\ currentTerm[j] <= currentTerm[i]
     /\ ayeVoters \in Quorum
     /\ state' = [index \in Server |-> IF index \notin ayeVoters
                                       THEN state[index]
                                       ELSE IF index = i THEN "Leader" ELSE "Follower"]
-    /\ currentTerm' = [index \in Server |-> IF index \in (ayeVoters \union {i})
-                                            THEN currentTerm[i] + 1
-                                            ELSE currentTerm[index]]
+    /\ globalCurrentTerm' = globalCurrentTerm + 1
     /\ UNCHANGED <<commitPoint, logVars>>
 
 \* ACTION
@@ -178,7 +164,7 @@ BecomePrimaryByMagic(i, ayeVoters) ==
 ClientWrite(i) ==
     /\ state[i] = "Leader"
     /\ \E numEntries \in 1..MaxClientWriteSize :
-        LET entry == [term |-> currentTerm[i]]
+        LET entry == [term |-> globalCurrentTerm]
             newEntries == [ j \in 1..numEntries |-> entry ]
             newLog == log[i] \o newEntries
         IN  log' = [log EXCEPT ![i] = newLog]
@@ -219,9 +205,6 @@ LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
 AppendOplogAction ==
     \E i,j \in Server : AppendOplog(i, j)
 
-LearnTermViaHeartbeatAction ==
-    \E i,j \in Server : LearnTermViaHeartbeat(i, j)
-    
 RollbackOplogAction ==
     \E i,j \in Server : RollbackOplog(i, j)
 
@@ -272,7 +255,6 @@ CommitPointEventuallyPropagates ==
 Next ==
     \* --- Replication protocol
     \/ AppendOplogAction
-    \/ LearnTermViaHeartbeatAction
     \/ RollbackOplogAction
     \/ BecomePrimaryByMagicAction
     \/ ClientWriteAction
@@ -286,10 +268,9 @@ SpecBehavior == Init /\ [][Next]_vars
 
 Liveness ==
     /\ SF_vars(AppendOplogAction)
-    /\ SF_vars(LearnTermViaHeartbeatAction)
     /\ SF_vars(RollbackOplogAction)
     \* A new primary should eventually write one entry.
-    /\ WF_vars(\E i \in Server : LastTerm(log[i]) # GlobalCurrentTerm /\ ClientWrite(i))
+    /\ WF_vars(\E i \in Server : LastTerm(log[i]) # globalCurrentTerm /\ ClientWrite(i))
     \*
     /\ WF_vars(AdvanceCommitPoint)
     /\ SF_vars(LearnCommitPointWithTermCheckAction)
