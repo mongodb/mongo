@@ -78,12 +78,16 @@ class TransportLayerASIO::ASIOSession final : public Session {
     ASIOSession& operator=(const ASIOSession&) = delete;
 
 public:
+    using Endpoint = asio::generic::stream_protocol::endpoint;
+
     // If the socket is disconnected while any of these options are being set, this constructor
     // may throw, but it is guaranteed to throw a mongo DBException.
-    ASIOSession(TransportLayerASIO* tl, GenericSocket socket, bool isIngressSession) try
-        : _socket(std::move(socket)),
-          _tl(tl),
-          _isIngressSession(isIngressSession) {
+    ASIOSession(TransportLayerASIO* tl,
+                GenericSocket socket,
+                bool isIngressSession,
+                Endpoint endpoint = Endpoint()) try : _socket(std::move(socket)),
+                                                      _tl(tl),
+                                                      _isIngressSession(isIngressSession) {
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
             _socket.set_option(asio::ip::tcp::no_delay(true));
@@ -92,7 +96,16 @@ public:
         }
 
         _localAddr = endpointToSockAddr(_socket.local_endpoint());
-        _remoteAddr = endpointToSockAddr(_socket.remote_endpoint());
+
+        if (endpoint == Endpoint()) {
+            // Inbound connection, query socket for remote.
+            _remoteAddr = endpointToSockAddr(_socket.remote_endpoint());
+        } else {
+            // Outbound connection, get remote from resolved endpoint.
+            // Necessary for TCP_FASTOPEN where the remote isn't connected yet.
+            _remoteAddr = endpointToSockAddr(endpoint);
+        }
+
         _local = HostAndPort(_localAddr.toString(true));
         _remote = HostAndPort(_remoteAddr.toString(true));
     } catch (const DBException&) {

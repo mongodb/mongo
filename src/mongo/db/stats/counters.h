@@ -119,6 +119,21 @@ public:
     void hitLogicalIn(long long bytes);
     void hitLogicalOut(long long bytes);
 
+    // TFO Counters and Status;
+    void acceptedTFOIngress();
+
+    void setTFOKernelSetting(std::int64_t val) {
+        _tfo.kernelSetting = val;
+    }
+
+    void setTFOServerSupport(bool val) {
+        _tfo.kernelSupportServer = val;
+    }
+
+    void setTFOClientSupport(bool val) {
+        _tfo.kernelSupportClient = val;
+    }
+
     void append(BSONObjBuilder& b);
 
 private:
@@ -136,6 +151,17 @@ private:
                   "cache line spill");
 
     CacheAligned<AtomicWord<long long>> _logicalBytesOut{0};
+
+    struct TFO {
+        // Counter of inbound connections at runtime.
+        AtomicWord<std::int64_t> accepted{0};
+
+        // Info determined at startup.
+        std::int64_t kernelSetting;
+        bool kernelSupportServer{false};
+        bool kernelSupportClient{false};
+    };
+    CacheAligned<TFO> _tfo{};
 };
 
 extern NetworkCounter networkCounter;
