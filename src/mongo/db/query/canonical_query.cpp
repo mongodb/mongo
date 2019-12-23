@@ -340,8 +340,7 @@ void CanonicalQuery::sortTree(MatchExpression* tree) {
     for (size_t i = 0; i < tree->numChildren(); ++i) {
         sortTree(tree->getChild(i));
     }
-    std::vector<MatchExpression*>* children = tree->getChildVector();
-    if (nullptr != children) {
+    if (auto&& children = tree->getChildVector()) {
         std::stable_sort(children->begin(), children->end(), matchExpressionLessThan);
     }
 }

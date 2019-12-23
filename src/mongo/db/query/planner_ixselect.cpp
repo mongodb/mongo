@@ -467,7 +467,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             newContext.fullPathToParentElemMatch = fullPathToNode;
             newContext.innermostParentElemMatch = static_cast<ElemMatchValueMatchExpression*>(node);
 
-            auto* children = node->getChildVector();
+            auto&& children = node->getChildVector();
             if (!std::all_of(children->begin(), children->end(), [&](MatchExpression* child) {
                     const auto newPath = fullPathToNode.toString() + child->path();
                     return _compatible(

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <pcrecpp.h>
 #include <utility>
@@ -138,8 +139,8 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return boost::none;
     }
 
     size_t numChildren() const final {

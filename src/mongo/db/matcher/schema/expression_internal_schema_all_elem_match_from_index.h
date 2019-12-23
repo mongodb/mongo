@@ -28,6 +28,8 @@
  */
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -67,8 +69,8 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return boost::none;
     }
 
     size_t numChildren() const final {

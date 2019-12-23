@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -88,8 +89,8 @@ public:
 
     BSONObj getSerializedRightHandSide() const final;
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return boost::none;
     }
 
     virtual size_t numChildren() const {
@@ -143,8 +144,8 @@ public:
 
     BSONObj getSerializedRightHandSide() const final;
 
-    virtual std::vector<MatchExpression*>* getChildVector() {
-        return &_subs;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return _subs;
     }
 
     virtual size_t numChildren() const {
@@ -184,8 +185,8 @@ public:
         return nullptr;
     }
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return boost::none;
     }
 
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;

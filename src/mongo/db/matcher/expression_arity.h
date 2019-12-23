@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <array>
+#include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/db/matcher/expression.h"
@@ -80,8 +81,8 @@ public:
             [](const auto& expr1, const auto& expr2) { return expr1->equivalent(expr2.get()); });
     }
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return boost::none;
     }
 
     size_t numChildren() const final {
