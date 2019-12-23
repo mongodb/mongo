@@ -574,8 +574,8 @@ public:
         return BSONObj(static_cast<const char*>(ptr));
     }
     int memUsageForSorter() const {
-        // TODO consider ownedness?
-        return sizeof(BSONObj) + objsize();
+        const auto ownedSize = isOwned() ? _ownedBuffer.capacity() : 0;
+        return sizeof(BSONObj) + ownedSize;
     }
 
 private:
