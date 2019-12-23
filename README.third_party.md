@@ -19,33 +19,33 @@ not authored by MongoDB, and has a license which requires reproduction,
 a notice will be included in
 `THIRD-PARTY-NOTICES`.
 
-| Name                       | License           | Upstream Version | Vendored Version  | Emits persisted data | Distributed in Release Binaries |
-| ---------------------------| ----------------- | ---------------- | ------------------| :------------------: | :-----------------------------: |
-| Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
-| [ASIO]                     | BSL-1.0           | 1.13.0           | 9229964dc1        |                      |                ✗                |
-| [benchmark]                | Apache-2.0        | 1.5.0            | 1.3.0             |                      |                                 |
-| [Boost]                    | BSL-1.0           | 1.70.0           | 1.60.0            |                      |                ✗                |
-| [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.5               |                      |                ✗                |
-| [ICU4]                     | ICU               | 64.2             | 57.1              |          ✗           |                ✗                |
-| [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 2     | 2.0 Update 1      |                      |                ✗                |
-| [JSON-Schema-Test-Suite]   | MIT               |                  | 728066f9c5        |                      |                                 |
-| [libstemmer]               | BSD-3-Clause      |                  | Unknown           |          ✗           |                ✗                |
-| [linenoise]                | BSD-3-Clause      |                  | Unknown + changes |                      |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 60.7         | ESR 45.9.0        |                      |                ✗                |
-| [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
-| [Pcre]                     | BSD-3-Clause      | 8.43             | 8.42              |                      |                ✗                |
-| [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
-| [scons]                    | MIT               | 3.0.4            | 2.5.0             |                      |                                 |
-| [Snappy]                   | BSD-3-Clause      | 1.1.7            | 1.1.3             |          ✗           |                ✗                |
-| [sqlite]                   | Public Domain     | 3280000          | 3190300           |          ✗           |                ✗                |
-| [timelib]                  | MIT               | 2018.01          | 2018.01alpha1     |                      |                ✗                |
-| [TomCrypt]                 | Public Domain     | 1.18.2           | 1.18.1            |          ✗           |                ✗                |
-| [Unicode]                  | Unicode-DFS-2015  | 12.0.0           | 8.0.0             |          ✗           |                ✗                |
-| [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.14.0 | 3.11.0 | |             ✗                |
-| [variant]                  | BSL-1.0           | 1.4.0            | 1.3.0             |                      |                ✗                |
-| [wiredtiger]               |                   |                  | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
-| [yaml-cpp]                 | MIT               | 0.6.2            | 0.5.3             |                      |                ✗                |
-| [Zlib]                     | Zlib              | 1.2.11           | 1.2.11            |          ✗           |                ✗                |
+| Name                       | License           | Vendored Version  | Emits persisted data | Distributed in Release Binaries |
+| ---------------------------| ----------------- | ------------------| :------------------: | :-----------------------------: |
+| Aladdin MD5                | Zlib              | Unknown           |          ✗           |                ✗                |
+| [ASIO]                     | BSL-1.0           | 9229964dc1        |                      |                ✗                |
+| [benchmark]                | Apache-2.0        | 1.3.0             |                      |                                 |
+| [Boost]                    | BSL-1.0           | 1.60.0            |                      |                ✗                |
+| [GPerfTools]               | BSD-3-Clause      | 2.5               |                      |                ✗                |
+| [ICU4]                     | ICU               | 57.1              |          ✗           |                ✗                |
+| [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 1      |                      |                ✗                |
+| [JSON-Schema-Test-Suite]   | MIT               | 728066f9c5        |                      |                                 |
+| [libstemmer]               | BSD-3-Clause      | Unknown           |          ✗           |                ✗                |
+| [linenoise]                | BSD-3-Clause      | Unknown + changes |                      |                ✗                |
+| [MozJS]                    | MPL-2.0           | ESR 45.9.0        |                      |                ✗                |
+| [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
+| [Pcre]                     | BSD-3-Clause      | 8.42              |                      |                ✗                |
+| [S2]                       | Apache-2.0        | Unknown           |          ✗           |                ✗                |
+| [scons]                    | MIT               | 2.5.0             |                      |                                 |
+| [Snappy]                   | BSD-3-Clause      | 1.1.3             |          ✗           |                ✗                |
+| [sqlite]                   | Public Domain     | 3190300           |          ✗           |                ✗                |
+| [timelib]                  | MIT               | 2018.01alpha1     |                      |                ✗                |
+| [TomCrypt]                 | Public Domain     | 1.18.1            |          ✗           |                ✗                |
+| [Unicode]                  | Unicode-DFS-2015  | 8.0.0             |          ✗           |                ✗                |
+| [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.11.0 |       |                ✗                |
+| [variant]                  | BSL-1.0           | 1.3.0             |                      |                ✗                |
+| [wiredtiger]               |                   | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
+| [yaml-cpp]                 | MIT               | 0.5.3             |                      |                ✗                |
+| [Zlib]                     | Zlib              | 1.2.11            |          ✗           |                ✗                |
 
 [ASIO]: https://github.com/chriskohlhoff/asio
 [benchmark]: https://github.com/google/benchmark
