@@ -68,7 +68,16 @@ stepNames.forEach((stepName) => {
 
         // Verify that the index command succeeds.
         ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, index);
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, index);
+
+        // If createIndexes is run after the migration has reached the steady state, shard1
+        // will not have the index created by the command because the index just does not
+        // exist when shard1 clones the collection options and indexes from shard0. However,
+        // if createIndexes is run after the cloning step starts but before the steady state
+        // is reached, shard0 may have the index when shard1 does the cloning so shard1 may
+        // or may not have the index.
+        if (stepName == moveChunkStepNames.reachedSteadyState) {
+            ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, index);
+        }
     });
 });
 
@@ -128,7 +137,16 @@ stepNames.forEach((stepName) => {
 
         // Verify that the index command succeeds.
         ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, index);
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, index);
+
+        // If createIndexes is run after the migration has reached the steady state, shard1
+        // will not have the index created by the command because the index just does not
+        // exist when shard1 clones the collection options and indexes from shard0. However,
+        // if createIndexes is run after the cloning step starts but before the steady state
+        // is reached, shard0 may have the index when shard1 does the cloning so shard1 may
+        // or may not have the index.
+        if (stepName == moveChunkStepNames.reachedSteadyState) {
+            ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, index);
+        }
     });
 });
 
