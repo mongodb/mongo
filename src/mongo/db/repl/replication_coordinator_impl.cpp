@@ -99,6 +99,8 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
+// Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
+MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 
 // Tracks the number of operations killed on step down.
 Counter64 userOpsKilled;
@@ -2466,7 +2468,8 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
     }
 
     stdx::unique_lock<Latch> lk(_mutex);
-    if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
+    if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate ||
+        MONGO_unlikely(setMaintenanceModeFailsWithNotSecondary.shouldFail())) {
         return Status(ErrorCodes::NotSecondary, "currently running for election");
     }
 
