@@ -126,7 +126,13 @@
 
     jsTestLog("7: Stop and restart Node 2.");
     replTest.stop(2);
-    replTest.restart(2);
+    replTest.restart(2, {
+        // Set the failpoint to fail the transition to maintenance mode once. Make sure
+        // transitioning to maintenance mode is resilient to errors (e.g. race with a concurrent
+        // election) and will eventually succeed.
+        setParameter:
+            {'failpoint.setMaintenanceModeFailsWithNotSecondary': tojson({mode: {times: 1}})}
+    });
 
     jsTestLog(
         "8: Wait for Node 2 to transition to RECOVERING (its oplog should remain stale after restart)");
