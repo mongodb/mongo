@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <functional>
 #include <memory>
 
@@ -185,11 +186,12 @@ public:
 
     /**
      * For MatchExpression nodes that can participate in tree restructuring (like AND/OR), returns a
-     * non-const vector of MatchExpression* child nodes.
+     * non-const vector of MatchExpression* child nodes. If the MatchExpression does not
+     * participated in tree restructuring, returns boost::none.
      * Do not use to traverse the MatchExpression tree. Use numChildren() and getChild(), which
      * provide access to all nodes.
      */
-    virtual std::vector<MatchExpression*>* getChildVector() = 0;
+    virtual boost::optional<std::vector<MatchExpression*>&> getChildVector() = 0;
 
     /**
      * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).

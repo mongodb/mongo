@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression.h"
+#include <boost/optional.hpp>
 
+#include "mongo/db/matcher/expression.h"
 
 /**
  * this contains all Expessions that define the structure of the tree
@@ -82,8 +83,8 @@ public:
         return child;
     }
 
-    virtual std::vector<MatchExpression*>* getChildVector() {
-        return &_expressions;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return _expressions;
     }
 
     bool equivalent(const MatchExpression* other) const;
@@ -223,8 +224,8 @@ public:
         return _exp.get();
     }
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
+    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
+        return boost::none;
     }
 
     MatchExpression* releaseChild(void) {

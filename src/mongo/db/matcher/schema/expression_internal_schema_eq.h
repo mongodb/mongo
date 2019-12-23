@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
@@ -64,10 +66,6 @@ public:
 
     MatchExpression* getChild(size_t i) const final {
         MONGO_UNREACHABLE;
-    }
-
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
     }
 
 private:

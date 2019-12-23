@@ -113,14 +113,13 @@ void sortUsingTags(MatchExpression* tree) {
     for (size_t i = 0; i < tree->numChildren(); ++i) {
         sortUsingTags(tree->getChild(i));
     }
-    std::vector<MatchExpression*>* children = tree->getChildVector();
-    if (nullptr != children) {
+
+    if (auto&& children = tree->getChildVector())
         std::stable_sort(children->begin(),
                          children->end(),
                          [](const MatchExpression* lhs, const MatchExpression* rhs) {
                              return tagComparison(lhs, rhs) < 0;
                          });
-    }
 }
 
 // Attaches 'node' to 'target'. If 'target' is an AND, adds 'node' as a child of 'target'.
