@@ -1324,10 +1324,16 @@ DBCollection.prototype.unsetWriteConcern = function() {
  *
  */
 DBCollection.prototype.count = function(query, options) {
-    query = this.find(query);
-
-    // Apply options and return the result of the find
-    return QueryHelpers._applyCountOptions(query, options).count(true);
+    const cmd =
+        Object.assign({count: this.getName(), query: this._massageObject(query || {})}, options);
+    if (cmd.readConcern) {
+        cmd.readConcern = {level: cmd.readConcern};
+    }
+    const res = this._db.runReadCommand(cmd);
+    if (!res.ok) {
+        throw _getErrorWithCode(res, "count failed: " + tojson(res));
+    }
+    return res.n;
 };
 
 /**
@@ -1403,7 +1409,7 @@ DBCollection.prototype.estimatedDocumentCount = function(options) {
     const res = this.runCommand(cmd);
 
     if (!res.ok) {
-        throw _getErrorWithCode(res, "Error estimating document count: " + tojson(ret));
+        throw _getErrorWithCode(res, "Error estimating document count: " + tojson(res));
     }
 
     // Return the 'n' field, which should be the count of documents.
