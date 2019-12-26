@@ -20,12 +20,39 @@ import subprocess
 
 from pkg_resources import parse_version
 
-icecream_version_min = '1.1rc2'
+_icecream_version_min = parse_version('1.1rc2')
+_ccache_nocpp2_version = parse_version('3.4.1')
+
+
+# I'd prefer to use value here, but amazingly, its __str__ returns the
+# *initial* value of the Value and not the built value, if
+# available. That seems like a bug. In the meantime, make our own very
+# sinmple Substition thing.
+class _BoundSubstitution:
+    def __init__(self, env, expression):
+        self.env = env
+        self.expression = expression
+        self.result = None
+
+    def __str__(self):
+        if self.result is None:
+            self.result = self.env.subst(self.expression)
+        return self.result
 
 def generate(env):
 
     if not exists(env):
         return
+
+    # If we are going to load the ccache tool, but we haven't done so
+    # yet, then explicitly do it now. We need the ccache tool to be in
+    # place before we setup icecream because we need to do things a
+    # little differently if ccache is in play. If you don't use the
+    # TOOLS variable to configure your tools, you should explicitly
+    # load the ccache tool before you load icecream.
+    if 'ccache' in env['TOOLS'] and not 'CCACHE_VERSION' in env:
+        env.Tool('ccache')
+    ccache_enabled = ('CCACHE_VERSION' in env)
 
     # Absoluteify, so we can derive ICERUN
     env['ICECC'] = env.WhereIs('$ICECC')
@@ -78,7 +105,7 @@ def generate(env):
         # doesn't appear when executing icecc_create_env
         toolchain_env = env.Clone()
         if toolchain_env.ToolchainIs('clang'):
-            toolchain = env.Command(
+            toolchain = toolchain_env.Command(
                 target=icecc_version,
                 source=[
                     '$ICECC_CREATE_ENV',
@@ -138,12 +165,22 @@ def generate(env):
 
     if env.ToolchainIs('clang'):
         env['ENV']['ICECC_CLANG_REMOTE_CPP'] = 1
+
+        if ccache_enabled and env['CCACHE_VERSION'] >= _ccache_nocpp2_version:
+            env.AppendUnique(
+                CCFLAGS=[
+                    '-frewrite-includes'
+                ]
+            )
+            env['ENV']['CCACHE_NOCPP2'] = 1
     else:
         env.AppendUnique(
             CCFLAGS=[
                 '-fdirectives-only'
             ]
         )
+        if ccache_enabled:
+            env['ENV']['CCACHE_NOCPP2'] = 1
 
     if 'ICECC_SCHEDULER' in env:
         env['ENV']['USE_SCHEDULER'] = env['ICECC_SCHEDULER']
@@ -161,26 +198,45 @@ def generate(env):
         # Be careful here. If we are running with the ninja tool, many things
         # may have been monkey patched away. Rely only on `os`, not things
         # that may try to stat. The abspath appears to be ok.
+        #
+        # TODO: Another idea would be to eternally memoize lstat in
+        # the ninja module, and then we could return to using a call
+        # to islink on the ICECC_VERSION file.  Similarly, it would be
+        # nice to be able to memoize away this call, but we should
+        # think carefully about where to store the result of such
+        # memoization.
         return os.path.realpath(env['ICECC_VERSION'].abspath)
     env['ICECC_VERSION_GEN'] = icecc_version_gen
 
-    # Build up the string we will stick at the front of the compile
-    # line. We wrap it in the magic "don't consider this part of the
-    # build signature" sigils in the hope that enabling and disabling
-    # icecream won't cause rebuilds. This is unlikely to really work,
-    # since above we have maybe changed compiler flags (things like
-    # -fdirectives-only), but we still try to do the right thing.
+    # Build up the string we will set in the environment to tell icecream
+    # about the compiler package.
     icecc_version_string = '${ICECC_VERSION_GEN}'
     if 'ICECC_VERSION_ARCH' in env:
         icecc_version_string = '${ICECC_VERSION_ARCH}:' + icecc_version_string
-    icecc_version_string = '$( ICECC_VERSION={value} $ICECC $)'.format(value=icecc_version_string)
 
-    # Amend the various C compilation command strings to start with
-    # the icecream prelude.
-    env['CCCOM'] = ' '.join([icecc_version_string, env['CCCOM']])
-    env['CXXCOM'] = ' '.join([icecc_version_string, env['CXXCOM']])
-    env['SHCCCOM'] = ' '.join([icecc_version_string, env['SHCCCOM']])
-    env['SHCXXCOM'] = ' '.join([icecc_version_string, env['SHCXXCOM']])
+    # Use our BoundSubstitition class to put ICECC_VERSION into
+    # env['ENV'] with substitution in play. This lets us defer doing
+    # the realpath in the generator above until after we have made the
+    # tarball.
+    env['ENV']['ICECC_VERSION'] = _BoundSubstitution(env, icecc_version_string)
+
+    # If ccache is in play we actually want the icecc binary in the
+    # CCACHE_PREFIX environment variable, not on the command line, per
+    # the ccache documentation on compiler wrappers. Otherwise, just
+    # put $ICECC on the command line. We wrap it in the magic "don't
+    # consider this part of the build signature" sigils in the hope
+    # that enabling and disabling icecream won't cause rebuilds. This
+    # is unlikely to really work, since above we have maybe changed
+    # compiler flags (things like -fdirectives-only), but we still try
+    # to do the right thing.
+    if ccache_enabled:
+        env['ENV']['CCACHE_PREFIX'] = _BoundSubstitution(env, '$ICECC')
+    else:
+        icecc_string = '$( $ICECC $)'
+        env['CCCOM'] = ' '.join([icecc_string, env['CCCOM']])
+        env['CXXCOM'] = ' '.join([icecc_string, env['CXXCOM']])
+        env['SHCCCOM'] = ' '.join([icecc_string, env['SHCCCOM']])
+        env['SHCXXCOM'] = ' '.join([icecc_string, env['SHCXXCOM']])
 
     # Make link like jobs flow through icerun so we don't kill the
     # local machine.
@@ -203,6 +259,8 @@ def exists(env):
     if not icecc:
         return False
     icecc = env.WhereIs(icecc)
+    if not icecc:
+        return False
 
     pipe = SCons.Action._subproc(env,
                                  SCons.Util.CLVar(icecc) + ['--version'], stdin='devnull',
@@ -223,8 +281,7 @@ def exists(env):
         if len(icecc_version) < 2:
             continue
         icecc_version = parse_version(icecc_version[1])
-        needed_version = parse_version(icecream_version_min)
-        if icecc_version >= needed_version:
+        if icecc_version >= _icecream_version_min:
             validated = True
 
     return validated
