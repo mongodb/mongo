@@ -805,7 +805,7 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
             if env["PLATFORM"] == "win32":
                 command_env += "set '{}={}' && ".format(key, value)
             else:
-                command_env += "{}={}; ".format(key, value)
+                command_env += "export {}={}; ".format(key, value)
 
         setattr(node.attributes, "NINJA_ENV_ENV", command_env)
 

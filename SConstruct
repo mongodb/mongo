@@ -110,15 +110,6 @@ add_option('ninja',
     help='Enable the build.ninja generator tool',
 )
 
-add_option('ccache',
-    choices=['true', 'false'],
-    default='false',
-    nargs='?',
-    const='true',
-    type='choice',
-    help='Enable ccache support',
-)
-
 add_option('prefix',
     help='installation prefix (conficts with DESTDIR, PREFIX, and --install-mode=hygienic)',
 )
@@ -696,18 +687,18 @@ env_vars.Add('ARFLAGS',
     converter=variable_shlex_converter)
 
 env_vars.Add('CCACHE',
-    help='Path to ccache used for the --ccache option. Defaults to first ccache in PATH.')
+    help='Tell SCons where the ccache binary is')
 
 env_vars.Add(
     'CACHE_SIZE',
-    help='Maximum size of the cache (in gigabytes)',
+    help='Maximum size of the SCons cache (in gigabytes)',
     default=32,
     converter=lambda x:int(x)
 )
 
 env_vars.Add(
     'CACHE_PRUNE_TARGET',
-    help='Maximum percent in-use in cache after pruning',
+    help='Maximum percent in-use in SCons cache after pruning',
     default=66,
     converter=lambda x:int(x)
 )
@@ -3740,7 +3731,10 @@ def doConfigure(myenv):
 env = doConfigure( env )
 env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 
-# Now that we are done with configure checks, enable icecream, if available.
+# Now that we are done with configure checks, enable ccache and
+# icecream, if available. Per the rules declared in the icecream tool,
+# load the ccache tool first.
+env.Tool('ccache')
 env.Tool('icecream')
 
 if get_option('ninja') == 'true':
@@ -3817,10 +3811,6 @@ if get_option('ninja') == 'true':
         }
 
     env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja)
-
-    # Load ccache after icecream since order matters when we're both changing CCCOM
-    if get_option('ccache') == 'true':
-        env.Tool('ccache')
 
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
