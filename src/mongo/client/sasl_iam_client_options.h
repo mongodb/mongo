@@ -43,6 +43,11 @@ struct SASLIamClientGlobalParams {
     std::string awsEC2InstanceMetadataUrl;
 
     /**
+     * ECS Instance metadata endpoint.
+     */
+    std::string awsECSInstanceMetadataUrl;
+
+    /**
      * AWS Session Token.
      */
     std::string awsSessionToken;

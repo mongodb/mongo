@@ -20,3 +20,9 @@ server_parameters:
         set_at: startup
         cpp_varname: saslIamClientGlobalParams.awsEC2InstanceMetadataUrl
         default: "http://169.254.169.254"
+
+    awsECSInstanceMetadataUrl:
+        description: "Test parameter to override the URL for AWS ECS Instance Metadata"
+        set_at: startup
+        cpp_varname: saslIamClientGlobalParams.awsECSInstanceMetadataUrl
+        default: "http://169.254.170.2"
