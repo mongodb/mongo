@@ -322,7 +322,7 @@ bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
         return managerA->getVersion() != managerB->getVersion();
     }
 
-    return databaseVersion::equal(dbVersionA, dbVersionB);
+    return !databaseVersion::equal(dbVersionA, dbVersionB);
 }
 
 /**
