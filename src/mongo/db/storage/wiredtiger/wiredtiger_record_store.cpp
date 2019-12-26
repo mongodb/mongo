@@ -1406,7 +1406,11 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     WT_SESSION* sess = sessRaii->getSession();
     WT_CURSOR* cursor;
     invariantWTOK(sess->open_cursor(sess, _uri.c_str(), nullptr, nullptr, &cursor));
-    invariantWTOK(cursor->prev(cursor));
+    int ret = cursor->prev(cursor);
+    if (ret == WT_NOTFOUND) {
+        return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
+    }
+    invariantWTOK(ret);
 
     RecordId recordId = getKey(cursor);
     invariantWTOK(sess->reset(sess));

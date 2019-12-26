@@ -260,6 +260,8 @@ public:
         boost::optional<TopologyVersion> clientTopologyVersion,
         boost::optional<Date_t> deadline) const final;
 
+    OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
+
 private:
     ServiceContext* const _service;
 };

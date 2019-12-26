@@ -64,6 +64,7 @@
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
@@ -1972,6 +1973,20 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     // A topology change has happened so we return an IsMasterResponse with the updated
     // topology version.
     return statusWithIsMaster.getValue();
+}
+
+OpTime ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationContext* opCtx) const {
+    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
+    Lock::GlobalLock globalLock(opCtx, MODE_IS);
+    // Check if the node is primary after acquiring global IS lock.
+    uassert(ErrorCodes::NotMaster,
+            "Not primary so can't get latest write optime",
+            canAcceptNonLocalWrites());
+    auto oplog = LocalOplogInfo::get(opCtx)->getCollection();
+    uassert(ErrorCodes::NamespaceNotFound, "oplog collection does not exist.", oplog);
+    auto latestOplogTimestamp =
+        uassertStatusOK(oplog->getRecordStore()->getLatestOplogTimestamp(opCtx));
+    return OpTime(latestOplogTimestamp, getTerm());
 }
 
 void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(

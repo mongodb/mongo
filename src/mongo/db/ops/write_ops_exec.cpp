@@ -167,7 +167,7 @@ public:
             // here. No-op updates will not generate a new lastOp, so we still need the
             // guard to fire in that case. Operations on the local DB aren't replicated, so they
             // don't need to bump the lastOp.
-            replClientInfo().setLastOpToSystemLastOpTime(_opCtx);
+            replClientInfo().setLastOpToSystemLastOpTimeIgnoringInterrupt(_opCtx);
             LOG(5) << "Set last op to system time: " << replClientInfo().getLastOp().getTimestamp();
         }
     }

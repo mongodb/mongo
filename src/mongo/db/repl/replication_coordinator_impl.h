@@ -348,6 +348,8 @@ public:
         RaftMongoSpecActionEnum action,
         boost::optional<Timestamp> oplogReadTimestamp = boost::none) const override;
 
+    virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
+
     // ================== Test support API ===================
 
     /**

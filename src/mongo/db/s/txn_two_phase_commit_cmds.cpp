@@ -244,7 +244,7 @@ public:
                 // (in all cases except the one where this command aborts the local participant), so
                 // ensure waiting for the client's writeConcern of the decision.
                 repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
+                    .setLastOpToSystemLastOpTimeIgnoringInterrupt(opCtx);
             });
 
             if (coordinatorDecisionFuture) {
