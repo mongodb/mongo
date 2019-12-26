@@ -23,6 +23,8 @@ certs:
     Subject: { C: US, ST: New York, etc... }
     # Required, Who is the (intermediate) CA for this certificate.  May be 'self'.
     Issuer: 'ca.pem'
+    # Optional, x509 version (default: 3)
+    version: 3
     # Optional, set to true to ignore global.Subject values.
     explicit_subject: false
     # Optional, hash algorithm to use

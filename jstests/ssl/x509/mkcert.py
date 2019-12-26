@@ -376,6 +376,7 @@ def create_cert(cert):
     key = make_key(cert)
     x509.set_pubkey(key)
 
+    x509.set_version(int(cert.get('version', 3)) - 1)
     set_subject(x509, cert)
     set_validity(x509, cert)
     set_extensions(x509, cert)
@@ -564,7 +565,7 @@ def validate_config():
     if not CONFIG.get('certs'):
         raise ValueError('No certificates defined')
 
-    permissible = ['name', 'description', 'Subject', 'Issuer', 'append_cert', 'extensions', 'passphrase', 'output_path', 'hash', 'include_header', 'key_type', 'keyfile', 'explicit_subject', 'serial', 'not_before', 'not_after', 'pkcs1', 'pkcs12']
+    permissible = ['name', 'description', 'Subject', 'Issuer', 'append_cert', 'extensions', 'passphrase', 'output_path', 'hash', 'include_header', 'key_type', 'keyfile', 'explicit_subject', 'serial', 'not_before', 'not_after', 'pkcs1', 'pkcs12', 'version']
     for cert in CONFIG.get('certs', []):
         keys = cert.keys()
         if not 'name' in keys:
