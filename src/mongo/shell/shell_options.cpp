@@ -63,6 +63,7 @@ using std::vector;
 // SERVER-36807: Limit --setShellParameter to SetParameters we know we want to expose.
 const std::set<std::string> kSetShellParameterWhitelist = {
     "awsEC2InstanceMetadataUrl",
+    "awsECSInstanceMetadataUrl",
     "disabledSecureAllocatorDomains",
     "newLineAfterPasswordPromptForTest",
     "skipShellCursorFinalize",

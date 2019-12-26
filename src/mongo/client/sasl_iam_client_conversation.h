@@ -74,6 +74,11 @@ private:
      */
     iam::AWSCredentials _getEc2Credentials() const;
 
+    /**
+     * Get AWS credentials from ECS Instance metadata HTTP server.
+     */
+    iam::AWSCredentials _getEcsCredentials(StringData relativeUri) const;
+
     StatusWith<bool> _firstStep(std::string* outputData);
     StatusWith<bool> _secondStep(StringData inputData, std::string* outputData);
 

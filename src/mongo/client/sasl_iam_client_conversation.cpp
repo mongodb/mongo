@@ -47,8 +47,12 @@ namespace iam {
 SASLIamClientGlobalParams saslIamClientGlobalParams;
 }  // namespace iam
 
-std::string getDefaultHost() {
+std::string getDefaultEC2Host() {
     return iam::saslIamClientGlobalParams.awsEC2InstanceMetadataUrl;
+}
+
+std::string getDefaultECSHost() {
+    return iam::saslIamClientGlobalParams.awsECSInstanceMetadataUrl;
 }
 
 SaslIAMClientConversation::SaslIAMClientConversation(SaslClientSession* saslClientSession)
@@ -79,7 +83,11 @@ iam::AWSCredentials SaslIAMClientConversation::_getUserCredentials() const {
 }
 
 iam::AWSCredentials SaslIAMClientConversation::_getLocalAWSCredentials() const {
-    // T O D O - branch on the environment variable that ECS tasks set
+    StringData ecsMetadata = getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
+    if (!ecsMetadata.empty()) {
+        return _getEcsCredentials(ecsMetadata);
+    }
+
     return _getEc2Credentials();
 }
 
@@ -93,7 +101,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
 
         // Retrieve the role attached to the EC2 instance
         DataBuilder getRoleResult =
-            httpClient->get(getDefaultHost() + "/latest/meta-data/iam/security-credentials/");
+            httpClient->get(getDefaultEC2Host() + "/latest/meta-data/iam/security-credentials/");
 
         ConstDataRange cdrRole = getRoleResult.getCursor();
         StringData getRoleOutput;
@@ -103,7 +111,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
 
         // Retrieve the temporary credentials of the EC2 instance
         DataBuilder getRoleCredentialsResult = httpClient->get(
-            str::stream() << getDefaultHost() + "/latest/meta-data/iam/security-credentials/"
+            str::stream() << getDefaultEC2Host() + "/latest/meta-data/iam/security-credentials/"
                           << role);
 
         ConstDataRange cdrCredentials = getRoleCredentialsResult.getCursor();
@@ -113,10 +121,33 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
         return iam::parseCredentialsFromEC2IamSecurityCredentials(getRoleCredentialsOutput);
     } catch (const DBException& e) {
         // Wrap exceptions from HTTP to make them clearer
-        uassertStatusOK(Status(e.code(),
-                               str::stream()
-                                   << "Failed to retrieve EC2 Instance Metadata Credentials:"
-                                   << e.reason()));
+        uassertStatusOKWithContext(e.toStatus(),
+                                   "Failed to retrieve EC2 Instance Metadata Credentials");
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+iam::AWSCredentials SaslIAMClientConversation::_getEcsCredentials(StringData relativeUri) const {
+    try {
+
+        std::unique_ptr<HttpClient> httpClient = HttpClient::create();
+
+        // The local web server is just a normal HTTP server
+        httpClient->allowInsecureHTTP(true);
+
+        // Retrieve the security token attached to the ECS task
+        DataBuilder getRoleResult = httpClient->get(getDefaultECSHost() + relativeUri);
+
+        ConstDataRange cdrRole = getRoleResult.getCursor();
+        StringData getRoleOutput;
+        cdrRole.readInto<StringData>(&getRoleOutput);
+
+        return iam::parseCredentialsFromECSTaskIamCredentials(getRoleOutput);
+    } catch (const DBException& e) {
+        // Wrap exceptions from HTTP to make them clearer
+        uassertStatusOKWithContext(e.toStatus(),
+                                   "Failed to retrieve ECS Instance Metadata Credentials");
     }
 
     MONGO_UNREACHABLE;
