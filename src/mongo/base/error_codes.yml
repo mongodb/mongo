@@ -307,7 +307,8 @@ error_codes:
     - {code: 280,name: ChangeStreamFatalError,categories: [NonResumableChangeStreamError]}
 
     # The two codes below are for internal use only and must never be returned in a network response
-    - {code: 281,name: TransactionCoordinatorSteppingDown} # Gets converted to InterruptedDueToReplStateChange
+    # TransactionCoordinatorSteppingDown gets converted to InterruptedDueToReplStateChange
+    - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption]}
     - {code: 282,name: TransactionCoordinatorReachedAbortDecision}
 
     - {code: 283,name: WouldChangeOwningShard,extra: WouldChangeOwningShardInfo}

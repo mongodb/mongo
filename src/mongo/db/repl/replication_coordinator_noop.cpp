@@ -470,5 +470,9 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMaste
     MONGO_UNREACHABLE;
 }
 
+OpTime ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx) const {
+    return getMyLastAppliedOpTime();
+}
+
 }  // namespace repl
 }  // namespace mongo

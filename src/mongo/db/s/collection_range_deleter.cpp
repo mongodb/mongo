@@ -340,12 +340,14 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         LOG(0) << "Waiting for majority replication of local deletions in " << nss.ns() << " range "
                << redact(range->toString());
 
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
         // Wait for replication outside the lock
         const auto replicationStatus = [&] {
             try {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                const auto clientOpTime =
+                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
                 WriteConcernResult unusedWCResult;
                 return waitForWriteConcern(
                     opCtx, clientOpTime, kMajorityWriteConcern, &unusedWCResult);

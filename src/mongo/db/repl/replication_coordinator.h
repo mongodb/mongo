@@ -953,6 +953,18 @@ public:
         RaftMongoSpecActionEnum action,
         boost::optional<Timestamp> oplogReadTimestamp = boost::none) const {}
 
+    /**
+     * Returns the OpTime that consists of the timestamp of the latest oplog entry and the current
+     * term.
+     * This function throws if:
+     * 1. It is called on secondaries.
+     * 2. OperationContext times out or is interrupted.
+     * 3. Oplog collection does not exist.
+     * 4. Oplog collection is empty.
+     * 5. Getting latest oplog timestamp is not supported by the storage engine.
+     */
+    virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const = 0;
+
 protected:
     ReplicationCoordinator();
 };
