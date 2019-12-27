@@ -797,12 +797,22 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
 
     Locker::setGlobalThrottling(&openReadTransaction, &openWriteTransaction);
+
+    _runTimeConfigParam.reset(new WiredTigerEngineRuntimeConfigParameter(
+        "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
+    _runTimeConfigParam->_data.second = this;
+    _maxCacheOverflowParam.reset(new WiredTigerMaxCacheOverflowSizeGBParameter(
+        "wiredTigerMaxCacheOverflowSizeGB", ServerParameterType::kRuntimeOnly));
+    _maxCacheOverflowParam->_data = {maxCacheOverflowFileSizeMB / 1024, this};
 }
 
 WiredTigerKVEngine::~WiredTigerKVEngine() {
-    if (_conn) {
-        cleanShutdown();
-    }
+    // Remove server parameters that we added in the constructor, to enable unit tests to reload the
+    // storage engine again in this same process.
+    ServerParameterSet::getGlobal()->remove("wiredTigerEngineRuntimeConfig");
+    ServerParameterSet::getGlobal()->remove("wiredTigerMaxCacheOverflowSizeGB");
+
+    cleanShutdown();
 
     _sessionCache.reset(nullptr);
 }
