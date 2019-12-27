@@ -57,7 +57,6 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -134,15 +133,6 @@ bool _hasOnlyAuthErrorUpHeartbeats(const std::vector<MemberData>& hbdata, const 
 
 void appendOpTime(BSONObjBuilder* bob, const char* elemName, const OpTime& opTime) {
     opTime.append(bob, elemName);
-}
-
-void appendIP(BSONObjBuilder* bob, const char* elemName, const HostAndPort& hostAndPort) {
-    auto ip = hostbyname(hostAndPort.host().c_str());
-    if (ip == "") {
-        bob->appendNull("ip");
-    } else {
-        bob->append("ip", ip);
-    }
 }
 }  // namespace
 
@@ -1451,7 +1441,6 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             BSONObjBuilder bb;
             bb.append("_id", _selfConfig().getId().getData());
             bb.append("name", _selfConfig().getHostAndPort().toString());
-            appendIP(&bb, "ip", _selfConfig().getHostAndPort());
             bb.append("health", 1.0);
             bb.append("state", static_cast<int>(myState.s));
             bb.append("stateStr", myState.toString());
@@ -1494,7 +1483,6 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             BSONObjBuilder bb;
             bb.append("_id", itConfig.getId().getData());
             bb.append("name", itConfig.getHostAndPort().toString());
-            appendIP(&bb, "ip", itConfig.getHostAndPort());
             double h = it->getHealth();
             bb.append("health", h);
             const MemberState state = it->getState();
