@@ -55,6 +55,8 @@ class JournalListener;
 class WiredTigerRecordStore;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
+class WiredTigerEngineRuntimeConfigParameter;
+class WiredTigerMaxCacheOverflowSizeGBParameter;
 
 struct WiredTigerFileVersion {
     enum class StartupVersion { IS_34, IS_36, IS_40, IS_42, IS_44 };
@@ -490,5 +492,8 @@ private:
     //
     // Access must be protected by the CheckpointLock.
     std::list<std::string> _checkpointedIndexes;
+
+    std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
+    std::unique_ptr<WiredTigerMaxCacheOverflowSizeGBParameter> _maxCacheOverflowParam;
 };
 }  // namespace mongo
