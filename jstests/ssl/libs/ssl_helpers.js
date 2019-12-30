@@ -281,9 +281,15 @@ function isDebian10() {
     // Debian 10 disables TLS 1.0 and TLS 1.1 as part their default crypto policy
     // We skip tests on Debian 10 that require these versions as a result.
     try {
-        // on non-debian systems, cat will throw here (file doesn't exist)
-        const debianVersion = cat("/etc/debian_version").toLowerCase();
-        return debianVersion.includes("10") || debianVersion.includes("buster");
+        // this file exists on systemd-based systems, necessary to avoid mischaracterizing debian
+        // derivatives as stock debian
+        const releaseFile = cat("/etc/os-release").toLowerCase();
+        const prettyName = releaseFile.split('\n').find(function(line) {
+            return line.startsWith("pretty_name");
+        });
+        return prettyName.includes("debian") &&
+            (prettyName.includes("10") || prettyName.includes("buster") ||
+             prettyName.includes("bullseye"));
     } catch (e) {
         return false;
     }
