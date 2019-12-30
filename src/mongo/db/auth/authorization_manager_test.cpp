@@ -31,9 +31,6 @@
 
 #include <memory>
 
-/**
- * Unit tests of the AuthorizationManager type.
- */
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/config.h"
@@ -151,7 +148,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT_OK(swu.getStatus());
     auto v2read = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
-    ASSERT(v2read->isValid());
+    ASSERT(v2read.isValid());
     RoleNameIterator roles = v2read->getRoles();
     ASSERT_EQUALS(RoleName("read", "test"), roles.next());
     ASSERT_FALSE(roles.more());
@@ -164,7 +161,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT_OK(swu.getStatus());
     auto v2cluster = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
-    ASSERT(v2cluster->isValid());
+    ASSERT(v2cluster.isValid());
     RoleNameIterator clusterRoles = v2cluster->getRoles();
     ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
     ASSERT_FALSE(clusterRoles.more());
@@ -184,7 +181,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     auto swu = authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"));
     ASSERT_OK(swu.getStatus());
     auto x509User = std::move(swu.getValue());
-    ASSERT(x509User->isValid());
+    ASSERT(x509User.isValid());
 
     stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
                                                 RoleName("readWrite", "test")};
@@ -311,7 +308,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     ASSERT_OK(swu.getStatus());
     auto myUser = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
-    ASSERT(myUser->isValid());
+    ASSERT(myUser.isValid());
     RoleNameIterator roles = myUser->getRoles();
     ASSERT_EQUALS(RoleName("myRole", "test"), roles.next());
     ASSERT_FALSE(roles.more());

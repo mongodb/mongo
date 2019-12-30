@@ -39,7 +39,6 @@
 namespace mongo {
 namespace {
 
-
 TEST(SecurityProperty, emptyHasEmptyProperties) {
     SecurityPropertySet set(SecurityPropertySet{});
     ASSERT_TRUE(set.hasAllProperties(set));
@@ -226,7 +225,7 @@ public:
                                                         << "roles" << BSONArray()),
                                                    BSONObj()));
 
-        internalSecurity.user = std::make_shared<User>(UserName("__system", "local"));
+        internalSecurity.user = UserHandle(User(UserName("__system", "local")));
     }
 
     BSONObj getMechsFor(const UserName user) {

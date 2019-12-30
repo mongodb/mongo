@@ -31,9 +31,6 @@
 
 #include <memory>
 
-/**
- * Unit tests of the AuthorizationSession type.
- */
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/crypto/mechanism_scram.h"
@@ -56,25 +53,22 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
-#define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
-#define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
-
 namespace mongo {
 namespace {
 
 class FailureCapableAuthzManagerExternalStateMock : public AuthzManagerExternalStateMock {
 public:
-    FailureCapableAuthzManagerExternalStateMock() : _findsShouldFail(false) {}
-    virtual ~FailureCapableAuthzManagerExternalStateMock() {}
+    FailureCapableAuthzManagerExternalStateMock() = default;
+    ~FailureCapableAuthzManagerExternalStateMock() = default;
 
     void setFindsShouldFail(bool enable) {
         _findsShouldFail = enable;
     }
 
-    virtual Status findOne(OperationContext* opCtx,
-                           const NamespaceString& collectionName,
-                           const BSONObj& query,
-                           BSONObj* result) {
+    Status findOne(OperationContext* opCtx,
+                   const NamespaceString& collectionName,
+                   const BSONObj& query,
+                   BSONObj* result) override {
         if (_findsShouldFail && collectionName == AuthorizationManager::usersCollectionNamespace) {
             return Status(ErrorCodes::UnknownError,
                           "findOne on admin.system.users set to fail in mock.");
@@ -83,7 +77,7 @@ public:
     }
 
 private:
-    bool _findsShouldFail;
+    bool _findsShouldFail{false};
 };
 
 class AuthorizationSessionTest : public ::mongo::unittest::Test {
@@ -413,17 +407,14 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
     User* user = authzSession->lookupUser(UserName("spencer", "test"));
-    ASSERT(user->isValid());
 
     // Change the user to be read-only
     int ignored;
-    managerState
-        ->remove(_opCtx.get(),
-                 AuthorizationManager::usersCollectionNamespace,
-                 BSONObj(),
-                 BSONObj(),
-                 &ignored)
-        .transitional_ignore();
+    ASSERT_OK(managerState->remove(_opCtx.get(),
+                                   AuthorizationManager::usersCollectionNamespace,
+                                   BSONObj(),
+                                   BSONObj(),
+                                   &ignored));
     ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
@@ -445,16 +436,13 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
     user = authzSession->lookupUser(UserName("spencer", "test"));
-    ASSERT(user->isValid());
 
     // Delete the user.
-    managerState
-        ->remove(_opCtx.get(),
-                 AuthorizationManager::usersCollectionNamespace,
-                 BSONObj(),
-                 BSONObj(),
-                 &ignored)
-        .transitional_ignore();
+    ASSERT_OK(managerState->remove(_opCtx.get(),
+                                   AuthorizationManager::usersCollectionNamespace,
+                                   BSONObj(),
+                                   BSONObj(),
+                                   &ignored));
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(_opCtx.get(), user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
@@ -486,18 +474,15 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
     User* user = authzSession->lookupUser(UserName("spencer", "test"));
-    ASSERT(user->isValid());
 
     // Change the user to be read-only
     int ignored;
     managerState->setFindsShouldFail(true);
-    managerState
-        ->remove(_opCtx.get(),
-                 AuthorizationManager::usersCollectionNamespace,
-                 BSONObj(),
-                 BSONObj(),
-                 &ignored)
-        .transitional_ignore();
+    ASSERT_OK(managerState->remove(_opCtx.get(),
+                                   AuthorizationManager::usersCollectionNamespace,
+                                   BSONObj(),
+                                   BSONObj(),
+                                   &ignored));
     ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"

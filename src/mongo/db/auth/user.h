@@ -42,6 +42,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/dist_cache.h"
 
 namespace mongo {
 
@@ -64,6 +65,8 @@ class User {
     User& operator=(const User&) = delete;
 
 public:
+    using UserId = std::vector<std::uint8_t>;
+
     template <typename HashBlock>
     struct SCRAMCredentials {
         SCRAMCredentials() : iterationCount(0), salt(""), serverKey(""), storedKey("") {}
@@ -87,6 +90,7 @@ public:
             return !iterationCount && salt.empty() && serverKey.empty() && storedKey.empty();
         }
     };
+
     struct CredentialData {
         CredentialData() : scram_sha1(), scram_sha256(), isExternal(false) {}
 
@@ -104,11 +108,11 @@ public:
         const SCRAMCredentials<HashBlock>& scram() const;
     };
 
-    typedef stdx::unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
+    using ResourcePrivilegeMap = stdx::unordered_map<ResourcePattern, Privilege>;
 
     explicit User(const UserName& name);
+    User(User&&) = default;
 
-    using UserId = std::vector<std::uint8_t>;
     const UserId& getID() const {
         return _id;
     }
@@ -130,7 +134,6 @@ public:
     const SHA256Block& getDigest() const {
         return _digest;
     }
-
 
     /**
      * Returns an iterator over the names of the user's direct roles
@@ -168,13 +171,6 @@ public:
      * Returns true if the user has is allowed to perform an action on the given resource.
      */
     bool hasActionsForResource(const ResourcePattern& resource) const;
-
-    /**
-     * Returns true if this copy of information about this user is still valid. If this returns
-     * false, this object should no longer be used and should be returned to the
-     * AuthorizationManager and a new User object for this user should be requested.
-     */
-    bool isValid() const;
 
     // Mutators below.  Mutation functions should *only* be called by the AuthorizationManager
 
@@ -232,21 +228,11 @@ public:
     }
     void getRestrictions() && = delete;
 
-protected:
-    friend class AuthorizationManagerImpl;
-    /**
-     * Marks this instance of the User object as invalid, most likely because information about
-     * the user has been updated and needs to be reloaded from the AuthorizationManager.
-     *
-     * This method should *only* be called by the AuthorizationManager.
-     */
-    void _invalidate();
-
 private:
-    // Unique ID (often UUID) for this user.
-    // May be empty for legacy users.
+    // Unique ID (often UUID) for this user. May be empty for legacy users.
     UserId _id;
 
+    // The full user name (as specified by the administrator)
     UserName _name;
 
     // Digest of the full username
@@ -266,11 +252,9 @@ private:
 
     // Restrictions which must be met by a Client in order to authenticate as this user.
     RestrictionDocuments _restrictions;
-
-    // Indicates whether the user has been marked as invalid by the AuthorizationManager.
-    AtomicWord<bool> _isValid{true};
 };
 
-using UserHandle = std::shared_ptr<User>;
+using UserDistCache = DistCache<UserName, User>;
+using UserHandle = UserDistCache::ValueHandle;
 
 }  // namespace mongo

@@ -27,46 +27,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_manager.h"
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/init.h"
 #include "mongo/base/shim.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/role_graph.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/str.h"
-
-mongo::AuthInfo mongo::internalSecurity;
 
 namespace mongo {
+
+AuthInfo internalSecurity;
 
 constexpr StringData AuthorizationManager::USERID_FIELD_NAME;
 constexpr StringData AuthorizationManager::USER_NAME_FIELD_NAME;
@@ -100,7 +70,6 @@ const int AuthorizationManager::schemaVersion24;
 const int AuthorizationManager::schemaVersion26Upgrade;
 const int AuthorizationManager::schemaVersion26Final;
 const int AuthorizationManager::schemaVersion28SCRAM;
-
 
 std::unique_ptr<AuthorizationManager> AuthorizationManager::create() {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthorizationManager::create);

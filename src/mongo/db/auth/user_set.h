@@ -30,13 +30,8 @@
 #pragma once
 
 #include <list>
-#include <string>
-#include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
 
 namespace mongo {
 
@@ -53,7 +48,7 @@ public:
     using iterator = std::list<UserHandle>::iterator;
     using const_iterator = std::list<UserHandle>::const_iterator;
 
-    UserSet() = default;
+    UserSet();
 
     /**
      * Adds a User to the UserSet.
@@ -105,6 +100,7 @@ public:
     iterator begin() {
         return _users.begin();
     }
+
     iterator end() {
         return _users.end();
     }

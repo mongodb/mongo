@@ -155,7 +155,8 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 }
 
 User* AuthorizationSessionImpl::lookupUser(const UserName& name) {
-    return _authenticatedUsers.lookup(name).get();
+    auto user = _authenticatedUsers.lookup(name);
+    return user ? user.get() : nullptr;
 }
 
 User* AuthorizationSessionImpl::getSingleUser() {
@@ -723,7 +724,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
 
     while (it != _authenticatedUsers.end()) {
         auto& user = *it;
-        if (!user->isValid()) {
+        if (!user.isValid()) {
             // Make a good faith effort to acquire an up-to-date user object, since the one
             // we've cached is marked "out-of-date."
             UserName name = user->getName();

@@ -32,334 +32,339 @@
 #include <memory>
 #include <vector>
 
-#include <boost/optional.hpp>
-
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
 /**
- * This class implements an LRU cache that stores Key -> std::unique_ptr<Value> and will return
- * std::shared_ptr<Value> for a given Key. The returned shared_ptr will be returned to the cache
- * when the last copy is destroyed, if the cache was not invalidated between the time it was
- * created and when it was destroyed.
- *
- * Additionally, the owner of the cache can invalidate both items in the LRU cache and items that
- * have been checked out of the cache either by Key or by a predicate function. The lifetime of
- * the checked out shared_ptrs are not effected by invalidation.
- *
- * The Invalidator callback must have the signature of void(const Key& key, Value*) and must not
- * throw.
+ * Extension over 'LRUCache', which provides thread-safety, introspection and most importantly the
+ * ability to mark entries as invalid to indicate to potential callers that they should not be used
+ * anymore.
  */
-template <typename Key, typename Value, typename Invalidator>
+template <typename Key, typename Value>
 class InvalidatingLRUCache {
+    /**
+     * Data structure representing the values stored in the cache.
+     */
+    struct StoredValue {
+        /**
+         * The 'owningCache' and 'key' values can be nullptr/boost::none in order to support the
+         * detached mode of ValueHandle below.
+         */
+        StoredValue(InvalidatingLRUCache* in_owningCache,
+                    boost::optional<Key> in_key,
+                    Value&& in_value)
+            : owningCache(in_owningCache), key(in_key), value(std::move(in_value)) {}
+
+        ~StoredValue() {
+            if (owningCache) {
+                stdx::lock_guard<Latch> lg(owningCache->_mutex);
+                owningCache->_evictedCheckedOutValues.erase(*key);
+            }
+        }
+
+        // The cache which stores this key/value pair
+        InvalidatingLRUCache* owningCache;
+
+        // The key/value pair. See the comments on the constructor about why the key is optional.
+        boost::optional<Key> key;
+        Value value;
+
+        // Initially set to true to indicate that the entry is valid and can be read without
+        // synchronisation. Transitions to false only once, under `_mutex` in order to mark the
+        // entry as invalid.
+        AtomicWord<bool> isValid{true};
+    };
+    using Cache = LRUCache<Key, std::shared_ptr<StoredValue>>;
+
 public:
-    explicit InvalidatingLRUCache(size_t maxCacheSize, Invalidator invalidator)
-        : _cache(maxCacheSize), _invalidator(std::move(invalidator)) {}
+    using key_type = typename Cache::key_type;
+    using mapped_type = typename Cache::mapped_type;
 
-    /*
-     * Inserts or updates a key with a std::unique_ptr<Value>. The cache will be invalidated if
-     * the Key was already in the cache and was active at the time it was updated.
-     */
-    void insertOrAssign(const Key& key, std::unique_ptr<Value> value) {
-        UniqueLockWithPtrGuard lk(this);
-        _invalidateKey(lk, key);
-        _cache.add(key, std::move(value));
+    explicit InvalidatingLRUCache(size_t maxCacheSize) : _cache(maxCacheSize) {}
+
+    ~InvalidatingLRUCache() {
+        invariant(_evictedCheckedOutValues.empty());
     }
 
-    /*
-     * Inserts or updates a key with a std::unique_ptr<Value> and immediate marks it as active,
-     * returning a shared_ptr to value to the caller.
+    /**
+     * Wraps the entries returned from the cache.
      */
-    std::shared_ptr<Value> insertOrAssignAndGet(const Key& key, std::unique_ptr<Value> value) {
-        UniqueLockWithPtrGuard lk(this);
-        _invalidateKey(lk, key);
-        auto ret = std::shared_ptr<Value>(value.release(), _makeDeleterWithLock(key, _generation));
-        bool inserted;
-        std::tie(std::ignore, inserted) = _active.emplace(key, ret);
-        fassert(50902, inserted);
+    class ValueHandle {
+    public:
+        // The two constructors below are present in order to offset the fact that the cache doesn't
+        // support pinning items. Their only usage must be in the authorization mananager for the
+        // internal authentication user.
+        explicit ValueHandle(Value&& value)
+            : _value(std::make_shared<StoredValue>(nullptr, boost::none, std::move(value))) {}
 
-        return ret;
+        ValueHandle() = default;
+
+        operator bool() const {
+            return bool(_value);
+        }
+
+        bool isValid() const {
+            return _value->isValid.loadRelaxed();
+        }
+
+        Value* get() {
+            invariant(bool(*this));
+            return &_value->value;
+        }
+
+        const Value* get() const {
+            invariant(bool(*this));
+            return &_value->value;
+        }
+
+        Value& operator*() {
+            return *get();
+        }
+
+        const Value& operator*() const {
+            return *get();
+        }
+
+        Value* operator->() {
+            return get();
+        }
+
+        const Value* operator->() const {
+            return get();
+        }
+
+    private:
+        friend class InvalidatingLRUCache;
+
+        explicit ValueHandle(std::shared_ptr<StoredValue> value) : _value(std::move(value)) {}
+
+        std::shared_ptr<StoredValue> _value;
+    };
+
+    /**
+     * Inserts or updates a key with a new value. If 'key' was checked-out at the time this method
+     * was called, it will become invalidated.
+     */
+    void insertOrAssign(const Key& key, Value&& value) {
+        LockGuardWithPostUnlockDestructor guard(_mutex);
+        _invalidate(&guard, key, _cache.find(key));
+        if (auto evicted = _cache.add(
+                key, std::make_shared<StoredValue>(this, key, std::forward<Value>(value)))) {
+            const auto& evictedKey = evicted->first;
+            auto& evictedValue = evicted->second;
+
+            if (evictedValue.use_count() != 1) {
+                invariant(_evictedCheckedOutValues.emplace(evictedKey, evictedValue).second);
+            } else {
+                invariant(evictedValue.use_count() == 1);
+
+                // Since the cache had the only reference to the evicted value, there could be
+                // nobody who has that key checked out who might be interested in listening for it
+                // getting invalidated, so we can safely discard it without adding it to the
+                // _evictedCheckedOutValues map
+            }
+
+            // evictedValue must always be handed-off to guard so that the destructor never runs run
+            // while the mutex is held
+            guard.releasePtr(std::move(evictedValue));
+        }
     }
 
-    /*
-     * Invalidates cached and active items by key. If the Key was not in the cache, then the cache
-     * will not be invalidated.
+    /**
+     * Same as 'insertOrAssign' above, but also immediately checks-out the newly inserted value and
+     * returns it. See the 'get' method below for the semantics of checking-out a value.
+     */
+    ValueHandle insertOrAssignAndGet(const Key& key, Value&& value) {
+        LockGuardWithPostUnlockDestructor guard(_mutex);
+        _invalidate(&guard, key, _cache.find(key));
+        if (auto evicted = _cache.add(
+                key, std::make_shared<StoredValue>(this, key, std::forward<Value>(value)))) {
+            const auto& evictedKey = evicted->first;
+            auto& evictedValue = evicted->second;
+
+            if (evictedValue.use_count() != 1) {
+                invariant(_evictedCheckedOutValues.emplace(evictedKey, evictedValue).second);
+            } else {
+                invariant(evictedValue.use_count() == 1);
+
+                if (evictedKey == key) {
+                    // This handles the zero cache size case where the inserted value was
+                    // immediately evicted. Because it still needs to be tracked for invalidation
+                    // purposes, we need to add it to the _evictedCheckedOutValues map.
+                    invariant(_evictedCheckedOutValues.emplace(evictedKey, evictedValue).second);
+                    return ValueHandle(std::move(evictedValue));
+                } else {
+                    // Since the cache had the only reference to the evicted value, there could be
+                    // nobody who has that key checked out who might be interested in listening for
+                    // it getting invalidated, so we can safely discard it without adding it to the
+                    // _evictedCheckedOutValues map
+                }
+            }
+
+            // evictedValue must always be handed-off to guard so that the destructor never runs run
+            // while the mutex is held
+            guard.releasePtr(std::move(evictedValue));
+        }
+
+        auto it = _cache.find(key);
+        invariant(it != _cache.end());
+        return ValueHandle(it->second);
+    }
+
+    /**
+     * Returns the specified key, if found in the cache. Checking-out the value does not pin it and
+     * it could still get evicted if the cache is under pressure. The returned handle must be
+     * destroyed before the owning cache object itself is destroyed.
+     */
+    ValueHandle get(const Key& key) {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (auto it = _cache.find(key); it != _cache.end())
+            return ValueHandle(it->second);
+
+        if (auto it = _evictedCheckedOutValues.find(key); it != _evictedCheckedOutValues.end())
+            return ValueHandle(it->second.lock());
+
+        return ValueHandle(nullptr);
+    }
+
+    /**
+     * Marks 'key' as invalid if it is found in the cache (whether checked-out or not).
      */
     void invalidate(const Key& key) {
-        UniqueLockWithPtrGuard lk(this);
-        _invalidateKey(lk, key);
+        LockGuardWithPostUnlockDestructor guard(_mutex);
+        _invalidate(&guard, key, _cache.find(key));
     }
 
-    /*
-     * Invalidates any cached or active items if the predicate returns true. The cache will only
-     * be invalidated if at least one active item matches the predicate.
+    /**
+     * Performs the same logic as 'invalidate' above of all items in the cache, which match the
+     * predicate.
      */
     template <typename Pred>
     void invalidateIf(Pred predicate) {
-        UniqueLockWithPtrGuard lk(this);
-
-        // Remove any matching values from the cache (of inactive items). Do not bump the
-        // generation - that only happens if any active items are invalidated.
+        LockGuardWithPostUnlockDestructor guard(_mutex);
         for (auto it = _cache.begin(); it != _cache.end();) {
-            if (predicate(it->first, it->second.get())) {
-                auto toErase = it++;
-                _cache.erase(toErase);
+            if (predicate(it->first, &it->second->value)) {
+                auto itToInvalidate = it++;
+                _invalidate(&guard, itToInvalidate->first, itToInvalidate);
             } else {
                 it++;
             }
         }
 
-        auto it = _active.begin();
-        while (it != _active.end()) {
-            auto& kv = *it;
-            auto value = lk.lockWeakPtr(kv.second);
-
-            // If the value is a valid ptr (they're still checked out), and the key/value
-            // doesn't match the predicate, then just skip this one.
-            if (value && !predicate(kv.first, value.get())) {
+        for (auto it = _evictedCheckedOutValues.begin(); it != _evictedCheckedOutValues.end();) {
+            if (auto storedValue = it->second.lock()) {
+                if (predicate(it->first, &storedValue->value)) {
+                    _invalidate(&guard, (it++)->first, _cache.end());
+                } else {
+                    it++;
+                }
+            } else {
                 it++;
-                continue;
             }
-
-            // If the weak_ptr is expired (about to be returned to the cache), or the predicate
-            // returned true, then invalidate the item.
-            //
-            // After this the iterator will point to the next item to check or _active.end().
-            it = _invalidateActiveIterator(lk, it, std::move(value));
         }
     }
 
-    /*
-     * Gets an item from the cache by Key, or returns boost::none if the item was not in the
-     * cache.
-     */
-    boost::optional<std::shared_ptr<Value>> get(const Key& key) {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto myGeneration = _generation;
-
-        auto cacheIt = _cache.find(key);
-        // If the value is not in _cache, check whether it's in _active
-        if (cacheIt == _cache.end()) {
-            auto activeIt = _active.find(key);
-            // If the key is not in active, return boost::none
-            if (activeIt == _active.end())
-                return boost::none;
-
-            // If the key was in active, but the weak_ptr was expired, then count that as
-            // "not being in the cache" and return boost::none.
-            //
-            // This is a race with the deleter of the shared_ptr's we return here. There is a
-            // small possibility that we could needlessly invalidate the cache here by saying
-            // a key is not in the cache, even though it is just about to be. However, this
-            // should only be missing a perf optimization rather than causing a correctness
-            // problem.
-            auto ret = activeIt->second.lock();
-            fassert(51148, !ret || ret->isValid());
-            return ret ? boost::optional<std::shared_ptr<Value>>(ret) : boost::none;
-        }
-
-        // The value has been found in _cache, so we should convert it from a unique_ptr to a
-        // shared_ptr and return that.
-        std::unique_ptr<Value> ownedUser(cacheIt->second.release());
-        _cache.erase(cacheIt);
-        auto deleter = _makeDeleterWithLock(key, myGeneration);
-
-        auto ret = std::shared_ptr<Value>(ownedUser.release(), std::move(deleter));
-        bool inserted;
-        std::tie(std::ignore, inserted) = _active.emplace(key, ret);
-
-        fassert(50903, inserted);
-        fassert(51147, ret->isValid());
-        return ret;
-    }
-
-    /*
-     * Represents an item in the cache.
-     */
     struct CachedItemInfo {
-        Key key;        // the key of the item in the cache
-        bool active;    // Whether the item is currently active or in the LRU cache
-        long useCount;  // The number of copies of the item (0 if active is false, otherwise >= 1)
+        Key key;            // The key of the item in the cache
+        long int useCount;  // The number of callers of 'get', which still have the item checked-out
     };
 
-    /*
-     * Returns a vector of info about items in the cache for testing/reporting purposes
+    /**
+     * Returns a vector of info about the valid items in the cache for reporting purposes. Any
+     * entries, which have been invalidated will not be included, even if they are currently
+     * checked-out.
      */
     std::vector<CachedItemInfo> getCacheInfo() const {
-        stdx::lock_guard<Latch> lk(_mutex);
-        std::vector<CachedItemInfo> ret;
-        ret.reserve(_active.size() + _cache.size());
+        stdx::lock_guard<Latch> lg(_mutex);
 
-        for (const auto& kv : _active) {
-            ret.push_back({kv.first, true, kv.second.use_count()});
-        }
+        std::vector<CachedItemInfo> ret;
+        ret.reserve(_cache.size() + _evictedCheckedOutValues.size());
 
         for (const auto& kv : _cache) {
-            ret.push_back({kv.first, false, 0});
+            const auto& value = kv.second;
+            ret.push_back({kv.first, value.use_count() - 1});
+        }
+
+        for (const auto& kv : _evictedCheckedOutValues) {
+            if (auto value = kv.second.lock())
+                ret.push_back({kv.first, value.use_count() - 1});
         }
 
         return ret;
     }
 
 private:
-    template <typename T>
-    struct hasIsValidMethod {
-    private:
-        using yes = std::true_type;
-        using no = std::false_type;
-
-        template <typename U>
-        static auto test(int) -> decltype(std::declval<U>().isValid() == true, yes());
-
-        template <typename>
-        static no test(...);
-
-    public:
-        static constexpr bool value = std::is_same<decltype(test<T>(0)), yes>::value;
-    };
-
-    /*
-     * When locking weak_ptr's from the _activeMap, the newly locked shared_ptrs must be destroyed
-     * while not holding the _mutex to prevent a deadlock. This is a guard type that ensures
-     * locked weak_ptrs get cleaned up without the _mutex being locked. Holding this is the same
-     * as holding a stdx::unique_ptr<>(_mutex), and this type must be held if you create temporary
-     * shared_ptr's from the _active map (e.g. when you're doing invalidation).
+    /**
+     * Used as means to ensure that any objects which are scheduled to be released from '_cache' or
+     * the '_evictedCheckedOutValues' map will be destroyed outside of the cache's mutex. This is
+     * necessary, because the destructor function also acquires '_mutex'.
      */
-    class UniqueLockWithPtrGuard {
+    class LockGuardWithPostUnlockDestructor {
     public:
-        UniqueLockWithPtrGuard(InvalidatingLRUCache<Key, Value, Invalidator>* cache)
-            : _cache(cache), _lk(_cache->_mutex) {}
+        LockGuardWithPostUnlockDestructor(Mutex& mutex) : _ul(mutex) {}
 
-        ~UniqueLockWithPtrGuard() {
-            // Move the active ptrs to destroy vector into a local variable so it gets destroyed
-            // after the lock is released.
-            auto toCleanup = std::move(_activePtrsToDestroy);
-            _lk.unlock();
-        }
-
-        // Call this method to lock a weak_ptr from the _active map, its lifetime will be extended
-        // to the destructor of this guard type.
-        auto lockWeakPtr(std::weak_ptr<Value>& ptr) -> auto {
-            auto value = ptr.lock();
-            if (value) {
-                _activePtrsToDestroy.push_back(value);
-            }
-            return value;
+        void releasePtr(std::shared_ptr<StoredValue>&& value) {
+            _valuesToDestroy.emplace_back(std::move(value));
         }
 
     private:
-        InvalidatingLRUCache<Key, Value, Invalidator>* _cache;
-        stdx::unique_lock<Latch> _lk;
-        std::vector<std::shared_ptr<Value>> _activePtrsToDestroy;
+        // Must be destroyed after '_ul' is destroyed so that any StoredValue destructors execute
+        // outside of the cache's mutex
+        std::vector<std::shared_ptr<StoredValue>> _valuesToDestroy;
+
+        stdx::unique_lock<Latch> _ul;
     };
 
-    using ActiveMap = stdx::unordered_map<Key, std::weak_ptr<Value>>;
-    using ActiveIterator = typename ActiveMap::iterator;
-
-    static_assert(hasIsValidMethod<Value>::value,
-                  "Value type must have a method matching bool isValid()");
-
-    /*
-     * Invalidates an item in the cache and active map by key.
+    /**
+     * Invalidates the item in the cache pointed to by 'it' and, if 'key' is on the
+     * '_evictedCheckedOutValues' map, invalidates it as well. The iterator may be _cache.end() and
+     * the key may not exist, and after this call will no longer be valid and will not be in either
+     * of the maps.
      */
-    void _invalidateKey(UniqueLockWithPtrGuard& lk, const Key& key) {
-        // Erase any cached user (one that hasn't been given out yet).
-        _cache.erase(key);
-
-        // Then invalidate any user we've already given out.
-
-        _invalidateActiveIterator(lk, _active.find(key), nullptr);
-    }
-
-
-    /*
-     * Invalidates an item in the active map pointed to by an iterator, and returns the next
-     * iterator in the map or the end() iterator.
-     *
-     * If the active item's weak_ptr has already been locked, it should be moved into value,
-     * otherwise pass nullptr and this function will lock/check the weak_ptr itself.
-     */
-    ActiveIterator _invalidateActiveIterator(UniqueLockWithPtrGuard& guard,
-                                             ActiveIterator it,
-                                             std::shared_ptr<Value>&& value) {
-        // If the iterator is past-the-end, then just return the iterator
-        if (it == _active.end()) {
-            return it;
-        }
-        // Bump the generation count so that any now-invalid shared_ptr<Values> returned
-        // from get() and insertOrAssignAndGet() don't get returned to the cache. Since
-        // the key for it was in the _active list, we know we want to invalidate it, but
-        // calling _invalidator is only for items still checked out from the cache.
-        _generation++;
-
-        // It's valid to pass in a nullptr here, so if value is a nullptr, then try to lock
-        // the weak_ptr in the active map.
-        if (!value) {
-            value = guard.lockWeakPtr(it->second);
+    void _invalidate(LockGuardWithPostUnlockDestructor* guard,
+                     const Key& key,
+                     typename Cache::iterator it) {
+        if (it != _cache.end()) {
+            auto& storedValue = it->second;
+            storedValue->isValid.store(false);
+            guard->releasePtr(std::move(storedValue));
+            _cache.erase(it);
+            return;
         }
 
-        // We only call the invalidator if the value is a valid ptr, otherwise it's about to
-        // be returned to the cache and the generation bump should invalidate it.
-        if (value) {
-            _invalidator(value.get());
+        auto itEvicted = _evictedCheckedOutValues.find(key);
+        if (itEvicted == _evictedCheckedOutValues.end())
+            return;
+
+        // Locking the evicted pointer value could fail if the last shared reference is concurrently
+        // released and drops to zero
+        if (auto evictedValue = itEvicted->second.lock()) {
+            evictedValue->isValid.store(false);
+            guard->releasePtr(std::move(evictedValue));
         }
 
-        // Erase the iterator from the _active map and return the next iterator (so this
-        // can be called in a loop).
-        _active.erase(it++);
-        return it;
+        _evictedCheckedOutValues.erase(itEvicted);
     }
 
-    /*
-     * This makes a deleter for std::shared_ptr<Value> that will return Value to the _cache
-     * on shared_ptr destruction.
-     *
-     * The value will only be returned to the cache if
-     * * the Value is still valid
-     * * the generation hasn't changed
-     *
-     * The deleter will always remove the weak_ptr in _active if
-     * * the generation hasn't changed
-     * * the weak_ptr in _active is expired
-     */
-    auto _makeDeleterWithLock(const Key& key, uint64_t myGeneration) -> auto {
-        return [this, key, myGeneration](Value* d) {
-            std::unique_ptr<Value> owned(d);
-            stdx::lock_guard<Latch> lk(_mutex);
-            auto it = _active.find(key);
-            if (it != _active.end() && it->second.expired()) {
-                _active.erase(it);
-            }
-
-            if (!owned->isValid() || myGeneration != _generation) {
-                return;
-            }
-
-            _cache.add(key, std::move(owned));
-        };
-    }
-
+    // Protects the state below
     mutable Mutex _mutex = MONGO_MAKE_LATCH("InvalidatingLRUCache::_mutex");
 
-    // The generation count - items will not be returned to the cache if their generation count
-    // does not match the current generation count
-    uint64_t _generation = 0;
+    // This map is used to track any values, which were evicted from the LRU cache below, while they
+    // were checked out (i.e., their use_count > 1, where the 1 comes from the ownership by
+    // '_cache'). The same key may only be in one of the maps - either '_cache' or here, but never
+    // on both.
+    //
+    // It must be destroyed after the entries in '_cache' are destroyed, because their destructors
+    // look-up into that map.
+    using EvictedCheckedOutValuesMap = stdx::unordered_map<Key, std::weak_ptr<StoredValue>>;
+    EvictedCheckedOutValuesMap _evictedCheckedOutValues;
 
-    // Items that have been checked out of the cache
-    ActiveMap _active;
-
-    // Items that are inactive but valid
-    LRUCache<Key, std::unique_ptr<Value>> _cache;
-
-    // The invalidator object to call when an item removed from the cache by invalidate() or
-    // invalidateIf()
-    Invalidator _invalidator;
+    Cache _cache;
 };
 
 }  // namespace mongo

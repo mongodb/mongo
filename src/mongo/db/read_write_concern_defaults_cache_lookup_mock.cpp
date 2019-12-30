@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 
 namespace mongo {
 
-ReadWriteConcernDefaults::LookupFn ReadWriteConcernDefaultsLookupMock::getLookupFn() {
+ReadWriteConcernDefaults::FetchDefaultsFn ReadWriteConcernDefaultsLookupMock::getFetchDefaultsFn() {
     return std::bind(&ReadWriteConcernDefaultsLookupMock::lookup, this, std::placeholders::_1);
 }
 

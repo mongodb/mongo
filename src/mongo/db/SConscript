@@ -370,17 +370,18 @@ env.Library(
 )
 
 env.Library(
-    target="read_write_concern_defaults",
+    target='read_write_concern_defaults',
     source=[
-        "read_write_concern_defaults.cpp",
+        'read_write_concern_defaults.cpp',
         env.Idlc('rw_concern_default.idl')[0],
     ],
     LIBDEPS=[
-        'write_concern_options',
         'repl/read_concern_args',
+        'write_concern_options',
     ],
     LIBDEPS_PRIVATE=[
-        "logical_clock",
+        '$BUILD_DIR/mongo/util/caching',
+        'logical_clock',
     ],
 )
 
