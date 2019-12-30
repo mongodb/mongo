@@ -49,6 +49,9 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+const OperationContext::Decoration<bool> operationShouldSkipCatalogCacheRefresh =
+    OperationContext::declareDecoration<bool>();
+
 namespace {
 
 // How many times to try refreshing the routing info if the set of chunks loaded from the config
@@ -232,7 +235,7 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
 
         auto& collEntry = itColl->second;
 
-        if (collEntry->needsRefresh) {
+        if (collEntry->needsRefresh && !getOperationShouldSkipCatalogCacheRefresh(opCtx)) {
             auto refreshNotification = collEntry->refreshCompletionNotification;
             if (!refreshNotification) {
                 refreshNotification = (collEntry->refreshCompletionNotification =
@@ -367,6 +370,15 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
         itColl->second->needsRefresh = true;
     }
 }
+
+bool CatalogCache::getOperationShouldSkipCatalogCacheRefresh(OperationContext* opCtx) {
+    return operationShouldSkipCatalogCacheRefresh(opCtx);
+};
+
+void CatalogCache::setOperationShouldSkipCatalogCacheRefresh(OperationContext* opCtx,
+                                                             bool shouldSkip) {
+    operationShouldSkipCatalogCacheRefresh(opCtx) = shouldSkip;
+};
 
 void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
                                      ChunkVersion targetCollectionVersion) const {
