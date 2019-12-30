@@ -23,7 +23,7 @@ var st = new ShardingTest({
     other: {shardAsReplicaSet: false}
 });
 
-st.s1.getDB('admin').createUser({user: 'root', pwd: 'pwd', roles: ['root']});
+st.s1.getDB('admin').createUser({user: 'root', pwd: 'pwd', roles: ['__system']});
 st.s1.getDB('admin').auth('root', 'pwd');
 
 var res = st.s1.getDB('admin').runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 0});
@@ -53,12 +53,12 @@ st.s0.getDB('test').createUser({
 });
 st.s0.getDB('admin').logout();
 
-var db1 = st.s0.getDB('test');
-db1.auth('spencer', 'pwd');
-var db2 = st.s1.getDB('test');
-db2.auth('spencer', 'pwd');
-var db3 = st.s2.getDB('test');
-db3.auth('spencer', 'pwd');
+const db1 = st.s0.getDB('test');
+assert(db1.auth('spencer', 'pwd'));
+const db2 = st.s1.getDB('test');
+assert(db2.auth('spencer', 'pwd'));
+const db3 = st.s2.getDB('test');
+assert(db3.auth('spencer', 'pwd'));
 
 /**
  * At this point we have 3 handles to the "test" database, each of which are on connections to
@@ -211,6 +211,32 @@ db3.auth('spencer', 'pwd');
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
     assert.commandFailedWithCode(db3.foo.runCommand("collStats"), authzErrorCode);
+})();
+
+(function testStaticCacheGeneration() {
+    jsTestLog("Testing that cache generations stay static across config server authentication");
+    const cfg1 = st.configRS.getPrimary().getDB('admin');
+    assert(cfg1.auth('root', 'pwd'));
+
+    // Create a previously unauthenticated user which is not in the authorization cached
+    assert.commandWorked(
+        cfg1.runCommand({createUser: "previouslyUncached", pwd: "pwd", roles: []}));
+
+    const oldRes = assert.commandWorked(cfg1.runCommand({_getUserCacheGeneration: 1}));
+
+    // Authenticate as the uncached user
+    cfg1.logout();
+    assert(cfg1.auth("previouslyUncached", "pwd"));
+    cfg1.logout();
+    assert(cfg1.auth('root', 'pwd'));
+
+    const newRes = assert.commandWorked(cfg1.runCommand({_getUserCacheGeneration: 1}));
+    assert.eq(oldRes.cacheGeneration,
+              newRes.cacheGeneration,
+              "User cache generation supriously incremented on config servers");
+
+    // Put connection to config server back into default state before shutdown
+    cfg1.logout();
 })();
 
 st.stop();

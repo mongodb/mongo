@@ -592,7 +592,6 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
         if (_version == schemaVersionInvalid)
             _version = authzVersion;
         ret = _userCache.insertOrAssignAndGet(userName, std::move(user));
-        _updateCacheGeneration_inlock(guard);
     } else {
         // If the cache generation changed while this thread was in fetch mode, the data
         // associated with the user may now be invalid, so we must mark it as such.  The caller
