@@ -125,6 +125,65 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     ASSERT_EQ(4, cm->numChunks());
 }
 
+TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+    auto initialRoutingInfo(
+        makeChunkManager(kNss, shardKeyPattern, nullptr, true, {BSON("_id" << 0)}));
+    ASSERT_EQ(2, initialRoutingInfo->numChunks());
+
+    ChunkVersion version = initialRoutingInfo->getVersion();
+
+    // Make sure that no refresh calls are made if the operation context variable is set to
+    // skip the refresh.
+    auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
+    catalogCache->setOperationShouldSkipCatalogCacheRefresh(operationContext(), true);
+
+    auto futureNoRefresh = scheduleRoutingInfoRefresh(kNss);
+
+    auto routingInfo = futureNoRefresh.default_timed_get();
+    ASSERT(routingInfo->cm());
+    auto cm = routingInfo->cm();
+    ASSERT_EQ(2, cm->numChunks());
+
+    // TODO SERVER-44051 Remove the following section of this test, since when the operation
+    // context variable is set to skip the refresh by default, we will be setting it to skip for
+    // every test that performs a refresh in this unit test file.
+
+    // Make sure that refresh calls are made is the operation context variable is set to block
+    // behind the refresh.
+    catalogCache->setOperationShouldSkipCatalogCacheRefresh(operationContext(), false);
+    auto futureRefresh = scheduleRoutingInfoRefresh(kNss);
+
+    ChunkVersion expectedDestShardVersion;
+
+    expectGetCollection(version.epoch(), shardKeyPattern);
+
+    // Return set of chunks, which represent a move
+    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+        version.incMajor();
+        expectedDestShardVersion = version;
+        ChunkType chunk1(
+            kNss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"1"});
+        chunk1.setName(OID::gen());
+
+        version.incMinor();
+        ChunkType chunk2(
+            kNss, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"0"});
+        chunk2.setName(OID::gen());
+
+        return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
+    }());
+
+    routingInfo = futureRefresh.default_timed_get();
+    ASSERT(routingInfo->cm());
+    cm = routingInfo->cm();
+
+    ASSERT_EQ(2, cm->numChunks());
+    ASSERT_EQ(version, cm->getVersion());
+    ASSERT_EQ(version, cm->getVersion({"0"}));
+    ASSERT_EQ(expectedDestShardVersion, cm->getVersion({"1"}));
+}
+
 class MockLockerAlwaysReportsToBeLocked : public LockerNoop {
 public:
     using LockerNoop::LockerNoop;

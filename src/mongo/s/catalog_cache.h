@@ -53,6 +53,15 @@ class OperationContext;
 static constexpr int kMaxNumStaleVersionRetries = 10;
 
 /**
+ * If true, this operation should skip a catalog cache refresh. Otherwise, the operation will
+ * block behind the catalog cache refresh.
+ *
+ * TODO SERVER-44501: Invert this boolean, because boolean decorations are default-constructed to
+ * false.
+ */
+extern const OperationContext::Decoration<bool> operationShouldSkipCatalogCacheRefresh;
+
+/**
  * Constructed exclusively by the CatalogCache, contains a reference to the cached information for
  * the specified database.
  */
@@ -205,6 +214,16 @@ public:
      * To be called if using the input routing info caused a StaleShardVersion to be received.
      */
     void onStaleShardVersion(CachedCollectionRoutingInfo&&);
+
+    /**
+     * Gets whether this operation should skip a catalog cache refresh.
+     */
+    static bool getOperationShouldSkipCatalogCacheRefresh(OperationContext* opCtx);
+
+    /**
+     * Sets whether this operation should skip a catalog catche refresh.
+     */
+    static void setOperationShouldSkipCatalogCacheRefresh(OperationContext* opCtx, bool shouldSkip);
 
     /**
      * Throws a StaleConfigException if this catalog cache does not have an entry for the given
