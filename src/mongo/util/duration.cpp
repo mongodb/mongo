@@ -31,130 +31,25 @@
 
 #include "mongo/util/duration.h"
 
-#include <iostream>
-
-#include "mongo/bson/util/builder.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
-namespace {
-template <typename Stream>
-Stream& streamPut(Stream& os, Nanoseconds ns) {
-    return os << ns.count() << "ns";
+
+template <typename Period>
+BSONObj Duration<Period>::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("units", unit_short());
+    builder.append("value", count());
+    builder.done();
+    return builder.obj();
 }
 
-template <typename Stream>
-Stream& streamPut(Stream& os, Microseconds us) {
-    return os << us.count() << "\xce\xbcs";
-}
+template BSONObj Nanoseconds::toBSON() const;
+template BSONObj Microseconds::toBSON() const;
+template BSONObj Milliseconds::toBSON() const;
+template BSONObj Seconds::toBSON() const;
+template BSONObj Minutes::toBSON() const;
+template BSONObj Hours::toBSON() const;
+template BSONObj Days::toBSON() const;
 
-template <typename Stream>
-Stream& streamPut(Stream& os, Milliseconds ms) {
-    return os << ms.count() << "ms";
-}
-
-template <typename Stream>
-Stream& streamPut(Stream& os, Seconds s) {
-    return os << s.count() << 's';
-}
-
-template <typename Stream>
-Stream& streamPut(Stream& os, Minutes min) {
-    return os << min.count() << "min";
-}
-
-template <typename Stream>
-Stream& streamPut(Stream& os, Hours hrs) {
-    return os << hrs.count() << "hr";
-}
-
-template <typename Stream>
-Stream& streamPut(Stream& os, Days days) {
-    return os << days.count() << "d";
-}
-
-}  // namespace
-
-std::ostream& operator<<(std::ostream& os, Nanoseconds ns) {
-    return streamPut(os, ns);
-}
-
-std::ostream& operator<<(std::ostream& os, Microseconds us) {
-    return streamPut(os, us);
-}
-
-std::ostream& operator<<(std::ostream& os, Milliseconds ms) {
-    return streamPut(os, ms);
-}
-std::ostream& operator<<(std::ostream& os, Seconds s) {
-    return streamPut(os, s);
-}
-
-std::ostream& operator<<(std::ostream& os, Minutes m) {
-    return streamPut(os, m);
-}
-
-std::ostream& operator<<(std::ostream& os, Hours h) {
-    return streamPut(os, h);
-}
-
-std::ostream& operator<<(std::ostream& os, Days d) {
-    return streamPut(os, d);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Nanoseconds ns) {
-    return streamPut(os, ns);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Microseconds us) {
-    return streamPut(os, us);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Milliseconds ms) {
-    return streamPut(os, ms);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Seconds s) {
-    return streamPut(os, s);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Minutes m) {
-    return streamPut(os, m);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Hours h) {
-    return streamPut(os, h);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Days d) {
-    return streamPut(os, d);
-}
-
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
-                                                       Nanoseconds);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
-                                                       Microseconds);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
-                                                       Milliseconds);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Seconds);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Minutes);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Hours);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, Nanoseconds);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, Microseconds);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, Milliseconds);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, Seconds);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, Minutes);
-template StringBuilderImpl<SharedBufferAllocator>& operator<<(
-    StringBuilderImpl<SharedBufferAllocator>&, Hours);
 }  // namespace mongo

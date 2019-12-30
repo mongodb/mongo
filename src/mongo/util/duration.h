@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <ratio>
@@ -42,6 +43,8 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+class BSONObj;
 
 template <typename Allocator>
 class StringBuilderImpl;
@@ -64,36 +67,6 @@ using Days = Duration<std::ratio<86400>>;
 // E.g., std::cout << Minutes{5} << std::endl; should produce the following:
 // 5min
 //
-
-std::ostream& operator<<(std::ostream& os, Nanoseconds ns);
-std::ostream& operator<<(std::ostream& os, Microseconds us);
-std::ostream& operator<<(std::ostream& os, Milliseconds ms);
-std::ostream& operator<<(std::ostream& os, Seconds s);
-std::ostream& operator<<(std::ostream& os, Minutes m);
-std::ostream& operator<<(std::ostream& os, Hours h);
-std::ostream& operator<<(std::ostream& os, Days h);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Nanoseconds ns);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Microseconds us);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Milliseconds ms);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Seconds s);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Minutes m);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Hours h);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Days h);
-
 
 template <typename Duration1, typename Duration2>
 using HigherPrecisionDuration =
@@ -155,6 +128,24 @@ inline long long durationCount(const stdx::chrono::duration<RepIn, PeriodIn>& d)
 template <typename Period>
 class Duration {
 public:
+    static constexpr StringData unit_short() {
+        if constexpr (std::is_same_v<Duration, Nanoseconds>) {
+            return "ns"_sd;
+        } else if constexpr (std::is_same_v<Duration, Microseconds>) {
+            return "\xce\xbcs"_sd;
+        } else if constexpr (std::is_same_v<Duration, Milliseconds>) {
+            return "ms"_sd;
+        } else if constexpr (std::is_same_v<Duration, Seconds>) {
+            return "s"_sd;
+        } else if constexpr (std::is_same_v<Duration, Minutes>) {
+            return "min"_sd;
+        } else if constexpr (std::is_same_v<Duration, Hours>) {
+            return "hr"_sd;
+        } else if constexpr (std::is_same_v<Duration, Days>) {
+            return "d"_sd;
+        }
+        return StringData{};
+    }
     MONGO_STATIC_ASSERT_MSG(Period::num > 0, "Duration::period's numerator must be positive");
     MONGO_STATIC_ASSERT_MSG(Period::den > 0, "Duration::period's denominator must be positive");
 
@@ -367,6 +358,13 @@ public:
         return *this;
     }
 
+    BSONObj toBSON() const;
+
+    std::string toString() const {
+        return fmt::format("{} {}", count(), unit_short());
+    }
+
+
 private:
     rep _count = {};
 };
@@ -449,6 +447,27 @@ template <typename Period, typename Rep2>
 Duration<Period> operator/(Duration<Period> d, const Rep2& scale) {
     d /= scale;
     return d;
+}
+
+template <typename Stream, typename Period>
+Stream& streamPut(Stream& os, const Duration<Period>& dp) {
+    MONGO_STATIC_ASSERT_MSG(!Duration<Period>::unit_short().empty(),
+                            "Only standard Durations can logged");
+    return os << dp.count() << dp.unit_short();
+}
+
+template <typename Period>
+std::ostream& operator<<(std::ostream& os, Duration<Period> dp) {
+    MONGO_STATIC_ASSERT_MSG(!Duration<Period>::unit_short().empty(),
+                            "Only standard Durations can logged");
+    return streamPut(os, dp);
+}
+
+template <typename Allocator, typename Period>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Duration<Period> dp) {
+    MONGO_STATIC_ASSERT_MSG(!Duration<Period>::unit_short().empty(),
+                            "Only standard Durations can logged");
+    return streamPut(os, dp);
 }
 
 }  // namespace mongo
