@@ -122,6 +122,11 @@ public:
 };
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {
+public:
+    OplogApplierImplTest(){};
+    OplogApplierImplTest(std::string storageEngine)
+        : ServiceContextMongoDTest(std::move(storageEngine)){};
+
 protected:
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,

@@ -88,6 +88,9 @@ StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBuf
                                                      const CollectionState& state);
 
 class IdempotencyTest : public OplogApplierImplTest {
+public:
+    IdempotencyTest() : OplogApplierImplTest("wiredTiger"){};
+
 protected:
     enum class SequenceType : int { kEntireSequence, kAnyPrefix, kAnySuffix, kAnyPrefixOrSuffix };
     OplogEntry createCollection(CollectionUUID uuid = UUID::gen());
