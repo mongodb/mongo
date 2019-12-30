@@ -2113,6 +2113,35 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     ASSERT_EQUALS(state1, state2);
 }
 
+TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+    CollectionUUID uuid = kUuid;
+
+    auto options1 = BSON("idIndex" << BSON("key" << fromjson("{_id: 1}") << "name"
+                                                 << "_id_"
+                                                 << "v" << 2)
+                                   << "uuid" << uuid);
+    auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
+    ASSERT_OK(runOpInitialSync(createColl1));
+
+    auto runOpsAndValidate = [this, uuid]() {
+        auto insertOp = insert(BSON("_id" << Decimal128(1)));
+        auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
+        auto createColl2 = createCollection(uuid);
+
+        auto ops = {insertOp, dropColl, createColl2};
+        ASSERT_OK(runOpsInitialSync(ops));
+        auto state = validate();
+
+        return state;
+    };
+
+    auto state1 = runOpsAndValidate();
+    auto state2 = runOpsAndValidate();
+    ASSERT_EQUALS(state1, state2);
+}
+
 TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_RECOVERING));

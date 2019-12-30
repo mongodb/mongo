@@ -35,7 +35,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -120,10 +119,6 @@ void OplogApplierImplTest::setUp() {
     // the server parameter.
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
-    // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
-    // invalid timestamp.
-    ASSERT_OK(LogicalClock::get(_opCtx.get())->advanceClusterTime(LogicalTime(Timestamp(1, 0))));
 }
 
 void OplogApplierImplTest::tearDown() {

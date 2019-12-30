@@ -113,10 +113,6 @@ StatusWith<std::string> ServerParameter::coerceToString(const BSONElement& eleme
     }
 }
 
-void ServerParameterSet::remove(const std::string& name) {
-    invariant(1 == _map.erase(name));
-}
-
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
                                                                      ServerParameter* sp)
     : ServerParameter(ServerParameterSet::getGlobal(),

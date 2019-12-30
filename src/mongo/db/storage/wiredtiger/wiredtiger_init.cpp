@@ -130,9 +130,21 @@ public:
             MONGO_COMPILER_VARIABLE_UNUSED auto leakedSection =
                 new WiredTigerServerStatusSection(kv);
 
+            auto* param = new WiredTigerEngineRuntimeConfigParameter(
+                "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly);
+            param->_data.second = kv;
+
+            auto* maxCacheOverflowParam = new WiredTigerMaxCacheOverflowSizeGBParameter(
+                "wiredTigerMaxCacheOverflowSizeGB", ServerParameterType::kRuntimeOnly);
+            maxCacheOverflowParam->_data = {wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB, kv};
+
             // This allows unit tests to run this code without encountering memory leaks
+            // TODO (SERVER-43063): to fix the global server parameter registry memory leak. The
+            // server status section leak will still exist after SERVER-43063.
 #if __has_feature(address_sanitizer)
             __lsan_ignore_object(leakedSection);
+            __lsan_ignore_object(param);
+            __lsan_ignore_object(maxCacheOverflowParam);
 #endif
         }
 
