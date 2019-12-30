@@ -200,7 +200,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             self.logger.warning("All members of the sharded cluster were expected to be running, "
                                 "but weren't.")
 
-        # If we're just killing, shutting down the balancer fails for nonresponsive servers.
+        # If we're killing to archive data files, stopping the balancer will execute
+        # server commands that might lead to on-disk changes from the point of failure.
         if self.enable_balancer and not kill:
             self.stop_balancer()
 
@@ -446,7 +447,9 @@ class _MongoSFixture(interface.Fixture):
         self.mongos.stop(kill=kill)
         exit_code = self.mongos.wait()
 
-        if exit_code == 0:
+        # SIGKILL has an exit code of 9 and Python's subprocess module returns
+        # negative versions of system calls.
+        if exit_code == 0 or (exit_code == -9 and kill):
             self.logger.info("Successfully stopped the mongos on port {:d}".format(self.port))
         else:
             self.logger.warning("Stopped the mongos on port {:d}. "
