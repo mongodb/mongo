@@ -543,6 +543,19 @@ TEST_F(LogTestV2, Types) {
         mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").String(),
         withoutBSON.toString());
     ASSERT_EQUALS(lastBSONElement().String(), withoutBSON.toString());
+
+    // Duration
+    Milliseconds ms{12345};
+    LOGV2("Duration {}", "name"_attr = ms);
+    ASSERT_EQUALS(text.back(), std::string("Duration ") + ms.toString());
+    ASSERT_EQUALS(mongo::fromjson(json.back())
+                      .getField(kAttributesFieldName)
+                      .Obj()
+                      .getField("name")
+                      .Obj()
+                      .woCompare(ms.toBSON()),
+                  0);
+    ASSERT(lastBSONElement().Obj().woCompare(ms.toBSON()) == 0);
 }
 
 TEST_F(LogTestV2, TextFormat) {
