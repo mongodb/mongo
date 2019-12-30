@@ -6205,7 +6205,7 @@ tasks:
       resmoke_args: --suites=multiversion --storageEngine=wiredTiger
 
 - name: unittest_shell_hang_analyzer_gen
-  tags: ["misc_js"]
+  tags: ["misc_js", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -8492,7 +8492,7 @@ buildvariants:
   - name: aggregation_auth
   - name: auth_gen
   - name: bulk_gle_passthrough
-  - name: .misc_js
+  - name: .misc_js !.sharded
   - name: concurrency
   - name: concurrency_simultaneous
   - name: disk_wiredtiger
