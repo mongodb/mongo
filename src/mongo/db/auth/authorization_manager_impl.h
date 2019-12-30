@@ -30,37 +30,12 @@
 #pragma once
 
 #include "mongo/db/auth/authorization_manager.h"
-
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <string>
-
-#include "mongo/base/secure_allocator.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/privilege_format.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/role_graph.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/invalidating_lru_cache.h"
 
 namespace mongo {
-class AuthorizationSession;
-class AuthzManagerExternalState;
-class OperationContext;
-class ServiceContext;
-class UserDocumentParser;
 
 /**
  * Contains server/cluster-wide information about Authorization.
@@ -138,8 +113,6 @@ public:
 
     void updatePinnedUsersList(std::vector<UserName> names) override;
 
-    Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) override;
-
     void logOp(OperationContext* opCtx,
                const char* opstr,
                const NamespaceString& nss,
@@ -149,18 +122,6 @@ public:
     std::vector<CachedUserInfo> getUserCacheInfo() const override;
 
 private:
-    /**
-     * Type used to guard accesses and updates to the user cache.
-     */
-    class CacheGuard;
-    friend class AuthorizationManagerImpl::CacheGuard;
-
-    /**
-     * Invalidates all User objects in the cache and removes them from the cache.
-     * Should only be called when already holding _cacheMutex.
-     */
-    void _invalidateUserCache_inlock(const CacheGuard&);
-
     /**
      * Given the objects describing an oplog entry that affects authorization data, invalidates
      * the portion of the user cache that is affected by that operation.  Should only be called
@@ -172,96 +133,75 @@ private:
                                       const BSONObj& o,
                                       const BSONObj* o2);
 
-    /**
-     * Updates _cacheGeneration to a new OID
-     */
-    void _updateCacheGeneration_inlock(const CacheGuard&);
-
     void _pinnedUsersThreadRoutine() noexcept;
-
-    /**
-     * Fetches user information from a v2-schema user document for the named user,
-     * and stores a pointer to a new user object into *acquiredUser on success.
-     */
-    Status _fetchUserV2(OperationContext* opCtx,
-                        const UserName& userName,
-                        std::unique_ptr<User>* acquiredUser);
-
-    /**
-     * True if AuthSchema startup checks should be applied in this AuthorizationManager.
-     *
-     * Defaults to true.  Changes to its value are not synchronized, so it should only be set
-     * at initalization-time.
-     */
-    bool _startupAuthSchemaValidation;
-
-    /**
-     * True if access control enforcement is enabled in this AuthorizationManager.
-     *
-     * Defaults to false.  Changes to its value are not synchronized, so it should only be set
-     * at initalization-time.
-     */
-    bool _authEnabled;
-
-    /**
-     * A cache of whether there are any users set up for the cluster.
-     */
-    AtomicWord<bool> _privilegeDocsExist;
 
     std::unique_ptr<AuthzManagerExternalState> _externalState;
 
     /**
-     * Cached value of the authorization schema version.
+     * True if AuthSchema startup checks should be applied in this AuthorizationManager.
      *
-     * May be set by acquireUser() and getAuthorizationVersion().  Invalidated by
-     * invalidateUserCache().
-     *
-     * Reads and writes guarded by CacheGuard.
+     * Changes to its value are not synchronized, so it should only be set at initalization-time.
      */
-    int _version;
+    bool _startupAuthSchemaValidation{true};
 
     /**
-     * Caches User objects with information about user privileges, to avoid the need to
-     * go to disk to read user privilege documents whenever possible.  Every User object
-     * has a reference count - the AuthorizationManager must not delete a User object in the
-     * cache unless its reference count is zero.
+     * True if access control enforcement is enabled in this AuthorizationManager.
+     *
+     * Changes to its value are not synchronized, so it should only be set at initalization-time.
      */
-    struct UserCacheInvalidator {
-        void operator()(User* user);
-    };
+    bool _authEnabled{false};
 
-    InvalidatingLRUCache<UserName, User, UserCacheInvalidator> _userCache;
+    /**
+     * A cache of whether there are any users set up for the cluster.
+     */
+    AtomicWord<bool> _privilegeDocsExist{false};
+
+    /**
+     * Cache which contains at most a single entry (which has key 0), whose value is the version of
+     * the auth schema.
+     */
+    class AuthSchemaVersionDistCache : public DistCache<int, int> {
+    public:
+        AuthSchemaVersionDistCache(AuthzManagerExternalState* externalState);
+
+        // Even though the dist cache permits for lookup to return boost::none for non-existent
+        // values, the contract of the authorization manager is that it should throw an exception if
+        // the value can not be loaded, so if it returns, the value will always be set.
+        boost::optional<int> lookup(OperationContext* opCtx, const int& unusedKey) override;
+
+    private:
+        Mutex _mutex =
+            MONGO_MAKE_LATCH("AuthorizationManagerImpl::AuthSchemaVersionDistCache::_mutex");
+
+        AuthzManagerExternalState* const _externalState;
+    } _authSchemaVersionCache;
+
+    /**
+     * Cache of the users known to the authentication subsystem.
+     */
+    class UserDistCacheImpl : public UserDistCache {
+    public:
+        UserDistCacheImpl(AuthSchemaVersionDistCache* authSchemaVersionCache,
+                          AuthzManagerExternalState* externalState,
+                          int cacheSize);
+
+        // Even though the dist cache permits for lookup to return boost::none for non-existent
+        // values, the contract of the authorization manager is that it should throw an exception if
+        // the value can not be loaded, so if it returns, the value will always be set.
+        boost::optional<User> lookup(OperationContext* opCtx, const UserName& userName) override;
+
+    private:
+        Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::UserDistCacheImpl::_mutex");
+
+        AuthSchemaVersionDistCache* const _authSchemaVersionCache;
+
+        AuthzManagerExternalState* const _externalState;
+    } _userCache;
 
     Mutex _pinnedUsersMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_pinnedUsersMutex");
     stdx::condition_variable _pinnedUsersCond;
     std::once_flag _pinnedThreadTrackerStarted;
     boost::optional<std::vector<UserName>> _usersToPin;
-
-    /**
-     * Protects _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
-     * via CacheGuard.
-     */
-    Mutex _cacheWriteMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_cacheWriteMutex");
-
-    /**
-     * Current generation of cached data.  Updated every time part of the cache gets
-     * invalidated.  Protected by CacheGuard.
-     */
-    OID _fetchGeneration;
-
-    /**
-     * True if there is an update to the _userCache in progress, and that update is currently in
-     * the "fetch phase", during which it does not hold the _cacheMutex.
-     *
-     * Manipulated via CacheGuard.
-     */
-    bool _isFetchPhaseBusy = false;
-
-    /**
-     * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.
-     * Manipulated via CacheGuard.
-     */
-    stdx::condition_variable _fetchPhaseIsReady;
 };
 
 extern int authorizationManagerCacheSize;

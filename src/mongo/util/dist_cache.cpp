@@ -27,34 +27,23 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/util/dist_cache.h"
 
 namespace mongo {
 
-/**
- * A class which handles looking up RWConcernDefault values from an in-memory location.
- */
-class ReadWriteConcernDefaultsLookupMock {
-public:
-    ReadWriteConcernDefaults::FetchDefaultsFn getFetchDefaultsFn();
+DistCacheBase::DistCacheBase(Mutex& mutex) : _cacheWriteMutex(mutex) {}
 
-    boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);
+DistCacheBase::~DistCacheBase() = default;
 
-    /**
-     * Behind-the-scenes way to update the stored in-memory value that lookup() returns.
-     */
-    void setLookupCallReturnValue(RWConcernDefault&& value);
+OID DistCacheBase::getCacheGeneration() const {
+    stdx::lock_guard<Latch> lk(_cacheWriteMutex);
+    return _fetchGeneration;
+}
 
-    /**
-     * Set a status that lookup() should throw (or boost::none to not throw an exception).
-     */
-    void setLookupCallFailure(boost::optional<Status> status);
-
-private:
-    boost::optional<RWConcernDefault> _value;
-    boost::optional<Status> _status;
-};
+void DistCacheBase::_updateCacheGeneration(const CacheGuard&) {
+    _fetchGeneration = OID::gen();
+}
 
 }  // namespace mongo

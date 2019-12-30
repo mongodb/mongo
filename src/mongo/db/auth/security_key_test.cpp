@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "boost/filesystem.hpp"
+#include <boost/filesystem.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -38,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 class TestFile {
     TestFile(TestFile&) = delete;
@@ -157,7 +158,7 @@ TEST(SecurityFile, Test) {
 }
 
 TEST(SecurityKey, Test) {
-    internalSecurity.user = std::make_shared<User>(UserName("__system", "local"));
+    internalSecurity.user = UserHandle(User(UserName("__system", "local")));
 
     for (const auto& testCase : testCases) {
         TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);
@@ -170,4 +171,5 @@ TEST(SecurityKey, Test) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

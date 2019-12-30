@@ -29,11 +29,10 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstdlib>
 #include <iterator>
 #include <list>
-
-#include <boost/optional.hpp>
 
 #include "mongo/stdx/unordered_map.h"
 
@@ -87,7 +86,7 @@ public:
      * This method does not provide the strong exception safe guarantee. If a call
      * to this method throws, the cache may be left in an inconsistent state.
      */
-    boost::optional<V> add(const K& key, V entry) {
+    boost::optional<std::pair<K, V>> add(const K& key, V entry) {
         // If the key already exists, delete it first.
         auto i = this->_map.find(key);
         if (i != this->_map.end()) {
@@ -101,13 +100,12 @@ public:
         // evict the least recently used entry.
         if (this->size() > this->_maxSize) {
             auto pair = std::move(this->_list.back());
-            auto result = std::move(pair.second);
 
             this->_map.erase(pair.first);
             this->_list.pop_back();
 
             invariant(this->size() <= this->_maxSize);
-            return std::move(result);
+            return std::move(pair);
         }
 
         invariant(this->size() <= this->_maxSize);

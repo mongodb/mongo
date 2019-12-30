@@ -43,148 +43,327 @@
 namespace mongo {
 namespace {
 
-class TestValue {
-public:
-    bool isValid() {
-        return _isValidHook.value_or([&] { return _isValid.load(); })();
-    }
+// The structure for testing is intentionally made movable, but non-copyable
+struct TestValue {
+    TestValue(std::string in_value) : value(std::move(in_value)) {}
+    TestValue(TestValue&&) = default;
+    TestValue(const TestValue&) = delete;
+    TestValue& operator=(const TestValue&) = delete;
 
-    void markValid(bool isValid) {
-        _isValid.store(isValid);
-    }
-
-    void setValidHook(std::function<bool()> validHook) {
-        _isValidHook = std::move(validHook);
-    }
-
-private:
-    AtomicWord<bool> _isValid{true};
-    boost::optional<std::function<bool()>> _isValidHook;
+    std::string value;
 };
 
-struct TestValueInvalidator {
-    void operator()(TestValue* value) {
-        value->markValid(false);
+using TestValueCache = InvalidatingLRUCache<int, TestValue>;
+using TestValueHandle = TestValueCache::ValueHandle;
+
+TEST(InvalidatingLRUCacheTest, ValueHandleOperators) {
+    TestValueCache cache(1);
+    cache.insertOrAssign(100, {"Test value"});
+
+    {
+        auto valueHandle = cache.get(100);
+        ASSERT_EQ("Test value", valueHandle->value);
+        ASSERT_EQ("Test value", (*valueHandle).value);
     }
-};
-
-TEST(InvalidatingLRUCache, Invalidate) {
-    constexpr int key = 0;
-    InvalidatingLRUCache<int, TestValue, TestValueInvalidator> cache(1, TestValueInvalidator{});
-
-    auto validItem = std::make_unique<TestValue>();
-    const auto validItemPtr = validItem.get();
-    // Insert an item into the cache.
-    cache.insertOrAssign(0, std::move(validItem));
-
-    // Make sure the cache now contains 1 cached item that mainsertOrAssign(0,
-    // std::move(validItem));
-    auto cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), size_t(1));
-    ASSERT_FALSE(cacheInfo[0].active);
-    ASSERT_EQ(cacheInfo[0].key, key);
-
-    // Get the cached item out as a shared_ptr and verify that it's valid and matches the item
-    // we just inserted - both by key and by pointer.
-    auto cachedItem = cache.get(key);
-    ASSERT_TRUE(cachedItem);
-    ASSERT_EQ(cachedItem->get(), validItemPtr);
-    ASSERT_TRUE((*cachedItem));
-
-    // Make sure the cache info reflects that the cache size is 1, but the item is now active.
-    cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), size_t(1));
-    ASSERT_TRUE(cacheInfo[0].active);
-    ASSERT_EQ(cacheInfo[0].key, key);
-
-    // Invalidate the active item and make sure the invalidator ran and that we can still access
-    // our shared_ptr to the item.
-    cache.invalidate(key);
-    ASSERT_FALSE((*cachedItem)->isValid());
-
-    // The cache should now be totally empty.
-    cacheInfo = cache.getCacheInfo();
-    ASSERT_TRUE(cacheInfo.empty());
-
-    // Insert a new item into the cache at the same key.
-    cache.insertOrAssign(key, std::make_unique<TestValue>());
-
-    // Make sure we can get the new item from the cache. By assigning to cachedItem, we should
-    // destroy the old shared_ptr as well.
-    cachedItem = cache.get(key);
-    ASSERT_TRUE(cachedItem);
-
-    // Make sure the new item isn't just the old item over again.
-    ASSERT_NE(cachedItem->get(), validItemPtr);
-    cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), size_t(1));
+    {
+        const auto valueHandle = cache.get(100);
+        ASSERT_EQ("Test value", valueHandle->value);
+        ASSERT_EQ("Test value", (*valueHandle).value);
+    }
 }
 
-TEST(InvalidatingLRUCache, CacheFull) {
-    constexpr int cacheSize = 2;
-    InvalidatingLRUCache<int, TestValue, TestValueInvalidator> cache(cacheSize,
-                                                                     TestValueInvalidator{});
-    // Make a cache that's absolutely full of items.
-    for (int i = 0; i < cacheSize; i++) {
-        cache.insertOrAssign(i, std::make_unique<TestValue>());
-    }
+TEST(InvalidatingLRUCacheTest, InvalidateNonCheckedOutValue) {
+    TestValueCache cache(3);
 
-    auto cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), static_cast<size_t>(cacheSize));
+    cache.insertOrAssign(0, {"Non checked-out (not invalidated)"});
+    cache.insertOrAssign(1, {"Non checked-out (invalidated)"});
+    cache.insertOrAssign(2, {"Non checked-out (not invalidated)"});
 
-    // Make sure we can actually get an item. This should move item 0 from the LRU cache and into
-    // the active list.
-    auto zeroItem = cache.get(0);
-    ASSERT_TRUE(zeroItem);
+    ASSERT(cache.get(0));
+    ASSERT(cache.get(1));
+    ASSERT(cache.get(2));
+    ASSERT_EQ(3UL, cache.getCacheInfo().size());
 
-    // Insert a new item into the cache. Because item zero is in the active list, the cache info
-    // should have 4 items with one of them active.
-    cache.insertOrAssign(size_t(cacheSize + 1), std::make_unique<TestValue>());
-    cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), size_t(cacheSize + 1));
-
-    auto zeroInfoIt = std::find_if(
-        cacheInfo.begin(), cacheInfo.end(), [](const auto& info) { return info.key == 0; });
-    ASSERT_TRUE(zeroInfoIt != cacheInfo.end());
-    ASSERT_TRUE(zeroInfoIt->active);
-    ASSERT_EQ(zeroInfoIt->useCount, 1);
-
-    // release our active item by assigning it to boost::none. This should bump item 1 out of the
-    // cache because it was the least recently used item.
-    zeroItem = boost::none;
-    cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), size_t(cacheSize));
-
-    auto oneItem = cache.get(1);
-    ASSERT_FALSE(oneItem);
+    cache.invalidate(1);
+    ASSERT(cache.get(0));
+    ASSERT(!cache.get(1));
+    ASSERT(cache.get(2));
+    ASSERT_EQ(2UL, cache.getCacheInfo().size());
 }
 
-TEST(InvalidatingLRUCache, InvalidateIf) {
-    constexpr int cacheSize = 3;
-    InvalidatingLRUCache<int, TestValue, TestValueInvalidator> cache(cacheSize,
-                                                                     TestValueInvalidator{});
+TEST(InvalidatingLRUCacheTest, InvalidateCheckedOutValue) {
+    TestValueCache cache(3);
 
-    for (int i = 0; i < cacheSize; i++) {
-        cache.insertOrAssign(i, std::make_unique<TestValue>());
+    cache.insertOrAssign(0, {"Non checked-out (not invalidated)"});
+    auto checkedOutValue = cache.insertOrAssignAndGet(1, {"Checked-out (invalidated)"});
+    cache.insertOrAssign(2, {"Non checked-out (not invalidated)"});
+
+    ASSERT(checkedOutValue.isValid());
+    ASSERT_EQ(3UL, cache.getCacheInfo().size());
+
+    cache.invalidate(1);
+    ASSERT(!checkedOutValue.isValid());
+    ASSERT_EQ(2UL, cache.getCacheInfo().size());
+    ASSERT(cache.get(0));
+    ASSERT(!cache.get(1));
+    ASSERT(cache.get(2));
+}
+
+TEST(InvalidatingLRUCacheTest, InvalidateOneKeyDoesnAffectAnyOther) {
+    TestValueCache cache(4);
+
+    auto checkedOutKey = cache.insertOrAssignAndGet(0, {"Checked-out key (0)"});
+    auto checkedOutAndInvalidatedKey =
+        cache.insertOrAssignAndGet(1, {"Checked-out and invalidated key (1)"});
+    cache.insertOrAssign(2, {"Non-checked-out and invalidated key (2)"});
+    cache.insertOrAssign(3, {"Key which is not neither checked-out nor invalidated (3)"});
+
+    // Invalidated keys 1 and 2 above and then ensure that only they are affected
+    cache.invalidate(1);
+    cache.invalidate(2);
+
+    ASSERT(checkedOutKey.isValid());
+    ASSERT(!checkedOutAndInvalidatedKey.isValid());
+    ASSERT(!cache.get(2));
+    ASSERT(cache.get(3));
+    ASSERT_EQ(2UL, cache.getCacheInfo().size());
+}
+
+TEST(InvalidatingLRUCacheTest, CheckedOutItemsAreInvalidatedWhenEvictedFromCache) {
+    TestValueCache cache(3);
+
+    // Make a cache that's at its maximum size
+    auto checkedOutKey = cache.insertOrAssignAndGet(
+        0, {"Checked-out key which will be discarded and invalidated (0)"});
+    (void)cache.insertOrAssignAndGet(1, {"Non-checked-out key (1)"});
+    (void)cache.insertOrAssignAndGet(2, {"Non-checked-out key (2)"});
+
+    {
+        auto cacheInfo = cache.getCacheInfo();
+        std::sort(cacheInfo.begin(), cacheInfo.end(), [](auto a, auto b) { return a.key < b.key; });
+        ASSERT_EQ(3UL, cacheInfo.size());
+        ASSERT_EQ(0, cacheInfo[0].key);
+        ASSERT_EQ(1, cacheInfo[0].useCount);
+        ASSERT_EQ(1, cacheInfo[1].key);
+        ASSERT_EQ(2, cacheInfo[2].key);
     }
 
-    constexpr int middleItem = 1;
-    auto middle = cache.get(middleItem);
-    ASSERT_TRUE(middle);
-    auto middleVal = std::move(*middle);
+    // Inserting one more key, should boot out key 0, which was inserted first, but it should still
+    // show-up in the statistics for the cache
+    cache.insertOrAssign(3, {"Non-checked-out key (3)"});
 
-    auto cacheInfo = cache.getCacheInfo();
-    auto infoIt = std::find_if(cacheInfo.begin(), cacheInfo.end(), [&](const auto& info) {
-        return info.key == middleItem;
+    {
+        auto cacheInfo = cache.getCacheInfo();
+        std::sort(cacheInfo.begin(), cacheInfo.end(), [](auto a, auto b) { return a.key < b.key; });
+        ASSERT_EQ(4UL, cacheInfo.size());
+        ASSERT_EQ(0, cacheInfo[0].key);
+        ASSERT_EQ(1, cacheInfo[0].useCount);
+        ASSERT_EQ(1, cacheInfo[1].key);
+        ASSERT_EQ(2, cacheInfo[2].key);
+        ASSERT_EQ(3, cacheInfo[3].key);
+    }
+
+    // Invalidating the key, which was booted out due to cache size exceeded should still be
+    // reflected on the checked-out key
+    ASSERT(checkedOutKey.isValid());
+    cache.invalidate(0);
+    ASSERT(!checkedOutKey.isValid());
+
+    {
+        auto cacheInfo = cache.getCacheInfo();
+        std::sort(cacheInfo.begin(), cacheInfo.end(), [](auto a, auto b) { return a.key < b.key; });
+        ASSERT_EQ(3UL, cacheInfo.size());
+        ASSERT_EQ(1, cacheInfo[0].key);
+        ASSERT_EQ(2, cacheInfo[1].key);
+        ASSERT_EQ(3, cacheInfo[2].key);
+    }
+}
+
+TEST(InvalidatingLRUCacheTest, CheckedOutItemsAreInvalidatedWithPredicateWhenEvictedFromCache) {
+    TestValueCache cache(3);
+
+    // Make a cache that's at its maximum size
+    auto checkedOutKey = cache.insertOrAssignAndGet(
+        0, {"Checked-out key which will be discarded and invalidated (0)"});
+    (void)cache.insertOrAssignAndGet(1, {"Non-checked-out key (1)"});
+    (void)cache.insertOrAssignAndGet(2, {"Non-checked-out key (2)"});
+
+    {
+        auto cacheInfo = cache.getCacheInfo();
+        std::sort(cacheInfo.begin(), cacheInfo.end(), [](auto a, auto b) { return a.key < b.key; });
+        ASSERT_EQ(3UL, cacheInfo.size());
+        ASSERT_EQ(0, cacheInfo[0].key);
+        ASSERT_EQ(1, cacheInfo[0].useCount);
+        ASSERT_EQ(1, cacheInfo[1].key);
+        ASSERT_EQ(2, cacheInfo[2].key);
+    }
+
+    // Inserting one more key, should boot out key 0, which was inserted first, but it should still
+    // show-up in the statistics for the cache
+    cache.insertOrAssign(3, {"Non-checked-out key (3)"});
+
+    {
+        auto cacheInfo = cache.getCacheInfo();
+        std::sort(cacheInfo.begin(), cacheInfo.end(), [](auto a, auto b) { return a.key < b.key; });
+        ASSERT_EQ(4UL, cacheInfo.size());
+        ASSERT_EQ(0, cacheInfo[0].key);
+        ASSERT_EQ(1, cacheInfo[0].useCount);
+        ASSERT_EQ(1, cacheInfo[1].key);
+        ASSERT_EQ(2, cacheInfo[2].key);
+        ASSERT_EQ(3, cacheInfo[3].key);
+    }
+
+    // Invalidating the key, which was booted out due to cache size exceeded should still be
+    // reflected on the checked-out key
+    ASSERT(checkedOutKey.isValid());
+    cache.invalidateIf([](int key, TestValue* value) { return key == 0; });
+    ASSERT(!checkedOutKey.isValid());
+
+    {
+        auto cacheInfo = cache.getCacheInfo();
+        std::sort(cacheInfo.begin(), cacheInfo.end(), [](auto a, auto b) { return a.key < b.key; });
+        ASSERT_EQ(3UL, cacheInfo.size());
+        ASSERT_EQ(1, cacheInfo[0].key);
+        ASSERT_EQ(2, cacheInfo[1].key);
+        ASSERT_EQ(3, cacheInfo[2].key);
+    }
+}
+
+TEST(InvalidatingLRUCacheTest, AssignWhileValueIsCheckedOutInvalidatesFirstValue) {
+    TestValueCache cache(1);
+
+    auto firstGet = cache.insertOrAssignAndGet(100, {"First check-out of the key (100)"});
+    ASSERT(firstGet);
+    ASSERT(firstGet.isValid());
+
+    auto secondGet = cache.insertOrAssignAndGet(100, {"Second check-out of the key (100)"});
+    ASSERT(!firstGet.isValid());
+    ASSERT(secondGet);
+    ASSERT(secondGet.isValid());
+    ASSERT_EQ("Second check-out of the key (100)", secondGet->value);
+}
+
+TEST(InvalidatingLRUCacheTest, InvalidateIfAllEntries) {
+    TestValueCache cache(6);
+
+    for (int i = 0; i < 6; i++) {
+        cache.insertOrAssign(i, TestValue{str::stream() << "Test value " << i});
+    }
+
+    const std::vector checkedOutValues{cache.get(0), cache.get(1), cache.get(2)};
+    cache.invalidateIf([](int, TestValue*) { return true; });
+}
+
+TEST(InvalidatingLRUCacheTest, CacheSizeZero) {
+    TestValueCache cache(0);
+
+    {
+        auto immediatelyEvictedValue = cache.insertOrAssignAndGet(0, TestValue{"Evicted value"});
+        auto anotherImmediatelyEvictedValue =
+            cache.insertOrAssignAndGet(1, TestValue{"Another evicted value"});
+        ASSERT(immediatelyEvictedValue.isValid());
+        ASSERT(anotherImmediatelyEvictedValue.isValid());
+        ASSERT(cache.get(0));
+        ASSERT(cache.get(1));
+        ASSERT_EQ(2UL, cache.getCacheInfo().size());
+        ASSERT_EQ(1UL, cache.getCacheInfo()[0].useCount);
+        ASSERT_EQ(1UL, cache.getCacheInfo()[1].useCount);
+    }
+
+    ASSERT(!cache.get(0));
+    ASSERT(!cache.get(1));
+    ASSERT_EQ(0UL, cache.getCacheInfo().size());
+}
+
+TEST(InvalidatingLRUCacheTest, CacheSizeZeroInvalidate) {
+    TestValueCache cache(0);
+
+    auto immediatelyEvictedValue = cache.insertOrAssignAndGet(0, TestValue{"Evicted value"});
+    ASSERT(immediatelyEvictedValue.isValid());
+    ASSERT(cache.get(0));
+    ASSERT_EQ(1UL, cache.getCacheInfo().size());
+    ASSERT_EQ(1UL, cache.getCacheInfo()[0].useCount);
+
+    cache.invalidate(0);
+
+    ASSERT(!immediatelyEvictedValue.isValid());
+    ASSERT(!cache.get(0));
+    ASSERT_EQ(0UL, cache.getCacheInfo().size());
+}
+
+TEST(InvalidatingLRUCacheTest, CacheSizeZeroInvalidateAllEntries) {
+    TestValueCache cache(0);
+
+    std::vector<TestValueHandle> checkedOutValues;
+    for (int i = 0; i < 6; i++) {
+        checkedOutValues.emplace_back(
+            cache.insertOrAssignAndGet(i, TestValue{str::stream() << "Test value " << i}));
+    }
+
+    cache.invalidateIf([](int, TestValue*) { return true; });
+
+    for (auto&& value : checkedOutValues) {
+        ASSERT(!value.isValid()) << "Value " << value->value << " was not invalidated";
+    }
+}
+
+template <typename TestFunc>
+void parallelTest(size_t cacheSize, TestFunc doTest) {
+    constexpr auto kNumIterations = 100'000;
+    constexpr auto kNumThreads = 4;
+
+    TestValueCache cache(cacheSize);
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kNumThreads; i++) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kNumIterations / kNumThreads; i++) {
+                doTest(cache);
+            }
+        });
+    }
+
+    for (auto&& thread : threads) {
+        thread.join();
+    }
+}
+
+TEST(InvalidatingLRUCacheParallelTest, InsertOrAssignThenGet) {
+    parallelTest(1, [](TestValueCache& cache) mutable {
+        const int key = 100;
+        cache.insertOrAssign(key, TestValue{"Parallel tester value"});
+
+        auto cachedItem = cache.get(key);
+        if (!cachedItem || !cachedItem.isValid())
+            return;
+
+        auto cachedItemSecondRef = cachedItem;
+        cache.invalidate(key);
+
+        ASSERT(!cachedItem.isValid());
+        ASSERT(!cachedItemSecondRef.isValid());
     });
-    ASSERT_EQ(cacheInfo.size(), static_cast<size_t>(cacheSize));
-    ASSERT_TRUE(infoIt->active);
+}
 
-    cache.invalidateIf([&](const int& key, const TestValue*) { return (key == middleItem); });
+TEST(InvalidatingLRUCacheParallelTest, InsertOrAssignAndGet) {
+    parallelTest(1, [](auto& cache) {
+        const int key = 200;
+        auto cachedItem = cache.insertOrAssignAndGet(key, TestValue{"Parallel tester value"});
+        ASSERT(cachedItem);
 
-    ASSERT_FALSE(middleVal->isValid());
-    cacheInfo = cache.getCacheInfo();
-    ASSERT_EQ(cacheInfo.size(), static_cast<size_t>(cacheSize) - 1);
+        auto cachedItemSecondRef = cache.get(key);
+        ASSERT(cachedItemSecondRef);
+    });
+}
+
+TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
+    parallelTest(0, [](TestValueCache& cache) mutable {
+        const int key = 300;
+        auto cachedItem = cache.insertOrAssignAndGet(key, TestValue{"Parallel tester value"});
+        ASSERT(cachedItem);
+
+        auto cachedItemSecondRef = cache.get(key);
+    });
 }
 
 }  // namespace

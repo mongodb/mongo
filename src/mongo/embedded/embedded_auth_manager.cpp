@@ -125,10 +125,6 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    Status _initializeUserFromPrivilegeDocument(User*, const BSONObj&) override {
-        UASSERT_NOT_IMPLEMENTED;
-    }
-
     void logOp(OperationContext*,
                const char*,
                const NamespaceString&,

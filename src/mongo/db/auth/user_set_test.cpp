@@ -44,9 +44,9 @@ namespace {
 TEST(UserSetTest, BasicTest) {
     UserSet set;
 
-    UserHandle p1 = std::make_shared<User>(UserName("Bob", "test"));
-    UserHandle p2 = std::make_shared<User>(UserName("George", "test"));
-    UserHandle p3 = std::make_shared<User>(UserName("Bob", "test2"));
+    UserHandle p1(User(UserName("Bob", "test")));
+    UserHandle p2(User(UserName("George", "test")));
+    UserHandle p3(User(UserName("Bob", "test2")));
 
     ASSERT_NULL(set.lookup(UserName("Bob", "test")));
     ASSERT_NULL(set.lookup(UserName("George", "test")));
@@ -98,7 +98,7 @@ TEST(UserSetTest, IterateNames) {
     UserNameIterator iter = pset.getNames();
     ASSERT(!iter.more());
 
-    UserHandle user = std::make_shared<User>(UserName("bob", "test"));
+    UserHandle user(User(UserName("bob", "test")));
     pset.add(std::move(user));
 
     iter = pset.getNames();

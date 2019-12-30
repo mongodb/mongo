@@ -40,8 +40,8 @@ env.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        ]
-    )
+    ]
+)
 
 env.Library(
     target='log_and_backoff',
@@ -200,6 +200,16 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         'concurrency/spin_lock',
     ],
+)
+
+env.Library(
+    target='caching',
+    source=[
+        'dist_cache.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
 )
 
 if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
@@ -446,7 +456,6 @@ env.Benchmark(
     ],
 )
 
-
 env.Benchmark(
     target='future_bm',
     source=[
@@ -557,6 +566,7 @@ icuEnv.CppUnitTest(
         'decimal_counter_test.cpp',
         'decorable_test.cpp',
         'diagnostic_info_test.cpp',
+        'dist_cache_test.cpp',
         'dns_name_test.cpp',
         'dns_query_test.cpp',
         'duration_test.cpp',
@@ -602,18 +612,18 @@ icuEnv.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         'alarm',
         'background_job',
+        'caching',
         'clock_source_mock',
         'clock_sources',
         'diagnostic_info',
-        'latch_analyzer',
         'dns_query',
         'fail_point',
         'icu',
+        'latch_analyzer',
         'md5',
         'periodic_runner_impl',
         'processinfo',

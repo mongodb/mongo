@@ -27,19 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/user_set.h"
 
 #include <algorithm>
-#include <iostream>
-#include <string>
-#include <vector>
-
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/user.h"
 
 namespace mongo {
-
 namespace {
+
 class UserSetNameIteratorImpl : public UserNameIterator::Impl {
     UserSetNameIteratorImpl(const UserSetNameIteratorImpl&) = delete;
     UserSetNameIteratorImpl& operator=(const UserSetNameIteratorImpl&) = delete;
@@ -48,17 +44,22 @@ public:
     UserSetNameIteratorImpl(const UserSet::const_iterator& begin,
                             const UserSet::const_iterator& end)
         : _curr(begin), _end(end) {}
-    virtual ~UserSetNameIteratorImpl() {}
-    virtual bool more() const {
+
+    ~UserSetNameIteratorImpl() = default;
+
+    bool more() const override {
         return _curr != _end;
     }
-    virtual const UserName& next() {
+
+    const UserName& next() override {
         return (*(_curr++))->getName();
     }
-    virtual const UserName& get() const {
+
+    const UserName& get() const override {
         return (*_curr)->getName();
     }
-    virtual UserNameIterator::Impl* doClone() const {
+
+    UserNameIterator::Impl* doClone() const override {
         return new UserSetNameIteratorImpl(_curr, _end);
     }
 
@@ -66,7 +67,10 @@ private:
     UserSet::const_iterator _curr;
     UserSet::const_iterator _end;
 };
+
 }  // namespace
+
+UserSet::UserSet() = default;
 
 void UserSet::add(UserHandle user) {
     auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& storedUser) {
@@ -97,24 +101,21 @@ void UserSet::removeAt(iterator it) {
 }
 
 UserHandle UserSet::lookup(const UserName& name) const {
-    auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& user) {
-        invariant(user);
-        return user->getName() == name;
-    });
-
-    return (it != _users.end()) ? *it : nullptr;
+    auto it = std::find_if(
+        _users.begin(), _users.end(), [&](const auto& user) { return user->getName() == name; });
+    return (it != _users.end()) ? *it : UserHandle();
 }
 
 UserHandle UserSet::lookupByDBName(StringData dbname) const {
     auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& user) {
-        invariant(user);
         return user->getName().getDB() == dbname;
     });
-    return (it != _users.end()) ? *it : nullptr;
+    return (it != _users.end()) ? *it : UserHandle();
 }
 
 UserNameIterator UserSet::getNames() const {
     return UserNameIterator(
         std::make_unique<UserSetNameIteratorImpl>(_users.cbegin(), _users.cend()));
 }
+
 }  // namespace mongo

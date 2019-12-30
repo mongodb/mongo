@@ -37,38 +37,31 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/util/clock_source_mock.h"
 
-/**
- * Unit tests of the ReadWriteConcernDefaults type.
- */
-
 namespace mongo {
 namespace {
 
 class ReadWriteConcernDefaultsTest : public ServiceContextTest {
 public:
-    virtual ~ReadWriteConcernDefaultsTest() {
+    ~ReadWriteConcernDefaultsTest() {
         _rwcd.invalidate();
     }
 
 protected:
-    auto* operationContext() {
-        return _opCtx.get();
-    }
-
     ReadWriteConcernDefaultsLookupMock _lookupMock;
+
     ReadWriteConcernDefaults& _rwcd{[&]() -> ReadWriteConcernDefaults& {
-        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getLookupFn());
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
         return ReadWriteConcernDefaults::get(getServiceContext());
     }()};
 
-private:
-    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
+    ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
+    OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentDefaults) {
     // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
     // boost::none.
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
     ASSERT(!defaults.getEpoch());
@@ -79,7 +72,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentDefaults) {
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithDefaultsNeverSet) {
     _lookupMock.setLookupCallReturnValue({});
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
     ASSERT(!defaults.getEpoch());
@@ -93,7 +86,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetDefaults) {
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
     ASSERT_EQ(Timestamp(1, 2), *defaults.getEpoch());
@@ -112,7 +105,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetDefaults) {
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
     ASSERT_EQ(4, defaults.getDefaultWriteConcern()->wNumNodes);
@@ -123,8 +116,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetDefaults) {
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultLookupFailure) {
     _lookupMock.setLookupCallFailure(Status{ErrorCodes::Error(1234), "foobar"});
-    ASSERT_THROWS_CODE_AND_WHAT(
-        _rwcd.getDefault(operationContext()), AssertionException, 1234, "foobar");
+    ASSERT_THROWS_CODE_AND_WHAT(_rwcd.getDefault(_opCtx), AssertionException, 1234, "foobar");
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallLookup) {
@@ -133,7 +125,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
     ASSERT_EQ(Timestamp(1, 2), *defaults.getEpoch());
@@ -150,7 +142,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     newDefaults2.setSetTime(Date_t::fromMillisSinceEpoch(5678));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
-    auto defaults2 = _rwcd.getDefault(operationContext());
+    auto defaults2 = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults2.getDefaultReadConcern());
     ASSERT(!defaults2.getDefaultWriteConcern());
     ASSERT_EQ(Timestamp(1, 2), *defaults2.getEpoch());
@@ -164,7 +156,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
     ASSERT_EQ(Timestamp(1, 2), *defaults.getEpoch());
@@ -182,7 +174,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
     _rwcd.invalidate();
-    auto defaults2 = _rwcd.getDefault(operationContext());
+    auto defaults2 = _rwcd.getDefault(_opCtx);
     ASSERT(defaults2.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
     ASSERT_EQ(4, defaults2.getDefaultWriteConcern()->wNumNodes);
@@ -192,9 +184,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndAbsentDefaults) {
-    _rwcd.refreshIfNecessary(operationContext());
+    _rwcd.refreshIfNecessary(_opCtx);
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
     ASSERT(!defaults.getEpoch());
@@ -208,9 +200,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndSetDefa
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    _rwcd.refreshIfNecessary(operationContext());
+    _rwcd.refreshIfNecessary(_opCtx);
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT_EQ(Timestamp(1, 2), *defaults.getEpoch());
     ASSERT_EQ(1234, defaults.getSetTime()->toMillisSinceEpoch());
     ASSERT(defaults.getLocalSetTime());
@@ -222,7 +214,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT_EQ(Timestamp(1, 2), *defaults.getEpoch());
     ASSERT_EQ(1234, defaults.getSetTime()->toMillisSinceEpoch());
 
@@ -231,9 +223,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
     newDefaults2.setSetTime(Date_t::fromMillisSinceEpoch(5678));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
-    _rwcd.refreshIfNecessary(operationContext());
+    _rwcd.refreshIfNecessary(_opCtx);
 
-    auto defaults2 = _rwcd.getDefault(operationContext());
+    auto defaults2 = _rwcd.getDefault(_opCtx);
     ASSERT_EQ(Timestamp(3, 4), *defaults2.getEpoch());
     ASSERT_EQ(5678, defaults2.getSetTime()->toMillisSinceEpoch());
 }
@@ -244,7 +236,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
     newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-    auto defaults = _rwcd.getDefault(operationContext());
+    auto defaults = _rwcd.getDefault(_opCtx);
     ASSERT(defaults.getEpoch());
     ASSERT(defaults.getSetTime());
 
@@ -253,9 +245,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
     newDefaults2.setSetTime(Date_t::fromMillisSinceEpoch(5678));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
-    _rwcd.refreshIfNecessary(operationContext());
+    _rwcd.refreshIfNecessary(_opCtx);
 
-    auto defaults2 = _rwcd.getDefault(operationContext());
+    auto defaults2 = _rwcd.getDefault(_opCtx);
     ASSERT_EQ(Timestamp(10, 20), *defaults2.getEpoch());
     ASSERT_EQ(1234, defaults2.getSetTime()->toMillisSinceEpoch());
 }
@@ -293,8 +285,9 @@ protected:
     }
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
+
     ReadWriteConcernDefaults& _rwcd{[&]() -> ReadWriteConcernDefaults& {
-        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getLookupFn());
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
         return ReadWriteConcernDefaults::get(getServiceContext());
     }()};
 };

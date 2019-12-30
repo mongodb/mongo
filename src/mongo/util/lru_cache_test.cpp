@@ -38,8 +38,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/lru_cache.h"
 
-using namespace mongo;
-
+namespace mongo {
 namespace {
 
 /**
@@ -140,7 +139,7 @@ void assertNotInCache(const LRUCache<K, V>& cache, const K& key) {
     assertEquals(cache.cfind(key), cache.cend());
 }
 
-const std::array<int, 7> kTestSizes{1, 2, 3, 4, 5, 10, 1000};
+const std::array<int, 7> kTestSizes{1, 2, 3, 4, 5, 10, 100};
 using SizedTest = std::function<void(int)>;
 void runWithDifferentSizes(SizedTest test) {
     for (auto size : kTestSizes) {
@@ -192,7 +191,7 @@ TEST(LRUCacheTest, SizeZeroCache) {
 
     // When elements are added to a zero-size cache, instant eviction.
     auto evicted = cache.add(1, 2);
-    assertEquals(*evicted, 2);
+    assertEquals(evicted->second, 2);
     assertEquals(cache.size(), size_t(0));
     assertNotInCache(cache, 1);
 
@@ -253,7 +252,7 @@ TEST(LRUCacheTest, StressTest) {
     // Try causing an eviction
     auto evicted = cache.add(maxSize + 1, maxSize + 1);
     assertEquals(cache.size(), size_t(maxSize));
-    assertEquals(*evicted, 0);
+    assertEquals(evicted->second, 0);
     assertInCache(cache, maxSize + 1, maxSize + 1);
     assertNotInCache(cache, 0);
 }
@@ -297,9 +296,9 @@ TEST(LRUCacheTest, EvictionTest) {
             // Adding another entry will evict the least-recently used one
             auto evicted = cache.add(maxSize, maxSize);
             assertEquals(cache.size(), size_t(maxSize));
-            assertEquals(*evicted, i);
+            assertEquals(evicted->second, i);
             assertInCache(cache, maxSize, maxSize);
-            assertNotInCache(cache, *evicted);
+            assertNotInCache(cache, evicted->second);
         }
     });
 }
@@ -603,3 +602,4 @@ TEST(LRUCacheTest, CountTest) {
 }
 
 }  // namespace
+}  // namespace mongo

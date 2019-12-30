@@ -31,7 +31,6 @@
 
 #include <map>
 
-#include "mongo/db/dist_cache.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/rw_concern_default_gen.h"
@@ -39,6 +38,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/dist_cache.h"
 
 namespace mongo {
 
@@ -53,7 +53,7 @@ public:
     using ReadConcern = repl::ReadConcernArgs;
     using WriteConcern = WriteConcernOptions;
 
-    using LookupFn = std::function<boost::optional<RWConcernDefault>(OperationContext*)>;
+    using FetchDefaultsFn = std::function<boost::optional<RWConcernDefault>(OperationContext*)>;
 
     static constexpr StringData readConcernFieldName = ReadConcern::kReadConcernFieldName;
     static constexpr StringData writeConcernFieldName = WriteConcern::kWriteConcernField;
@@ -62,13 +62,20 @@ public:
     static constexpr StringData kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
 
     static ReadWriteConcernDefaults& get(ServiceContext* service);
-    static ReadWriteConcernDefaults& get(ServiceContext& service);
     static ReadWriteConcernDefaults& get(OperationContext* opCtx);
-    static void create(ServiceContext* service, LookupFn lookupFn);
+    static void create(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
 
-    ReadWriteConcernDefaults() = delete;
-    ReadWriteConcernDefaults(LookupFn lookupFn);
-    ~ReadWriteConcernDefaults() = default;
+    ReadWriteConcernDefaults(FetchDefaultsFn fetchDefaultsFn);
+    ~ReadWriteConcernDefaults();
+
+    /**
+     * Syntactic sugar around 'getDefault' below. A return value of boost::none means that there is
+     * no default specified for that particular concern.
+     */
+    boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
+    boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
+
+    RWConcernDefault getDefault(OperationContext* opCtx);
 
     /**
      * Returns true if the RC level is permissible to use as a default, and false if it cannot be a
@@ -117,10 +124,6 @@ public:
      * defaults or indicates there are no defaults, then update the cache with the new defaults.
      */
     void refreshIfNecessary(OperationContext* opCtx);
-
-    RWConcernDefault getDefault(OperationContext* opCtx);
-    boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
-    boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
 
     /**
      * Sets the given read write concern as the defaults in the cache.

@@ -33,7 +33,6 @@
 #include <iostream>
 #include <string>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/assert_util.h"
 
@@ -49,7 +48,6 @@ UserName::UserName(StringData user, StringData dbname) {
     dassert(iter == _fullName.end());
     _splitPoint = user.size();
 }
-
 
 StatusWith<UserName> UserName::parse(StringData userNameStr) {
     size_t splitPoint = userNameStr.find('.');

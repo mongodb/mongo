@@ -89,11 +89,6 @@ const User::CredentialData& User::getCredentials() const {
     return _credentials;
 }
 
-bool User::isValid() const {
-    return _isValid.loadRelaxed();
-}
-
-
 const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
     stdx::unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
     if (it == _privileges.end()) {
@@ -101,7 +96,6 @@ const ActionSet User::getActionsForResource(const ResourcePattern& resource) con
     }
     return it->second.getActions();
 }
-
 
 bool User::hasActionsForResource(const ResourcePattern& resource) const {
     return !getActionsForResource(resource).empty();
@@ -162,10 +156,6 @@ void User::addPrivileges(const PrivilegeVector& privileges) {
 
 void User::setRestrictions(RestrictionDocuments restrictions) & {
     _restrictions = std::move(restrictions);
-}
-
-void User::_invalidate() {
-    _isValid.store(false);
 }
 
 }  // namespace mongo
