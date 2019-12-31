@@ -33,6 +33,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
@@ -59,6 +60,7 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
     BSONElement clientElem;
     BSONElement logicalTimeElem;
     BSONElement impersonationElem;
+    BSONElement clientOperationKeyElem;
 
     for (const auto& metadataElem : metadataObj) {
         auto fieldName = metadataElem.fieldNameStringData();
@@ -74,7 +76,19 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
             logicalTimeElem = metadataElem;
         } else if (fieldName == kImpersonationMetadataSectionName) {
             impersonationElem = metadataElem;
+        } else if (fieldName == "clientOperationKey"_sd) {
+            clientOperationKeyElem = metadataElem;
         }
+    }
+
+    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+
+    if (clientOperationKeyElem &&
+        (getTestCommandsEnabled() ||
+         authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal))) {
+        auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
+        opCtx->setOperationKey(std::move(opKey));
     }
 
     if (readPreferenceElem) {
@@ -103,7 +117,6 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
             AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled() &&
             (!signedTime.getProof() || *signedTime.getProof() == TimeProofService::TimeProof())) {
 
-            AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
             // The client is not authenticated and is not using localhost auth bypass.
             if (authSession && !authSession->isAuthenticated() &&
                 !authSession->isUsingLocalhostBypass()) {

@@ -79,7 +79,7 @@ class OperationContext : public Interruptible, public Decorable<OperationContext
     OperationContext& operator=(const OperationContext&) = delete;
 
 public:
-    OperationContext(Client* client, unsigned int opId);
+    OperationContext(Client* client, OperationId opId);
     virtual ~OperationContext();
 
     bool shouldParticipateInFlowControl() const {
@@ -166,9 +166,23 @@ public:
     /**
      * Returns the operation ID associated with this operation.
      */
-    unsigned int getOpID() const {
+    OperationId getOpID() const {
         return _opId;
     }
+
+    /**
+     * Returns the operation UUID associated with this operation or boost::none.
+     */
+    const boost::optional<OperationKey>& getOperationKey() const {
+        return _opKey;
+    }
+
+    /**
+     * Sets the operation UUID associated with this operation.
+     *
+     * This function may only be called once per OperationContext.
+     */
+    void setOperationKey(OperationKey opKey);
 
     /**
      * Returns the session ID associated with this operation, if there is one.
@@ -490,7 +504,8 @@ private:
 
     Client* const _client;
 
-    const unsigned int _opId;
+    const OperationId _opId;
+    boost::optional<OperationKey> _opKey;
 
     boost::optional<LogicalSessionId> _lsid;
     boost::optional<TxnNumber> _txnNumber;

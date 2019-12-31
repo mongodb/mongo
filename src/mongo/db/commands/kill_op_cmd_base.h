@@ -60,25 +60,9 @@ public:
 
 protected:
     /**
-     * Given an operation ID, search for an OperationContext with that ID. Returns either
-     * boost::none if no operation with the given ID exists, or the OperationContext along with the
-     * (acquired) lock for the associated Client.
-     */
-    static boost::optional<std::tuple<stdx::unique_lock<Client>, OperationContext*>>
-    findOperationContext(ServiceContext* serviceContext, unsigned int opId);
-
-    /**
-     * Find the given operation, and check if we're authorized to kill it. If the operation is
-     * found, and we're allowed to kill it, this returns the OperationContext as well as the
-     * acquired lock for the associated Client. Otherwise boost::none is returned.
-     */
-    static boost::optional<std::tuple<stdx::unique_lock<Client>, OperationContext*>>
-    findOpForKilling(Client* client, unsigned int opId);
-
-    /**
      * Kill an operation running on this instance of mongod or mongos.
      */
-    static void killLocalOperation(OperationContext* opCtx, unsigned int opToKill);
+    static void killLocalOperation(OperationContext* opCtx, OperationId opToKill);
 
     /**
      * Extract the "op" field from 'cmdObj' and convert the value to unsigned int. Since BSON only

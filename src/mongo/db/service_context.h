@@ -50,6 +50,7 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
+#include "mongo/util/uuid.h"
 
 #include <iostream>
 
@@ -89,6 +90,53 @@ protected:
     // Should not delete through a pointer of this type
     virtual ~KillOpListenerInterface() = default;
 };
+
+/**
+ * A simple container type to pass around a client and a lock on said client
+ */
+class LockedClient {
+public:
+    LockedClient() = default;
+    explicit LockedClient(Client* client);
+
+    Client* client() const noexcept {
+        return _client;
+    }
+
+    Client* operator->() const noexcept {
+        return client();
+    }
+
+    explicit operator bool() const noexcept {
+        return client();
+    }
+
+    operator WithLock() const noexcept {
+        return WithLock(_lk);
+    }
+
+private:
+    // Technically speaking, _lk holds a Client* and _client is a superfluous variable. That said,
+    // LockedClients will likely be optimized away and the extra variable is a cheap price to pay
+    // for better developer comprehension.
+    stdx::unique_lock<Client> _lk;
+    Client* _client = nullptr;
+};
+
+/**
+ * Every OperationContext is expected to have a unique OperationId within the domain of its
+ * ServiceContext. Generally speaking, OperationId is used for forming maps of OperationContexts and
+ * directing metaoperations like killop.
+ */
+using OperationId = uint32_t;
+
+/**
+ * Users may provide an OperationKey when sending a command request as a stable token by which to
+ * refer to an operation (and thus an OperationContext). An OperationContext is not required to have
+ * an OperationKey. The presence of an OperationKey implies that the client is either closely
+ * tracking or speculative executing its command.
+ */
+using OperationKey = UUID;
 
 /**
  * Class representing the context of a service, such as a MongoD database service or
@@ -519,6 +567,8 @@ public:
         _catalogGeneration.fetchAndAdd(1);
     }
 
+    LockedClient getLockedClient(OperationId id);
+
 private:
     class ClientObserverHolder {
     public:
@@ -541,7 +591,7 @@ private:
         std::unique_ptr<ClientObserver> _observer;
     };
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "ServiceContext::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(/*HierarchicalAcquisitionLevel(2), */ "ServiceContext::_mutex");
 
     /**
      * The periodic runner.
@@ -574,6 +624,8 @@ private:
     std::vector<ClientObserverHolder> _clientObservers;
     ClientSet _clients;
 
+    stdx::unordered_map<OperationId, Client*> _clientByOperationId;
+
     /**
      * The registered OpObserver.
      */
@@ -599,7 +651,7 @@ private:
     std::vector<KillOpListenerInterface*> _killOpListeners;
 
     // Counter for assigning operation ids.
-    AtomicWord<unsigned> _nextOpId{1};
+    AtomicWord<OperationId> _nextOpId{1};
 
     // When the catalog is restarted, the generation goes up by one each time.
     AtomicWord<uint64_t> _catalogGeneration{0};

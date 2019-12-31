@@ -65,6 +65,8 @@ AtomicWord<int> _numCurrentOps{0};
 
 }  // namespace
 
+LockedClient::LockedClient(Client* client) : _lk{*client}, _client{client} {}
+
 bool hasGlobalServiceContext() {
     return globalServiceContext;
 }
@@ -266,6 +268,12 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         stdx::lock_guard<Client> lk(*client);
         client->setOperationContext(opCtx.get());
     }
+
+    {
+        stdx::lock_guard lk(_mutex);
+        _clientByOperationId.emplace(opCtx->getOpID(), client);
+    }
+
     return UniqueOperationContext(opCtx.release());
 };
 
@@ -275,6 +283,12 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
         _numCurrentOps.subtractAndFetch(1);
     }
     auto service = client->getServiceContext();
+
+    {
+        stdx::lock_guard lk(service->_mutex);
+        service->_clientByOperationId.erase(opCtx->getOpID());
+    }
+
     {
         stdx::lock_guard<Client> lk(*client);
         client->resetOperationContext();
@@ -283,6 +297,16 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
 
     onDestroy(opCtx, service->_clientObservers);
     delete opCtx;
+}
+
+LockedClient ServiceContext::getLockedClient(OperationId id) {
+    stdx::lock_guard lk(_mutex);
+    auto it = _clientByOperationId.find(id);
+    if (it == _clientByOperationId.end()) {
+        return {};
+    }
+
+    return LockedClient(it->second);
 }
 
 void ServiceContext::registerClientObserver(std::unique_ptr<ClientObserver> observer) {
