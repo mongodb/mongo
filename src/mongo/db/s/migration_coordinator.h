@@ -52,7 +52,8 @@ public:
                          ShardId recipientShard,
                          NamespaceString collectionNamespace,
                          UUID collectionUuid,
-                         ChunkRange range);
+                         ChunkRange range,
+                         ChunkVersion preMigrationChunkVersion);
     MigrationCoordinator(const MigrationCoordinator&) = delete;
     MigrationCoordinator& operator=(const MigrationCoordinator&) = delete;
     MigrationCoordinator(MigrationCoordinator&&) = delete;

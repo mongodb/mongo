@@ -36,6 +36,7 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/chunk_range.idl"
+    - "mongo/s/chunk_version.idl"
     - "mongo/db/logical_session_id.idl"
 
 structs:
@@ -69,3 +70,6 @@ structs:
             range:
                 type: chunk_range
                 description: "The range being migrated."
+            preMigrationChunkVersion:
+                type: ChunkVersion
+                description: "The version, at the start of the migration, of the chunk being moved."
