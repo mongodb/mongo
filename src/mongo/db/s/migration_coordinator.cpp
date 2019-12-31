@@ -42,12 +42,16 @@ namespace migrationutil {
 
 MigrationCoordinator::MigrationCoordinator(OperationContext* opCtx,
                                            UUID migrationId,
+                                           LogicalSessionId lsid,
+                                           TxnNumber txnNumber,
                                            ShardId donorShard,
                                            ShardId recipientShard,
                                            NamespaceString collectionNamespace,
                                            UUID collectionUuid,
                                            ChunkRange range)
     : _migrationInfo(migrationId,
+                     std::move(lsid),
+                     txnNumber,
                      std::move(collectionNamespace),
                      collectionUuid,
                      std::move(donorShard),
@@ -77,8 +81,11 @@ void MigrationCoordinator::commitMigrationOnDonorAndRecipient(OperationContext* 
            << _migrationInfo.getId();
     LOG(0) << "Deleting range deletion task on recipient for migration " << _migrationInfo.getId();
 
-    migrationutil::deleteRangeDeletionTaskOnRecipient(
-        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
+    migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
+                                                      _migrationInfo.getRecipientShardId(),
+                                                      _migrationInfo.getId(),
+                                                      _migrationInfo.getLsid(),
+                                                      _migrationInfo.getTxnNumber());
 
     LOG(0) << "Marking range deletion task on donor as ready for processing for migration "
            << _migrationInfo.getId();
@@ -94,8 +101,11 @@ void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* o
     LOG(0) << "Marking range deletion task on recipient as ready for processing for migration "
            << _migrationInfo.getId();
 
-    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(
-        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
+    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
+                                                           _migrationInfo.getRecipientShardId(),
+                                                           _migrationInfo.getId(),
+                                                           _migrationInfo.getLsid(),
+                                                           _migrationInfo.getTxnNumber());
 }
 
 void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {

@@ -134,7 +134,9 @@ void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
  */
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
-                                        const UUID& migrationId);
+                                        const UUID& migrationId,
+                                        const LogicalSessionId& lsid,
+                                        const TxnNumber txnNumber);
 
 /**
  * Removes the 'pending' flag from the range deletion task document with the specified id from
@@ -151,7 +153,9 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
  */
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
-                                             const UUID& migrationId);
+                                             const UUID& migrationId,
+                                             const LogicalSessionId& lsid,
+                                             const TxnNumber txnNumber);
 
 /**
  * Deletes the migration coordinator document with the specified id from
