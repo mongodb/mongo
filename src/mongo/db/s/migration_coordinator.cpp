@@ -79,6 +79,9 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx, bool waitForD
 }
 
 void MigrationCoordinator::commitMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+    LOG(0) << _logPrefix() << "Making commit decision durable";
+    migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
+
     LOG(0) << _logPrefix() << "Deleting range deletion task on recipient";
     migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
                                                       _migrationInfo.getRecipientShardId(),
@@ -91,6 +94,9 @@ void MigrationCoordinator::commitMigrationOnDonorAndRecipient(OperationContext* 
 }
 
 void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+    LOG(0) << _logPrefix() << "Making abort decision durable";
+    migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
+
     LOG(0) << _logPrefix() << "Deleting range deletion task on donor";
     migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 

@@ -331,6 +331,23 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
     }
 }
 
+void persistCommitDecision(OperationContext* opCtx, const UUID& migrationId) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+    store.update(
+        opCtx,
+        QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
+        BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName << "committed")));
+}
+
+void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+    store.update(
+        opCtx,
+        QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
+        BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName << "aborted")));
+}
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
                                         const UUID& migrationId,

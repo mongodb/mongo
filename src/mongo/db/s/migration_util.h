@@ -116,6 +116,18 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
                                      const RangeDeletionTask& deletionTask);
 
 /**
+ * Updates the migration coordinator document to set the decision field to "committed" and waits for
+ * majority writeConcern.
+ */
+void persistCommitDecision(OperationContext* opCtx, const UUID& migrationId);
+
+/**
+ * Updates the migration coordinator document to set the decision field to "aborted" and waits for
+ * majority writeConcern.
+ */
+void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId);
+
+/**
  * Deletes the range deletion task document with the specified id from config.rangeDeletions and
  * waits for majority write concern.
  */
