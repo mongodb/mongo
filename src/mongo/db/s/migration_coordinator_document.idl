@@ -73,3 +73,7 @@ structs:
             preMigrationChunkVersion:
                 type: ChunkVersion
                 description: "The version, at the start of the migration, of the chunk being moved."
+            decision:
+                type: string
+                description: "Whether the migration committed or aborted."
+                optional: true
