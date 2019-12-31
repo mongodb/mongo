@@ -16,8 +16,11 @@ static int __curtable_update(WT_CURSOR *cursor);
         WT_CURSOR **__cp;                                                               \
         u_int __i;                                                                      \
         for (__i = 0, __cp = (ctable)->cg_cursors; __i < WT_COLGROUPS((ctable)->table); \
-             __i++, __cp++)                                                             \
+             __i++, __cp++) {                                                           \
             WT_TRET((*__cp)->f(*__cp));                                                 \
+            if (ret != 0 && ret != WT_NOTFOUND)                                         \
+                goto err;                                                               \
+        }                                                                               \
     } while (0)
 
 /* Cursor type for custom extractor callback. */
@@ -224,7 +227,7 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
     primary = *cp++;
 
     va_start(ap, cursor);
-    __wt_cursor_set_keyv(primary, cursor->flags, ap);
+    WT_IGNORE_RET(__wt_cursor_set_keyv(primary, cursor->flags, ap));
     va_end(ap);
 
     if (!F_ISSET(primary, WT_CURSTD_KEY_SET))
@@ -240,11 +243,11 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 }
 
 /*
- * __wt_curtable_set_value --
+ * __curtable_set_valuev --
  *     WT_CURSOR->set_value implementation for tables.
  */
-void
-__wt_curtable_set_value(WT_CURSOR *cursor, ...)
+static int
+__curtable_set_valuev(WT_CURSOR *cursor, va_list ap)
 {
     WT_CURSOR **cp;
     WT_CURSOR_TABLE *ctable;
@@ -252,12 +255,10 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
     WT_ITEM *item, *tmp;
     WT_SESSION_IMPL *session;
     u_int i;
-    va_list ap;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
 
-    va_start(ap, cursor);
     if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON)) {
         item = va_arg(ap, WT_ITEM *);
         cursor->value.data = item->data;
@@ -292,7 +293,6 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
             }
         }
     }
-    va_end(ap);
 
     for (i = 0, cp = ctable->cg_cursors; i < WT_COLGROUPS(ctable->table); i++, cp++)
         if (ret == 0)
@@ -303,7 +303,21 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
         }
 
 err:
-    API_END(session, ret);
+    API_END_RET(session, ret);
+}
+
+/*
+ * __wt_curtable_set_value --
+ *     WT_CURSOR->set_value implementation for tables.
+ */
+void
+__wt_curtable_set_value(WT_CURSOR *cursor, ...)
+{
+    va_list ap;
+
+    va_start(ap, cursor);
+    WT_IGNORE_RET(__curtable_set_valuev(cursor, ap));
+    va_end(ap);
 }
 
 /*

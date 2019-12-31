@@ -15,6 +15,9 @@ static int __backup_start(
   WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, WT_CURSOR_BACKUP *, const char *[]);
 static int __backup_stop(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 
+#define WT_CURSOR_BACKUP_CHECK_STOP(cursor) \
+    WT_ERR(F_ISSET(((WT_CURSOR_BACKUP *)(cursor)), WT_CURBACKUP_FORCE_STOP) ? EINVAL : 0);
+
 /*
  * __curbackup_next --
  *     WT_CURSOR->next method for the backup cursor type.

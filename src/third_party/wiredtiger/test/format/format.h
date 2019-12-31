@@ -169,7 +169,6 @@ typedef struct {
     char *c_logging_compression;
     uint32_t c_logging_file_max;
     uint32_t c_logging_prealloc;
-    uint32_t c_long_running_txn;
     uint32_t c_lsm_worker_threads;
     uint32_t c_memory_page_max;
     uint32_t c_merge_max;
@@ -347,7 +346,6 @@ void key_gen_init(WT_ITEM *);
 void key_gen_insert(WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void key_gen_teardown(WT_ITEM *);
 void key_init(void);
-WT_THREAD_RET lrt(void *);
 WT_THREAD_RET random_kv(void *);
 void path_setup(const char *);
 int read_row_worker(WT_CURSOR *, uint64_t, WT_ITEM *, WT_ITEM *, bool);
