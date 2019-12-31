@@ -90,6 +90,11 @@ public:
     void forgetMigration(OperationContext* opCtx);
 
 private:
+    /**
+     * Returns a string that uniquely identifies the migration.
+     */
+    std::string _logPrefix() const;
+
     MigrationCoordinatorDocument _migrationInfo;
 };
 

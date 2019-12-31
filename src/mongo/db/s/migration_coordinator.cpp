@@ -63,8 +63,10 @@ MigrationCoordinator::MigrationCoordinator(OperationContext* opCtx,
 MigrationCoordinator::~MigrationCoordinator() = default;
 
 void MigrationCoordinator::startMigration(OperationContext* opCtx, bool waitForDelete) {
+    LOG(0) << _logPrefix() << "Persisting migration coordinator doc";
     migrationutil::persistMigrationCoordinatorLocally(opCtx, _migrationInfo);
 
+    LOG(0) << _logPrefix() << "Persisting range deletion task on donor";
     RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
                                         _migrationInfo.getNss(),
                                         _migrationInfo.getCollectionUuid(),
@@ -73,36 +75,26 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx, bool waitForD
                                         waitForDelete ? CleanWhenEnum::kNow
                                                       : CleanWhenEnum::kDelayed);
     donorDeletionTask.setPending(true);
-
-    LOG(0) << "Persisting range deletion task on donor for migration " << _migrationInfo.getId();
     migrationutil::persistRangeDeletionTaskLocally(opCtx, donorDeletionTask);
 }
 
 void MigrationCoordinator::commitMigrationOnDonorAndRecipient(OperationContext* opCtx) {
-    LOG(0) << "Committing migration on donor and recipient for migration "
-           << _migrationInfo.getId();
-    LOG(0) << "Deleting range deletion task on recipient for migration " << _migrationInfo.getId();
-
+    LOG(0) << _logPrefix() << "Deleting range deletion task on recipient";
     migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
                                                       _migrationInfo.getRecipientShardId(),
                                                       _migrationInfo.getId(),
                                                       _migrationInfo.getLsid(),
                                                       _migrationInfo.getTxnNumber());
 
-    LOG(0) << "Marking range deletion task on donor as ready for processing for migration "
-           << _migrationInfo.getId();
+    LOG(0) << _logPrefix() << "Marking range deletion task on donor as ready for processing";
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 }
 
 void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
-    LOG(0) << "Aborting migration on donor and recipient for migration " << _migrationInfo.getId();
-    LOG(0) << "Deleting range deletion task on donor for migration " << _migrationInfo.getId();
-
+    LOG(0) << _logPrefix() << "Deleting range deletion task on donor";
     migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 
-    LOG(0) << "Marking range deletion task on recipient as ready for processing for migration "
-           << _migrationInfo.getId();
-
+    LOG(0) << _logPrefix() << "Marking range deletion task on recipient as ready for processing";
     migrationutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
                                                            _migrationInfo.getRecipientShardId(),
                                                            _migrationInfo.getId(),
@@ -111,8 +103,12 @@ void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* o
 }
 
 void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
-    LOG(0) << "Deleting migration coordinator document for migration " << _migrationInfo.getId();
+    LOG(0) << _logPrefix() << "Deleting migration coordinator document";
     migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
+}
+
+std::string MigrationCoordinator::_logPrefix() const {
+    return str::stream() << "[migration-coordinator-" << _migrationInfo.getId() << "] ";
 }
 
 }  // namespace migrationutil
