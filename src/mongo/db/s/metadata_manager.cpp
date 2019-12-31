@@ -196,23 +196,25 @@ public:
     }
 
 private:
-    friend boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
-        std::shared_ptr<MetadataManager>, const boost::optional<LogicalTime>&);
-
     std::shared_ptr<MetadataManager> _metadataManager;
     std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
 };
 
 MetadataManager::MetadataManager(ServiceContext* serviceContext,
                                  NamespaceString nss,
-                                 TaskExecutor* executor)
+                                 TaskExecutor* executor,
+                                 CollectionMetadata initialMetadata)
     : _serviceContext(serviceContext),
       _nss(std::move(nss)),
-      _executor(executor),
-      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
+      _collectionUuid(*initialMetadata.getChunkManager()->getUUID()),
+      _executor(std::move(executor)),
+      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {
+    _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
+}
 
 MetadataManager::~MetadataManager() {
-    clearFilteringMetadata();
+    stdx::lock_guard<Latch> lg(_managerLock);
+    _clearAllCleanups(lg);
 }
 
 void MetadataManager::_clearAllCleanups(WithLock lock) {
@@ -230,13 +232,9 @@ void MetadataManager::_clearAllCleanups(WithLock, Status status) {
     _rangesToClean.clear(status);
 }
 
-boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
-    std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime) {
+ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+    const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<Latch> lg(_managerLock);
-
-    if (_metadata.empty()) {
-        return boost::none;
-    }
 
     auto activeMetadataTracker = _metadata.back();
     const auto& activeMetadata = activeMetadataTracker->metadata;
@@ -245,7 +243,7 @@ boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
     // just return the active metadata
     if (!atClusterTime || !activeMetadata->isSharded()) {
         return ScopedCollectionMetadata(std::make_shared<RangePreserver>(
-            lg, std::move(self), std::move(activeMetadataTracker)));
+            lg, shared_from_this(), std::move(activeMetadataTracker)));
     }
 
     auto chunkManager = activeMetadata->getChunkManager();
@@ -270,9 +268,7 @@ boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
     stdx::lock_guard<Latch> lg(_managerLock);
-    if (_metadata.empty())
-        return 0;
-
+    invariant(!_metadata.empty());
     return _metadata.size() - 1;
 }
 
@@ -290,49 +286,21 @@ int MetadataManager::numberOfEmptyMetadataSnapshots() const {
 
 void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     stdx::lock_guard<Latch> lg(_managerLock);
-
-    // Collection is becoming sharded
-    if (_metadata.empty()) {
-        LOG(0) << "Marking collection " << _nss.ns() << " as " << remoteMetadata.toStringBasic();
-
-        invariant(_receivingChunks.empty());
-        invariant(_rangesToClean.isEmpty());
-
-        _setActiveMetadata(lg, std::move(remoteMetadata));
-        return;
-    }
-
-    const auto& activeMetadata = _metadata.back()->metadata;
-
-    // If the metadata being installed is unsharded or is sharded and has a different UUID from
-    // ours, this means the collection was dropped and recreated, so we must entirely reset the
-    // metadata state.
-    if (!remoteMetadata.isSharded() ||
-        (activeMetadata->isSharded() &&
-         *activeMetadata->getChunkManager()->getUUID() !=
-             remoteMetadata.getChunkManager()->getUUID())) {
-        LOG(0) << "Updating metadata for collection " << _nss.ns() << " from "
-               << activeMetadata->toStringBasic() << " to " << remoteMetadata.toStringBasic()
-               << " due to UUID change";
-
-        _receivingChunks.clear();
-        _clearAllCleanups(lg);
-        _metadata.clear();
-
-        _setActiveMetadata(lg, std::move(remoteMetadata));
-        return;
-    }
+    invariant(!_metadata.empty());
+    // The active metadata should always be available (not boost::none)
+    invariant(_metadata.back()->metadata);
+    const auto& activeMetadata = _metadata.back()->metadata.get();
 
     // We already have the same or newer version
-    if (activeMetadata->getCollVersion().epoch() == remoteMetadata.getCollVersion().epoch() &&
-        activeMetadata->getCollVersion() >= remoteMetadata.getCollVersion()) {
-        LOG(1) << "Ignoring update of active metadata " << activeMetadata->toStringBasic()
+    if (activeMetadata.getCollVersion().epoch() == remoteMetadata.getCollVersion().epoch() &&
+        activeMetadata.getCollVersion() >= remoteMetadata.getCollVersion()) {
+        LOG(1) << "Ignoring update of active metadata " << activeMetadata.toStringBasic()
                << " with an older " << remoteMetadata.toStringBasic();
         return;
     }
 
     LOG(0) << "Updating metadata for collection " << _nss.ns() << " from "
-           << activeMetadata->toStringBasic() << " to " << remoteMetadata.toStringBasic()
+           << activeMetadata.toStringBasic() << " to " << remoteMetadata.toStringBasic()
            << " due to version change";
 
     // Resolve any receiving chunks, which might have completed by now
@@ -354,13 +322,6 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     }
 
     _setActiveMetadata(lg, std::move(remoteMetadata));
-}
-
-void MetadataManager::clearFilteringMetadata() {
-    stdx::lock_guard<Latch> lg(_managerLock);
-    _receivingChunks.clear();
-    _clearAllCleanups(lg);
-    _metadata.clear();
 }
 
 void MetadataManager::_setActiveMetadata(WithLock wl, CollectionMetadata newMetadata) {
@@ -423,9 +384,7 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
     }
     pcArr.done();
 
-    if (_metadata.empty()) {
-        return;
-    }
+    invariant(!_metadata.empty());
 
     BSONArrayBuilder amrArr(builder->subarrayStart("activeMetadataRanges"));
     for (const auto& entry : _metadata.back()->metadata->getChunks()) {
@@ -449,9 +408,7 @@ auto MetadataManager::_pushRangeToClean(WithLock lock, ChunkRange const& range, 
 void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
     auto when = _rangesToClean.add(std::move(ranges));
     if (when) {
-        auto collectionUuid = _metadata.back()->metadata->getChunkManager()->getUUID();
-        invariant(collectionUuid);
-        scheduleCleanup(_executor, _nss, *collectionUuid, *when);
+        scheduleCleanup(_executor, _nss, _collectionUuid, *when);
     }
 }
 

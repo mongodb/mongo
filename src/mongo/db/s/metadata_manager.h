@@ -48,31 +48,49 @@ namespace mongo {
 
 class RangePreserver;
 
-class MetadataManager {
-    MetadataManager(const MetadataManager&) = delete;
-    MetadataManager& operator=(const MetadataManager&) = delete;
-
+/**
+ * Contains filtering metadata for a sharded collection.
+ */
+class MetadataManager : public std::enable_shared_from_this<MetadataManager> {
 public:
     using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
     using Deletion = CollectionRangeDeleter::Deletion;
 
     MetadataManager(ServiceContext* serviceContext,
                     NamespaceString nss,
-                    executor::TaskExecutor* executor);
+                    executor::TaskExecutor* executor,
+                    CollectionMetadata initialMetadata);
     ~MetadataManager();
 
+    MetadataManager(const MetadataManager&) = delete;
+    MetadataManager& operator=(const MetadataManager&) = delete;
+
     /**
-     * If there is no filtering metadata set yet (setFilteringMetadata has not been called) returns
-     * boost::none. Otherwise increments the usage counter of the active metadata and returns an
-     * RAII object, which corresponds to it.
+     * Increments the usage counter of the active metadata and returns an RAII object, which
+     * corresponds to it.
      *
      * Holding a reference on a particular instance of the metadata means that orphan cleanup is not
      * allowed to run and delete chunks which are covered by that metadata. When the returned
      * ScopedCollectionMetadata goes out of scope, the reference counter on the metadata will be
      * decremented and if it reaches to zero, orphan cleanup may proceed.
      */
-    boost::optional<ScopedCollectionMetadata> getActiveMetadata(
-        std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime);
+    ScopedCollectionMetadata getActiveMetadata(const boost::optional<LogicalTime>& atClusterTime);
+
+    /**
+     * Returns the shard version of the active metadata object.
+     */
+    ChunkVersion getActiveShardVersion() {
+        stdx::lock_guard<Latch> lg(_managerLock);
+        invariant(!_metadata.empty());
+        return _metadata.back()->metadata->getShardVersion();
+    }
+
+    /**
+     * Returns the UUID of the collection tracked by this MetadataManager object.
+     */
+    UUID getCollectionUuid() const {
+        return _collectionUuid;
+    }
 
     /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
@@ -89,8 +107,6 @@ public:
     int numberOfEmptyMetadataSnapshots() const;
 
     void setFilteringMetadata(CollectionMetadata newMetadata);
-
-    void clearFilteringMetadata();
 
     void toBSONPending(BSONArrayBuilder& bb) const;
 
@@ -235,6 +251,9 @@ private:
 
     // Namespace for which this manager object applies
     const NamespaceString _nss;
+
+    // The UUID for the collection tracked by this manager object.
+    const UUID _collectionUuid;
 
     // The background task that deletes documents from orphaned chunk ranges.
     executor::TaskExecutor* const _executor;

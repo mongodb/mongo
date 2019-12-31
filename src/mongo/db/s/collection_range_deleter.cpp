@@ -297,14 +297,13 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
             }
         }
 
-        const auto scopedCollectionMetadata =
-            metadataManager->getActiveMetadata(metadataManager, boost::none);
+        const auto scopedCollectionMetadata = metadataManager->getActiveMetadata(boost::none);
         const auto& metadata = *scopedCollectionMetadata;
 
         try {
             swNumDeleted = doDeletion(opCtx,
                                       collection,
-                                      metadata->getKeyPattern(),
+                                      metadata.getKeyPattern(),
                                       *range,
                                       maxToDelete,
                                       // _throwWriteConflictForTest is only used in unit tests, so
@@ -434,20 +433,13 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
     Collection* collection,
     std::shared_ptr<MetadataManager> metadataManager) {
 
-    const auto scopedCollectionMetadata =
-        metadataManager->getActiveMetadata(metadataManager, boost::none);
-
-    if (!scopedCollectionMetadata) {
+    if (!metadataManager) {
         LOG(0) << "Abandoning any range deletions because the metadata for " << nss.ns()
                << " was reset";
-        stdx::lock_guard<Latch> lk(metadataManager->_managerLock);
-        metadataManager->_clearAllCleanups(lk);
         return false;
     }
 
-    const auto& metadata = *scopedCollectionMetadata;
-
-    if (!forTestOnly && (!collection || !metadata->isSharded())) {
+    if (!forTestOnly && (!collection)) {
         if (!collection) {
             LOG(0) << "Abandoning any range deletions left over from dropped " << nss.ns();
         } else {

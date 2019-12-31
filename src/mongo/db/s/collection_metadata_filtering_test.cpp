@@ -44,7 +44,6 @@ class CollectionMetadataFilteringTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor().get());
     }
 
     /**
@@ -106,7 +105,8 @@ protected:
             css->setFilteringMetadata(operationContext(), CollectionMetadata(cm, ShardId("0")));
         }
 
-        _manager->setFilteringMetadata(CollectionMetadata(cm, ShardId("0")));
+        _manager = std::make_shared<MetadataManager>(
+            getServiceContext(), kNss, executor().get(), CollectionMetadata(cm, ShardId("0")));
 
         auto& oss = OperationShardingState::get(operationContext());
         const auto version = cm->getVersion(ShardId("0"));
@@ -143,8 +143,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     }
 
     {
-        const auto scm = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(100, 0)));
-        testFn(*scm);
+        const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(100, 0)));
+        testFn(scm);
     }
 }
 
@@ -173,8 +173,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     }
 
     {
-        const auto scm = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(50, 0)));
-        testFn(*scm);
+        const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(50, 0)));
+        testFn(scm);
     }
 }
 
@@ -211,8 +211,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     }
 
     {
-        const auto scm = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10, 0)));
-        testFn(*scm);
+        const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(10, 0)));
+        testFn(scm);
     }
 }
 

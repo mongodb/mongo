@@ -102,11 +102,11 @@ boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCt
 CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* sc,
                                                      NamespaceString nss,
                                                      executor::TaskExecutor* rangeDeleterExecutor)
-    : _stateChangeMutex(nss.toString()),
-      _nss(std::move(nss)),
-      _metadataManager(std::make_shared<MetadataManager>(sc, _nss, rangeDeleterExecutor)) {
+    : _nss(std::move(nss)),
+      _rangeDeleterExecutor(rangeDeleterExecutor),
+      _stateChangeMutex(nss.toString()) {
     if (isNamespaceAlwaysUnsharded(_nss)) {
-        _metadataManager->setFilteringMetadata(CollectionMetadata());
+        _metadataType = MetadataType::kUnsharded;
     }
 }
 
@@ -134,28 +134,28 @@ ScopedCollectionMetadata CollectionShardingRuntime::getOrphansFilter(OperationCo
 }
 
 ScopedCollectionMetadata CollectionShardingRuntime::getCurrentMetadata() {
-    auto optMetadata = _metadataManager->getActiveMetadata(_metadataManager, boost::none);
-
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
     if (!optMetadata)
         return {kUnshardedCollection};
 
-    return {std::move(*optMetadata)};
+    return *optMetadata;
 }
 
 boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() {
-    return _metadataManager->getActiveMetadata(_metadataManager, boost::none);
+    return _getCurrentMetadataIfKnown(boost::none);
 }
 
 boost::optional<ChunkVersion> CollectionShardingRuntime::getCurrentShardVersionIfKnown() {
-    const auto optMetadata = _metadataManager->getActiveMetadata(_metadataManager, boost::none);
-    if (!optMetadata)
-        return boost::none;
-
-    const auto& metadata = *optMetadata;
-    if (!metadata->isSharded())
-        return ChunkVersion::UNSHARDED();
-
-    return metadata->getCollVersion();
+    stdx::lock_guard lk(_metadataManagerLock);
+    switch (_metadataType) {
+        case MetadataType::kUnknown:
+            return boost::none;
+        case MetadataType::kUnsharded:
+            return ChunkVersion::UNSHARDED();
+        case MetadataType::kSharded:
+            return _metadataManager->getActiveShardVersion();
+    };
+    MONGO_UNREACHABLE;
 }
 
 void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx,
@@ -202,21 +202,39 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
               str::stream() << "Namespace " << _nss.ns() << " must never be sharded.");
 
     auto csrLock = CSRLock::lockExclusive(opCtx, this);
+    stdx::lock_guard lk(_metadataManagerLock);
 
-    _metadataManager->setFilteringMetadata(std::move(newMetadata));
+    if (!newMetadata.isSharded()) {
+        LOG(0) << "Marking collection " << _nss.ns() << " as " << newMetadata.toStringBasic();
+        _metadataType = MetadataType::kUnsharded;
+        _metadataManager.reset();
+    } else if (!_metadataManager ||
+               !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
+        _metadataType = MetadataType::kSharded;
+        _metadataManager = std::make_shared<MetadataManager>(
+            opCtx->getServiceContext(), _nss, _rangeDeleterExecutor, newMetadata);
+    } else {
+        _metadataManager->setFilteringMetadata(std::move(newMetadata));
+    }
 }
 
 void CollectionShardingRuntime::clearFilteringMetadata() {
+    stdx::lock_guard lk(_metadataManagerLock);
     if (!isNamespaceAlwaysUnsharded(_nss)) {
-        _metadataManager->clearFilteringMetadata();
+        _metadataType = MetadataType::kUnknown;
+        _metadataManager.reset();
     }
 }
 
 auto CollectionShardingRuntime::beginReceive(ChunkRange const& range) -> CleanupNotification {
+    stdx::lock_guard lk(_metadataManagerLock);
+    invariant(_metadataType == MetadataType::kSharded);
     return _metadataManager->beginReceive(range);
 }
 
 void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
+    stdx::lock_guard lk(_metadataManagerLock);
+    invariant(_metadataType == MetadataType::kSharded);
     _metadataManager->forgetReceive(range);
 }
 
@@ -224,6 +242,8 @@ auto CollectionShardingRuntime::cleanUpRange(ChunkRange const& range, CleanWhen 
     -> CleanupNotification {
     Date_t time =
         (when == kNow) ? Date_t{} : Date_t::now() + Seconds(orphanCleanupDelaySecs.load());
+    stdx::lock_guard lk(_metadataManagerLock);
+    invariant(_metadataType == MetadataType::kSharded);
     return _metadataManager->cleanUpRange(range, time);
 }
 
@@ -237,24 +257,18 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             auto* const self = CollectionShardingRuntime::get(opCtx, nss);
+            stdx::lock_guard lk(self->_metadataManagerLock);
 
-            {
-                // First, see if collection was dropped, but do it in a separate scope in order to
-                // not hold reference on it, which would make it appear in use
-                const auto optMetadata =
-                    self->_metadataManager->getActiveMetadata(self->_metadataManager, boost::none);
-                if (!optMetadata)
-                    return {ErrorCodes::ConflictingOperationInProgress,
-                            "Collection being migrated had its metadata reset"};
-
-                const auto& metadata = *optMetadata;
-                if (!metadata->isSharded() || metadata->getCollVersion().epoch() != epoch) {
-                    return {ErrorCodes::ConflictingOperationInProgress,
-                            "Collection being migrated was dropped"};
-                }
+            // If the metadata was reset, the collection does not exist, or the collection was
+            // dropped and recreated since the metadata manager was created, return an error.
+            if (!self->_metadataManager || !autoColl.getCollection() ||
+                autoColl.getCollection()->uuid() != self->_metadataManager->getCollectionUuid()) {
+                return {ErrorCodes::ConflictingOperationInProgress,
+                        "Collection being migrated was dropped or otherwise had its metadata "
+                        "reset"};
             }
 
-            stillScheduled = self->trackOrphanedDataCleanup(orphanRange);
+            stillScheduled = self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
             if (!stillScheduled) {
                 log() << "Finished deleting " << nss.ns() << " range "
                       << redact(orphanRange.toString());
@@ -274,13 +288,24 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-auto CollectionShardingRuntime::trackOrphanedDataCleanup(ChunkRange const& range)
-    -> boost::optional<CleanupNotification> {
-    return _metadataManager->trackOrphanedDataCleanup(range);
+boost::optional<ChunkRange> CollectionShardingRuntime::getNextOrphanRange(BSONObj const& from) {
+    stdx::lock_guard lk(_metadataManagerLock);
+    invariant(_metadataType == MetadataType::kSharded);
+    return _metadataManager->getNextOrphanRange(from);
 }
 
-boost::optional<ChunkRange> CollectionShardingRuntime::getNextOrphanRange(BSONObj const& from) {
-    return _metadataManager->getNextOrphanRange(from);
+boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getCurrentMetadataIfKnown(
+    const boost::optional<LogicalTime>& atClusterTime) {
+    stdx::lock_guard lk(_metadataManagerLock);
+    switch (_metadataType) {
+        case MetadataType::kUnknown:
+            return boost::none;
+        case MetadataType::kUnsharded:
+            return ScopedCollectionMetadata{kUnshardedCollection};
+        case MetadataType::kSharded:
+            return _metadataManager->getActiveMetadata(atClusterTime);
+    };
+    MONGO_UNREACHABLE;
 }
 
 boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
@@ -303,24 +328,22 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
-    auto metadata = _metadataManager->getActiveMetadata(_metadataManager, atClusterTime);
-    auto wantedShardVersion = ChunkVersion::UNSHARDED();
+    auto wantedShardVersion = [&] {
+        auto optionalWantedShardVersion = getCurrentShardVersionIfKnown();
+        return optionalWantedShardVersion ? *optionalWantedShardVersion : ChunkVersion::UNSHARDED();
+    }();
 
     if (MONGO_unlikely(useFCV44CheckShardVersionProtocol.shouldFail())) {
         LOG(0) << "Received shardVersion: " << receivedShardVersion << " for " << _nss.ns();
         if (isCollection) {
+            auto shardVersionKnown = _metadataType != MetadataType::kUnknown;
             LOG(0) << "Namespace " << _nss.ns() << " is collection, "
-                   << (metadata ? "have shardVersion cached" : "don't know shardVersion");
+                   << (shardVersionKnown ? "have shardVersion cached" : "don't know shardVersion");
             uassert(StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion),
                     "don't know shardVersion",
-                    metadata);
-            wantedShardVersion = (*metadata)->getShardVersion();
+                    shardVersionKnown);
         }
         LOG(0) << "Wanted shardVersion: " << wantedShardVersion << " for " << _nss.ns();
-    } else {
-        if (metadata && (*metadata)->isSharded()) {
-            wantedShardVersion = (*metadata)->getShardVersion();
-        }
     }
 
     auto criticalSectionSignal = [&] {
@@ -336,7 +359,7 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
     }
 
     if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
-        return metadata;
+        return _getCurrentMetadataIfKnown(atClusterTime);
     }
 
     //
