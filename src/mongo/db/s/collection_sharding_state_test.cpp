@@ -41,6 +41,18 @@ namespace {
 
 const NamespaceString kTestNss("TestDB", "TestColl");
 
+void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
+    AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
+    auto* const css = CollectionShardingRuntime::get(opCtx, kTestNss);
+    css->setFilteringMetadata(opCtx, std::move(metadata));
+
+    auto& oss = OperationShardingState::get(opCtx);
+    const auto version = metadata.getShardVersion();
+    BSONObjBuilder builder;
+    version.appendToCommand(&builder);
+    oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
+}
+
 /**
  * Constructs a CollectionMetadata suitable for refreshing a CollectionShardingState. The only
  * salient detail is the argument `keyPattern` which, defining the shard key, selects the fields
@@ -58,23 +70,20 @@ CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
     return CollectionMetadata(std::move(cm), ShardId("this"));
 }
 
-class DeleteStateTest : public ShardServerTestFixture {
-protected:
-    void setCollectionFilteringMetadata(CollectionMetadata metadata) {
-        AutoGetCollection autoColl(operationContext(), kTestNss, MODE_X);
-        auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
-        css->setFilteringMetadata(operationContext(), std::move(metadata));
+class DeleteStateTest : public ShardServerTestFixture {};
 
-        auto& oss = OperationShardingState::get(operationContext());
-        const auto version = metadata.getShardVersion();
-        BSONObjBuilder builder;
-        version.appendToCommand(&builder);
-        oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
+class CollectionShardingRuntimeTest : public ShardServerTestFixture {
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+    }
+
+    void tearDown() override {
+        ShardServerTestFixture::tearDown();
     }
 };
 
 TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
-    setCollectionFilteringMetadata(CollectionMetadata());
+    setCollectionFilteringMetadata(operationContext(), CollectionMetadata());
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
@@ -93,7 +102,8 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
     // Push a CollectionMetadata with a shard key not including "_id"...
-    setCollectionFilteringMetadata(makeAMetadata(BSON("key" << 1 << "key3" << 1)));
+    setCollectionFilteringMetadata(operationContext(),
+                                   makeAMetadata(BSON("key" << 1 << "key3" << 1)));
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
@@ -115,7 +125,8 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
     // Push a CollectionMetadata with a shard key that does have "_id" in the middle...
-    setCollectionFilteringMetadata(makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1)));
+    setCollectionFilteringMetadata(operationContext(),
+                                   makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1)));
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
@@ -136,7 +147,8 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
     // Push a CollectionMetadata with a shard key "_id", hashed.
-    setCollectionFilteringMetadata(makeAMetadata(BSON("_id"
+    setCollectionFilteringMetadata(operationContext(),
+                                   makeAMetadata(BSON("_id"
                                                       << "hashed")));
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
@@ -150,6 +162,13 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
                       BSON("_id"
                            << "hello"));
     ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
+}
+
+
+TEST_F(CollectionShardingRuntimeTest,
+       GetCurrentMetadataReturnsNoneBeforeSetFilteringMetadataIsCalled) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor().get());
+    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 
 }  // namespace

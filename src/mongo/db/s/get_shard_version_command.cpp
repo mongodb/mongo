@@ -119,12 +119,7 @@ public:
             }
         } else {
             const auto& metadata = *optMetadata;
-
-            if (metadata->isSharded()) {
-                result.appendTimestamp("global", metadata->getShardVersion().toLong());
-            } else {
-                result.appendTimestamp("global", ChunkVersion::UNSHARDED().toLong());
-            }
+            result.appendTimestamp("global", metadata->getShardVersion().toLong());
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));

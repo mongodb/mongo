@@ -154,15 +154,6 @@ public:
     CleanupNotification cleanUpRange(ChunkRange const& range, CleanWhen when);
 
     /**
-     * Reports whether any range still scheduled for deletion overlaps the argument range. If so,
-     * it returns a notification n such that n->get(opCtx) will wake when the newest overlapping
-     * range's deletion (possibly the one of interest) completes or fails. This should be called
-     * again after each wakeup until it returns boost::none, because there can be more than one
-     * range scheduled for deletion that overlaps its argument.
-     */
-    auto trackOrphanedDataCleanup(ChunkRange const& range) -> boost::optional<CleanupNotification>;
-
-    /**
      * Returns a range _not_ owned by this shard that starts no lower than the specified
      * startingFrom key value, if any, or boost::none if there is no such range.
      */
@@ -189,23 +180,47 @@ private:
      * Returns the latest version of collection metadata with filtering configured for
      * atClusterTime if specified.
      */
+    boost::optional<ScopedCollectionMetadata> _getCurrentMetadataIfKnown(
+        const boost::optional<LogicalTime>& atClusterTime);
+
+    /**
+     * Returns the latest version of collection metadata with filtering configured for
+     * atClusterTime if specified. Throws StaleConfigInfo if the shard version attached to the
+     * operation context does not match the shard version on the active metadata object.
+     */
     boost::optional<ScopedCollectionMetadata> _getMetadataWithVersionCheckAt(
         OperationContext* opCtx,
         const boost::optional<mongo::LogicalTime>& atClusterTime,
         bool isCollection);
+
+    // Namespace this state belongs to.
+    const NamespaceString _nss;
+
+    // The executor used for deleting ranges of orphan chunks.
+    executor::TaskExecutor* _rangeDeleterExecutor;
 
     // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects held
     // within (including the MigrationSourceManager, which is a decoration on the CSR). Use only the
     // CSRLock to lock this mutex.
     Lock::ResourceMutex _stateChangeMutex;
 
-    // Namespace this state belongs to.
-    const NamespaceString _nss;
-
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
-    // Contains all the metadata associated with this collection.
+    mutable Mutex _metadataManagerLock =
+        MONGO_MAKE_LATCH("CollectionShardingRuntime::_metadataManagerLock");
+
+    // Tracks whether the filtering metadata is unknown, unsharded, or sharded
+    enum class MetadataType {
+        kUnknown,
+        kUnsharded,
+        kSharded
+    } _metadataType{MetadataType::kUnknown};
+
+    // If the collection is sharded, contains all the metadata associated with this collection.
+    //
+    // If the collection is unsharded, the metadata has not been set yet, or the metadata has been
+    // specifically reset by calling clearFilteringMetadata(), this will be nullptr;
     std::shared_ptr<MetadataManager> _metadataManager;
 };
 

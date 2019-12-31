@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -64,7 +64,8 @@ class MetadataManagerTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor().get());
+        _manager = std::make_shared<MetadataManager>(
+            getServiceContext(), kNss, executor().get(), makeEmptyMetadata());
     }
 
     /**
@@ -156,45 +157,12 @@ protected:
     std::shared_ptr<MetadataManager> _manager;
 };
 
-TEST_F(MetadataManagerTest, InitialMetadataIsUnknown) {
-    ASSERT(!_manager->getActiveMetadata(_manager, boost::none));
-    ASSERT(!_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))));
-
-    ASSERT_EQ(0UL, _manager->numberOfMetadataSnapshots());
-    ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
-    ASSERT_EQ(0UL, _manager->numberOfRangesToCleanStillInUse());
-}
-
-TEST_F(MetadataManagerTest, MetadataAfterClearIsUnknown) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-    ASSERT(_manager->getActiveMetadata(_manager, boost::none));
-    ASSERT(_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))));
-
-    _manager->clearFilteringMetadata();
-    ASSERT(!_manager->getActiveMetadata(_manager, boost::none));
-    ASSERT(!_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))));
-
-    ASSERT_EQ(0UL, _manager->numberOfMetadataSnapshots());
-    ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
-    ASSERT_EQ(0UL, _manager->numberOfRangesToCleanStillInUse());
-}
-
-TEST_F(MetadataManagerTest, GetActiveMetadataForUnshardedCollection) {
-    _manager->setFilteringMetadata(CollectionMetadata());
-
-    ASSERT(_manager->getActiveMetadata(_manager, boost::none));
-    ASSERT(!(*_manager->getActiveMetadata(_manager, boost::none))->isSharded());
-
-    ASSERT(_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))));
-    ASSERT(!(*_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))))->isSharded());
-}
-
 TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
     _manager->setFilteringMetadata(makeEmptyMetadata());
 
     // Sanity checks
-    ASSERT((*_manager->getActiveMetadata(_manager, boost::none))->isSharded());
-    ASSERT_EQ(0UL, (*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size());
+    ASSERT(_manager->getActiveMetadata(boost::none)->isSharded());
+    ASSERT_EQ(0UL, _manager->getActiveMetadata(boost::none)->getChunks().size());
 
     ChunkRange range1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange range2(BSON("key" << 10), BSON("key" << 20));
@@ -213,8 +181,6 @@ TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
 }
 
 TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
 
     auto notifn1 = _manager->cleanUpRange(cr1, Date_t{});
@@ -229,76 +195,21 @@ TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
     optNotifn->abandon();
 }
 
-TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
-    ChunkRange cr1(BSON("key" << 20), BSON("key" << 30));
-    auto optNotif = _manager->trackOrphanedDataCleanup(cr1);
-    ASSERT(!optNotif);
-
-    {
-        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0UL);
-        ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
-
-        auto scm1 = _manager->getActiveMetadata(_manager, boost::none);  // and increment refcount
-
-        const auto addChunk = [this] {
-            _manager->setFilteringMetadata(
-                cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none),
-                                       {BSON("key" << 0), BSON("key" << 20)}));
-        };
-
-        addChunk();                                                      // push new metadata
-        auto scm2 = _manager->getActiveMetadata(_manager, boost::none);  // and increment refcount
-        ASSERT_EQ(1ULL, (*scm2)->getChunks().size());
-
-        // Simulate drop and recreate
-        _manager->setFilteringMetadata(makeEmptyMetadata());
-
-        addChunk();                                                      // push new metadata
-        auto scm3 = _manager->getActiveMetadata(_manager, boost::none);  // and increment refcount
-        ASSERT_EQ(1ULL, (*scm3)->getChunks().size());
-
-        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0UL);
-        ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
-
-        optNotif = _manager->cleanUpRange(cr1, Date_t{});
-        ASSERT(optNotif);
-        ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0UL);
-        ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
-    }
-
-    // At this point scm1,2,3 above are destroyed and the refcount of each metadata goes to zero
-
-    ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0UL);
-    ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
-    ASSERT(!optNotif->ready());
-
-    auto optNotif2 = _manager->trackOrphanedDataCleanup(cr1);  // now tracking it in _rangesToClean
-    ASSERT(optNotif2);
-
-    ASSERT(!optNotif->ready());
-    ASSERT(!optNotif2->ready());
-    ASSERT(*optNotif == *optNotif2);
-
-    optNotif->abandon();
-    optNotif2->abandon();
-}
-
-TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledOnDropAndRecreate) {
+TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIsDestroyed) {
     const ChunkRange rangeToClean(BSON("key" << 20), BSON("key" << 30));
 
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-    _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none),
-                               {BSON("key" << 0), BSON("key" << 20)}));
+    _manager->setFilteringMetadata(cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none),
+                                                          {BSON("key" << 0), BSON("key" << 20)}));
 
     _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none), rangeToClean));
-    auto cursorOnMovedMetadata = _manager->getActiveMetadata(_manager, boost::none);
+        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), rangeToClean));
+
+    // Optional so that it can be reset.
+    boost::optional<ScopedCollectionMetadata> cursorOnMovedMetadata{
+        _manager->getActiveMetadata(boost::none)};
 
     _manager->setFilteringMetadata(
-        cloneMetadataMinusChunk(*_manager->getActiveMetadata(_manager, boost::none), rangeToClean));
+        cloneMetadataMinusChunk(_manager->getActiveMetadata(boost::none), rangeToClean));
 
     auto notif = _manager->cleanUpRange(rangeToClean, Date_t{});
     ASSERT(!notif.ready());
@@ -307,90 +218,68 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledOnDropAndRecreate) {
     ASSERT(optNotif);
     ASSERT(!optNotif->ready());
 
-    _manager->setFilteringMetadata(makeEmptyMetadata());
+    // Reset the original shared_ptr. The cursorOnMovedMetadata will still contain its own copy of
+    // the shared_ptr though, so the destructor of ~MetadataManager won't yet be called.
+    _manager.reset();
+    ASSERT(!notif.ready());
+    ASSERT(!optNotif->ready());
+
+    // Destroys the ScopedCollectionMetadata object and causes the destructor of MetadataManager to
+    // run, which should trigger all deletion notifications.
+    cursorOnMovedMetadata.reset();
     ASSERT(notif.ready());
     ASSERT(optNotif->ready());
 }
 
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
 
     _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none), cr1));
-    ASSERT_EQ((*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size(), 1UL);
+        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), cr1));
+    ASSERT_EQ(_manager->getActiveMetadata(boost::none)->getChunks().size(), 1UL);
 }
 
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationMultiplePending) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
     {
         _manager->setFilteringMetadata(
-            cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none), cr1));
+            cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), cr1));
         ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
-        ASSERT_EQ((*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size(), 1UL);
+        ASSERT_EQ(_manager->getActiveMetadata(boost::none)->getChunks().size(), 1UL);
     }
 
     {
         _manager->setFilteringMetadata(
-            cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none), cr2));
-        ASSERT_EQ((*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size(), 2UL);
+            cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), cr2));
+        ASSERT_EQ(_manager->getActiveMetadata(boost::none)->getChunks().size(), 2UL);
     }
 }
 
 TEST_F(MetadataManagerTest, RefreshAfterNotYetCompletedMigrationMultiplePending) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
-    _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none),
-                               {BSON("key" << 50), BSON("key" << 60)}));
-    ASSERT_EQ((*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size(), 1UL);
+    _manager->setFilteringMetadata(cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none),
+                                                          {BSON("key" << 50), BSON("key" << 60)}));
+    ASSERT_EQ(_manager->getActiveMetadata(boost::none)->getChunks().size(), 1UL);
 }
 
 TEST_F(MetadataManagerTest, BeginReceiveWithOverlappingRange) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
     _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none), cr1));
+        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), cr1));
     _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none), cr2));
+        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), cr2));
 
     ChunkRange crOverlap(BSON("key" << 5), BSON("key" << 35));
 }
 
-TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-    _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none),
-                               {BSON("key" << 0), BSON("key" << 10)}));
-
-    // Now, pretend that the collection was dropped and recreated
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-    _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager, boost::none),
-                               {BSON("key" << 20), BSON("key" << 30)}));
-
-    const auto chunks = (*_manager->getActiveMetadata(_manager, boost::none))->getChunks();
-    ASSERT_EQ(1UL, chunks.size());
-    const auto chunkEntry = chunks.begin();
-    ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
-    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second);
-}
-
 // Tests membership functions for _rangesToClean
 TEST_F(MetadataManagerTest, RangesToCleanMembership) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
-
     ChunkRange cr(BSON("key" << 0), BSON("key" << 10));
 
     ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
@@ -403,17 +292,16 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
 }
 
 TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectsLastSnapshotInList) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
-    auto scm1 = *_manager->getActiveMetadata(_manager, boost::none);
+    auto scm1 = _manager->getActiveMetadata(boost::none);
     {
         _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm1, cr1));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
         ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
 
-        auto scm2 = *_manager->getActiveMetadata(_manager, boost::none);
+        auto scm2 = _manager->getActiveMetadata(boost::none);
         ASSERT_EQ(scm2->getChunks().size(), 1UL);
         _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm2, cr2));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 2UL);
@@ -424,27 +312,26 @@ TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectsLastSnapshotInList) 
     // is now out of scope, but that in scm1 should remain
     ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 1);
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 2UL);
-    ASSERT_EQ((*_manager->getActiveMetadata(_manager, boost::none))->getChunks().size(), 2UL);
+    ASSERT_EQ(_manager->getActiveMetadata(boost::none)->getChunks().size(), 2UL);
 }
 
 TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectSnapshotInMiddleOfList) {
-    _manager->setFilteringMetadata(makeEmptyMetadata());
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
     ChunkRange cr3(BSON("key" << 50), BSON("key" << 80));
     ChunkRange cr4(BSON("key" << 90), BSON("key" << 100));
 
-    auto scm = *_manager->getActiveMetadata(_manager, boost::none);
+    auto scm = _manager->getActiveMetadata(boost::none);
     _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm, cr1));
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
     ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
 
-    auto scm2 = *_manager->getActiveMetadata(_manager, boost::none);
+    auto scm2 = _manager->getActiveMetadata(boost::none);
     ASSERT_EQ(scm2->getChunks().size(), 1UL);
     _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm2, cr2));
 
     {
-        auto scm3 = *_manager->getActiveMetadata(_manager, boost::none);
+        auto scm3 = _manager->getActiveMetadata(boost::none);
         ASSERT_EQ(scm3->getChunks().size(), 2UL);
         _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm3, cr3));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 3UL);
@@ -460,7 +347,7 @@ TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectSnapshotInMiddleOfLis
          *      CollectionMetadataTracker{ metadata: xxx, orphans: [], usageCounter: 1}
          * ]
          */
-        scm2 = *_manager->getActiveMetadata(_manager, boost::none);
+        scm2 = _manager->getActiveMetadata(boost::none);
         ASSERT_EQ(scm2->getChunks().size(), 3UL);
         _manager->setFilteringMetadata(cloneMetadataPlusChunk(scm2, cr4));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 4UL);
