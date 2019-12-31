@@ -533,7 +533,7 @@ leaf_only:
      * read-mostly workload. Check that case and get out fast.
      */
     if (0) {
-    leaf_match:
+leaf_match:
         cbt->compare = 0;
         cbt->slot = WT_ROW_SLOT(page, rip);
         return (0);

@@ -48,9 +48,6 @@ smoke_list=(
 	"$smoke_base_1 file_type=row huffman_key=1 huffman_value=1"
 	"$smoke_base_1 file_type=var huffman_key=1 huffman_value=1"
 
-	# Abort/recovery test.
-	"$smoke_base_1 file_type=row abort=1"
-
 	# LSM
 	"$smoke_base_1 file_type=row data_source=lsm"
 

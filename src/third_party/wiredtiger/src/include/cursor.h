@@ -52,7 +52,9 @@ struct __wt_cursor_backup {
 
     size_t next;     /* Cursor position */
     WT_FSTREAM *bfs; /* Backup file stream */
-    uint32_t maxid;  /* Maximum log file ID seen */
+
+#define WT_CURSOR_BACKUP_ID(cursor) (((WT_CURSOR_BACKUP *)(cursor))->maxid)
+    uint32_t maxid; /* Maximum log file ID seen */
 
     char **list; /* List of files to be copied. */
     size_t list_allocated;
@@ -86,9 +88,6 @@ struct __wt_cursor_backup {
                                      /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 };
-#define WT_CURSOR_BACKUP_CHECK_STOP(cursor) \
-    WT_RET(F_ISSET(((WT_CURSOR_BACKUP *)(cursor)), WT_CURBACKUP_FORCE_STOP) ? EINVAL : 0);
-#define WT_CURSOR_BACKUP_ID(cursor) (((WT_CURSOR_BACKUP *)(cursor))->maxid)
 
 struct __wt_cursor_btree {
     WT_CURSOR iface;

@@ -1,5 +1,9 @@
 /*! @page devdoc-index Developer Documentation
 
+@subpage devdoc-glossary
+
+WiredTiger assigns specific meanings to certain words. Here we decode them.
+
 @subpage devdoc-schema
 
 Most applications begin to make use of WiredTiger by creating a table (or other

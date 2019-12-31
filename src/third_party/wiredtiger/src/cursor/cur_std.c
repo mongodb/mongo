@@ -253,7 +253,7 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
     va_list ap;
 
     va_start(ap, cursor);
-    __wt_cursor_set_keyv(cursor, cursor->flags, ap);
+    WT_IGNORE_RET(__wt_cursor_set_keyv(cursor, cursor->flags, ap));
     va_end(ap);
 }
 
@@ -377,7 +377,7 @@ err:
  * __wt_cursor_set_keyv --
  *     WT_CURSOR->set_key default implementation.
  */
-void
+int
 __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 {
     WT_DECL_RET;
@@ -453,7 +453,7 @@ err:
         } else
             __wt_free(session, tmp.mem);
     }
-    API_END(session, ret);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -516,7 +516,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
     va_list ap;
 
     va_start(ap, cursor);
-    __wt_cursor_set_valuev(cursor, ap);
+    WT_IGNORE_RET(__wt_cursor_set_valuev(cursor, ap));
     va_end(ap);
 }
 
@@ -524,7 +524,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
  * __wt_cursor_set_valuev --
  *     WT_CURSOR->set_value worker implementation.
  */
-void
+int
 __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 {
     WT_DECL_RET;
@@ -588,7 +588,7 @@ err:
             __wt_free(session, tmp.mem);
     }
 
-    API_END(session, ret);
+    API_END_RET(session, ret);
 }
 
 /*

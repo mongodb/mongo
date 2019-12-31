@@ -142,32 +142,6 @@ __wt_snprintf_len_incr(char *buf, size_t size, size_t *retsizep, const char *fmt
 }
 
 /*
- * __wt_txn_context_prepare_check --
- *     Return an error if the current transaction is in the prepare state.
- */
-static inline int
-__wt_txn_context_prepare_check(WT_SESSION_IMPL *session)
-{
-    if (F_ISSET(&session->txn, WT_TXN_PREPARE))
-        WT_RET_MSG(session, EINVAL, "%s: not permitted in a prepared transaction", session->name);
-    return (0);
-}
-
-/*
- * __wt_txn_context_check --
- *     Complain if a transaction is/isn't running.
- */
-static inline int
-__wt_txn_context_check(WT_SESSION_IMPL *session, bool requires_txn)
-{
-    if (requires_txn && !F_ISSET(&session->txn, WT_TXN_RUNNING))
-        WT_RET_MSG(session, EINVAL, "%s: only permitted in a running transaction", session->name);
-    if (!requires_txn && F_ISSET(&session->txn, WT_TXN_RUNNING))
-        WT_RET_MSG(session, EINVAL, "%s: not permitted in a running transaction", session->name);
-    return (0);
-}
-
-/*
  * __wt_spin_backoff --
  *     Back off while spinning for a resource. This is used to avoid busy waiting loops that can
  *     consume enough CPU to block real work being done. The algorithm spins a few times, then

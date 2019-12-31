@@ -57,7 +57,7 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
         cbt->v = 0;
         cbt->iface.value.data = &cbt->v;
     } else {
-    restart_read:
+restart_read:
         WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
         if (upd == NULL) {
             cbt->v = 0;
@@ -111,7 +111,7 @@ new_page:
     if (cbt->ins != NULL && cbt->recno != WT_INSERT_RECNO(cbt->ins))
         cbt->ins = NULL;
     if (cbt->ins != NULL)
-    restart_read:
+restart_read:
     WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
     if (upd == NULL) {
         cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
@@ -145,12 +145,12 @@ __cursor_var_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 
     for (;;) {
         cbt->ins = WT_SKIP_NEXT(cbt->ins);
-    new_page:
+new_page:
         if (cbt->ins == NULL)
             return (WT_NOTFOUND);
 
         __cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
-    restart_read:
+restart_read:
         WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
         if (upd == NULL)
             continue;
@@ -209,8 +209,8 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
             return (WT_NOTFOUND);
         __cursor_set_recno(cbt, cbt->recno + 1);
 
-    new_page:
-    restart_read:
+new_page:
+restart_read:
         /* Find the matching WT_COL slot. */
         if ((cip = __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
             return (WT_NOTFOUND);
@@ -337,9 +337,9 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
         if (cbt->ins != NULL)
             cbt->ins = WT_SKIP_NEXT(cbt->ins);
 
-    new_insert:
+new_insert:
         cbt->iter_retry = WT_CBT_RETRY_INSERT;
-    restart_read_insert:
+restart_read_insert:
         if ((ins = cbt->ins) != NULL) {
             WT_RET(__wt_txn_read(session, ins->upd, &upd));
             if (upd == NULL)
@@ -373,7 +373,7 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 
         cbt->iter_retry = WT_CBT_RETRY_PAGE;
         cbt->slot = cbt->row_iteration_slot / 2 - 1;
-    restart_read_page:
+restart_read_page:
         rip = &page->pg_row[cbt->slot];
         WT_RET(__wt_txn_read(session, WT_ROW_UPDATE(page, rip), &upd));
         if (upd != NULL && upd->type == WT_UPDATE_TOMBSTONE) {

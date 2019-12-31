@@ -120,35 +120,46 @@ err:
 }
 
 /*
+ * __curstat_set_keyv --
+ *     WT_CURSOR->set_key for statistics cursors.
+ */
+static int
+__curstat_set_keyv(WT_CURSOR *cursor, va_list ap)
+{
+    WT_CURSOR_STAT *cst;
+    WT_DECL_RET;
+    WT_ITEM *item;
+    WT_SESSION_IMPL *session;
+
+    cst = (WT_CURSOR_STAT *)cursor;
+    CURSOR_API_CALL(cursor, session, set_key, NULL);
+    F_CLR(cursor, WT_CURSTD_KEY_SET);
+
+    if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+        item = va_arg(ap, WT_ITEM *);
+        ret = __wt_struct_unpack(session, item->data, item->size, cursor->key_format, &cst->key);
+    } else
+        cst->key = va_arg(ap, int);
+
+    if ((cursor->saved_err = ret) == 0)
+        F_SET(cursor, WT_CURSTD_KEY_EXT);
+
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __curstat_set_key --
  *     WT_CURSOR->set_key for statistics cursors.
  */
 static void
 __curstat_set_key(WT_CURSOR *cursor, ...)
 {
-    WT_CURSOR_STAT *cst;
-    WT_DECL_RET;
-    WT_ITEM *item;
-    WT_SESSION_IMPL *session;
     va_list ap;
 
-    cst = (WT_CURSOR_STAT *)cursor;
-    CURSOR_API_CALL(cursor, session, set_key, NULL);
-    F_CLR(cursor, WT_CURSTD_KEY_SET);
-
     va_start(ap, cursor);
-    if (F_ISSET(cursor, WT_CURSTD_RAW)) {
-        item = va_arg(ap, WT_ITEM *);
-        ret = __wt_struct_unpack(session, item->data, item->size, cursor->key_format, &cst->key);
-    } else
-        cst->key = va_arg(ap, int);
+    WT_IGNORE_RET(__curstat_set_keyv(cursor, ap));
     va_end(ap);
-
-    if ((cursor->saved_err = ret) == 0)
-        F_SET(cursor, WT_CURSTD_KEY_EXT);
-
-err:
-    API_END(session, ret);
 }
 
 /*
@@ -716,7 +727,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
     WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
     if (0) {
-    config_err:
+config_err:
         WT_ERR_MSG(session, EINVAL,
           "cursor's statistics configuration doesn't match the "
           "database statistics configuration");

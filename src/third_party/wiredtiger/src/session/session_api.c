@@ -1643,10 +1643,13 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 
     WT_ERR(__wt_txn_context_check(session, true));
 
-    if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
-        WT_ERR_MSG(session, EINVAL, "failed transaction requires rollback%s%s",
+    /* Permit the commit if the transaction failed, but was read-only. */
+    if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0) {
+        __wt_err(session, EINVAL, "failed transaction requires rollback%s%s",
           txn->rollback_reason == NULL ? "" : ": ",
           txn->rollback_reason == NULL ? "" : txn->rollback_reason);
+        ret = EINVAL;
+    }
 
     if (ret == 0)
         ret = __wt_txn_commit(session, cfg);
@@ -1656,7 +1659,6 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
     }
 
 err:
-    WT_ASSERT(session, WT_SESSION_TXN_STATE(session)->id == WT_TXN_NONE);
     API_END_RET(session, ret);
 }
 
@@ -1669,7 +1671,6 @@ __session_prepare_transaction(WT_SESSION *wt_session, const char *config)
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    WT_TXN *txn;
 
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL(session, prepare_transaction, config, cfg);
@@ -1678,19 +1679,9 @@ __session_prepare_transaction(WT_SESSION *wt_session, const char *config)
 
     WT_ERR(__wt_txn_context_check(session, true));
 
-    /*
-     * A failed transaction cannot be prepared, as it cannot guarantee a subsequent commit.
-     */
-    txn = &session->txn;
-    if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
-        WT_ERR_MSG(session, EINVAL, "failed transaction requires rollback%s%s",
-          txn->rollback_reason == NULL ? "" : ": ",
-          txn->rollback_reason == NULL ? "" : txn->rollback_reason);
-
     WT_ERR(__wt_txn_prepare(session, cfg));
 
 err:
-    WT_ASSERT(session, WT_SESSION_TXN_STATE(session)->id == WT_TXN_NONE);
     API_END_RET(session, ret);
 }
 

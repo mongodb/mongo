@@ -126,7 +126,7 @@ wts_ops(bool lastrun)
     TINFO *tinfo, total;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    wt_thread_t alter_tid, backup_tid, checkpoint_tid, compact_tid, lrt_tid, random_tid;
+    wt_thread_t alter_tid, backup_tid, checkpoint_tid, compact_tid, random_tid;
     wt_thread_t timestamp_tid;
     int64_t fourths, quit_fourths, thread_ops;
     uint32_t i;
@@ -139,7 +139,6 @@ wts_ops(bool lastrun)
     memset(&backup_tid, 0, sizeof(backup_tid));
     memset(&checkpoint_tid, 0, sizeof(checkpoint_tid));
     memset(&compact_tid, 0, sizeof(compact_tid));
-    memset(&lrt_tid, 0, sizeof(lrt_tid));
     memset(&random_tid, 0, sizeof(random_tid));
     memset(&timestamp_tid, 0, sizeof(timestamp_tid));
 
@@ -209,7 +208,7 @@ wts_ops(bool lastrun)
     }
 
     /*
-     * If a multi-threaded run, start optional backup, compaction and long-running reader threads.
+     * If a multi-threaded run, start optional special-purpose threads.
      */
     if (g.c_alter)
         testutil_check(__wt_thread_create(NULL, &alter_tid, alter, NULL));
@@ -219,8 +218,6 @@ wts_ops(bool lastrun)
         testutil_check(__wt_thread_create(NULL, &checkpoint_tid, checkpoint, NULL));
     if (g.c_compact)
         testutil_check(__wt_thread_create(NULL, &compact_tid, compact, NULL));
-    if (!SINGLETHREADED && g.c_long_running_txn)
-        testutil_check(__wt_thread_create(NULL, &lrt_tid, lrt, NULL));
     if (g.c_random_cursor)
         testutil_check(__wt_thread_create(NULL, &random_tid, random_kv, NULL));
     if (g.c_txn_timestamps)
@@ -293,7 +290,7 @@ wts_ops(bool lastrun)
         }
     }
 
-    /* Wait for the other threads. */
+    /* Wait for the special-purpose threads. */
     g.workers_finished = true;
     if (g.c_alter)
         testutil_check(__wt_thread_join(NULL, &alter_tid));
@@ -303,8 +300,6 @@ wts_ops(bool lastrun)
         testutil_check(__wt_thread_join(NULL, &checkpoint_tid));
     if (g.c_compact)
         testutil_check(__wt_thread_join(NULL, &compact_tid));
-    if (!SINGLETHREADED && g.c_long_running_txn)
-        testutil_check(__wt_thread_join(NULL, &lrt_tid));
     if (g.c_random_cursor)
         testutil_check(__wt_thread_join(NULL, &random_tid));
     if (g.c_txn_timestamps)
@@ -842,7 +837,7 @@ ops(void *arg)
                 READ_OP_FAILED(true);
             break;
         case REMOVE:
-        remove_instead_of_truncate:
+remove_instead_of_truncate:
             switch (g.type) {
             case ROW:
                 ret = row_remove(tinfo, cursor, positioned);
@@ -930,7 +925,7 @@ ops(void *arg)
                 WRITE_OP_FAILED(false);
             break;
         case UPDATE:
-        update_instead_of_chosen_op:
+update_instead_of_chosen_op:
             ++tinfo->update;
             switch (g.type) {
             case ROW:
@@ -1250,7 +1245,7 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
             } else if (tinfo->keyno > keyno || (!record_gaps && keyno != tinfo->keyno + 1))
                 goto order_error_col;
             if (0) {
-            order_error_col:
+order_error_col:
                 testutil_die(
                   0, "%s returned %" PRIu64 " then %" PRIu64, which, tinfo->keyno, keyno);
             }
@@ -1284,7 +1279,7 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
                     goto order_error_row;
             }
             if (0) {
-            order_error_row:
+order_error_row:
                 testutil_die(0, "%s returned {%.*s} then {%.*s}", which, (int)tinfo->key->size,
                   (char *)tinfo->key->data, (int)key.size, (char *)key.data);
             }
