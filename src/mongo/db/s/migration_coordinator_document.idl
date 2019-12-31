@@ -48,6 +48,12 @@ structs:
                 type: uuid
                 description: "A unique identifier for the migration."
                 cpp_name: id
+            lsid:
+                type: LogicalSessionId
+                description: "The sessionId to use to communicate with the recipient"
+            txnNumber:
+                type: TxnNumber
+                description: "The txnNumber to use to communicate with the recipient"
             nss:
                 type: namespacestring
                 description: "The namespace of the collection that the chunk belongs to."

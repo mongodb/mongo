@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -45,6 +46,8 @@ class MigrationCoordinator {
 public:
     MigrationCoordinator(OperationContext* opCtx,
                          UUID migrationId,
+                         LogicalSessionId lsid,
+                         TxnNumber txnNumber,
                          ShardId donorShard,
                          ShardId recipientShard,
                          NamespaceString collectionNamespace,

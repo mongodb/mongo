@@ -71,7 +71,11 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoTimeout);
 
 template <typename Cmd>
-void sendToRecipient(OperationContext* opCtx, const ShardId& recipientId, const Cmd& cmd) {
+void sendToRecipient(OperationContext* opCtx,
+                     const ShardId& recipientId,
+                     const Cmd& cmd,
+                     const LogicalSessionId& lsid,
+                     const TxnNumber txnNumber) {
     auto recipientShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientId));
 
@@ -81,8 +85,11 @@ void sendToRecipient(OperationContext* opCtx, const ShardId& recipientId, const 
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "config",
-        cmd.toBSON({}),
+        cmd.toBSON(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber
+                               << WriteConcernOptions::kWriteConcernField
+                               << WriteConcernOptions::Majority)),
         Shard::RetryPolicy::kIdempotent);
+
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
@@ -326,13 +333,15 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
-                                        const UUID& migrationId) {
+                                        const UUID& migrationId,
+                                        const LogicalSessionId& lsid,
+                                        const TxnNumber txnNumber) {
     write_ops::Delete deleteOp(NamespaceString::kRangeDeletionNamespace);
     write_ops::DeleteOpEntry query(BSON(RangeDeletionTask::kIdFieldName << migrationId),
                                    false /*multi*/);
     deleteOp.setDeletes({query});
 
-    sendToRecipient(opCtx, recipientId, deleteOp);
+    sendToRecipient(opCtx, recipientId, deleteOp, lsid, txnNumber);
 }
 
 void deleteRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& deletionTaskId) {
@@ -348,7 +357,9 @@ void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
 
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
-                                             const UUID& migrationId) {
+                                             const UUID& migrationId,
+                                             const LogicalSessionId& lsid,
+                                             const TxnNumber txnNumber) {
     write_ops::Update updateOp(NamespaceString::kRangeDeletionNamespace);
     auto queryFilter = BSON(RangeDeletionTask::kIdFieldName << migrationId);
     auto updateModification = write_ops::UpdateModification(
@@ -358,7 +369,7 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     updateEntry.setUpsert(false);
     updateOp.setUpdates({updateEntry});
 
-    sendToRecipient(opCtx, recipientId, updateOp);
+    sendToRecipient(opCtx, recipientId, updateOp, lsid, txnNumber);
 }
 
 void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {
