@@ -396,6 +396,8 @@ void runCommand(OperationContext* opCtx,
 
     boost::optional<RouterOperationContextSession> routerSession;
     try {
+        rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
+
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName, invocation->ns());
         bool startTransaction = false;
         if (osi.getAutocommit()) {
