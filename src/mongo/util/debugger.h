@@ -31,9 +31,9 @@
 
 namespace mongo {
 
-// Sets SIGTRAP handler to launch GDB
+// Sets SIGTRAP handler to launch debugger
 // Noop unless on *NIX and compiled with MONGO_CONFIG_DEBUG_BUILD
-void setupSIGTRAPforGDB();
+void setupSIGTRAPforDebugger();
 
 void breakpoint();
 

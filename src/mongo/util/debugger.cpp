@@ -34,13 +34,10 @@
 #include <cstdlib>
 #include <mutex>
 
-#if defined(USE_GDBSERVER)
+#ifndef _WIN32
+#include <csignal>
 #include <cstdio>
 #include <unistd.h>
-#endif
-
-#ifndef _WIN32
-#include <signal.h>
 #endif
 
 #include "mongo/util/debug_util.h"
@@ -76,16 +73,17 @@ void breakpoint() {
 #endif
 }
 
-#if defined(USE_GDBSERVER)
-
-/* Magic gdb trampoline
- * Do not call directly! call setupSIGTRAPforGDB()
+/* Magic debugging trampoline
+ * Do not call directly! call setupSIGTRAPforDebugger()
  * Assumptions:
- *  1) gdbserver is on your path
+ *  1) the debugging server binary is on your path
  *  2) You have run "handle SIGSTOP noprint" in gdb
  *  3) serverGlobalParams.port + 2000 is free
  */
-void launchGDB(int) {
+namespace {
+#ifndef _WIN32
+template <typename Exec>
+void launchDebugger(Exec debugger) {
     // Don't come back here
     signal(SIGTRAP, SIG_IGN);
 
@@ -95,8 +93,10 @@ void launchGDB(int) {
         std::abort();
 
     char msg[128];
-    int msgRet = snprintf(
-        msg, sizeof(msg), "\n\n\t**** Launching gdbserver (use lsof to find port) ****\n\n");
+    int msgRet = snprintf(msg,
+                          sizeof(msg),
+                          "\n\n\t**** Launching debugging server (ensure binary is in PATH, use "
+                          "lsof to find port) ****\n\n");
     if (!(msgRet >= 0 && size_t(msgRet) < sizeof(msg)))
         std::abort();
 
@@ -105,21 +105,42 @@ void launchGDB(int) {
 
     if (fork() == 0) {
         // child
-        execlp("gdbserver", "gdbserver", "--attach", ":0", pidToDebug, nullptr);
+        debugger(pidToDebug);
         perror(nullptr);
         _exit(1);
     } else {
         // parent
-        raise(SIGSTOP);  // pause all threads until gdb connects and continues
-        raise(SIGTRAP);  // break inside gdbserver
+        raise(SIGSTOP);  // pause all threads until debugger connects and continues
+        raise(SIGTRAP);  // break inside server
     }
 }
 
-void setupSIGTRAPforGDB() {
-    if (!(signal(SIGTRAP, launchGDB) != SIG_ERR))
-        std::abort();
+#if defined(USE_GDBSERVER)
+
+void execCallback(int) {
+    launchDebugger([](char* pidToDebug) {
+        execlp("gdbserver", "gdbserver", "--attach", ":0", pidToDebug, nullptr);
+    });
 }
-#else
-void setupSIGTRAPforGDB() {}
+
+#elif defined(USE_LLDB_SERVER)
+
+void execCallback(int) {
+    launchDebugger([](char* pidToDebug) {
+        execlp("debugserver", "debugserver", "*:12345", "--attach", pidToDebug, nullptr);
+    });
+}
+
 #endif
+
+}  // namespace
+
+void setupSIGTRAPforDebugger() {
+#if defined(USE_GDBSERVER) || defined(USE_LLDB_SERVER)
+    if (signal(SIGTRAP, execCallback) == SIG_ERR) {
+        std::abort();
+    }
+#endif
+#endif
+}
 }  // namespace mongo

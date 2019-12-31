@@ -66,6 +66,8 @@ env.Library(
 debuggerEnv = env.Clone()
 if has_option("gdbserver"):
     debuggerEnv.Append(CPPDEFINES=["USE_GDBSERVER"])
+elif has_option("lldb-server"):
+    debuggerEnv.Append(CPPDEFINES=["USE_LLDB_SERVER"])
 
 debuggerEnv.Library(
     target='debugger',

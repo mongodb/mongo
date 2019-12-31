@@ -300,6 +300,11 @@ add_option('gdbserver',
     nargs=0,
 )
 
+add_option('lldb-server',
+    help='build in lldb server support',
+    nargs=0,
+)
+
 add_option('gcov',
     help='compile with flags for gcov',
     nargs=0,

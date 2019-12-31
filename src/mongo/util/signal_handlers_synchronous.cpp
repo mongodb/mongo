@@ -338,7 +338,7 @@ void setupSynchronousSignalHandlers() {
             fassertFailed(31334);
         }
     }
-    setupSIGTRAPforGDB();
+    setupSIGTRAPforDebugger();
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
     setupStackTraceSignalAction(stackTraceSignal());
 #endif
