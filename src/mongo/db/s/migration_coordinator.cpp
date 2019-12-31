@@ -48,7 +48,8 @@ MigrationCoordinator::MigrationCoordinator(OperationContext* opCtx,
                                            ShardId recipientShard,
                                            NamespaceString collectionNamespace,
                                            UUID collectionUuid,
-                                           ChunkRange range)
+                                           ChunkRange range,
+                                           ChunkVersion preMigrationChunkVersion)
     : _migrationInfo(migrationId,
                      std::move(lsid),
                      txnNumber,
@@ -56,7 +57,8 @@ MigrationCoordinator::MigrationCoordinator(OperationContext* opCtx,
                      collectionUuid,
                      std::move(donorShard),
                      std::move(recipientShard),
-                     std::move(range)) {}
+                     std::move(range),
+                     std::move(preMigrationChunkVersion)) {}
 
 MigrationCoordinator::~MigrationCoordinator() = default;
 
