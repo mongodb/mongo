@@ -146,6 +146,8 @@ selector:
   - jstests/sharding/enable_sharding_with_primary.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
+  # Enable if SERVER-43310 is backported to 4.0
+  - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
 
 executor:
   config:

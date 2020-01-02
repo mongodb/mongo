@@ -77,7 +77,7 @@ public:
             opCtx,
             nss,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-            ReadPreferenceSetting::get(opCtx),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kNoRetry,
             {ErrorCodes::CannotImplicitlyCreateCollection});
 

@@ -82,7 +82,7 @@ Status SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext
         scatterGatherOnlyVersionIfUnsharded(opCtx,
                                             NamespaceString::kLogicalSessionsNamespace,
                                             SessionsCollection::generateCreateIndexesCmd(),
-                                            ReadPreferenceSetting::get(opCtx),
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                             Shard::RetryPolicy::kNoRetry);
         return Status::OK();
     } catch (const DBException& ex) {
