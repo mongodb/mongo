@@ -167,7 +167,13 @@ TEST(Unwind, Linkage) {
     std::string_view remainder = stacktrace;
 
     // Check that these function names appear in the trace, in order. The tracing code which
-    // preceded our libunwind integration could *not* symbolize hidden/static_function.
+    // preceded our libunwind integration could *not* symbolize hiddenFunction,
+    // anonymousNamespaceFunction, or staticFunction.
+    //
+    // When libunwind does cursor stepping, it picks up these procedure names with
+    // `unw_get_proc_name`. However, it doesn't provide a way to convert raw addrs to procedure
+    // names otherwise, so we can't do an `unw_backtrace` and then lookup the names in the usual
+    // way (i.e. `mergeDlInfo` calling `dladdr`).
     std::string frames[] = {
         "printStackTrace",
         "staticFunction",
