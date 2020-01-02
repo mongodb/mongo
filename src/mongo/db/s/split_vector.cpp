@@ -66,7 +66,6 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                                              bool force,
                                              boost::optional<long long> maxSplitPoints,
                                              boost::optional<long long> maxChunkObjects,
-                                             boost::optional<long long> maxChunkSize,
                                              boost::optional<long long> maxChunkSizeBytes) {
     std::vector<BSONObj> splitKeys;
     std::size_t splitVectorResponseSize = 0;
@@ -113,26 +112,20 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
         // Now that we have the size estimate, go over the remaining parameters and apply any
         // maximum size restrictions specified there.
 
-        // Forcing a split is equivalent to having maxChunkSize be the size of the current
+        // Forcing a split is equivalent to having maxChunkSizeBytes be the size of the current
         // chunk, i.e., the logic below will split that chunk in half
 
         if (force) {
-            maxChunkSize = dataSize;
-        } else if (!maxChunkSize) {
-            if (maxChunkSizeBytes) {
-                maxChunkSize = maxChunkSizeBytes.get();
-            }
-        } else {
-            maxChunkSize = maxChunkSize.get() * 1 << 20;
+            maxChunkSizeBytes = dataSize;
         }
 
         // We need a maximum size for the chunk.
-        if (!maxChunkSize || maxChunkSize.get() <= 0) {
+        if (!maxChunkSizeBytes || maxChunkSizeBytes.get() <= 0) {
             return {ErrorCodes::InvalidOptions, "need to specify the desired max chunk size"};
         }
 
         // If there's not enough data for more than one chunk, no point continuing.
-        if (dataSize < maxChunkSize.get() || recCount == 0) {
+        if (dataSize < maxChunkSizeBytes.get() || recCount == 0) {
             std::vector<BSONObj> emptyVector;
             return emptyVector;
         }
@@ -141,11 +134,11 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
               << " -->> " << redact(maxKey);
 
         // We'll use the average object size and number of object to find approximately how many
-        // keys each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects,
-        // if provided.
+        // keys each chunk should have. We'll split at half the maxChunkSizeBytes or
+        // maxChunkObjects, if provided.
         const long long avgRecSize = dataSize / recCount;
 
-        long long keyCount = maxChunkSize.get() / (2 * avgRecSize);
+        long long keyCount = maxChunkSizeBytes.get() / (2 * avgRecSize);
 
         if (maxChunkObjects.get() && (maxChunkObjects.get() < keyCount)) {
             log() << "limiting split vector to " << maxChunkObjects.get() << " (from " << keyCount
@@ -299,7 +292,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
         // index
         //
 
-        // Warn for keys that are more numerous than maxChunkSize allows.
+        // Warn for keys that are more numerous than maxChunkSizeBytes allows.
         for (auto it = tooFrequentKeys.cbegin(); it != tooFrequentKeys.cend(); ++it) {
             warning() << "possible low cardinality key detected in " << nss.toString()
                       << " - key is " << redact(prettyKey(idx->keyPattern(), *it));

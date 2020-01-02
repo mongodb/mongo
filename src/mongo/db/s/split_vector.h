@@ -64,7 +64,6 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                                              bool force,
                                              boost::optional<long long> maxSplitPoints,
                                              boost::optional<long long> maxChunkObjects,
-                                             boost::optional<long long> maxChunkSize,
                                              boost::optional<long long> maxChunkSizeBytes);
 
 }  // namespace mongo
