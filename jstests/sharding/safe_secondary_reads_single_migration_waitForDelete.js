@@ -70,6 +70,7 @@ let testCases = {
     _getUserCacheGeneration: {skip: "does not return user data"},
     _hashBSONElement: {skip: "does not return user data"},
     _isSelf: {skip: "does not return user data"},
+    _killOperations: {skip: "does not return user data"},
     _mergeAuthzCollections: {skip: "primary only"},
     _migrateClone: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},

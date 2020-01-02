@@ -112,6 +112,7 @@ let viewsCommandTests = {
     _getUserCacheGeneration: {skip: isAnInternalCommand},
     _hashBSONElement: {skip: isAnInternalCommand},
     _isSelf: {skip: isAnInternalCommand},
+    _killOperations: {skip: isUnrelated},
     _mergeAuthzCollections: {skip: isAnInternalCommand},
     _migrateClone: {skip: isAnInternalCommand},
     _movePrimary: {skip: wasRemovedInBinaryVersion44},
