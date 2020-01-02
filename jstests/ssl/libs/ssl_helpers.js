@@ -180,9 +180,18 @@ function mixedShardTest(options1, options2, shouldSucceed) {
                 node.getDB('admin').auth('admin', 'pwd');
             });
         }
+
         // This has to be done in order for failure
         // to not prevent future tests from running...
         if (st) {
+            if (st.s.fullOptions.clusterAuthMode === 'x509') {
+                // Index consistency check during shutdown needs a privileged user to auth as.
+                const x509User =
+                    'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
+                st.s.getDB('$external')
+                    .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+            }
+
             st.stop();
         }
     }

@@ -6,6 +6,7 @@
  * test suite. This suite does not use ssl so it cannot test modes with ssl.
  */
 
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 load('jstests/ssl/libs/ssl_helpers.js');
 
 (function() {

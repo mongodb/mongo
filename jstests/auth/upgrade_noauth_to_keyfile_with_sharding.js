@@ -7,8 +7,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
 'use strict';
 
-// TODO (SERVER-45108): This test doesn't specify authentication mode through 'options' and
-// authutil.asCluster() only checks jsTest.options().clusterAuthMode.
+// IndexConsistencyCheck requires auth which ttA/ttA fails at.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 // Disable auth explicitly

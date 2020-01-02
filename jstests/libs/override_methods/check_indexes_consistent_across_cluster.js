@@ -27,6 +27,8 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
     print("Checking consistency of indexes across the cluster");
 
     const mongos = new Mongo(this.s.host);
+    mongos.fullOptions = this.s.fullOptions || {};
+
     const keyFile = this.keyFile;
 
     // TODO (SERVER-45017): Remove this check when v4.4 becomes last-stable.
@@ -65,7 +67,9 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
         };
     }
 
-    const collDocs = keyFile ? authutil.asCluster(mongos, keyFile, getCollDocs) : getCollDocs();
+    const requiresAuth = keyFile || (mongos.fullOptions.clusterAuthMode === 'x509');
+    const collDocs =
+        requiresAuth ? authutil.asCluster(mongos, keyFile, getCollDocs) : getCollDocs();
     for (const collDoc of collDocs) {
         const ns = collDoc._id;
         const getIndexDocsForNs = makeGetIndexDocsFunc(ns);
@@ -77,8 +81,8 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
         //                {"spec" : {"v" : 2, "key" : {"x" : 1}, "name" : "x_1"}}]},
         //  {"shard" : "rs1",
         //   "indexes" : [{"spec" : {"v" : 2, "key" : {"_id" :1}, "name" : "_id_"}}]}];
-        const indexDocs =
-            keyFile ? authutil.asCluster(mongos, keyFile, getIndexDocsForNs) : getIndexDocsForNs();
+        const indexDocs = requiresAuth ? authutil.asCluster(mongos, keyFile, getIndexDocsForNs)
+                                       : getIndexDocsForNs();
 
         if (indexDocs.length == 0) {
             print(`Found no indexes for ${ns}, skipping index consistency check`);

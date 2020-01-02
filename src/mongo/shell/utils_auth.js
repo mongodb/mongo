@@ -80,7 +80,9 @@ authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
  */
 authutil.asCluster = function(conn, keyfile, action) {
     var ex;
-    const authMode = jsTest.options().clusterAuthMode;
+
+    const connOptions = conn.fullOptions || {};
+    const authMode = connOptions.clusterAuthMode || jsTest.options().clusterAuthMode;
 
     // put a connection in an array for uniform processing.
     let connArray = conn;
@@ -99,13 +101,15 @@ authutil.asCluster = function(conn, keyfile, action) {
         return {connClusterTime, sessionClusterTime, operationTime};
     });
 
-    if (authMode === 'keyFile') {
+    let authDB = 'admin';
+    if ((authMode === 'keyFile') || (authMode === 'sendKeyFile') || (authMode === 'sendX509')) {
         authutil.assertAuthenticate(conn, 'admin', {
             user: '__system',
             mechanism: 'SCRAM-SHA-1',
             pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
         });
     } else if (authMode === 'x509') {
+        authDB = '$external';
         authutil.assertAuthenticate(conn, '$external', {
             mechanism: 'MONGODB-X509',
         });
@@ -117,7 +121,7 @@ authutil.asCluster = function(conn, keyfile, action) {
         return action();
     } finally {
         try {
-            authutil.logout(conn, 'admin');
+            authutil.logout(conn, authDB);
             let connArray = conn;
             if (conn.length == null)
                 connArray = [conn];
