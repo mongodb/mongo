@@ -183,9 +183,9 @@ var _kill_sessions_api_module = (function() {
         this.visit(function(client) {
             var db = client.getDB("admin");
             db.setSlaveOk();
-            var cursors = db.aggregate([{"$listLocalCursors": {}}]).toArray();
-            cursors.forEach(function(cursor) {
-                assert(!cursor.lsid);
+            assert.soon(() => {
+                let cursors = db.aggregate([{"$listLocalCursors": {}}]).toArray();
+                return cursors.every(cursor => !cursor.lsid);
             });
         });
     };
