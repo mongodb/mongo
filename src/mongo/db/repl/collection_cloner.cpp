@@ -245,21 +245,24 @@ void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
 void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd) {
     uassertStatusOK(cbd.status);
 
-    std::vector<BSONObj> docs;
     {
         stdx::lock_guard<Latch> lk(_mutex);
+        std::vector<BSONObj> docs;
         if (_documentsToInsert.size() == 0) {
-            warning() << "_insertDocumentsCallback, but no documents to insert for ns:"
+            warning() << "insertDocumentsCallback, but no documents to insert for ns:"
                       << _sourceNss;
             return;
         }
         _documentsToInsert.swap(docs);
         _stats.documentsCopied += docs.size();
         ++_stats.fetchedBatches;
+        _progressMeter.hit(int(docs.size()));
+        invariant(_collLoader);
+
+        // The insert must be done within the lock, because CollectionBulkLoader is not
+        // thread safe.
+        uassertStatusOK(_collLoader->insertDocuments(docs.cbegin(), docs.cend()));
     }
-    _progressMeter.hit(int(docs.size()));
-    invariant(_collLoader);
-    uassertStatusOK(_collLoader->insertDocuments(docs.cbegin(), docs.cend()));
 
     initialSyncHangDuringCollectionClone.executeIf(
         [&](const BSONObj&) {
