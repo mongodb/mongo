@@ -80,6 +80,11 @@ public:
     virtual DataBuilder post(StringData url, ConstDataRange data) const = 0;
 
     /**
+     * Perform a PUT request to specified URL.
+     */
+    virtual DataBuilder put(StringData url, ConstDataRange data) const = 0;
+
+    /**
      * Perform a GET request from the specified URL.
      */
     virtual DataBuilder get(StringData url) const = 0;

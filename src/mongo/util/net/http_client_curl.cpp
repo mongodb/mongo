@@ -277,6 +277,21 @@ public:
         return doRequest(myHandle.get(), url);
     }
 
+    DataBuilder put(StringData url, ConstDataRange cdr) const final {
+        // Make a local copy of the base handle for this request.
+        CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
+        uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
+
+        curl_easy_setopt(myHandle.get(), CURLOPT_PUT, 1);
+
+        ConstDataRangeCursor cdrc(cdr);
+        curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
+        curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
+        curl_easy_setopt(myHandle.get(), CURLOPT_INFILESIZE_LARGE, (long)cdrc.length());
+
+        return doRequest(myHandle.get(), url);
+    }
+
 private:
     /**
      * Helper for use with curl_easy_setopt which takes a vararg list,

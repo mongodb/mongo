@@ -214,10 +214,13 @@ std::string getRegionFromHost(StringData host) {
 }
 
 std::string parseRoleFromEC2IamSecurityCredentials(StringData data) {
+    // Before the Nov 2019 AWS update, they added \n to the role_name.
     size_t pos = data.find('\n');
 
-    uassert(
-        51294, "Failed to parse role name from EC2 instance metadata", pos != std::string::npos);
+    if (pos == std::string::npos) {
+        pos = data.size();
+    }
+
     return data.substr(0, pos).toString();
 }
 
