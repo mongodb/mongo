@@ -325,7 +325,6 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                                                        false,
                                                        boost::none,
                                                        boost::none,
-                                                       boost::none,
                                                        maxChunkSizeBytes));
 
         if (splitPoints.empty()) {

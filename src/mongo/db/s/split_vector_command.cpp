@@ -123,16 +123,14 @@ public:
             maxChunkObjects = maxChunkObjectsElem.numberLong();
         }
 
-        boost::optional<long long> maxChunkSize;
-        BSONElement maxSizeElem = jsobj["maxChunkSize"];
-        if (maxSizeElem.isNumber()) {
-            maxChunkSize = maxSizeElem.numberLong();
-        }
-
         boost::optional<long long> maxChunkSizeBytes;
-        maxSizeElem = jsobj["maxChunkSizeBytes"];
+        BSONElement maxSizeElem = jsobj["maxChunkSize"];
+        BSONElement maxSizeBytesElem = jsobj["maxChunkSizeBytes"];
+        // Use maxChunkSize if present otherwise maxChunkSizeBytes
         if (maxSizeElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeElem.numberLong();
+            maxChunkSizeBytes = maxSizeElem.numberLong() * 1 << 20;
+        } else if (maxSizeBytesElem.isNumber()) {
+            maxChunkSizeBytes = maxSizeBytesElem.numberLong();
         }
 
         auto statusWithSplitKeys = splitVector(opCtx,
@@ -143,7 +141,6 @@ public:
                                                force,
                                                maxSplitPoints,
                                                maxChunkObjects,
-                                               maxChunkSize,
                                                maxChunkSizeBytes);
         uassertStatusOK(statusWithSplitKeys.getStatus());
 
