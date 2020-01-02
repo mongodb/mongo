@@ -163,6 +163,11 @@ public:
             L"POST", url, const_cast<void*>(static_cast<const void*>(cdr.data())), cdr.length());
     }
 
+    DataBuilder put(StringData url, ConstDataRange cdr) const final {
+        return doRequest(
+            L"PUT", url, const_cast<void*>(static_cast<const void*>(cdr.data())), cdr.length());
+    }
+
     DataBuilder get(StringData url) const final {
         return doRequest(L"GET", url, nullptr, 0);
     }
