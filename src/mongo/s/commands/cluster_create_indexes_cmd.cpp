@@ -83,7 +83,7 @@ public:
             routingInfo,
             CommandHelpers::filterCommandRequestForPassthrough(
                 applyReadWriteConcern(opCtx, this, cmdObj)),
-            ReadPreferenceSetting::get(opCtx),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kNoRetry,
             BSONObj() /* query */,
             BSONObj() /* collation */);
