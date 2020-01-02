@@ -57,6 +57,364 @@ def raise_exception(exception, target, s):
         raise SCons.Errors.UserError(msg)
 
 
+class StringSubber(object):
+    """A class to construct the results of a scons_subst() call.
+
+    This binds a specific construction environment, mode, target and
+    source with two methods (substitute() and expand()) that handle
+    the expansion.
+    """
+    def __init__(self, env, mode, conv, gvars):
+        self.env = env
+        self.mode = mode
+        self.conv = conv
+        self.gvars = gvars
+
+    def expand(self, s, lvars):
+        """Expand a single "token" as necessary, returning an
+        appropriate string containing the expansion.
+
+        This handles expanding different types of things (strings,
+        lists, callables) appropriately.  It calls the wrapper
+        substitute() method to re-expand things as necessary, so that
+        the results of expansions of side-by-side strings still get
+        re-evaluated separately, not smushed together.
+        """
+        if is_String(s):
+            try:
+                s0, s1 = s[:2]
+            except (IndexError, ValueError):
+                return s
+            if s0 != '$':
+                return s
+            if s1 == '$':
+                # In this case keep the double $'s which we'll later
+                # swap for a single dollar sign as we need to retain
+                # this information to properly avoid matching "$("" when
+                # the actual text was "$$(""  (or "$)"" when "$$)"" )
+                return '$$'
+            elif s1 in '()':
+                return s
+            else:
+                key = s[1:]
+                if key[0] == '{' or '.' in key:
+                    if key[0] == '{':
+                        key = key[1:-1]
+                    try:
+                        s = eval(key, self.gvars, lvars)
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception as e:
+                        if e.__class__ in AllowableExceptions:
+                            return ''
+                        raise_exception(e, lvars['TARGETS'], s)
+                else:
+                    if key in lvars:
+                        s = lvars[key]
+                    elif key in self.gvars:
+                        s = self.gvars[key]
+                    elif NameError not in AllowableExceptions:
+                        raise_exception(NameError(key), lvars['TARGETS'], s)
+                    else:
+                        return ''
+
+                # Before re-expanding the result, handle
+                # recursive expansion by copying the local
+                # variable dictionary and overwriting a null
+                # string for the value of the variable name
+                # we just expanded.
+                #
+                # This could potentially be optimized by only
+                # copying lvars when s contains more expansions,
+                # but lvars is usually supposed to be pretty
+                # small, and deeply nested variable expansions
+                # are probably more the exception than the norm,
+                # so it should be tolerable for now.
+                lv = lvars.copy()
+                var = key.split('.')[0]
+                lv[var] = ''
+                return self.substitute(s, lv)
+        elif is_Sequence(s):
+            def func(l, conv=self.conv, substitute=self.substitute, lvars=lvars):
+                return conv(substitute(l, lvars))
+            return list(map(func, s))
+        elif callable(s):
+            try:
+                s = s(target=lvars['TARGETS'],
+                     source=lvars['SOURCES'],
+                     env=self.env,
+                     for_signature=(self.mode != SUBST_CMD))
+            except TypeError:
+                # This probably indicates that it's a callable
+                # object that doesn't match our calling arguments
+                # (like an Action).
+                if self.mode == SUBST_RAW:
+                    return s
+                s = self.conv(s)
+            return self.substitute(s, lvars)
+        elif s is None:
+            return ''
+        else:
+            return s
+
+    def substitute(self, args, lvars):
+        """Substitute expansions in an argument or list of arguments.
+
+        This serves as a wrapper for splitting up a string into
+        separate tokens.
+        """
+        if is_String(args) and not isinstance(args, CmdStringHolder):
+            args = str(args)        # In case it's a UserString.
+            try:
+                def sub_match(match):
+                    return self.conv(self.expand(match.group(1), lvars))
+                result = _dollar_exps.sub(sub_match, args)
+            except TypeError:
+                # If the internal conversion routine doesn't return
+                # strings (it could be overridden to return Nodes, for
+                # example), then the 1.5.2 re module will throw this
+                # exception.  Back off to a slower, general-purpose
+                # algorithm that works for all data types.
+                args = _separate_args.findall(args)
+                result = []
+                for a in args:
+                    result.append(self.conv(self.expand(a, lvars)))
+                if len(result) == 1:
+                    result = result[0]
+                else:
+                    result = ''.join(map(str, result))
+            return result
+        else:
+            return self.expand(args, lvars)
+
+
+class ListSubber(collections.UserList):
+    """A class to construct the results of a scons_subst_list() call.
+
+    Like StringSubber, this class binds a specific construction
+    environment, mode, target and source with two methods
+    (substitute() and expand()) that handle the expansion.
+
+    In addition, however, this class is used to track the state of
+    the result(s) we're gathering so we can do the appropriate thing
+    whenever we have to append another word to the result--start a new
+    line, start a new word, append to the current word, etc.  We do
+    this by setting the "append" attribute to the right method so
+    that our wrapper methods only need ever call ListSubber.append(),
+    and the rest of the object takes care of doing the right thing
+    internally.
+    """
+    def __init__(self, env, mode, conv, gvars):
+        collections.UserList.__init__(self, [])
+        self.env = env
+        self.mode = mode
+        self.conv = conv
+        self.gvars = gvars
+
+        if self.mode == SUBST_RAW:
+            self.add_strip = lambda x: self.append(x)
+        else:
+            self.add_strip = lambda x: None
+        self.in_strip = None
+        self.next_line()
+
+    def expand(self, s, lvars, within_list):
+        """Expand a single "token" as necessary, appending the
+        expansion to the current result.
+
+        This handles expanding different types of things (strings,
+        lists, callables) appropriately.  It calls the wrapper
+        substitute() method to re-expand things as necessary, so that
+        the results of expansions of side-by-side strings still get
+        re-evaluated separately, not smushed together.
+        """
+
+        if is_String(s):
+            try:
+                s0, s1 = s[:2]
+            except (IndexError, ValueError):
+                self.append(s)
+                return
+            if s0 != '$':
+                self.append(s)
+                return
+            if s1 == '$':
+                self.append('$')
+            elif s1 == '(':
+                self.open_strip('$(')
+            elif s1 == ')':
+                self.close_strip('$)')
+            else:
+                key = s[1:]
+                if key[0] == '{' or key.find('.') >= 0:
+                    if key[0] == '{':
+                        key = key[1:-1]
+                    try:
+                        s = eval(key, self.gvars, lvars)
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception as e:
+                        if e.__class__ in AllowableExceptions:
+                            return
+                        raise_exception(e, lvars['TARGETS'], s)
+                else:
+                    if key in lvars:
+                        s = lvars[key]
+                    elif key in self.gvars:
+                        s = self.gvars[key]
+                    elif NameError not in AllowableExceptions:
+                        raise_exception(NameError(), lvars['TARGETS'], s)
+                    else:
+                        return
+
+                # Before re-expanding the result, handle
+                # recursive expansion by copying the local
+                # variable dictionary and overwriting a null
+                # string for the value of the variable name
+                # we just expanded.
+                lv = lvars.copy()
+                var = key.split('.')[0]
+                lv[var] = ''
+                self.substitute(s, lv, 0)
+                self.this_word()
+        elif is_Sequence(s):
+            for a in s:
+                self.substitute(a, lvars, 1)
+                self.next_word()
+        elif callable(s):
+            try:
+                s = s(target=lvars['TARGETS'],
+                     source=lvars['SOURCES'],
+                     env=self.env,
+                     for_signature=(self.mode != SUBST_CMD))
+            except TypeError:
+                # This probably indicates that it's a callable
+                # object that doesn't match our calling arguments
+                # (like an Action).
+                if self.mode == SUBST_RAW:
+                    self.append(s)
+                    return
+                s = self.conv(s)
+            self.substitute(s, lvars, within_list)
+        elif s is None:
+            self.this_word()
+        else:
+            self.append(s)
+
+    def substitute(self, args, lvars, within_list):
+        """Substitute expansions in an argument or list of arguments.
+
+        This serves as a wrapper for splitting up a string into
+        separate tokens.
+        """
+
+        if is_String(args) and not isinstance(args, CmdStringHolder):
+            args = str(args)        # In case it's a UserString.
+            args = _separate_args.findall(args)
+            for a in args:
+                if a[0] in ' \t\n\r\f\v':
+                    if '\n' in a:
+                        self.next_line()
+                    elif within_list:
+                        self.append(a)
+                    else:
+                        self.next_word()
+                else:
+                    self.expand(a, lvars, within_list)
+        else:
+            self.expand(args, lvars, within_list)
+
+    def next_line(self):
+        """Arrange for the next word to start a new line.  This
+        is like starting a new word, except that we have to append
+        another line to the result."""
+        collections.UserList.append(self, [])
+        self.next_word()
+
+    def this_word(self):
+        """Arrange for the next word to append to the end of the
+        current last word in the result."""
+        self.append = self.add_to_current_word
+
+    def next_word(self):
+        """Arrange for the next word to start a new word."""
+        self.append = self.add_new_word
+
+    def add_to_current_word(self, x):
+        """Append the string x to the end of the current last word
+        in the result.  If that is not possible, then just add
+        it as a new word.  Make sure the entire concatenated string
+        inherits the object attributes of x (in particular, the
+        escape function) by wrapping it as CmdStringHolder."""
+
+        if not self.in_strip or self.mode != SUBST_SIG:
+            try:
+                current_word = self[-1][-1]
+            except IndexError:
+                self.add_new_word(x)
+            else:
+                # All right, this is a hack and it should probably
+                # be refactored out of existence in the future.
+                # The issue is that we want to smoosh words together
+                # and make one file name that gets escaped if
+                # we're expanding something like foo$EXTENSION,
+                # but we don't want to smoosh them together if
+                # it's something like >$TARGET, because then we'll
+                # treat the '>' like it's part of the file name.
+                # So for now, just hard-code looking for the special
+                # command-line redirection characters...
+                try:
+                    last_char = str(current_word)[-1]
+                except IndexError:
+                    last_char = '\0'
+                if last_char in '<>|':
+                    self.add_new_word(x)
+                else:
+                    y = current_word + x
+
+                    # We used to treat a word appended to a literal
+                    # as a literal itself, but this caused problems
+                    # with interpreting quotes around space-separated
+                    # targets on command lines.  Removing this makes
+                    # none of the "substantive" end-to-end tests fail,
+                    # so we'll take this out but leave it commented
+                    # for now in case there's a problem not covered
+                    # by the test cases and we need to resurrect this.
+                    #literal1 = self.literal(self[-1][-1])
+                    #literal2 = self.literal(x)
+                    y = self.conv(y)
+                    if is_String(y):
+                        #y = CmdStringHolder(y, literal1 or literal2)
+                        y = CmdStringHolder(y, None)
+                    self[-1][-1] = y
+
+    def add_new_word(self, x):
+        if not self.in_strip or self.mode != SUBST_SIG:
+            literal = self.literal(x)
+            x = self.conv(x)
+            if is_String(x):
+                x = CmdStringHolder(x, literal)
+            self[-1].append(x)
+        self.append = self.add_to_current_word
+
+    def literal(self, x):
+        try:
+            l = x.is_literal
+        except AttributeError:
+            return None
+        else:
+            return l()
+
+    def open_strip(self, x):
+        """Handle the "open strip" $( token."""
+        self.add_strip(x)
+        self.in_strip = 1
+
+    def close_strip(self, x):
+        """Handle the "close strip" $) token."""
+        self.add_strip(x)
+        self.in_strip = None
+
 
 class Literal(object):
     """A wrapper for a string.  If you use this object wrapped
@@ -412,136 +770,6 @@ def scons_subst(strSubst, env, mode=SUBST_RAW, target=None, source=None, gvars={
     if (isinstance(strSubst, str) and '$' not in strSubst) or isinstance(strSubst, CmdStringHolder):
         return strSubst
 
-    class StringSubber(object):
-        """A class to construct the results of a scons_subst() call.
-
-        This binds a specific construction environment, mode, target and
-        source with two methods (substitute() and expand()) that handle
-        the expansion.
-        """
-        def __init__(self, env, mode, conv, gvars):
-            self.env = env
-            self.mode = mode
-            self.conv = conv
-            self.gvars = gvars
-
-        def expand(self, s, lvars):
-            """Expand a single "token" as necessary, returning an
-            appropriate string containing the expansion.
-
-            This handles expanding different types of things (strings,
-            lists, callables) appropriately.  It calls the wrapper
-            substitute() method to re-expand things as necessary, so that
-            the results of expansions of side-by-side strings still get
-            re-evaluated separately, not smushed together.
-            """
-            if is_String(s):
-                try:
-                    s0, s1 = s[:2]
-                except (IndexError, ValueError):
-                    return s
-                if s0 != '$':
-                    return s
-                if s1 == '$':
-                    # In this case keep the double $'s which we'll later
-                    # swap for a single dollar sign as we need to retain
-                    # this information to properly avoid matching "$("" when
-                    # the actual text was "$$(""  (or "$)"" when "$$)"" )
-                    return '$$'
-                elif s1 in '()':
-                    return s
-                else:
-                    key = s[1:]
-                    if key[0] == '{' or '.' in key:
-                        if key[0] == '{':
-                            key = key[1:-1]
-                        try:
-                            s = eval(key, self.gvars, lvars)
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as e:
-                            if e.__class__ in AllowableExceptions:
-                                return ''
-                            raise_exception(e, lvars['TARGETS'], s)
-                    else:
-                        if key in lvars:
-                            s = lvars[key]
-                        elif key in self.gvars:
-                            s = self.gvars[key]
-                        elif NameError not in AllowableExceptions:
-                            raise_exception(NameError(key), lvars['TARGETS'], s)
-                        else:
-                            return ''
-
-                    # Before re-expanding the result, handle
-                    # recursive expansion by copying the local
-                    # variable dictionary and overwriting a null
-                    # string for the value of the variable name
-                    # we just expanded.
-                    #
-                    # This could potentially be optimized by only
-                    # copying lvars when s contains more expansions,
-                    # but lvars is usually supposed to be pretty
-                    # small, and deeply nested variable expansions
-                    # are probably more the exception than the norm,
-                    # so it should be tolerable for now.
-                    lv = lvars.copy()
-                    var = key.split('.')[0]
-                    lv[var] = ''
-                    return self.substitute(s, lv)
-            elif is_Sequence(s):
-                def func(l, conv=self.conv, substitute=self.substitute, lvars=lvars):
-                    return conv(substitute(l, lvars))
-                return list(map(func, s))
-            elif callable(s):
-                try:
-                    s = s(target=lvars['TARGETS'],
-                         source=lvars['SOURCES'],
-                         env=self.env,
-                         for_signature=(self.mode != SUBST_CMD))
-                except TypeError:
-                    # This probably indicates that it's a callable
-                    # object that doesn't match our calling arguments
-                    # (like an Action).
-                    if self.mode == SUBST_RAW:
-                        return s
-                    s = self.conv(s)
-                return self.substitute(s, lvars)
-            elif s is None:
-                return ''
-            else:
-                return s
-
-        def substitute(self, args, lvars):
-            """Substitute expansions in an argument or list of arguments.
-
-            This serves as a wrapper for splitting up a string into
-            separate tokens.
-            """
-            if is_String(args) and not isinstance(args, CmdStringHolder):
-                args = str(args)        # In case it's a UserString.
-                try:
-                    def sub_match(match):
-                        return self.conv(self.expand(match.group(1), lvars))
-                    result = _dollar_exps.sub(sub_match, args)
-                except TypeError:
-                    # If the internal conversion routine doesn't return
-                    # strings (it could be overridden to return Nodes, for
-                    # example), then the 1.5.2 re module will throw this
-                    # exception.  Back off to a slower, general-purpose
-                    # algorithm that works for all data types.
-                    args = _separate_args.findall(args)
-                    result = []
-                    for a in args:
-                        result.append(self.conv(self.expand(a, lvars)))
-                    if len(result) == 1:
-                        result = result[0]
-                    else:
-                        result = ''.join(map(str, result))
-                return result
-            else:
-                return self.expand(args, lvars)
-
     if conv is None:
         conv = _strconv[mode]
 
@@ -616,232 +844,6 @@ def scons_subst_list(strSubst, env, mode=SUBST_RAW, target=None, source=None, gv
     substitutions within strings, so see that function instead
     if that's what you're looking for.
     """
-    class ListSubber(collections.UserList):
-        """A class to construct the results of a scons_subst_list() call.
-
-        Like StringSubber, this class binds a specific construction
-        environment, mode, target and source with two methods
-        (substitute() and expand()) that handle the expansion.
-
-        In addition, however, this class is used to track the state of
-        the result(s) we're gathering so we can do the appropriate thing
-        whenever we have to append another word to the result--start a new
-        line, start a new word, append to the current word, etc.  We do
-        this by setting the "append" attribute to the right method so
-        that our wrapper methods only need ever call ListSubber.append(),
-        and the rest of the object takes care of doing the right thing
-        internally.
-        """
-        def __init__(self, env, mode, conv, gvars):
-            collections.UserList.__init__(self, [])
-            self.env = env
-            self.mode = mode
-            self.conv = conv
-            self.gvars = gvars
-
-            if self.mode == SUBST_RAW:
-                self.add_strip = lambda x: self.append(x)
-            else:
-                self.add_strip = lambda x: None
-            self.in_strip = None
-            self.next_line()
-
-        def expand(self, s, lvars, within_list):
-            """Expand a single "token" as necessary, appending the
-            expansion to the current result.
-
-            This handles expanding different types of things (strings,
-            lists, callables) appropriately.  It calls the wrapper
-            substitute() method to re-expand things as necessary, so that
-            the results of expansions of side-by-side strings still get
-            re-evaluated separately, not smushed together.
-            """
-
-            if is_String(s):
-                try:
-                    s0, s1 = s[:2]
-                except (IndexError, ValueError):
-                    self.append(s)
-                    return
-                if s0 != '$':
-                    self.append(s)
-                    return
-                if s1 == '$':
-                    self.append('$')
-                elif s1 == '(':
-                    self.open_strip('$(')
-                elif s1 == ')':
-                    self.close_strip('$)')
-                else:
-                    key = s[1:]
-                    if key[0] == '{' or key.find('.') >= 0:
-                        if key[0] == '{':
-                            key = key[1:-1]
-                        try:
-                            s = eval(key, self.gvars, lvars)
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as e:
-                            if e.__class__ in AllowableExceptions:
-                                return
-                            raise_exception(e, lvars['TARGETS'], s)
-                    else:
-                        if key in lvars:
-                            s = lvars[key]
-                        elif key in self.gvars:
-                            s = self.gvars[key]
-                        elif NameError not in AllowableExceptions:
-                            raise_exception(NameError(), lvars['TARGETS'], s)
-                        else:
-                            return
-
-                    # Before re-expanding the result, handle
-                    # recursive expansion by copying the local
-                    # variable dictionary and overwriting a null
-                    # string for the value of the variable name
-                    # we just expanded.
-                    lv = lvars.copy()
-                    var = key.split('.')[0]
-                    lv[var] = ''
-                    self.substitute(s, lv, 0)
-                    self.this_word()
-            elif is_Sequence(s):
-                for a in s:
-                    self.substitute(a, lvars, 1)
-                    self.next_word()
-            elif callable(s):
-                try:
-                    s = s(target=lvars['TARGETS'],
-                         source=lvars['SOURCES'],
-                         env=self.env,
-                         for_signature=(self.mode != SUBST_CMD))
-                except TypeError:
-                    # This probably indicates that it's a callable
-                    # object that doesn't match our calling arguments
-                    # (like an Action).
-                    if self.mode == SUBST_RAW:
-                        self.append(s)
-                        return
-                    s = self.conv(s)
-                self.substitute(s, lvars, within_list)
-            elif s is None:
-                self.this_word()
-            else:
-                self.append(s)
-
-        def substitute(self, args, lvars, within_list):
-            """Substitute expansions in an argument or list of arguments.
-
-            This serves as a wrapper for splitting up a string into
-            separate tokens.
-            """
-
-            if is_String(args) and not isinstance(args, CmdStringHolder):
-                args = str(args)        # In case it's a UserString.
-                args = _separate_args.findall(args)
-                for a in args:
-                    if a[0] in ' \t\n\r\f\v':
-                        if '\n' in a:
-                            self.next_line()
-                        elif within_list:
-                            self.append(a)
-                        else:
-                            self.next_word()
-                    else:
-                        self.expand(a, lvars, within_list)
-            else:
-                self.expand(args, lvars, within_list)
-
-        def next_line(self):
-            """Arrange for the next word to start a new line.  This
-            is like starting a new word, except that we have to append
-            another line to the result."""
-            collections.UserList.append(self, [])
-            self.next_word()
-
-        def this_word(self):
-            """Arrange for the next word to append to the end of the
-            current last word in the result."""
-            self.append = self.add_to_current_word
-
-        def next_word(self):
-            """Arrange for the next word to start a new word."""
-            self.append = self.add_new_word
-
-        def add_to_current_word(self, x):
-            """Append the string x to the end of the current last word
-            in the result.  If that is not possible, then just add
-            it as a new word.  Make sure the entire concatenated string
-            inherits the object attributes of x (in particular, the
-            escape function) by wrapping it as CmdStringHolder."""
-
-            if not self.in_strip or self.mode != SUBST_SIG:
-                try:
-                    current_word = self[-1][-1]
-                except IndexError:
-                    self.add_new_word(x)
-                else:
-                    # All right, this is a hack and it should probably
-                    # be refactored out of existence in the future.
-                    # The issue is that we want to smoosh words together
-                    # and make one file name that gets escaped if
-                    # we're expanding something like foo$EXTENSION,
-                    # but we don't want to smoosh them together if
-                    # it's something like >$TARGET, because then we'll
-                    # treat the '>' like it's part of the file name.
-                    # So for now, just hard-code looking for the special
-                    # command-line redirection characters...
-                    try:
-                        last_char = str(current_word)[-1]
-                    except IndexError:
-                        last_char = '\0'
-                    if last_char in '<>|':
-                        self.add_new_word(x)
-                    else:
-                        y = current_word + x
-
-                        # We used to treat a word appended to a literal
-                        # as a literal itself, but this caused problems
-                        # with interpreting quotes around space-separated
-                        # targets on command lines.  Removing this makes
-                        # none of the "substantive" end-to-end tests fail,
-                        # so we'll take this out but leave it commented
-                        # for now in case there's a problem not covered
-                        # by the test cases and we need to resurrect this.
-                        #literal1 = self.literal(self[-1][-1])
-                        #literal2 = self.literal(x)
-                        y = self.conv(y)
-                        if is_String(y):
-                            #y = CmdStringHolder(y, literal1 or literal2)
-                            y = CmdStringHolder(y, None)
-                        self[-1][-1] = y
-
-        def add_new_word(self, x):
-            if not self.in_strip or self.mode != SUBST_SIG:
-                literal = self.literal(x)
-                x = self.conv(x)
-                if is_String(x):
-                    x = CmdStringHolder(x, literal)
-                self[-1].append(x)
-            self.append = self.add_to_current_word
-
-        def literal(self, x):
-            try:
-                l = x.is_literal
-            except AttributeError:
-                return None
-            else:
-                return l()
-
-        def open_strip(self, x):
-            """Handle the "open strip" $( token."""
-            self.add_strip(x)
-            self.in_strip = 1
-
-        def close_strip(self, x):
-            """Handle the "close strip" $) token."""
-            self.add_strip(x)
-            self.in_strip = None
 
     if conv is None:
         conv = _strconv[mode]
