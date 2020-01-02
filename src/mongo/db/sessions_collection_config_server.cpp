@@ -92,7 +92,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                     nss,
                     routingInfo,
                     SessionsCollection::generateCreateIndexesCmd(),
-                    ReadPreferenceSetting::get(opCtx),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kNoRetry,
                     BSONObj() /* query */,
                     BSONObj() /* collation */);
