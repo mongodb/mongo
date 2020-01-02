@@ -35,13 +35,16 @@
 
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(disableWritingPendingRangeDeletionEntries);
+
 namespace migrationutil {
 
-MigrationCoordinator::MigrationCoordinator(OperationContext* opCtx,
-                                           UUID migrationId,
+MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            LogicalSessionId lsid,
                                            TxnNumber txnNumber,
                                            ShardId donorShard,
@@ -66,19 +69,53 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx, bool waitForD
     LOG(0) << _logPrefix() << "Persisting migration coordinator doc";
     migrationutil::persistMigrationCoordinatorLocally(opCtx, _migrationInfo);
 
-    LOG(0) << _logPrefix() << "Persisting range deletion task on donor";
-    RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
-                                        _migrationInfo.getNss(),
-                                        _migrationInfo.getCollectionUuid(),
-                                        _migrationInfo.getDonorShardId(),
-                                        _migrationInfo.getRange(),
-                                        waitForDelete ? CleanWhenEnum::kNow
-                                                      : CleanWhenEnum::kDelayed);
-    donorDeletionTask.setPending(true);
-    migrationutil::persistRangeDeletionTaskLocally(opCtx, donorDeletionTask);
+    if (!disableWritingPendingRangeDeletionEntries.shouldFail()) {
+        LOG(0) << _logPrefix() << "Persisting range deletion task on donor";
+        RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
+                                            _migrationInfo.getNss(),
+                                            _migrationInfo.getCollectionUuid(),
+                                            _migrationInfo.getDonorShardId(),
+                                            _migrationInfo.getRange(),
+                                            waitForDelete ? CleanWhenEnum::kNow
+                                                          : CleanWhenEnum::kDelayed);
+        donorDeletionTask.setPending(true);
+        migrationutil::persistRangeDeletionTaskLocally(opCtx, donorDeletionTask);
+    }
 }
 
-void MigrationCoordinator::commitMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+void MigrationCoordinator::setMigrationDecision(Decision decision) {
+    LOG(0) << _logPrefix() << "MigrationCoordinator setting migration decision to "
+           << (decision == Decision::kCommitted ? "committed" : "aborted");
+    _decision = decision;
+}
+
+
+void MigrationCoordinator::completeMigration(OperationContext* opCtx) {
+    if (!_decision) {
+        LOG(0) << _logPrefix()
+               << "Migration completed without setting a decision. This node might have started "
+                  "stepping down or shutting down after having initiated commit against the config "
+                  "server but before having found out if the commit succeeded. The new primary of "
+                  "this replica set will complete the migration coordination.";
+        return;
+    }
+
+    LOG(0) << _logPrefix() << "MigrationCoordinator delivering decision "
+           << (_decision == Decision::kCommitted ? "committed" : "aborted")
+           << " to self and to recipient";
+
+    switch (*_decision) {
+        case Decision::kAborted:
+            _abortMigrationOnDonorAndRecipient(opCtx);
+            break;
+        case Decision::kCommitted:
+            _commitMigrationOnDonorAndRecipient(opCtx);
+            break;
+    }
+    _forgetMigration(opCtx);
+}
+
+void MigrationCoordinator::_commitMigrationOnDonorAndRecipient(OperationContext* opCtx) {
     LOG(0) << _logPrefix() << "Making commit decision durable";
     migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
 
@@ -93,7 +130,7 @@ void MigrationCoordinator::commitMigrationOnDonorAndRecipient(OperationContext* 
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 }
 
-void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
     LOG(0) << _logPrefix() << "Making abort decision durable";
     migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
 
@@ -108,7 +145,7 @@ void MigrationCoordinator::abortMigrationOnDonorAndRecipient(OperationContext* o
                                                            _migrationInfo.getTxnNumber());
 }
 
-void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
+void MigrationCoordinator::_forgetMigration(OperationContext* opCtx) {
     LOG(0) << _logPrefix() << "Deleting migration coordinator document";
     migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
 }

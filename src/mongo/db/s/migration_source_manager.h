@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
+#include "mongo/db/s/migration_coordinator.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/util/timer.h"
 
@@ -190,7 +191,15 @@ public:
 private:
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
-    enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kCloneCompleted, kDone };
+    enum State {
+        kCreated,
+        kCloning,
+        kCloneCaughtUp,
+        kCriticalSection,
+        kCloneCompleted,
+        kCommittingOnConfig,
+        kDone
+    };
 
     ScopedCollectionMetadata _getCurrentMetadataAndCheckEpoch();
 
@@ -242,6 +251,14 @@ private:
     // The UUID of the the collection whose chunks are being moved. Default to empty if the
     // collection doesn't have UUID.
     boost::optional<UUID> _collectionUuid;
+
+    // Whether to use the FCV 4.2 or FCV 4.4 protocol. After branching for v4.4, this should be
+    // removed and the FCV 4.4 protocol should always be used.
+    bool _useFCV44Protocol;
+
+    // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
+    // correctly updated based on whether the migration committed or aborted.
+    std::unique_ptr<migrationutil::MigrationCoordinator> _coordinator;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, a collection lock and the CSRLock need to be acquired first in order to block all

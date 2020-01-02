@@ -7,6 +7,11 @@ load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
+assert.commandWorked(st.shard0.adminCommand(
+    {configureFailPoint: "disableWritingPendingRangeDeletionEntries", mode: "alwaysOn"}));
+assert.commandWorked(st.shard1.adminCommand(
+    {configureFailPoint: "disableWritingPendingRangeDeletionEntries", mode: "alwaysOn"}));
+
 const mongosDB = st.s.getDB(jsTestName());
 const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];

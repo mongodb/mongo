@@ -53,11 +53,31 @@ assert.commandWorked(
 unpauseMigrateAtStep(st.rs1.getPrimary(), 2);
 
 // The migration should fail to commit without being able to advance the majority commit point.
-awaitMigration();
+if (jsTestOptions().mongosBinVersion == "last-stable") {
+    awaitMigration();
 
-assert.commandWorked(
-    destinationSec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
-    "failed to enable fail point on secondary");
+    assert.commandWorked(
+        destinationSec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
+        "failed to enable fail point on secondary");
+} else {
+    // In FCV 4.4, check the migration coordinator document, because the moveChunk command itself
+    // will hang on trying to remove the recipient's range deletion entry with majority writeConcern
+    // until replication is re-enabled on the recipient.
+    assert.soon(() => {
+        return st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").findOne({
+            nss: "test.foo",
+            "range.min._id": 0,
+            "range.max._id": MaxKey,
+            decision: "aborted",
+        }) != null;
+    });
+
+    assert.commandWorked(
+        destinationSec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
+        "failed to enable fail point on secondary");
+
+    awaitMigration();
+}
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);

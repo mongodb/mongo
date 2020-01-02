@@ -54,7 +54,10 @@ assert.commandWorked(priConn.getDB('test').sharded.insert({_id: 'marker'}));
 checkBasicCRUD(priConn.getDB('test').sharded);
 
 for (var x = 0; x < NUM_NODES; x++) {
-    replShard.restart(x, {shardsvr: ''});
+    replShard.restart(x, {
+        shardsvr: '',
+        setParameter: {"failpoint.disableWritingPendingRangeDeletionEntries": "{mode: 'alwaysOn'}"}
+    });
 }
 
 replShard.awaitNodesAgreeOnPrimary();
