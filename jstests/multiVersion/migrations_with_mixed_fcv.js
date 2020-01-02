@@ -181,9 +181,10 @@ function testMigrateFromLastStableToLatest() {
     checkFCV(st.shard0.getDB("admin"), lastStableFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
-    // TODO(SERVER-45179): uncomment when destination is updated to fail due to missing migration
-    // uuid. Move chunk [50, inf) to shard1. assert.commandFailed(
-    //    st.s.adminCommand({ moveChunk: ns, find: { x: 50 }, to: st.shard1.shardName }));
+    // Move chunk [50, inf) to shard1 should fail.
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}),
+        ErrorCodes.ConflictingOperationInProgress);
 
     st.stop();
 }

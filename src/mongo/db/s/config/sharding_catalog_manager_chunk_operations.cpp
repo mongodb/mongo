@@ -205,7 +205,8 @@ Status checkChunkMatchesRequest(OperationContext* opCtx,
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Config server rejecting commitChunkMigration request that does not have a "
                 "ChunkVersion because config server is in feature compatibility version 4.4",
-                requestedChunk.getVersion().isSet() && requestedChunk.getVersion().epoch().isSet());
+                requestedChunk.isVersionSet() && requestedChunk.getVersion().isSet() &&
+                    requestedChunk.getVersion().epoch().isSet());
 
         if (requestedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
             requestedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
