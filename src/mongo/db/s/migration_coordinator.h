@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -44,8 +45,9 @@ namespace migrationutil {
  */
 class MigrationCoordinator {
 public:
-    MigrationCoordinator(OperationContext* opCtx,
-                         UUID migrationId,
+    enum class Decision { kAborted, kCommitted };
+
+    MigrationCoordinator(UUID migrationId,
                          LogicalSessionId lsid,
                          TxnNumber txnNumber,
                          ShardId donorShard,
@@ -73,23 +75,39 @@ public:
     void startMigration(OperationContext* opCtx, bool waitForDelete);
 
     /**
+     * Saves the decision.
+     *
+     * This method is non-blocking and does not perform any I/O.
+     */
+    void setMigrationDecision(Decision decision);
+
+    /**
+     * If a decision has been set, makes the decision durable, then communicates the decision by
+     * updating the local (donor's) and remote (recipient's) config.rangeDeletions entries.
+     */
+    void completeMigration(OperationContext* opCtx);
+
+private:
+    /**
      * Deletes the range deletion task from the recipient node and marks the range deletion task on
      * the donor as ready to be processed.
      */
-    void commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    void _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
     /**
      * Deletes the range deletion task from the donor node and marks the range deletion task on the
      * recipient node as ready to be processed.
      */
-    void abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    void _abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
     /**
      * Deletes the persistent state for this migration from config.migrationCoordinators.
      */
-    void forgetMigration(OperationContext* opCtx);
+    void _forgetMigration(OperationContext* opCtx);
 
-private:
+    // The decision of the migration commit against the config server.
+    boost::optional<Decision> _decision;
+
     /**
      * Returns a string that uniquely identifies the migration.
      */

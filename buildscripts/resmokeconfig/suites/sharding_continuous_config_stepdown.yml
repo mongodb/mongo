@@ -95,6 +95,7 @@ selector:
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/keys_rotation_interval_sec.js
+  - jstests/sharding/migration_coordinator_basic.js # sets a failpoint on the config primary
   - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
   - jstests/sharding/move_chunk_insert_with_write_retryability.js
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
@@ -143,6 +144,7 @@ selector:
   # earlier, but can potentially pass or have different side effects on the second try
   - jstests/sharding/migration_ignore_interrupts_1.js
   - jstests/sharding/migration_sets_fromMigrate_flag.js
+  - jstests/sharding/migration_waits_for_majority_commit.js
   # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
   - jstests/sharding/migration_ignore_interrupts_3.js
   - jstests/sharding/migration_ignore_interrupts_4.js
