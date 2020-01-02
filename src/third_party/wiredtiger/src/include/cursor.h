@@ -32,24 +32,62 @@
       0                      /* uint32_t flags */                                               \
     }
 
+/*
+ * Block based incremental backup structure. These live in the connection.
+ */
+#define WT_BLKINCR_MAX 2
+struct __wt_blkincr {
+    const char *id_str;    /* User's name for this backup. */
+    const char *ckpt_name; /* Requires WT-5115. All checkpoints must be this name */
+    void *data;
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_BLKINCR_INUSE 0x1u /* This entry is active */
+#define WT_BLKINCR_VALID 0x2u /* This entry is valid */
+                              /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint64_t flags;
+};
+
 struct __wt_cursor_backup {
     WT_CURSOR iface;
 
     size_t next;     /* Cursor position */
     WT_FSTREAM *bfs; /* Backup file stream */
-    uint32_t maxid;  /* Maximum log file ID seen */
+
+#define WT_CURSOR_BACKUP_ID(cursor) (((WT_CURSOR_BACKUP *)(cursor))->maxid)
+    uint32_t maxid; /* Maximum log file ID seen */
 
     char **list; /* List of files to be copied. */
     size_t list_allocated;
     size_t list_next;
 
+    /* File offset-based incremental backup. */
+    WT_BLKINCR *incr;          /* Incremental backup in use */
+    char *incr_file;           /* File name */
+    char *incr_src;            /* Source identifier */
+    char *incr_this;           /* New base identifier */
+    uint64_t incr_granularity; /* Maximum transfer size */
+
+    WT_CURSOR *incr_cursor; /* File cursor */
+    /* Start/stop checkpoints */
+    char *incr_checkpoint_start;
+    char *incr_checkpoint_stop;
+
+#define WT_BACKUP_INCR_COMPONENTS 3
+    bool incr_init;            /* Cursor traversal initialized */
+    uint64_t *incr_list;       /* List of file offset/size/type triples */
+    uint64_t incr_list_count;  /* Count of file offset/size/type triples */
+    uint64_t incr_list_offset; /* Current offset */
+    uint64_t incr_size;        /* Maximum transfer size */
+    WT_ITEM *incr_block;       /* Current block of data */
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_CURBACKUP_DUP 0x1u    /* Duplicated backup cursor */
-#define WT_CURBACKUP_LOCKER 0x2u /* Hot-backup started */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_CURBACKUP_DUP 0x1u        /* Duplicated backup cursor */
+#define WT_CURBACKUP_FORCE_STOP 0x2u /* Force stop incremental backup */
+#define WT_CURBACKUP_INCR 0x4u       /* Incremental backup cursor */
+#define WT_CURBACKUP_LOCKER 0x8u     /* Hot-backup started */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 };
-#define WT_CURSOR_BACKUP_ID(cursor) (((WT_CURSOR_BACKUP *)(cursor))->maxid)
 
 struct __wt_cursor_btree {
     WT_CURSOR iface;

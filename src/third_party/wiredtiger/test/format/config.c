@@ -39,7 +39,6 @@ static bool config_fix(void);
 static void config_in_memory(void);
 static void config_in_memory_reset(void);
 static int config_is_perm(const char *);
-static void config_lrt(void);
 static void config_lsm_reset(void);
 static void config_map_checkpoint(const char *, u_int *);
 static void config_map_checksum(const char *, u_int *);
@@ -176,7 +175,6 @@ config_setup(void)
     config_compression("compression");
     config_compression("logging_compression");
     config_encryption();
-    config_lrt();
 
     /* Configuration based on the configuration already chosen. */
     config_pct();
@@ -238,7 +236,7 @@ config_setup(void)
 static void
 config_cache(void)
 {
-    uint32_t required;
+    uint32_t required, workers;
 
     /* Page sizes are powers-of-two for bad historic reasons. */
     g.intl_page_max = 1U << g.c_intl_page_max;
@@ -269,7 +267,8 @@ config_cache(void)
      * This code is what dramatically increases the cache size when there are lots of threads, it
      * grows the cache to several megabytes per thread.
      */
-    g.c_cache = WT_MAX(g.c_cache, 2 * g.c_threads * g.c_memory_page_max);
+    workers = g.c_threads + (g.c_random_cursor ? 1 : 0);
+    g.c_cache = WT_MAX(g.c_cache, 2 * workers * g.c_memory_page_max);
 
     /*
      * Ensure cache size sanity for LSM runs. An LSM tree open requires 3
@@ -281,7 +280,7 @@ config_cache(void)
      */
     if (DATASOURCE("lsm")) {
         required = WT_LSM_TREE_MINIMUM_SIZE(
-          g.c_chunk_size * WT_MEGABYTE, g.c_threads * g.c_merge_max, g.c_threads * g.leaf_page_max);
+          g.c_chunk_size * WT_MEGABYTE, workers * g.c_merge_max, workers * g.leaf_page_max);
         required = (required + (WT_MEGABYTE - 1)) / WT_MEGABYTE;
         if (g.c_cache < required)
             g.c_cache = required;
@@ -451,12 +450,7 @@ config_encryption(void)
 static bool
 config_fix(void)
 {
-    /*
-     * Fixed-length column stores don't support the lookaside table (so, no long running
-     * transactions), or modify operations.
-     */
-    if (config_is_perm("long_running_txn"))
-        return (false);
+    /* Fixed-length column stores don't support the lookaside table, so no modify operations. */
     if (config_is_perm("modify_pct"))
         return (false);
     return (true);
@@ -569,25 +563,6 @@ config_lsm_reset(void)
     if (!config_is_perm("prepare") && !config_is_perm("transaction_timestamps")) {
         config_single("prepare=off", false);
         config_single("transaction_timestamps=off", false);
-    }
-}
-
-/*
- * config_lrt --
- *     Long-running transaction configuration.
- */
-static void
-config_lrt(void)
-{
-    /*
-     * WiredTiger doesn't support a lookaside file for fixed-length column stores.
-     */
-    if (g.type == FIX && g.c_long_running_txn) {
-        if (config_is_perm("long_running_txn"))
-            testutil_die(EINVAL,
-              "long_running_txn not supported with fixed-length "
-              "column store");
-        config_single("long_running_txn=off", false);
     }
 }
 

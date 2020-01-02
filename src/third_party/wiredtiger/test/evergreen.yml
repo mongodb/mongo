@@ -97,6 +97,36 @@ functions:
           set -o verbose
           echo '#undef HAVE_FTRUNCATE' >> wiredtiger_config.h
     - *make_wiredtiger
+  "compile wiredtiger address sanitizer":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/build_posix"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          sh reconf
+          if [ "$OS" != "Windows_NT" ]; then
+            CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer -fsanitize=address" \
+              ../configure ${configure_python_setting|} \
+              --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          fi
+    - *make_wiredtiger
+  "compile wiredtiger with builtins":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/build_posix"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          sh reconf
+          if [ "$OS" != "Windows_NT" ]; then
+            CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC" \
+              ../configure ${configure_python_setting|} \
+              --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          fi
+    - *make_wiredtiger
   "make check directory":
     command: shell.exec
     params:
@@ -124,7 +154,7 @@ functions:
         set -o verbose
 
         ${test_env_vars|} ${python_binary|python} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1
-  "test format":
+  "format test":
     command: shell.exec
     params:
       working_dir: "wiredtiger/build_posix/test/format"
@@ -132,32 +162,89 @@ functions:
         set -o errexit
         set -o verbose
         for i in $(seq ${times|1}); do
-          ./t -1 -c ${config|../../../test/format/CONFIG.stress} ${extra_args|}
+          ./t -1 -c ${config|../../../test/format/CONFIG.stress} ${extra_args|} 2>&1
+        done
+  "format test script":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/test/format"
+      script: |
+        set -o errexit
+        set -o verbose
+        for i in $(seq ${times|1}); do
+          ${test_env_vars|} ${format_test_setting|} ./format.sh ${smp_command|} ${format_test_script_args|} 2>&1
         done
   "many dbs test":
     command: shell.exec
-    parms:
+    params:
       working_dir: "wiredtiger/build_posix/test/manydbs"
       script: |
         set -o errexit
         set -o verbose
-        ${test_env_vars|} ./t ${many_db_args|}
+        ${test_env_vars|} ./t ${many_db_args|} 2>&1
   "thread test":
     command: shell.exec
-    parms:
+    params:
       working_dir: "wiredtiger/build_posix/test/thread"
       script: |
         set -o errexit
         set -o verbose
-        ${test_env_vars|} ./t ${thread_test_args|}
+        ${test_env_vars|} ./t ${thread_test_args|} 2>&1
   "random abort test":
     command: shell.exec
-    parms:
+    params:
       working_dir: "wiredtiger/build_posix/test/csuite"
       script: |
         set -o errexit
         set -o verbose
-        ${test_env_vars|} ./test_random_abort ${random_abort_args|}
+        ${test_env_vars|} ./test_random_abort ${random_abort_args|} 2>&1
+  "timestamp abort test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix/test/csuite"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./test_timestamp_abort ${timestamp_abort_args|} 2>&1
+  "truncated log test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix/test/csuite"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./test_truncated_log ${truncated_log_args|} 2>&1
+  "recovery stress test script":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix/test/csuite"
+      script: |
+        set -o errexit
+        set -o verbose
+
+        for i in $(seq ${times|1}); do
+          # Run the various combinations of args.  Let time and threads be random.
+          # Run current version with write-no-sync txns.
+          ${test_env_vars|} ./test_random_abort 2>&1
+          ${test_env_vars|} ./test_timestamp_abort 2>&1
+
+          # Current version with memory-based txns (MongoDB usage).
+          ${test_env_vars|} ./test_random_abort -m 2>&1
+          ${test_env_vars|} ./test_timestamp_abort -m 2>&1
+
+          # V1 log compatibility mode with write-no-sync txns.
+          ${test_env_vars|} ./test_random_abort -C 2>&1
+          ${test_env_vars|} ./test_timestamp_abort -C 2>&1
+
+          # V1 log compatibility mode with memory-based txns.
+          ${test_env_vars|} ./test_random_abort -C -m 2>&1
+          ${test_env_vars|} ./test_timestamp_abort -C -m 2>&1
+
+          ${test_env_vars|} ./test_truncated_log ${truncated_log_args|} 2>&1
+
+          # Just let the system take a breath
+          sleep 10s
+        done
   "upload artifact":
     - command: archive.targz_pack
       params:
@@ -190,6 +277,28 @@ functions:
         set -o errexit
         set -o verbose
         ./t ${checkpoint_args} 2>&1
+
+  "checkpoint stress test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix/test/checkpoint"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+
+        export WIREDTIGER_CONFIG='checkpoint_sync=0,transaction_sync=(method=none)'
+        CMD='./t -h WT_TEST.$i.$t -t r -r 2 -W 3 -n 1000000 -k 1000000 -C "cache_size=100MB"'
+
+        for i in $(seq ${times|1}); do
+          for t in $(seq ${no_of_procs|1}); do
+            eval nohup $CMD > nohup.out.$i.$t 2>&1 &
+          done
+
+          for t in $(seq ${no_of_procs|1}); do
+            wait -n || exit $?
+          done
+        done
 
 pre:
   - func: "cleanup"
@@ -283,7 +392,7 @@ tasks:
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make check all"
         vars:
-          test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1
 
   - name: make-check-asan-test
     depends_on:
@@ -632,14 +741,7 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/test_truncated_log 2>&1
+      - func: "truncated log test"
 
   - name: csuite-wt1965-col-efficiency-test
     tags: ["pull_request"]
@@ -1337,7 +1439,7 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - func: "test format"
+      - func: "format test"
         vars:
           times: 10
           config: ../../../test/format/CONFIG.endian
@@ -1399,7 +1501,7 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - func: "test format"
+      - func: "format test"
         vars:
           times: 10
           config: ../../../test/format/CONFIG.endian
@@ -1493,7 +1595,7 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - func: "test format"
+      - func: "format test"
         vars:
           times: 3
           config: ../../../test/format/CONFIG.stress
@@ -1507,7 +1609,7 @@ tasks:
         vars:
           dependent_task: compile-linux-no-ftruncate
       - func: "compile wiredtiger no linux ftruncate"
-      - func: "test format"
+      - func: "format test"
         vars:
           times: 3
 
@@ -1564,37 +1666,37 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 --long
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row direct_io=1 firstfit=1 internal_key_truncation=1
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_key=1 huffman_value=1
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row isolation=random transaction_timestamps=0
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row data_source=lsm bloom=1
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
       - command: shell.exec
@@ -1623,7 +1725,7 @@ tasks:
         vars:
           posix_configure_flags: --enable-python --with-spinlock=gcc --enable-strict
       - func: "make check all"
-      - func: "test format"
+      - func: "format test"
         vars:
           times: 3
       - func: "unit test"
@@ -1635,7 +1737,7 @@ tasks:
         vars:
           posix_configure_flags: --enable-python --with-spinlock=pthread_adaptive --enable-strict
       - func: "make check all"
-      - func: "test format"
+      - func: "format test"
         vars:
           times: 3
       - func: "unit test"
@@ -1747,20 +1849,13 @@ tasks:
           random_abort_args: -t 40
       
       # truncated-log
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix/test/csuite/"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ./test_truncated_log
+      - func: "truncated log test"
       
       # format test
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: file_type=fix
-      - func: "test format"
+      - func: "format test"
         vars:
           extra_args: file_type=row
       
@@ -1783,6 +1878,145 @@ tasks:
             set -o verbose
 
             ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
+  
+  - name: format-stress-sanitizer-test
+    #set a 25 hours (25*60*60 = 90000 seconds) timeout
+    exec_timeout_secs: 90000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger address sanitizer"
+      - func: "format test script"
+        vars:
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          # run for 24 hours ( 24 * 60 = 1440 minutes), don't stop at failed tests, use default config
+          format_test_script_args: -t 1440
+  
+  - name: format-stress-sanitizer-smoke-test
+    #set a 7 hours timeout
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger address sanitizer"
+      - func: "format test script"
+        # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
+        # run smoke tests, don't stop at failed tests, use default config
+        vars:
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          format_test_script_args: -S
+          times: 16
+
+  - name: recovery-stress-test
+    #set a 25 hours timeout
+    exec_timeout_secs: 90000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
+      - func: "recovery stress test script"
+        vars:
+          # Repeat this script enough times to make this task run for 24 hours
+          # At the time of writing this script, one call to underlying scripts takes about ~15 mins to finish in worst case.
+          # We are giving an extra ~20% room for vairance in execution time.
+          times: 80
+
+  # This is special task until lz4 issues are resolved for zSeries distros
+  - name: recovery-stress-test-without-lz4
+    #set a 25 hours timeout
+    exec_timeout_secs: 90000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=snappy,zlib
+      - func: "recovery stress test script"
+        vars:
+          # Repeat this script enough times to make this task run for 24 hours
+          # At the time of writing this script, one call to underlying scripts takes about 8 mins to finish in worst case.
+          # We are giving an extra ~20% room for vairance in execution time.
+          times: 120
+          
+  - name: split-stress-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in {1..10}; do ${python_binary|python} split_stress.py; done
+
+  - name: format-stress-test
+    # Set 25 hours timeout
+    exec_timeout_secs: 90000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          #run for 24 hours ( 24 * 60 = 1440 minutes), use default config
+          format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -t 1440
+
+  - name: format-stress-smoke-test
+    # Set 7 hours timeout
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
+          # run smoke tests, use default config (-S)
+          format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -S
+          times: 16
+
+  - name: checkpoint-stress-test
+    commands:
+      - command: timeout.update
+        params:
+          # set 24 hour timeout for the task and command
+          exec_timeout_secs: 86400
+          timeout_secs: 86400
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "checkpoint stress test"
+        vars:
+          # No of times to run the loop
+          times: 2
+          # No of processes to run in the background
+          no_of_procs: 10
+
+  # The task name is ppc-zseries because this task will be used in both buildVariants
+  - name: format-stress-ppc-zseries-test
+    # Set 2.5 hours timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          # Make sure we dump core on failure
+          format_test_setting: ulimit -c unlimited
+          #run for 2 hours ( 2 * 60 = 120 minutes), use default config
+          format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -t 120
+
+  - name: format-wtperf-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/bench/wtperf"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cp ../../../bench/wtperf/split_heavy.wtperf .
+            ./wtperf -O ./split_heavy.wtperf -o verbose=2
 
 buildvariants:
 - name: ubuntu1804
@@ -1813,6 +2047,13 @@ buildvariants:
     - name: wtperf-test
     - name: ftruncate-test
     - name: long-test
+    - name: recovery-stress-test
+    - name: format-stress-sanitizer-test
+    - name: format-stress-sanitizer-smoke-test
+    - name: split-stress-test
+    - name: format-stress-test
+    - name: format-stress-smoke-test
+    - name: checkpoint-stress-test
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
@@ -1952,6 +2193,9 @@ buildvariants:
   tasks:
   - name: compile
   - name: unit-test
+  - name: format-stress-ppc-zseries-test
+  - name: format-stress-smoke-test
+  - name: format-wtperf-test
 
 - name: ubuntu1804-zseries
   display_name: Ubuntu 18.04 zSeries
@@ -1965,3 +2209,5 @@ buildvariants:
   tasks:
   - name: compile
   - name: unit-test
+  - name: recovery-stress-test-without-lz4
+  - name: split-stress-test

@@ -838,10 +838,6 @@ __wt_row_leaf_key_info(
             *ikeyp = NULL;
         if (cellp != NULL)
             *cellp = WT_PAGE_REF_OFFSET(page, WT_CELL_DECODE_OFFSET(v));
-        if (datap != NULL) {
-            *(void **)datap = NULL;
-            *sizep = 0;
-        }
         return (false);
     case WT_K_FLAG:
         /* Encoded key: no instantiated key, no cell. */
@@ -998,6 +994,9 @@ __wt_row_leaf_value_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip,
     WT_CELL_UNPACK unpack;
     size_t size;
     void *copy, *key;
+
+    size = 0;   /* -Werror=maybe-uninitialized */
+    key = NULL; /* -Werror=maybe-uninitialized */
 
     /* If we already have an unpacked key cell, use it. */
     if (kpack != NULL)

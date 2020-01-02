@@ -189,6 +189,13 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                 list_prepared = true;
                 if (upd->start_ts > max_ts)
                     max_ts = upd->start_ts;
+
+                /*
+                 * Track the oldest update not on the page, used to decide whether reads can use the
+                 * page image, hence using the start rather than the durable timestamp.
+                 */
+                if (upd->start_ts < r->min_skipped_ts)
+                    r->min_skipped_ts = upd->start_ts;
                 continue;
             }
         }
@@ -231,10 +238,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                 skipped_birthmark = true;
 
             /*
-             * Track the oldest update not on the page.
-             *
-             * This is used to decide whether reads can use the page image, hence using the start
-             * rather than the durable timestamp.
+             * Track the oldest update not on the page, used to decide whether reads can use the
+             * page image, hence using the start rather than the durable timestamp.
              */
             if (upd_select->upd == NULL && upd->start_ts < r->min_skipped_ts)
                 r->min_skipped_ts = upd->start_ts;

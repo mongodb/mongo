@@ -20,6 +20,12 @@ a {
 	color: #3D578C;
 }
 
+img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
 .tablist {
 	width: 800px;
 }

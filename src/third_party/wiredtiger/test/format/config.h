@@ -190,9 +190,6 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"logging_prealloc", "if log file pre-allocation configured", /* 50% */
     C_BOOL, 50, 0, 0, &g.c_logging_prealloc, NULL},
 
-  {"long_running_txn", "if a long-running transaction configured", /* 0% */
-    C_BOOL, 0, 0, 0, &g.c_long_running_txn, NULL},
-
   {"lsm_worker_threads", "the number of LSM worker threads", 0x0, 3, 4, 20, &g.c_lsm_worker_threads,
     NULL},
 

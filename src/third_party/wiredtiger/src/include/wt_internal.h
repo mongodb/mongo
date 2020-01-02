@@ -77,6 +77,8 @@ struct __wt_async_op_impl;
 typedef struct __wt_async_op_impl WT_ASYNC_OP_IMPL;
 struct __wt_async_worker_state;
 typedef struct __wt_async_worker_state WT_ASYNC_WORKER_STATE;
+struct __wt_blkincr;
+typedef struct __wt_blkincr WT_BLKINCR;
 struct __wt_block;
 typedef struct __wt_block WT_BLOCK;
 struct __wt_block_ckpt;

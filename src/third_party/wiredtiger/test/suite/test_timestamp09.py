@@ -62,7 +62,6 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.timestamp_transaction(
                 'commit_timestamp=' + timestamp_str(2)),
                 '/older than the first commit timestamp/')
-        c[2] = 2
         self.session.rollback_transaction()
 
         self.session.begin_transaction()
@@ -87,7 +86,6 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.timestamp_transaction(
                 'commit_timestamp=' + timestamp_str(2)),
                 '/less than the oldest timestamp/')
-        c[2] = 2
         self.session.rollback_transaction()
 
         self.session.begin_transaction()
@@ -137,7 +135,6 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.timestamp_transaction(
                 'commit_timestamp=' + timestamp_str(5)),
                 '/less than the stable timestamp/')
-        c[5] = 5
         self.session.rollback_transaction()
 
         self.session.begin_transaction()

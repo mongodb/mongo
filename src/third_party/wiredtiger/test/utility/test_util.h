@@ -148,6 +148,18 @@ typedef struct {
     } while (0)
 
 /*
+ * error_sys_check --
+ *     Complain and quit if a function call fails. A special name because it appears in the
+ *     documentation. Allow any non-negative values.
+ */
+#define error_sys_check(call)                                          \
+    do {                                                               \
+        int __r;                                                       \
+        if ((__r = (int)(call)) < 0 && __r != ENOTSUP)                 \
+            testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call); \
+    } while (0)
+
+/*
  * error_check --
  *     Complain and quit if a function call fails. A special name because it appears in the
  *     documentation. Ignore ENOTSUP to allow library calls which might not be included in any
