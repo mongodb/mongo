@@ -45,6 +45,8 @@ namespace repl {
 
 /**
  * Used on a local Collection to create and bulk build indexes.
+ *
+ * Note that no methods on this class are thread-safe.
  */
 class CollectionBulkLoader {
 public:
