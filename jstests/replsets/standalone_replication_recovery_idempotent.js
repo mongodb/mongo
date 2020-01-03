@@ -146,7 +146,7 @@ assertDocsInColl1(node, [3, 4]);
 assertPrepareConflictColl2(node, 1);
 
 restartServerReplication(secondary);
-rst.awaitReplication();
+PrepareHelpers.awaitMajorityCommitted(rst, prepareTimestamp);
 
 assertDocsInColl1(node, [3, 4]);
 assertPrepareConflictColl2(node, 1);
