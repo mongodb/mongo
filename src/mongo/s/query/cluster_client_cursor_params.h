@@ -78,10 +78,10 @@ struct ClusterClientCursorParams {
      */
     AsyncResultsMergerParams extractARMParams() {
         AsyncResultsMergerParams armParams;
-        if (!sort.isEmpty()) {
-            armParams.setSort(sort);
+        if (!sortToApplyOnRouter.isEmpty()) {
+            armParams.setSort(sortToApplyOnRouter);
         }
-        armParams.setCompareWholeSortKey(compareWholeSortKey);
+        armParams.setCompareWholeSortKey(compareWholeSortKeyOnRouter);
         armParams.setRemotes(std::move(remotes));
         armParams.setTailableMode(tailableMode);
         armParams.setBatchSize(batchSize);
@@ -116,17 +116,17 @@ struct ClusterClientCursorParams {
     // Per-remote node data.
     std::vector<RemoteCursor> remotes;
 
-    // The sort specification. Leave empty if there is no sort.
-    BSONObj sort;
+    // The sort specification to be applied on router. Leave empty if there is no sort.
+    BSONObj sortToApplyOnRouter;
 
-    // When 'compareWholeSortKey' is true, $sortKey is a scalar value, rather than an object. We
-    // extract the sort key {$sortKey: <value>}. The sort key pattern is verified to be {$sortKey:
-    // 1}.
-    bool compareWholeSortKey = false;
+    // When 'compareWholeSortKeyOnRouter' is true, $sortKey is a scalar value, rather than an
+    // object. We extract the sort key {$sortKey: <value>}. The sort key pattern is verified to be
+    // {$sortKey: 1}.
+    bool compareWholeSortKeyOnRouter = false;
 
-    // The number of results to skip. Optional. Should not be forwarded to the remote hosts in
-    // 'cmdObj'.
-    boost::optional<long long> skip;
+    // The number of results to skip on the router. Optional. Should not be forwarded to the remote
+    // hosts in 'cmdObj'.
+    boost::optional<long long> skipToApplyOnRouter;
 
     // The number of results per batch. Optional. If specified, will be specified as the batch for
     // each getMore.
