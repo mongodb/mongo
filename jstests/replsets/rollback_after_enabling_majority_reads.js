@@ -27,7 +27,7 @@ config.members[2].priority = 0;
 config.settings = {
     chainingAllowed: false
 };
-replTest.initiate(config);
+replTest.initiateWithHighElectionTimeout(config);
 let rollbackTest = new RollbackTest(name, replTest);
 
 jsTest.log("Ensure the stable timestamp is ahead of the common point on the rollback node.");

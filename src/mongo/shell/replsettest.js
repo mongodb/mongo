@@ -1386,10 +1386,11 @@ var ReplSetTest = function(opts) {
      * Modifies the election timeout to be 24 hours so that no unplanned elections happen. Then
      * runs replSetInitiate on the replica set with the new config.
      */
-    this.initiateWithHighElectionTimeout = function(opts = {}) {
-        let cfg = this.getReplSetConfig();
-        cfg.settings = Object.assign(opts, {"electionTimeoutMillis": 24 * 60 * 60 * 1000});
-        this.initiate(cfg);
+    this.initiateWithHighElectionTimeout = function(config) {
+        config = config || this.getReplSetConfig();
+        config.settings = config.settings || {};
+        config.settings["electionTimeoutMillis"] = ReplSetTest.kForeverMillis;
+        this.initiate(config);
     };
 
     /**
@@ -3197,6 +3198,7 @@ ReplSetTest.kDefaultTimeoutMS = 10 * 60 * 1000;
  *  Global default number that's effectively infinite.
  */
 ReplSetTest.kForeverSecs = 24 * 60 * 60;
+ReplSetTest.kForeverMillis = ReplSetTest.kForeverSecs * 1000;
 
 /**
  * Set of states that the replica set can be in. Used for the wait functions.

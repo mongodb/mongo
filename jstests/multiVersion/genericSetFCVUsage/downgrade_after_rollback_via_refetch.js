@@ -23,7 +23,7 @@ function testDowngrade(enableMajorityReadConcern) {
     let config = replTest.getReplSetConfig();
     config.members[2].priority = 0;
     config.settings = {chainingAllowed: false};
-    replTest.initiate(config);
+    replTest.initiateWithHighElectionTimeout(config);
     let rollbackTest = new RollbackTest(name, replTest);
 
     // Set the featureCompatibilityVersion to the last-stable version, so that we can downgrade
