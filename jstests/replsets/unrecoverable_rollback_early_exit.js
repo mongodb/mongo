@@ -29,7 +29,7 @@
         nodeOptions: {enableMajorityReadConcern: "false"}
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     const rollbackTest = new RollbackTest(testName, rst);
     const rollbackNode = rollbackTest.transitionToRollbackOperations();

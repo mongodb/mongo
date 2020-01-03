@@ -55,7 +55,7 @@
         {name, nodes: 3, useBridge: true, nodeOptions: {enableMajorityReadConcern: "false"}});
     replTest.startSet();
     const nodes = replTest.nodeList();
-    replTest.initiate({
+    replTest.initiateWithHighElectionTimeout({
         _id: name,
         members: [
             {_id: 0, host: nodes[0]},

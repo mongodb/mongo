@@ -25,7 +25,7 @@
         useBridge: true,
     });
     const nodes = rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     // Prior to 4.0, rollback imposed a 300 MB limit on the total size of documents to refetch from
     // the sync source. Therefore, we select values for numDocs and minDocSizeMB, while accounting

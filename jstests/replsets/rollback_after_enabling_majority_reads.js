@@ -23,7 +23,7 @@
     replTest.startSet();
     let config = replTest.getReplSetConfig();
     config.members[2].arbiterOnly = true;
-    replTest.initiate(config);
+    replTest.initiateWithHighElectionTimeout(config);
     let rollbackTest = new RollbackTest(name, replTest);
 
     let rollbackNode = rollbackTest.transitionToRollbackOperations();

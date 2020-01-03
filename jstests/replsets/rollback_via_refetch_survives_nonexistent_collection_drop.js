@@ -27,7 +27,7 @@
 
     rst.startSet();
     const nodes = rst.nodeList();
-    rst.initiate({
+    rst.initiateWithHighElectionTimeout({
         _id: collName,
         members: [
             {_id: 0, host: nodes[0]},

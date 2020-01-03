@@ -110,7 +110,7 @@ function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     // Start up a two-node cluster first.
     var rst = new ReplSetTest({name: testName, nodes: initialNodes, useBridge: true});
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     // Wait for both nodes to be up.
     waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY);

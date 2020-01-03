@@ -195,6 +195,40 @@ var ReplSetTest = function(opts) {
     }
 
     /**
+     * Wrap a function so it can accept a node id or connection as its first argument. The argument
+     * is converted to a connection.
+     */
+    function _nodeParamToConn(wrapped) {
+        return function(node, ...wrappedArgs) {
+            if (node.getDB) {
+                return wrapped.call(this, node, ...wrappedArgs);
+            }
+
+            assert(self.nodes.hasOwnProperty(node), `${node} not found in self.nodes`);
+            return wrapped.call(this, self.nodes[node], ...wrappedArgs);
+        };
+    }
+
+    /**
+     * Wrap a function so it accepts a single node or list of them as its first argument. The
+     * function is called once per node provided.
+     */
+    function _nodeParamToSingleNode(wrapped) {
+        return function(node, ...wrappedArgs) {
+            if (node.hasOwnProperty('length')) {
+                let returnValueList = [];
+                for (let i = 0; i < node.length; i++) {
+                    returnValueList.push(wrapped.call(this, node[i], ...wrappedArgs));
+                }
+
+                return returnValueList;
+            }
+
+            return wrapped.call(this, node, ...wrappedArgs);
+        };
+    }
+
+    /**
      * Wait for a rs indicator to go to a particular state or states.
      *
      * @param node is a single node or list of nodes, by id or conn
@@ -1167,10 +1201,11 @@ var ReplSetTest = function(opts) {
      * Modifies the election timeout to be 24 hours so that no unplanned elections happen. Then
      * runs replSetInitiate on the replica set with the new config.
      */
-    this.initiateWithHighElectionTimeout = function(opts = {}) {
-        let cfg = this.getReplSetConfig();
-        cfg.settings = Object.assign(opts, {"electionTimeoutMillis": 24 * 60 * 60 * 1000});
-        this.initiate(cfg);
+    this.initiateWithHighElectionTimeout = function(config) {
+        config = config || this.getReplSetConfig();
+        config.settings = config.settings || {};
+        config.settings["electionTimeoutMillis"] = ReplSetTest.kForeverMillis;
+        this.initiate(config);
     };
 
     /**
@@ -2505,6 +2540,31 @@ var ReplSetTest = function(opts) {
         return started;
     };
 
+    /**
+     * Step down and freeze a particular node or nodes.
+     *
+     * @param node is a single node or list of nodes, by id or conn
+     */
+    this.freeze = _nodeParamToSingleNode(_nodeParamToConn(function(node) {
+        assert.soon(() => {
+            try {
+                // Ensure node is not primary. Ignore errors, probably means it's already secondary.
+                node.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true});
+                // Prevent node from running election. Fails if it already started an election.
+                assert.commandWorked(node.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
+                return true;
+            } catch (e) {
+                if (isNetworkError(e) || e.code === ErrorCodes.NotSecondary ||
+                    e.code === ErrorCodes.NotYetInitialized) {
+                    jsTestLog(`Failed to freeze node ${node.host}: ${e}`);
+                    return false;
+                }
+
+                throw e;
+            }
+        }, `Failed to run replSetFreeze cmd on ${node.host}`);
+    }));
+
     this.stopMaster = function(signal, opts) {
         var master = this.getPrimary();
         var master_id = this.getNodeId(master);
@@ -2808,6 +2868,12 @@ var ReplSetTest = function(opts) {
  *  Global default timeout (10 minutes).
  */
 ReplSetTest.kDefaultTimeoutMS = 10 * 60 * 1000;
+
+/**
+ *  Global default number that's effectively infinite.
+ */
+ReplSetTest.kForeverSecs = 24 * 60 * 60;
+ReplSetTest.kForeverMillis = ReplSetTest.kForeverSecs * 1000;
 
 /**
  * Set of states that the replica set can be in. Used for the wait functions.
