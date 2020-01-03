@@ -725,6 +725,11 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 def _get_logging_config(pathname):
     """Read YAML configuration from 'pathname' how to log tests and fixtures."""
     try:
+        # If the user provides a full valid path to a logging config
+        # we don't need to search LOGGER_DIR for the file.
+        if os.path.exists(pathname):
+            return utils.load_yaml_file(pathname).pop("logging")
+
         root = os.path.abspath(_config.LOGGER_DIR)
         files = os.listdir(root)
         for filename in files:
