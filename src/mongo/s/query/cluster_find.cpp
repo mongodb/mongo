@@ -76,7 +76,6 @@ static const BSONObj kSortKeyMetaProjection = BSON("$meta"
                                                    << "sortKey");
 static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta"
                                                            << "geoNearDistance");
-
 // We must allow some amount of overhead per result document, since when we make a cursor response
 // the documents are elements of a BSONArray. The overhead is 1 byte/doc for the type + 1 byte/doc
 // for the field name's null terminator + 1 byte per digit in the array index. The index can be no
@@ -209,8 +208,19 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
     bool appendGeoNearDistanceProjection) {
-    const auto qrToForward = uassertStatusOK(
-        transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection));
+
+    std::unique_ptr<QueryRequest> qrToForward;
+    if (shardIds.size() > 1) {
+        qrToForward = uassertStatusOK(
+            transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection));
+    } else {
+        // Forwards the QueryRequest as is to a single shard so that limit and skip can
+        // be applied on mongod.
+        qrToForward = std::make_unique<QueryRequest>(query.getQueryRequest());
+        // Indicate to shard servers that this is a 4.4 or newer mongoS, and they should serialize
+        // sort keys in the new format.
+        qrToForward->setUse44SortKeys(true);
+    }
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<std::pair<ShardId, BSONObj>> requests;
@@ -265,13 +275,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());
 
-    // Construct the query and parameters.
-
+    // Construct the query and parameters. Defer setting skip and limit here until
+    // we determine if the query is targeting multi-shards or a single shard below.
     ClusterClientCursorParams params(query.nss(), readPref);
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
-    params.limit = query.getQueryRequest().getLimit();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
-    params.skip = query.getQueryRequest().getSkip();
     params.tailableMode = query.getQueryRequest().getTailableMode();
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
     params.lsid = opCtx->getLogicalSessionId();
@@ -293,24 +301,26 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // $natural sort is actually a hint to use a collection scan, and shouldn't be treated like a
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
     // being considered a hint to use a collection scan.
+    BSONObj sortComparatorBob;
     if (!query.getQueryRequest().getSort().hasField("$natural")) {
-        params.sort = transformSortSpec(query.getQueryRequest().getSort());
+        sortComparatorBob = transformSortSpec(query.getQueryRequest().getSort());
     }
 
     bool appendGeoNearDistanceProjection = false;
+    bool compareWholeSortKeyOnRouter = false;
     if (query.getQueryRequest().getSort().isEmpty() &&
         QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
         // There is no specified sort, and there is a GEO_NEAR node. This means we should merge sort
         // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
         // shards. Indicate to the AsyncResultsMerger that it should extract the sort key
         // {"$sortKey": <geoNearDistance>} and sort by the order {"$sortKey": 1}.
-        params.sort = AsyncResultsMerger::kWholeSortKeySortPattern;
-        params.compareWholeSortKey = true;
+        sortComparatorBob = AsyncResultsMerger::kWholeSortKeySortPattern;
+        compareWholeSortKeyOnRouter = true;
         appendGeoNearDistanceProjection = true;
     }
 
     // Tailable cursors can't have a sort, which should have already been validated.
-    invariant(params.sort.isEmpty() || !query.getQueryRequest().isTailable());
+    invariant(sortComparatorBob.isEmpty() || !query.getQueryRequest().isTailable());
 
     // Construct the requests that we will use to establish cursors on the targeted shards,
     // attaching the shardVersion and txnNumber, if necessary.
@@ -331,6 +341,16 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     const auto cursorType = params.remotes.size() > 1
         ? ClusterCursorManager::CursorType::MultiTarget
         : ClusterCursorManager::CursorType::SingleTarget;
+
+    // Only set skip, limit and sort to be applied to on the router for the multi-shard case. For
+    // the single-shard case skip/limit as well as sorts are appled on mongod.
+    if (cursorType == ClusterCursorManager::CursorType::MultiTarget) {
+        const auto qr = query.getQueryRequest();
+        params.skipToApplyOnRouter = qr.getSkip();
+        params.limit = qr.getLimit();
+        params.sortToApplyOnRouter = sortComparatorBob;
+        params.compareWholeSortKeyOnRouter = compareWholeSortKeyOnRouter;
+    }
 
     // Transfer the established cursors to a ClusterClientCursor.
 
