@@ -151,7 +151,19 @@ public:
     // Deletes all connections in the pool
     void clear();
 
-    void done(DBConnectionPool* pool, DBClientBase* c);
+    /**
+     * A concrete statement about the health of a DBClientBase connection
+     */
+    enum class ConnectionHealth {
+        kReuseable,
+        kTooMany,
+        kFailed,
+    };
+
+    /**
+     * Attempt to reclaim the underlying connection behind the DBClientBase
+     */
+    ConnectionHealth done(DBConnectionPool* pool, DBClientBase* c);
 
     void flush();
 
