@@ -61,6 +61,10 @@ assert.eq(1, keyVault.getKeys().itcount());
 result = keyVault.addKeyAlternateName(keyId, [2]);
 assert.eq("TypeError: key alternate name cannot be object or array type.", result);
 
+// Test create key with no CMK
+result = keyVault.createKey("aws", ["altName"]);
+assert.eq("ValueError: customerMasterKey must be defined if kmsProvider is not local.", result);
+
 keyVault.removeKeyAlternateName(keyId, "mongoKey2");
 assert.eq(1, keyVault.getKey(keyId).toArray()[0].keyAltNames.length);
 
