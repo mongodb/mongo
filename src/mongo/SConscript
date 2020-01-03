@@ -185,6 +185,7 @@ baseEnv.Library(
     LIBDEPS_PRIVATE=[
         'util/debugger',
     ],
+    AIB_COMPONENT='platform',
 )
 
 # Shim library for boost to depend on
