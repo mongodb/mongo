@@ -97,8 +97,7 @@ void PoolForHost::clear() {
     _pool = decltype(_pool){};
 }
 
-void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c_raw) {
-    std::unique_ptr<DBClientBase> c{c_raw};
+auto PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) -> ConnectionHealth {
     const bool isFailed = c->isFailed();
 
     --_checkedOut;
@@ -116,18 +115,19 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c_raw) {
                      << _socketTimeoutSecs << " seconds)"
                      << " due to bad connection status; " << openConnections()
                      << " connections to that host remain open";
-        pool->onDestroy(c.get());
+        return ConnectionHealth::kFailed;
     } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
         logNoCache() << "Ending idle connection to host " << _hostName << "(with timeout of "
                      << _socketTimeoutSecs << " seconds)"
                      << " because the pool meets constraints; " << openConnections()
                      << " connections to that host remain open";
-        pool->onDestroy(c.get());
-    } else {
-        // The connection is probably fine, save for later
-        _pool.push(std::move(c));
+        return ConnectionHealth::kTooMany;
     }
+
+    // The connection is probably fine, save for later
+    _pool.push(std::unique_ptr<DBClientBase>(c));
+    return ConnectionHealth::kReuseable;
 }
 
 void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
@@ -424,12 +424,22 @@ void DBConnectionPool::onRelease(DBClientBase* conn) {
 void DBConnectionPool::release(const string& host, DBClientBase* c) {
     onRelease(c);
 
-    stdx::unique_lock<Latch> lk(_mutex);
-    PoolForHost& p = _pools[PoolKey(host, c->getSoTimeout())];
-    p.done(this, c);
+    PoolForHost* pool;
+    PoolForHost::ConnectionHealth health;
+    {
+        // Grab our pool and update its accounting
+        stdx::lock_guard lk(_mutex);
+        pool = &_pools[PoolKey(host, c->getSoTimeout())];
+        health = pool->done(this, c);
+    }
 
-    lk.unlock();
-    p.notifyWaiters();
+    if (health != PoolForHost::ConnectionHealth::kReuseable) {
+        // If the connection wasn't okay, destroy it
+        onDestroy(c);
+        delete c;
+    }
+
+    pool->notifyWaiters();
 }
 
 void DBConnectionPool::decrementEgress(const string& host, DBClientBase* c) {
