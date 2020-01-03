@@ -44,6 +44,7 @@ if platform_family? 'debian'
     command 'apt-get update'
   end
 
+  ENV['DEBIAN_FRONTEND'] = 'noninteractive'
   package 'openssl'
 
   # dpkg returns 1 if dependencies are not satisfied, which they will not be
