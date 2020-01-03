@@ -97,7 +97,7 @@ env.CppUnitTest(
         'system_error_test.cpp',
         'uuid_test.cpp',
     ],
-    AIB_COMPONENT='base',
+    AIB_COMPONENT='platform',
     LIBDEPS=[
         'secure_allocator',
         'system_error',

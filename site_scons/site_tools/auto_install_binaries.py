@@ -362,18 +362,35 @@ def scan_for_transitive_install(node, env, cb=None):
     return results
 
 
-def collect_transitive_files(env, source):
-    """Collect all transitive files for source where source is a list of either Alias or File nodes."""
+def collect_transitive_files(env, source, installed, cache=None):
+    """Collect all installed transitive files for source where source is a list of either Alias or File nodes."""
+
+    if not cache:
+        cache = set()
+
     files = []
 
     for s in source:
+
+        cache.add(s)
+
         if isinstance(s, SCons.Node.FS.File):
+            if s not in installed:
+                continue
             files.append(s)
-        else:
-            files.extend(collect_transitive_files(env, s.children()))
+
+        children_to_collect = []
+        for child in s.children():
+            if child in cache:
+                continue
+            if isinstance(child, SCons.Node.FS.File) and child not in installed:
+                continue
+            children_to_collect.append(child)
+
+        if children_to_collect:
+            files.extend(collect_transitive_files(env, children_to_collect, installed, cache))
 
     return files
-
 
 def archive_builder(source, target, env, for_signature):
     """Build archives of the AutoInstall'd sources."""
@@ -381,11 +398,14 @@ def archive_builder(source, target, env, for_signature):
         return
 
     source = env.Flatten([source])
-    common_ancestor = None
-
-    archive_type = env["__AIB_ARCHIVE_TYPE"]
     make_archive_script = source[0].get_abspath()
-    source = source[1:]
+
+    # We expect this to be a list of aliases, but really they could be
+    # any sort of node.
+    aliases = source[1:]
+
+    common_ancestor = None
+    archive_type = env["__AIB_ARCHIVE_TYPE"]
 
     # Get the path elements that make up both DESTDIR and PREFIX. Then
     # iterate the dest_dir_elems with the prefix path elements
@@ -403,8 +423,28 @@ def archive_builder(source, target, env, for_signature):
     else:
         common_ancestor = dest_dir_elems
 
-    # Pre-process what should be in the archive
-    transitive_files = collect_transitive_files(env, source)
+    archive_name = env.File(target[0]).get_abspath()
+
+    command_prefix = "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor}".format(
+        python=sys.executable,
+        archive_type=archive_type,
+        archive_name=archive_name,
+        make_archive_script=make_archive_script,
+        common_ancestor=common_ancestor,
+    )
+
+    # If we are just being invoked for our signature, we can omit the indirect dependencies
+    # found by expanding the transitive dependencies, since we really only have a hard dependency
+    # on our direct depenedencies.
+    if for_signature:
+        return command_prefix
+
+    # Pre-process what should be in the archive. We need to pass the
+    # set of known installed files along to the transitive dependency
+    # walk so we can filter out files that aren't in the install
+    # directory.
+    installed = env.get('__AIB_INSTALLED_SET', set())
+    transitive_files = collect_transitive_files(env, aliases, installed)
     paths = {file.get_abspath() for file in transitive_files}
 
     # The env["ESCAPE"] function is used by scons to make arguments
@@ -419,17 +459,8 @@ def archive_builder(source, target, env, for_signature):
         escape_func(os.path.relpath(path, common_ancestor))
         for path in paths
     ])
-    archive_name = env.File(target[0]).get_abspath()
 
-    return "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor} {relative_files}".format(
-        python=sys.executable,
-        archive_type=archive_type,
-        archive_name=archive_name,
-        make_archive_script=make_archive_script,
-        common_ancestor=common_ancestor,
-        relative_files=relative_files,
-    )
-
+    return " ".join([command_prefix, relative_files])
 
 
 def auto_install(env, target, source, **kwargs):
@@ -517,6 +548,8 @@ def auto_install(env, target, source, **kwargs):
 def finalize_install_dependencies(env):
     """Generates package aliases and wires install dependencies."""
 
+    installed = set(env.FindInstalledFiles())
+
     for component, rolemap in env[ALIAS_MAP].items():
         for role, info in rolemap.items():
             info.alias.extend(env.Alias(info.alias_name, info.actions))
@@ -563,6 +596,7 @@ def finalize_install_dependencies(env):
                     target="#{}.{}".format(pkg_name, pkg_suffix),
                     source=[make_archive_script] + info.alias,
                     __AIB_ARCHIVE_TYPE=fmt,
+                    __AIB_INSTALLED_SET=installed,
                     AIB_COMPONENT=component,
                     AIB_ROLE=role,
                 )
