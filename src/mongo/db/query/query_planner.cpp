@@ -947,7 +947,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
                         soln->cacheData.reset(scd);
                         out.push_back(std::move(soln));
-                        break;
                     }
                 }
                 if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
@@ -964,7 +963,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
                         soln->cacheData.reset(scd);
                         out.push_back(std::move(soln));
-                        break;
                     }
                 }
             }

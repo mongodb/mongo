@@ -1411,5 +1411,19 @@ TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesROOT) {
         "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
+TEST_F(QueryPlannerTest, PlansForWholeIndexScanWithSortAreGenerated) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, node: {fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}");
+}
+
 }  // namespace
 }  // namespace mongo

@@ -1175,7 +1175,6 @@ TEST_F(QueryPlannerTest, MergeSortEvenIfSameIndex) {
 }
 
 TEST_F(QueryPlannerTest, ReverseScanForSort) {
-    addIndex(BSON("_id" << 1));
     runQuerySortProj(BSONObj(), fromjson("{_id: -1}"), BSONObj());
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
