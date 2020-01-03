@@ -3796,6 +3796,7 @@ if get_option('ninja') == 'true':
         }
 
     env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", skip)
+    env.NinjaRegisterFunctionHandler("libfuzzer_test_list_builder_action", skip)
     env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", skip)
     env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", skip)
 
@@ -4334,7 +4335,7 @@ env.SConscript(
 )
 
 
-allTargets = ['core', 'tools', 'unittests', 'integration_tests', 'benchmarks']
+allTargets = ['core', 'tools', 'unittests', 'integration_tests', 'libfuzzer_tests', 'benchmarks']
 
 if not has_option('noshell') and usemozjs:
     allTargets.extend(['dbtest'])
