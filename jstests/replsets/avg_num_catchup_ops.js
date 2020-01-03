@@ -10,14 +10,11 @@ load("jstests/replsets/libs/election_metrics.js");
 load("jstests/replsets/rslib.js");
 
 const name = jsTestName();
-const rst = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+const rst = new ReplSetTest(
+    {name: name, nodes: 3, useBridge: true, settings: {catchUpTimeoutMillis: 4 * 60 * 1000}});
 
 rst.startSet();
-const confSettings = {
-    catchUpTimeoutMillis: 4 * 60 * 1000,
-};
-
-rst.initiateWithHighElectionTimeout(confSettings);
+rst.initiateWithHighElectionTimeout();
 rst.awaitSecondaryNodes();
 rst.awaitReplication();
 

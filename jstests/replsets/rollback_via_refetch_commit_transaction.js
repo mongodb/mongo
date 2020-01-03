@@ -31,7 +31,7 @@ config.members[2].priority = 0;
 config.settings = {
     chainingAllowed: false
 };
-rst.initiate(config);
+rst.initiateWithHighElectionTimeout(config);
 
 const primaryNode = rst.getPrimary();
 

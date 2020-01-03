@@ -21,7 +21,7 @@ config.members[2].priority = 0;
 config.settings = {
     chainingAllowed: false
 };
-replTest.initiate(config);
+replTest.initiateWithHighElectionTimeout(config);
 const rollbackTest = new RollbackTest(name, replTest);
 
 const rollbackNode = rollbackTest.transitionToRollbackOperations();

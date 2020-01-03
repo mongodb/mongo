@@ -27,7 +27,7 @@ const replTest = new ReplSetTest({
 replTest.startSet();
 let config = replTest.getReplSetConfig();
 config.members[2].priority = 0;
-replTest.initiate(config);
+replTest.initiateWithHighElectionTimeout(config);
 
 const rollbackTest = new RollbackTest(name, replTest);
 const primary = rollbackTest.getPrimary();
