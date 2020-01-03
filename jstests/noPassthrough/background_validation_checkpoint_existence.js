@@ -8,7 +8,16 @@
 (function() {
 'use strict';
 
+// To prevent the checkpoint thread from running during this test, change its frequency to the
+// largest possible value using the 'syncdelay' parameter.
+const kMaxSyncDelaySecs = 9 * 1000 * 1000;
+let conn = MongoRunner.runMongod({syncdelay: kMaxSyncDelaySecs});
+assert.neq(null, conn, "mongod was unable to start up");
+
+const dbName = "test";
 const collName = "background_validation_checkpoint_existence";
+
+const db = conn.getDB(dbName);
 
 const forceCheckpoint = () => {
     assert.commandWorked(db.fsyncLock());
@@ -48,4 +57,6 @@ forceCheckpoint();
 res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
 assert.eq(true, res.valid);
 assert.eq(2, res.nIndexes);
+
+MongoRunner.stopMongod(conn);
 }());
