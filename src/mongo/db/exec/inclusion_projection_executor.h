@@ -86,8 +86,12 @@ protected:
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
     MutableDocument initializeOutputDocument(const Document& inputDoc) const final {
-        return MutableDocument{_children.size() + _expressions.size() +
-                               std::min(_projectedFields.size(), inputDoc.size())};
+        // Technically this value could be min(number of projected fields, size of input
+        // document). However, the size() function on Document() can take linear time, so we just
+        // allocate the number of projected fields.
+        const auto maxPossibleResultingFields =
+            _children.size() + _expressions.size() + _projectedFields.size();
+        return MutableDocument{maxPossibleResultingFields};
     }
     Value applyLeafProjectionToValue(const Value& value) const final {
         return value;
