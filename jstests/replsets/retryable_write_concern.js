@@ -90,28 +90,6 @@ runWriteConcernRetryabilityTest(priConn,
                                 },
                                 kNodes);
 
-runWriteConcernRetryabilityTest(priConn,
-                                secConn,
-                                {
-                                    setFeatureCompatibilityVersion: lastStableFCV,
-                                    writeConcern: {w: 'majority', wtimeout: 200},
-                                },
-                                kNodes,
-                                'admin');
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-checkFCV(priConn.getDB('admin'), lastStableFCV);
-
-runWriteConcernRetryabilityTest(priConn,
-                                secConn,
-                                {
-                                    setFeatureCompatibilityVersion: latestFCV,
-                                    writeConcern: {w: 'majority', wtimeout: 200},
-                                },
-                                kNodes,
-                                'admin');
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-checkFCV(priConn.getDB('admin'), latestFCV);
-
 txnNumber++;
 runWriteConcernRetryabilityTest(priConn,
                                 secConn,
