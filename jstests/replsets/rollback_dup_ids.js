@@ -37,6 +37,12 @@ rollbackTest.transitionToSteadyStateOperations();
 // Kill and restart the node that rolled back.
 rollbackTest.restartNode(0, 9);
 
+jsTestLog("Primary oplog");
+rollbackTest.getPrimary().getDB('local').getCollection('oplog.rs').find().pretty().shellPrint();
+
+jsTestLog("Secondary oplog");
+rollbackTest.getSecondary().getDB('local').getCollection('oplog.rs').find().pretty().shellPrint();
+
 // Check the replica set.
 rollbackTest.stop();
 }());

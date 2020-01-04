@@ -117,11 +117,13 @@ void ReplicationCoordinatorImpl::_tlaPlusRaftMongoEvent(
         auto backward = oplogReadTimestamp.has_value();
         auto cursor = oplogRecordStore->getCursor(opCtx, !backward);
         std::vector<OpTime> entryOpTimes;
+        auto foundInitiatingSet = false;
         while (auto record = cursor->next()) {
             auto entry = OplogEntry(record.get().data.toBson());
             auto msg = entry.getObject()["msg"];
             if (!msg.eoo() && msg.String() == kInitiatingSetMsg) {
                 // Skip "initiating set" message.
+                foundInitiatingSet = true;
                 continue;
             }
 
@@ -129,6 +131,10 @@ void ReplicationCoordinatorImpl::_tlaPlusRaftMongoEvent(
             if (!oplogReadTimestamp || oplogReadTimestamp >= opTime.getTimestamp()) {
                 entryOpTimes.emplace_back(opTime);
             }
+        }
+
+        if (foundInitiatingSet && entryOpTimes.empty()) {
+            LOG(2) << "Only oplog entry is '" << kInitiatingSetMsg << "'";
         }
 
         TlaPlusTraceEvent event;
