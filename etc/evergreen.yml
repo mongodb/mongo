@@ -4869,6 +4869,21 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: rollback_fuzzer
 
+## rollback generational fuzzer for TLA+ trace checking ##
+- <<: *jstestfuzz_template
+  name: rollback_fuzzer_tla_plus_trace_gen
+  tags: ["rollbackfuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 1
+      num_tasks: 1
+      npm_command: rollback-fuzzer
+      suite: rollback_fuzzer_tla_plus_trace
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2, tlaPlusTrace: 2}, \"failpoint.logForTLAPlusSpecs\": \"{mode: \\\"alwaysOn\\\", data: {specs: [\\\"RaftMongo\\\"]}}\"}'"
+      name: rollback_fuzzer_tla_plus_trace
+
 ## rollback generational fuzzer with clean shutdowns ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_clean_shutdowns_gen
