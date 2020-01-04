@@ -1114,7 +1114,7 @@ var ReplSetTest = function(opts) {
         // Start up a single node replica set then reconfigure to the correct size (if the config
         // contains more than 1 node), so the primary is elected more quickly.
         var originalMembers, originalSettings;
-        if (config.members && config.members.length > 1) {
+        if (config.members && config.members.length > 1 && false) {
             originalMembers = config.members.slice();
             config.members = config.members.slice(0, 1);
             originalSettings = config.settings;
@@ -1177,6 +1177,9 @@ var ReplSetTest = function(opts) {
 
         print("ReplSetTest initiate command took " + (new Date() - initiateStart) + "ms for " +
               this.nodes.length + " nodes in set '" + this.name + "'");
+
+        // Initial sync semantics are wrong and mess w/ RaftMongo.tla.
+        this.awaitSecondaryNodes();
 
         // Set the FCV to 'last-stable' if we are running a mixed version replica set. If this is a
         // config server, the FCV will be set as part of ShardingTest.
