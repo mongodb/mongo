@@ -62,10 +62,7 @@ vars == <<serverVars, logVars>>
 ----
 \* Helpers
 
-\* The set of all quorums. This just calculates simple majorities, but the only
-\* important property is that every quorum overlaps with every other.
-Quorum == {i \in SUBSET(Server) : Cardinality(i) * 2 > Cardinality(Server)}
-
+IsMajority(servers) == Cardinality(servers) * 2 > Cardinality(Server)
 GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
@@ -96,7 +93,7 @@ CommitPointLessThan(i, j) ==
       /\ commitPoint[i].index < commitPoint[j].index
 
 IsCommitted(me, logIndex) ==
-    /\ Agree(me, logIndex) \in Quorum
+    /\ IsMajority(Agree(me, logIndex))
     /\ LogTerm(me, logIndex) = globalCurrentTerm
 
 \* Is it possible for node i's log to roll back based on j's log? If true, it
@@ -149,10 +146,11 @@ RollbackOplog(i, j) ==
     /\ UNCHANGED <<serverVars>>
 
 \* ACTION
-\* i = the new primary node.
+\* Node i is elected by a majority, and nodes that voted for it can't still be primary.
+\* A stale primary might persist among the minority that didn't vote for it.
 BecomePrimaryByMagic(i, ayeVoters) ==
-    /\ \A j \in ayeVoters : /\ NotBehind(i, j)
-    /\ ayeVoters \in Quorum
+    /\ \A j \in ayeVoters : NotBehind(i, j)
+    /\ IsMajority(ayeVoters)
     /\ state' = [index \in Server |-> IF index \notin ayeVoters
                                       THEN state[index]
                                       ELSE IF index = i THEN "Leader" ELSE "Follower"]
@@ -177,7 +175,10 @@ AdvanceCommitPoint ==
         \* New commitPoint is any committed log index after current commitPoint
         /\ \E committedIndex \in (commitPoint[leader].index + 1)..Len(log[leader]) :
             /\ IsCommitted(leader, committedIndex)
-            /\ LET newCommitPoint == [term |-> LogTerm(leader, committedIndex), index |-> committedIndex]
+            /\ LET newCommitPoint == [
+                       term |-> LogTerm(leader, committedIndex),
+                       index |-> committedIndex
+                   ]
                IN  commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
             /\ UNCHANGED <<electionVars, logVars>>
 
