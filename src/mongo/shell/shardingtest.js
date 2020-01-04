@@ -411,7 +411,7 @@ var ShardingTest = function(params) {
             }
         }
 
-        if (!opts || !opts.noCleanData) {
+        if (!opts || !opts.noCleanData || !jsTestOptions().alwaysUseLogFiles) {
             print("ShardingTest stop deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
                 resetDbpath(MongoRunner.dataPath + _alldbpaths[i]);

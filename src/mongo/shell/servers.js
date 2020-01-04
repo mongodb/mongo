@@ -636,7 +636,7 @@ MongoRunner.mongodOptions = function(opts) {
     _removeSetParameterIfBeforeVersion(opts, "numInitialSyncConnectAttempts", "3.3.12");
     _removeSetParameterIfBeforeVersion(opts, "migrationLockAcquisitionMaxWaitMS", "4.1.7");
 
-    if (!opts.logFile && opts.useLogFiles) {
+    if (!opts.logFile && opts.useLogFiles || jsTestOptions().alwaysUseLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";
     } else if (opts.logFile) {
         opts.logFile = MongoRunner.toRealFile(opts.logFile, opts.pathOpts);

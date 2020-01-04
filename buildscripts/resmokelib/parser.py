@@ -15,7 +15,8 @@ from . import utils
 
 ResmokeConfig = collections.namedtuple(
     "ResmokeConfig",
-    ["list_suites", "find_suites", "dry_run", "suite_files", "test_files", "logging_config"])
+    ["list_suites", "find_suites", "dry_run", "suite_files", "test_files", "logging_config",
+     "always_use_log_files"])
 
 _EVERGREEN_OPTIONS_TITLE = "Evergreen options"
 
@@ -77,6 +78,11 @@ def _make_parser():  # pylint: disable=too-many-statements
         "--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
         help=("The directory which will contain the dbpaths of any mongod's started"
               " by resmoke.py or the tests themselves."))
+
+    parser.add_option(
+        "--alwaysUseLogFiles", dest="always_use_log_files", action="store_true",
+        help=("JSTests configure servers to log to stdout by default. If set, always log to "
+              "files, and don't clean dbpaths after tests."))
 
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
                       help="The path to the dbtest executable for resmoke to use.")
@@ -500,7 +506,8 @@ def parse_command_line():
 
     return ResmokeConfig(list_suites=options.list_suites, find_suites=options.find_suites,
                          dry_run=options.dry_run, suite_files=options.suite_files.split(","),
-                         test_files=args, logging_config=_get_logging_config(options.logger_file))
+                         test_files=args, logging_config=_get_logging_config(options.logger_file),
+                         always_use_log_files=options.always_use_log_files)
 
 
 def _validate_options(parser, options, args):
@@ -577,6 +584,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
+    _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
     _config.DRY_RUN = config.pop("dry_run")
     # EXCLUDE_WITH_ANY_TAGS will always contain the implicitly defined EXCLUDED_TAG.

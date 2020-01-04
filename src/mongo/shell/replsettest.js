@@ -2960,7 +2960,7 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        if ((!opts || !opts.noCleanData) && _alldbpaths) {
+        if ((!opts || !opts.noCleanData) && !jsTestOptions().alwaysUseLogFiles && _alldbpaths) {
             print("ReplSetTest stopSet deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
                 print("ReplSetTest stopSet deleting dbpath: " + _alldbpaths[i]);

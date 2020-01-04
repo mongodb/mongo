@@ -346,6 +346,9 @@ jsTestOptions = function() {
             // Set a specific random seed to be used when useRandomBinVersionsWithinReplicaSet is
             // true.
             seed: TestData.seed || undefined,
+            // JSTests configure servers to log to stdout by default. If set, always log to files
+            // and don't clean dbpaths after tests.
+            alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
         });
     }
     return _jsTestOptions;

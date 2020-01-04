@@ -52,6 +52,7 @@ DEFAULTS = {
     "buildlogger_url": "https://logkeeper.mongodb.org",
     "continue_on_failure": False,
     "dbpath_prefix": None,
+    "always_use_log_files": False,
     "dbtest_executable": None,
     "dry_run": None,
     "exclude_with_any_tags": None,
@@ -236,6 +237,10 @@ BUILDLOGGER_URL = None
 # Root directory for where resmoke.py puts directories containing data files of mongod's it starts,
 # as well as those started by individual tests.
 DBPATH_PREFIX = None
+
+# JSTests configure servers to log to stdout by default. If set, always log to files and don't clean
+# dbpaths after tests.
+ALWAYS_USE_LOG_FILES = None
 
 # The path to the dbtest executable used by resmoke.py.
 DBTEST_EXECUTABLE = None
