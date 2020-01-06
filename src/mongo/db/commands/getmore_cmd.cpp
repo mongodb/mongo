@@ -563,9 +563,15 @@ public:
 
             // Mark this as an AwaitData operation if appropriate.
             if (cursorPin->isAwaitData() && !disableAwaitDataFailpointActive) {
-                if (_request.lastKnownCommittedOpTime)
-                    clientsLastKnownCommittedOpTime(opCtx) =
-                        _request.lastKnownCommittedOpTime.get();
+                auto lastKnownCommittedOpTime = _request.lastKnownCommittedOpTime;
+                if (opCtx->isExhaust() && cursorPin->getLastKnownCommittedOpTime()) {
+                    // Use the commit point of the last batch for exhaust cursors.
+                    lastKnownCommittedOpTime = cursorPin->getLastKnownCommittedOpTime();
+                }
+                if (lastKnownCommittedOpTime) {
+                    clientsLastKnownCommittedOpTime(opCtx) = lastKnownCommittedOpTime.get();
+                }
+
                 awaitDataState(opCtx).shouldWaitForInserts = true;
             }
 
@@ -622,6 +628,12 @@ public:
                 cursorPin->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
                 cursorPin->incNReturnedSoFar(numResults);
                 cursorPin->incNBatches();
+
+                if (opCtx->isExhaust() && !clientsLastKnownCommittedOpTime(opCtx).isNull()) {
+                    // Set the commit point of the latest batch.
+                    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+                    cursorPin->setLastKnownCommittedOpTime(replCoord->getLastCommittedOpTime());
+                }
             } else {
                 curOp->debug().cursorExhausted = true;
             }

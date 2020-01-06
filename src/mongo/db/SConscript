@@ -1664,6 +1664,7 @@ env.Library(
     ],
     LIBDEPS=[
         'service_context',
+        '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

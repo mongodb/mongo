@@ -1,6 +1,10 @@
 // Regression test to ensure that we don't crash during a getMore if the client's
 // lastKnownCommittedOpTime switches from being ahead of the node's lastCommittedOpTime to behind
-// while an awaitData query is running. See SERVER-35239.
+// while a tailable awaitData query is running. See SERVER-35239. This also tests that when the
+// client's lastKnownCommittedOpTime is behind the node's lastCommittedOpTime, getMore returns early
+// with an empty batch.
+//
+// @tags: [requires_fcv_44]
 
 (function() {
 'use strict';
@@ -62,24 +66,31 @@ let waitForGetMoreToFinish = startParallelShell(() => {
     assert.eq(cmdRes.cursor.firstBatch.length, 2, tojson(cmdRes));
 
     // Enable failpoint.
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: 'planExecutorHangBeforeShouldWaitForInserts', mode: 'alwaysOn'}));
+    assert.commandWorked(db.adminCommand({
+        configureFailPoint: 'planExecutorHangBeforeShouldWaitForInserts',
+        mode: 'alwaysOn',
+        data: {namespace: dbName + "." + collName}
+    }));
 
     // Call getMore on awaitData cursor with lastKnownCommittedOpTime ahead of node. This will
-    // hang until we've disabled the failpoint. maxTimeMS must be set otherwise the default
-    // timeout for waiting for inserts is 1 second.
+    // hang until we've disabled the failpoint. Set awaitData timeout "maxTimeMS" to use a large
+    // timeout so we can test if the getMore command returns early on a stale
+    // lastKnownCommittedOpTime.
     const lastOpTime = getLastOpTime(secondary);
+    const cursorId = cmdRes.cursor.id;
     cmdRes = awaitDataDB.runCommand({
-        getMore: cmdRes.cursor.id,
+        getMore: cursorId,
         collection: collName,
         batchSize: NumberInt(2),
-        maxTimeMS: 10000,
+        maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
         lastKnownCommittedOpTime: lastOpTime
     });
 
     assert.commandWorked(cmdRes);
-    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.id, cursorId);
     assert.eq(cmdRes.cursor.ns, dbName + "." + collName);
+    // Test that getMore returns early with an empty batch even though there was a new document
+    // inserted.
     assert.eq(cmdRes.cursor.nextBatch.length, 0, tojson(cmdRes));
 }, secondary.port);
 
@@ -92,6 +103,11 @@ jsTestLog('Restarting replication');
 restartServerReplication(secondaries[1]);
 restartServerReplication(secondaries[2]);
 restartServerReplication(secondaries[3]);
+
+// Do another write to advance the optime so that the test client's lastKnownCommittedOpTime is
+// behind the node's lastCommittedOpTime once all nodes catch up.
+jsTestLog('Do another write after restarting replication');
+assert.commandWorked(primaryDB[collName].insert({_id: 2}));
 
 // Wait until all nodes have committed the last op. At this point in executing the getMore,
 // the node's lastCommittedOpTime should now be ahead of the client's lastKnownCommittedOpTime.

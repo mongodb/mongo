@@ -152,6 +152,7 @@ GenericCursor ClientCursor::toGenericCursor() const {
     if (auto opCtx = _operationUsingCursor) {
         gc.setOperationUsingCursorId(opCtx->getOpID());
     }
+    gc.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
     return gc;
 }
 
