@@ -69,6 +69,7 @@ using repl::OplogEntry;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
+MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
 
 const auto documentKeyDecoration = OperationContext::declareDecoration<BSONObj>();
 
@@ -1296,6 +1297,13 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         // reserve enough entries for all statements in the transaction.
         auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size());
         invariant(oplogSlots.size() == statements.size());
+
+        if (MONGO_unlikely(hangAndFailUnpreparedCommitAfterReservingOplogSlot.shouldFail())) {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangAndFailUnpreparedCommitAfterReservingOplogSlot);
+            uasserted(51268,
+                      "hangAndFailUnpreparedCommitAfterReservingOplogSlot fail point enabled");
+        }
 
         // Log in-progress entries for the transaction along with the implicit commit.
         int numOplogEntries = logOplogEntriesForTransaction(opCtx, statements, oplogSlots, false);

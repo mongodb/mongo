@@ -82,6 +82,7 @@ namespace mongo {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
+MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
@@ -640,6 +641,12 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     OplogSlot createOplogSlot;
     if (canAcceptWrites && supportsDocLocking() && !coordinator->isOplogDisabledFor(opCtx, nss)) {
         createOplogSlot = repl::getNextOpTime(opCtx);
+    }
+
+    if (MONGO_unlikely(hangAndFailAfterCreateCollectionReservesOpTime.shouldFail())) {
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, hangAndFailAfterCreateCollectionReservesOpTime);
+        uasserted(51267, "hangAndFailAfterCreateCollectionReservesOpTime fail point enabled");
     }
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);

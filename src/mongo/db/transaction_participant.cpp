@@ -676,13 +676,6 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
         // side transaction.
         _recoveryUnit->abortUnitOfWork();
     }
-
-    // After releasing the oplog hole, the all_durable timestamp can advance past this oplog hole,
-    // if there are no other open holes. Check if we can advance the stable timestamp any further
-    // since a majority write may be waiting on the stable timestamp to advance beyond this oplog
-    // hole to acknowledge the write to the user.
-    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    replCoord->attemptToAdvanceStableTimestamp();
 }
 
 TransactionParticipant::TxnResources::TxnResources(WithLock wl,
