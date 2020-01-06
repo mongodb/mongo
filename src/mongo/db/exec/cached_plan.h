@@ -106,7 +106,7 @@ private:
      *
      * We only modify the plan cache if 'shouldCache' is true.
      */
-    Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache);
+    Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, std::string reason);
 
     /**
      * May yield during the cached plan stage's trial period or replanning phases.

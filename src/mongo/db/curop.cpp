@@ -699,7 +699,11 @@ string OpDebug::report(Client* client,
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP_BOOL(usedDisk);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
-    OPDEBUG_TOSTRING_HELP_BOOL(replanned);
+    if (replanReason) {
+        bool replanned = true;
+        OPDEBUG_TOSTRING_HELP_BOOL(replanned);
+        s << " replanReason:\"" << str::escape(redact(*replanReason)) << "\"";
+    }
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", additiveMetrics.nMatched);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", additiveMetrics.nModified);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", additiveMetrics.ninserted);
@@ -801,7 +805,11 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_BOOL(hasSortStage);
     OPDEBUG_APPEND_BOOL(usedDisk);
     OPDEBUG_APPEND_BOOL(fromMultiPlanner);
-    OPDEBUG_APPEND_BOOL(replanned);
+    if (replanReason) {
+        bool replanned = true;
+        OPDEBUG_APPEND_BOOL(replanned);
+        b.append("replanReason", *replanReason);
+    }
     OPDEBUG_APPEND_OPTIONAL("nMatched", additiveMetrics.nMatched);
     OPDEBUG_APPEND_OPTIONAL("nModified", additiveMetrics.nModified);
     OPDEBUG_APPEND_OPTIONAL("ninserted", additiveMetrics.ninserted);
@@ -868,7 +876,7 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     hasSortStage = planSummaryStats.hasSortStage;
     usedDisk = planSummaryStats.usedDisk;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
-    replanned = planSummaryStats.replanned;
+    replanReason = planSummaryStats.replanReason;
 }
 
 BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) const {

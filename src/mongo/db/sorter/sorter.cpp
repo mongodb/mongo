@@ -552,10 +552,8 @@ private:
             // elsewhere where extSortAllowed could possibly be false, this message will
             // need to be revisited.
             uasserted(16819,
-                      str::stream()
-                          << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
-                          << " bytes, but did not opt in to external sorting. Aborting operation."
-                          << " Pass allowDiskUse:true to opt in.");
+                      str::stream() << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
+                                    << " bytes, but did not opt in to external sorting.");
         }
 
         sort();

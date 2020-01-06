@@ -64,7 +64,7 @@ struct PlanSummaryStats {
     bool fromMultiPlanner = false;
 
     // Was a replan triggered during the execution of this query?
-    bool replanned = false;
+    std::optional<std::string> replanReason;
 };
 
 }  // namespace mongo
