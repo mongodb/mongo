@@ -33,6 +33,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/query/blocking_results_merger.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -41,6 +42,7 @@ BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
                                              std::shared_ptr<executor::TaskExecutor> executor,
                                              std::unique_ptr<ResourceYielder> resourceYielder)
     : _tailableMode(armParams.getTailableMode().value_or(TailableModeEnum::kNormal)),
+      _recordRemoteOpWaitTime(armParams.getRecordRemoteOpWaitTime()),
       _executor(executor),
       _arm(opCtx, std::move(executor), std::move(armParams)),
       _resourceYielder(std::move(resourceYielder)) {}
@@ -59,6 +61,11 @@ StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
 
     boost::optional<StatusWith<stdx::cv_status>> result;
     try {
+        // Record the time spent waiting for remotes. If remote-wait recording is not enabled in
+        // CurOp, this will have no effect.
+        CurOp::get(opCtx)->startRemoteOpWaitTimer();
+        ON_BLOCK_EXIT([&] { CurOp::get(opCtx)->stopRemoteOpWaitTimer(); });
+
         // This shouldn't throw, but we cannot enforce that.
         result = waitFn();
     } catch (const DBException&) {
@@ -135,6 +142,10 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::blockUntilNext(OperationCo
 }
 StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opCtx,
                                                            RouterExecStage::ExecContext execCtx) {
+    if (_recordRemoteOpWaitTime) {
+        CurOp::get(opCtx)->enableRecordRemoteOpWait();
+    }
+
     // Non-tailable and tailable non-awaitData cursors always block until ready(). AwaitData
     // cursors wait for ready() only until a specified time limit is exceeded.
     return (_tailableMode == TailableModeEnum::kTailableAndAwaitData

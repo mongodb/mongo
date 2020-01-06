@@ -757,6 +757,10 @@ string OpDebug::report(Client* client,
         s << " protocol:" << getProtoString(networkOp);
     }
 
+    if (remoteOpWaitTime) {
+        s << " remoteOpWaitMillis:" << durationCount<Milliseconds>(*remoteOpWaitTime);
+    }
+
     s << " " << (executionTimeMicros / 1000) << "ms";
 
     return s.str();
@@ -859,6 +863,11 @@ void OpDebug::append(const CurOp& curop,
     if (iscommand) {
         b.append("protocol", getProtoString(networkOp));
     }
+
+    if (remoteOpWaitTime) {
+        b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
+    }
+
     b.appendIntOrLL("millis", executionTimeMicros / 1000);
 
     if (!curop.getPlanSummary().empty()) {

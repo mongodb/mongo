@@ -12,6 +12,7 @@
 TestData.disableImplicitSessions = true;
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+load("jstests/libs/log.js");              // For findMatchingLogLine.
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -404,36 +405,6 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
 //
 // Helper functions.
 //
-
-// Finds and returns a logline containing all the specified fields, or null if no such logline
-// was found. The regex escape function used here is drawn from the following:
-// https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript
-// https://github.com/ljharb/regexp.escape
-function findMatchingLogLine(logLines, fields, ignoreFields) {
-    function escapeRegex(input) {
-        return (typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, '\\$&')
-                                          : input);
-    }
-    function lineMatches(line, fields, ignoreFields) {
-        const fieldNames =
-            Object.keys(fields).filter((fieldName) => !ignoreFields.includes(fieldName));
-        return fieldNames.every((fieldName) => {
-            const fieldValue = fields[fieldName];
-            let regex = escapeRegex(fieldName) + ":? ?(" +
-                escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
-                escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
-            const match = line.match(regex);
-            return match && match[0];
-        });
-    }
-
-    for (let line of logLines) {
-        if (lineMatches(line, fields, ignoreFields)) {
-            return line;
-        }
-    }
-    return null;
-}
 
 // In cases where some tests were not logged, this helper will identify and return them.
 function getUnloggedTests(testsRun, logLines) {
