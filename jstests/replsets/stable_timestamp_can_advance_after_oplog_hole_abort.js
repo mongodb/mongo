@@ -1,7 +1,7 @@
 /**
  * Test that the stable timestamp can advance after an oplog hole is released via an abort.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions,requires_fcv_44]
  */
 
 (function() {
