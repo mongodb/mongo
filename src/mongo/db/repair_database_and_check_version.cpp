@@ -312,7 +312,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
+        fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 
     // Once all unfinished indexes have been rebuilt, restart any unfinished index builds. This will

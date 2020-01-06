@@ -42,6 +42,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_index_builds_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/platform/mutex.h"
@@ -145,8 +146,9 @@ public:
 
     /**
      * Runs the full index rebuild for recovery. This will only rebuild single-phase index builds.
-     * Rebuilding an index in recovery mode verifies each document to ensure that it is a valid
-     * BSON object. It will remove any documents with invalid BSON.
+     * Rebuilding an index in recovery mode verifies the BSON format of each document. Upon
+     * discovery of corruption, if 'repair' is kYes, this function will remove any documents with
+     * invalid BSON; otherwise, it will abort the server process.
      *
      * Returns the number of records and the size of the data iterated over, if successful.
      */
@@ -154,7 +156,8 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const std::vector<BSONObj>& specs,
-        const UUID& buildUUID);
+        const UUID& buildUUID,
+        RepairData repair);
 
     /**
      * Signals the index build identified by 'buildUUID' to commit, and waits for its thread to
@@ -588,12 +591,15 @@ protected:
     /**
      * Runs the index build.
      * Rebuilding an index in recovery mode verifies each document to ensure that it is a valid
-     * BSON object. It will remove any documents with invalid BSON.
+     * BSON object. If repair is kYes, it will remove any documents with invalid BSON.
      *
      * Returns the number of records and the size of the data iterated over, if successful.
      */
     StatusWith<std::pair<long long, long long>> _runIndexRebuildForRecovery(
-        OperationContext* opCtx, Collection* collection, const UUID& buildUUID) noexcept;
+        OperationContext* opCtx,
+        Collection* collection,
+        const UUID& buildUUID,
+        RepairData repair) noexcept;
 
     /**
      * Looks up active index build by UUID.
