@@ -53,10 +53,48 @@ struct CustomAttributeValue {
     std::function<std::string()> toString;
 };
 
+template <typename T>
+auto seqLog(const T& container);
+
+template <typename It>
+auto seqLog(It begin, It end);
+
+template <typename T>
+auto mapLog(const T& container);
+
+template <typename It>
+auto mapLog(It begin, It end);
+
 namespace detail {
 namespace {
 
 // Helper traits to figure out capabilities on custom types
+template <class T>
+struct IsOptional : std::false_type {};
+
+template <class T>
+struct IsOptional<boost::optional<T>> : std::true_type {};
+
+template <class T, typename = void>
+struct IsContainer : std::false_type {};
+
+template <class T, typename = void>
+struct HasMappedType : std::false_type {};
+
+template <typename T>
+struct HasMappedType<T, std::void_t<typename T::mapped_type>> : std::true_type {};
+
+// Trait to detect container, common interface for both std::array and std::forward_list
+template <typename T>
+struct IsContainer<T,
+                   std::void_t<typename T::value_type,
+                               typename T::size_type,
+                               typename T::iterator,
+                               typename T::const_iterator,
+                               decltype(std::declval<T>().empty()),
+                               decltype(std::declval<T>().begin()),
+                               decltype(std::declval<T>().end())>> : std::true_type {};
+
 template <class T, class = void>
 struct HasToBSON : std::false_type {};
 
@@ -105,87 +143,314 @@ struct HasToString<T, std::void_t<decltype(std::declval<T>().toString())>> : std
 
 }  // namespace
 
+// Mapping functions on how to map a logged value to how it is stored in variant (reused by
+// container support)
+inline bool mapValue(bool value) {
+    return value;
+}
+inline int mapValue(int value) {
+    return value;
+}
+inline unsigned int mapValue(unsigned int value) {
+    return value;
+}
+inline long long mapValue(long value) {
+    return value;
+}
+inline unsigned long long mapValue(unsigned long value) {
+    return value;
+}
+inline long long mapValue(long long value) {
+    return value;
+}
+inline unsigned long long mapValue(unsigned long long value) {
+    return value;
+}
+inline double mapValue(float value) {
+    return value;
+}
+inline double mapValue(double value) {
+    return value;
+}
+inline StringData mapValue(StringData value) {
+    return value;
+}
+inline StringData mapValue(std::string const& value) {
+    return value;
+}
+inline StringData mapValue(char* value) {
+    return value;
+}
+inline StringData mapValue(const char* value) {
+    return value;
+}
+inline const BSONObj* mapValue(BSONObj const& value) {
+    return &value;
+}
+inline const BSONArray* mapValue(BSONArray const& value) {
+    return &value;
+}
+inline CustomAttributeValue mapValue(BSONElement const& val) {
+    CustomAttributeValue custom;
+    custom.BSONSerialize = [&val](BSONObjBuilder& builder) { builder.appendElements(val.wrap()); };
+    custom.toString = [&val]() { return val.toString(); };
+    return custom;
+}
+inline CustomAttributeValue mapValue(boost::none_t val) {
+    CustomAttributeValue custom;
+    // Use BSONAppend instead of toBSON because we just want the null value and not a whole
+    // object with a field name
+    custom.BSONAppend = [](BSONObjBuilder& builder, StringData fieldName) {
+        builder.appendNull(fieldName);
+    };
+    custom.toString = [&val]() { return constants::kNullOptionalString.toString(); };
+    return custom;
+}
+
+template <typename T, std::enable_if_t<IsContainer<T>::value && !HasMappedType<T>::value, int> = 0>
+CustomAttributeValue mapValue(const T& val) {
+    CustomAttributeValue custom;
+    custom.toBSONArray = [&val]() { return seqLog(val).toBSONArray(); };
+    custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { seqLog(val).serialize(buffer); };
+    return custom;
+}
+
+template <typename T, std::enable_if_t<IsContainer<T>::value && HasMappedType<T>::value, int> = 0>
+CustomAttributeValue mapValue(const T& val) {
+    CustomAttributeValue custom;
+    custom.BSONSerialize = [&val](BSONObjBuilder& builder) { mapLog(val).serialize(&builder); };
+    custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { mapLog(val).serialize(buffer); };
+    return custom;
+}
+
+template <typename T,
+          std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T> &&
+                               !IsContainer<T>::value,
+                           int> = 0>
+CustomAttributeValue mapValue(const T& val) {
+    static_assert(HasToString<T>::value || HasStringSerialize<T>::value,
+                  "custom type needs toString() or serialize(fmt::memory_buffer&) implementation");
+
+    CustomAttributeValue custom;
+    if constexpr (HasBSONBuilderAppend<T>::value) {
+        custom.BSONAppend = [&val](BSONObjBuilder& builder, StringData fieldName) {
+            builder.append(fieldName, val);
+        };
+    }
+    if constexpr (HasBSONSerialize<T>::value) {
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) { val.serialize(&builder); };
+    } else if constexpr (HasToBSON<T>::value) {
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+            builder.appendElements(val.toBSON());
+        };
+    } else if constexpr (HasToBSONArray<T>::value) {
+        custom.toBSONArray = [&val]() { return val.toBSONArray(); };
+    }
+    if constexpr (HasStringSerialize<T>::value) {
+        custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { val.serialize(buffer); };
+    } else if constexpr (HasToString<T>::value) {
+        custom.toString = [&val]() { return val.toString(); };
+    }
+
+    return custom;
+}
+
+template <typename It>
+class SequenceContainerLogger {
+public:
+    SequenceContainerLogger(It begin, It end) : _begin(begin), _end(end) {}
+
+    // JSON Format: [elem1, elem2, ..., elemN]
+    BSONArray toBSONArray() const {
+        BSONArrayBuilder builder;
+        for (auto it = _begin; it != _end; ++it) {
+            const auto& item = *it;
+            auto append = [&builder](auto&& val) {
+                if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
+                    if (val.BSONAppend) {
+                        BSONObjBuilder objBuilder;
+                        val.BSONAppend(objBuilder, ""_sd);
+                        builder.append(objBuilder.done().getField(""_sd));
+                    } else if (val.BSONSerialize) {
+                        BSONObjBuilder objBuilder;
+                        val.BSONSerialize(objBuilder);
+                        builder.append(objBuilder.done());
+                    } else if (val.toBSONArray) {
+                        builder.append(val.toBSONArray());
+                    } else if (val.stringSerialize) {
+                        fmt::memory_buffer buffer;
+                        val.stringSerialize(buffer);
+                        builder.append(fmt::to_string(buffer));
+                    } else {
+                        builder.append(val.toString());
+                    }
+                } else {
+                    builder.append(val);
+                }
+            };
+
+            using item_t = std::decay_t<decltype(item)>;
+            if constexpr (IsOptional<item_t>::value) {
+                if (item) {
+                    append(mapValue(*item));
+                } else {
+                    append(mapValue(boost::none));
+                }
+            } else {
+                append(mapValue(item));
+            }
+        }
+        return builder.arr();
+    }
+
+    // Text Format: (elem1, elem2, ..., elemN)
+    void serialize(fmt::memory_buffer& buffer) const {
+        StringData separator = ""_sd;
+        buffer.push_back('(');
+        for (auto it = _begin; it != _end; ++it) {
+            const auto& item = *it;
+            buffer.append(separator.begin(), separator.end());
+
+            auto append = [&buffer](auto&& val) {
+                if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
+                    if (val.stringSerialize) {
+                        val.stringSerialize(buffer);
+                    } else {
+                        fmt::format_to(buffer, "{}", val.toString());
+                    }
+                } else {
+                    fmt::format_to(buffer, "{}", val);
+                }
+            };
+
+            using item_t = std::decay_t<decltype(item)>;
+            if constexpr (IsOptional<item_t>::value) {
+                if (item) {
+                    append(mapValue(*item));
+                } else {
+                    append(mapValue(boost::none));
+                }
+            } else {
+                append(mapValue(item));
+            }
+
+            separator = ", "_sd;
+        }
+        buffer.push_back(')');
+    }
+
+private:
+    It _begin;
+    It _end;
+};
+
+template <typename It>
+class AssociativeContainerLogger {
+public:
+    static_assert(std::is_same_v<decltype(mapValue(std::declval<It>()->first)), StringData>,
+                  "key in associative container needs to be a string");
+
+    AssociativeContainerLogger(It begin, It end) : _begin(begin), _end(end) {}
+
+    // JSON Format: {"elem1": val1, "elem2": val2, ..., "elemN": valN}
+    void serialize(BSONObjBuilder* builder) const {
+        for (auto it = _begin; it != _end; ++it) {
+            const auto& item = *it;
+            auto append = [builder](StringData key, auto&& val) {
+                if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
+                    if (val.BSONAppend) {
+                        val.BSONAppend(*builder, key);
+                    } else if (val.BSONSerialize) {
+                        BSONObjBuilder subBuilder = builder->subobjStart(key);
+                        val.BSONSerialize(subBuilder);
+                        subBuilder.done();
+                    } else if (val.toBSONArray) {
+                        builder->append(key, val.toBSONArray());
+                    } else if (val.stringSerialize) {
+                        fmt::memory_buffer buffer;
+                        val.stringSerialize(buffer);
+                        builder->append(key, fmt::to_string(buffer));
+                    } else {
+                        builder->append(key, val.toString());
+                    }
+                } else {
+                    builder->append(key, val);
+                }
+            };
+            auto key = mapValue(item.first);
+            using value_t = std::decay_t<decltype(item.second)>;
+            if constexpr (IsOptional<value_t>::value) {
+                if (item.second) {
+                    append(key, mapValue(*item.second));
+                } else {
+                    append(key, mapValue(boost::none));
+                }
+            } else {
+                append(key, mapValue(item.second));
+            }
+        }
+    }
+
+    // Text Format: (elem1: val1, elem2: val2, ..., elemN: valN)
+    void serialize(fmt::memory_buffer& buffer) const {
+        StringData separator = ""_sd;
+        buffer.push_back('(');
+        for (auto it = _begin; it != _end; ++it) {
+            const auto& item = *it;
+            buffer.append(separator.begin(), separator.end());
+
+            auto append = [&buffer](StringData key, auto&& val) {
+                if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
+                    if (val.stringSerialize) {
+                        fmt::format_to(buffer, "{}: ", key);
+                        val.stringSerialize(buffer);
+                    } else {
+                        fmt::format_to(buffer, "{}: {}", key, val.toString());
+                    }
+                } else {
+                    fmt::format_to(buffer, "{}: {}", key, val);
+                }
+            };
+
+            auto key = mapValue(item.first);
+            using value_t = std::decay_t<decltype(item.second)>;
+            if constexpr (IsOptional<value_t>::value) {
+                if (item.second) {
+                    append(key, mapValue(*item.second));
+                } else {
+                    append(key, mapValue(boost::none));
+                }
+            } else {
+                append(key, mapValue(item.second));
+            }
+
+            separator = ", "_sd;
+        }
+        buffer.push_back(')');
+    }
+
+private:
+    It _begin;
+    It _end;
+};
+
 // Named attribute, storage for a name-value attribute.
 class NamedAttribute {
 public:
     NamedAttribute() = default;
-    NamedAttribute(StringData n, int val) : name(n), value(val) {}
-    NamedAttribute(StringData n, unsigned int val) : name(n), value(val) {}
-    // long is 32bit on Windows and 64bit on posix. To avoid ambiguity where different platforms we
-    // treat long as 64bit always
-    NamedAttribute(StringData n, long val) : name(n), value(static_cast<long long>(val)) {}
-    NamedAttribute(StringData n, unsigned long val)
-        : name(n), value(static_cast<unsigned long long>(val)) {}
-    NamedAttribute(StringData n, long long val) : name(n), value(val) {}
-    NamedAttribute(StringData n, unsigned long long val) : name(n), value(val) {}
-    NamedAttribute(StringData n, double val) : name(n), value(val) {}
-    NamedAttribute(StringData n, bool val) : name(n), value(val) {}
-    NamedAttribute(StringData n, StringData val) : name(n), value(val) {}
-    NamedAttribute(StringData n, BSONObj const& val) : name(n), value(&val) {}
-    NamedAttribute(StringData n, BSONArray const& val) : name(n), value(&val) {}
-    NamedAttribute(StringData n, const char* val) : NamedAttribute(n, StringData(val)) {}
-    NamedAttribute(StringData n, char* val) : NamedAttribute(n, static_cast<const char*>(val)) {}
-    NamedAttribute(StringData n, float val) : NamedAttribute(n, static_cast<double>(val)) {}
-    NamedAttribute(StringData n, std::string const& val) : NamedAttribute(n, StringData(val)) {}
     NamedAttribute(StringData n, long double val) = delete;
-
-    NamedAttribute(StringData n, BSONElement const& val) : name(n) {
-        CustomAttributeValue custom;
-        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
-            builder.appendElements(val.wrap());
-        };
-        custom.toString = [&val]() { return val.toString(); };
-        value = std::move(custom);
-    }
 
     template <typename T>
     NamedAttribute(StringData n, const boost::optional<T>& val)
         : NamedAttribute(val ? NamedAttribute(n, *val) : NamedAttribute()) {
         if (!val) {
-            CustomAttributeValue custom;
-            // Use BSONAppend instead of toBSON because we just want the null value and not a whole
-            // object with a field name
-            custom.BSONAppend = [](BSONObjBuilder& builder, StringData fieldName) {
-                builder.appendNull(fieldName);
-            };
-            custom.toString = [&val]() { return constants::kNullOptionalString.toString(); };
             name = n;
-            value = std::move(custom);
+            value = mapValue(boost::none);
         }
     }
 
-    template <typename T,
-              typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>
-    NamedAttribute(StringData n, const T& val) : name(n) {
-        static_assert(
-            HasToString<T>::value || HasStringSerialize<T>::value,
-            "custom type needs toString() or serialize(fmt::memory_buffer&) implementation");
-
-        CustomAttributeValue custom;
-        if constexpr (HasBSONBuilderAppend<T>::value) {
-            custom.BSONAppend = [&val](BSONObjBuilder& builder, StringData fieldName) {
-                builder.append(fieldName, val);
-            };
-        }
-        if constexpr (HasBSONSerialize<T>::value) {
-            custom.BSONSerialize = [&val](BSONObjBuilder& builder) { val.serialize(&builder); };
-        } else if constexpr (HasToBSON<T>::value) {
-            custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
-                builder.appendElements(val.toBSON());
-            };
-        } else if constexpr (HasToBSONArray<T>::value) {
-            custom.toBSONArray = [&val]() { return val.toBSONArray(); };
-        }
-        if constexpr (HasStringSerialize<T>::value) {
-            custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
-                return val.serialize(buffer);
-            };
-        } else if constexpr (HasToString<T>::value) {
-            custom.toString = [&val]() { return val.toString(); };
-        }
-
-        value = std::move(custom);
-    }
+    template <typename T>
+    NamedAttribute(StringData n, const T& val) : name(n), value(mapValue(val)) {}
 
     StringData name;
     stdx::variant<int,
@@ -259,6 +524,31 @@ private:
     const detail::NamedAttribute* _data;
     size_t _size;
 };
+
+// Helpers for logging containers, optional to use. Allowes logging of ranges.
+template <typename T>
+auto seqLog(const T& container) {
+    using std::begin;
+    using std::end;
+    return detail::SequenceContainerLogger(begin(container), end(container));
+}
+
+template <typename It>
+auto seqLog(It begin, It end) {
+    return detail::SequenceContainerLogger(begin, end);
+}
+
+template <typename T>
+auto mapLog(const T& container) {
+    using std::begin;
+    using std::end;
+    return detail::AssociativeContainerLogger(begin(container), end(container));
+}
+
+template <typename It>
+auto mapLog(It begin, It end) {
+    return detail::AssociativeContainerLogger(begin, end);
+}
 
 }  // namespace logv2
 }  // namespace mongo

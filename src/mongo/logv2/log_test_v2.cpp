@@ -754,6 +754,207 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     validateCustomAttrBSONArray(BSONObj(linesBson.back().data()));
 }
 
+TEST_F(LogTestV2, Containers) {
+    using namespace constants;
+
+    std::vector<std::string> text;
+    auto text_sink = LogTestBackend::create(text);
+    text_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
+    text_sink->set_formatter(PlainFormatter());
+    attach(text_sink);
+
+    std::vector<std::string> json;
+    auto json_sink = LogTestBackend::create(json);
+    json_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
+    json_sink->set_formatter(JSONFormatter());
+    attach(json_sink);
+
+    std::vector<std::string> bson;
+    auto bson_sink = LogTestBackend::create(bson);
+    bson_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
+    bson_sink->set_formatter(BSONFormatter());
+    attach(bson_sink);
+
+    // Helper to create a comma separated list of a container, stringify is function on how to
+    // transform element into a string.
+    auto text_join = [](auto begin, auto end, auto stringify) -> std::string {
+        if (begin == end)
+            return "()";
+
+        auto second = begin;
+        ++second;
+        if (second == end)
+            return fmt::format("({})", stringify(*begin));
+
+        return fmt::format(
+            "({})",
+            std::accumulate(
+                second, end, stringify(*begin), [&stringify](std::string result, auto&& item) {
+                    return result + ", " + stringify(item);
+                }));
+    };
+
+    // All standard sequential containers are supported
+    std::vector<std::string> vectorStrings = {"str1", "str2", "str3"};
+    LOGV2("{}", "name"_attr = vectorStrings);
+    ASSERT_EQUALS(text.back(),
+                  text_join(vectorStrings.begin(), vectorStrings.end(), [](const std::string& str) {
+                      return str;
+                  }));
+    auto validateStringVector = [&vectorStrings](const BSONObj& obj) {
+        std::vector<BSONElement> jsonVector =
+            obj.getField(kAttributesFieldName).Obj().getField("name").Array();
+        ASSERT_EQUALS(vectorStrings.size(), jsonVector.size());
+        for (std::size_t i = 0; i < vectorStrings.size(); ++i)
+            ASSERT_EQUALS(jsonVector[i].String(), vectorStrings[i]);
+    };
+    validateStringVector(mongo::fromjson(json.back()));
+    validateStringVector(BSONObj(bson.back().data()));
+
+    // Elements can require custom formatting
+    std::list<TypeWithBSON> listCustom = {
+        TypeWithBSON(0.0, 1.0), TypeWithBSON(2.0, 3.0), TypeWithBSON(4.0, 5.0)};
+    LOGV2("{}", "name"_attr = listCustom);
+    ASSERT_EQUALS(text.back(),
+                  text_join(listCustom.begin(), listCustom.end(), [](const auto& item) {
+                      return item.toString();
+                  }));
+    auto validateBSONObjList = [&listCustom](const BSONObj& obj) {
+        std::vector<BSONElement> jsonVector =
+            obj.getField(kAttributesFieldName).Obj().getField("name").Array();
+        ASSERT_EQUALS(listCustom.size(), jsonVector.size());
+        auto in = listCustom.begin();
+        auto out = jsonVector.begin();
+        for (; in != listCustom.end(); ++in, ++out) {
+            ASSERT(in->toBSON().woCompare(out->Obj()) == 0);
+        }
+    };
+    validateBSONObjList(mongo::fromjson(json.back()));
+    validateBSONObjList(BSONObj(bson.back().data()));
+
+    // Optionals are also allowed as elements
+    std::forward_list<boost::optional<bool>> listOptionalBool = {true, boost::none, false};
+    LOGV2("{}", "name"_attr = listOptionalBool);
+    ASSERT_EQUALS(text.back(),
+                  text_join(listOptionalBool.begin(),
+                            listOptionalBool.end(),
+                            [](const auto& item) -> std::string {
+                                if (!item)
+                                    return constants::kNullOptionalString.toString();
+                                else if (*item)
+                                    return "true";
+                                else
+                                    return "false";
+                            }));
+    auto validateOptionalBool = [&listOptionalBool](const BSONObj& obj) {
+        std::vector<BSONElement> jsonVector =
+            obj.getField(kAttributesFieldName).Obj().getField("name").Array();
+        auto in = listOptionalBool.begin();
+        auto out = jsonVector.begin();
+        for (; in != listOptionalBool.end() && out != jsonVector.end(); ++in, ++out) {
+            if (*in)
+                ASSERT_EQUALS(**in, out->Bool());
+            else
+                ASSERT(out->isNull());
+        }
+        ASSERT(in == listOptionalBool.end());
+        ASSERT(out == jsonVector.end());
+    };
+    validateOptionalBool(mongo::fromjson(json.back()));
+    validateOptionalBool(BSONObj(bson.back().data()));
+
+    // Containers can be nested
+    std::array<std::deque<int>, 4> arrayOfDeques = {{{0, 1}, {2, 3}, {4, 5}, {6, 7}}};
+    LOGV2("{}", "name"_attr = arrayOfDeques);
+    ASSERT_EQUALS(text.back(),
+                  text_join(arrayOfDeques.begin(),
+                            arrayOfDeques.end(),
+                            [text_join](const std::deque<int>& deque) {
+                                return text_join(deque.begin(), deque.end(), [](int val) {
+                                    return fmt::format("{}", val);
+                                });
+                            }));
+    auto validateArrayOfDeques = [&arrayOfDeques](const BSONObj& obj) {
+        std::vector<BSONElement> jsonVector =
+            obj.getField(kAttributesFieldName).Obj().getField("name").Array();
+        ASSERT_EQUALS(arrayOfDeques.size(), jsonVector.size());
+        auto in = arrayOfDeques.begin();
+        auto out = jsonVector.begin();
+        for (; in != arrayOfDeques.end(); ++in, ++out) {
+            std::vector<BSONElement> inner_array = out->Array();
+            ASSERT_EQUALS(in->size(), inner_array.size());
+            auto inner_begin = in->begin();
+            auto inner_end = in->end();
+
+            auto inner_out = inner_array.begin();
+            for (; inner_begin != inner_end; ++inner_begin, ++inner_out) {
+                ASSERT_EQUALS(*inner_begin, inner_out->Int());
+            }
+        }
+    };
+    validateArrayOfDeques(mongo::fromjson(json.back()));
+    validateArrayOfDeques(BSONObj(bson.back().data()));
+
+    // Associative containers are also supported
+    std::map<std::string, std::string> mapStrStr = {{"key1", "val1"}, {"key2", "val2"}};
+    LOGV2("{}", "name"_attr = mapStrStr);
+    ASSERT_EQUALS(text.back(), text_join(mapStrStr.begin(), mapStrStr.end(), [](const auto& item) {
+                      return fmt::format("{}: {}", item.first, item.second);
+                  }));
+    auto validateMapOfStrings = [&mapStrStr](const BSONObj& obj) {
+        BSONObj mappedValues = obj.getField(kAttributesFieldName).Obj().getField("name").Obj();
+        auto in = mapStrStr.begin();
+        for (; in != mapStrStr.end(); ++in) {
+            ASSERT_EQUALS(mappedValues.getField(in->first).String(), in->second);
+        }
+    };
+    validateMapOfStrings(mongo::fromjson(json.back()));
+    validateMapOfStrings(BSONObj(bson.back().data()));
+
+    // Associative containers with optional sequential container is ok too
+    stdx::unordered_map<std::string, boost::optional<std::vector<int>>> mapOptionalVector = {
+        {"key1", boost::optional<std::vector<int>>{{1, 2, 3}}},
+        {"key2", boost::optional<std::vector<int>>{boost::none}}};
+
+    LOGV2("{}", "name"_attr = mapOptionalVector);
+    ASSERT_EQUALS(
+        text.back(),
+        text_join(mapOptionalVector.begin(),
+                  mapOptionalVector.end(),
+                  [text_join](const std::pair<std::string, boost::optional<std::vector<int>>>&
+                                  optionalVectorItem) {
+                      if (!optionalVectorItem.second)
+                          return optionalVectorItem.first + ": " +
+                              constants::kNullOptionalString.toString();
+                      else
+                          return optionalVectorItem.first + ": " +
+                              text_join(optionalVectorItem.second->begin(),
+                                        optionalVectorItem.second->end(),
+                                        [](int val) { return fmt::format("{}", val); });
+                  }));
+    auto validateMapOfOptionalVectors = [&mapOptionalVector](const BSONObj& obj) {
+        BSONObj mappedValues = obj.getField(kAttributesFieldName).Obj().getField("name").Obj();
+        auto in = mapOptionalVector.begin();
+        for (; in != mapOptionalVector.end(); ++in) {
+            BSONElement mapElement = mappedValues.getField(in->first);
+            if (!in->second)
+                ASSERT(mapElement.isNull());
+            else {
+                const std::vector<int>& intVec = *(in->second);
+                std::vector<BSONElement> jsonVector = mapElement.Array();
+                ASSERT_EQUALS(jsonVector.size(), intVec.size());
+                for (std::size_t i = 0; i < intVec.size(); ++i)
+                    ASSERT_EQUALS(jsonVector[i].Int(), intVec[i]);
+            }
+        }
+    };
+    validateMapOfOptionalVectors(mongo::fromjson(json.back()));
+    validateMapOfOptionalVectors(BSONObj(bson.back().data()));
+}
+
 TEST_F(LogTestV2, Unicode) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
