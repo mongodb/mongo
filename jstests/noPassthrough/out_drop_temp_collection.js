@@ -11,14 +11,6 @@
 load("jstests/libs/curop_helpers.js");    // for waitForCurOpByFilter.
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
-function setFailPointOnShards(st, failpointName, mode, numShards) {
-    for (let i = 0; i < numShards; i++) {
-        const shardConn = st["rs" + i].getPrimary();
-        assert.commandWorked(
-            shardConn.adminCommand({configureFailPoint: failpointName, mode: mode}));
-    }
-}
-
 function runTest(st, testDb, portNum) {
     const failpointName = "outWaitAfterTempCollectionCreation";
     const coll = testDb.out_source_coll;
@@ -45,7 +37,18 @@ function runTest(st, testDb, portNum) {
     }, portNum);
 
     waitForCurOpByFilter(testDb, {"msg": failpointName});
-    testDb.adminCommand({dropDatabase: testDb.getName()});
+    // TODO SERVER-45358 Make it easier to run commands without retrying.
+    // Tests are run with an override function that retries commands that fail because of a
+    // background operation. Parallel shells don't automatically have that override, so drop has to
+    // be run in a parallel shell.
+    const dropColl = startParallelShell(() => {
+        const targetDb = db.getSiblingDB("out_drop_temp");
+        assert.commandFailedWithCode(targetDb.runCommand({dropDatabase: 1}), [
+            ErrorCodes.BackgroundOperationInProgressForDatabase,
+            ErrorCodes.BackgroundOperationInProgressForNamespace
+        ]);
+    }, portNum);
+    dropColl();
     // The $out should complete once the failpoint is disabled, not fail on index creation.
     FixtureHelpers.runCommandOnEachPrimary({
         db: testDb.getSiblingDB("admin"),
