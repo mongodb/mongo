@@ -7314,7 +7314,7 @@ tasks:
 
 - <<: *task_template
   name: ocsp
-  tags: ["ocsp"]
+  tags: ["ssl", "ocsp"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -8577,6 +8577,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
+  - name: .ocsp
   - name: .random_multiversion_replica_sets
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -8823,6 +8824,7 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: .ocsp
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -9767,7 +9769,6 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion
-  - name: .ocsp
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
@@ -10177,6 +10178,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog

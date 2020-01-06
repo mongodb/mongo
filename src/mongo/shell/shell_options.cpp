@@ -64,6 +64,7 @@ using std::vector;
 const std::set<std::string> kSetShellParameterWhitelist = {
     "awsEC2InstanceMetadataUrl",
     "awsECSInstanceMetadataUrl",
+    "ocspEnabled",
     "disabledSecureAllocatorDomains",
     "newLineAfterPasswordPromptForTest",
     "skipShellCursorFinalize",

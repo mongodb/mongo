@@ -13,3 +13,4 @@ executor:
       tlsCAFile: jstests/libs/ocsp/ca_ocsp.pem
       tlsCertificateKeyFile: jstests/libs/ocsp/client_ocsp.pem
       sslAllowInvalidHostnames: ''
+      setShellParameter: ocspEnabled=true

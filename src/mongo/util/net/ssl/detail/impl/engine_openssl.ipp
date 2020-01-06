@@ -35,6 +35,7 @@ engine::engine(SSL_CTX* context, const std::string& remoteHostName)
         asio::error_code ec(static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category());
         asio::detail::throw_error(ec, "engine");
     }
+    SSL_set_tlsext_status_type(ssl_, TLSEXT_STATUSTYPE_ocsp);
 
 #if (OPENSSL_VERSION_NUMBER < 0x10000000L)
     accept_mutex().init();

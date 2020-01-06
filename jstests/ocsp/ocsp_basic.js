@@ -6,6 +6,10 @@ load("jstests/ocsp/lib/mock_ocsp.js");
 (function() {
 "use strict";
 
+if (determineSSLProvider() != "openssl") {
+    return;
+}
+
 let mock_ocsp = new MockOCSPServer();
 mock_ocsp.start();
 
@@ -13,10 +17,11 @@ const ocsp_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: OCSP_SERVER_CERT,
     sslCAFile: OCSP_CA_CERT,
-    setParameter: {
-        ocspEnabled: "true",
-    },
     sslAllowInvalidHostnames: "",
+    setParameter: {
+        "failpoint.disableStapling": "{'mode':'alwaysOn'}",
+        "ocspEnabled": "true",
+    },
 };
 
 let conn = null;

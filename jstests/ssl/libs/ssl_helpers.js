@@ -311,3 +311,21 @@ function sslProviderSupportsTLS1_1() {
     }
     return !isDebian10();
 }
+
+function opensslVersionAsInt() {
+    const opensslInfo = getBuildInfo().openssl;
+    if (!opensslInfo) {
+        return null;
+    }
+
+    const matches = opensslInfo.running.match(/OpenSSL\s+(\d+)\.(\d+)\.(\d+)([a-z]?)/);
+    assert.neq(matches, null);
+
+    let version = (matches[1] << 24) | (matches[2] << 16) | (matches[3] << 8);
+
+    return version;
+}
+
+function supportsStapling() {
+    return opensslVersionAsInt() >= 0x01000200;
+}
