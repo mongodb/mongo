@@ -108,6 +108,7 @@
     <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>MONGO_SSL;WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+    <AdditionalOptions>/std:c++latest</AdditionalOptions>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <NMakeBuildCommandLine>ninja.exe -k 0 core</NMakeBuildCommandLine>
@@ -116,6 +117,7 @@
     <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>not_supported;WIN32;NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+    <AdditionalOptions>/std:c++latest</AdditionalOptions>
   </PropertyGroup>
 
    <!-- SPECIFICS -->
