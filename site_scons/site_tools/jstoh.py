@@ -9,37 +9,39 @@ def jsToHeader(target, source):
     h = [
         '#include "mongo/base/string_data.h"',
         '#include "mongo/scripting/engine.h"',
-        'namespace mongo {',
-        'namespace JSFiles{',
+        "namespace mongo {",
+        "namespace JSFiles{",
     ]
 
     def lineToChars(s):
-        return ','.join(str(ord(c)) for c in (s.rstrip() + '\n')) + ','
+        return ",".join(str(ord(c)) for c in (s.rstrip() + "\n")) + ","
 
     for s in source:
         filename = str(s)
-        objname = os.path.split(filename)[1].split('.')[0]
-        stringname = '_jscode_raw_' + objname
+        objname = os.path.split(filename)[1].split(".")[0]
+        stringname = "_jscode_raw_" + objname
 
-        h.append('constexpr char ' + stringname + "[] = {")
+        h.append("constexpr char " + stringname + "[] = {")
 
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             for line in f:
                 h.append(lineToChars(line))
 
         h.append("0};")
         # symbols aren't exported w/o this
-        h.append('extern const JSFile %s;' % objname)
-        h.append('const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };' %
-                 (objname, filename.replace('\\', '/'), stringname, stringname))
+        h.append("extern const JSFile %s;" % objname)
+        h.append(
+            'const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };'
+            % (objname, filename.replace("\\", "/"), stringname, stringname)
+        )
 
     h.append("} // namespace JSFiles")
     h.append("} // namespace mongo")
     h.append("")
 
-    text = '\n'.join(h)
+    text = "\n".join(h)
 
-    with open(outFile, 'w') as out:
+    with open(outFile, "w") as out:
         try:
             out.write(text)
         finally:

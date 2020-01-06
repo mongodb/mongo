@@ -19,21 +19,25 @@ import subprocess
 
 
 def exists(env):
-    if not 'AR' in env:
+    if not "AR" in env:
         return False
 
-    ar = env.subst(env['AR'])
+    ar = env.subst(env["AR"])
     if not ar:
         return False
 
     # If the user has done anything confusing with ARFLAGS, bail out. We want to find
     # an item in ARFLAGS of the exact form 'rc'.
-    if not "rc" in env['ARFLAGS']:
+    if not "rc" in env["ARFLAGS"]:
         return False
 
-    pipe = SCons.Action._subproc(env,
-                                 SCons.Util.CLVar(ar) + ['--version'], stdin='devnull',
-                                 stderr='devnull', stdout=subprocess.PIPE)
+    pipe = SCons.Action._subproc(
+        env,
+        SCons.Util.CLVar(ar) + ["--version"],
+        stdin="devnull",
+        stderr="devnull",
+        stdout=subprocess.PIPE,
+    )
     if pipe.wait() != 0:
         return False
 
@@ -41,9 +45,10 @@ def exists(env):
     for line in pipe.stdout:
         if found:
             continue  # consume all data
-        found = re.search(r'^GNU ar|^LLVM', line.decode('utf-8'))
+        found = re.search(r"^GNU ar|^LLVM", line.decode("utf-8"))
 
     return bool(found)
+
 
 def _add_emitter(builder):
     base_emitter = builder.emitter
@@ -70,23 +75,25 @@ def _add_scanner(builder):
                 new_results.extend(base.children())
         return new_results
 
-    builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner,
-                                                   path_function=path_function)
+    builder.target_scanner = SCons.Scanner.Scanner(
+        function=new_scanner, path_function=path_function
+    )
 
 
 def generate(env):
     if not exists(env):
         return
 
-    env['ARFLAGS'] = SCons.Util.CLVar(
-        [arflag if arflag != "rc" else "rcsTD" for arflag in env['ARFLAGS']])
+    env["ARFLAGS"] = SCons.Util.CLVar(
+        [arflag if arflag != "rc" else "rcsTD" for arflag in env["ARFLAGS"]]
+    )
 
     # Disable running ranlib, since we added 's' above
-    env['RANLIBCOM'] = ''
-    env['RANLIBCOMSTR'] = 'Skipping ranlib for thin archive $TARGET'
+    env["RANLIBCOM"] = ""
+    env["RANLIBCOMSTR"] = "Skipping ranlib for thin archive $TARGET"
 
-    for builder in ['StaticLibrary', 'SharedArchive']:
-        _add_emitter(env['BUILDERS'][builder])
+    for builder in ["StaticLibrary", "SharedArchive"]:
+        _add_emitter(env["BUILDERS"][builder])
 
-    for builder in ['SharedLibrary', 'LoadableModule', 'Program']:
-        _add_scanner(env['BUILDERS'][builder])
+    for builder in ["SharedLibrary", "LoadableModule", "Program"]:
+        _add_scanner(env["BUILDERS"][builder])

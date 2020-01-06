@@ -99,7 +99,7 @@ env.CppUnitTest(
         'file_manager_test.cpp',
         'file_writer_test.cpp',
         'ftdc_test.cpp',
-        'util_test.cpp',
+        'ftdc_util_test.cpp',
         'varint_test.cpp',
     ],
     LIBDEPS=[
