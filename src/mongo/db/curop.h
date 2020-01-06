@@ -202,7 +202,7 @@ public:
     bool fromMultiPlanner{false};
 
     // True if a replan was triggered during the execution of this operation.
-    bool replanned{false};
+    std::optional<std::string> replanReason;
 
     bool upsert{false};  // true if the update actually did an insert
     bool cursorExhausted{
