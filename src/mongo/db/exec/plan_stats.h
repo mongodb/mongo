@@ -214,7 +214,7 @@ struct AndSortedStats : public SpecificStats {
 };
 
 struct CachedPlanStats : public SpecificStats {
-    CachedPlanStats() : replanned(false) {}
+    CachedPlanStats() = default;
 
     SpecificStats* clone() const final {
         return new CachedPlanStats(*this);
@@ -224,7 +224,7 @@ struct CachedPlanStats : public SpecificStats {
         return sizeof(*this);
     }
 
-    bool replanned;
+    boost::optional<std::string> replanReason;
 };
 
 struct CollectionScanStats : public SpecificStats {

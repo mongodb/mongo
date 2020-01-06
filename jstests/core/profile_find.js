@@ -115,8 +115,11 @@
     assert.neq(coll.findOne({a: 15, b: 10}), null);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
-    assert.eq(profileObj.replanned, true, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.replanned, true);
+    assert(profileObj.hasOwnProperty('replanReason'));
+    assert(profileObj.replanReason.match(
+        /cached plan was less efficient than expected: expected trial execution to take [0-9]+ works but it took at least [0-9]+ works/));
+    assert.eq(profileObj.appName, "MongoDB Shell");
 
     //
     // Confirm that query modifiers such as "hint" are in the profiler document.

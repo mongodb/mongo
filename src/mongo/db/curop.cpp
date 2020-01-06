@@ -492,7 +492,11 @@ string OpDebug::report(Client* client,
     OPDEBUG_TOSTRING_HELP(docsExamined);
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
-    OPDEBUG_TOSTRING_HELP_BOOL(replanned);
+    if (replanReason) {
+        bool replanned = true;
+        OPDEBUG_TOSTRING_HELP_BOOL(replanned);
+        s << " replanReason:\"" << escape(redact(*replanReason)) << "\"";
+    }
     OPDEBUG_TOSTRING_HELP(nMatched);
     OPDEBUG_TOSTRING_HELP(nModified);
     OPDEBUG_TOSTRING_HELP(ninserted);
@@ -582,7 +586,11 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_NUMBER(docsExamined);
     OPDEBUG_APPEND_BOOL(hasSortStage);
     OPDEBUG_APPEND_BOOL(fromMultiPlanner);
-    OPDEBUG_APPEND_BOOL(replanned);
+    if (replanReason) {
+        bool replanned = true;
+        OPDEBUG_APPEND_BOOL(replanned);
+        b.append("replanReason", *replanReason);
+    }
     OPDEBUG_APPEND_NUMBER(nMatched);
     OPDEBUG_APPEND_NUMBER(nModified);
     OPDEBUG_APPEND_NUMBER(ninserted);
@@ -640,7 +648,7 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     docsExamined = planSummaryStats.totalDocsExamined;
     hasSortStage = planSummaryStats.hasSortStage;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
-    replanned = planSummaryStats.replanned;
+    replanReason = planSummaryStats.replanReason;
 }
 
 }  // namespace mongo

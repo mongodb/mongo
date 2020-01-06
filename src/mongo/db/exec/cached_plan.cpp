@@ -147,7 +147,10 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                    << " status: " << redact(statusObj);
 
             const bool shouldCache = false;
-            return replan(yieldPolicy, shouldCache);
+            return replan(yieldPolicy,
+                          shouldCache,
+                          str::stream() << "cached plan returned: "
+                                        << WorkingSetCommon::toStatusString(statusObj));
         } else if (PlanStage::DEAD == state) {
             BSONObj statusObj;
             invariant(WorkingSet::INVALID_ID != id);
@@ -173,7 +176,15 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
            << " plan summary before replan: " << Explain::getPlanSummary(child().get());
 
     const bool shouldCache = true;
-    return replan(yieldPolicy, shouldCache);
+    return replan(
+        yieldPolicy,
+        shouldCache,
+        str::stream()
+            << "cached plan was less efficient than expected: expected trial execution to take "
+            << _decisionWorks
+            << " works but it took at least "
+            << maxWorksBeforeReplan
+            << " works");
 }
 
 Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
@@ -194,13 +205,13 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     return Status::OK();
 }
 
-Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
+Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, std::string reason) {
     // We're going to start over with a new plan. Clear out info from our old plan.
     _results.clear();
     _ws->clear();
     _children.clear();
 
-    _specificStats.replanned = true;
+    _specificStats.replanReason = std::move(reason);
 
     // Use the query planning module to plan the whole query.
     std::vector<QuerySolution*> rawSolutions;

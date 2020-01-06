@@ -896,7 +896,7 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
             const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
             const CachedPlanStats* cachedStats =
                 static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
-            statsOut->replanned = cachedStats->replanned;
+            statsOut->replanReason = cachedStats->replanReason;
         } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
             statsOut->fromMultiPlanner = true;
         }

@@ -102,7 +102,7 @@ public:
     bool fromMultiPlanner{false};
 
     // True if a replan was triggered during the execution of this operation.
-    bool replanned{false};
+    boost::optional<std::string> replanReason;
 
     long long nMatched{-1};   // number of records that match the query
     long long nModified{-1};  // number of records written (no no-ops)
