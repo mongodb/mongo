@@ -332,6 +332,7 @@ error_codes:
     - {code: 296,name: TopologySetNameRequired}
     - {code: 297,name: HierarchicalAcquisitionLevelViolation}
     - {code: 298,name: InvalidServerType}
+    - {code: 299,name: OCSPCertificateStatusRevoked}
 
     # Error codes 4000-8999 are reserved.
 
