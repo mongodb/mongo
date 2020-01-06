@@ -102,26 +102,14 @@ if __name__ == "__main__":
 """
 
 RoleInfo = namedtuple(
-    'RoleInfo',
-    [
-        'alias_name',
-        'alias',
-        'components',
-        'roles',
-        'actions',
-        'dependencies'
-    ],
+    "RoleInfo",
+    ["alias_name", "alias", "components", "roles", "actions", "dependencies"],
 )
 
-SuffixMap = namedtuple(
-    'SuffixMap',
-    [
-        'directory',
-        'default_roles',
-    ],
-)
+SuffixMap = namedtuple("SuffixMap", ["directory", "default_roles",],)
 
-class DeclaredRole():
+
+class DeclaredRole:
     def __init__(self, name, dependencies=None, transitive=False, silent=False):
         self.name = name
 
@@ -133,18 +121,18 @@ class DeclaredRole():
         self.transitive = transitive
         self.silent = silent
 
+
 def declare_role(env, **kwargs):
     """Construct a new role declaration"""
     return DeclaredRole(**kwargs)
+
 
 def declare_roles(env, roles, base_role=None, meta_role=None):
     """Given a list of role declarations, validate them and store them in the environment"""
 
     role_names = [role.name for role in roles]
     if len(role_names) != len(set(role_names)):
-        raise Exception(
-            "Cannot declare duplicate roles"
-        )
+        raise Exception("Cannot declare duplicate roles")
 
     # Ensure that all roles named in dependency lists actually were
     # passed in as a role.
@@ -193,9 +181,7 @@ def declare_roles(env, roles, base_role=None, meta_role=None):
 
     silents = [role for role in roles if role.silent]
     if len(silents) > 1:
-        raise Exception(
-            "No more than one role can be declared as silent"
-        )
+        raise Exception("No more than one role can be declared as silent")
 
     # If a base role was given, then add it as a dependency of every
     # role that isn't the base role (which would be circular).
@@ -205,7 +191,7 @@ def declare_roles(env, roles, base_role=None, meta_role=None):
                 role.dependencies.add(base_role)
 
     # Become a dictionary, so we can look up roles easily.
-    roles = { role.name : role for role in roles }
+    roles = {role.name: role for role in roles}
 
     # If a meta role was given, then add every role which isn't the
     # meta role as one of its dependencies.
@@ -228,6 +214,7 @@ def generate_alias(env, component, role, target="install"):
         role="" if env[ROLE_DECLARATIONS][role].silent else "-" + role,
     )
 
+
 def get_alias_map_entry(env, component, role):
     c_entry = env[ALIAS_MAP][component]
     try:
@@ -240,28 +227,23 @@ def get_alias_map_entry(env, component, role):
             components=set(),
             roles=set(),
             actions=[],
-            dependencies=[]
+            dependencies=[],
         )
         c_entry[role] = r_entry
         return r_entry
 
+
 def get_package_name(env, component, role):
     """Return the package file name for the component and role combination."""
     basename = env[PACKAGE_ALIAS_MAP].get(
-        (component, role),
-        "{component}-{role}".format(component=component, role=role)
+        (component, role), "{component}-{role}".format(component=component, role=role)
     )
 
     return basename
 
 
 def get_dependent_actions(
-        env,
-        components,
-        roles,
-        non_transitive_roles,
-        node,
-        cb=None,
+    env, components, roles, non_transitive_roles, node, cb=None,
 ):
     """
     Check if node is a transitive dependency of components and roles
@@ -285,16 +267,13 @@ def get_dependent_actions(
     # If they are overlapping then that means we can't transition to a
     # new role during scanning.
     if env[BASE_ROLE] not in roles:
-        can_transfer = (
-            non_transitive_roles
-            and roles.isdisjoint(non_transitive_roles)
-        )
+        can_transfer = non_transitive_roles and roles.isdisjoint(non_transitive_roles)
     else:
         can_transfer = True
 
     node_roles = {
-        role for role
-        in getattr(node.attributes, ROLES, set())
+        role
+        for role in getattr(node.attributes, ROLES, set())
         if role != env[META_ROLE]
     }
     if (
@@ -308,14 +287,7 @@ def get_dependent_actions(
         return []
 
     if cb is not None and callable(cb):
-        return cb(
-            components,
-            roles,
-            non_transitive_roles,
-            node,
-            node_roles,
-            actions,
-        )
+        return cb(components, roles, non_transitive_roles, node, node_roles, actions,)
     return actions
 
 
@@ -325,17 +297,19 @@ def scan_for_transitive_install(node, env, cb=None):
     install_sources = node.sources
     # Filter out all
     components = {
-        component for component
-        in getattr(node.sources[0].attributes, COMPONENTS, set())
+        component
+        for component in getattr(node.sources[0].attributes, COMPONENTS, set())
         if component != "all"
     }
     roles = {
-        role for role
-        in getattr(node.sources[0].attributes, ROLES, set())
+        role
+        for role in getattr(node.sources[0].attributes, ROLES, set())
         if role != env[META_ROLE]
     }
 
-    non_transitive_roles = {role for role in roles if env[ROLE_DECLARATIONS][role].transitive}
+    non_transitive_roles = {
+        role for role in roles if env[ROLE_DECLARATIONS][role].transitive
+    }
     for install_source in install_sources:
         install_executor = install_source.get_executor()
         if not install_executor:
@@ -348,12 +322,7 @@ def scan_for_transitive_install(node, env, cb=None):
             for grandchild in grandchildren:
                 results.extend(
                     get_dependent_actions(
-                        env,
-                        components,
-                        roles,
-                        non_transitive_roles,
-                        grandchild,
-                        cb=cb,
+                        env, components, roles, non_transitive_roles, grandchild, cb=cb,
                     )
                 )
 
@@ -388,9 +357,12 @@ def collect_transitive_files(env, source, installed, cache=None):
             children_to_collect.append(child)
 
         if children_to_collect:
-            files.extend(collect_transitive_files(env, children_to_collect, installed, cache))
+            files.extend(
+                collect_transitive_files(env, children_to_collect, installed, cache)
+            )
 
     return files
+
 
 def archive_builder(source, target, env, for_signature):
     """Build archives of the AutoInstall'd sources."""
@@ -419,7 +391,7 @@ def archive_builder(source, target, env, for_signature):
     # In python slicing a string with [:-0] gives an empty string. So
     # make sure we have a prefix to slice off before trying it.
     if prefix_elems:
-        common_ancestor = dest_dir_elems[:-len(prefix_elems)]
+        common_ancestor = dest_dir_elems[: -len(prefix_elems)]
     else:
         common_ancestor = dest_dir_elems
 
@@ -443,7 +415,7 @@ def archive_builder(source, target, env, for_signature):
     # set of known installed files along to the transitive dependency
     # walk so we can filter out files that aren't in the install
     # directory.
-    installed = env.get('__AIB_INSTALLED_SET', set())
+    installed = env.get("__AIB_INSTALLED_SET", set())
     transitive_files = collect_transitive_files(env, aliases, installed)
     paths = {file.get_abspath() for file in transitive_files}
 
@@ -455,10 +427,9 @@ def archive_builder(source, target, env, for_signature):
 
     # TODO: relpath is costly, and we do it for every file in the archive here. We should
     # find a way to avoid the repeated relpath invocation, probably by bucketing by directory.
-    relative_files = " ".join([
-        escape_func(os.path.relpath(path, common_ancestor))
-        for path in paths
-    ])
+    relative_files = " ".join(
+        [escape_func(os.path.relpath(path, common_ancestor)) for path in paths]
+    )
 
     return " ".join([command_prefix, relative_files])
 
@@ -477,14 +448,8 @@ def auto_install(env, target, source, **kwargs):
         roles = roles.union(set(kwargs[ROLES]))
 
     component = kwargs.get(PRIMARY_COMPONENT)
-    if (
-            component is not None
-            and (not isinstance(component, str)
-                 or " " in component)
-    ):
-        raise Exception(
-            "AIB_COMPONENT must be a string and contain no whitespace."
-        )
+    if component is not None and (not isinstance(component, str) or " " in component):
+        raise Exception("AIB_COMPONENT must be a string and contain no whitespace.")
 
     components = {
         component,
@@ -517,15 +482,12 @@ def auto_install(env, target, source, **kwargs):
         # TODO: Find a way to not need this early subst.
         target = env.Dir(env.subst(target, source=source))
 
-        action = env.Install(
-            target=target,
-            source=s,
-        )
+        action = env.Install(target=target, source=s,)
 
         setattr(
             s.attributes,
             INSTALL_ACTIONS,
-            action if isinstance(action, (list, set)) else [action]
+            action if isinstance(action, (list, set)) else [action],
         )
         actions.append(action)
 
@@ -567,8 +529,7 @@ def finalize_install_dependencies(env):
     # TODO: $BUILD_ROOT should be $VARIANT_DIR after we fix our dir
     # setup later on.
     make_archive_script = env.Textfile(
-        target="$BUILD_ROOT/aib_make_archive.py",
-        source=[AIB_MAKE_ARCHIVE_CONTENT],
+        target="$BUILD_ROOT/aib_make_archive.py", source=[AIB_MAKE_ARCHIVE_CONTENT],
     )
 
     for component, rolemap in env[ALIAS_MAP].items():
@@ -623,7 +584,7 @@ def auto_install_emitter(target, source, env):
         # way available to us.
         #
         # We're working with upstream to expose this information.
-        if 'conftest' in str(entry):
+        if "conftest" in str(entry):
             continue
 
         auto_install_mapping = env[SUFFIX_MAP].get(suffix)
@@ -670,19 +631,20 @@ def add_package_name_alias(env, component, role, name):
     """Add a package name mapping for the combination of component and role."""
     # Verify we didn't get a None or empty string for any argument
     if not name:
-        raise Exception("when setting a package name alias must provide a name parameter")
+        raise Exception(
+            "when setting a package name alias must provide a name parameter"
+        )
     if not component:
         raise Exception("No component provided for package name alias")
     if not role:
         raise Exception("No role provided for package name alias")
     env[PACKAGE_ALIAS_MAP][(component, role)] = name
 
+
 def suffix_mapping(env, directory=False, default_roles=False):
     """Generate a SuffixMap object from source and target."""
-    return SuffixMap(
-        directory=directory,
-        default_roles=default_roles,
-    )
+    return SuffixMap(directory=directory, default_roles=default_roles,)
+
 
 def dest_dir_generator(initial_value=None):
     """Memoized dest_dir_generator"""
@@ -696,7 +658,7 @@ def dest_dir_generator(initial_value=None):
         # absolute path here because if it is the sub Dir call will
         # not expand correctly.
         prefix = env.subst("$PREFIX")
-        if prefix and prefix[0] == '/':
+        if prefix and prefix[0] == "/":
             prefix = prefix[1:]
 
         if dd[1] is not None and dd[0] == prefix:
@@ -751,7 +713,7 @@ def generate(env):  # pylint: disable=too-many-statements
     bld = SCons.Builder.Builder(
         action=SCons.Action.CommandGeneratorAction(
             archive_builder,
-           {"cmdstr": "Building package ${TARGETS[0]} from ${SOURCES[1:]}"},
+            {"cmdstr": "Building package ${TARGETS[0]} from ${SOURCES[1:]}"},
         )
     )
     env.Append(BUILDERS={"__AibArchive": bld})
@@ -763,7 +725,7 @@ def generate(env):  # pylint: disable=too-many-statements
     env["DESTDIR"] = dest_dir_generator(env.get("DESTDIR", None))
     env["PREFIX_BINDIR"] = env.get("PREFIX_BINDIR", "$DESTDIR/bin")
     env["PREFIX_LIBDIR"] = env.get("PREFIX_LIBDIR", "$DESTDIR/lib")
-    env["PREFIX_SHAREDIR"]  = env.get("PREFIX_SHAREDIR", "$DESTDIR/share")
+    env["PREFIX_SHAREDIR"] = env.get("PREFIX_SHAREDIR", "$DESTDIR/share")
     env["PREFIX_DOCDIR"] = env.get("PREFIX_DOCDIR", "$PREFIX_SHAREDIR/doc")
     env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$DESTDIR/include")
     env["PREFIX_DEBUGDIR"] = env.get("PREFIX_DEBUGDIR", _aib_debugdir)
@@ -793,10 +755,7 @@ def generate(env):  # pylint: disable=too-many-statements
         base_emitter = builder.emitter
         # TODO: investigate if using a ListEmitter here can cause
         # problems if AIB is not loaded last
-        new_emitter = SCons.Builder.ListEmitter([
-            base_emitter,
-            auto_install_emitter,
-        ])
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, auto_install_emitter,])
         builder.emitter = new_emitter
 
     base_install_builder = install.BaseInstallBuilder
