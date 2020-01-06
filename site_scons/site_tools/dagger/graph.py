@@ -6,7 +6,6 @@ import copy
 
 from . import graph_consts
 
-
 class Graph(object):
     """Graph class for storing the build dependency graph. The graph stores the
     directed edges as a nested dict of { RelationshipType: {From_Node: Set of
@@ -19,8 +18,8 @@ class Graph(object):
         A graph can be initialized with a .json file, graph object, or with no args
         """
         if isinstance(input, str):
-            if input.endswith(".json"):
-                with open(input, "r") as f:
+            if input.endswith('.json'):
+                with open(input, 'r') as f:
                     data = json.load(f, encoding="ascii")
                 nodes = {}
                 should_fail = False
@@ -28,9 +27,8 @@ class Graph(object):
                 for node in data["nodes"]:
                     id = str(node["id"])
                     try:
-                        nodes[id] = node_factory(
-                            id, int(node["node"]["type"]), dict_source=node["node"]
-                        )
+                        nodes[id] = node_factory(id, int(node["node"]["type"]),
+                                                 dict_source=node["node"])
                     except Exception as e:
                         logging.warning("Malformed Data: " + id)
                         should_fail = True
@@ -118,9 +116,7 @@ class Graph(object):
         if from_node not in self._edges[relationship]:
             self._edges[relationship][from_node] = set()
 
-        if any(
-            item is None for item in (from_node, to_node, from_node_obj, to_node_obj)
-        ):
+        if any(item is None for item in (from_node, to_node, from_node_obj, to_node_obj)):
             raise ValueError
 
         self._edges[relationship][from_node].add(to_node)
@@ -154,28 +150,21 @@ class Graph(object):
             edges_dict = self._edges[edge_type]
             for node in list(edges_dict.keys()):
                 to_nodes = list(self._edges[edge_type][node])
-                to_nodes_dicts = [
-                    {"index": node_index[to_node], "id": to_node}
-                    for to_node in to_nodes
-                ]
+                to_nodes_dicts = [{"index": node_index[to_node], "id": to_node}
+                                  for to_node in to_nodes]
 
-                data["edges"].append(
-                    {
-                        "type": edge_type,
-                        "from_node": {"id": node, "index": node_index[node]},
-                        "to_node": to_nodes_dicts,
-                    }
-                )
+                data["edges"].append({"type": edge_type,
+                                      "from_node": {"id": node,
+                                                    "index": node_index[node]},
+                                      "to_node": to_nodes_dicts})
 
-        with open(filename, "w", encoding="ascii") as outfile:
+        with open(filename, 'w', encoding="ascii") as outfile:
             json.dump(data, outfile, indent=4)
 
     def __str__(self):
-        return ("<Number of Nodes : {0}, Number of Edges : {1}, " "Hash: {2}>").format(
-            len(list(self._nodes.keys())),
-            sum(len(x) for x in list(self._edges.values())),
-            hash(self),
-        )
+        return ("<Number of Nodes : {0}, Number of Edges : {1}, "
+                "Hash: {2}>").format(len(list(self._nodes.keys())),
+                sum(len(x) for x in list(self._edges.values())), hash(self))
 
 
 class NodeInterface(object, metaclass=abc.ABCMeta):
@@ -194,7 +183,6 @@ class NodeInterface(object, metaclass=abc.ABCMeta):
 class NodeLib(NodeInterface):
     """NodeLib class which represents a library within the graph
     """
-
     def __init__(self, id, name, input=None):
         if isinstance(input, dict):
             should_fail = False
@@ -295,13 +283,10 @@ class NodeLib(NodeInterface):
 
     def __eq__(self, other):
         if isinstance(other, NodeLib):
-            return (
-                self._id == other._id
-                and self._defined_symbols == other._defined_symbols
-                and self._defined_files == other._defined_files
-                and self._dependent_libs == other._dependent_libs
-                and self._dependent_files == other._dependent_files
-            )
+            return (self._id == other._id and self._defined_symbols == other._defined_symbols
+                    and self._defined_files == other._defined_files
+                    and self._dependent_libs == other._dependent_libs
+                    and self._dependent_files == other._dependent_files)
 
         else:
             return False
@@ -424,13 +409,10 @@ class NodeSymbol(NodeInterface):
 
     def __eq__(self, other):
         if isinstance(other, NodeSymbol):
-            return (
-                self.id == other.id
-                and self._libs == other._libs
-                and self._files == other._files
-                and self._dependent_libs == other._dependent_libs
-                and self._dependent_files == other._dependent_files
-            )
+            return (self.id == other.id and self._libs == other._libs
+                    and self._files == other._files
+                    and self._dependent_libs == other._dependent_libs
+                    and self._dependent_files == other._dependent_files)
         else:
             return False
 
@@ -545,13 +527,10 @@ class NodeFile(NodeInterface):
 
     def __eq__(self, other):
         if isinstance(other, NodeSymbol):
-            return (
-                self.id == other.id
-                and self._lib == other._lib
-                and self._dependent_libs == other._dependent_libs
-                and self._dependent_files == other._dependent_files
-                and self._defined_symbols == other._defined_symbols
-            )
+            return (self.id == other.id and self._lib == other._lib
+                    and self._dependent_libs == other._dependent_libs
+                    and self._dependent_files == other._dependent_files
+                    and self._defined_symbols == other._defined_symbols)
 
         else:
             return False

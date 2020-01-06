@@ -32,20 +32,18 @@ def idlc_emitter(target, source, env):
     first_source = str(source[0])
 
     if not first_source.endswith(".idl"):
-        raise ValueError(
-            "Bad idl file name '%s', it must end with '.idl' " % (first_source)
-        )
+        raise ValueError("Bad idl file name '%s', it must end with '.idl' " % (first_source))
 
     base_file_name, _ = SCons.Util.splitext(str(target[0]))
     target_source = base_file_name + "_gen.cpp"
     target_header = base_file_name + "_gen.h"
 
-    env.Alias("generated-sources", [target_source, target_header])
+    env.Alias('generated-sources', [target_source, target_header])
 
     return [target_source, target_header], source
 
 
-IDLCAction = SCons.Action.Action("$IDLCCOM", "$IDLCCOMSTR")
+IDLCAction = SCons.Action.Action('$IDLCCOM', '$IDLCCOMSTR')
 
 
 def idl_scanner(node, env, path):
@@ -55,30 +53,24 @@ def idl_scanner(node, env, path):
 
     nodes_deps_list = IDL_GLOBAL_DEPS[:]
 
-    with open(str(node), encoding="utf-8") as file_stream:
-        parsed_doc = idlc.parser.parse(
-            file_stream, str(node), idlc.CompilerImportResolver(["src"])
-        )
+    with open(str(node), encoding='utf-8') as file_stream:
+        parsed_doc = idlc.parser.parse(file_stream, str(node),
+                                       idlc.CompilerImportResolver(['src']))
 
     if not parsed_doc.errors and parsed_doc.spec.imports is not None:
-        nodes_deps_list.extend(
-            [env.File(d) for d in sorted(parsed_doc.spec.imports.dependencies)]
-        )
+        nodes_deps_list.extend([
+            env.File(d) for d in sorted(parsed_doc.spec.imports.dependencies)
+        ])
 
     setattr(node.attributes, "IDL_NODE_DEPS", nodes_deps_list)
     return nodes_deps_list
 
 
-idl_scanner = SCons.Scanner.Scanner(function=idl_scanner, skeys=[".idl"])
+idl_scanner = SCons.Scanner.Scanner(function=idl_scanner, skeys=['.idl'])
 
 # TODO: create a scanner for imports when imports are implemented
-IDLCBuilder = SCons.Builder.Builder(
-    action=IDLCAction,
-    emitter=idlc_emitter,
-    srcsuffx=".idl",
-    suffix=".cpp",
-    source_scanner=idl_scanner,
-)
+IDLCBuilder = SCons.Builder.Builder(action=IDLCAction, emitter=idlc_emitter, srcsuffx=".idl",
+                                    suffix=".cpp", source_scanner=idl_scanner)
 
 
 def generate(env):
@@ -86,27 +78,22 @@ def generate(env):
 
     env.Append(SCANNERS=idl_scanner)
 
-    env["BUILDERS"]["Idlc"] = bld
+    env['BUILDERS']['Idlc'] = bld
 
     sys.path.append(env.Dir("#buildscripts").get_abspath())
     import buildscripts.idl.idl.compiler as idlc_mod
-
     global idlc
     idlc = idlc_mod
 
-    env["IDLC"] = sys.executable + " buildscripts/idl/idlc.py"
-    env["IDLCFLAGS"] = ""
-    base_dir = env.subst("$BUILD_ROOT/$VARIANT_DIR").replace("#", "")
-    env["IDLCCOM"] = (
-        "$IDLC --include src --base_dir %s --target_arch $TARGET_ARCH --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES "
-        % (base_dir)
-    )
-    env["IDLCSUFFIX"] = ".idl"
+    env['IDLC'] = sys.executable + " buildscripts/idl/idlc.py"
+    env['IDLCFLAGS'] = ''
+    base_dir = env.subst('$BUILD_ROOT/$VARIANT_DIR').replace("#", "")
+    env['IDLCCOM'] = '$IDLC --include src --base_dir %s --target_arch $TARGET_ARCH --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES ' % (
+        base_dir)
+    env['IDLCSUFFIX'] = '.idl'
 
-    IDL_GLOBAL_DEPS = env.Glob("#buildscripts/idl/*.py") + env.Glob(
-        "#buildscripts/idl/idl/*.py"
-    )
-    env["IDL_HAS_INLINE_DEPENDENCIES"] = True
+    IDL_GLOBAL_DEPS = env.Glob('#buildscripts/idl/*.py') + env.Glob('#buildscripts/idl/idl/*.py')
+    env['IDL_HAS_INLINE_DEPENDENCIES'] = True
 
 
 def exists(env):
