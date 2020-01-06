@@ -1,5 +1,6 @@
 /**
  * Test that stepdown during collection cloning and oplog fetching does not interrupt initial sync.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
@@ -33,6 +34,8 @@ function setupTest({
     nssSuffix: nssSuffix = '',
     secondaryStartupParams: secondaryStartupParams = {}
 }) {
+    assert.commandWorked(primary.adminCommand({clearLog: "global"}));
+
     jsTestLog("Writing data to collection.");
     assert.commandWorked(primaryColl.insert([{_id: 1}, {_id: 2}]));
 
@@ -126,10 +129,10 @@ runStepDownTest({
 });
 
 // Restart secondary with "oplogFetcherInitialSyncMaxFetcherRestarts"
-// set to zero to avoid masking the oplog fetcher error and enable fail point
-// "waitAfterPinningCursorBeforeGetMoreBatch" which drops and reacquires read lock
-// to prevent deadlock between getmore and insert thread for ephemeral storage
-// engine.
+// set to zero to avoid masking the oplog fetcher error and an increased oplog fetcher network
+// timeout to avoid spurious failures. Enable fail point "waitAfterPinningCursorBeforeGetMoreBatch"
+// which drops and reacquires read lock to prevent deadlock between getmore and insert thread for
+// ephemeral storage engine.
 jsTestLog("Testing stepdown during oplog fetching");
 const oplogNss = "local.oplog.rs";
 setupTest({
@@ -138,6 +141,7 @@ setupTest({
     secondaryStartupParams: {
         initialSyncOplogFetcherBatchSize: 1,
         oplogFetcherInitialSyncMaxFetcherRestarts: 0,
+        oplogNetworkTimeoutBufferSeconds: ReplSetTest.kDefaultTimeoutMS / 1000,
         "failpoint.initialSyncHangAfterDataCloning": tojson({mode: 'alwaysOn'})
     }
 });

@@ -56,10 +56,6 @@ Counter64 readersCreatedStats;
 ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
                                                          &readersCreatedStats);
 
-// Number of milliseconds to add to the `find` and `getMore` timeouts to calculate the network
-// timeout for the requests.
-const Milliseconds kNetworkTimeoutBufferMS{5000};
-
 // Default `maxTimeMS` timeout for `getMore`s.
 const Milliseconds kDefaultOplogGetMoreMaxMS{5000};
 
@@ -93,6 +89,10 @@ Milliseconds AbstractOplogFetcher::_getRetriedFindMaxTime() const {
 
 Milliseconds AbstractOplogFetcher::_getGetMoreMaxTime() const {
     return kDefaultOplogGetMoreMaxMS;
+}
+
+Milliseconds AbstractOplogFetcher::_getNetworkTimeoutBuffer() const {
+    return Milliseconds(oplogNetworkTimeoutBufferSeconds.load() * 1000);
 }
 
 std::string AbstractOplogFetcher::toString() const {
@@ -322,8 +322,8 @@ std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findC
                Fetcher::NextAction*,
                BSONObjBuilder* builder) { return _callback(resp, builder); },
         metadataObj,
-        findMaxTime + kNetworkTimeoutBufferMS,
-        _getGetMoreMaxTime() + kNetworkTimeoutBufferMS);
+        findMaxTime + _getNetworkTimeoutBuffer(),
+        _getGetMoreMaxTime() + _getNetworkTimeoutBuffer());
 }
 
 }  // namespace repl
