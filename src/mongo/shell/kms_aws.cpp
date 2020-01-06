@@ -309,7 +309,7 @@ void AWSConnection::connect(const HostAndPort& host) {
 
     int attempt = 0;
     bool connected = false;
-    while ((connected == false) && (attempt < 3)) {
+    while ((connected == false) && (attempt < 20)) {
         connected = _socket->connect(server);
         attempt++;
     }
