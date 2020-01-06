@@ -831,6 +831,10 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         s << " protocol:" << getProtoString(networkOp);
     }
 
+    if (remoteOpWaitTime) {
+        s << " remoteOpWaitMillis:" << durationCount<Milliseconds>(*remoteOpWaitTime);
+    }
+
     s << " " << (executionTimeMicros / 1000) << "ms";
 
     return s.str();
@@ -996,6 +1000,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("protocol", getProtoString(networkOp));
     }
 
+    if (remoteOpWaitTime) {
+        pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
+    }
+
     pAttrs->add("durationMillis", (executionTimeMicros / 1000));
 }
 
@@ -1113,6 +1121,11 @@ void OpDebug::append(OperationContext* opCtx,
     if (iscommand) {
         b.append("protocol", getProtoString(networkOp));
     }
+
+    if (remoteOpWaitTime) {
+        b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
+    }
+
     b.appendIntOrLL("millis", executionTimeMicros / 1000);
 
     if (!curop.getPlanSummary().empty()) {

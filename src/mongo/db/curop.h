@@ -247,6 +247,9 @@ public:
     boost::optional<float> dataThroughputLastSecond;
     boost::optional<float> dataThroughputAverage;
 
+    // Used to track the amount of time spent waiting for a response from remote operations.
+    boost::optional<Microseconds> remoteOpWaitTime;
+
     // Stores additive metrics.
     AdditiveMetrics additiveMetrics;
 
@@ -480,6 +483,9 @@ public:
     bool isDone() const {
         return _end > 0;
     }
+    bool isPaused() {
+        return _lastPauseTime != 0;
+    }
 
     /**
      * Stops the operation latency timer from "ticking". Time spent paused is not included in the
@@ -504,6 +510,58 @@ public:
         _totalPausedDuration +=
             Microseconds{static_cast<long long>(curTimeMicros64()) - _lastPauseTime};
         _lastPauseTime = 0;
+    }
+
+    /**
+     * Ensures that remoteOpWait will be recorded in the OpDebug.
+     *
+     * This method is separate from startRemoteOpWait because operation types that do record
+     * remoteOpWait, such as a getMore of a sharded aggregation, should always include the
+     * remoteOpWait field even if its value is zero. An operation should call
+     * enableRecordRemoteOpWait() to declare that it wants to report remoteOpWait, and call
+     * startRemoteOpWaitTimer()/stopRemoteOpWaitTimer() to measure the time.
+     *
+     * This timer uses the same clock source as elapsedTimeTotal().
+     */
+    void enableRecordRemoteOpWait() {
+        if (!_debug.remoteOpWaitTime) {
+            _debug.remoteOpWaitTime.emplace(0);
+        }
+    }
+
+    /**
+     * Starts the remoteOpWait timer.
+     *
+     * Does nothing if enableRecordRemoteOpWait() was not called.
+     */
+    void startRemoteOpWaitTimer() {
+        invariant(isStarted());
+        invariant(!isDone());
+        invariant(!isPaused());
+        invariant(!_remoteOpStartTime);
+        if (_debug.remoteOpWaitTime) {
+            _remoteOpStartTime.emplace(elapsedTimeTotal());
+        }
+    }
+
+    /**
+     * Stops the remoteOpWait timer.
+     *
+     * Does nothing if enableRecordRemoteOpWait() was not called.
+     */
+    void stopRemoteOpWaitTimer() {
+        invariant(isStarted());
+        invariant(!isDone());
+        invariant(!isPaused());
+        if (_debug.remoteOpWaitTime) {
+            Microseconds end = elapsedTimeTotal();
+            invariant(_remoteOpStartTime);
+            invariant(*_remoteOpStartTime <= end);
+            Microseconds delta = end - *_remoteOpStartTime;
+            *_debug.remoteOpWaitTime += delta;
+            _remoteOpStartTime = boost::none;
+        }
+        invariant(!_remoteOpStartTime);
     }
 
     /**
@@ -687,6 +745,10 @@ private:
 
     // The cumulative duration for which the timer has been paused.
     Microseconds _totalPausedDuration{0};
+
+    // The elapsedTimeTotal() value at which the remoteOpWait timer was started, or empty if the
+    // remoteOpWait timer is not currently running.
+    boost::optional<Microseconds> _remoteOpStartTime;
 
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_MSG, etc.
     NetworkOp _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced

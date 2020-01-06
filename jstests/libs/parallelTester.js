@@ -178,6 +178,7 @@ if (typeof _threadInject != "undefined") {
             "getlog2.js",
             "logprocessdetails.js",
             "queryoptimizera.js",
+            "log_remote_op_wait.js",
 
             "connections_opened.js",  // counts connections, globally
             "opcounters_write_cmd.js",

@@ -34,6 +34,7 @@
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
@@ -117,6 +118,9 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 
             auto uniqueOpCtx = client->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
+            auto curOp = CurOp::get(opCtx);
+            curOp->ensureStarted();
+            ON_BLOCK_EXIT([&] { curOp->done(); });
 
             try {
                 long long numShardedCollsWithInconsistentIndexes = 0;

@@ -92,3 +92,7 @@ structs:
                 type: bool
                 default: false
                 description: If set, error responses are ignored.
+            recordRemoteOpWaitTime:
+                type: bool
+                default: false
+                description: If set, records the total time spent waiting for remote operations to complete.
