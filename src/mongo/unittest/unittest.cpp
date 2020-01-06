@@ -67,8 +67,9 @@ logger::MessageLogDomain* unittestOutput() {
     return p;
 }
 
+/** Each map key is owned by its corresponding Suite object. */
 auto& suitesMap() {
-    static std::map<std::string, std::shared_ptr<Suite>> m;
+    static std::map<StringData, std::shared_ptr<Suite>> m;
     return m;
 }
 
@@ -370,7 +371,7 @@ int Suite::run(const std::vector<std::string>& suites,
 
     if (torun.empty()) {
         for (const auto& kv : suitesMap()) {
-            torun.push_back(kv.first);
+            torun.push_back(std::string{kv.first});
         }
     }
 
@@ -433,13 +434,13 @@ int Suite::run(const std::vector<std::string>& suites,
     return rc;
 }
 
-Suite& Suite::getSuite(const std::string& name) {
+Suite& Suite::getSuite(StringData name) {
     auto& map = suitesMap();
     if (auto found = map.find(name); found != map.end()) {
         return *found->second;
     }
-    auto sp = std::make_shared<Suite>(ConstructorEnable{}, name);
-    auto [it, noCollision] = map.try_emplace(name, sp->shared_from_this());
+    auto sp = std::make_shared<Suite>(ConstructorEnable{}, std::string{name});
+    auto [it, noCollision] = map.try_emplace(sp->key(), sp->shared_from_this());
     fassert(10162, noCollision);
     return *sp;
 }
@@ -496,7 +497,7 @@ std::ostream& TestAssertionFailure::stream() {
 std::vector<std::string> getAllSuiteNames() {
     std::vector<std::string> result;
     for (const auto& kv : suitesMap()) {
-        result.push_back(kv.first);
+        result.push_back(std::string{kv.first});
     }
     return result;
 }

@@ -382,9 +382,14 @@ public:
      *
      * Safe to call during static initialization.
      */
-    static Suite& getSuite(const std::string& name);
+    static Suite& getSuite(StringData name);
 
 private:
+    /** Points to the string data of the _name field. */
+    StringData key() const {
+        return _name;
+    }
+
     std::string _name;
     std::vector<SuiteTest> _tests;
 };
@@ -510,29 +515,33 @@ protected:
     template <typename T>
     class RegistrationAgent {
     public:
-        RegistrationAgent(std::string suiteName, std::string testName, std::string fileName)
-            : _suiteName(std::move(suiteName)),
-              _testName(std::move(testName)),
-              _fileName(std::move(fileName)) {
-            Suite::getSuite(_suiteName).add(_testName, _fileName, [] { T{}.run(); });
+        /**
+         * These StringData must point to data that outlives this RegistrationAgent.
+         * In the case of TEST/TEST_F, these are string literals.
+         */
+        RegistrationAgent(StringData suiteName, StringData testName, StringData fileName)
+            : _suiteName{suiteName}, _testName{testName}, _fileName{fileName} {
+            Suite::getSuite(_suiteName).add(std::string{_testName}, std::string{_fileName}, [] {
+                T{}.run();
+            });
         }
 
-        const std::string& getSuiteName() const {
+        StringData getSuiteName() const {
             return _suiteName;
         }
 
-        const std::string& getTestName() const {
+        StringData getTestName() const {
             return _testName;
         }
 
-        const std::string& getFileName() const {
+        StringData getFileName() const {
             return _fileName;
         }
 
     private:
-        std::string _suiteName;
-        std::string _testName;
-        std::string _fileName;
+        StringData _suiteName;
+        StringData _testName;
+        StringData _fileName;
     };
 
     /**
