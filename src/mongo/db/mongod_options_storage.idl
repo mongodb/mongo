@@ -37,6 +37,17 @@ global:
         initializer:
             register: addMongodStorageOptions
 
+server_parameters:
+  recoverToOplogTimestamp:
+    description: >-
+        When --queryableBackupMode is supplied on startup along with this server parameter, the
+        server will perform replication recovery up to and including the provided timestamp. The
+        parameter should be passed in as a JSON string with the following format:
+        {timestamp: Timestamp(123, 456)}.
+    set_at: [ startup ]
+    cpp_vartype: std::string
+    cpp_varname: recoverToOplogTimestamp
+
 configs:
     'storage.engine':
         description: 'What storage engine to use - defaults to wiredTiger if no data files present'

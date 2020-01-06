@@ -40,6 +40,8 @@
 #include <limits>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
@@ -55,6 +57,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
@@ -79,6 +82,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -767,7 +771,37 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     if (!isReplEnabled()) {
         if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Cannot set parameter 'recoverToOplogTimestamp' "
+                                  << "when recovering from the oplog as a standalone",
+                    recoverToOplogTimestamp.empty());
             _replicationProcess->getReplicationRecovery()->recoverFromOplogAsStandalone(opCtx);
+        }
+
+        if (storageGlobalParams.readOnly && !recoverToOplogTimestamp.empty()) {
+            BSONObj recoverToTimestampObj = fromjson(recoverToOplogTimestamp);
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "'recoverToOplogTimestamp' needs to have a 'timestamp' field",
+                    recoverToTimestampObj.hasField("timestamp"));
+
+            Timestamp recoverToTimestamp = recoverToTimestampObj.getField("timestamp").timestamp();
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "'recoverToOplogTimestamp' needs to be a valid timestamp",
+                    !recoverToTimestamp.isNull());
+
+            StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(opCtx);
+            uassert(ErrorCodes::InvalidReplicaSetConfig,
+                    str::stream()
+                        << "No replica set config document was found, 'recoverToOplogTimestamp' "
+                        << "must be used with a node that was previously part of a replica set",
+                    cfg.isOK());
+
+            // Need to perform replication recovery up to and including the given timestamp.
+            // Temporarily turn off read-only mode for this procedure as we'll have to do writes.
+            storageGlobalParams.readOnly = false;
+            ON_BLOCK_EXIT([&] { storageGlobalParams.readOnly = true; });
+            _replicationProcess->getReplicationRecovery()->recoverFromOplogUpTo(opCtx,
+                                                                                recoverToTimestamp);
         }
 
         stdx::lock_guard<Latch> lk(_mutex);

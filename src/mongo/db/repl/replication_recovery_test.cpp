@@ -48,6 +48,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -1261,6 +1262,108 @@ TEST_F(ReplicationRecoveryTest,
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5, 6, 7, 8, 9, 10});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    // Recovers operations with timestamps: 3, 4, 5.
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
+    _assertDocsInTestCollection(opCtx, {3, 4, 5});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+
+    // Recovers operations with timestamps: 6, 7, 8, 9.
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
+    _assertDocsInTestCollection(opCtx, {3, 4, 5, 6, 7, 8, 9});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(9, 9), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToEndOfOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5, 6, 7, 8, 9, 10});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    // Recovers all operations
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(10, 10));
+    _assertDocsInTestCollection(opCtx, {3, 4, 5, 6, 7, 8, 9, 10});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(10, 10), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToInvalidEndPoint) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    ASSERT_THROWS_CODE(
+        recovery.recoverFromOplogUpTo(opCtx, Timestamp(1, 1)), DBException, ErrorCodes::BadValue);
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(2, 2));
+
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(2, 2), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(0, 0), 1));
+
+    startCapturingLogMessages();
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(1, countLogLinesContaining("No stored oplog entries to apply for recovery."));
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(0, 0), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToFailsWithInitialSyncFlag) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setInitialSyncFlag(opCtx);
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    ASSERT_THROWS_CODE(recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5)),
+                       DBException,
+                       ErrorCodes::InitialSyncActive);
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogUpToWithoutStableCheckpoint,
+             "Fatal Assertion 31399") {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogUpToInvalidTimestamp,
+             "Fatal Assertion 31400") {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp::max());
+}
+
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoverFromOplogAsStandaloneFailsWithoutStableCheckpoint,
              "Fatal Assertion 31229") {
@@ -1282,6 +1385,18 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     _setUpOplog(opCtx, getStorageInterface(), {5});
 
     recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoverFromOplogUpToFailsWithNullStableCheckpoint,
+             "Fatal Assertion 50806") {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(0, 0));
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp::max());
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneRecoversOplog) {

@@ -139,6 +139,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl.h"
@@ -527,6 +528,26 @@ ExitCode _initAndListen(int listenPort) {
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
     BackupCursorHooks::initialize(serviceContext, storageEngine);
+
+    // Perform replication recovery for queryable backup mode if needed.
+    if (storageGlobalParams.readOnly) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Cannot specify both queryableBackupMode and "
+                              << "recoverFromOplogAsStandalone at the same time",
+                !replSettings.shouldRecoverFromOplogAsStandalone());
+        uassert(
+            ErrorCodes::BadValue,
+            str::stream()
+                << "Cannot take an unstable checkpoint on shutdown while using queryableBackupMode",
+            !gTakeUnstableCheckpointOnShutdown);
+
+        auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
+        invariant(replCoord);
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Cannot use queryableBackupMode in a replica set",
+                !replCoord->isReplEnabled());
+        replCoord->startup(startupOpCtx.get());
+    }
 
     if (!storageGlobalParams.readOnly) {
 
