@@ -173,7 +173,7 @@ public:
     bool fromMultiPlanner{false};
 
     // True if a replan was triggered during the execution of this operation.
-    bool replanned{false};
+    boost::optional<std::string> replanReason;
 
     bool fastmodinsert{false};  // upsert of an $operation. builds a default object
     bool upsert{false};         // true if the update actually did an insert
