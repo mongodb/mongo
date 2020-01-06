@@ -3,10 +3,18 @@
  * oplog entry whose documentKey omits the shard key.
  * TODO SERVER-44598: the oplog entry will no longer omit the shard key when SERVER-44598 is fixed,
  * and so this test will no longer be relevant.
- * @tags: [uses_change_streams]
+ * @tags: [uses_change_streams, requires_majority_read_concern]
  */
 (function() {
     "use strict";
+
+    load(
+        "jstests/multiVersion/libs/causal_consistency_helpers.js");  // supportsMajorityReadConcern.
+
+    if (!supportsMajorityReadConcern()) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        return;
+    }
 
     // The UUID consistency check can hit NotMasterNoSlaveOk when it attempts to obtain a list of
     // collections from the shard Primaries through mongoS at the end of this test.
