@@ -369,6 +369,36 @@ def expand_libdeps_tags(source, target, env, for_signature):
     return results
 
 
+def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
+    result = []
+    libs = get_libdeps(source, target, env, for_signature)
+    whole_archive_start = env.subst("$LINK_WHOLE_ARCHIVE_LIB_START")
+    whole_archive_end = env.subst("$LINK_WHOLE_ARCHIVE_LIB_END")
+    whole_archive_separator = env.get("LINK_WHOLE_ARCHIVE_SEP", " ")
+    for lib in libs:
+        if isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
+            lib_target = str(lib)
+        else:
+            lib_target = env.subst("$TARGET", target=lib)
+
+        if "init-no-global-side-effects" in env.Entry(lib).get_env().get(
+            "LIBDEPS_TAGS", []
+        ):
+            result.append(lib_target)
+        else:
+            whole_archive_flag = "{}{}{}".format(
+                whole_archive_start, whole_archive_separator, lib_target
+            )
+            if whole_archive_end:
+                whole_archive_flag += "{}{}".format(
+                    whole_archive_separator, whole_archive_end
+                )
+
+            result.extend(whole_archive_flag.split())
+
+    return result
+
+
 def setup_environment(env, emitting_shared=False):
     """Set up the given build environment to do LIBDEPS tracking."""
 
@@ -411,25 +441,6 @@ def setup_environment(env, emitting_shared=False):
         ),
         PROGEMITTER=make_indirect_emitter("LIBDEPS_PROGEMITTER"),
     )
-
-    def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
-        result = []
-        libs = get_libdeps(source, target, env, for_signature)
-        for lib in libs:
-            if "init-no-global-side-effects" in env.Entry(lib).get_env().get(
-                "LIBDEPS_TAGS", []
-            ):
-                result.append(str(lib))
-            else:
-                result.extend(
-                    env.subst(
-                        "$LINK_WHOLE_ARCHIVE_LIB_START"
-                        "$TARGET"
-                        "$LINK_WHOLE_ARCHIVE_LIB_END",
-                        target=lib,
-                    ).split()
-                )
-        return result
 
     env["_LIBDEPS_LIBS_WITH_TAGS"] = expand_libdeps_with_extraction_flags
 
