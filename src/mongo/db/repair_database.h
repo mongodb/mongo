@@ -60,10 +60,14 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 /**
  * Rebuilds the indexes provided by the 'indexSpecs' on the given collection.
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
+ * When 'repair' is set to kYes, this function will delete corrupt records when found, rather than
+ * crashing.
  */
+enum class RepairData { kYes, kNo };
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
                                   Collection* collection,
-                                  const std::vector<BSONObj>& indexSpecs);
+                                  const std::vector<BSONObj>& indexSpecs,
+                                  RepairData repair);
 
 /**
  * Repairs a database using a storage engine-specific, best-effort process.

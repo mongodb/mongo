@@ -109,7 +109,8 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
                                   Collection* collection,
-                                  const std::vector<BSONObj>& indexSpecs) {
+                                  const std::vector<BSONObj>& indexSpecs,
+                                  RepairData repair) {
     // Skip the rest if there are no indexes to rebuild.
     if (indexSpecs.empty())
         return Status::OK();
@@ -117,8 +118,8 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     // Rebuild the indexes provided by 'indexSpecs'.
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     UUID buildUUID = UUID::gen();
-    auto swRebuild =
-        indexBuildsCoord->rebuildIndexesForRecovery(opCtx, collection->ns(), indexSpecs, buildUUID);
+    auto swRebuild = indexBuildsCoord->rebuildIndexesForRecovery(
+        opCtx, collection->ns(), indexSpecs, buildUUID, repair);
     if (!swRebuild.isOK()) {
         return swRebuild.getStatus();
     }
@@ -161,7 +162,7 @@ Status repairCollections(OperationContext* opCtx,
             return swIndexNameObjs.getStatus();
 
         std::vector<BSONObj> indexSpecs = swIndexNameObjs.getValue().second;
-        Status status = rebuildIndexesOnCollection(opCtx, collection, indexSpecs);
+        Status status = rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kYes);
         if (!status.isOK())
             return status;
 

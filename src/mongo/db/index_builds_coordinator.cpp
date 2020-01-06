@@ -306,7 +306,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<BSONObj>& specs,
-    const UUID& buildUUID) {
+    const UUID& buildUUID,
+    RepairData repair) {
 
     const auto protocol = IndexBuildProtocol::kSinglePhase;
     auto status = _startIndexBuildForRecovery(opCtx, nss, specs, buildUUID, protocol);
@@ -318,7 +319,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
     Collection* collection = collectionCatalog.lookupCollectionByNamespace(opCtx, nss);
 
     // Complete the index build.
-    return _runIndexRebuildForRecovery(opCtx, collection, buildUUID);
+    return _runIndexRebuildForRecovery(opCtx, collection, buildUUID, repair);
 }
 
 Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opCtx,
@@ -1756,7 +1757,10 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexRebuildForRecovery(
-    OperationContext* opCtx, Collection* collection, const UUID& buildUUID) noexcept {
+    OperationContext* opCtx,
+    Collection* collection,
+    const UUID& buildUUID,
+    RepairData repair) noexcept {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     auto replState = invariant(_getIndexBuild(buildUUID));
@@ -1777,8 +1781,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     try {
         log() << "Index builds manager starting: " << buildUUID << ": " << nss;
 
-        std::tie(numRecords, dataSize) = uassertStatusOK(
-            _indexBuildsManager.startBuildingIndexForRecovery(opCtx, collection->ns(), buildUUID));
+        std::tie(numRecords, dataSize) =
+            uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
+                opCtx, collection->ns(), buildUUID, repair));
 
         uassertStatusOK(
             _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
