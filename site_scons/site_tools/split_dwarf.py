@@ -14,24 +14,24 @@
 
 import SCons
 
-_splitDwarfFlag = "-gsplit-dwarf"
+_splitDwarfFlag = '-gsplit-dwarf'
 
 # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
 # we could obtain this from SCons.
-_CSuffixes = [".c"]
-if not SCons.Util.case_sensitive_suffixes(".c", ".C"):
-    _CSuffixes.append(".C")
+_CSuffixes = ['.c']
+if not SCons.Util.case_sensitive_suffixes('.c', '.C'):
+    _CSuffixes.append('.C')
 
-_CXXSuffixes = [".cpp", ".cc", ".cxx", ".c++", ".C++"]
-if SCons.Util.case_sensitive_suffixes(".c", ".C"):
-    _CXXSuffixes.append(".C")
+_CXXSuffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++']
+if SCons.Util.case_sensitive_suffixes('.c', '.C'):
+    _CXXSuffixes.append('.C')
 
 
 def _dwo_emitter(target, source, env):
     new_targets = []
     for t in target:
         base, ext = SCons.Util.splitext(str(t))
-        if not any(ext == env[osuffix] for osuffix in ["OBJSUFFIX", "SHOBJSUFFIX"]):
+        if not any(ext == env[osuffix] for osuffix in ['OBJSUFFIX', 'SHOBJSUFFIX']):
             continue
         # TODO: Move 'dwo' into DWOSUFFIX so it can be customized? For
         # now, GCC doesn't let you control the output filename, so it
@@ -44,12 +44,12 @@ def _dwo_emitter(target, source, env):
 
 def generate(env):
     suffixes = []
-    if _splitDwarfFlag in env["CCFLAGS"]:
+    if _splitDwarfFlag in env['CCFLAGS']:
         suffixes = _CSuffixes + _CXXSuffixes
     else:
-        if _splitDwarfFlag in env["CFLAGS"]:
+        if _splitDwarfFlag in env['CFLAGS']:
             suffixes.extend(_CSuffixes)
-        if _splitDwarfFlag in env["CXXFLAGS"]:
+        if _splitDwarfFlag in env['CXXFLAGS']:
             suffixes.extend(_CXXSuffixes)
 
     for object_builder in SCons.Tool.createObjBuilders(env):
@@ -58,8 +58,11 @@ def generate(env):
             if not suffix in suffixes:
                 continue
             base = emitterdict[suffix]
-            emitterdict[suffix] = SCons.Builder.ListEmitter([base, _dwo_emitter,])
+            emitterdict[suffix] = SCons.Builder.ListEmitter([
+                base,
+                _dwo_emitter,
+            ])
 
 
 def exists(env):
-    return any(_splitDwarfFlag in env[f] for f in ["CCFLAGS", "CFLAGS", "CXXFLAGS"])
+    return any(_splitDwarfFlag in env[f] for f in ['CCFLAGS', 'CFLAGS', 'CXXFLAGS'])

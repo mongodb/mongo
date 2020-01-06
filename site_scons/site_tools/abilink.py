@@ -23,14 +23,14 @@ import subprocess
 
 def _detect(env):
     try:
-        abidw = env["ABIDW"]
+        abidw = env['ABIDW']
         if not abidw:
             return None
         return abidw
     except KeyError:
         pass
 
-    return env.WhereIs("abidw")
+    return env.WhereIs('abidw')
 
 
 def _add_emitter(builder):
@@ -62,16 +62,14 @@ def _add_scanner(builder):
             new_results.append(abidw if abidw else base)
         return new_results
 
-    builder.target_scanner = SCons.Scanner.Scanner(
-        function=new_scanner, path_function=path_function
-    )
+    builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner,
+                                                   path_function=path_function)
 
 
 def _add_action(builder):
     actions = builder.action
     builder.action = actions + SCons.Action.Action(
-        "$ABIDW --no-show-locs $TARGET | md5sum > ${TARGET}.abidw"
-    )
+        "$ABIDW --no-show-locs $TARGET | md5sum > ${TARGET}.abidw")
 
 
 def exists(env):
@@ -84,9 +82,9 @@ def generate(env):
     if not exists(env):
         return
 
-    builder = env["BUILDERS"]["SharedLibrary"]
+    builder = env['BUILDERS']['SharedLibrary']
     _add_emitter(builder)
     _add_action(builder)
     _add_scanner(builder)
-    _add_scanner(env["BUILDERS"]["Program"])
-    _add_scanner(env["BUILDERS"]["LoadableModule"])
+    _add_scanner(env['BUILDERS']['Program'])
+    _add_scanner(env['BUILDERS']['LoadableModule'])

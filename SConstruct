@@ -630,15 +630,11 @@ def decide_platform_tools():
 
 def variable_tools_converter(val):
     tool_list = shlex.split(val)
-    # This list is not sorted intentionally, the order of tool loading
-    # matters as some of the tools have dependencies on other tools.
     return tool_list + [
         "distsrc",
         "gziptool",
-        "idl_tool",
+        'idl_tool',
         "jsheader",
-        "mongo_test_execution",
-        "mongo_test_list",
         "mongo_benchmark",
         "mongo_integrationtest",
         "mongo_unittest",

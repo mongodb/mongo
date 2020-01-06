@@ -22,3 +22,4 @@ NODE_TYPES = list(range(1, 5))
 
 """Error/query codes"""
 NODE_NOT_FOUND = 1
+
