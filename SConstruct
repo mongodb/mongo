@@ -1660,7 +1660,8 @@ elif env.TargetOSIs('solaris'):
     env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-z,allextract '
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,-z,defaultextract'
 elif env.TargetOSIs('windows'):
-    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '/WHOLEARCHIVE:'
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '/WHOLEARCHIVE'
+    env['LINK_WHOLE_ARCHIVE_SEP'] = ':'
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 
 # ---- other build setup -----
