@@ -100,10 +100,12 @@ IsCommitted(me, logIndex) ==
 \* implies that i's log should remove entries to become a prefix of j's.
 CanRollbackOplog(i, j) ==
     /\ Len(log[i]) > 0
-    /\ Len(log[j]) > 0
-    \* The terms of the last entries of each log do not match. The term of node
-    \* j's last log entry is greater than that of node i's.
-    /\ LastTerm(log[j]) > LastTerm(log[i])
+    /\ \* The log with later term is more up-to-date
+       LastTerm(log[i]) < LastTerm(log[j])
+    /\
+       \/ Len(log[i]) > Len(log[j])
+       \/ /\ Len(log[i]) <= Len(log[j])
+          /\ LastTerm(log[i]) /= LogTerm(j, Len(log[i]))
 
 RollbackCommitted(i) ==
     \E j \in Server:
@@ -189,9 +191,10 @@ LearnCommitPointWithTermCheck(i, j) ==
     /\ LearnCommitPoint(i, j)
 
 \* ACTION
+\* Node i learns the commit point from j while tailing j's oplog
 LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
-    \* From sync source
-    /\ CanSyncFrom(i, j)
+    \* j is a potential sync source, either ahead of or equal to i's oplog
+    /\ NotBehind(j, i)
     /\ CommitPointLessThan(i, j)
     \* Never beyond last applied
     /\ LET myCommitPoint ==
