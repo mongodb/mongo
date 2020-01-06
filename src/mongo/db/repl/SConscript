@@ -909,6 +909,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/kill_sessions_local',
+        '$BUILD_DIR/mongo/db/mongod_options',
         '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
