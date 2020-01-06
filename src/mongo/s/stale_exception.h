@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -43,11 +44,8 @@ public:
     StaleConfigInfo(NamespaceString nss,
                     ChunkVersion received,
                     boost::optional<ChunkVersion> wanted,
-                    std::shared_ptr<Notification<void>> criticalSectionSignal = nullptr)
-        : _nss(std::move(nss)),
-          _received(received),
-          _wanted(wanted),
-          _criticalSectionSignal(criticalSectionSignal) {}
+                    boost::optional<ShardId> shardId,
+                    std::shared_ptr<Notification<void>> criticalSectionSignal = nullptr);
 
     const auto& getNss() const {
         return _nss;
@@ -59,6 +57,10 @@ public:
 
     const auto& getVersionWanted() const {
         return _wanted;
+    }
+
+    const auto& getShardId() const {
+        return _shardId;
     }
 
     auto getCriticalSectionSignal() const {
@@ -73,6 +75,7 @@ private:
     NamespaceString _nss;
     ChunkVersion _received;
     boost::optional<ChunkVersion> _wanted;
+    boost::optional<ShardId> _shardId;
 
     // This signal does not get serialized and therefore does not get propagated
     // to the router.

@@ -190,6 +190,12 @@ public:
                 oss.setMigrationCriticalSectionSignal(sce->getCriticalSectionSignal());
             }
 
+            if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+                invariant(sce->getShardId());
+            }
+
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh

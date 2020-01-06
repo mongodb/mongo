@@ -381,28 +381,29 @@ void CatalogCache::setOperationShouldSkipCatalogCacheRefresh(OperationContext* o
 };
 
 void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
-                                     ChunkVersion targetCollectionVersion) const {
+                                     ChunkVersion targetCollectionVersion,
+                                     const ShardId& shardId) const {
     stdx::lock_guard<Latch> lg(_mutex);
     const auto itDb = _collectionsByDb.find(nss.db());
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
             str::stream() << "could not act as router for " << nss.ns()
                           << ", no entry for database " << nss.db(),
             itDb != _collectionsByDb.end());
 
     auto itColl = itDb->second.find(nss.ns());
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
             str::stream() << "could not act as router for " << nss.ns()
                           << ", no entry for collection.",
             itColl != itDb->second.end());
 
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
             str::stream() << "could not act as router for " << nss.ns() << ", wanted "
                           << targetCollectionVersion.toString()
                           << ", but found the collection was unsharded",
             itColl->second->routingInfo);
 
     auto foundVersion = itColl->second->routingInfo->getVersion();
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, foundVersion),
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, foundVersion, shardId),
             str::stream() << "could not act as router for " << nss.ns() << ", wanted "
                           << targetCollectionVersion.toString() << ", but found "
                           << foundVersion.toString(),

@@ -1632,6 +1632,12 @@ bool runMapReduce(OperationContext* opCtx,
             return false;
         }
     } catch (StaleConfigException& e) {
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            invariant(e.extraInfo<StaleConfigInfo>()->getShardId());
+        }
+
         log() << "mr detected stale config, should retry" << redact(e);
         throw;
     }

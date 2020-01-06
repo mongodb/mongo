@@ -85,7 +85,9 @@ void MongoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
     const NamespaceString& nss,
     ChunkVersion targetCollectionVersion) const {
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
-    return catalogCache->checkEpochOrThrow(nss, targetCollectionVersion);
+    auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
+
+    return catalogCache->checkEpochOrThrow(nss, targetCollectionVersion, shardId);
 }
 
 std::pair<std::vector<FieldPath>, bool>
