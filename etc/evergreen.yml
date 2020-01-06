@@ -3484,7 +3484,6 @@ functions:
       optional: true
 
   "save unstripped dbtest":
-  - *detect_failed_dbtest
   - *archive_dbtest
   - *archive_dbtest_debug
 
@@ -3921,7 +3920,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-all-meta
+        targets: install-all
         compiling_for_test: true
         task_compile_flags: >-
           --detect-odr-violations
@@ -3964,7 +3963,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-unittests install-unittests-debug
+        targets: install-unittests
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
@@ -7550,6 +7549,7 @@ tasks:
   depends_on:
   - name: package
   commands:
+    - func: "git get project"
     - func: "fetch packages"
     - func: "set up remote credentials"
       vars:
@@ -8320,9 +8320,6 @@ task_groups:
   name: compile_TG
   tasks:
   - compile
-- <<: *compile_task_group_template
-  name: compile_packages_TG
-  tasks:
   - package
 - <<: *compile_task_group_template
   name: compile_core_tools_TG
@@ -8364,6 +8361,7 @@ task_groups:
   - unittests
   - dbtest
   - compile_all
+  - package
 
 - name: clang_tidy_TG
   setup_group_can_fail_task: true
@@ -8618,7 +8616,6 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -8673,7 +8670,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .watchdog
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -8736,7 +8732,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .stitch
   - name: .ssl
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -8785,7 +8780,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - ubuntu1604-test
@@ -8833,7 +8827,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -8863,7 +8856,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -8918,7 +8910,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -8949,7 +8940,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: ssl_gen
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -9007,7 +8997,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .sharding .txns
   - name: snmp
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -9059,7 +9048,6 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -9110,7 +9098,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -9166,7 +9153,6 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -9221,7 +9207,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -9240,45 +9225,6 @@ buildvariants:
 ###########################################
 #         Windows buildvariants           #
 ###########################################
-
-- name: enterprise-windows-required
-  display_name: "! Enterprise Windows"
-  batchtime: 60 # 1 hour
-  modules:
-    - enterprise
-  run_on:
-    - windows-64-vs2017-test
-  expansions: &enterprise_windows_expansions
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
-    msi_target: msi
-    burn_in_tests_build_variant: enterprise-windows
-    exe: ".exe"
-    mh_target: archive-mh archive-mh-debug
-    content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python37/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    target_resmoke_time: 20
-    large_distro_name: windows-64-vs2017-compile
-  tasks:
-    - name: compile_TG
-      distros:
-        - windows-64-vs2017-compile
-    - name: burn_in_tests_gen
-    - name: buildscripts_test
-    - name: unittest_shell_hang_analyzer_gen
-    - name: server_discovery_and_monitoring_json_test_TG
-    - name: dbtest_TG
-      distros:
-        - windows-64-vs2017-compile
-    - name: noPassthrough_gen
 
 - name: windows-debug
   display_name: "* Windows DEBUG"
@@ -9356,6 +9302,7 @@ buildvariants:
   expansions:
     exe: ".exe"
     msi_target: msi
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
     mh_target: archive-mh archive-mh-debug
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
@@ -9411,7 +9358,6 @@ buildvariants:
   - name: sharding_ese_gen
   - name: snmp
   - name: unittest_shell_hang_analyzer_gen
-  - name: compile_packages_TG
   - name: push
     distros:
     - rhel70-small
@@ -9571,7 +9517,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer
-  - name: compile_packages_TG
   - name: push
     distros:
     - rhel70-small
@@ -9649,7 +9594,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: push
     distros:
     - rhel70-small
@@ -9707,7 +9651,6 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: compile_packages_TG
   - name: push
     distros:
     - rhel70-small
@@ -9872,7 +9815,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -10323,7 +10265,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -10381,7 +10322,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -10541,7 +10481,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -10591,7 +10530,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -10643,7 +10581,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -10717,7 +10654,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - rhel70
@@ -10775,7 +10711,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - rhel70
@@ -10827,7 +10762,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - rhel62-large
@@ -10854,7 +10788,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: ssl_gen
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - rhel70
@@ -10881,7 +10814,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: ssl_gen
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - rhel62-large
@@ -10934,7 +10866,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .watchdog
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -11042,7 +10973,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -11099,7 +11029,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - suse12-test
@@ -11131,7 +11060,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: ssl_gen
-  - name: compile_packages_TG
   - name: .publish
     distros:
     - suse12-test
@@ -11180,7 +11108,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
 
 - name: enterprise-suse15-64
@@ -11219,7 +11146,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
 
 - name: suse15
@@ -11265,7 +11191,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: .publish
 
 ###########################################
@@ -11314,7 +11239,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -11367,7 +11291,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -11415,7 +11338,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -11468,7 +11390,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: compile_packages_TG
   - name: test_packages
     distros:
     - ubuntu1604-packer

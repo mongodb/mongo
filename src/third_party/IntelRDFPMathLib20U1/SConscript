@@ -406,6 +406,17 @@ readtest_wrapper = env.Substfile(
     SUBST_DICT=readtest_dict,
 )
 env.Depends(readtest_wrapper, readtest_input)
+if get_option("install-mode") == "hygienic":
+    readtest_wrapper_install = env.AutoInstall(
+        target="$PREFIX_BINDIR",
+        source=readtest_wrapper,
+        AIB_ROLE="runtime",
+        AIB_COMPONENT="intel-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+        ],
+    )
 
 if env.TargetOSIs('windows'):
     readtest_wrapper_bat = env.Substfile(
@@ -426,23 +437,13 @@ if env.TargetOSIs('windows'):
                 "tests",
             ],
         )
-        env.RegisterUnitTest(readtest_wrapper_bat_install[0])
+        env.RegisterTest("$UNITTEST_LIST", readtest_wrapper_bat_install[0])
     else:
         env.RegisterUnitTest(readtest_wrapper_bat[0])
 else:
 
     if get_option("install-mode") == "hygienic":
-        readtest_wrapper_install = env.AutoInstall(
-            target="$PREFIX_BINDIR",
-            source=readtest_wrapper,
-            AIB_ROLE="runtime",
-            AIB_COMPONENT="intel-test",
-            AIB_COMPONENTS_EXTRA=[
-                "unittests",
-                "tests",
-            ],
-        )
-        env.RegisterUnitTest(readtest_wrapper_install[0])
+        env.RegisterTest("$UNITTEST_LIST", readtest_wrapper_install[0])
     else:
         env.RegisterUnitTest(readtest_wrapper[0])
 

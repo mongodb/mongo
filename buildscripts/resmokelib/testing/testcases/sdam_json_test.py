@@ -13,10 +13,7 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
     """Server Discovery and Monitoring JSON test case."""
 
     REGISTERED_NAME = "sdam_json_test"
-    if config.INSTALL_DIR is not None:
-        EXECUTABLE_BUILD_PATH = os.path.join(config.INSTALL_DIR, "sdam_json_test")
-    else:
-        EXECUTABLE_BUILD_PATH = "build/**/mongo/client/sdam/sdam_json_test"
+    EXECUTABLE_BUILD_PATH = "build/**/mongo/client/sdam/sdam_json_test"
     TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests")
 
     def __init__(self, logger, json_test_file, program_options=None):
@@ -28,6 +25,14 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
     def _find_executable(self):
+        if config.INSTALL_DIR is not None:
+            binary = os.path.join(config.INSTALL_DIR, "sdam_json_test")
+            if os.name == "nt":
+                binary += ".exe"
+
+            if os.path.isfile(binary):
+                return binary
+
         execs = globstar.glob(self.EXECUTABLE_BUILD_PATH + '.exe')
         if not execs:
             execs = globstar.glob(self.EXECUTABLE_BUILD_PATH)

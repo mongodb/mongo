@@ -87,7 +87,7 @@ yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 if get_option('link-model') != 'dynamic-sdk':
     mongocEmbeddedTestEnv = create_mongoc_env(yamlEnv)
-    clientTest = mongocEmbeddedTestEnv.Program(
+    clientTest = mongocEmbeddedTestEnv.CppUnitTest(
         target='mongoc_embedded_test',
         source=[
             'mongoc_embedded_test.cpp',
@@ -100,13 +100,9 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
             'mongoc_embedded',
         ],
+        UNITTEST_HAS_CUSTOM_MAINLINE=True,
         AIB_COMPONENT='embedded-test',
-        AIB_COMPONENTS_EXTRA=[
-            'tests',
-        ],
     )
-
-    env.RegisterUnitTest(clientTest[0]);
 
 # Frameworkization craziness begins here. Honestly, we should do this
 # better in the future in some re-usable way, but we need to get this

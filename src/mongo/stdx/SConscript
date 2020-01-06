@@ -35,17 +35,19 @@ env.CppUnitTest(
     ],
 )
 
-# Not a CppUnitTest because it needs low-level control of thread creation and signals,
-# so it shouldn't use unittest_main and typical mongo startup routines.
-env.RegisterUnitTest(env.Program(
+# Specify UNITTEST_HAS_CUSTOM_MAINLINE because it needs low-level control of
+# thread creation and signals, so it shouldn't use unittest_main and typical
+# mongo startup routines.
+env.CppUnitTest(
     target='sigaltstack_location_test',
     source=[
         'sigaltstack_location_test.cpp',
     ],
     LIBDEPS=[
         'stdx',
-    ]
-)[0])
+    ],
+    UNITTEST_HAS_CUSTOM_MAINLINE=True,
+)
 
 # The tests for `stdx::set_terminate` need to run outside of the mongo unittest harneses.
 # The tests require altering the global `set_terminate` handler, which our unittest framework
@@ -56,45 +58,49 @@ env.RegisterUnitTest(env.Program(
 # robust testing of this mechanism.
 
 # Needs to be a different test -- It has to have direct control over the `main()` entry point.
-env.RegisterUnitTest(env.Program(
+env.CppUnitTest(
     target='set_terminate_dispatch_test',
     source=[
         'set_terminate_dispatch_test.cpp',
     ],
     LIBDEPS=[
         'stdx',
-    ]
-)[0])
+    ],
+    UNITTEST_HAS_CUSTOM_MAINLINE=True,
+)
 
 # Needs to be a different test -- It has to have direct control over the `main()` entry point.
-env.RegisterUnitTest(env.Program(
+env.CppUnitTest(
     target='set_terminate_from_main_die_in_thread_test',
     source=[
         'set_terminate_from_main_die_in_thread_test.cpp',
     ],
     LIBDEPS=[
         'stdx',
-    ]
-)[0])
+    ],
+    UNITTEST_HAS_CUSTOM_MAINLINE=True,
+)
 
 # Needs to be a different test -- It has to have direct control over the `main()` entry point.
-env.RegisterUnitTest(env.Program(
+env.CppUnitTest(
     target='set_terminate_from_thread_die_in_main_test',
     source=[
         'set_terminate_from_thread_die_in_main_test.cpp',
     ],
     LIBDEPS=[
         'stdx',
-    ]
-)[0])
+    ],
+    UNITTEST_HAS_CUSTOM_MAINLINE=True,
+)
 
 # Needs to be a different test -- It has to have direct control over the `main()` entry point.
-env.RegisterUnitTest(env.Program(
+env.CppUnitTest(
     target='set_terminate_from_thread_die_in_thread_test',
     source=[
         'set_terminate_from_thread_die_in_thread_test.cpp',
     ],
     LIBDEPS=[
         'stdx',
-    ]
-)[0])
+    ],
+    UNITTEST_HAS_CUSTOM_MAINLINE=True,
+)

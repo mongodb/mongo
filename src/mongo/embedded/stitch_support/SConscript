@@ -59,7 +59,7 @@ if get_option('install-mode') == 'hygienic':
 
 if get_option('link-model') != 'dynamic-sdk':
     stitchSupportTestEnv = env.Clone()
-    unitTest = stitchSupportTestEnv.Program(
+    unitTest = stitchSupportTestEnv.CppUnitTest(
         target="stitch_support_test",
         source=[
             "stitch_support_test.cpp",
@@ -68,11 +68,6 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/unittest/unittest',
             'stitch_support',
         ],
+        UNITTEST_HAS_CUSTOM_MAINLINE=True,
         AIB_COMPONENT='stitch-support-test',
-        AIB_COMPONENTS_EXTRA=[
-            'tests',
-            'unittests',
-        ],
     )
-
-    env.RegisterUnitTest(unitTest[0]);

@@ -36,7 +36,6 @@ sdam_json_test = env.Program(
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/util/options_parser/options_parser'],
 )[0]
-env.RegisterUnitTest(sdam_json_test)
 
 env.Library(
     target='sdam_test',

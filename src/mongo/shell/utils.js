@@ -259,7 +259,7 @@ jsTestName = function() {
     return "__unknown_name__";
 };
 
-var _jsTestOptions = {enableTestCommands: true};  // Test commands should be enabled by default
+var _jsTestOptions = {};
 
 jsTestOptions = function() {
     if (TestData) {
@@ -364,10 +364,6 @@ jsTestOptions = function() {
     return _jsTestOptions;
 };
 
-setJsTestOption = function(name, value) {
-    _jsTestOptions[name] = value;
-};
-
 jsTestLog = function(msg) {
     if (typeof msg === "object") {
         msg = tojson(msg);
@@ -381,7 +377,6 @@ jsTest = {};
 
 jsTest.name = jsTestName;
 jsTest.options = jsTestOptions;
-jsTest.setOption = setJsTestOption;
 jsTest.log = jsTestLog;
 jsTest.readOnlyUserRoles = ["read"];
 jsTest.basicUserRoles = ["dbOwner"];

@@ -228,7 +228,7 @@ wtbin = wtbinEnv.Program(
     # however, we must link with snappy, etc. as C++. The smart_link() function isn't used by
     # default on Windows, so we leave the value unchanged on other platforms.
     LINK="$CXX" if wtbinEnv["LINK"] == "$SMARTLINK" else wtbinEnv["LINK"],
-    AIB_COMPONENT="tools",
+    AIB_COMPONENT="dist-test",
 )
 
 hygienic = get_option('install-mode') == 'hygienic'

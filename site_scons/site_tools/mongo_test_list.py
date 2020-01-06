@@ -21,14 +21,14 @@ TEST_REGISTRY = defaultdict(list)
 
 def register_test(env, file, test):
     """Register test into the dictionary of tests for file_name"""
-    test_path = test.path
-    if getattr(test.attributes, "AIB_INSTALL_ACTIONS", []):
-        test_path = getattr(test.attributes, "AIB_INSTALL_ACTIONS")[0].path
+    test_path = test
+    if env.get("AUTO_INSTALL_ENABLED", False) and env.GetAutoInstalledFiles(test):
+        test_path = env.GetAutoInstalledFiles(test)[0]
 
     if SCons.Util.is_String(file):
         file = env.File(file)
 
-    env.Depends(file, test)
+    env.Depends(file, test_path)
     file_name = file.path
     TEST_REGISTRY[file_name].append(test_path)
     env.GenerateTestExecutionAliases(test)
@@ -41,7 +41,7 @@ def test_list_builder_action(env, target, source):
     else:
         filename = target[0].path
 
-    source = [env.subst(s) if SCons.Util.is_String(s) else s.path for s in source]
+    source = [env.File(s).path if SCons.Util.is_String(s) else s.path for s in source]
 
     with open(filename, "w") as ofile:
         tests = TEST_REGISTRY[filename]

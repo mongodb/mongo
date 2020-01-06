@@ -20,6 +20,7 @@ env.Program(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/unittest/unittest_main'
     ],
+    AIB_COMPONENT="standalone-console-test",
 )
 
 env.CppUnitTest(

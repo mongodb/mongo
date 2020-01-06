@@ -86,7 +86,7 @@ yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 if get_option('link-model') != 'dynamic-sdk':
-    mongoEmbeddedTest = yamlEnv.Program(
+    mongoEmbeddedTest = yamlEnv.CppUnitTest(
         target='mongo_embedded_test',
         source=[
             'mongo_embedded_test.cpp',
@@ -102,13 +102,9 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
             'mongo_embedded',
         ],
+        UNITTEST_HAS_CUSTOM_MAINLINE=True,
         AIB_COMPONENT='embedded-test',
-        AIB_COMPONENTS_EXTRA=[
-            'tests',
-        ],
     )
-
-    env.RegisterUnitTest(mongoEmbeddedTest[0])
 
 # Frameworkization craziness begins here. Honestly, we should do this
 # better in the future in some re-usable way, but we need to get this

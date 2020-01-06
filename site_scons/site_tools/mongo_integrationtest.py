@@ -15,8 +15,14 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     kwargs["LIBDEPS"] = libdeps
     integration_test_components = {"tests", "integration-tests"}
 
-    if "AIB_COMPONENT" in kwargs and not kwargs["AIB_COMPONENT"].endswith("-test"):
+    primary_component = kwargs.get("AIB_COMPONENT", env.get("AIB_COMPONENT", ""))
+    if primary_component and not primary_component.endswith("-test"):
         kwargs["AIB_COMPONENT"] += "-test"
+    elif primary_component:
+        kwargs["AIB_COMPONENT"] = primary_component
+    else:
+        kwargs["AIB_COMPONENT"] = "integration-tests"
+        integration_test_components = {"tests"}
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
         kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(

@@ -484,6 +484,7 @@ mongod = env.Program(
         "dist",
         "dist-test",
         "servers",
+        "integration-tests",
     ],
 )
 
@@ -589,7 +590,8 @@ mongos = env.Program(
         "core",
         "dist",
         "dist-test",
-        "servers"
+        "servers",
+        "integration-tests",
     ]
 )
 
@@ -687,6 +689,7 @@ if not has_option('noshell') and usemozjs:
             "dist",
             "dist-test",
             "shell",
+            "integration-tests",
         ],
     )
 
@@ -787,7 +790,6 @@ if hygienic:
             distsrc.File('MPL-2'),
         ],
         AIB_COMPONENT='common',
-        AIB_COMPONENTS_EXTRA=['dist'],
         AIB_ROLE='base',
     )
 else:
@@ -866,8 +868,7 @@ else:
         source=[
             compass_installer,
         ],
-        AIB_COMPONENT='tools',
-        AIB_COMPONENTS_EXTRA=['dist'],
+        AIB_COMPONENT='dist',
         AIB_ROLE='runtime',
     )
 
