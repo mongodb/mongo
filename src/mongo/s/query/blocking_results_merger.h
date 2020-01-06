@@ -119,6 +119,7 @@ private:
         const std::function<StatusWith<stdx::cv_status>()>& waitFn) noexcept;
 
     TailableModeEnum _tailableMode;
+    bool _recordRemoteOpWaitTime;
     std::shared_ptr<executor::TaskExecutor> _executor;
 
     // In a case where we have a tailable, awaitData cursor, a call to 'next()' will block waiting

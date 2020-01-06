@@ -35,6 +35,7 @@
 
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -107,6 +108,8 @@ public:
         }
 
         setupShards(shards);
+
+        CurOp::get(operationContext())->ensureStarted();
     }
 
     boost::intrusive_ptr<ExpressionContext> getExpCtx() {

@@ -71,6 +71,8 @@ sharding_multiversion:
   test_file: jstests/sharding/explain_cmd.js
 - ticket: SERVER-43889
   test_file: jstests/sharding/retryable_writes.js
+- ticket: SERVER-31368
+  test_file: jstests/sharding/log_remote_op_wait.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-46196

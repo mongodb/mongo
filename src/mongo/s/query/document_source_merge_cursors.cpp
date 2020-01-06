@@ -50,7 +50,9 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     boost::optional<BSONObj> ownedParamsSpec)
     : DocumentSource(kStageName, expCtx),
       _armParamsObj(std::move(ownedParamsSpec)),
-      _armParams(std::move(armParams)) {}
+      _armParams(std::move(armParams)) {
+    _armParams->setRecordRemoteOpWaitTime(true);
+}
 
 std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
     if (_armParams) {
@@ -77,6 +79,7 @@ bool DocumentSourceMergeCursors::remotesExhausted() const {
 void DocumentSourceMergeCursors::populateMerger() {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
+    invariant(_armParams->getRecordRemoteOpWaitTime());
 
     _blockingResultsMerger.emplace(pExpCtx->opCtx,
                                    std::move(*_armParams),
