@@ -56,7 +56,6 @@
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/shell/shell_options.h"
-#include "mongo/util/lru_cache.h"
 
 namespace mongo {
 
