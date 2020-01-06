@@ -627,7 +627,14 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
         } else if (PlanStage::IS_EOF == code) {
-            if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail())) {
+            if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
+                    [this](const BSONObj& data) {
+                        if (data.hasField("namespace") &&
+                            _nss != NamespaceString(data.getStringField("namespace"))) {
+                            return false;
+                        }
+                        return true;
+                    }))) {
                 log() << "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
                          "enabled. Blocking until fail point is disabled.";
                 planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();

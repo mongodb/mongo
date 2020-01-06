@@ -282,10 +282,6 @@ public:
      */
     GenericCursor toGenericCursor() const;
 
-    //
-    // Timing.
-    //
-
     /**
      * Returns the amount of time execution time available to this cursor. Only valid at the
      * beginning of a getMore request, and only really for use by the maxTime tracking code.
@@ -304,6 +300,20 @@ public:
      */
     void setLeftoverMaxTimeMicros(Microseconds leftoverMaxTimeMicros) {
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
+    }
+
+    /**
+     * Returns the commit point at the time the last batch was returned.
+     */
+    boost::optional<repl::OpTime> getLastKnownCommittedOpTime() const {
+        return _lastKnownCommittedOpTime;
+    }
+
+    /**
+     * Sets the commit point at the time the last batch was returned.
+     */
+    void setLastKnownCommittedOpTime(boost::optional<repl::OpTime> lastCommittedOpTime) {
+        _lastKnownCommittedOpTime = std::move(lastCommittedOpTime);
     }
 
     /**
@@ -443,6 +453,10 @@ private:
 
     // A string with the plan summary of the cursor's query.
     std::string _planSummary;
+
+    // Commit point at the time the last batch was returned. This is only used by internal exhaust
+    // oplog fetching. Also see lastKnownCommittedOpTime in GetMoreRequest.
+    boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
 };
 
 /**
