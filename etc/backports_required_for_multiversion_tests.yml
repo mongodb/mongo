@@ -29,6 +29,8 @@ concurrency_sharded_replication_multiversion:
 replica_sets_jscore_multiversion_passthrough:
 - ticket: SERVER-35921
   test_file: jstests/core/min_max_key.js
+- ticket: SERVER-40805
+  test_file: jstests/core/profile_find.js
 
 replica_sets_multiversion:
 
