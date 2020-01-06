@@ -930,6 +930,7 @@ buildvariants:
   modules:
   - wtdevelop
   - enterprise
+  - genny # needed for genny_generate_all_tasks
   expansions:
     <<: *compile-expansions
     compile-variant: -wtdevelop
