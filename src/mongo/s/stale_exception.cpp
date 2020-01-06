@@ -33,27 +33,53 @@
 
 #include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
-
 namespace mongo {
 namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
-boost::optional<ChunkVersion> extractOptionalVersion(const BSONObj& obj, StringData field) {
+boost::optional<ChunkVersion> extractOptionalChunkVersion(const BSONObj& obj, StringData field) {
     auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);
     if (swChunkVersion == ErrorCodes::NoSuchKey)
         return boost::none;
     return uassertStatusOK(std::move(swChunkVersion));
 }
 
+boost::optional<ShardId> extractOptionalShardId(const BSONObj& obj, StringData field) {
+    const auto shardIdElem = obj[field];
+    if (shardIdElem.eoo()) {
+        return boost::none;
+    }
+
+    const auto shardId = shardIdElem.String();
+    if (shardId == "") {
+        return boost::none;
+    }
+    return ShardId(shardId);
+}
+
 }  // namespace
+
+StaleConfigInfo::StaleConfigInfo(NamespaceString nss,
+                                 ChunkVersion received,
+                                 boost::optional<ChunkVersion> wanted,
+                                 boost::optional<ShardId> shardId,
+                                 std::shared_ptr<Notification<void>> criticalSectionSignal)
+    : _nss(std::move(nss)),
+      _received(received),
+      _wanted(wanted),
+      _shardId(shardId),
+      _criticalSectionSignal(criticalSectionSignal) {}
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
     _received.appendLegacyWithField(bob, "vReceived");
     if (_wanted) {
         _wanted->appendLegacyWithField(bob, "vWanted");
+    }
+    if (_shardId) {
+        bob->append("shardId", _shardId->toString());
     }
 }
 
@@ -64,7 +90,8 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
 StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
     return StaleConfigInfo(NamespaceString(obj["ns"].String()),
                            uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
-                           extractOptionalVersion(obj, "vWanted"));
+                           extractOptionalChunkVersion(obj, "vWanted"),
+                           extractOptionalShardId(obj, "shardId"));
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {

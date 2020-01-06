@@ -38,6 +38,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 
@@ -317,6 +318,8 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
         return boost::none;
     }
 
+    auto const shardId = ShardingState::get(opCtx)->shardId();
+
     const auto& receivedShardVersion = *optReceivedShardVersion;
     if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
         return boost::none;
@@ -339,7 +342,7 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
             auto shardVersionKnown = _metadataType != MetadataType::kUnknown;
             LOG(0) << "Namespace " << _nss.ns() << " is collection, "
                    << (shardVersionKnown ? "have shardVersion cached" : "don't know shardVersion");
-            uassert(StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion),
+            uassert(StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion, shardId),
                     "don't know shardVersion",
                     shardVersionKnown);
         }
@@ -354,7 +357,8 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
 
     if (criticalSectionSignal) {
         uasserted(
-            StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion, criticalSectionSignal),
+            StaleConfigInfo(
+                _nss, receivedShardVersion, wantedShardVersion, shardId, criticalSectionSignal),
             str::stream() << "migration commit in progress for " << _nss.ns());
     }
 
@@ -367,7 +371,7 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
     // The versions themselves are returned in the error, so not needed in messages here
     //
 
-    StaleConfigInfo sci(_nss, receivedShardVersion, wantedShardVersion);
+    StaleConfigInfo sci(_nss, receivedShardVersion, wantedShardVersion, shardId);
 
     uassert(std::move(sci),
             str::stream() << "epoch mismatch detected for " << _nss.ns() << ", "
