@@ -273,3 +273,14 @@ server_parameters:
             expr: 24 * 60 * 60
         validator:
             gte: 0
+
+    oplogNetworkTimeoutBufferSeconds:
+        description: >-
+            Number of seconds to add to the `find` and `getMore` timeouts for oplog fetching to
+            calculate the network timeout for the requests.
+        set_at: [ startup ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: oplogNetworkTimeoutBufferSeconds
+        default: 5
+        validator:
+            gte: 0

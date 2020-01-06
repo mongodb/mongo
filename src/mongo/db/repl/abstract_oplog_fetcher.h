@@ -121,6 +121,12 @@ protected:
     virtual Milliseconds _getGetMoreMaxTime() const;
 
     /**
+     * Returns the amount of time to add to the `find` and `getMore` timeouts to calculate the
+     * network timeout for the requests.
+     */
+    virtual Milliseconds _getNetworkTimeoutBuffer() const;
+
+    /**
      * Returns the sync source from which this oplog fetcher is fetching.
      */
     HostAndPort _getSource() const;
