@@ -67,6 +67,8 @@ public:
      */
     using OnShutdownCallbackFn = std::function<void(const Status& shutdownStatus)>;
 
+    class OplogFetcherRestartDecision;
+
     /**
      * Invariants if validation fails on any of the provided arguments.
      */
@@ -75,6 +77,14 @@ public:
                          HostAndPort source,
                          NamespaceString nss,
                          std::size_t maxFetcherRestarts,
+                         OnShutdownCallbackFn onShutdownCallbackFn,
+                         const std::string& componentName);
+
+    AbstractOplogFetcher(executor::TaskExecutor* executor,
+                         OpTime lastFetched,
+                         HostAndPort source,
+                         NamespaceString nss,
+                         std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
                          OnShutdownCallbackFn onShutdownCallbackFn,
                          const std::string& componentName);
 
@@ -100,6 +110,38 @@ public:
      * Returns the OpTime of the last oplog entry fetched and processed.
      */
     OpTime getLastOpTimeFetched_forTest() const;
+
+    class OplogFetcherRestartDecision {
+    public:
+        OplogFetcherRestartDecision(){};
+
+        virtual ~OplogFetcherRestartDecision() = 0;
+
+        virtual bool shouldContinue(AbstractOplogFetcher* fetcher, Status status) = 0;
+
+        virtual void fetchSuccessful(AbstractOplogFetcher* fetcher) = 0;
+    };
+
+    class OplogFetcherRestartDecisionDefault : public OplogFetcherRestartDecision {
+    public:
+        OplogFetcherRestartDecisionDefault(std::size_t maxFetcherRestarts)
+            : _maxFetcherRestarts(maxFetcherRestarts){};
+
+        bool shouldContinue(AbstractOplogFetcher* fetcher, Status status) final;
+
+        void fetchSuccessful(AbstractOplogFetcher* fetcher) final;
+
+        ~OplogFetcherRestartDecisionDefault(){};
+
+    private:
+        AbstractOplogFetcher* _abstractOplogFetcher;
+
+        // Fetcher restarts since the last successful oplog query response.
+        std::size_t _fetcherRestarts = 0;
+
+        const std::size_t _maxFetcherRestarts;
+    };
+
 
 protected:
     /**
@@ -216,8 +258,7 @@ private:
     // Namespace of the oplog to read.
     const NamespaceString _nss;
 
-    // Maximum number of times to consecutively restart the Fetcher on non-cancellation errors.
-    const std::size_t _maxFetcherRestarts;
+    std::unique_ptr<OplogFetcherRestartDecision> _oplogFetcherRestartDecision;
 
     // Protects member data of this AbstractOplogFetcher.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("AbstractOplogFetcher::_mutex");
@@ -227,9 +268,6 @@ private:
 
     // Used to keep track of the last oplog entry read and processed from the sync source.
     OpTime _lastFetched;
-
-    // Fetcher restarts since the last successful oplog query response.
-    std::size_t _fetcherRestarts = 0;
 
     std::unique_ptr<Fetcher> _fetcher;
     std::unique_ptr<Fetcher> _shuttingDownFetcher;

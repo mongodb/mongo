@@ -137,6 +137,20 @@ public:
                  const int batchSize,
                  StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
 
+    OplogFetcher(executor::TaskExecutor* executor,
+                 OpTime lastFetched,
+                 HostAndPort source,
+                 NamespaceString nss,
+                 ReplSetConfig config,
+                 std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+                 int requiredRBID,
+                 bool requireFresherSyncSource,
+                 DataReplicatorExternalState* dataReplicatorExternalState,
+                 EnqueueDocumentsFn enqueueDocumentsFn,
+                 OnShutdownCallbackFn onShutdownCallbackFn,
+                 const int batchSize,
+                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
+
     virtual ~OplogFetcher();
 
     // ================== Test support API ===================

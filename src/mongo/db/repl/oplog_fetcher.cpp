@@ -326,6 +326,40 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
     invariant(enqueueDocumentsFn);
 }
 
+OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
+                           OpTime lastFetched,
+                           HostAndPort source,
+                           NamespaceString nss,
+                           ReplSetConfig config,
+                           std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+                           int requiredRBID,
+                           bool requireFresherSyncSource,
+                           DataReplicatorExternalState* dataReplicatorExternalState,
+                           EnqueueDocumentsFn enqueueDocumentsFn,
+                           OnShutdownCallbackFn onShutdownCallbackFn,
+                           const int batchSize,
+                           StartingPoint startingPoint)
+    : AbstractOplogFetcher(executor,
+                           lastFetched,
+                           source,
+                           nss,
+                           std::move(oplogFetcherRestartDecision),
+                           onShutdownCallbackFn,
+                           "oplog fetcher"),
+      _metadataObject(makeMetadataObject()),
+      _requiredRBID(requiredRBID),
+      _requireFresherSyncSource(requireFresherSyncSource),
+      _dataReplicatorExternalState(dataReplicatorExternalState),
+      _enqueueDocumentsFn(enqueueDocumentsFn),
+      _awaitDataTimeout(calculateAwaitDataTimeout(config)),
+      _batchSize(batchSize),
+      _startingPoint(startingPoint) {
+
+    invariant(config.isInitialized());
+    invariant(enqueueDocumentsFn);
+}
+
+
 OplogFetcher::~OplogFetcher() {
     shutdown();
     join();

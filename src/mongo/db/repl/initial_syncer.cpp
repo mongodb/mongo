@@ -70,6 +70,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -473,7 +474,6 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     // All updates that represent initial sync must be completed before setting the initial data
     // timestamp.
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(), initialDataTimestamp);
-
     auto currentLastAppliedOpTime = _opts.getMyLastOptime();
     if (currentLastAppliedOpTime.isNull()) {
         _opts.setMyLastOptime(lastApplied.getValue(),
@@ -1014,7 +1014,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         _syncSource,
         _opts.remoteOplogNS,
         config,
-        _opts.oplogFetcherMaxFetcherRestarts,
+        std::make_unique<OplogFetcherRestartDecisionInitialSyncer>(
+            _sharedData.get(), _opts.oplogFetcherMaxFetcherRestarts),
         _rollbackChecker->getBaseRBID(),
         false /* requireFresherSyncSource */,
         _dataReplicatorExternalState.get(),
@@ -1490,7 +1491,6 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
         stdx::lock_guard<Latch> lock(_mutex);
         auto opCtx = makeOpCtx();
         _tearDown_inlock(opCtx.get(), lastApplied);
-
         invariant(_onCompletion);
         std::swap(_onCompletion, onCompletion);
     }
@@ -1834,6 +1834,24 @@ void InitialSyncer::InitialSyncAttemptInfo::append(BSONObjBuilder* builder) cons
     builder->appendNumber("durationMillis", durationMillis);
     builder->append("status", status.toString());
     builder->append("syncSource", syncSource.toString());
+}
+
+bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(
+    AbstractOplogFetcher* fetcher, Status status) {
+    if (ErrorCodes::isNetworkError(status)) {
+        stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+        return _sharedData->shouldRetryOperation(lk, &_retryingOperation);
+    }
+    // A non-network error occured, so clear any network error and use the default restart
+    // strategy.
+    _retryingOperation = boost::none;
+    return _defaultDecision.shouldContinue(fetcher, status);
+}
+
+void InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::fetchSuccessful(
+    AbstractOplogFetcher* fetcher) {
+    _retryingOperation = boost::none;
+    _defaultDecision.fetchSuccessful(fetcher);
 }
 
 }  // namespace repl
