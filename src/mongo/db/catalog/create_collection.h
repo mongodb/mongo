@@ -50,14 +50,17 @@ Status createCollection(OperationContext* opCtx,
 
 /**
  * As above, but only used by replication to apply operations. This allows recreating collections
- * with specific UUIDs (if ui is given), and in that case will rename any existing collections with
- * the same name and a UUID to a temporary name. If ui is not given, an existing collection will
- * result in an error.
+ * with specific UUIDs (if ui is given). If ui is given and and a collection exists with the same
+ * name, the existing collection will be renamed to a temporary name if allowRenameOutOfTheWay is
+ * true. This function will invariant if there is an existing collection with the same name and
+ * allowRenameOutOfTheWay is false. If ui is not given, an existing collection will result in an
+ * error.
  */
 Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
                                    const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
+                                   const bool allowRenameOutOfTheWay,
                                    const BSONObj& idIndex = BSONObj());
 
 }  // namespace mongo
