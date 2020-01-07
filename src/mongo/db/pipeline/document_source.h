@@ -250,6 +250,11 @@ public:
      */
     GetNextResult getNext() {
         pExpCtx->checkForInterrupt();
+
+        if (MONGO_likely(!pExpCtx->explain)) {
+            return doGetNext();
+        }
+
         auto serviceCtx = pExpCtx->opCtx->getServiceContext();
         invariant(serviceCtx);
         auto fcs = serviceCtx->getFastClockSource();
