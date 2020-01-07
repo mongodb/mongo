@@ -147,19 +147,15 @@ class SConsToNinjaTranslator:
     def __init__(self, env):
         self.env = env
         self.func_handlers = {
-
             # Skip conftest builders
             "_createSource": ninja_noop,
-
             # SCons has a custom FunctionAction that just makes sure the
             # target isn't static. We let the commands that ninja runs do
             # this check for us.
             "SharedFlagChecker": ninja_noop,
-
             # The install builder is implemented as a function action.
             "installFunc": _install_action_function,
             "LibSymlinksActionFunction": _lib_symlink_action_function,
-
         }
 
         self.func_handlers.update(self.env[NINJA_CUSTOM_HANDLERS])
@@ -365,10 +361,8 @@ class NinjaState:
                 ),
             ),
             "SCONS_INVOCATION_W_TARGETS": "{} {}".format(
-                sys.executable,
-                " ".join([escape(arg) for arg in sys.argv])
+                sys.executable, " ".join([escape(arg) for arg in sys.argv])
             ),
-
             # This must be set to a global default per:
             # https://ninja-build.org/manual.html
             #
@@ -381,13 +375,11 @@ class NinjaState:
                 "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
                 "description": "Building $out",
             },
-
             # We add the deps processing variables to this below.
             "CMD_W_DEPS": {
                 "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
                 "description": "Building $out",
             },
-
             "SYMLINK": {
                 "command": (
                     "cmd /c mklink $out $in"
@@ -412,18 +404,13 @@ class NinjaState:
             "TEMPLATE": {
                 "command": "$SCONS_INVOCATION $out",
                 "description": "Rendering $out",
-                # Console pool restricts to 1 job running at a time,
-                # it additionally has some special handling about
-                # passing stdin, stdout, etc to process in this pool
-                # that we need for SCons to behave correctly when run
-                # by Ninja.
-                "pool": "console",
+                "pool": "scons_pool",
                 "restat": 1,
             },
             "SCONS": {
                 "command": "$SCONS_INVOCATION $out",
                 "description": "SCons $out",
-                "pool": "console",
+                "pool": "scons_pool",
                 # restat
                 #    if present, causes Ninja to re-stat the command's outputs
                 #    after execution of the command. Each output whose
@@ -445,12 +432,23 @@ class NinjaState:
             "REGENERATE": {
                 "command": "$SCONS_INVOCATION_W_TARGETS",
                 "description": "Regenerating $out",
+                "generator": 1,
+                # Console pool restricts to 1 job running at a time,
+                # it additionally has some special handling about
+                # passing stdin, stdout, etc to process in this pool
+                # that we need for SCons to behave correctly when
+                # regenerating Ninja
                 "pool": "console",
                 # Again we restat in case Ninja thought the
                 # build.ninja should be regenerated but SCons knew
                 # better.
                 "restat": 1,
             },
+        }
+
+        self.pools = {
+            "install_pool": self.env.GetOption("num_jobs") / 2,
+            "scons_pool": 1,
         }
 
         if env["PLATFORM"] == "win32":
@@ -529,12 +527,10 @@ class NinjaState:
 
         generated_source_files = {
             output
-
             # First find builds which have header files in their outputs.
             for build in self.builds
             if is_generated_source(build["outputs"])
             for output in build["outputs"]
-
             # Collect only the header files from the builds with them
             # in their output. We do this because is_generated_source
             # returns True if it finds a header in any of the outputs,
@@ -619,7 +615,8 @@ class NinjaState:
         ninja.build(
             ninja_file,
             rule="REGENERATE",
-            implicit=[self.env.File("#SConstruct").get_abspath()] + glob("src/**/SConscript", recursive=True),
+            implicit=[self.env.File("#SConstruct").get_abspath()]
+            + glob("src/**/SConscript", recursive=True),
         )
 
         ninja.build(
@@ -761,7 +758,9 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         # Ninja but for now, and partially because the existing Ninja
         # generator does so, we just disable it all together.
         cmd = cmd.replace("\n", " && ").strip()
-        if env["PLATFORM"] == "win32" and ("embedManifestExeCheck" in cmd or "embedManifestDllCheck" in cmd):
+        if env["PLATFORM"] == "win32" and (
+            "embedManifestExeCheck" in cmd or "embedManifestDllCheck" in cmd
+        ):
             cmd = " && ".join(cmd.split(" && ")[0:-1])
 
         if cmd.endswith("&&"):
@@ -912,7 +911,7 @@ def ninja_csig(original):
 
     def wrapper(self):
         name = str(self)
-        if 'SConscript' in name or 'SConstruct' in name:
+        if "SConscript" in name or "SConstruct" in name:
             return original(self)
         return "dummy_ninja_csig"
 
@@ -924,7 +923,7 @@ def ninja_contents(original):
 
     def wrapper(self):
         name = str(self)
-        if 'SConscript' in name or 'SConstruct' in name:
+        if "SConscript" in name or "SConstruct" in name:
             return original(self)
         return bytes("dummy_ninja_contents", encoding="utf-8")
 
@@ -1005,7 +1004,7 @@ class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
 
         node = target[0] if SCons.Util.is_List(target) else target
         if node is not None:
-            cmdlist = getattr(node.attributes, 'tempfile_cmdlist', None)
+            cmdlist = getattr(node.attributes, "tempfile_cmdlist", None)
             if cmdlist is not None:
                 return cmdlist
 
@@ -1014,7 +1013,7 @@ class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
         # If TempFileMunge.__call__ returns a string it means that no
         # response file was needed. No processing required so just
         # return the command.
-        if isinstance(cmd, str): 
+        if isinstance(cmd, str):
             return cmd
 
         # Strip the removal commands from the command list.
@@ -1054,14 +1053,13 @@ class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
         # Note the weird newline and rm command in the middle
         # element and the lack of TEMPFILEPREFIX on the last
         # element.
-        prefix = env.subst('$TEMPFILEPREFIX')
+        prefix = env.subst("$TEMPFILEPREFIX")
         if not prefix:
-            prefix = '@'
+            prefix = "@"
 
         new_cmdlist = [cmd[0], prefix + cmd[-1]]
-        setattr(node.attributes, 'tempfile_cmdlist', new_cmdlist)
+        setattr(node.attributes, "tempfile_cmdlist", new_cmdlist)
         return new_cmdlist
-
 
     def _print_cmd_str(*_args, **_kwargs):
         """Disable this method"""
@@ -1157,8 +1155,12 @@ def generate(env):
     # slows down the build significantly and we don't need contents or
     # content signatures calculated when generating a ninja file since
     # we're not doing any SCons caching or building.
-    SCons.Executor.Executor.get_contents = ninja_contents(SCons.Executor.Executor.get_contents)
-    SCons.Node.Alias.Alias.get_contents = ninja_contents(SCons.Node.Alias.Alias.get_contents)
+    SCons.Executor.Executor.get_contents = ninja_contents(
+        SCons.Executor.Executor.get_contents
+    )
+    SCons.Node.Alias.Alias.get_contents = ninja_contents(
+        SCons.Node.Alias.Alias.get_contents
+    )
     SCons.Node.FS.File.get_contents = ninja_contents(SCons.Node.FS.File.get_contents)
     SCons.Node.FS.File.get_csig = ninja_csig(SCons.Node.FS.File.get_csig)
     SCons.Node.FS.Dir.get_csig = ninja_csig(SCons.Node.FS.Dir.get_csig)
@@ -1201,7 +1203,7 @@ def generate(env):
     if not os.path.isdir(os.environ["TMPDIR"]):
         env.Execute(SCons.Defaults.Mkdir(os.environ["TMPDIR"]))
 
-    env['TEMPFILE'] = NinjaEternalTempFile
+    env["TEMPFILE"] = NinjaEternalTempFile
 
     # Force the SConsign to be written, we benefit from SCons caching of
     # implicit dependencies and conftests. Unfortunately, we have to do this
