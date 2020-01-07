@@ -52,12 +52,16 @@ bool lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
 }
 }  // namespace
 
-LogicalTime LogicalClock::getClusterTimeForReplicaSet(OperationContext* opCtx) {
+LogicalTime LogicalClock::getClusterTimeForReplicaSet(ServiceContext* svcCtx) {
     if (getGlobalReplSettings().usingReplSets()) {
-        return get(opCtx)->getClusterTime();
+        return get(svcCtx)->getClusterTime();
     }
 
     return {};
+}
+
+LogicalTime LogicalClock::getClusterTimeForReplicaSet(OperationContext* opCtx) {
+    return getClusterTimeForReplicaSet(opCtx->getClient()->getServiceContext());
 }
 
 LogicalClock* LogicalClock::get(ServiceContext* service) {

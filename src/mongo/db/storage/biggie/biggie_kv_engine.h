@@ -80,7 +80,7 @@ public:
 
     virtual void endBackup(OperationContext* opCtx) {}
 
-    virtual Status dropIdent(OperationContext* opCtx, StringData ident);
+    virtual Status dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, StringData ident);
 
     virtual bool supportsDocLocking() const {
         return true;

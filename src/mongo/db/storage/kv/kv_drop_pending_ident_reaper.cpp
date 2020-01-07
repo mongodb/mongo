@@ -112,7 +112,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             log() << "Completing drop for ident " << ident << " (ns: " << nss
                   << ") with drop timestamp " << dropTimestamp;
             WriteUnitOfWork wuow(opCtx);
-            auto status = _engine->dropIdent(opCtx, ident);
+            auto status = _engine->dropIdent(opCtx, opCtx->recoveryUnit(), ident);
             if (!status.isOK()) {
                 severe() << "Failed to remove drop-pending ident " << ident << "(ns: " << nss
                          << ") with drop timestamp " << dropTimestamp << ": " << status;

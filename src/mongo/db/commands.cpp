@@ -110,11 +110,12 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 }
 
 // The command names that are allowed in a multi-document transaction.
+const StringMap<int> txnCmdWhitelistFCV44 = {
+    {"create", 1}, {"createIndexes", 1}, {"_configsvrCreateCollection", 1}};
 const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"aggregate", 1},
                                         {"commitTransaction", 1},
                                         {"coordinateCommitTransaction", 1},
-                                        {"createIndexes", 1},
                                         {"delete", 1},
                                         {"distinct", 1},
                                         {"find", 1},
@@ -443,9 +444,21 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
             cmdName != "count"_sd);
 
+    auto inTxnWhitelist = txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend();
+    auto inTxnWhitelistFCV44 = txnCmdWhitelistFCV44.find(cmdName) != txnCmdWhitelistFCV44.cend();
+    auto isFullyUpgradedTo44 =
+        (serverGlobalParams.featureCompatibility.getVersion() ==
+         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot run '" << cmdName
+                          << "' in a multi-document transaction unless the "
+                             "featureCompatibilityVersion is equal to 4.4.",
+            isFullyUpgradedTo44 || !inTxnWhitelistFCV44);
+
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
-            txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend());
+            inTxnWhitelist || inTxnWhitelistFCV44);
 
     const auto dbName = nss.db();
 

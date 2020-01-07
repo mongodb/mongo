@@ -171,8 +171,9 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     log() << "index build: done building index " << _indexName << " on ns " << _nss;
 
     collection->indexBuildSuccess(opCtx, _indexCatalogEntry);
+    auto svcCtx = opCtx->getClient()->getServiceContext();
 
-    opCtx->recoveryUnit()->onCommit([opCtx, entry = _indexCatalogEntry, coll = collection](
+    opCtx->recoveryUnit()->onCommit([svcCtx, entry = _indexCatalogEntry, coll = collection](
                                         boost::optional<Timestamp> commitTime) {
         // Note: this runs after the WUOW commits but before we release our X lock on the
         // collection. This means that any snapshot created after this must include the full
@@ -182,7 +183,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             // timestamp. We use the cluster time since it's guaranteed to be greater than the
             // time of the index build. It is possible the cluster time could be in the future,
             // and we will need to do another write to reach the minimum visible snapshot.
-            commitTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+            commitTime = LogicalClock::getClusterTimeForReplicaSet(svcCtx).asTimestamp();
         }
         entry->setMinimumVisibleSnapshot(commitTime.get());
         // We must also set the minimum visible snapshot on the collection like during init().

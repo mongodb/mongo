@@ -65,28 +65,4 @@ BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
     return cmdObjBuilder.obj();
 }
 
-BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,
-                             const CollectionOptions& options,
-                             const BSONObj& idIndex) {
-    BSONObjBuilder b;
-    b.append("create", collectionName.coll().toString());
-    {
-        // Don't store the UUID as part of the options, but instead only at the top level
-        CollectionOptions optionsToStore = options;
-        optionsToStore.uuid.reset();
-        b.appendElements(optionsToStore.toBSON());
-    }
-
-    // Include the full _id index spec in the oplog for index versions >= 2.
-    if (!idIndex.isEmpty()) {
-        auto versionElem = idIndex[IndexDescriptor::kIndexVersionFieldName];
-        invariant(versionElem.isNumber());
-        if (IndexDescriptor::IndexVersion::kV2 <=
-            static_cast<IndexDescriptor::IndexVersion>(versionElem.numberInt())) {
-            b.append("idIndex", idIndex);
-        }
-    }
-
-    return b.obj();
-}
 }  // namespace mongo

@@ -59,7 +59,7 @@ public:
  */
 class KVEngineMock : public KVEngine {
 public:
-    Status dropIdent(OperationContext* opCtx, StringData ident) override;
+    Status dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) override;
 
     // Unused KVEngine functions below.
     RecoveryUnit* newRecoveryUnit() override {
@@ -132,12 +132,14 @@ public:
     std::vector<std::string> droppedIdents;
 
     // Override to modify dropIdent() behavior.
-    using DropIdentFn = std::function<Status(OperationContext*, StringData)>;
-    DropIdentFn dropIdentFn = [](OperationContext*, StringData) { return Status::OK(); };
+    using DropIdentFn = std::function<Status(OperationContext*, RecoveryUnit*, StringData)>;
+    DropIdentFn dropIdentFn = [](OperationContext*, RecoveryUnit*, StringData) {
+        return Status::OK();
+    };
 };
 
-Status KVEngineMock::dropIdent(OperationContext* opCtx, StringData ident) {
-    auto status = dropIdentFn(opCtx, ident);
+Status KVEngineMock::dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) {
+    auto status = dropIdentFn(opCtx, ru, ident);
     if (status.isOK()) {
         droppedIdents.push_back(ident.toString());
     }
@@ -320,11 +322,13 @@ DEATH_TEST_F(KVDropPendingIdentReaperTest,
     ASSERT_EQUALS(dropTimestamp, *reaper.getEarliestDropTimestamp());
 
     // Make KVEngineMock::dropIndent() fail.
-    engine->dropIdentFn = [ident](OperationContext* opCtx, StringData identToDrop) {
-        ASSERT(opCtx);
-        ASSERT_EQUALS(ident, identToDrop);
-        return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIndent() failed.");
-    };
+    engine->dropIdentFn =
+        [ident](OperationContext* opCtx, RecoveryUnit* ru, StringData identToDrop) {
+            ASSERT(opCtx);
+            ASSERT(ru);
+            ASSERT_EQUALS(ident, identToDrop);
+            return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIndent() failed.");
+        };
 
     auto opCtx = makeOpCtx();
     reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));

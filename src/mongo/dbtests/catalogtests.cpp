@@ -59,10 +59,6 @@ public:
             return;
         }
 
-        // TODO SERVER-44138: The commented out lines can be reinstated when committing new
-        // collections to the catalog are transactional (all succeed or fail).
-
-        // NamespaceString op1UniqueNss("test.uniqueCollection");
         NamespaceString competingNss("test.competingCollection");
 
         auto client1 = serviceContext->makeClient("client1");
@@ -74,7 +70,6 @@ public:
 
         Lock::DBLock dbLk1(op1.get(), competingNss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLk1(op1.get(), competingNss, LockMode::MODE_IX);
-        // Lock::CollectionLock uniqueNssLk(op1.get(), op1UniqueNss, LockMode::MODE_IX);
         Lock::DBLock dbLk2(op2.get(), competingNss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLk2(op2.get(), competingNss, LockMode::MODE_IX);
 
@@ -83,7 +78,6 @@ public:
 
         {
             WriteUnitOfWork wuow1(op1.get());
-            // ASSERT_TRUE(db->createCollection(op1.get(), op1UniqueNss) != nullptr);
             ASSERT_TRUE(db->createCollection(op1.get(), competingNss) != nullptr);
             ASSERT_TRUE(collectionExists(op1.get(), competingNss));
             ASSERT_FALSE(collectionExists(op2.get(), competingNss));
@@ -103,8 +97,6 @@ public:
 
         ASSERT_TRUE(collectionExists(op1.get(), competingNss));
         ASSERT_TRUE(collectionExists(op2.get(), competingNss));
-        // ASSERT_FALSE(collectionExists(op1.get(), op1UniqueNss));
-        // ASSERT_FALSE(collectionExists(op2.get(), op1UniqueNss));
     }
 };
 

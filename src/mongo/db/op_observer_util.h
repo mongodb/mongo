@@ -34,11 +34,6 @@
 #include "mongo/db/op_observer.h"
 
 namespace mongo {
-
-BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,
-                             const CollectionOptions& options,
-                             const BSONObj& idIndex);
-
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
                           boost::optional<TTLCollModInfo> ttlInfo);

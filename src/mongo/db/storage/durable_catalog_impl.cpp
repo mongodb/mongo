@@ -178,17 +178,22 @@ public:
 
 class DurableCatalogImpl::AddIndexChange : public RecoveryUnit::Change {
 public:
-    AddIndexChange(OperationContext* opCtx, StorageEngineInterface* engine, StringData ident)
-        : _opCtx(opCtx), _engine(engine), _ident(ident.toString()) {}
+    AddIndexChange(OperationContext* opCtx,
+                   RecoveryUnit* ru,
+                   StorageEngineInterface* engine,
+                   StringData ident)
+        : _opCtx(opCtx), _recoveryUnit(ru), _engine(engine), _ident(ident.toString()) {}
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         // Intentionally ignoring failure.
         auto kvEngine = _engine->getEngine();
-        MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
+        MONGO_COMPILER_VARIABLE_UNUSED auto status =
+            kvEngine->dropIdent(_opCtx, _recoveryUnit, _ident);
     }
 
     OperationContext* const _opCtx;
+    RecoveryUnit* const _recoveryUnit;
     StorageEngineInterface* _engine;
     const std::string _ident;
 };
@@ -202,6 +207,7 @@ public:
                       StringData indexName,
                       StringData ident)
         : _opCtx(opCtx),
+          _recoveryUnit(opCtx->recoveryUnit()),
           _engine(engine),
           _uuid(uuid),
           _indexNss(indexNss),
@@ -219,11 +225,13 @@ public:
             _engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
         } else {
             auto kvEngine = _engine->getEngine();
-            MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
+            MONGO_COMPILER_VARIABLE_UNUSED auto status =
+                kvEngine->dropIdent(_opCtx, _recoveryUnit, _ident);
         }
     }
 
     OperationContext* const _opCtx;
+    RecoveryUnit* const _recoveryUnit;
     StorageEngineInterface* _engine;
     OptionalCollectionUUID _uuid;
     const NamespaceString _indexNss;
@@ -809,11 +817,13 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         }
     }
 
+    auto ru = opCtx->recoveryUnit();
     CollectionUUID uuid = options.uuid.get();
-    opCtx->recoveryUnit()->onRollback([opCtx, catalog = this, nss, ident = entry.ident, uuid]() {
-        // Intentionally ignoring failure
-        catalog->_engine->getEngine()->dropIdent(opCtx, ident).ignore();
-    });
+    opCtx->recoveryUnit()->onRollback(
+        [opCtx, ru, catalog = this, nss, ident = entry.ident, uuid]() {
+            // Intentionally ignoring failure
+            catalog->_engine->getEngine()->dropIdent(opCtx, ru, ident).ignore();
+        });
 
     auto rs =
         _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), entry.ident, options, prefix);
@@ -854,9 +864,10 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
         return status;
     }
 
+    auto ru = opCtx->recoveryUnit();
     // This will notify the storageEngine to drop the collection only on WUOW::commit().
     opCtx->recoveryUnit()->onCommit(
-        [opCtx, catalog = this, entry](boost::optional<Timestamp> commitTimestamp) {
+        [opCtx, ru, catalog = this, entry](boost::optional<Timestamp> commitTimestamp) {
             StorageEngineInterface* engine = catalog->_engine;
             auto storageEngine = engine->getStorageEngine();
             if (storageEngine->supportsPendingDrops() && commitTimestamp) {
@@ -867,7 +878,7 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
                 // Intentionally ignoring failure here. Since we've removed the metadata pointing to
                 // the collection, we should never see it again anyway.
                 auto kvEngine = engine->getEngine();
-                kvEngine->dropIdent(opCtx, entry.ident).ignore();
+                kvEngine->dropIdent(opCtx, ru, entry.ident).ignore();
             }
         });
 
@@ -982,7 +993,7 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
         opCtx, getCollectionOptions(opCtx, catalogId), ident, spec, prefix);
     if (status.isOK()) {
         opCtx->recoveryUnit()->registerChange(
-            std::make_unique<AddIndexChange>(opCtx, _engine, ident));
+            std::make_unique<AddIndexChange>(opCtx, opCtx->recoveryUnit(), _engine, ident));
     }
 
     return status;

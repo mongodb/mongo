@@ -75,7 +75,7 @@ class SortedDataInterface : public ::mongo::SortedDataInterface {
 public:
     // Truncate is not required at the time of writing but will be when the truncate command is
     // created
-    Status truncate(OperationContext* opCtx);
+    Status truncate(RecoveryUnit* ru);
     SortedDataInterface(OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
     SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident);
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,

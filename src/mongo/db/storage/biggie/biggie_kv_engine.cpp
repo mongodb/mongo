@@ -118,21 +118,20 @@ std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
     return std::make_unique<SortedDataInterface>(opCtx, ident, desc);
 }
 
-Status KVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
+Status KVEngine::dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, StringData ident) {
     Status dropStatus = Status::OK();
     if (_idents.count(ident.toString()) > 0) {
         // Check if the ident is a RecordStore or a SortedDataInterface then call the corresponding
         // truncate. A true value in the map means it is a RecordStore, false a SortedDataInterface.
         if (_idents[ident.toString()] == true) {  // ident is RecordStore.
             CollectionOptions s;
-            auto rs = getRecordStore(opCtx, ""_sd, ident, s);
-            dropStatus = checked_cast<RecordStore*>(rs.get())
-                             ->truncateWithoutUpdatingCount(opCtx)
-                             .getStatus();
+            auto rs = getRecordStore(/*unused*/ opCtx, ""_sd, ident, s);
+            dropStatus =
+                checked_cast<RecordStore*>(rs.get())->truncateWithoutUpdatingCount(ru).getStatus();
         } else {  // ident is SortedDataInterface.
             auto sdi =
                 std::make_unique<SortedDataInterface>(Ordering::make(BSONObj()), true, ident);
-            dropStatus = sdi->truncate(opCtx);
+            dropStatus = sdi->truncate(ru);
         }
         _idents.erase(ident.toString());
     }
