@@ -191,13 +191,13 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
             findCmdIsByUuid = false;
         }
 
-        // Get the ID and version of the single shard to which this query will be sent.
-        auto shardInfo = getSingleTargetedShardForQuery(expCtx->opCtx, routingInfo, filterObj);
-
         // Dispatch the request. This will only be sent to a single shard and only a single result
         // will be returned. The 'establishCursors' method conveniently prepares the result into a
         // cursor response for us.
         try {
+            // Get the ID and version of the single shard to which this query will be sent.
+            auto shardInfo = getSingleTargetedShardForQuery(expCtx->opCtx, routingInfo, filterObj);
+
             shardResult = establishCursors(
                 expCtx->opCtx,
                 Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
@@ -210,9 +210,18 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
             // If it's an unsharded collection which has been deleted and re-created, we may get a
             // NamespaceNotFound error when looking up by UUID.
             return boost::none;
-        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>&) {
-            // If we hit a stale shardVersion exception, invalidate the routing table cache.
-            catalogCache->onStaleShardVersion(std::move(routingInfo));
+        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& e) {
+            if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
+                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                    expCtx->opCtx,
+                    nss,
+                    staleInfo->getVersionWanted(),
+                    staleInfo->getVersionReceived(),
+                    staleInfo->getShardId());
+            } else {
+                catalogCache->onEpochChange(nss);
+            }
+
             continue;  // Try again if allowed.
         }
         break;  // Success!
