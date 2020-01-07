@@ -63,12 +63,14 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                     << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1, config.getConfigVersion());
+    ASSERT_EQUALS(1, config.getConfigTerm());
     ASSERT_EQUALS(1, config.getNumMembers());
     ASSERT_EQUALS(MemberId(0), config.membersBegin()->getId());
     ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
@@ -91,7 +93,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_OK(
         config.initialize(BSON("_id"
                                << "rs0"
-                               << "version" << 1234 << "members"
+                               << "version" << 1234 << "term" << 1 << "members"
                                << BSON_ARRAY(BSON("_id" << 234 << "host"
                                                         << "localhost:12345"
                                                         << "tags"
@@ -109,6 +111,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
+    ASSERT_EQUALS(1, config.getConfigTerm());
     ASSERT_EQUALS(1, config.getNumMembers());
     ASSERT_EQUALS(MemberId(234), config.membersBegin()->getId());
     ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
@@ -301,6 +304,63 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
+                                     << static_cast<long long>(std::numeric_limits<int>::max()) + 1
+                                     << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
+
+TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
+    ReplSetConfig config;
+    // Absent term field should set a default.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_EQUALS(config.getConfigTerm(), -1);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch,
+                  config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "term"
+                                         << "1"
+                                         << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")))));
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term" << 0.0 << "protocolVersion" << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    // Config term can be -1.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term" << -1.0 << "protocolVersion" << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term" << -2.0 << "protocolVersion" << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term"
                                      << static_cast<long long>(std::numeric_limits<int>::max()) + 1
                                      << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"

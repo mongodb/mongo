@@ -49,14 +49,30 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
+    ASSERT_OK(config.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 2 << "term" << OpTime::kInitialTerm
+                                                << "protocolVersion" << 1 << "members"
+                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                         << "h1")))));
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                  validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
+}
+
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
+    ReplicationCoordinatorExternalStateMock rses;
+    rses.addSelf(HostAndPort("h1"));
+
+    ReplSetConfig config;
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
-                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << "version" << 1 << "term" << (OpTime::kInitialTerm + 1)
+                                          << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                    << "h1")))));
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
+    ASSERT_OK(validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
+    ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
@@ -136,41 +152,41 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
     ReplSetConfig zeroConfig;
     ReplSetConfig oneConfig;
     ReplSetConfig twoConfig;
-    ASSERT_OK(zeroConfig.initialize(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 1 << "protocolVersion" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "h1")
-                                                       << BSON("_id" << 2 << "host"
-                                                                     << "h2"
-                                                                     << "priority" << 0
-                                                                     << "arbiterOnly" << true)
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "h3")))));
+    ASSERT_OK(zeroConfig.initializeForInitiate(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "h1")
+                           << BSON("_id" << 2 << "host"
+                                         << "h2"
+                                         << "priority" << 0 << "arbiterOnly" << true)
+                           << BSON("_id" << 3 << "host"
+                                         << "h3")))));
 
-    ASSERT_OK(oneConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "priority" << 1
-                                                                    << "arbiterOnly" << true)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    ASSERT_OK(oneConfig.initializeForInitiate(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "h1")
+                           << BSON("_id" << 2 << "host"
+                                         << "h2"
+                                         << "priority" << 1 << "arbiterOnly" << true)
+                           << BSON("_id" << 3 << "host"
+                                         << "h3")))));
 
-    ASSERT_OK(twoConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "priority" << 2
-                                                                    << "arbiterOnly" << true)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    ASSERT_OK(twoConfig.initializeForInitiate(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "h1")
+                           << BSON("_id" << 2 << "host"
+                                         << "h2"
+                                         << "priority" << 2 << "arbiterOnly" << true)
+                           << BSON("_id" << 3 << "host"
+                                         << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
