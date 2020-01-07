@@ -213,7 +213,7 @@ public:
      *
      * To be called if using the input routing info caused a StaleShardVersion to be received.
      */
-    void onStaleShardVersion(CachedCollectionRoutingInfo&&);
+    void onStaleShardVersion(CachedCollectionRoutingInfo&&, const ShardId& staleShardId);
 
     /**
      * Gets whether this operation should skip a catalog cache refresh.
@@ -224,6 +224,27 @@ public:
      * Sets whether this operation should skip a catalog catche refresh.
      */
     static void setOperationShouldSkipCatalogCacheRefresh(OperationContext* opCtx, bool shouldSkip);
+
+    /**
+     * Invalidates a single shard for the current collection if:
+     *   1. The shard's id is given, and
+     *   2. The epochs given in the two chunk versions match.
+     * Otherwise, invalidates the entire collection, causing any future targetting requests to
+     * block on an upcoming catalog cache refresh.
+     */
+    void invalidateShardOrEntireCollectionEntryForShardedCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<ChunkVersion> wantedVersion,
+        const ChunkVersion& receivedVersion,
+        boost::optional<ShardId> shardId);
+
+    /**
+     * Non-blocking method that marks the current collection entry for the namespace as needing
+     * refresh due to an epoch change. Will cause all further targetting attempts for this
+     * namespace to block on a catalog cache refresh.
+     */
+    void onEpochChange(const NamespaceString& nss);
 
     /**
      * Throws a StaleConfigException if this catalog cache does not have an entry for the given
@@ -243,10 +264,12 @@ public:
     void invalidateDatabaseEntry(const StringData dbName);
 
     /**
-     * Non-blocking method, which indiscriminately causes the routing table for the specified
-     * namespace to be refreshed the next time getCollectionRoutingInfo is called.
+     * Non-blocking method, which invalidates the shard for the routing table for the specified
+     * namespace. If that shard is targetted in the future, getCollectionRoutingInfo will wait on a
+     * refresh.
      */
-    void invalidateShardedCollection(const NamespaceString& nss);
+    void invalidateShardForShardedCollection(const NamespaceString& nss,
+                                             const ShardId& staleShardId);
 
     /**
      * Non-blocking method, which invalidates all namespaces which contain data on the specified
@@ -289,6 +312,10 @@ private:
         // Specifies whether this cache entry needs a refresh (in which case routingInfo should not
         // be relied on) or it doesn't, in which case there should be a non-null routingInfo.
         bool needsRefresh{true};
+
+        // Specifies whether the namespace has had an epoch change, which indicates that every
+        // shard should block on an upcoming refresh.
+        bool epochHasChanged{false};
 
         // Contains a notification to be waited on for the refresh to complete (only available if
         // needsRefresh is true)
@@ -335,6 +362,15 @@ private:
                                     std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
                                     NamespaceString const& nss,
                                     int refreshAttempt);
+
+    /**
+     * Marks a collection entry as needing refresh. Will create the collection entry if one does
+     * not exist. If 'markEpochAsChanged' is true, will cause all further targetting requests
+     * against this namespace to block upon a catalog cache refresh.
+     */
+    void _createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss,
+                                                          bool markEpochAsChanged);
+
     /**
      * Used as a flag to indicate whether or not this thread performed its own
      * refresh for certain helper functions
@@ -360,6 +396,13 @@ private:
         StatusWith<CachedCollectionRoutingInfo> statusWithInfo;
         RefreshAction actionTaken;
     };
+
+    /**
+     * Retrieves the collection routing info for this namespace after blocking on a catalog cache
+     * refresh.
+     */
+    CatalogCache::RefreshResult _getCollectionRoutingInfoWithForcedRefresh(
+        OperationContext* opctx, const NamespaceString& nss);
 
     /**
      * Helper function used when we need the refresh action taken (e.g. when we

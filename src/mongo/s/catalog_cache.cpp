@@ -59,6 +59,14 @@ namespace {
 const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
 
 /**
+ * Returns whether two shard versions have a matching epoch.
+ */
+bool shardVersionsHaveMatchingEpoch(boost::optional<ChunkVersion> wanted,
+                                    const ChunkVersion& received) {
+    return wanted && wanted->epoch() == received.epoch();
+};
+
+/**
  * Given an (optional) initial routing table and a set of changed chunks returned by the catalog
  * cache loader, produces a new routing table with the changes applied.
  *
@@ -191,6 +199,15 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     return _getCollectionRoutingInfo(opCtx, nss).statusWithInfo;
 }
 
+CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoWithForcedRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    // TODO SERVER-44501 Change function to indicate that the operation should block on a catalog
+    // cache refresh before triggering the refresh, since we will change the operation context
+    // variable to indicate skipping the refresh by default.
+    _createOrGetCollectionEntryAndMarkAsNeedsRefresh(nss, false /* markEpochAsChanged */);
+    return _getCollectionRoutingInfo(opCtx, nss);
+}
+
 CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfo(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
     return _getCollectionRoutingInfoAt(opCtx, nss, boost::none);
@@ -286,8 +303,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationCon
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss, bool forceRefreshFromThisThread) {
-    invalidateShardedCollection(nss);
-    auto refreshResult = _getCollectionRoutingInfo(opCtx, nss);
+    auto refreshResult = _getCollectionRoutingInfoWithForcedRefresh(opCtx, nss);
     // We want to ensure that we don't join an in-progress refresh because that
     // could violate causal consistency for this client. We don't need to actually perform the
     // refresh ourselves but we do need the refresh to begin *after* this function is
@@ -295,17 +311,14 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWi
     // second time. See SERVER-33954 for reasoning.
     if (forceRefreshFromThisThread &&
         refreshResult.actionTaken == RefreshAction::kDidNotPerformRefresh) {
-        invalidateShardedCollection(nss);
-        refreshResult = _getCollectionRoutingInfo(opCtx, nss);
+        refreshResult = _getCollectionRoutingInfoWithForcedRefresh(opCtx, nss);
     }
     return refreshResult.statusWithInfo;
 }
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
-    invalidateShardedCollection(nss);
-
-    auto routingInfoStatus = getCollectionRoutingInfo(opCtx, nss);
+    auto routingInfoStatus = _getCollectionRoutingInfoWithForcedRefresh(opCtx, nss).statusWithInfo;
     if (routingInfoStatus.isOK() && !routingInfoStatus.getValue().cm()) {
         return {ErrorCodes::NamespaceNotSharded,
                 str::stream() << "Collection " << nss.ns() << " is not sharded."};
@@ -333,7 +346,8 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
     }
 }
 
-void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInvalidate) {
+void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInvalidate,
+                                       const ShardId& staleShardId) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
     // Ensure the move constructor of CachedCollectionRoutingInfo is invoked in order to clear the
@@ -343,7 +357,7 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
     if (!ccri._cm) {
         // We received StaleShardVersion for a collection we thought was unsharded. The collection
         // must have become sharded.
-        invalidateShardedCollection(ccri._nss);
+        onEpochChange(ccri._nss);
         return;
     }
 
@@ -378,6 +392,23 @@ bool CatalogCache::getOperationShouldSkipCatalogCacheRefresh(OperationContext* o
 void CatalogCache::setOperationShouldSkipCatalogCacheRefresh(OperationContext* opCtx,
                                                              bool shouldSkip) {
     operationShouldSkipCatalogCacheRefresh(opCtx) = shouldSkip;
+};
+
+void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<ChunkVersion> wantedVersion,
+    const ChunkVersion& receivedVersion,
+    boost::optional<ShardId> shardId) {
+    if (shardId && shardVersionsHaveMatchingEpoch(wantedVersion, receivedVersion)) {
+        invalidateShardForShardedCollection(nss, *shardId);
+    } else {
+        onEpochChange(nss);
+    }
+}
+
+void CatalogCache::onEpochChange(const NamespaceString& nss) {
+    _createOrGetCollectionEntryAndMarkAsNeedsRefresh(nss, true /* markEpochAsChanged */);
 };
 
 void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
@@ -420,18 +451,9 @@ void CatalogCache::invalidateDatabaseEntry(const StringData dbName) {
     itDbEntry->second->needsRefresh = true;
 }
 
-void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
-    stdx::lock_guard<Latch> lg(_mutex);
-
-    auto itDb = _collectionsByDb.find(nss.db());
-    if (itDb == _collectionsByDb.end()) {
-        return;
-    }
-
-    if (itDb->second.find(nss.ns()) == itDb->second.end()) {
-        itDb->second[nss.ns()] = std::make_shared<CollectionRoutingInfoEntry>();
-    }
-    itDb->second[nss.ns()]->needsRefresh = true;
+void CatalogCache::invalidateShardForShardedCollection(const NamespaceString& nss,
+                                                       const ShardId& staleShardId) {
+    _createOrGetCollectionEntryAndMarkAsNeedsRefresh(nss, false /* markEpochAsChanged */);
 }
 
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
@@ -678,6 +700,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
 
         stdx::lock_guard<Latch> lg(_mutex);
 
+        collEntry->epochHasChanged = false;
         collEntry->needsRefresh = false;
         collEntry->refreshCompletionNotification->set(Status::OK());
         collEntry->refreshCompletionNotification = nullptr;
@@ -717,6 +740,26 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     // The routing info for this collection shouldn't change, as other threads may try to use the
     // CatalogCache while we are waiting for the refresh to complete.
     invariant(collEntry->routingInfo.get() == existingRoutingInfo.get());
+}
+
+void CatalogCache::_createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss,
+                                                                    bool markEpochAsChanged) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    auto itDb = _collectionsByDb.find(nss.db());
+    if (itDb == _collectionsByDb.end()) {
+        return;
+    }
+
+    if (itDb->second.find(nss.ns()) == itDb->second.end()) {
+        itDb->second[nss.ns()] = std::make_shared<CollectionRoutingInfoEntry>();
+    }
+
+    itDb->second[nss.ns()]->needsRefresh = true;
+
+    if (markEpochAsChanged) {
+        itDb->second[nss.ns()]->epochHasChanged = true;
+    }
 }
 
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {

@@ -575,7 +575,16 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             LOG(1) << "Received error status for query " << redact(query.toStringShort())
                    << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
 
-            catalogCache->onStaleShardVersion(std::move(routingInfo));
+            if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                    opCtx,
+                    query.nss(),
+                    staleInfo->getVersionWanted(),
+                    staleInfo->getVersionReceived(),
+                    staleInfo->getShardId());
+            } else {
+                catalogCache->onEpochChange(query.nss());
+            }
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName)) {

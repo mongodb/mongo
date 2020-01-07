@@ -66,7 +66,7 @@ CatalogCacheTestFixture::scheduleRoutingInfoRefresh(const NamespaceString& nss) 
     return launchAsync([this, nss] {
         auto client = getServiceContext()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
-        catalogCache->invalidateShardedCollection(nss);
+        catalogCache->onEpochChange(nss);
 
         return boost::make_optional(
             uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss)));
