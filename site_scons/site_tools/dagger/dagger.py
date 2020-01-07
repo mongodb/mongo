@@ -44,9 +44,12 @@ from . import graph
 from . import graph_consts
 
 
-LIB_DB = [] # Stores every SCons library nodes
-OBJ_DB = [] # Stores every SCons object file node
-EXE_DB = {} # Stores every SCons executable node, with the object files that build into it {Executable: [object files]}
+LIB_DB = []  # Stores every SCons library nodes
+OBJ_DB = []  # Stores every SCons object file node
+EXE_DB = (
+    {}
+)  # Stores every SCons executable node, with the object files that build into it {Executable: [object files]}
+
 
 def list_process(items):
     """From WIL, converts lists generated from an NM command with unicode strings to lists
@@ -57,12 +60,12 @@ def list_process(items):
     for l in items:
         if isinstance(l, list):
             for i in l:
-                if i.startswith('.L'):
+                if i.startswith(".L"):
                     continue
                 else:
                     r.append(str(i))
         else:
-            if l.startswith('.L'):
+            if l.startswith(".L"):
                 continue
             else:
                 r.append(str(l))
@@ -75,26 +78,26 @@ def get_symbol_worker(object_file, task):
     """From WIL, launches a worker subprocess which collects either symbols defined
     or symbols required by an object file"""
 
-    platform = 'linux' if sys.platform.startswith('linux') else 'darwin'
+    platform = "linux" if sys.platform.startswith("linux") else "darwin"
 
-    if platform == 'linux':
-        if task == 'used':
+    if platform == "linux":
+        if task == "used":
             cmd = r'nm "' + object_file + r'" | grep -e "U " | c++filt'
-        elif task == 'defined':
+        elif task == "defined":
             cmd = r'nm "' + object_file + r'" | grep -v -e "U " | c++filt'
-    elif platform == 'darwin':
-        if task == 'used':
+    elif platform == "darwin":
+        if task == "used":
             cmd = "nm -u " + object_file + " | c++filt"
-        elif task == 'defined':
+        elif task == "defined":
             cmd = "nm -jU " + object_file + " | c++filt"
 
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
     uses = p.communicate()[0].decode()
 
-    if platform == 'linux':
-        return list_process([use[19:] for use in uses.split('\n') if use != ''])
-    elif platform == 'darwin':
-        return list_process([use.strip() for use in uses.split('\n') if use != ''])
+    if platform == "linux":
+        return list_process([use[19:] for use in uses.split("\n") if use != ""])
+    elif platform == "darwin":
+        return list_process([use.strip() for use in uses.split("\n") if use != ""])
 
 
 def emit_obj_db_entry(target, source, env):
@@ -135,7 +138,7 @@ def __compute_libdeps(node):
 
     env = node.get_env()
     deps = set()
-    for child in env.Flatten(getattr(node.attributes, 'libdeps_direct', [])):
+    for child in env.Flatten(getattr(node.attributes, "libdeps_direct", [])):
         if not child:
             continue
         deps.add(child)
