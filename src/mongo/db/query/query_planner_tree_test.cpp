@@ -1130,6 +1130,34 @@ TEST_F(QueryPlannerTest, CompoundAndNonCompoundIndices) {
 }
 
 //
+// Sort with queries having point predicates.
+//
+TEST_F(QueryPlannerTest, SortOrderOnEqualitiesDoesNotMatter) {
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+    runQueryAsCommand(fromjson("{filter: {a: 1, b: 'b'}, sort:{a: -1, b: -1, c: 1}}"));
+
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    // Verify that the solution doesn't require a sort stage.
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1}, dir: 1}} }}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: -1, b: -1, c: 1}, limit: 0, type: 'simple', node: {cscan: {dir: 1}}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, NonIndexEqualitiesNotProvided) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson("{filter: {a: 1, b: 1}, sort:{a: 1, b: 1}}"));
+
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    // Verify that we use 'sort' stage because 'b' is not part of the index.
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: {fetch: {filter: {b: "
+        "{$eq: 1}}, node: {ixscan: {pattern: {a: 1}, dir: 1 }} }} }}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: {cscan: {dir: 1}} }}");
+}
+
+//
 // Sort orders
 //
 
@@ -1182,8 +1210,7 @@ TEST_F(QueryPlannerTest, ReverseScanForSort) {
         "{sort: {pattern: {_id: -1}, limit: 0, type: 'simple', node: "
         "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{filter: null, pattern: {_id: 1}}}}}");
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {_id: 1}, dir: -1}}}}");
 }
 
 TEST_F(QueryPlannerTest, MergeSortReverseScans) {
@@ -1195,9 +1222,13 @@ TEST_F(QueryPlannerTest, MergeSortReverseScans) {
     assertSolutionExists(
         "{sort: {pattern: {a: -1}, limit: 0, type: 'simple', node: "
         "{cscan: {dir: 1}}}}");
+
+    // Note that the first node of 'mergeSort' doesn't require reverse scan because of there is an
+    // equality predicate on 'a' and scan in any direction will produce the results in sorted order
+    // of 'a'.
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
-        "[{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {a: 1}, dir: -1}}}}, {ixscan: "
+        "[{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {a: 1}, dir: 1}}}}, {ixscan: "
         "{pattern: {a: 1}, dir: -1}}]}}}}");
 }
 
@@ -1220,7 +1251,8 @@ TEST_F(QueryPlannerTest, MergeSortReverseScanOneIndexNotExplodeForSort) {
     addIndex(BSON("a" << 1));
     addIndex(BSON("a" << -1 << "b" << -1));
     runQueryAsCommand(
-        fromjson("{find: 'testns', filter: {$or: [{a: 1, b: 1}, {a: {$lt: 0}}]}, sort: {a: -1}}"));
+        fromjson("{find: 'testns', filter: {$or: [{a: {$in: [1, 2]}, b: 1}, {a: {$lt: 0}}]}, sort: "
+                 "{a: -1}}"));
 
     assertNumSolutions(5U);
     assertSolutionExists(

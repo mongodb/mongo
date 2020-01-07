@@ -698,17 +698,15 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     }
 
     // See if solnRoot gives us the sort.  If so, we're done.
-    BSONObjSet sorts = solnRoot->getSort();
-
-    // If the sort we want is in the set of sort orders provided already, bail out.
-    if (sorts.end() != sorts.find(sortObj)) {
+    auto providedSorts = solnRoot->providedSorts();
+    if (providedSorts.contains(sortObj)) {
         return solnRoot;
     }
 
     // Sort is not provided.  See if we provide the reverse of our sort pattern.
     // If so, we can reverse the scan direction(s).
     BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
-    if (sorts.end() != sorts.find(reverseSort)) {
+    if (providedSorts.contains(reverseSort)) {
         QueryPlannerCommon::reverseScans(solnRoot);
         LOGV2_DEBUG(20951,
                     5,

@@ -578,15 +578,25 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
         getHashedBound(2) +
         "], y: [['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]}}}]}}}}");
 
-    // Verify that an exact match predicate on hashed field (prefix) and sort with an immediate
-    // range field can use 'SORT_MERGE'.
-    runQueryAsCommand(fromjson("{filter: {x: 1}, sort: {y: -1}}"));
+    // Verify that an equality predicate on hashed field (prefix) and sort with an immediate
+    // range field can be sorted by the index.
+    runQueryAsCommand(fromjson("{filter: {x: 1}, sort: {y: 1, z: -1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {x: {$eq: 1}}, node: {mergeSort: {nodes: [{ixscan: {pattern: {x: "
-        "'hashed', y: -1, z: 1}, bounds: {x: [" +
+        "{fetch: {filter: {x: {$eq: 1}}, node: {ixscan: {pattern: {x: "
+        "'hashed', y: -1, z: 1}, dir: -1, bounds: {x: [" +
         getHashedBound(1) +
-        "], y: [['MaxKey','MinKey',true,true]], z: [['MinKey','MaxKey',true,true]] }}}] }}}}");
+        "], y: [['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]] } }} }}");
+
+    // {$exists: false} is treated as a point-interval in BSONNULL. Hence index can provide the
+    // sort.
+    runQueryAsCommand(fromjson("{filter: {x: {$exists: false}}, sort: {y: 1, z: -1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$exists: false}}, node: {ixscan: {pattern: {x: 'hashed', y: -1, z: "
+        "1}, dir: -1, bounds: {x: [" +
+        getHashedBound(BSONNULL) +
+        "], y: [['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]] } }} }}");
 
     // Sort on any index field other than the one immediately following the hashed field will use a
     // blocking sort.
@@ -630,7 +640,7 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {pattern: {x: "
-        "1, y: -1, z: 'hashed', a: 1}, bounds: {x: [[1,1,true,true]], y: "
+        "1, y: -1, z: 'hashed', a: 1}, dir: 1, bounds: {x: [[1,1,true,true]], y: "
         "[['MaxKey','MinKey',true,true]], z: [['MinKey','MaxKey',true,true]], a: "
         "[['MinKey','MaxKey',true,true]]}}}}}");
 

@@ -180,7 +180,7 @@ findCmd = {
     hint: {a: 1, b: 1}
 };
 expected = [{a: 1, b: 2}, {a: 2, b: 2}];
-assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
+assertExpectedResult(findCmd, expected, kIsCovered, kNonBlockingSort);
 
 // The index does not have a special collation, but the query asks for one. The no-fetch
 // optimization will be applied in this case. The server must correctly respect the collation

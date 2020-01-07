@@ -668,6 +668,17 @@ BSONObj BSONObj::removeField(StringData name) const {
     return b.obj();
 }
 
+BSONObj BSONObj::removeFields(const std::set<std::string>& fields) const {
+    BSONObjBuilder bob;
+    for (auto&& field : *this) {
+        if (fields.count(field.fieldName())) {
+            continue;
+        }
+        bob.append(field);
+    }
+    return bob.obj();
+}
+
 std::string BSONObj::hexDump() const {
     std::stringstream ss;
     const char* d = objdata();

@@ -124,10 +124,9 @@ std::vector<bool> canProvideSortWithMergeSort(
     const auto reverseSort = QueryPlannerCommon::reverseSortObj(requestedSort);
     for (auto&& node : nodes) {
         node->computeProperties();
-        auto sorts = node->getSort();
-        if (sorts.find(requestedSort) != sorts.end()) {
+        if (node->providedSorts().contains(requestedSort)) {
             shouldReverseScan.push_back(false);
-        } else if (sorts.find(reverseSort) != sorts.end()) {
+        } else if (node->providedSorts().contains(reverseSort)) {
             shouldReverseScan.push_back(true);
         } else {
             return {};
@@ -1103,8 +1102,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
             // that one last.
             for (size_t i = 0; i < andResult->children.size(); ++i) {
                 andResult->children[i]->computeProperties();
-                const BSONObjSet& sorts = andResult->children[i]->getSort();
-                if (sorts.end() != sorts.find(query.getQueryRequest().getSort())) {
+                if (andResult->children[i]->providedSorts().contains(
+                        query.getQueryRequest().getSort())) {
                     std::swap(andResult->children[i], andResult->children.back());
                     break;
                 }

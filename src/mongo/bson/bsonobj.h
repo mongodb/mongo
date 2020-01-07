@@ -311,6 +311,11 @@ public:
      */
     BSONObj removeField(StringData name) const;
 
+    /**
+     * Remove specified fields and return a new object with the remaining fields.
+     */
+    BSONObj removeFields(const std::set<std::string>& fields) const;
+
     /** returns # of top level fields in the object
        note: iterates to count the fields
     */

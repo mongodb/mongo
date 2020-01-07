@@ -117,15 +117,15 @@ TEST(QueryPlannerAnalysis, GetSortPatternSpecialIndexTypes) {
 
     ASSERT_BSONOBJ_EQ(fromjson("{a: 1}"),
                       QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 'text', c: 1}")));
-    ASSERT_BSONOBJ_EQ(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: '2dsphere',"
-                                                                    " c: 1}")));
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{a: 1}"),
+        QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: '2dsphere', c: 1}")));
 
     ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1}"),
                       QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text'}")));
-    ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text',"
-                                                                    " d: 1}")));
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{a: 1, b: 1}"),
+        QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text', d: 1}")));
 }
 
 // Test the generation of sort orders provided by an index scan done by
@@ -158,25 +158,31 @@ TEST(QueryPlannerAnalysis, IxscanSortOrdersBasic) {
 
     // Compute and retrieve the set of sorts.
     ixscan.computeProperties();
-    const BSONObjSet& sorts = ixscan.getSort();
+    auto sorts = ixscan.providedSorts();
 
     // One possible sort is the index key pattern.
-    ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")) != sorts.end());
+    ASSERT(sorts.contains(fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")));
 
     // All prefixes of the key pattern.
-    ASSERT(sorts.find(fromjson("{a: 1}")) != sorts.end());
-    ASSERT(sorts.find(fromjson("{a: 1, b: 1}")) != sorts.end());
-    ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1}")) != sorts.end());
-    ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1, d: 1}")) != sorts.end());
+    ASSERT(sorts.contains(fromjson("{a: 1}")));
+    ASSERT(sorts.contains(fromjson("{a: -1, b: 1}")));
+    ASSERT(sorts.contains(fromjson("{a: 1, b: -1, c: 1}")));
+    ASSERT(sorts.contains(fromjson("{a: 1, b: 1, c: -1, d: 1}")));
 
     // Additional sorts considered due to point intervals on 'a', 'b', and 'c'.
-    ASSERT(sorts.find(fromjson("{b: 1, c: 1, d: 1, e: 1}")) != sorts.end());
-    ASSERT(sorts.find(fromjson("{c: 1, d: 1, e: 1}")) != sorts.end());
-    ASSERT(sorts.find(fromjson("{d: 1, e: 1}")) != sorts.end());
-    ASSERT(sorts.find(fromjson("{d: 1}")) != sorts.end());
+    ASSERT(sorts.contains(fromjson("{b: -1, d: 1, e: 1}")));
+    ASSERT(sorts.contains(fromjson("{d: 1, c: 1, e: 1}")));
+    ASSERT(sorts.contains(fromjson("{d: 1, c: -1}")));
 
-    // There should be 9 total sorts: make sure no other ones snuck their way in.
-    ASSERT_EQ(9U, sorts.size());
+    // Sorts that are not considered.
+    ASSERT_FALSE(sorts.contains(fromjson("{d: -1, e: -1}")));
+    ASSERT_FALSE(sorts.contains(fromjson("{e: 1, a: 1}")));
+    ASSERT_FALSE(sorts.contains(fromjson("{d: 1, e: -1}")));
+    ASSERT_FALSE(sorts.contains(fromjson("{a: 1, d: 1, e: -1}")));
+
+    // Verify that the 'sorts' object has expected internal fields.
+    ASSERT(sorts.getIgnoredFields() == std::set<std::string>({"a", "b", "c"}));
+    ASSERT_BSONOBJ_EQ(fromjson("{d: 1, e: 1}"), sorts.getBaseSortPattern());
 }
 
 TEST(QueryPlannerAnalysis, GeoSkipValidation) {

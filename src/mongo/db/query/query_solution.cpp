@@ -93,73 +93,24 @@ bool rangeCanContainString(const BSONElement& startKey,
     IndexBoundsBuilder::intersectize(rangeOil, &stringBoundsOil);
     return !stringBoundsOil.intervals.empty();
 }
-
-// Helper function for IndexScanNode::computeProperties for adding additional sort orders made
-// possible by point bounds on some fields of the sort pattern.
-void addEqualityFieldSorts(const BSONObj& sortPattern,
-                           const std::set<string>& equalityFields,
-                           BSONObjSet* sortsOut) {
-    invariant(sortsOut);
-    // TODO: Each field in equalityFields could be dropped from the sort order since it is
-    // a point interval.  The full set of sort orders is as follows:
-    // For each sort in sortsOut:
-    //    For each drop in powerset(equalityFields):
-    //        Remove fields in 'drop' from 'sort' and add resulting sort to output.
-    //
-    // Since this involves a powerset, we don't generate the full set of possibilities.
-    // Instead, we generate sort orders by removing possible contiguous prefixes of equality
-    // predicates. For example, if the key pattern is {a: 1, b: 1, c: 1, d: 1, e: 1}
-    // and and there are equality predicates on 'a', 'b', and 'c', then here we add the sort
-    // orders {b: 1, c: 1, d: 1, e: 1} and {c: 1, d: 1, e: 1}. (We also end up adding
-    // {d: 1, e: 1} and {d: 1}, but this is done later on.)
-    BSONObjIterator it(sortPattern);
-    BSONObjBuilder suffixBob;
-    while (it.more()) {
-        BSONElement elt = it.next();
-        // TODO: string slowness.  fix when bounds are stringdata not string.
-        if (equalityFields.end() == equalityFields.find(string(elt.fieldName()))) {
-            suffixBob.append(elt);
-            // This field isn't a point interval, can't drop.
-            break;
-        }
-
-        // We add the sort obtained by dropping 'elt' and all preceding elements from the index
-        // key pattern.
-        BSONObjIterator droppedPrefixIt = it;
-        if (!droppedPrefixIt.more()) {
-            // Do not insert an empty sort order.
-            break;
-        }
-        BSONObjBuilder droppedPrefixBob;
-        while (droppedPrefixIt.more()) {
-            droppedPrefixBob.append(droppedPrefixIt.next());
-        }
-        sortsOut->insert(droppedPrefixBob.obj());
-    }
-
-    while (it.more()) {
-        suffixBob.append(it.next());
-    }
-
-    // We've found the suffix following the contiguous prefix of equality fields.
-    //   Ex. For index {a: 1, b: 1, c: 1, d: 1} and query {a: 3, b: 5}, this suffix
-    //   of the key pattern is {c: 1, d: 1}.
-    //
-    // Now we have to add all prefixes of this suffix as possible sort orders.
-    //   Ex. Continuing the example from above, we have to include sort orders
-    //   {c: 1} and {c: 1, d: 1}.
-    BSONObj filterPointsObj = suffixBob.obj();
-    for (int i = 0; i < filterPointsObj.nFields(); ++i) {
-        // Make obj out of fields [0,i]
-        BSONObjIterator it(filterPointsObj);
-        BSONObjBuilder prefixBob;
-        for (int j = 0; j <= i; ++j) {
-            prefixBob.append(it.next());
-        }
-        sortsOut->insert(prefixBob.obj());
-    }
-}
 }  // namespace
+
+bool ProvidedSortSet::contains(BSONObj input) const {
+    auto sortPatternItr = BSONObjIterator(_baseSortPattern);
+    for (auto&& inputElement : input) {
+        // Remove all the fields that are present in '_ignoredFields' from the sort pattern object
+        // since they do not contribute to changing the output order.
+        if (_ignoredFields.count(inputElement.fieldName())) {
+            continue;
+        }
+        if (SimpleBSONElementComparator::kInstance.evaluate(inputElement == *sortPatternItr)) {
+            ++sortPatternItr;
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
 
 string QuerySolutionNode::toString() const {
     str::stream ss;
@@ -180,11 +131,7 @@ void QuerySolutionNode::addCommon(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << '\n';
     addIndent(ss, indent + 1);
-    *ss << "getSort = [";
-    for (BSONObjSet::const_iterator it = getSort().begin(); it != getSort().end(); it++) {
-        *ss << it->toString() << ", ";
-    }
-    *ss << "]" << '\n';
+    *ss << "providedSorts = {" << providedSorts().debugString() << "}" << '\n';
 }
 
 //
@@ -230,8 +177,7 @@ QuerySolutionNode* TextNode::clone() const {
 // CollectionScanNode
 //
 
-CollectionScanNode::CollectionScanNode()
-    : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), tailable(false), direction(1) {}
+CollectionScanNode::CollectionScanNode() : tailable(false), direction(1) {}
 
 void CollectionScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -263,7 +209,7 @@ QuerySolutionNode* CollectionScanNode::clone() const {
 // AndHashNode
 //
 
-AndHashNode::AndHashNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
+AndHashNode::AndHashNode() {}
 
 AndHashNode::~AndHashNode() {}
 
@@ -315,7 +261,7 @@ QuerySolutionNode* AndHashNode::clone() const {
 // AndSortedNode
 //
 
-AndSortedNode::AndSortedNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
+AndSortedNode::AndSortedNode() {}
 
 AndSortedNode::~AndSortedNode() {}
 
@@ -363,7 +309,7 @@ QuerySolutionNode* AndSortedNode::clone() const {
 // OrNode
 //
 
-OrNode::OrNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), dedup(true) {}
+OrNode::OrNode() : dedup(true) {}
 
 OrNode::~OrNode() {}
 
@@ -422,8 +368,7 @@ QuerySolutionNode* OrNode::clone() const {
 // MergeSortNode
 //
 
-MergeSortNode::MergeSortNode()
-    : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), dedup(true) {}
+MergeSortNode::MergeSortNode() : dedup(true) {}
 
 MergeSortNode::~MergeSortNode() {}
 
@@ -483,7 +428,7 @@ QuerySolutionNode* MergeSortNode::clone() const {
 // FetchNode
 //
 
-FetchNode::FetchNode() : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
+FetchNode::FetchNode() {}
 
 void FetchNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -515,8 +460,7 @@ QuerySolutionNode* FetchNode::clone() const {
 //
 
 IndexScanNode::IndexScanNode(IndexEntry index)
-    : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
-      index(std::move(index)),
+    : index(std::move(index)),
       direction(1),
       addKeyMetadata(false),
       shouldDedup(index.multikey),
@@ -699,137 +643,69 @@ std::set<StringData> getMultikeyFields(const BSONObj& keyPattern,
 
 /**
  * Returns true if the index scan described by 'multikeyFields' and 'bounds' can legally provide the
- * 'sortSpec', or false if the sort cannot be provided. A multikey index cannot provide a sort if
- * either of the following is true: 1) the sort spec includes a multikey field that has bounds other
- * than [minKey, maxKey], 2) there are bounds other than [minKey, maxKey] over a multikey field
- * which share a path prefix with a component of the sort pattern. These cases are further explained
- * in SERVER-31898.
+ * 'sortPatternComponent' field, or false if the sort cannot be provided. A multikey index cannot
+ * provide a sort if either of the following is true: 1) the sort spec includes a multikey field
+ * that has bounds other than [minKey, maxKey], 2) there are bounds other than [minKey, maxKey] over
+ * a multikey field which share a path prefix with a component of the sort pattern. These cases are
+ * further explained in SERVER-31898.
  */
-bool confirmBoundsProvideSortGivenMultikeyness(const BSONObj& sortSpec,
-                                               const IndexBounds& bounds,
-                                               const std::set<StringData>& multikeyFields) {
+bool confirmBoundsProvideSortComponentGivenMultikeyness(
+    StringData sortPatternComponent,
+    const IndexBounds& bounds,
+    const std::set<StringData>& multikeyFields) {
     // Forwardize the bounds to correctly apply checks to descending sorts and well as ascending
     // sorts.
     const auto ascendingBounds = bounds.forwardize();
     const auto& fields = ascendingBounds.fields;
-    for (auto&& sortPatternComponent : sortSpec) {
-        if (multikeyFields.count(sortPatternComponent.fieldNameStringData()) == 0) {
-            // If this component of the sort pattern (which must be one of the components of
-            // the index spec) is not multikey, we don't need additional checks.
-            continue;
-        }
+    if (multikeyFields.count(sortPatternComponent) == 0) {
+        // If this component of the sort pattern (which must be one of the components of
+        // the index spec) is not multikey, we don't need additional checks.
+        return true;
+    }
 
-        // Bail out if the bounds are specified as a simple range. As a future improvement, we could
-        // extend this optimization to allow simple multikey scans to provide a sort.
-        if (ascendingBounds.isSimpleRange) {
+    // Return false if the bounds are specified as a simple range. As a future improvement, we could
+    // extend this optimization to allow simple multikey scans to provide a sort.
+    if (ascendingBounds.isSimpleRange) {
+        return false;
+    }
+
+    // Checks if the 'sortPatternComponent' has [MinKey, MaxKey].
+    for (auto&& intervalList : fields) {
+        if (sortPatternComponent == intervalList.name && !intervalList.isMinToMax()) {
             return false;
         }
+    }
 
-        // Checks if the current 'sortPatternComponent' has [MinKey, MaxKey].
-        const auto name = sortPatternComponent.fieldNameStringData();
-        for (auto&& intervalList : fields) {
-            if (name == intervalList.name && !intervalList.isMinToMax()) {
-                return false;
-            }
+    // Checks if there is a shared path prefix between the bounds and the sort pattern of
+    // multikey fields.
+    FieldRef refName(sortPatternComponent);
+    for (const auto& intervalList : fields) {
+        // Ignores the prefix if the bounds are [MinKey, MaxKey] or if the field is not
+        // multikey.
+        if (intervalList.isMinToMax() ||
+            (multikeyFields.find(intervalList.name) == multikeyFields.end())) {
+            continue;
         }
-
-        // Checks if there is a shared path prefix between the bounds and the sort pattern of
-        // multikey fields.
-        FieldRef refName(name);
-        for (const auto& intervalList : fields) {
-            // Ignores the prefix if the bounds are [MinKey, MaxKey] or if the field is not
-            // multikey.
-            if (intervalList.isMinToMax() ||
-                (multikeyFields.find(intervalList.name) == multikeyFields.end())) {
-                continue;
-            }
-
-            FieldRef boundsPath(intervalList.name);
-            const auto commonPrefixSize = boundsPath.commonPrefixSize(refName);
-            // The interval list name and the sort pattern name will never be equal at this point.
-            // This is because if they are equal and do not have [minKey, maxKey] bounds, we would
-            // already have bailed out of the function. If they do have [minKey, maxKey] bounds,
-            // they will be skipped in the check for [minKey, maxKey] bounds above.
-            invariant(refName != boundsPath);
-            // Checks if there's a common prefix between the interval list name and the sort pattern
-            // name.
-            if (commonPrefixSize > 0) {
-                return false;
-            }
+        FieldRef boundsPath(intervalList.name);
+        const auto commonPrefixSize = boundsPath.commonPrefixSize(refName);
+        // The interval list name and the sort pattern name will never be equal at this point.
+        // This is because if they are equal and do not have [minKey, maxKey] bounds, we would
+        // already have bailed out of the function. If they do have [minKey, maxKey] bounds,
+        // they will be skipped in the check for [minKey, maxKey] bounds above.
+        invariant(refName != boundsPath);
+        // Checks if there's a common prefix between the interval list name and the sort pattern
+        // name.
+        if (commonPrefixSize > 0) {
+            return false;
         }
     }
     return true;
 }
 
+std::set<std::string> extractEqualityFields(const IndexBounds& bounds, const IndexEntry& index) {
+    std::set<std::string> equalityFields;
 
-/**
- * Populates 'sortsOut' with the sort orders provided by an index scan over 'index', with the given
- * 'bounds' and 'direction'.
- *
- * The caller must ensure that the set pointed to by 'sortsOut' is empty before calling this
- * function.
- */
-void computeSortsForScan(const IndexEntry& index,
-                         int direction,
-                         const IndexBounds& bounds,
-                         const CollatorInterface* queryCollator,
-                         const std::set<StringData>& multikeyFields,
-                         BSONObjSet* sortsOut) {
-    invariant(sortsOut->empty());
-
-    BSONObj sortPattern = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
-    if (direction == -1) {
-        sortPattern = QueryPlannerCommon::reverseSortObj(sortPattern);
-    }
-
-    // If 'index' is the result of expanding a wildcard index, then its key pattern should look like
-    // {$_path: 1, <field>: 1}. The "$_path" prefix stores the value of the path associated with the
-    // key as opposed to real user data. We shouldn't report any sort orders including "$_path". In
-    // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
-    // this as a path in user-data could trigger subsequent assertions.
-    if (index.type == IndexType::INDEX_WILDCARD) {
-        invariant(bounds.fields.size() == 2u);
-        // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
-        // happen for existence queries. For example, {a: {$exists: true}} results in bounds
-        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
-        // object are in bounds.
-        if (bounds.fields[0].intervals.size() != 1u) {
-            return;
-        }
-
-        // Strip '$_path' out of 'sortPattern' and then proceed with regular sort analysis.
-        BSONObjIterator it{sortPattern};
-        invariant(it.more());
-        auto pathElement = it.next();
-        invariant(pathElement.fieldNameStringData() == "$_path"_sd);
-        invariant(it.more());
-        auto secondElement = it.next();
-        invariant(!it.more());
-        sortPattern = BSONObjBuilder{}.append(secondElement).obj();
-    }
-
-    sortsOut->insert(sortPattern);
-
-    const int nFields = sortPattern.nFields();
-    if (nFields > 1) {
-        // We're sorted not only by sortPattern but also by all prefixes of it.
-        for (int i = 0; i < nFields; ++i) {
-            // Make obj out of fields [0,i]
-            BSONObjIterator it(sortPattern);
-            BSONObjBuilder prefixBob;
-            for (int j = 0; j <= i; ++j) {
-                prefixBob.append(it.next());
-            }
-            sortsOut->insert(prefixBob.obj());
-        }
-    }
-
-    // If we are using the index {a:1, b:1} to answer the predicate {a: 10}, it's sorted
-    // both by the index key pattern and by the pattern {b: 1}.
-
-    // See if there are any fields with equalities for bounds.  We can drop these
-    // from any sort orders created.
-    std::set<string> equalityFields;
+    // Find all equality predicate fields.
     if (!bounds.isSimpleRange) {
         // Figure out how many fields are point intervals.
         for (size_t i = 0; i < bounds.fields.size(); ++i) {
@@ -855,77 +731,163 @@ void computeSortsForScan(const IndexEntry& index,
             }
         }
     }
-
-    if (!equalityFields.empty()) {
-        addEqualityFieldSorts(sortPattern, equalityFields, sortsOut);
-    }
-
-    if (!CollatorInterface::collatorsMatch(queryCollator, index.collator)) {
-        // Prune sorts containing fields that don't match the collation.
-        std::set<StringData> collatedFields =
-            IndexScanNode::getFieldsWithStringBounds(bounds, index.keyPattern);
-        auto sortsIt = sortsOut->begin();
-        while (sortsIt != sortsOut->end()) {
-            bool matched = false;
-            for (const BSONElement& el : *sortsIt) {
-                if (collatedFields.find(el.fieldNameStringData()) != collatedFields.end()) {
-                    sortsIt = sortsOut->erase(sortsIt);
-                    matched = true;
-                    break;
-                }
-            }
-
-            if (!matched) {
-                sortsIt++;
-            }
-        }
-    }
-
-    if (index.multikey) {
-        for (auto sortsIt = sortsOut->begin(); sortsIt != sortsOut->end();) {
-            // Erase this sort from 'sortsOut' if it is not compatible with multikey fields in the
-            // index.
-            if (confirmBoundsProvideSortGivenMultikeyness(*sortsIt, bounds, multikeyFields)) {
-                ++sortsIt;
-            } else {
-                sortsIt = sortsOut->erase(sortsIt);
-            }
-        }
-    }
+    return equalityFields;
 }
 
 /**
- * Computes sort orders for index scans, including DISTINCT_SCAN. The 'sortsOut' set gets populated
- * with all the sort orders that will be provided by the index scan, and the 'multikeyFieldsOut'
- * field gets populated with the names of all fields that the index indicates are multikey.
+ * Returns a 'ProvidedSortSet' with the sort orders provided by an index scan over 'index',
+ * with the given 'bounds' and 'direction'.
  */
-void computeSortsAndMultikeyPathsForScan(const IndexEntry& index,
-                                         int direction,
-                                         const IndexBounds& bounds,
-                                         const CollatorInterface* queryCollator,
-                                         BSONObjSet* sortsOut,
-                                         std::set<StringData>* multikeyFieldsOut) {
-    sortsOut->clear();
-    multikeyFieldsOut->clear();
+ProvidedSortSet computeSortsForScan(const IndexEntry& index,
+                                    int direction,
+                                    const IndexBounds& bounds,
+                                    const CollatorInterface* queryCollator,
+                                    const std::set<StringData>& multikeyFields) {
+    BSONObj sortPatternProvidedByIndex = index.keyPattern;
 
+    // If 'index' is the result of expanding a wildcard index, then its key pattern should look like
+    // {$_path: 1, <field>: 1}. The "$_path" prefix stores the value of the path associated with the
+    // key as opposed to real user data. We shouldn't report any sort orders including "$_path". In
+    // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
+    // this as a path in user-data could trigger subsequent assertions.
+    if (index.type == IndexType::INDEX_WILDCARD) {
+        invariant(bounds.fields.size() == 2u);
+
+        // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
+        // happen for existence queries. For example, {a: {$exists: true}} results in bounds
+        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
+        // object are in bounds.
+        if (bounds.fields[0].intervals.size() != 1u) {
+            return {};
+        }
+
+        // Strip '$_path' out of 'sortPattern' and then proceed with regular sort analysis.
+        BSONObjIterator it{sortPatternProvidedByIndex};
+        invariant(it.more());
+        auto pathElement = it.next();
+        invariant(pathElement.fieldNameStringData() == "$_path"_sd);
+        invariant(it.more());
+        auto secondElement = it.next();
+        invariant(!it.more());
+        sortPatternProvidedByIndex = BSONObjBuilder{}.append(secondElement).obj();
+    }
+
+    //
+    // There are two buckets of field names "equality fields" and "unsupported fields". The
+    // "equality fields" are those over which we have an equality predicate. These fields can
+    // optionally be ignored when checking whether a pattern is provided or not. The "unsupported
+    // fields" are fields for which we cannot provide a sort. Currently we cannot provide sort when
+    // the field is collated or multikey.
+    //
+    // The intersection of the "equality fields" and "unsupported fields" (called 'ignoreFields')
+    // can simply be ignored. The index scan does not provide these fields in sorted order (e.g.
+    // because of a mismatched collation), but due to the point bounds in the index scan, this
+    // doesn't affect our ability to provide a sort on any subsequent fields. Fields in this
+    // intersection set can simply be dropped when constructing the "base sort pattern".
+    //
+    // The remaining are 'unsupportedFields', which we get when we do a set subtraction of
+    // the initial "unsupported fields" minus 'ignoreFields'. The index scan will never provide a
+    // sort order on this field or any subsequent fields. When we encounter such a field in the
+    // index key pattern, we truncate it and any later fields to form the "base sort pattern".
+    //
+    // Example, consider an index pattern {a: 1, b: 1, c: 1, d: 1},
+    // - If the query predicate is {a: 1} and 'c' is a multikey field then, unsupportedFields = {c},
+    // equalityFields = {a}, ignoreFields = {} and baseSortPattern = {b: 1}. Field 'a' is dropped
+    // from the base sort pattern because it is an equality field. Fields 'c' and 'd' are truncted
+    // from the base sort pattern because 'c' is an unsupported field.
+    // - If the query predicate is {} and 'a' is a multikey field then, unsupportedFields = {a},
+    // equalityFields = {}, ignoreFields = {} and baseSortPattern = {}. The entire sort pattern is
+    // truncated since the first field 'a' is an unsupported field.
+    // - If the query predicate is {b: 1} with 'b' is a multikey field then, unsupportedFields = {},
+    // equalityFields = {}, ignoreFields = {b} and baseSortPattern = {a: 1, c: 1, d: 1}. Field 'b'
+    // has to be dropped from the base sort pattern, since although we are not sorted by 'b', we
+    // have point bounds on it.
+    // - If the query predicate is {b: 1, c: 1} and 'b' is a multikey field then, unsupportedFields
+    // = {}, equalityFields = {c}, ignoreFields = {b} and baseSortPattern = {a: 1, d: 1}. Field 'b'
+    // has to be dropped from the base sort pattern, since although we are not sorted by 'b', we
+    // have point bounds on it. Field 'c' is removed because of the presence of equality predicate.
+    // So we can provide sorts {a: 1, d: 1}, {a: 1, c: 1, d: 1} but not sort patterns that include
+    // field 'b'.
+    //
+    std::set<std::string> equalityFields = extractEqualityFields(bounds, index);
+    std::set<StringData> unsupportedFields;
+    std::set<StringData> ignoreFields;
+    if (!CollatorInterface::collatorsMatch(queryCollator, index.collator)) {
+        for (auto&& collatedField :
+             IndexScanNode::getFieldsWithStringBounds(bounds, index.keyPattern)) {
+            if (equalityFields.count(collatedField.toString())) {
+                ignoreFields.insert(collatedField);
+                equalityFields.erase(collatedField.toString());
+            } else {
+                unsupportedFields.insert(collatedField);
+            }
+        }
+    }
+    if (index.multikey) {
+        for (auto&& multikeyField : multikeyFields) {
+            if (!confirmBoundsProvideSortComponentGivenMultikeyness(
+                    multikeyField, bounds, multikeyFields)) {
+                if (equalityFields.count(multikeyField.toString())) {
+                    ignoreFields.insert(multikeyField);
+                    equalityFields.erase(multikeyField.toString());
+                } else {
+                    unsupportedFields.insert(multikeyField);
+                }
+            }
+        }
+    }
+    // Remove all equality predicates from sort object since they do not contribute in changing the
+    // sort order.
+    sortPatternProvidedByIndex = QueryPlannerAnalysis::getSortPattern(
+        sortPatternProvidedByIndex.removeFields(equalityFields));
+    if (direction == -1) {
+        sortPatternProvidedByIndex = QueryPlannerCommon::reverseSortObj(sortPatternProvidedByIndex);
+    }
+
+    BSONObjBuilder prefixBob;
+    for (auto&& elem : sortPatternProvidedByIndex) {
+        if (ignoreFields.count(elem.fieldNameStringData())) {
+            continue;
+        }
+        // Once a multi-key/collator field is encountered we cannot provide sort the the later
+        // fields.
+        if (unsupportedFields.find(elem.fieldNameStringData()) != unsupportedFields.end()) {
+            break;
+        }
+        prefixBob.append(elem);
+    }
+    return ProvidedSortSet(prefixBob.obj(), std::move(equalityFields));
+}
+
+/**
+ * Computes sort orders for index scans, including DISTINCT_SCAN. Returns a pair where the first
+ * field is 'ProvidedSortSet', which contains all the sort orders that can be provided by the index
+ * scan. The second field is a set populated with the names of all fields that the index indicates
+ * are multikey.
+ */
+std::pair<ProvidedSortSet, std::set<StringData>> computeSortsAndMultikeyPathsForScan(
+    const IndexEntry& index,
+    int direction,
+    const IndexBounds& bounds,
+    const CollatorInterface* queryCollator) {
     // If the index is multikey but does not have path-level multikey metadata, then this index
     // cannot provide any sorts and we need not populate 'multikeyFieldsOut'.
     if (index.multikey && index.multikeyPaths.empty()) {
-        return;
+        return {};
     }
 
+    std::set<StringData> multikeyFieldsOut;
     if (index.multikey) {
-        *multikeyFieldsOut = getMultikeyFields(index.keyPattern, index.multikeyPaths);
+        multikeyFieldsOut = getMultikeyFields(index.keyPattern, index.multikeyPaths);
     }
-
-    computeSortsForScan(index, direction, bounds, queryCollator, *multikeyFieldsOut, sortsOut);
+    return {computeSortsForScan(index, direction, bounds, queryCollator, multikeyFieldsOut),
+            std::move(multikeyFieldsOut)};
 }
-
 }  // namespace
 
 void IndexScanNode::computeProperties() {
-    computeSortsAndMultikeyPathsForScan(
-        index, direction, bounds, queryCollator, &_sorts, &multikeyFields);
+    std::tie(_sorts, multikeyFields) =
+        computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator);
 }
 
 QuerySolutionNode* IndexScanNode::clone() const {
@@ -1009,24 +971,17 @@ void ProjectionNode::computeProperties() {
     invariant(children.size() == 1U);
     children[0]->computeProperties();
 
-    _sorts.clear();
-
-    const BSONObjSet& inputSorts = children[0]->getSort();
-
     // Our input sort is not necessarily maintained if we project some fields that are part of the
     // sort out.
-    for (auto&& sort : inputSorts) {
-        bool sortCompatible = true;
-        for (auto&& key : sort) {
-            if (!proj.isFieldRetainedExactly(key.fieldNameStringData())) {
-                sortCompatible = false;
-                break;
-            }
+    BSONObjBuilder prefixBob;
+    const auto& inputSorts = children[0]->providedSorts();
+    for (auto&& key : inputSorts.getBaseSortPattern()) {
+        if (!proj.isFieldRetainedExactly(key.fieldNameStringData())) {
+            break;
         }
-        if (sortCompatible) {
-            _sorts.insert(sort);
-        }
+        prefixBob.append(key);
     }
+    _sorts = ProvidedSortSet(prefixBob.obj(), inputSorts.getIgnoredFields());
 }
 
 void ProjectionNode::cloneProjectionData(ProjectionNode* copy) const {
@@ -1296,11 +1251,9 @@ QuerySolutionNode* DistinctNode::clone() const {
 }
 
 void DistinctNode::computeProperties() {
-    // Note that we don't need to save the 'multikeyFields' for a DISTINCT_SCAN. They are only
-    // needed for explodeForSort(), which works on IXSCAN but not DISTINCT_SCAN.
-    std::set<StringData> multikeyFields;
-    computeSortsAndMultikeyPathsForScan(
-        index, direction, bounds, queryCollator, &sorts, &multikeyFields);
+    // Note that we don't need to save the returned multikey fields for a DISTINCT_SCAN. They are
+    // only needed for explodeForSort(), which works on IXSCAN but not DISTINCT_SCAN.
+    sorts = computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator).first;
 }
 
 //
