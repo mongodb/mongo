@@ -127,7 +127,10 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
                 factory->supportsReadOnly());
     }
 
-    std::unique_ptr<StorageEngineMetadata> metadata = StorageEngineMetadata::forPath(dbpath);
+    std::unique_ptr<StorageEngineMetadata> metadata;
+    if ((initFlags & StorageEngineInitFlags::kSkipMetadataFile) == 0) {
+        metadata = StorageEngineMetadata::forPath(dbpath);
+    }
 
     if (storageGlobalParams.readOnly) {
         uassert(34415,
@@ -158,7 +161,7 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
     }
 
     // Write a new metadata file if it is not present.
-    if (!metadata.get()) {
+    if (!metadata.get() && (initFlags & StorageEngineInitFlags::kSkipMetadataFile) == 0) {
         invariant(!storageGlobalParams.readOnly);
         metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
         metadata->setStorageEngine(factory->getCanonicalName().toString());

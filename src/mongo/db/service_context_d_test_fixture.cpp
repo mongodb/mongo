@@ -77,7 +77,11 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     storageGlobalParams.dbpath = _tempDir.path();
 
-    initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
+    // Since unit tests start in their own directories, skip lock file and metadata file for faster
+    // startup.
+    initializeStorageEngine(serviceContext,
+                            StorageEngineInitFlags::kAllowNoLockFile |
+                                StorageEngineInitFlags::kSkipMetadataFile);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
