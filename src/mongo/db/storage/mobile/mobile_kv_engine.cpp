@@ -244,8 +244,9 @@ std::unique_ptr<SortedDataInterface> MobileKVEngine::getSortedDataInterface(
     return std::make_unique<MobileIndexStandard>(opCtx, desc, ident.toString());
 }
 
-Status MobileKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
+Status MobileKVEngine::dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) {
+    auto mRu = checked_cast<MobileRecoveryUnit*>(ru);
+    MobileSession* session = mRu->getSessionNoTxn(opCtx);
     std::string dropQuery = "DROP TABLE IF EXISTS \"" + ident + "\";";
 
     try {
@@ -256,7 +257,7 @@ Status MobileKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
         LOG(MOBILE_LOG_LEVEL_LOW)
             << "MobileSE: Caught WriteConflictException while dropping table, "
                "queuing to retry later";
-        MobileRecoveryUnit::get(opCtx)->enqueueFailedDrop(dropQuery);
+        mRu->enqueueFailedDrop(dropQuery);
     }
     return Status::OK();
 }

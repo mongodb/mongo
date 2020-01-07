@@ -92,7 +92,7 @@ public:
                                                     bool forward) const final;
 
     virtual Status truncate(OperationContext* opCtx);
-    StatusWith<int64_t> truncateWithoutUpdatingCount(OperationContext* opCtx);
+    StatusWith<int64_t> truncateWithoutUpdatingCount(RecoveryUnit* ru);
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 

@@ -376,7 +376,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         _buildingIndexes.add(std::move(entry));
     }
 
-    if (!initFromDisk) {
+    if (!initFromDisk &&
+        UncommittedCollections::getForTxn(opCtx, descriptorPtr->parentNS()) == nullptr) {
         opCtx->recoveryUnit()->onRollback([this, opCtx, isReadyIndex, descriptor = descriptorPtr] {
             // Need to preserve indexName as descriptor no longer exists after remove().
             const std::string indexName = descriptor->indexName();
@@ -1607,14 +1608,17 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEn
     index->setIndexBuildInterceptor(nullptr);
     index->setIsReady(true);
 
-    opCtx->recoveryUnit()->onRollback([this, index, interceptor]() {
-        auto releasedEntry = _readyIndexes.release(index->descriptor());
-        invariant(releasedEntry.get() == index);
-        _buildingIndexes.add(std::move(releasedEntry));
+    // Only roll back index changes that are part of pre-existing collections.
+    if (UncommittedCollections::getForTxn(opCtx, index->descriptor()->parentNS()) == nullptr) {
+        opCtx->recoveryUnit()->onRollback([this, index, interceptor]() {
+            auto releasedEntry = _readyIndexes.release(index->descriptor());
+            invariant(releasedEntry.get() == index);
+            _buildingIndexes.add(std::move(releasedEntry));
 
-        index->setIndexBuildInterceptor(interceptor);
-        index->setIsReady(false);
-    });
+            index->setIndexBuildInterceptor(interceptor);
+            index->setIsReady(false);
+        });
+    }
 }
 
 StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,

@@ -608,13 +608,27 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                                         const CollectionOptions& options,
                                         const BSONObj& idIndex,
                                         const OplogSlot& createOpTime) {
-    if (!collectionName.isSystemDotProfile()) {
-        // do not replicate system.profile modifications
+    // do not replicate system.profile modifications
+    if (collectionName.isSystemDotProfile()) {
+        return;
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+
+    if (inMultiDocumentTransaction) {
+        invariant(serverGlobalParams.featureCompatibility.getVersion() ==
+                  ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+        auto operation = MutableOplogEntry::makeCreateCommand(collectionName, options, idIndex);
+        txnParticipant.addTransactionOperation(opCtx, operation);
+    } else {
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
         oplogEntry.setNss(collectionName.getCommandNS());
         oplogEntry.setUuid(options.uuid);
-        oplogEntry.setObject(makeCreateCollCmdObj(collectionName, options, idIndex));
+        oplogEntry.setObject(
+            MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex));
         oplogEntry.setOpTime(createOpTime);
         logOperation(opCtx, &oplogEntry);
     }

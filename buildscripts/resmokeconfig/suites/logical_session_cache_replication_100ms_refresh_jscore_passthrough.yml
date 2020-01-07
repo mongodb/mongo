@@ -24,6 +24,9 @@ selector:
   # time, the logical session cache refresh thread will flush these sessions to disk, creating more
   # opLog entries. To avoid this infinite loop, we will blacklist the test from this suite.
   - jstests/core/awaitdata_getmore_cmd.js
+  # TODO(SERVER-44852) re-enable once secondary oplog application supports collection creation
+  # inside multi-document transactions.
+  - jstests/core/txns/create_collection.js
 
 executor:
   archive:

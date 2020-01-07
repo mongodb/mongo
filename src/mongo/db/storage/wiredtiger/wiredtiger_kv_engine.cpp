@@ -1481,11 +1481,11 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     return std::move(rs);
 }
 
-Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
+Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) {
     string uri = _uri(ident);
 
-    WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(opCtx);
-    ru->getSessionNoTxn()->closeAllCursors(uri);
+    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);
+    wtRu->getSessionNoTxn()->closeAllCursors(uri);
     _sessionCache->closeAllCursors(uri);
 
     WiredTigerSession session(_conn);

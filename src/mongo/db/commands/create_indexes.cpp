@@ -471,7 +471,7 @@ BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
 
     auto createStatus =
         createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
-    if (!UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, ns)) {
+    if (createStatus == ErrorCodes::NamespaceExists) {
         // We should retry the createIndexes command so we can perform the checks for index
         // and/or collection existence again.
         throw WriteConflictException();

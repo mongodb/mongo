@@ -53,6 +53,7 @@ public:
      * Returns the current cluster time if this is a replica set node, otherwise returns a null
      * logical time.
      */
+    static LogicalTime getClusterTimeForReplicaSet(ServiceContext* svcCtx);
     static LogicalTime getClusterTimeForReplicaSet(OperationContext* opCtx);
 
     /**

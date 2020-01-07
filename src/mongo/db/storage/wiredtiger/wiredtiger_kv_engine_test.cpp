@@ -166,7 +166,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(*dataFilePath, tmpFile, err);
     ASSERT(!err) << err.message();
 
-    ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), ident));
+    ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), opCtxPtr.get()->recoveryUnit(), ident));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
     // engine and the restoration process can be tested.
@@ -209,7 +209,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
-    ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), ident));
+    ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), opCtxPtr.get()->recoveryUnit(), ident));
 
 #ifdef _WIN32
     auto status =

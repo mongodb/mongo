@@ -226,16 +226,17 @@ std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* o
 
 Status RecordStore::truncate(OperationContext* opCtx) {
     SizeAdjuster adjuster(opCtx, this);
-    StatusWith<int64_t> s = truncateWithoutUpdatingCount(opCtx);
+    StatusWith<int64_t> s =
+        truncateWithoutUpdatingCount(checked_cast<biggie::RecoveryUnit*>(opCtx->recoveryUnit()));
     if (!s.isOK())
         return s.getStatus();
 
     return Status::OK();
 }
 
-StatusWith<int64_t> RecordStore::truncateWithoutUpdatingCount(OperationContext* opCtx) {
-    auto ru = RecoveryUnit::get(opCtx);
-    StringStore* workingCopy(ru->getHead());
+StatusWith<int64_t> RecordStore::truncateWithoutUpdatingCount(mongo::RecoveryUnit* ru) {
+    auto bRu = checked_cast<biggie::RecoveryUnit*>(ru);
+    StringStore* workingCopy(bRu->getHead());
     StringStore::const_iterator end = workingCopy->upper_bound(_postfix);
     std::vector<std::string> toDelete;
 
@@ -249,7 +250,7 @@ StatusWith<int64_t> RecordStore::truncateWithoutUpdatingCount(OperationContext* 
     for (const auto& key : toDelete)
         workingCopy->erase(key);
 
-    ru->makeDirty();
+    bRu->makeDirty();
 
     return static_cast<int64_t>(toDelete.size());
 }

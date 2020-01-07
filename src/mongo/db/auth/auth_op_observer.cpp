@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/op_observer_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
 
@@ -101,7 +102,8 @@ void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
                                         const OplogSlot& createOpTime) {
     const auto cmdNss = collectionName.getCommandNS();
 
-    const auto cmdObj = makeCreateCollCmdObj(collectionName, options, idIndex);
+    const auto cmdObj =
+        repl::MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);

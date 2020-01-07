@@ -256,7 +256,7 @@ TEST(KVEngineTestHarness, TemporaryRecordStoreSimple) {
         ASSERT_EQUALS(ident, all[0]);
 
         WriteUnitOfWork wuow(&opCtx);
-        ASSERT_OK(engine->dropIdent(&opCtx, ident));
+        ASSERT_OK(engine->dropIdent(&opCtx, opCtx.recoveryUnit(), ident));
         wuow.commit();
     }
 }

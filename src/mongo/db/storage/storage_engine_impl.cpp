@@ -383,7 +383,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         const auto& toRemove = it;
         log() << "Dropping unknown ident: " << toRemove;
         WriteUnitOfWork wuow(opCtx);
-        fassert(40591, _engine->dropIdent(opCtx, toRemove));
+        fassert(40591, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), toRemove));
         wuow.commit();
     }
 
@@ -479,7 +479,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                     log() << "Dropping an unfinished index because --noIndexBuildRetry is set. "
                              "Collection: "
                           << coll << " Index: " << indexName;
-                    fassert(51197, _engine->dropIdent(opCtx, indexIdent));
+                    fassert(51197, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), indexIdent));
                     indexesToDrop.push_back(indexName);
                     continue;
                 }
@@ -501,7 +501,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 log() << "Dropping unfinished index. Collection: " << coll
                       << " Index: " << indexName;
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
-                fassert(50713, _engine->dropIdent(opCtx, indexIdent));
+                fassert(50713, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), indexIdent));
                 indexesToDrop.push_back(indexName);
                 continue;
             }
@@ -522,7 +522,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     for (auto&& temp : internalIdentsToDrop) {
         log() << "Dropping internal ident: " << temp;
         WriteUnitOfWork wuow(opCtx);
-        fassert(51067, _engine->dropIdent(opCtx, temp));
+        fassert(51067, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), temp));
         wuow.commit();
     }
 

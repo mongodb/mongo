@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -89,6 +90,14 @@ public:
     static ReplOperation makeDeleteOperation(const NamespaceString& nss,
                                              boost::optional<UUID> uuid,
                                              const BSONObj& docToDelete);
+
+    static ReplOperation makeCreateCommand(const NamespaceString nss,
+                                           const mongo::CollectionOptions& options,
+                                           const BSONObj& idIndex);
+
+    static BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,
+                                        const mongo::CollectionOptions& options,
+                                        const BSONObj& idIndex);
 
     static StatusWith<MutableOplogEntry> parse(const BSONObj& object);
 
@@ -213,6 +222,7 @@ public:
 
     // Make helper functions accessible.
     using MutableOplogEntry::getOpTime;
+    using MutableOplogEntry::makeCreateCommand;
     using MutableOplogEntry::makeDeleteOperation;
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;

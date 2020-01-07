@@ -78,7 +78,7 @@ public:
 
     void endBackup(OperationContext* opCtx) override {}
 
-    Status dropIdent(OperationContext* opCtx, StringData ident) override;
+    Status dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) override;
 
     bool supportsDocLocking() const override {
         return false;

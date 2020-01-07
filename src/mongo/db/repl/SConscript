@@ -179,11 +179,11 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/health_log',
         '$BUILD_DIR/mongo/db/db_raii',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/util/md5',
     ],
@@ -488,6 +488,7 @@ env.Library(
         'optime_and_wall_time_base',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

@@ -104,7 +104,9 @@ std::unique_ptr<SortedDataInterface> EphemeralForTestEngine::getSortedDataInterf
                                         &_dataMap[ident]);
 }
 
-Status EphemeralForTestEngine::dropIdent(OperationContext* opCtx, StringData ident) {
+Status EphemeralForTestEngine::dropIdent(OperationContext* opCtx,
+                                         RecoveryUnit* ru,
+                                         StringData ident) {
     stdx::lock_guard<Latch> lk(_mutex);
     _dataMap.erase(ident);
     return Status::OK();

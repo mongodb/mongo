@@ -190,6 +190,10 @@ Status createCollection(OperationContext* opCtx,
     }
 
     if (collectionOptions.isView()) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create a view in a multi-document "
+                                 "transaction.",
+                !opCtx->inMultiDocumentTransaction());
         return _createView(opCtx, nss, collectionOptions, idIndex);
     } else {
         return _createCollection(opCtx, nss, collectionOptions, idIndex);

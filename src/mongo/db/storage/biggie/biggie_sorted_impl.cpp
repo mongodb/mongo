@@ -443,8 +443,9 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
 
 // This function is, as of now, not in the interface, but there exists a server ticket to add
 // truncate to the list of commands able to be used.
-Status SortedDataInterface::truncate(OperationContext* opCtx) {
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
+Status SortedDataInterface::truncate(mongo::RecoveryUnit* ru) {
+    auto bRu = checked_cast<biggie::RecoveryUnit*>(ru);
+    StringStore* workingCopy(bRu->getHead());
     std::vector<std::string> toDelete;
     auto end = workingCopy->upper_bound(_KSForIdentEnd);
     for (auto it = workingCopy->lower_bound(_KSForIdentStart); it != end; ++it) {
@@ -453,7 +454,7 @@ Status SortedDataInterface::truncate(OperationContext* opCtx) {
     if (!toDelete.empty()) {
         for (const auto& key : toDelete)
             workingCopy->erase(key);
-        RecoveryUnit::get(opCtx)->makeDirty();
+        bRu->makeDirty();
     }
 
     return Status::OK();
