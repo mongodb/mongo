@@ -143,6 +143,15 @@ func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, err
 	return exists, nil
 }
 
+// addToKnownCollections will add a collection to the restore.knownCollections cache.
+// This is used to update the cache after a collection has been created during a restore.
+func (restore *MongoRestore) addToKnownCollections(intent *intents.Intent) {
+	restore.knownCollectionsMutex.Lock()
+	defer restore.knownCollectionsMutex.Unlock()
+
+	restore.knownCollections[intent.DB] = append(restore.knownCollections[intent.DB], intent.C)
+}
+
 // CreateIndexes takes in an intent and an array of index documents and
 // attempts to create them using the createIndexes command. If that command
 // fails, we fall back to individual index creation.
@@ -389,19 +398,19 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 		}
 
 		// make sure we always drop the temporary collection
-		defer func() {
+		defer func(cleanupArg loopArg) {
 			session, e := restore.SessionProvider.GetSession()
 			if e != nil {
 				// logging errors here because this has no way of returning that doesn't mask other errors
-				log.Logvf(log.Info, "error establishing connection to drop temporary collection admin.%v: %v", arg.tempCollectionName, e)
+				log.Logvf(log.Info, "error establishing connection to drop temporary collection admin.%v: %v", cleanupArg.tempCollectionName, e)
 				return
 			}
-			log.Logvf(log.DebugHigh, "dropping temporary collection admin.%v", arg.tempCollectionName)
-			e = session.Database("admin").Collection(arg.tempCollectionName).Drop(nil)
+			log.Logvf(log.DebugHigh, "dropping temporary collection admin.%v", cleanupArg.tempCollectionName)
+			e = session.Database("admin").Collection(cleanupArg.tempCollectionName).Drop(nil)
 			if e != nil {
-				log.Logvf(log.Info, "error dropping temporary collection admin.%v: %v", arg.tempCollectionName, e)
+				log.Logvf(log.Info, "error dropping temporary collection admin.%v: %v", cleanupArg.tempCollectionName, e)
 			}
-		}()
+		}(arg)
 		userTargetDB = arg.intent.DB
 	}
 
