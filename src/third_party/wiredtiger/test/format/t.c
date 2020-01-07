@@ -190,7 +190,6 @@ main(int argc, char *argv[])
      * Initialize locks to single-thread named checkpoints and backups, last last-record updates,
      * and failures.
      */
-    testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
     testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
     testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
     testutil_check(pthread_rwlock_init(&g.ts_lock, NULL));
@@ -270,7 +269,6 @@ main(int argc, char *argv[])
 
     config_print(false);
 
-    testutil_check(pthread_rwlock_destroy(&g.append_lock));
     testutil_check(pthread_rwlock_destroy(&g.backup_lock));
     testutil_check(pthread_rwlock_destroy(&g.death_lock));
     testutil_check(pthread_rwlock_destroy(&g.ts_lock));

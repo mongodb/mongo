@@ -371,6 +371,55 @@ tasks:
         vars:
           posix_configure_flags: --enable-strict --enable-diagnostic
 
+  - name: compile-gcc
+    tags: ["pull_request", "pull_request_compilers"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-4.8 CXX=g++-4.8 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-5 CXX=g++-5 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-6 CXX=g++-6 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-6 CXX=g++-6 CFLAGS="-ggdb -fPIC" CPPFLAGS=-fvisibility=hidden
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-7 CXX=g++-7 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-8 CXX=g++-8 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-9 CXX=g++-9 CFLAGS="-ggdb -fPIC"
+
+  - name: compile-clang
+    tags: ["pull_request", "pull_request_compilers"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-3.9 CXX=clang++-3.9 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-4.0 CXX=clang++-4.0 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-5.0 CXX=clang++-5.0 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-6.0 CXX=clang++-6.0 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-7 CXX=clang++-7 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-8 CXX=clang++-8 CFLAGS="-ggdb -fPIC"
+
   - name: make-check-test
     depends_on:
       - name: compile
@@ -2029,7 +2078,7 @@ buildvariants:
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
-    - name: ".pull_request !.windows_only"
+    - name: ".pull_request !.windows_only !.pull_request_compilers"
     - name: compile-msan
     - name: make-check-msan-test
     - name: compile-ubsan
@@ -2054,6 +2103,17 @@ buildvariants:
     - name: format-stress-test
     - name: format-stress-smoke-test
     - name: checkpoint-stress-test
+
+- name: ubuntu1804-compilers
+  display_name: Ubuntu 18.04 Compilers
+  run_on:
+  - ubuntu1804-wt-build
+  expansions:
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-lz4 --enable-snappy --enable-zlib --enable-zstd --enable-python
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+  tasks:
+    - name: ".pull_request_compilers"
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)

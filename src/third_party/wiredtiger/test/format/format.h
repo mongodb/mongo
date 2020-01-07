@@ -106,15 +106,6 @@ typedef struct {
 
     uint64_t truncate_cnt; /* Counter for truncation */
 
-    /*
-     * We have a list of records that are appended, but not yet "resolved", that is, we haven't yet
-     * incremented the g.rows value to reflect the new records.
-     */
-    uint64_t *append;             /* Appended records */
-    size_t append_max;            /* Maximum unresolved records */
-    size_t append_cnt;            /* Current unresolved records */
-    pthread_rwlock_t append_lock; /* Single-thread resolution */
-
     pthread_rwlock_t death_lock; /* Single-thread failure */
 
     char *uri; /* Object name */
@@ -314,6 +305,9 @@ typedef struct {
     uint64_t read_ts;      /* read timestamp */
     uint64_t commit_ts;    /* commit timestamp */
     SNAP_OPS *snap, *snap_first, snap_list[512];
+
+    uint64_t insert_list[256]; /* column-store inserted records */
+    u_int insert_list_cnt;
 
     WT_ITEM *tbuf, _tbuf; /* temporary buffer */
 

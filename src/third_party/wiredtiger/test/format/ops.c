@@ -29,6 +29,7 @@
 #include "format.h"
 
 static int col_insert(TINFO *, WT_CURSOR *);
+static void col_insert_resolve(TINFO *);
 static int col_modify(TINFO *, WT_CURSOR *, bool);
 static int col_remove(TINFO *, WT_CURSOR *, bool);
 static int col_reserve(TINFO *, WT_CURSOR *, bool);
@@ -43,7 +44,6 @@ static int row_remove(TINFO *, WT_CURSOR *, bool);
 static int row_reserve(TINFO *, WT_CURSOR *, bool);
 static int row_truncate(TINFO *, WT_CURSOR *);
 static int row_update(TINFO *, WT_CURSOR *, bool);
-static void table_append_init(void);
 
 static char modify_repl[256];
 
@@ -166,9 +166,6 @@ wts_ops(bool lastrun)
         fourths = ((int64_t)g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
         quit_fourths = fourths + 15 * 4 * 60;
     }
-
-    /* Initialize the table extension code. */
-    table_append_init();
 
     /*
      * We support replay of threaded runs, but don't log random numbers after threaded operations
@@ -789,7 +786,7 @@ ops(void *arg)
                  * We can only append so many new records, once we reach that limit, update a record
                  * instead of inserting.
                  */
-                if (g.append_cnt >= g.append_max)
+                if (tinfo->insert_list_cnt >= WT_ELEMENTS(tinfo->insert_list))
                     goto update_instead_of_chosen_op;
 
                 ret = col_insert(tinfo, cursor);
@@ -943,6 +940,10 @@ update_instead_of_chosen_op:
                 WRITE_OP_FAILED(false);
             break;
         }
+
+        /* If we have pending inserts, try and update the total rows. */
+        if (tinfo->insert_list_cnt > 0)
+            col_insert_resolve(tinfo);
 
         /*
          * The cursor is positioned if we did any operation other than insert, do a small number of
@@ -1582,100 +1583,6 @@ col_update(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 }
 
 /*
- * table_append_init --
- *     Re-initialize the appended records list.
- */
-static void
-table_append_init(void)
-{
-    /* Append up to 10 records per thread before waiting on resolution. */
-    g.append_max = (size_t)g.c_threads * 10;
-    g.append_cnt = 0;
-
-    free(g.append);
-    g.append = dcalloc(g.append_max, sizeof(uint64_t));
-}
-
-/*
- * table_append --
- *     Resolve the appended records.
- */
-static void
-table_append(uint64_t keyno)
-{
-    uint64_t *ep, *p;
-    int done;
-
-    ep = g.append + g.append_max;
-
-    /*
-     * We don't want to ignore records we append, which requires we update the "last row" as we
-     * insert new records. Threads allocating record numbers can race with other threads, so the
-     * thread allocating record N may return after the thread allocating N + 1. We can't update a
-     * record before it's been inserted, and so we can't leave gaps when the count of records in the
-     * table is incremented.
-     *
-     * The solution is the append table, which contains an unsorted list of appended records. Every
-     * time we finish appending a record, process the table, trying to update the total records in
-     * the object.
-     *
-     * First, enter the new key into the append list.
-     *
-     * It's technically possible to race: we allocated space for 10 records per thread, but the
-     * check for the maximum number of records being appended doesn't lock. If a thread allocated a
-     * new record and went to sleep (so the append table fills up), then N threads of control used
-     * the same g.append_cnt value to decide there was an available slot in the append table and
-     * both allocated new records, we could run out of space in the table. It's unfortunately not
-     * even unlikely in the case of a large number of threads all inserting as fast as they can and
-     * a single thread going to sleep for an unexpectedly long time. If it happens, sleep and retry
-     * until earlier records are resolved and we find a slot.
-     */
-    for (done = 0;;) {
-        testutil_check(pthread_rwlock_wrlock(&g.append_lock));
-
-        /*
-         * If this is the thread we've been waiting for, and its record won't fit, we'd loop
-         * infinitely. If there are many append operations and a thread goes to sleep for a little
-         * too long, it can happen.
-         */
-        if (keyno == g.rows + 1) {
-            g.rows = keyno;
-            done = 1;
-
-            /*
-             * Clean out the table, incrementing the total count of records until we don't find the
-             * next key.
-             */
-            for (;;) {
-                for (p = g.append; p < ep; ++p)
-                    if (*p == g.rows + 1) {
-                        g.rows = *p;
-                        *p = 0;
-                        --g.append_cnt;
-                        break;
-                    }
-                if (p == ep)
-                    break;
-            }
-        } else
-            /* Enter the key into the table. */
-            for (p = g.append; p < ep; ++p)
-                if (*p == 0) {
-                    *p = keyno;
-                    ++g.append_cnt;
-                    done = 1;
-                    break;
-                }
-
-        testutil_check(pthread_rwlock_unlock(&g.append_lock));
-
-        if (done)
-            break;
-        __wt_sleep(1, 0);
-    }
-}
-
-/*
  * row_insert --
  *     Insert a row in a row-store file.
  */
@@ -1707,6 +1614,63 @@ row_insert(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 }
 
 /*
+ * col_insert_resolve --
+ *     Resolve newly inserted records.
+ */
+static void
+col_insert_resolve(TINFO *tinfo)
+{
+    uint64_t v, *p;
+    u_int i;
+
+    /*
+     * We don't want to ignore column-store records we insert, which requires we update the "last
+     * row" so other threads consider them. Threads allocating record numbers can race with other
+     * threads, so the thread allocating record N may return after the thread allocating N + 1. We
+     * can't update a record before it's been inserted, and so we can't leave gaps when the count of
+     * records in the table is incremented.
+     *
+     * The solution is a per-thread array which contains an unsorted list of inserted records. If
+     * there are pending inserts, we review the table after every operation, trying to update the
+     * total rows. This is wasteful, but we want to give other threads immediate access to the row,
+     * ideally they'll collide with our insert before we resolve.
+     *
+     * Process the existing records and advance the last row count until we can't go further.
+     */
+    do {
+        WT_ORDERED_READ(v, g.rows);
+        for (i = 0, p = tinfo->insert_list; i < WT_ELEMENTS(tinfo->insert_list); ++i) {
+            if (*p == v + 1) {
+                testutil_assert(__wt_atomic_casv64(&g.rows, v, v + 1));
+                *p = 0;
+                --tinfo->insert_list_cnt;
+                break;
+            }
+            testutil_assert(*p == 0 || *p > v);
+        }
+    } while (tinfo->insert_list_cnt > 0 && i < WT_ELEMENTS(tinfo->insert_list));
+}
+
+/*
+ * col_insert_add --
+ *     Add newly inserted records.
+ */
+static void
+col_insert_add(TINFO *tinfo)
+{
+    u_int i;
+
+    /* Add the inserted record to the array. */
+    for (i = 0; i < WT_ELEMENTS(tinfo->insert_list); ++i)
+        if (tinfo->insert_list[i] == 0) {
+            tinfo->insert_list[i] = tinfo->keyno;
+            ++tinfo->insert_list_cnt;
+            break;
+        }
+    testutil_assert(i < WT_ELEMENTS(tinfo->insert_list));
+}
+
+/*
  * col_insert --
  *     Insert an element in a column-store file.
  */
@@ -1726,7 +1690,7 @@ col_insert(TINFO *tinfo, WT_CURSOR *cursor)
 
     testutil_check(cursor->get_key(cursor, &tinfo->keyno));
 
-    table_append(tinfo->keyno); /* Extend the object. */
+    col_insert_add(tinfo); /* Extend the object. */
 
     if (g.type == FIX)
         logop(cursor->session, "%-10s%" PRIu64 " {0x%02" PRIx8 "}", "insert", tinfo->keyno,
