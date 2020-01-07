@@ -278,6 +278,13 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
                                              << " have version 1, but found "
                                              << newConfig.getConfigVersion());
     }
+
+    if (newConfig.getConfigTerm() != OpTime::kInitialTerm) {
+        return StatusWith<int>(
+            ErrorCodes::NewReplicaSetConfigurationIncompatible,
+            str::stream() << "Configuration used to initiate a replica set must have term "
+                          << OpTime::kInitialTerm << ", but found " << newConfig.getConfigTerm());
+    }
     return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 

@@ -55,6 +55,7 @@ const Milliseconds ReplSetConfig::kCatchUpTakeoverDisabled(-1);
 
 const std::string ReplSetConfig::kConfigServerFieldName = "configsvr";
 const std::string ReplSetConfig::kVersionFieldName = "version";
+const std::string ReplSetConfig::kTermFieldName = "term";
 const std::string ReplSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
@@ -76,6 +77,7 @@ const std::string kWriteConcernMajorityJournalDefaultFieldName =
 
 const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  ReplSetConfig::kVersionFieldName,
+                                                 ReplSetConfig::kTermFieldName,
                                                  kMembersFieldName,
                                                  kSettingsFieldName,
                                                  kProtocolVersionFieldName,
@@ -128,6 +130,19 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defa
     status = bsonExtractIntegerField(cfg, kVersionFieldName, &_version);
     if (!status.isOK())
         return status;
+
+    //
+    // Parse term. Default to -1 if none is given. Initial configs always have the initial term.
+    //
+    if (forInitiate) {
+        _term = OpTime::kInitialTerm;
+    } else {
+        status = bsonExtractIntegerFieldWithDefault(
+            cfg, kTermFieldName, OpTime::kUninitializedTerm, &_term);
+        if (!status.isOK())
+            return status;
+    }
+
 
     //
     // Parse members
@@ -411,6 +426,11 @@ Status ReplSetConfig::validate() const {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kVersionFieldName << " field value of " << _version
                                     << " is out of range");
+    }
+    if (_term < -1 || _term > std::numeric_limits<int>::max()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << kTermFieldName << " field value of " << _term << " is out of range");
     }
     if (_replSetName.empty()) {
         return Status(ErrorCodes::BadValue,
@@ -836,6 +856,9 @@ BSONObj ReplSetConfig::toBSON() const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
+    // TODO (SERVER-45408): Enable serialization of the config "term" field once we can handle it
+    // properly in upgrade/downgrade scenarios.
+    // configBuilder.appendIntOrLL(kTermFieldName, _term);
     if (_configServer) {
         // Only include "configsvr" field if true
         configBuilder.append(kConfigServerFieldName, _configServer);

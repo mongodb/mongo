@@ -56,6 +56,7 @@ public:
 
     static const std::string kConfigServerFieldName;
     static const std::string kVersionFieldName;
+    static const std::string kTermFieldName;
     static const std::string kMajorityWriteConcernModeName;
 
     // If this field is present, a repair operation potentially modified replicated data. This
@@ -118,6 +119,16 @@ public:
      */
     long long getConfigVersion() const {
         return _version;
+    }
+
+    /**
+     * Gets the term of this configuration.
+     *
+     * The configuration term is the term of the primary that originally created this configuration.
+     * Configurations in a replica set are totally ordered by their term and configuration version.
+     */
+    long long getConfigTerm() const {
+        return _term;
     }
 
     /**
@@ -400,6 +411,7 @@ private:
 
     bool _isInitialized = false;
     long long _version = 1;
+    long long _term = OpTime::kUninitializedTerm;
     std::string _replSetName;
     std::vector<MemberConfig> _members;
     WriteConcernOptions _defaultWriteConcern;
