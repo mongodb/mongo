@@ -3193,6 +3193,10 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
     auto deadline = getNet()->now() + maxAwaitTime;
 
     auto opCtx = makeOperationContext();
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
     stdx::thread getIsMasterThread([&] {
@@ -3230,6 +3234,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
         ASSERT_FALSE(responseStepdownComplete->hasPrimary());
     });
 
+    // Ensure that awaitIsMasterResponse() is called before triggering a stepdown.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
     // A topology change should cause the server to respond to the waiting IsMasterResponse.
     getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
@@ -3267,6 +3273,10 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionTimeout) {
     // A topology change should increment the TopologyVersion counter.
     auto expectedCounter = currentTopologyVersion.getCounter() + 1;
     auto opCtx = makeOperationContext();
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
     stdx::thread getIsMasterThread([&] {
@@ -3281,6 +3291,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionTimeout) {
         ASSERT_FALSE(response->hasPrimary());
     });
 
+    // Ensure that awaitIsMasterResponse() is called before triggering an election timeout.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
     getNet()->enterNetwork();
     // Primary steps down after not receiving a response within the election timeout.
     getNet()->advanceTime(electionTimeoutDate);
@@ -3711,6 +3723,10 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfig) {
     // A topology change should increment the TopologyVersion counter.
     auto expectedCounter = currentTopologyVersion.getCounter() + 1;
     auto opCtx = makeOperationContext();
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
     stdx::thread getIsMasterThread([&] {
@@ -3725,6 +3741,9 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfig) {
         ASSERT_EQUALS(3, hosts.size());
         ASSERT_EQUALS("node3", hosts[2].host());
     });
+
+    // Ensure that awaitIsMasterResponse() is called before triggering a reconfig.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
 
     // Do a reconfig to add a third node to the replica set. A reconfig should cause the server to
     // respond to the waiting IsMasterResponse.

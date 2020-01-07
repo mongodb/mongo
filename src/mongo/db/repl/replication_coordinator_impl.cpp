@@ -108,6 +108,7 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
+MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -1946,6 +1947,12 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     }
 
     lk.unlock();
+
+    if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
+        // Used in tests that wait for this failpoint to be entered before triggering a topology
+        // change.
+        log() << "waitForIsMasterResponse failpoint enabled.";
+    }
 
     // Wait for a topology change with timeout set to deadline.
     LOG(1) << "Waiting for an isMaster response from a topology change or until deadline: "
