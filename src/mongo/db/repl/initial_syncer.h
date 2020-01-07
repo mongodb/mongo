@@ -162,6 +162,28 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
+    class OplogFetcherRestartDecisionInitialSyncer
+        : public AbstractOplogFetcher::OplogFetcherRestartDecision {
+
+    public:
+        OplogFetcherRestartDecisionInitialSyncer(InitialSyncSharedData* sharedData,
+                                                 std::size_t maxFetcherRestarts)
+            : _sharedData(sharedData), _defaultDecision(maxFetcherRestarts){};
+
+        bool shouldContinue(AbstractOplogFetcher* fetcher, Status status) final;
+
+        void fetchSuccessful(AbstractOplogFetcher* fetcher) final;
+
+    private:
+        InitialSyncSharedData* _sharedData;
+
+        // We delegate to the default strategy when it's a non-network error.
+        AbstractOplogFetcher::OplogFetcherRestartDecisionDefault _defaultDecision;
+
+        // The operation, if any, currently being retried because of a network error.
+        InitialSyncSharedData::RetryableOperation _retryingOperation;
+    };
+
     struct Stats {
         std::uint32_t failedInitialSyncAttempts{0};
         std::uint32_t maxFailedInitialSyncAttempts{0};

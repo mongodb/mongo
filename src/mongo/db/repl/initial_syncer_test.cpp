@@ -1949,6 +1949,90 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
     ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
 }
 
+TEST_F(InitialSyncerTest,
+       InitialSyncerPassesThroughOplogFetcherRestartsBasedOnInitialSyncFetcherRestartDecision) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    const std::uint32_t initialSyncMaxAttempts = 2U;
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), initialSyncMaxAttempts));
+
+    auto lastOp = makeOplogEntry(2);
+
+    auto net = getNet();
+    int baseRollbackId = 1;
+    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        {
+            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
+            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
+                                                 kListDatabasesFailPointData);
+            // Feature Compatibility Version.
+            processSuccessfulFCVFetcherResponseLastStable();
+
+            // OplogFetcher's oplog tailing query. Response has enough operations to reach
+            // end timestamp.
+            request = net->scheduleSuccessfulResponse(makeCursorResponse(
+                1LL, _options.localOplogNS, {makeOplogEntryObj(1), lastOp.toBSON()}));
+            assertRemoteCommandNameEquals("find", request);
+            ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
+
+            net->runReadyNetworkOperations();
+
+            // Schedule a network error that restarts the OplogFetcher.
+            request = assertRemoteCommandNameEquals(
+                "getMore",
+                net->scheduleErrorResponse(Status(ErrorCodes::NetworkTimeout, "network error")));
+            assertRemoteCommandNameEquals("getMore", request);
+            net->runReadyNetworkOperations();
+
+            // Black hole OplogFetcher's find request.
+            auto noi = net->getNextReadyRequest();
+            request = noi->getRequest();
+            assertRemoteCommandNameEquals("find", request);
+            net->blackHole(noi);
+        }
+
+        // Oplog entry associated with the stopTimestamp.
+
+        processSuccessfulLastOplogEntryFetcherResponse({lastOp.toBSON()});
+
+        request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+        assertRemoteCommandNameEquals("replSetGetRBID", request);
+
+        net->runReadyNetworkOperations();
+
+        // _multiApplierCallback() will cancel the _getNextApplierBatchCallback() task after setting
+        // the completion status.
+        // We call runReadyNetworkOperations() again to deliver the cancellation status to
+        // _oplogFetcherCallback().
+
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_OK(_lastApplied.getStatus());
+}
+
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
