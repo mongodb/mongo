@@ -5,8 +5,9 @@
 
 load("jstests/multiVersion/libs/multi_rs.js");  // Used by upgradeSet.
 
-const dbName = "test";
-const collName = jsTestName();
+const testName = "map_reduce_multiversion_repl_set";
+const dbName = "test_" + testName;
+const collName = testName;
 
 TestData.skipCheckDBHashes = true;  // Skip db hashes when restarting the replset.
 

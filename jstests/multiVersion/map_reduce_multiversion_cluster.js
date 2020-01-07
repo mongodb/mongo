@@ -10,8 +10,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster.
 
-const dbName = "test";
-const collName = jsTestName();
+const testName = "map_reduce_multiversion_cluster";
+const dbName = "test_" + testName;
+const collName = testName;
 
 // Start a sharded cluster in which all mongod and mongos processes are "last-stable" binVersion.
 var st = new ShardingTest({

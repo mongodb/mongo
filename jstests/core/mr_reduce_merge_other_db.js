@@ -8,13 +8,15 @@
 (function() {
 "use strict";
 
-const coll = db.mr_replace;
+const testName = "mr_reduce_merge_other_db";
+const testDB = db.getSiblingDB(testName);
+const coll = testDB.mr_replace;
 coll.drop();
 
 assert.commandWorked(coll.insert([{a: [1, 2]}, {a: [2, 3]}, {a: [3, 4]}]));
 
-const outCollStr = "mr_replace_col";
-const outDbStr = "mr_db";
+const outCollStr = "mr_replace_col_" + testName;
+const outDbStr = "mr_db_" + testName;
 const outDb = db.getMongo().getDB(outDbStr);
 const outColl = outDb[outCollStr];
 
