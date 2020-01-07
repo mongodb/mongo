@@ -7026,15 +7026,6 @@ tasks:
       fallback_num_sub_suites: 3
 
 - <<: *task_template
-  name: tool
-  tags: ["misc_js", "non_mobile", "tool"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=tool --storageEngine=wiredTiger
-
-- <<: *task_template
   name: jsCore_decimal
   tags: ["jscore", "common", "decimal"]
   commands:
@@ -9533,7 +9524,6 @@ buildvariants:
   run_on:
   - macos-1014
   expansions:
-    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -9602,7 +9592,6 @@ buildvariants:
   - name: replica_sets_large_txns_format_gen
   - name: .ssl
   - name: .stitch
-  - name: tool
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -9611,7 +9600,6 @@ buildvariants:
   run_on:
   - macos-1014
   expansions:
-    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos
@@ -10100,7 +10088,7 @@ buildvariants:
     - name: .auth
     - name: causally_consistent_jscore_txns_passthrough
     - name: .change_streams
-    - name: .misc_js !.tool
+    - name: .misc_js
     - name: .concurrency !.ubsan !.no_txns !.stepdowns !.kill_terminate
     - name: disk_wiredtiger
     - name: .encrypt
