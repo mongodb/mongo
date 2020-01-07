@@ -217,6 +217,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
                                    const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
+                                   const bool allowRenameOutOfTheWay,
                                    const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
@@ -275,6 +276,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, newCollName)
                     : nullptr;
                 bool needsRenaming = static_cast<bool>(futureColl);
+                invariant(!needsRenaming || allowRenameOutOfTheWay);
+
                 for (int tries = 0; needsRenaming && tries < 10; ++tries) {
                     auto tmpNameResult =
                         db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");

@@ -122,8 +122,11 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
 
     auto uuid = UUID::gen();
     Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
-    ASSERT_OK(createCollectionForApplyOps(
-        opCtx.get(), newNss.db().toString(), uuid, BSON("create" << newNss.coll())));
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          newNss.db().toString(),
+                                          uuid,
+                                          BSON("create" << newNss.coll()),
+                                          /*allowRenameOutOfTheWay*/ false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
 }
@@ -148,8 +151,11 @@ TEST_F(CreateCollectionTest,
 
     // This should rename the existing collection 'curNss' to the collection 'newNss' we are trying
     // to create.
-    ASSERT_OK(createCollectionForApplyOps(
-        opCtx.get(), newNss.db().toString(), uuid, BSON("create" << newNss.coll())));
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          newNss.db().toString(),
+                                          uuid,
+                                          BSON("create" << newNss.coll()),
+                                          /*allowRenameOutOfTheWay*/ true));
 
     ASSERT_FALSE(collectionExists(opCtx.get(), curNss));
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
@@ -174,8 +180,11 @@ TEST_F(CreateCollectionTest,
     ASSERT_NOT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
 
     // This should rename the existing collection 'newNss' to a randomly generated collection name.
-    ASSERT_OK(createCollectionForApplyOps(
-        opCtx.get(), newNss.db().toString(), uuid, BSON("create" << newNss.coll())));
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          newNss.db().toString(),
+                                          uuid,
+                                          BSON("create" << newNss.coll()),
+                                          /*allowRenameOutOfTheWay*/ true));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
     ASSERT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
@@ -212,8 +221,11 @@ TEST_F(CreateCollectionTest,
     // This should fail because we are not allowed to take a collection out of its drop-pending
     // state.
     ASSERT_EQUALS(ErrorCodes::NamespaceExists,
-                  createCollectionForApplyOps(
-                      opCtx.get(), newNss.db().toString(), uuid, BSON("create" << newNss.coll())));
+                  createCollectionForApplyOps(opCtx.get(),
+                                              newNss.db().toString(),
+                                              uuid,
+                                              BSON("create" << newNss.coll()),
+                                              /*allowRenameOutOfTheWay*/ false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
