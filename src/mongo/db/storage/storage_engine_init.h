@@ -44,6 +44,7 @@ namespace mongo {
 enum StorageEngineInitFlags {
     kNone = 0,
     kAllowNoLockFile = 1 << 0,
+    kSkipMetadataFile = 1 << 1,
 };
 
 /**
