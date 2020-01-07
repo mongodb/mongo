@@ -71,23 +71,19 @@ BSONObj lsidQuery(const LogicalSessionRecord& record) {
     return lsidQuery(record.getId());
 }
 
-BSONObj updateQuery(const LogicalSessionRecord& record) {
-    // { $max : { lastUse : <time> }, $setOnInsert : { user : <user> } }
+BSONArray updateQuery(const LogicalSessionRecord& record) {
+    // [ { $set : { lastUse : $$NOW } } , { $set : { user: <user> } } ]
 
     // Build our update doc.
-    BSONObjBuilder updateBuilder;
-
-    {
-        BSONObjBuilder maxBuilder(updateBuilder.subobjStart("$currentDate"));
-        maxBuilder.append(LogicalSessionRecord::kLastUseFieldName, true);
-    }
+    BSONArrayBuilder updateBuilder;
+    updateBuilder << BSON("$set" << BSON(LogicalSessionRecord::kLastUseFieldName << "$$NOW"));
 
     if (record.getUser()) {
-        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$setOnInsert"));
-        setBuilder.append(LogicalSessionRecord::kUserFieldName, BSON("name" << *record.getUser()));
+        updateBuilder << BSON("$set" << BSON(LogicalSessionRecord::kUserFieldName
+                                             << BSON("name" << *record.getUser())));
     }
 
-    return updateBuilder.obj();
+    return updateBuilder.arr();
 }
 
 template <typename TFactory, typename AddLineFn, typename SendFn, typename Container>
