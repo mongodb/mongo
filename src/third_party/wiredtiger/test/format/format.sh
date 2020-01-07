@@ -361,14 +361,14 @@ format()
 	if [[ $smoke_test -ne 0 ]]; then
 		args=${smoke_list[$smoke_next]}
 		smoke_next=$(($smoke_next + 1))
-		echo "$name: starting smoke-test job in $dir"
+		echo "$name: starting smoke-test job in $dir ($(date))"
 	else
 		args=$format_args
 
 		# If abort/recovery testing is configured, do it 5% of the time.
 		[[ $abort_test -ne 0 ]] && [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args abort=1"
 
-		echo "$name: starting job in $dir"
+		echo "$name: starting job in $dir ($(date))"
 	fi
 
 	cmd="$format_binary -c "$config" -h "$dir" -1 $args quiet=1"
