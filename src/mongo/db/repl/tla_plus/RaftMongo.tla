@@ -16,7 +16,7 @@
 \*         Servers = a set of your desired replica set size, e.g. {1, 2, 3}
 \* "What to check?"
 \*     Deadlock: checked
-\*     Invariants: NeverRollbackCommitted
+\*     Invariants: NeverRollbackCommitted and NoTwoPrimariesInSameTerm
 \* "Additional Spec Options"
 \*     "State Constraint"
 \*         Add a state constraint to limit the state space like:
@@ -32,11 +32,16 @@ CONSTANT Server
 \* action. For model-checking, this can be 1 or a small number.
 CONSTANT MaxClientWriteSize
 
-\* The maximum term known by any server.
-VARIABLE globalCurrentTerm
+\* The set of log entries that have been acknowledged as committed, i.e.
+\* "immediately committed" entries. It does not include "prefix committed"
+\* entries, which are allowed to roll back on minority nodes.
+VARIABLE committedEntries
 
 ----
 \* The following variables are all per server (functions with domain Server).
+
+\* The server's term number.
+VARIABLE currentTerm
 
 \* The server's state ("Follower", "Candidate", or "Leader").
 VARIABLE state
@@ -44,14 +49,14 @@ VARIABLE state
 \* The commit point learned by each server.
 VARIABLE commitPoint
 
-electionVars == <<globalCurrentTerm, state>>
+electionVars == <<currentTerm, state>>
 serverVars == <<electionVars, commitPoint>>
 
 \* A Sequence of log entries. The index into this sequence is the index of the
 \* log entry. Unfortunately, the Sequence module defines Head(s) as the entry
 \* with index 1, so be careful not to use that!
 VARIABLE log
-logVars == <<log>>
+logVars == <<committedEntries, log>>
 
 \* End of per server variables.
 ----
@@ -66,6 +71,14 @@ IsMajority(servers) == Cardinality(servers) * 2 > Cardinality(Server)
 GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
+Leaders == {s \in Server : state[s] = "Leader"}
+
+\* The maximum currentTerm.
+GlobalCurrentTerm == 
+    LET server ==
+        CHOOSE x \in Server :
+            \A y \in Server : currentTerm[y] <= currentTerm[x]
+     IN currentTerm[server]
 
 \* Return the maximum value from a set, or undefined if the set is empty.
 Max(s) == CHOOSE x \in s : \A y \in s : x >= y
@@ -92,10 +105,6 @@ CommitPointLessThan(i, j) ==
    \/ /\ commitPoint[i].term = commitPoint[j].term
       /\ commitPoint[i].index < commitPoint[j].index
 
-IsCommitted(me, logIndex) ==
-    /\ IsMajority(Agree(me, logIndex))
-    /\ LogTerm(me, logIndex) = globalCurrentTerm
-
 \* Is it possible for node i's log to roll back based on j's log? If true, it
 \* implies that i's log should remove entries to become a prefix of j's.
 CanRollbackOplog(i, j) ==
@@ -107,18 +116,14 @@ CanRollbackOplog(i, j) ==
        \/ /\ Len(log[i]) <= Len(log[j])
           /\ LastTerm(log[i]) /= LogTerm(j, Len(log[i]))
 
-RollbackCommitted(i) ==
-    \E j \in Server:
-        /\ CanRollbackOplog(i, j)
-        /\ IsCommitted(i, Len(log[i]))
-
 ----
 \* Define initial values for all variables
 
-InitServerVars == /\ globalCurrentTerm = 0
+InitServerVars == /\ currentTerm       = [i \in Server |-> 0]
                   /\ state             = [i \in Server |-> "Follower"]
                   /\ commitPoint       = [i \in Server |-> [term |-> 0, index |-> 0]]
 InitLogVars ==    /\ log               = [i \in Server |-> << >>]
+                  /\ committedEntries  = {}
 Init == /\ InitServerVars
         /\ InitLogVars
 
@@ -129,60 +134,73 @@ Init == /\ InitServerVars
 \* Receive one or more oplog entries from j.
 AppendOplog(i, j) ==
     /\ CanSyncFrom(i, j)
+    /\ state[i] = "Follower"  \* Disable primary catchup and draining
     /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
         LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
          IN log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
-    /\ UNCHANGED <<serverVars>>
+    /\ UNCHANGED <<committedEntries, serverVars>>
 
 \* Node i learns the commit point from j via heartbeat.
 LearnCommitPoint(i, j) ==
     /\ CommitPointLessThan(i, j)
     /\ commitPoint' = [commitPoint EXCEPT ![i] = commitPoint[j]]
-    /\ UNCHANGED <<electionVars, logVars>>
+    /\ UNCHANGED <<committedEntries, electionVars, logVars>>
 
 RollbackOplog(i, j) ==
     /\ CanRollbackOplog(i, j)
     \* Rollback 1 oplog entry
     /\ LET new == [index2 \in 1..(Len(log[i]) - 1) |-> log[i][index2]]
-         IN log' = [log EXCEPT ![i] = new]
-    /\ UNCHANGED <<serverVars>>
+        IN log' = [log EXCEPT ![i] = new]
+    /\ UNCHANGED <<serverVars, committedEntries>>
 
 \* ACTION
 \* Node i is elected by a majority, and nodes that voted for it can't still be primary.
 \* A stale primary might persist among the minority that didn't vote for it.
 BecomePrimaryByMagic(i, ayeVoters) ==
-    /\ \A j \in ayeVoters : NotBehind(i, j)
+    /\ \A j \in ayeVoters : /\ NotBehind(i, j)
+                            /\ currentTerm[j] <= currentTerm[i]
     /\ IsMajority(ayeVoters)
     /\ state' = [index \in Server |-> IF index \notin ayeVoters
                                       THEN state[index]
                                       ELSE IF index = i THEN "Leader" ELSE "Follower"]
-    /\ globalCurrentTerm' = globalCurrentTerm + 1
-    /\ UNCHANGED <<commitPoint, logVars>>
+    /\ currentTerm' = [index \in Server |-> IF index \in (ayeVoters \union {i})
+                                            THEN currentTerm[i] + 1
+                                            ELSE currentTerm[index]]
+    /\ UNCHANGED <<committedEntries, commitPoint, logVars>>
 
 \* ACTION
 \* Leader i receives a client request to add one or more entries to the log.
+\* There can be multiple leaders, each in a different term. A leader writes
+\* an oplog entry in its own term.
 ClientWrite(i) ==
     /\ state[i] = "Leader"
     /\ \E numEntries \in 1..MaxClientWriteSize :
-        LET entry == [term |-> globalCurrentTerm]
+        LET entry == [term |-> currentTerm[i]]
             newEntries == [ j \in 1..numEntries |-> entry ]
             newLog == log[i] \o newEntries
         IN  log' = [log EXCEPT ![i] = newLog]
-    /\ UNCHANGED <<serverVars>>
+    /\ UNCHANGED <<committedEntries, serverVars>>
 
 \* ACTION
 AdvanceCommitPoint ==
-    \E leader \in Server :
-        /\ state[leader] = "Leader"
+    \E leader \in Leaders : \E acknowledgers \in SUBSET Server :
+        /\ acknowledgers \subseteq Agree(leader, Len(log[leader]))
+        /\ IsMajority(acknowledgers)
         \* New commitPoint is any committed log index after current commitPoint
         /\ \E committedIndex \in (commitPoint[leader].index + 1)..Len(log[leader]) :
-            /\ IsCommitted(leader, committedIndex)
+            /\ LogTerm(leader, Len(log[leader])) = currentTerm[leader]
+            \* If an acknowledger has a higher term, the leader would step down.
+            /\ \A j \in acknowledgers : currentTerm[j] <= currentTerm[leader]
             /\ LET newCommitPoint == [
                        term |-> LogTerm(leader, committedIndex),
                        index |-> committedIndex
                    ]
-               IN  commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
-            /\ UNCHANGED <<electionVars, logVars>>
+                IN /\ commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
+            /\ committedEntries' = committedEntries \union {[
+                   term |-> LogTerm(leader, i),
+                   index |-> i
+               ] : i \in commitPoint[leader].index + 1..committedIndex}
+    /\ UNCHANGED <<electionVars, log>>
 
 \* ACTION
 \* Node i learns the commit point from j via heartbeat with term check
@@ -194,7 +212,7 @@ LearnCommitPointWithTermCheck(i, j) ==
 \* Node i learns the commit point from j while tailing j's oplog
 LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
     \* j is a potential sync source, either ahead of or equal to i's oplog
-    /\ NotBehind(j, i)
+    /\ CanSyncFrom(i, j) \/ log[i] = log[j]
     /\ CommitPointLessThan(i, j)
     \* Never beyond last applied
     /\ LET myCommitPoint ==
@@ -203,7 +221,14 @@ LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
             THEN commitPoint[j]
             ELSE [term |-> LastTerm(log[i]), index |-> Len(log[i])]
        IN commitPoint' = [commitPoint EXCEPT ![i] = myCommitPoint]
-    /\ UNCHANGED <<electionVars, logVars>>
+    /\ UNCHANGED <<committedEntries, electionVars, logVars>>
+
+UpdateTermThroughHeartbeat(i, j) ==
+    /\ currentTerm[j] > currentTerm[i]
+    /\ currentTerm' = [currentTerm EXCEPT ![i] = currentTerm[j]]
+    \* If i is a Leader it steps down when it sees a higher term
+    /\ state' = [state EXCEPT ![i] = "Follower"]
+    /\ UNCHANGED <<logVars>>
 
 ----
 AppendOplogAction ==
@@ -224,31 +249,11 @@ LearnCommitPointWithTermCheckAction ==
 LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction ==
     \E i, j \in Server : LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j)
 
-----
-\* Properties to check
-
-RollbackBeforeCommitPoint(i) ==
-    /\ \E j \in Server:
-        /\ CanRollbackOplog(i, j)
-    /\ \/ LastTerm(log[i]) < commitPoint[i].term
-       \/ /\ LastTerm(log[i]) = commitPoint[i].term
-          /\ Len(log[i]) <= commitPoint[i].index
-
-NeverRollbackBeforeCommitPoint == \A i \in Server: ~RollbackBeforeCommitPoint(i)
-
-\* Liveness check
-
-\* This isn't accurate for any infinite behavior specified by Spec, but it's fine
-\* for any finite behavior with the liveness we can check with the model checker.
-\* This is to check at any time, if two nodes' commit points are not the same, they
-\* will be the same eventually.
-\* This is checked after all possible rollback is done.
-CommitPointEventuallyPropagates ==
-    /\ \A i, j \in Server:
-        [](commitPoint[i] # commitPoint[j] ~>
-               <>(~ENABLED RollbackOplogAction => commitPoint[i] = commitPoint[j]))
+UpdateTermThroughHeartbeatAction ==
+    \E i, j \in Server : UpdateTermThroughHeartbeat(i, j)
 
 ----
+
 \* Defines how the variables may transition.
 \*
 \* MongoDB's commit point learning protocol has evolved as we discovered
@@ -274,7 +279,7 @@ Liveness ==
     /\ SF_vars(AppendOplogAction)
     /\ SF_vars(RollbackOplogAction)
     \* A new primary should eventually write one entry.
-    /\ WF_vars(\E i \in Server : LastTerm(log[i]) # globalCurrentTerm /\ ClientWrite(i))
+    /\ WF_vars(\E i \in Server : LastTerm(log[i]) # GlobalCurrentTerm /\ ClientWrite(i))
     \*
     /\ WF_vars(AdvanceCommitPoint)
     /\ SF_vars(LearnCommitPointWithTermCheckAction)
@@ -284,8 +289,47 @@ Liveness ==
 \* to Next.
 Spec == SpecBehavior /\ Liveness
 
-\* Invariant for model-checking
+----
+
+\* Properties to check
+
+TwoPrimariesInSameTerm ==
+    \E i, j \in Server :
+        /\ i # j
+        /\ currentTerm[i] = currentTerm[j]
+        /\ state[i] = "Leader"
+        /\ state[j] = "Leader"
+
+NoTwoPrimariesInSameTerm == ~TwoPrimariesInSameTerm
+
+RollbackCommitted(i) ==
+    /\ [term |-> LastTerm(log[i]), index |-> Len(log[i])] \in committedEntries
+    /\ \E j \in Server: CanRollbackOplog(i, j)
+
 NeverRollbackCommitted ==
     \A i \in Server: ~RollbackCommitted(i)
+
+RollbackBeforeCommitPoint(i) ==
+    /\ \E j \in Server:
+        /\ CanRollbackOplog(i, j)
+    /\ \/ LastTerm(log[i]) < commitPoint[i].term
+       \/ /\ LastTerm(log[i]) = commitPoint[i].term
+          /\ Len(log[i]) <= commitPoint[i].index
+
+\* This is violated, although it's not ultimately a safety issue: SERVER-39626
+\* The property is here if you want to experiment with it.
+NeverRollbackBeforeCommitPoint == \A i \in Server: ~RollbackBeforeCommitPoint(i)
+
+\* Liveness check
+
+\* This isn't accurate for any infinite behavior specified by Spec, but it's fine
+\* for any finite behavior with the liveness we can check with the model checker.
+\* This is to check at any time, if two nodes' commit points are not the same, they
+\* will be the same eventually.
+\* This is checked after all possible rollback is done.
+CommitPointEventuallyPropagates ==
+    /\ \A i, j \in Server:
+        [](commitPoint[i] # commitPoint[j] ~>
+               <>(~ENABLED RollbackOplogAction => commitPoint[i] = commitPoint[j]))
 
 ===============================================================================
