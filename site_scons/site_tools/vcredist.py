@@ -19,9 +19,11 @@ import winreg
 
 import SCons
 
+
 def exists(env):
-    result = 'msvc' in env['TOOLS']
+    result = "msvc" in env["TOOLS"]
     return result
+
 
 # How to locate the Merge Modules path is described in:
 #
@@ -42,17 +44,18 @@ def exists(env):
 #
 # TODO: Expand this map as needed.
 target_arch_expansion_map = {
-    'amd64'  : 'x64',
-    'arm'    : None,
-    'arm64'  : 'arm64',
-    'emt64'  : 'x64',
-    'i386'   : 'x86',
-    'x86'    : 'x86',
-    'x86_64' : 'x64',
+    "amd64": "x64",
+    "arm": None,
+    "arm64": "arm64",
+    "emt64": "x64",
+    "i386": "x86",
+    "x86": "x86",
+    "x86_64": "x64",
 }
 
+
 def _get_programfiles():
-    result = os.getenv('ProgramFiles(x86)')
+    result = os.getenv("ProgramFiles(x86)")
     # When we run this under cygwin, the environment is broken, fall
     # back to hard coded C:\Program Files (x86)
     if result is None:
@@ -61,20 +64,22 @@ def _get_programfiles():
         return None
     return result
 
+
 def _get_merge_module_name_for_feature(env, feature):
-    version_components = env['MSVC_VERSION'].split('.')
+    version_components = env["MSVC_VERSION"].split(".")
     return "Microsoft_VC{msvc_major}{msvc_minor}_{feature}_{target_arch}.msm".format(
         msvc_major=version_components[0],
         msvc_minor=version_components[1],
         feature=feature,
-        target_arch=target_arch_expansion_map[env.subst('$TARGET_ARCH')]
+        target_arch=target_arch_expansion_map[env.subst("$TARGET_ARCH")],
     )
+
 
 def generate(env):
     if not exists(env):
         return
 
-    env.Tool('msvc')
+    env.Tool("msvc")
 
     env.AddMethod(_get_merge_module_name_for_feature, "GetMergeModuleNameForFeature")
 
@@ -85,7 +90,7 @@ def generate(env):
     # https://en.wikipedia.org/wiki/Microsoft_Visual_C%2B%2B#Internal_version_numbering
     # for details on the various version numbers in play for
     # the Microsoft toolchain.
-    msvc_major, msvc_minor = env['MSVC_VERSION'].split('.')
+    msvc_major, msvc_minor = env["MSVC_VERSION"].split(".")
     if msvc_major != "14":
         return
 
@@ -104,7 +109,7 @@ def generate(env):
 
     # On VS2015 the merge modules are in the program files directory,
     # not under the VS install dir.
-    if msvc_minor == '0':
+    if msvc_minor == "0":
 
         if not programfilesx86:
             programfilesx86 = _get_programfiles()
@@ -113,9 +118,9 @@ def generate(env):
 
         mergemodulepath = os.path.join(programfilesx86, "Common Files", "Merge Modules")
         if os.path.isdir(mergemodulepath):
-            env['MSVS']['VCREDISTMERGEMODULEPATH'] = mergemodulepath
+            env["MSVS"]["VCREDISTMERGEMODULEPATH"] = mergemodulepath
 
-    if not 'VSINSTALLDIR' in env['MSVS']:
+    if not "VSINSTALLDIR" in env["MSVS"]:
 
         # Compute a VS version based on the VC version. VC 14.0 is VS 2015, VC
         # 14.1 is VS 2017. Also compute the next theoretical version by
@@ -123,7 +128,9 @@ def generate(env):
         # that we can use as an argument to the -version flag to vswhere.
         vs_version = int(msvc_major) + int(msvc_minor)
         vs_version_next = vs_version + 1
-        vs_version_range = '[{vs_version}.0, {vs_version_next}.0)'.format(vs_version=vs_version, vs_version_next=vs_version_next)
+        vs_version_range = "[{vs_version}.0, {vs_version_next}.0)".format(
+            vs_version=vs_version, vs_version_next=vs_version_next
+        )
 
         if not programfilesx86:
             programfilesx86 = _get_programfiles()
@@ -131,28 +138,52 @@ def generate(env):
                 return
 
         # Use vswhere (it has a fixed stable path) to query where Visual Studio is installed.
-        env['MSVS']['VSINSTALLDIR'] = subprocess.check_output([os.path.join(programfilesx86, "Microsoft Visual Studio", "Installer", "vswhere.exe"), "-version", vs_version_range, "-property", "installationPath", "-nologo"]).decode('utf-8').strip()
+        env["MSVS"]["VSINSTALLDIR"] = (
+            subprocess.check_output(
+                [
+                    os.path.join(
+                        programfilesx86,
+                        "Microsoft Visual Studio",
+                        "Installer",
+                        "vswhere.exe",
+                    ),
+                    "-version",
+                    vs_version_range,
+                    "-property",
+                    "installationPath",
+                    "-nologo",
+                ]
+            )
+            .decode("utf-8")
+            .strip()
+        )
 
-    vsinstall_dir = env['MSVS']['VSINSTALLDIR']
+    vsinstall_dir = env["MSVS"]["VSINSTALLDIR"]
 
     # Combine and set the full merge module path
     redist_root = os.path.join(vsinstall_dir, "VC", "Redist", "MSVC")
     if not os.path.isdir(redist_root):
         return
-    env['MSVS']['VCREDISTROOT'] = redist_root
+    env["MSVS"]["VCREDISTROOT"] = redist_root
 
     # Check the registry key that has the runtime lib version
     try:
         # TOOO: This x64 needs to be abstracted away. Is it the host
         # arch, or the target arch? My guess is host.
-        vsruntime_key_name = "SOFTWARE\\Microsoft\\VisualStudio\\{msvc_major}.0\\VC\\Runtimes\\x64".format(msvc_major=msvc_major)
+        vsruntime_key_name = "SOFTWARE\\Microsoft\\VisualStudio\\{msvc_major}.0\\VC\\Runtimes\\x64".format(
+            msvc_major=msvc_major
+        )
         vsruntime_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, vsruntime_key_name)
-        vslib_version, vslib_version_type = winreg.QueryValueEx(vsruntime_key, "Version")
+        vslib_version, vslib_version_type = winreg.QueryValueEx(
+            vsruntime_key, "Version"
+        )
     except WindowsError:
         return
 
     # Fallback to directory search if we don't find the expected version
-    redist_path = os.path.join(redist_root, re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1))
+    redist_path = os.path.join(
+        redist_root, re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1)
+    )
     if not os.path.isdir(redist_path):
         redist_path = None
         dirs = os.listdir(redist_root)
@@ -164,12 +195,12 @@ def generate(env):
                 break
         else:
             return
-    env['MSVS']['VCREDISTPATH'] = redist_path
+    env["MSVS"]["VCREDISTPATH"] = redist_path
 
     if mergemodulepath is None and msvc_minor != "0":
         mergemodulepath = os.path.join(redist_path, "MergeModules")
         if os.path.isdir(mergemodulepath):
-            env['MSVS']['VCREDISTMERGEMODULEPATH'] = mergemodulepath
+            env["MSVS"]["VCREDISTMERGEMODULEPATH"] = mergemodulepath
 
     # Keep these in preference order. The way with the {} in between
     # the dots appears to be the more modern form, but we select the
@@ -185,15 +216,17 @@ def generate(env):
         "vc_redist.{}.exe",
     ]
 
-    expansion = target_arch_expansion_map.get(env.subst('$TARGET_ARCH'), None)
+    expansion = target_arch_expansion_map.get(env.subst("$TARGET_ARCH"), None)
     if not expansion:
         return
 
-    vcredist_candidates = [c.format(expansion) for c in vcredist_search_template_sequence]
+    vcredist_candidates = [
+        c.format(expansion) for c in vcredist_search_template_sequence
+    ]
     for candidate in vcredist_candidates:
         candidate = os.path.join(redist_path, candidate)
         if os.path.isfile(candidate):
             break
     else:
         return
-    env['MSVS']['VCREDISTEXE'] = candidate
+    env["MSVS"]["VCREDISTEXE"] = candidate
