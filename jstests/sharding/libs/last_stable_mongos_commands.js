@@ -17,6 +17,7 @@ const commandsRemovedFromMongosIn42 = [
 // being used.
 const commandsAddedToMongosIn42 = [
     'abortTransaction',
+    'clearJumboFlag',
     'commitTransaction',
     'dropConnections',
     'setIndexCommitQuorum',

@@ -27,6 +27,7 @@ env.Library(
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_build_info.cpp',
+        'cluster_clear_jumbo_flag_cmd.cpp',
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
         'cluster_commit_transaction_cmd.cpp',
