@@ -127,7 +127,7 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(
         checkSuitabilityAsDefault(*rc);
         rwc.setDefaultReadConcern(rc);
     }
-    if (wc && !wc->usedDefaultW) {
+    if (wc && !wc->usedDefault) {
         checkSuitabilityAsDefault(*wc);
         rwc.setDefaultWriteConcern(wc);
     }
