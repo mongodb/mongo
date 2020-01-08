@@ -42,7 +42,12 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -68,6 +73,24 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingConfigMetadata);  // TODO SERVER-4
 MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingConfigMetadata);    // TODO SERVER-44034: Remove.
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
+
+/**
+ * Deletes the persisted default read/write concern document.
+ */
+void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    const auto commandResponse = client.runCommand([&] {
+        write_ops::Delete deleteOp(NamespaceString::kConfigSettingsNamespace);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
+            entry.setMulti(false);
+            return entry;
+        }()});
+        return deleteOp.serialize({});
+    }());
+    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
+}
 
 /**
  * Sets the minimum allowed version for the cluster. If it is 4.2, then the node should not use 4.4
@@ -252,6 +275,9 @@ public:
             if (failDowngrading.shouldFail())
                 return false;
 
+            const bool isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet;
+
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 LOG(0) << "Downgrade: dropping config.rangeDeletions collection";
                 migrationutil::dropRangeDeletionsCollection(opCtx);
@@ -261,6 +287,10 @@ public:
                 // complete to guarantee no chunks are missed by the update on the config server.
                 ActiveShardCollectionRegistry::get(opCtx).waitForActiveShardCollectionsToComplete(
                     opCtx);
+            } else if (isReplSet || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                // The default rwc document should only be deleted on plain replica sets and the
+                // config server replica set, not on shards or standalones.
+                deletePersistedDefaultRWConcernDocument(opCtx);
             }
 
             // Downgrade shards before config finishes its downgrade.
