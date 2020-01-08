@@ -306,13 +306,13 @@ BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
 thread_local auto _prng = PseudoRandom(0);
 
 BSONObj JSSrand(const BSONObj& a, void* data) {
-    unsigned int seed;
+    int64_t seed;
     // grab the least significant bits of either the supplied argument or
     // a random number from SecureRandom.
-    if (a.nFields() == 1 && a.firstElement().isNumber())
-        seed = static_cast<unsigned int>(a.firstElement().numberLong());
-    else {
-        seed = static_cast<unsigned int>(SecureRandom().nextInt64());
+    if (a.nFields() == 1 && a.firstElement().isNumber()) {
+        seed = a.firstElement().safeNumberLong();
+    } else {
+        seed = SecureRandom().nextInt64();
     }
     _prng = PseudoRandom(seed);
     return BSON("" << static_cast<double>(seed));
@@ -400,23 +400,10 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
  * > convertShardKeyToHashed("Whatever key")
  */
 BSONObj convertShardKeyToHashed(const BSONObj& a, void* data) {
-    const auto& objEl = a[0];
+    uassert(10151, "convertShardKeyToHashed accepts 1 argument", a.nFields() == 1);
+    const auto& objEl = a.firstElement();
 
-    uassert(10151,
-            "convertShardKeyToHashed accepts either 1 or 2 arguments",
-            a.nFields() >= 1 && a.nFields() <= 2);
-
-    // It looks like the seed is always default right now.
-    // But no reason not to allow for the future
-    auto seed = BSONElementHasher::DEFAULT_HASH_SEED;
-    if (a.nFields() > 1) {
-        auto seedEl = a[1];
-
-        uassert(10159, "convertShardKeyToHashed seed value should be a number", seedEl.isNumber());
-        seed = seedEl.numberInt();
-    }
-
-    auto key = BSONElementHasher::hash64(objEl, seed);
+    auto key = BSONElementHasher::hash64(objEl, BSONElementHasher::DEFAULT_HASH_SEED);
     return BSON("" << key);
 }
 
