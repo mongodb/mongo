@@ -56,14 +56,19 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build be
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
 const cmdNs = testDB.getCollection('$cmd').getFullName();
-let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});
-assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
 if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});
+    assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
     ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
     assert.eq(1, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
+    ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
+    assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
+} else {
+    // The noop oplog entry is the only evidence of the failed single phase index build.
+    let ops = rst.dumpOplog(
+        primary, {op: 'n', ns: '', 'o.msg': 'Creating indexes. Coll: ' + coll.getFullName()});
+    assert.eq(1, ops.length, 'incorrect number of noop oplog entries: ' + tojson(ops));
 }
-ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
-assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 
 rst.stopSet();
 })();
