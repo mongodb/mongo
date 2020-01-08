@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <algorithm>
 #include <memory>
 #include <set>
 #include <string>
@@ -1072,12 +1071,11 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
     bool forApplyOps = false;
-    std::vector<std::string> expectedOplogEntries = {
-        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    std::vector<std::string> expectedOplogEntries;
     if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries.erase(
-            std::remove(expectedOplogEntries.begin(), expectedOplogEntries.end(), "index"),
-            expectedOplogEntries.end());
+        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
+    } else {
+        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     }
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
@@ -1089,12 +1087,11 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntries) {
     bool forApplyOps = true;
-    std::vector<std::string> expectedOplogEntries = {
-        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    std::vector<std::string> expectedOplogEntries;
     if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries.erase(
-            std::remove(expectedOplogEntries.begin(), expectedOplogEntries.end(), "index"),
-            expectedOplogEntries.end());
+        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
+    } else {
+        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     }
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
@@ -1107,12 +1104,11 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntri
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarget) {
     _createCollection(_opCtx.get(), _targetNssDifferentDb);
     bool forApplyOps = false;
-    std::vector<std::string> expectedOplogEntries = {
-        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    std::vector<std::string> expectedOplogEntries;
     if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries.erase(
-            std::remove(expectedOplogEntries.begin(), expectedOplogEntries.end(), "index"),
-            expectedOplogEntries.end());
+        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
+    } else {
+        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     }
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
@@ -1125,12 +1121,11 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarge
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesDropTarget) {
     _createCollection(_opCtx.get(), _targetNssDifferentDb);
     bool forApplyOps = true;
-    std::vector<std::string> expectedOplogEntries = {
-        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    std::vector<std::string> expectedOplogEntries;
     if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries.erase(
-            std::remove(expectedOplogEntries.begin(), expectedOplogEntries.end(), "index"),
-            expectedOplogEntries.end());
+        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
+    } else {
+        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     }
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
@@ -1172,12 +1167,11 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollect
     ASSERT_THROWS_CODE(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}),
                        AssertionException,
                        ErrorCodes::OperationFailed);
-    std::vector<std::string> expectedOplogEntries = {
-        "create", "startIndex", "index", "commitIndex", "drop"};
+    std::vector<std::string> expectedOplogEntries;
     if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries.erase(
-            std::remove(expectedOplogEntries.begin(), expectedOplogEntries.end(), "index"),
-            expectedOplogEntries.end());
+        expectedOplogEntries = {"create", "startIndex", "commitIndex", "drop"};
+    } else {
+        expectedOplogEntries = {"create", "index", "drop"};
     }
     _checkOplogEntries(_opObserver->oplogEntries, expectedOplogEntries);
 }

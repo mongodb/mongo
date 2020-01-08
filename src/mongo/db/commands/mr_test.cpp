@@ -284,6 +284,16 @@ public:
      * This function is called whenever mapReduce copies indexes from an existing output collection
      * to a temporary collection.
      */
+    void onCreateIndex(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       CollectionUUID uuid,
+                       BSONObj indexDoc,
+                       bool fromMigrate) override;
+
+    /**
+     * This function is called whenever mapReduce copies indexes from an existing output collection
+     * to a temporary collection.
+     */
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            CollectionUUID collUUID,
@@ -331,10 +341,14 @@ public:
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
-/**
- * This function is called whenever mapReduce copies indexes from an existing output collection
- * to a temporary collection.
- */
+void MapReduceOpObserver::onCreateIndex(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        CollectionUUID uuid,
+                                        BSONObj indexDoc,
+                                        bool fromMigrate) {
+    indexesCreated.push_back(indexDoc.getOwned());
+}
+
 void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             CollectionUUID collUUID,
