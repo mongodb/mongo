@@ -436,5 +436,49 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     ASSERT_LT(*oldDefaults.getLocalSetTime(), *newDefaults.getLocalSetTime());
 }
 
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewConcernsValidSetWriteConcernWithOnlyJ) {
+    auto oldDefaults = setupOldDefaults();
+    auto defaults =
+        _rwcd.generateNewConcerns(operationContext(),
+                                  boost::none,
+                                  uassertStatusOK(WriteConcernOptions::parse(BSON("j" << true))));
+    ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
+           defaults.getDefaultReadConcern()->getLevel());
+    ASSERT_EQ(1, defaults.getDefaultWriteConcern()->wNumNodes);
+    ASSERT_EQ(0, defaults.getDefaultWriteConcern()->wTimeout);
+    ASSERT(WriteConcernOptions::SyncMode::JOURNAL == defaults.getDefaultWriteConcern()->syncMode);
+    ASSERT_LT(*oldDefaults.getEpoch(), *defaults.getEpoch());
+    ASSERT_LT(*oldDefaults.getSetTime(), *defaults.getSetTime());
+    ASSERT(!defaults.getLocalSetTime());
+
+    _lookupMock.setLookupCallReturnValue(std::move(defaults));
+    _rwcd.refreshIfNecessary(operationContext());
+    auto newDefaults = _rwcd.getDefault(operationContext());
+    ASSERT_LT(*oldDefaults.getLocalSetTime(), *newDefaults.getLocalSetTime());
+}
+
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewConcernsValidSetWriteConcernWithOnlyWtimeout) {
+    auto oldDefaults = setupOldDefaults();
+    auto defaults = _rwcd.generateNewConcerns(
+        operationContext(),
+        boost::none,
+        uassertStatusOK(WriteConcernOptions::parse(BSON("wtimeout" << 12345))));
+    ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
+           defaults.getDefaultReadConcern()->getLevel());
+    ASSERT_EQ(1, defaults.getDefaultWriteConcern()->wNumNodes);
+    ASSERT_EQ(12345, defaults.getDefaultWriteConcern()->wTimeout);
+    ASSERT(WriteConcernOptions::SyncMode::UNSET == defaults.getDefaultWriteConcern()->syncMode);
+    ASSERT_LT(*oldDefaults.getEpoch(), *defaults.getEpoch());
+    ASSERT_LT(*oldDefaults.getSetTime(), *defaults.getSetTime());
+    ASSERT(!defaults.getLocalSetTime());
+
+    _lookupMock.setLookupCallReturnValue(std::move(defaults));
+    _rwcd.refreshIfNecessary(operationContext());
+    auto newDefaults = _rwcd.getDefault(operationContext());
+    ASSERT_LT(*oldDefaults.getLocalSetTime(), *newDefaults.getLocalSetTime());
+}
+
 }  // namespace
 }  // namespace mongo
