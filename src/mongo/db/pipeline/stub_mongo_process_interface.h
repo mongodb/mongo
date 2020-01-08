@@ -148,7 +148,9 @@ public:
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* pipeline,
+        bool allowTargetingShards = true) override {
         MONGO_UNREACHABLE;
     }
 

@@ -454,14 +454,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipelin
     }
 
     if (opts.attachCursorSource) {
-        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
+        pipeline =
+            attachCursorSourceToPipeline(expCtx, pipeline.release(), opts.allowTargetingShards);
     }
 
     return pipeline;
 }
 
 unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
     return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
 }
 

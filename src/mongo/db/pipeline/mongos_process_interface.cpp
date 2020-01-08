@@ -113,14 +113,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::makePipeline(
     }
     if (pipelineOptions.attachCursorSource) {
         // 'attachCursorSourceToPipeline' handles any complexity related to sharding.
-        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
+        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release(), false);
     }
 
     return pipeline;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
+    // On mongos we can't have local cursors.
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, ownedPipeline);
 }
 

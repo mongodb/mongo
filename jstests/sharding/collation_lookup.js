@@ -304,20 +304,21 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
     // collection or the aggregation operation, even if the foreign collection has a collation.
     // TODO SERVER-38830: when a pipeline $lookup is capable of serializing its 'let' variables to
     // remote shards, add a test-case to exercise SERVER-43350.
-    res = withoutDefaultCollationColl
-                  .aggregate([
-                      {$match: {_id: "lowercase"}},
-                      {
-                        $lookup: {
-                            from: withDefaultCollationColl.getName(),
-                            localField: "str",
-                            foreignField: "str",
-                            as: "matched",
-                        },
-                      },
-                  ])
-                  .toArray();
-    assert.eq([{_id: "lowercase", str: "abc", matched: [{_id: "lowercase", str: "abc"}]}], res);
+    // TODO SERVER-32536: Enable the following test.
+    // res = withoutDefaultCollationColl
+    // .aggregate([
+    // {$match: {_id: "lowercase"}},
+    // {
+    // $lookup: {
+    // from: withDefaultCollationColl.getName(),
+    // localField: "str",
+    // foreignField: "str",
+    // as: "matched",
+    // },
+    // },
+    // ])
+    // .toArray();
+    // assert.eq([{_id: "lowercase", str: "abc", matched: [{_id: "lowercase", str: "abc"}]}], res);
 
     res = withoutDefaultCollationColl
                   .aggregate([
@@ -354,8 +355,10 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
 }
 
 const st = new ShardingTest({shards: 2, config: 1});
-setParameterOnAllHosts(
-    DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
+// TODO SERVER-38830: when a pipeline $lookup is capable of serializing its 'let' variables to
+// remote shards this can be re-enabled.
+// setParameterOnAllHosts(
+// DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
 
 const testName = "collation_lookup";
 const caseInsensitive = {

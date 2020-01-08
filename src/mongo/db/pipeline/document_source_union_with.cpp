@@ -26,10 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -129,6 +132,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         _pipeline =
             pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(ctx, _pipeline.release());
         _cursorAttached = true;
+        LOG(3) << "$unionWith attached cursor to pipeline";
     }
 
     if (auto res = _pipeline->getNext())
@@ -172,14 +176,18 @@ void DocumentSourceUnionWith::detachFromOperationContext() {
     // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
     // use Pipeline::detachFromOperationContext() to take care of updating the Pipeline's
     // ExpressionContext.
-    _pipeline->detachFromOperationContext();
+    if (_pipeline) {
+        _pipeline->detachFromOperationContext();
+    }
 }
 
 void DocumentSourceUnionWith::reattachToOperationContext(OperationContext* opCtx) {
     // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
     // use Pipeline::reattachToOperationContext() to take care of updating the Pipeline's
     // ExpressionContext.
-    _pipeline->reattachToOperationContext(opCtx);
+    if (_pipeline) {
+        _pipeline->reattachToOperationContext(opCtx);
+    }
 }
 
 void DocumentSourceUnionWith::addInvolvedCollections(

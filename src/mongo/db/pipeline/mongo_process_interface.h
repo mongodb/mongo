@@ -111,6 +111,7 @@ public:
 
         bool optimize = true;
         bool attachCursorSource = true;
+        bool allowTargetingShards = true;
     };
 
     /**
@@ -271,9 +272,14 @@ public:
      * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
      * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
      * compiler expects to find an implementation of PipelineDeleter.
+     *
+     * If `allowTargetingShards` is true, the cursor will only be for local reads regardless of
+     * whether or not this function is called in a sharded environment.
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* pipeline,
+        bool allowTargetingShards = true) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying

@@ -49,7 +49,8 @@ StubMongoProcessInterfaceLookupSingleDocument::makePipeline(
     }
 
     if (opts.attachCursorSource) {
-        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
+        pipeline =
+            attachCursorSourceToPipeline(expCtx, pipeline.release(), opts.allowTargetingShards);
     }
 
     return pipeline;
@@ -66,7 +67,9 @@ StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipelineForLo
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
     return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
 }
 

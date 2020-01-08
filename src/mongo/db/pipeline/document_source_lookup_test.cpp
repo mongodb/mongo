@@ -504,14 +504,16 @@ public:
         }
 
         if (opts.attachCursorSource) {
-            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
+            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release(), false);
         }
 
         return pipeline;
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool allowTargetingShards = true) final {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                             PipelineDeleter(expCtx->opCtx));
 

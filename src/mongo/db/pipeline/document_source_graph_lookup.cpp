@@ -42,9 +42,22 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
+
+namespace {
+void assertIsValidCollectionState(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, expCtx->ns)) {
+        const bool foreignShardedAllowed =
+            getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
+        if (!foreignShardedAllowed) {
+            uasserted(31428, "Cannot run $graphLookup with sharded foreign collection");
+        }
+    }
+}
+}  // namespace
 
 using boost::intrusive_ptr;
 
@@ -174,6 +187,7 @@ void DocumentSourceGraphLookUp::doDispose() {
 void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     long long depth = 0;
     bool shouldPerformAnotherQuery;
+    assertIsValidCollectionState(_fromExpCtx);
     do {
         shouldPerformAnotherQuery = false;
 
@@ -200,8 +214,13 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
             // We've already allocated space for the trailing $match stage in '_fromPipeline'.
             _fromPipeline.back() = *matchStage;
-            auto pipeline =
-                pExpCtx->mongoProcessInterface->makePipeline(_fromPipeline, _fromExpCtx);
+            MongoProcessInterface::MakePipelineOptions pipelineOpts;
+            pipelineOpts.optimize = true;
+            pipelineOpts.attachCursorSource = true;
+            // By default, $graphLookup doesn't support a sharded 'from' collection.
+            pipelineOpts.allowTargetingShards = internalQueryAllowShardedLookup.load();
+            auto pipeline = pExpCtx->mongoProcessInterface->makePipeline(
+                _fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
