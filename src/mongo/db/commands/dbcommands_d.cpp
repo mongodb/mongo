@@ -125,6 +125,9 @@ protected:
         const bool readOnly = (profilingLevel < 0 || profilingLevel > 2);
         const LockMode dbMode = readOnly ? MODE_S : MODE_X;
 
+        // Accessing system.profile collection should not conflict with oplog application.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+            opCtx->lockState());
         AutoGetDb ctx(opCtx, dbName, dbMode);
         Database* db = ctx.getDb();
 

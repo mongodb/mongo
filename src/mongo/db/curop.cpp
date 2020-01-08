@@ -446,6 +446,9 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
             // We can get here and our lock acquisition be timed out or interrupted, log a
             // message if that happens.
             try {
+                // Retrieving storage stats should not be blocked by oplog application.
+                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                    opCtx->lockState());
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
