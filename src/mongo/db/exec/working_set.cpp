@@ -113,7 +113,15 @@ WorkingSetID WorkingSet::emplace(WorkingSetMember&& wsm) {
 void WorkingSetMember::clear() {
     _metadata = DocumentMetadataFields{};
     keyData.clear();
-    resetDocument(SnapshotId(), BSONObj());
+    if (doc.value().hasExclusivelyOwnedStorage()) {
+        // Reset the document to point to an empty BSON, which will preserve its underlying
+        // DocumentStorage for future users of this WSM.
+        resetDocument(SnapshotId(), BSONObj());
+    } else {
+        // If the Document doesn't exclusively own its storage, don't do anything. Attempting to
+        // assign it a value (even an empty one) would result in an allocation, which we don't want
+        // here, since this function is very much on the hot path.
+    }
     _state = WorkingSetMember::INVALID;
 }
 
