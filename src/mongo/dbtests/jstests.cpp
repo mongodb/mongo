@@ -1452,34 +1452,13 @@ public:
         ASSERT_EQUALS(scopeShardKey, trueShardKey);
     }
 
-    void checkWithSeed(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
-        s->setObject("o", o, true);
-        s->setNumber("seed", seed);
-        s->invoke("return convertShardKeyToHashed(o, seed);", nullptr, nullptr);
-        const auto scopeShardKey = s->getNumber("__returnValue");
-
-        // Wrapping to form a proper element
-        const auto wrapO = BSON("" << o);
-        const auto e = wrapO[""];
-        const auto trueShardKey = mongo::BSONElementHasher::hash64(e, seed);
-
-        ASSERT_EQUALS(scopeShardKey, trueShardKey);
-    }
-
     void checkNoArgs(shared_ptr<Scope> s) {
         s->invoke("return convertShardKeyToHashed();", nullptr, nullptr);
     }
 
     void checkWithExtraArg(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
         s->setObject("o", o, true);
-        s->setNumber("seed", seed);
-        s->invoke("return convertShardKeyToHashed(o, seed, 1);", nullptr, nullptr);
-    }
-
-    void checkWithBadSeed(shared_ptr<Scope> s, const mongo::BSONObj& o) {
-        s->setObject("o", o, true);
-        s->setString("seed", "sunflower");
-        s->invoke("return convertShardKeyToHashed(o, seed);", nullptr, nullptr);
+        s->invoke("return convertShardKeyToHashed(o, 1);", nullptr, nullptr);
     }
 
     void run() {
@@ -1499,23 +1478,8 @@ public:
               BSON("A" << 1 << "B"
                        << "Shardy"));
 
-        // Check a few different seeds
-        checkWithSeed(s,
-                      BSON(""
-                           << "Shardy"),
-                      mongo::BSONElementHasher::DEFAULT_HASH_SEED);
-        checkWithSeed(s,
-                      BSON(""
-                           << "Shardy"),
-                      0);
-        checkWithSeed(s,
-                      BSON(""
-                           << "Shardy"),
-                      -1);
-
         ASSERT_THROWS(checkNoArgs(s), mongo::DBException);
         ASSERT_THROWS(checkWithExtraArg(s, BSON("" << 10.0), 0), mongo::DBException);
-        ASSERT_THROWS(checkWithBadSeed(s, BSON("" << 1)), mongo::DBException);
     }
 };
 
