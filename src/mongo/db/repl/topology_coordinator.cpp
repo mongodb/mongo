@@ -1777,7 +1777,7 @@ void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterRespons
             response->addTag(tagKey, tagConfig.getTagValue(*tag));
         }
     }
-    response->setMe(selfConfig.getHostAndPort());
+    response->setMe(selfConfig.getHostAndPort(horizonString));
     if (_iAmPrimary()) {
         response->setElectionId(_electionId);
     }
