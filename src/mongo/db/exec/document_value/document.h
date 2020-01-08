@@ -334,6 +334,10 @@ public:
         return _storage ? _storage->isModified() : false;
     }
 
+    bool hasExclusivelyOwnedStorage() const {
+        return _storage && !_storage->isShared();
+    }
+
     /// only for testing
     const void* getPtr() const {
         return _storage.get();
