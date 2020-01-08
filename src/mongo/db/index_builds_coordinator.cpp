@@ -124,17 +124,10 @@ void onCommitIndexBuild(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const ReplIndexBuildState& replState,
                         bool replSetAndNotPrimaryAtStart) {
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return;
-    }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return;
-    }
-
     const auto& buildUUID = replState.buildUUID;
 
+    invariant(IndexBuildProtocol::kTwoPhase == replState.protocol,
+              str::stream() << "onCommitIndexBuild: " << buildUUID);
     invariant(opCtx->lockState()->isWriteLocked(),
               str::stream() << "onCommitIndexBuild: " << buildUUID);
 
@@ -142,23 +135,6 @@ void onCommitIndexBuild(OperationContext* opCtx,
     const auto& collUUID = replState.collectionUUID;
     const auto& indexSpecs = replState.indexSpecs;
     auto fromMigrate = false;
-
-    if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
-        // Do not expect replication state to change during committing index build when two phase
-        // index builds are not in effect because the index build would be aborted (most likely due
-        // to a stepdown) before we reach here.
-        if (replSetAndNotPrimaryAtStart) {
-            // Get a timestamp to complete the index build in the absence of a commitIndexBuild
-            // oplog entry.
-            repl::UnreplicatedWritesBlock uwb(opCtx);
-            if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
-                log() << "Did not timestamp index commit write.";
-            }
-            return;
-        }
-        opObserver->onCommitIndexBuild(opCtx, nss, collUUID, buildUUID, indexSpecs, fromMigrate);
-        return;
-    }
 
     // Since two phase index builds are allowed to survive replication state transitions, we should
     // check if the node is currently a primary before attempting to write to the oplog.
@@ -823,26 +799,16 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
     invariant(
         UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
 
-    // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
-        ? boost::make_optional(UUID::gen())
-        : boost::none;
-
-    if (buildUUID) {
-        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, *buildUUID, specs, fromMigrate);
-    }
 
     // If two phase index builds are enabled, the index build will be coordinated using
     // startIndexBuild and commitIndexBuild oplog entries.
     auto indexCatalog = collection->getIndexCatalog();
     if (supportsTwoPhaseIndexBuild()) {
-        invariant(buildUUID, str::stream() << collectionUUID << ": " << nss);
-
         // All indexes will be added to the mdb catalog using the commitIndexBuild timestamp.
-        opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, *buildUUID, specs, fromMigrate);
+        auto buildUUID = UUID::gen();
+        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
+        opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
         for (const auto& spec : specs) {
             uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
         }
@@ -852,10 +818,6 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
             // timestamp.
             opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
             uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
-        }
-        if (buildUUID) {
-            opObserver->onCommitIndexBuild(
-                opCtx, nss, collectionUUID, *buildUUID, specs, fromMigrate);
         }
     }
 }
@@ -1109,10 +1071,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     }
 
     MultiIndexBlock::OnInitFn onInitFn;
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-
+    if (IndexBuildProtocol::kTwoPhase == replIndexBuildState->protocol) {
         // Two-phase index builds write a different oplog entry than the default behavior which
         // writes a no-op just to generate an optime.
         onInitFn = [&](std::vector<BSONObj>& specs) {
@@ -1715,17 +1674,19 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
     uassertStatusOK(
         _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
 
-    // Generate both createIndexes and commitIndexBuild oplog entries.
-    // Secondaries currently interpret commitIndexBuild commands as noops.
+    // If two phase index builds is enabled, index build will be coordinated using
+    // startIndexBuild and commitIndexBuild oplog entries.
     auto onCommitFn = [&] {
+        if (IndexBuildProtocol::kTwoPhase != replState->protocol) {
+            return;
+        }
+
         onCommitIndexBuild(
             opCtx, collection->ns(), *replState, indexBuildOptions.replSetAndNotPrimaryAtStart);
     };
 
     auto onCreateEachFn = [&](const BSONObj& spec) {
-        // If two phase index builds is enabled, index build will be coordinated using
-        // startIndexBuild and commitIndexBuild oplog entries.
-        if (supportsTwoPhaseIndexBuild()) {
+        if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
             return;
         }
 
