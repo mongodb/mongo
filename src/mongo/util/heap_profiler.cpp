@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+#include <memory>
+
 #include "mongo/base/init.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"
@@ -126,6 +129,30 @@
 
 namespace mongo {
 namespace {
+
+// Simple wrapper for the demangler, particularly its buffer space.
+class Demangler {
+public:
+    Demangler() = default;
+
+    Demangler(const Demangler&) = delete;
+
+    ~Demangler() {
+        free(_buf);
+    }
+
+    char* operator()(const char* sym) {
+        char* dm = abi::__cxa_demangle(sym, _buf, &_bufSize, &_status);
+        if (dm)
+            _buf = dm;
+        return dm;
+    }
+
+private:
+    size_t _bufSize = 0;
+    char* _buf = nullptr;
+    int _status = 0;
+};
 
 //
 // Simple hash table maps Key->Value.
@@ -301,11 +328,11 @@ private:
 
     static const int kMaxStackInfos = 20000;         // max number of unique call sites we handle
     static const int kStackHashTableLoadFactor = 2;  // keep loading <50%
-    static const int kMaxFramesPerStack = 100;       // max depth of stack
+    static const size_t kMaxFramesPerStack = 100;    // max depth of stack
 
     // stack HashTable Key
     struct Stack {
-        int numFrames = 0;
+        size_t numFrames = 0;
         std::array<FrameInfo, kMaxFramesPerStack> frames;
         Stack() {}
 
@@ -336,8 +363,8 @@ private:
     HashTable<Stack, StackInfo> stackHashTable{kMaxStackInfos, kStackHashTableLoadFactor};
 
     // frames to skip at top and bottom of backtrace when reporting stacks
-    int skipStartFrames = 0;
-    int skipEndFrames = 0;
+    size_t skipStartFrames = 0;
+    size_t skipEndFrames = 0;
 
 
     //
@@ -406,7 +433,7 @@ private:
 
         // Get backtrace.
         Stack tempStack;
-        tempStack.numFrames = backtrace(tempStack.frames.data(), kMaxFramesPerStack);
+        tempStack.numFrames = rawBacktrace(tempStack.frames.data(), kMaxFramesPerStack);
 
         // Compute backtrace hash.
         Hash stackHash = tempStack.hash();
@@ -472,38 +499,42 @@ private:
     //
     // Generate bson representation of stack.
     //
-    void generateStackIfNeeded(Stack& stack, StackInfo& stackInfo) {
+    void generateStackIfNeeded(StackTraceAddressMetadataGenerator& metaGen,
+                               Demangler& demangler,
+                               Stack& stack,
+                               StackInfo& stackInfo) {
         if (!stackInfo.stackObj.isEmpty())
             return;
         BSONArrayBuilder builder;
-        for (int j = skipStartFrames; j < stack.numFrames - skipEndFrames; j++) {
-            Dl_info dli;
-            StringData frameString;
-            char* demangled = nullptr;
-            if (dladdr(stack.frames[j], &dli)) {
-                if (dli.dli_sname) {
-                    int status;
-                    demangled = abi::__cxa_demangle(dli.dli_sname, nullptr, nullptr, &status);
-                    if (demangled) {
-                        // strip off function parameters as they are very verbose and not useful
-                        char* p = strchr(demangled, '(');
-                        if (p)
-                            frameString = StringData(demangled, p - demangled);
-                        else
-                            frameString = demangled;
-                    } else {
-                        frameString = dli.dli_sname;
+
+        std::string frameString;
+
+        size_t jb = std::min(stack.numFrames, skipStartFrames);
+        size_t je = stack.numFrames - std::min(stack.numFrames - jb, skipEndFrames);
+        for (size_t j = jb; j != je; ++j) {
+            frameString.clear();
+            void* addr = stack.frames[j];
+            const auto& meta = metaGen.load(addr);
+            if (meta.symbol()) {
+                if (StringData name = meta.symbol().name(); !name.empty()) {
+                    // Upgrade frameString to symbol name.
+                    frameString.assign(name.begin(), name.end());
+                    if (char* dm = demangler(frameString.c_str())) {
+                        // Further upgrade frameString to demangled name.
+                        // We strip function parameters as they are very verbose and not useful.
+                        frameString = dm;
+                        if (auto paren = frameString.find('('); paren != std::string::npos)
+                            frameString.erase(paren);
                     }
                 }
             }
             if (frameString.empty()) {
+                // Fall back to frameString as stringified `void*`.
                 std::ostringstream s;
-                s << stack.frames[j];
+                s << addr;
                 frameString = s.str();
             }
             builder.append(frameString);
-            if (demangled)
-                free(demangled);
         }
         stackInfo.stackObj = builder.obj();
         log() << "heapProfile stack" << stackInfo.stackNum << ": " << stackInfo.stackObj;
@@ -560,9 +591,12 @@ private:
         // We use stackinfo_mutex to ensure safety wrt concurrent updates to the StackInfo objects.
         // We can get skew between entries, which is ok.
         std::vector<StackInfo*> stackInfos;
+
+        StackTraceAddressMetadataGenerator metaGen;
+        Demangler demangler;
         stackHashTable.forEach([&](Stack& stack, StackInfo& stackInfo) {
             if (stackInfo.activeBytes) {
-                generateStackIfNeeded(stack, stackInfo);
+                generateStackIfNeeded(metaGen, demangler, stack, stackInfo);
                 stackInfos.push_back(&stackInfo);
             }
         });
