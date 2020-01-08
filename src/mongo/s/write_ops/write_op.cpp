@@ -99,6 +99,7 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
             // can't retry half a regular multi-write.
             if (endpoints.size() > 1u && !inTransaction) {
                 endpoint.shardVersion = ChunkVersion::IGNORED();
+                endpoint.shardVersion.canThrowSSVOnIgnored();
             }
 
             targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));

@@ -80,6 +80,13 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
         version._epoch = epochPart.OID();
     }
 
+    if (it.more()) {
+        // Expect _canThrowSSVOnIgnored
+        BSONElement canThrowSSVOnIgnoredPart = it.next();
+
+        version._canThrowSSVOnIgnored = canThrowSSVOnIgnoredPart && canThrowSSVOnIgnoredPart.Bool();
+    }
+
     return version;
 }
 
@@ -117,6 +124,9 @@ void ChunkVersion::appendWithField(BSONObjBuilder* out, StringData field) const 
     BSONArrayBuilder arr(out->subarrayStart(field));
     arr.appendTimestamp(_combined);
     arr.append(_epoch);
+    if (_canThrowSSVOnIgnored) {
+        arr.append(_canThrowSSVOnIgnored);
+    }
 }
 
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
@@ -128,6 +138,9 @@ BSONObj ChunkVersion::toBSON() const {
     BSONArrayBuilder b;
     b.appendTimestamp(_combined);
     b.append(_epoch);
+    if (_canThrowSSVOnIgnored) {
+        b.append(_canThrowSSVOnIgnored);
+    }
     return b.arr();
 }
 
@@ -136,7 +149,8 @@ void ChunkVersion::legacyToBSON(StringData field, BSONObjBuilder* out) const {
 }
 
 std::string ChunkVersion::toString() const {
-    return str::stream() << majorVersion() << "|" << minorVersion() << "||" << _epoch;
+    return str::stream() << majorVersion() << "|" << minorVersion() << "||" << _epoch
+                         << (_canThrowSSVOnIgnored ? "|||canThrowSSVOnIgnored" : "");
 }
 
 }  // namespace mongo
