@@ -2,7 +2,7 @@
 // detail/impl/strand_executor_service.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -99,27 +99,23 @@ template <typename Executor, typename Function, typename Allocator>
 void strand_executor_service::dispatch(const implementation_type& impl,
     Executor& ex, ASIO_MOVE_ARG(Function) function, const Allocator& a)
 {
-  // Make a local, non-const copy of the function.
   typedef typename decay<Function>::type function_type;
-  function_type tmp(ASIO_MOVE_CAST(Function)(function));
 
   // If we are already in the strand then the function can run immediately.
   if (call_stack<strand_impl>::contains(impl.get()))
   {
+    // Make a local, non-const copy of the function.
+    function_type tmp(ASIO_MOVE_CAST(Function)(function));
+
     fenced_block b(fenced_block::full);
     asio_handler_invoke_helpers::invoke(tmp, tmp);
     return;
   }
 
-  // Construct an allocator to be used for the operation.
-  typedef typename detail::get_recycling_allocator<Allocator>::type alloc_type;
-  alloc_type allocator(detail::get_recycling_allocator<Allocator>::get(a));
-
   // Allocate and construct an operation to wrap the function.
-  typedef executor_op<function_type, alloc_type> op;
-  typename op::ptr p = { allocator, 0, 0 };
-  p.v = p.a.allocate(1);
-  p.p = new (p.v) op(tmp, allocator);
+  typedef executor_op<function_type, Allocator> op;
+  typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+  p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(function), a);
 
   ASIO_HANDLER_CREATION((impl->service_->context(), *p.p,
         "strand_executor", impl.get(), 0, "dispatch"));
@@ -128,7 +124,7 @@ void strand_executor_service::dispatch(const implementation_type& impl,
   bool first = enqueue(impl, p.p);
   p.v = p.p = 0;
   if (first)
-    ex.dispatch(invoker<Executor>(impl, ex), allocator);
+    ex.dispatch(invoker<Executor>(impl, ex), a);
 }
 
 // Request invocation of the given function and return immediately.
@@ -136,19 +132,12 @@ template <typename Executor, typename Function, typename Allocator>
 void strand_executor_service::post(const implementation_type& impl,
     Executor& ex, ASIO_MOVE_ARG(Function) function, const Allocator& a)
 {
-  // Make a local, non-const copy of the function.
   typedef typename decay<Function>::type function_type;
-  function_type tmp(ASIO_MOVE_CAST(Function)(function));
-
-  // Construct an allocator to be used for the operation.
-  typedef typename detail::get_recycling_allocator<Allocator>::type alloc_type;
-  alloc_type allocator(detail::get_recycling_allocator<Allocator>::get(a));
 
   // Allocate and construct an operation to wrap the function.
-  typedef executor_op<function_type, alloc_type> op;
-  typename op::ptr p = { allocator, 0, 0 };
-  p.v = p.a.allocate(1);
-  p.p = new (p.v) op(tmp, allocator);
+  typedef executor_op<function_type, Allocator> op;
+  typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+  p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(function), a);
 
   ASIO_HANDLER_CREATION((impl->service_->context(), *p.p,
         "strand_executor", impl.get(), 0, "post"));
@@ -157,7 +146,7 @@ void strand_executor_service::post(const implementation_type& impl,
   bool first = enqueue(impl, p.p);
   p.v = p.p = 0;
   if (first)
-    ex.post(invoker<Executor>(impl, ex), allocator);
+    ex.post(invoker<Executor>(impl, ex), a);
 }
 
 // Request invocation of the given function and return immediately.
@@ -165,19 +154,12 @@ template <typename Executor, typename Function, typename Allocator>
 void strand_executor_service::defer(const implementation_type& impl,
     Executor& ex, ASIO_MOVE_ARG(Function) function, const Allocator& a)
 {
-  // Make a local, non-const copy of the function.
   typedef typename decay<Function>::type function_type;
-  function_type tmp(ASIO_MOVE_CAST(Function)(function));
-
-  // Construct an allocator to be used for the operation.
-  typedef typename detail::get_recycling_allocator<Allocator>::type alloc_type;
-  alloc_type allocator(detail::get_recycling_allocator<Allocator>::get(a));
 
   // Allocate and construct an operation to wrap the function.
-  typedef executor_op<function_type, alloc_type> op;
-  typename op::ptr p = { allocator, 0, 0 };
-  p.v = p.a.allocate(1);
-  p.p = new (p.v) op(tmp, allocator);
+  typedef executor_op<function_type, Allocator> op;
+  typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+  p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(function), a);
 
   ASIO_HANDLER_CREATION((impl->service_->context(), *p.p,
         "strand_executor", impl.get(), 0, "defer"));
@@ -186,7 +168,7 @@ void strand_executor_service::defer(const implementation_type& impl,
   bool first = enqueue(impl, p.p);
   p.v = p.p = 0;
   if (first)
-    ex.defer(invoker<Executor>(impl, ex), allocator);
+    ex.defer(invoker<Executor>(impl, ex), a);
 }
 
 } // namespace detail

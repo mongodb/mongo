@@ -2,7 +2,7 @@
 // associated_allocator.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -115,6 +115,14 @@ get_associated_allocator(const T& t, const Allocator& a) ASIO_NOEXCEPT
 {
   return associated_allocator<T, Allocator>::get(t, a);
 }
+
+#if defined(ASIO_HAS_ALIAS_TEMPLATES)
+
+template <typename T, typename Allocator = std::allocator<void> >
+using associated_allocator_t
+  = typename associated_allocator<T, Allocator>::type;
+
+#endif // defined(ASIO_HAS_ALIAS_TEMPLATES)
 
 } // namespace asio
 

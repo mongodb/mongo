@@ -2,7 +2,7 @@
 // detail/executor_op.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -31,11 +31,12 @@ template <typename Handler, typename Alloc,
 class executor_op : public Operation
 {
 public:
-  ASIO_DEFINE_HANDLER_ALLOCATOR_PTR(executor_op, Alloc);
+  ASIO_DEFINE_HANDLER_ALLOCATOR_PTR(executor_op);
 
-  executor_op(Handler& h, const Alloc& allocator)
+  template <typename H>
+  executor_op(ASIO_MOVE_ARG(H) h, const Alloc& allocator)
     : Operation(&executor_op::do_complete),
-      handler_(ASIO_MOVE_CAST(Handler)(h)),
+      handler_(ASIO_MOVE_CAST(H)(h)),
       allocator_(allocator)
   {
   }
@@ -46,7 +47,8 @@ public:
   {
     // Take ownership of the handler object.
     executor_op* o(static_cast<executor_op*>(base));
-    ptr p = { o->allocator_, o, o };
+    Alloc allocator(o->allocator_);
+    ptr p = { detail::addressof(allocator), o, o };
 
     ASIO_HANDLER_COMPLETION((*o));
 

@@ -2,7 +2,7 @@
 // detail/reactive_socket_service_base.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -90,6 +90,8 @@ void reactive_socket_service_base::destroy(
 
     asio::error_code ignored_ec;
     socket_ops::close(impl.socket_, impl.state_, true, ignored_ec);
+
+    reactor_.cleanup_descriptor_data(impl.reactor_data_);
   }
 }
 
@@ -104,9 +106,15 @@ asio::error_code reactive_socket_service_base::close(
 
     reactor_.deregister_descriptor(impl.socket_, impl.reactor_data_,
         (impl.state_ & socket_ops::possible_dup) == 0);
-  }
 
-  socket_ops::close(impl.socket_, impl.state_, false, ec);
+    socket_ops::close(impl.socket_, impl.state_, false, ec);
+
+    reactor_.cleanup_descriptor_data(impl.reactor_data_);
+  }
+  else
+  {
+    ec = asio::error_code();
+  }
 
   // The descriptor is closed by the OS even if close() returns an error.
   //
@@ -126,18 +134,20 @@ socket_type reactive_socket_service_base::release(
     asio::error_code& ec)
 {
   if (!is_open(impl))
+  {
+    ec = asio::error::bad_descriptor;
     return invalid_socket;
+  }
 
-  cancel(impl, ec);
-  if (ec)
-    return invalid_socket;
+  ASIO_HANDLER_OPERATION((reactor_.context(),
+        "socket", &impl, impl.socket_, "release"));
 
-  reactor_.deregister_descriptor(impl.socket_, impl.reactor_data_,
-      (impl.state_ & socket_ops::possible_dup) == 0);
-
-  socket_type tmp = impl.socket_;
-  impl.socket_ = invalid_socket;
-  return tmp;
+  reactor_.deregister_descriptor(impl.socket_, impl.reactor_data_, false);
+  reactor_.cleanup_descriptor_data(impl.reactor_data_);
+  socket_type sock = impl.socket_;
+  construct(impl);
+  ec = asio::error_code();
+  return sock;
 }
 
 asio::error_code reactive_socket_service_base::cancel(
@@ -246,7 +256,7 @@ void reactive_socket_service_base::start_accept_op(
     reactor_op* op, bool is_continuation, bool peer_is_open)
 {
   if (!peer_is_open)
-    start_op(impl, reactor::read_op, op, true, is_continuation, false);
+    start_op(impl, reactor::read_op, op, is_continuation, true, false);
   else
   {
     op->ec_ = asio::error::already_open;

@@ -2,7 +2,7 @@
 // associated_executor.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -134,6 +134,13 @@ get_associated_executor(const T& t, ExecutionContext& ctx,
   return associated_executor<T,
     typename ExecutionContext::executor_type>::get(t, ctx.get_executor());
 }
+
+#if defined(ASIO_HAS_ALIAS_TEMPLATES)
+
+template <typename T, typename Executor = system_executor>
+using associated_executor_t = typename associated_executor<T, Executor>::type;
+
+#endif // defined(ASIO_HAS_ALIAS_TEMPLATES)
 
 } // namespace asio
 

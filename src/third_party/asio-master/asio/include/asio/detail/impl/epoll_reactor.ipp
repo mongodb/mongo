@@ -2,7 +2,7 @@
 // detail/impl/epoll_reactor.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -383,9 +383,6 @@ void epoll_reactor::deregister_descriptor(socket_type descriptor,
           context(), static_cast<uintmax_t>(descriptor),
           reinterpret_cast<uintmax_t>(descriptor_data)));
 
-    free_descriptor_state(descriptor_data);
-    descriptor_data = 0;
-
     scheduler_.post_deferred_completions(ops);
   }
 }
@@ -415,7 +412,14 @@ void epoll_reactor::deregister_internal_descriptor(socket_type descriptor,
     ASIO_HANDLER_REACTOR_DEREGISTRATION((
           context(), static_cast<uintmax_t>(descriptor),
           reinterpret_cast<uintmax_t>(descriptor_data)));
+  }
+}
 
+void epoll_reactor::cleanup_descriptor_data(
+    per_descriptor_data& descriptor_data)
+{
+  if (descriptor_data)
+  {
     free_descriptor_state(descriptor_data);
     descriptor_data = 0;
   }
@@ -462,6 +466,7 @@ void epoll_reactor::run(long usec, op_queue<operation>& ops)
       // Ignore.
     }
 # endif // defined(ASIO_HAS_TIMERFD)
+    else
     {
       unsigned event_mask = 0;
       if ((events[i].events & EPOLLIN) != 0)
@@ -512,8 +517,15 @@ void epoll_reactor::run(long usec, op_queue<operation>& ops)
       // don't call work_started() here. This still allows the scheduler to
       // stop if the only remaining operations are descriptor operations.
       descriptor_state* descriptor_data = static_cast<descriptor_state*>(ptr);
-      descriptor_data->set_ready_events(events[i].events);
-      ops.push(descriptor_data);
+      if (!ops.is_enqueued(descriptor_data))
+      {
+        descriptor_data->set_ready_events(events[i].events);
+        ops.push(descriptor_data);
+      }
+      else
+      {
+        descriptor_data->add_ready_events(events[i].events);
+      }
     }
   }
 

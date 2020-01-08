@@ -17,140 +17,18 @@ AC_ARG_WITH(boost,
   if test "${withval}" = no; then
     STANDALONE="yes"
   else
-    CPPFLAGS="$CPPFLAGS -I${withval}"
+    CPPFLAGS="$CPPFLAGS -I${withval} -DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING"
     LIBS="$LIBS -L${withval}/stage/lib"
   fi
 ],
 [
-  BOOSTDIR="`pwd`/../boost_1_55_0"
-  if test -d "${BOOSTDIR}"; then
-    CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-    LIBS="$LIBS -L${BOOSTDIR}/stage/lib"
-  else
-    BOOSTDIR="`pwd`/../boost_1_54_0"
+  BOOSTDIR=`ls -1d ../boost_*_*_*/ 2>/dev/null | sort -t "_" -k 2nr -k 3nr -k 4nr | head -n 1 | sed -e 's/\/$//'`
+  if test "${BOOSTDIR}" != ""; then
+    BOOSTDIR="`pwd`/${BOOSTDIR}"
     if test -d "${BOOSTDIR}"; then
-      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
+      echo "using automatically detected boost from ${BOOSTDIR}"
+      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR} -DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING"
       LIBS="$LIBS -L${BOOSTDIR}/stage/lib"
-    else
-      BOOSTDIR="`pwd`/../boost_1_53_0"
-      if test -d "${BOOSTDIR}"; then
-        CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-      else
-        BOOSTDIR="`pwd`/../boost_1_52_0"
-        if test -d "${BOOSTDIR}"; then
-          CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-        else
-          BOOSTDIR="`pwd`/../boost_1_51_0"
-          if test -d "${BOOSTDIR}"; then
-            CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-          else
-            BOOSTDIR="`pwd`/../boost_1_50_0"
-            if test -d "${BOOSTDIR}"; then
-              CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-            else
-              BOOSTDIR="`pwd`/../boost_1_49_0"
-              if test -d "${BOOSTDIR}"; then
-                CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-              else
-                BOOSTDIR="`pwd`/../boost_1_48_0"
-                if test -d "${BOOSTDIR}"; then
-                  CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                else
-                  BOOSTDIR="`pwd`/../boost_1_47_0"
-                  if test -d "${BOOSTDIR}"; then
-                    CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                  else
-                    BOOSTDIR="`pwd`/../boost_1_46_0"
-                    if test -d "${BOOSTDIR}"; then
-                      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                    else
-                      BOOSTDIR="`pwd`/../boost_1_46_1"
-                      if test -d "${BOOSTDIR}"; then
-                        CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                      else
-                        BOOSTDIR="`pwd`/../boost_1_45_0"
-                        if test -d "${BOOSTDIR}"; then
-                          CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                        else
-                          BOOSTDIR="`pwd`/../boost_1_44_0"
-                          if test -d "${BOOSTDIR}"; then
-                            CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                          else
-                            BOOSTDIR="`pwd`/../boost_1_43_0"
-                            if test -d "${BOOSTDIR}"; then
-                              CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                            else
-                              BOOSTDIR="`pwd`/../boost_1_42_0"
-                              if test -d "${BOOSTDIR}"; then
-                                CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                              else
-                                BOOSTDIR="`pwd`/../boost_1_41_0"
-                                if test -d "${BOOSTDIR}"; then
-                                  CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                else
-                                  BOOSTDIR="`pwd`/../boost_1_40_0"
-                                  if test -d "${BOOSTDIR}"; then
-                                    CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                  else
-                                    BOOSTDIR="`pwd`/../boost_1_39_0"
-                                    if test -d "${BOOSTDIR}"; then
-                                      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                    else
-                                      BOOSTDIR="`pwd`/../boost_1_38_0"
-                                      if test -d "${BOOSTDIR}"; then
-                                        CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                      else
-                                        BOOSTDIR="`pwd`/../boost_1_37_0"
-                                        if test -d "${BOOSTDIR}"; then
-                                          CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                        else
-                                          BOOSTDIR="`pwd`/../boost_1_36_0"
-                                          if test -d "${BOOSTDIR}"; then
-                                            CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                          else
-                                            BOOSTDIR="`pwd`/../boost_1_35_0"
-                                            if test -d "${BOOSTDIR}"; then
-                                              CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                            else
-                                              BOOSTDIR="`pwd`/../boost_1_34_1"
-                                              if test -d "${BOOSTDIR}"; then
-                                                CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                              else
-                                                BOOSTDIR="`pwd`/../boost_1_34_0"
-                                                if test -d "${BOOSTDIR}"; then
-                                                  CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                                else
-                                                  BOOSTDIR="`pwd`/../boost_1_33_1"
-                                                  if test -d "${BOOSTDIR}"; then
-                                                    CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                                  else
-                                                    BOOSTDIR="`pwd`/../boost_1_33_0"
-                                                    if test -d "${BOOSTDIR}"; then
-                                                      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR}"
-                                                    fi
-                                                  fi
-                                                fi
-                                              fi
-                                            fi
-                                          fi
-                                        fi
-                                      fi
-                                    fi
-                                  fi
-                                fi
-                              fi
-                            fi
-                          fi
-                        fi
-                      fi
-                    fi
-                  fi
-                fi
-              fi
-            fi
-          fi
-        fi
-      fi
     fi
   fi
 ])
@@ -179,7 +57,8 @@ fi
 AC_ARG_WITH(openssl,
   AC_HELP_STRING([--with-openssl=DIR],[location of openssl]),
 [
-  CPPFLAGS="$CPPFLAGS -I${withval}"
+  CPPFLAGS="$CPPFLAGS -I${withval}/include"
+  LIBS="$LIBS -L${withval}/lib"
 ],[])
 
 AC_CHECK_HEADER([openssl/ssl.h],,
@@ -198,6 +77,7 @@ case $host in
   *-*-linux*)
     CXXFLAGS="$CXXFLAGS -pthread"
     LDFLAGS="$LDFLAGS -pthread"
+    LIBS="$LIBS -lrt"
     ;;
   *-*-solaris*)
     if test "$GXX" = yes; then

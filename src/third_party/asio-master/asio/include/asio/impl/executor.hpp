@@ -2,7 +2,7 @@
 // impl/executor.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -39,15 +39,10 @@ public:
   template <typename F, typename Alloc>
   explicit function(F f, const Alloc& a)
   {
-    // Construct an allocator to be used for the operation.
-    typedef typename detail::get_recycling_allocator<Alloc>::type alloc_type;
-    alloc_type allocator(detail::get_recycling_allocator<Alloc>::get(a));
-
     // Allocate and construct an operation to wrap the function.
-    typedef detail::executor_op<F, alloc_type> op;
-    typename op::ptr p = { allocator, 0, 0 };
-    p.v = p.a.allocate(1);
-    op_ = new (p.v) op(f, allocator);
+    typedef detail::executor_op<F, Alloc> op;
+    typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+    op_ = new (p.v) op(ASIO_MOVE_CAST(F)(f), a);
     p.v = 0;
   }
 

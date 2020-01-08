@@ -2,7 +2,7 @@
 // socket_base.hpp
 // ~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -430,6 +430,40 @@ public:
   typedef asio::detail::socket_option::linger<
     ASIO_OS_DEF(SOL_SOCKET), ASIO_OS_DEF(SO_LINGER)>
       linger;
+#endif
+
+  /// Socket option for putting received out-of-band data inline.
+  /**
+   * Implements the SOL_SOCKET/SO_OOBINLINE socket option.
+   *
+   * @par Examples
+   * Setting the option:
+   * @code
+   * asio::ip::tcp::socket socket(io_context);
+   * ...
+   * asio::socket_base::out_of_band_inline option(true);
+   * socket.set_option(option);
+   * @endcode
+   *
+   * @par
+   * Getting the current option value:
+   * @code
+   * asio::ip::tcp::socket socket(io_context);
+   * ...
+   * asio::socket_base::out_of_band_inline option;
+   * socket.get_option(option);
+   * bool value = option.value();
+   * @endcode
+   *
+   * @par Concepts:
+   * Socket_Option, Boolean_Socket_Option.
+   */
+#if defined(GENERATING_DOCUMENTATION)
+  typedef implementation_defined out_of_band_inline;
+#else
+  typedef asio::detail::socket_option::boolean<
+    ASIO_OS_DEF(SOL_SOCKET), ASIO_OS_DEF(SO_OOBINLINE)>
+      out_of_band_inline;
 #endif
 
   /// Socket option to report aborted connections on accept.

@@ -2,7 +2,7 @@
 // impl/io_context.hpp
 // ~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -226,27 +226,23 @@ template <typename Function, typename Allocator>
 void io_context::executor_type::dispatch(
     ASIO_MOVE_ARG(Function) f, const Allocator& a) const
 {
-  // Make a local, non-const copy of the function.
   typedef typename decay<Function>::type function_type;
-  function_type tmp(ASIO_MOVE_CAST(Function)(f));
 
   // Invoke immediately if we are already inside the thread pool.
   if (io_context_.impl_.can_dispatch())
   {
+    // Make a local, non-const copy of the function.
+    function_type tmp(ASIO_MOVE_CAST(Function)(f));
+
     detail::fenced_block b(detail::fenced_block::full);
     asio_handler_invoke_helpers::invoke(tmp, tmp);
     return;
   }
 
-  // Construct an allocator to be used for the operation.
-  typedef typename detail::get_recycling_allocator<Allocator>::type alloc_type;
-  alloc_type allocator(detail::get_recycling_allocator<Allocator>::get(a));
-
   // Allocate and construct an operation to wrap the function.
-  typedef detail::executor_op<function_type, alloc_type, detail::operation> op;
-  typename op::ptr p = { allocator, 0, 0 };
-  p.v = p.a.allocate(1);
-  p.p = new (p.v) op(tmp, allocator);
+  typedef detail::executor_op<function_type, Allocator, detail::operation> op;
+  typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+  p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(f), a);
 
   ASIO_HANDLER_CREATION((this->context(), *p.p,
         "io_context", &this->context(), 0, "post"));
@@ -259,19 +255,12 @@ template <typename Function, typename Allocator>
 void io_context::executor_type::post(
     ASIO_MOVE_ARG(Function) f, const Allocator& a) const
 {
-  // Make a local, non-const copy of the function.
   typedef typename decay<Function>::type function_type;
-  function_type tmp(ASIO_MOVE_CAST(Function)(f));
-
-  // Construct an allocator to be used for the operation.
-  typedef typename detail::get_recycling_allocator<Allocator>::type alloc_type;
-  alloc_type allocator(detail::get_recycling_allocator<Allocator>::get(a));
 
   // Allocate and construct an operation to wrap the function.
-  typedef detail::executor_op<function_type, alloc_type, detail::operation> op;
-  typename op::ptr p = { allocator, 0, 0 };
-  p.v = p.a.allocate(1);
-  p.p = new (p.v) op(tmp, allocator);
+  typedef detail::executor_op<function_type, Allocator, detail::operation> op;
+  typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+  p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(f), a);
 
   ASIO_HANDLER_CREATION((this->context(), *p.p,
         "io_context", &this->context(), 0, "post"));
@@ -284,19 +273,12 @@ template <typename Function, typename Allocator>
 void io_context::executor_type::defer(
     ASIO_MOVE_ARG(Function) f, const Allocator& a) const
 {
-  // Make a local, non-const copy of the function.
   typedef typename decay<Function>::type function_type;
-  function_type tmp(ASIO_MOVE_CAST(Function)(f));
-
-  // Construct an allocator to be used for the operation.
-  typedef typename detail::get_recycling_allocator<Allocator>::type alloc_type;
-  alloc_type allocator(detail::get_recycling_allocator<Allocator>::get(a));
 
   // Allocate and construct an operation to wrap the function.
-  typedef detail::executor_op<function_type, alloc_type, detail::operation> op;
-  typename op::ptr p = { allocator, 0, 0 };
-  p.v = p.a.allocate(1);
-  p.p = new (p.v) op(tmp, allocator);
+  typedef detail::executor_op<function_type, Allocator, detail::operation> op;
+  typename op::ptr p = { detail::addressof(a), op::ptr::allocate(a), 0 };
+  p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(f), a);
 
   ASIO_HANDLER_CREATION((this->context(), *p.p,
         "io_context", &this->context(), 0, "defer"));
