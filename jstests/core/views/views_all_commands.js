@@ -74,6 +74,7 @@
         _configsvrBalancerStart: {skip: isAnInternalCommand},
         _configsvrBalancerStatus: {skip: isAnInternalCommand},
         _configsvrBalancerStop: {skip: isAnInternalCommand},
+        _configsvrClearJumboFlag: {skip: isAnInternalCommand},
         _configsvrCommitChunkMerge: {skip: isAnInternalCommand},
         _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
         _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
@@ -131,6 +132,13 @@
             skip: "Tested in views/views_sharded.js",
         },
         clearLog: {skip: isUnrelated},
+        clearJumboFlag: {
+            command: {clearJumboFlag: "test.view"},
+            skipStandalone: true,
+            isAdminCommand: true,
+            expectFailure: true,
+            expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        },
         clone: {skip: "Tested in replsets/cloneDb.js"},
         cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
         cloneCollectionAsCapped: {

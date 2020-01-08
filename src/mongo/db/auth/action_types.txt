@@ -21,6 +21,7 @@
 "changeStream",
 "checkFreeMonitoringStatus",
 "cleanupOrphaned",
+"clearJumboFlag",
 "closeAllDatabases",  # Deprecated, needs to stay around for backwards compatibility
 "collMod",
 "collStats",
