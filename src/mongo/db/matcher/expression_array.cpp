@@ -182,6 +182,38 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level)
     }
 }
 
+namespace {
+/**
+ * Helps consolidates double, triple, or more $nots into a single $not or zero $nots. Traverses the
+ * children of 'expr' to find the first child of a $not which is not a single-child $and or a $not.
+ * Returns that child and the number of $nots encountered along the way.
+ */
+std::pair<int, MatchExpression*> consolidateMultipleNotsAndGetChildOfNot(MatchExpression* expr) {
+    using MatchType = MatchExpression::MatchType;
+    invariant(expr->matchType() == MatchType::NOT);
+    int numberOfConsecutiveNots = 1;
+    expr = expr->getChild(0);
+
+    auto isSingleChildAndContainingANot = [](auto* expr) {
+        return expr->matchType() == MatchType::AND && expr->numChildren() == 1UL &&
+            expr->getChild(0)->matchType() == MatchType::NOT;
+    };
+    while (true) {
+        if (expr->matchType() == MatchType::NOT) {
+            expr = expr->getChild(0);
+            ++numberOfConsecutiveNots;
+        } else if (isSingleChildAndContainingANot(expr)) {
+            expr = expr->getChild(0);
+            invariant(expr->matchType() == MatchType::NOT);
+        } else {
+            // This expression is not a $not or an $and containing only a $not, so we're done.
+            break;
+        }
+    }
+    return {numberOfConsecutiveNots, expr};
+}
+}  // namespace
+
 void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder emBob;
 
@@ -189,9 +221,12 @@ void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
     // ElemMatchValue however as $nor is a top-level expression and expects that contained
     // expressions have path information. For this case we will serialize to $not.
     if (_subs.size() == 1 && _subs[0]->matchType() == MatchType::NOT) {
-        std::vector<MatchExpression*> childList{_subs[0]->getChild(0)};
+        int numberOfConsecutiveNots;
+        MatchExpression* notChildExpr;
+        std::tie(numberOfConsecutiveNots, notChildExpr) =
+            consolidateMultipleNotsAndGetChildOfNot(_subs[0]);
 
-        MatchExpression* notChildExpr = _subs[0]->getChild(0);
+        auto childList = std::vector<MatchExpression*>{notChildExpr};
         if (notChildExpr->matchType() == MatchType::AND) {
             childList = *notChildExpr->getChildVector();
         }
@@ -204,17 +239,18 @@ void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
         if (allChildrenArePathMatchExpression) {
             BSONObjBuilder pathBuilder(out->subobjStart(path()));
             BSONObjBuilder elemMatchBuilder(pathBuilder.subobjStart("$elemMatch"));
-            BSONObjBuilder notBuilder(elemMatchBuilder.subobjStart("$not"));
+            auto* builderForChildren = &elemMatchBuilder;
+            auto notBuilder = boost::optional<BSONObjBuilder>();
+            if (numberOfConsecutiveNots % 2 == 1) {
+                notBuilder.emplace(elemMatchBuilder.subobjStart("$not"));
+                builderForChildren = notBuilder.get_ptr();
+            }
 
             for (auto&& child : childList) {
                 BSONObjBuilder predicate;
                 child->serialize(&predicate);
-                notBuilder.appendElements(predicate.obj().firstElement().embeddedObject());
+                builderForChildren->appendElements(predicate.obj().firstElement().embeddedObject());
             }
-
-            notBuilder.doneFast();
-            elemMatchBuilder.doneFast();
-            pathBuilder.doneFast();
             return;
         }
     }
@@ -280,4 +316,4 @@ bool SizeMatchExpression::equivalent(const MatchExpression* other) const {
 
 
 // ------------------
-}
+}  // namespace mongo
