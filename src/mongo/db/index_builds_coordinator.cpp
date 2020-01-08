@@ -71,6 +71,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 namespace {
 
 constexpr StringData kCreateIndexesFieldName = "createIndexes"_sd;
+constexpr StringData kCommitIndexBuildFieldName = "commitIndexBuild"_sd;
+constexpr StringData kAbortIndexBuildFieldName = "abortIndexBuild"_sd;
 constexpr StringData kIndexesFieldName = "indexes"_sd;
 constexpr StringData kKeyFieldName = "key"_sd;
 constexpr StringData kUniqueFieldName = "unique"_sd;
@@ -240,6 +242,21 @@ void forEachIndexBuild(
 
         onIndexBuild(replState);
     }
+}
+
+/**
+ * Updates currentOp for commitIndexBuild or abortIndexBuild.
+ */
+void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, UUID buildUUID) {
+    BSONObjBuilder builder;
+    buildUUID.appendToBuilder(&builder, fieldName);
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    auto curOp = CurOp::get(opCtx);
+    builder.appendElementsUnique(curOp->opDescription());
+    auto opDescObj = builder.obj();
+    curOp->setLogicalOp_inlock(LogicalOp::opCommand);
+    curOp->setOpDescription_inlock(opDescObj);
+    curOp->ensureStarted();
 }
 
 }  // namespace
@@ -474,6 +491,8 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::
 }
 
 void IndexBuildsCoordinator::signalCommitAndWait(OperationContext* opCtx, const UUID& buildUUID) {
+    updateCurOpForCommitOrAbort(opCtx, kCommitIndexBuildFieldName, buildUUID);
+
     auto replState = uassertStatusOK(_getIndexBuild(buildUUID));
 
     {
@@ -493,6 +512,8 @@ void IndexBuildsCoordinator::signalCommitAndWait(OperationContext* opCtx, const 
 void IndexBuildsCoordinator::signalAbortAndWait(OperationContext* opCtx,
                                                 const UUID& buildUUID,
                                                 const std::string& reason) noexcept {
+    updateCurOpForCommitOrAbort(opCtx, kAbortIndexBuildFieldName, buildUUID);
+
     abortIndexBuildByBuildUUID(opCtx, buildUUID, reason);
 
     // Because we replicate abort oplog entries for single-phase builds, it is possible to receive
@@ -503,6 +524,7 @@ void IndexBuildsCoordinator::signalAbortAndWait(OperationContext* opCtx,
               << replStateResult.getStatus();
         return;
     }
+
     auto replState = replStateResult.getValue();
     auto fut = replState->sharedPromise.getFuture();
     log() << "Index build joined after abort: " << buildUUID << ": " << fut.waitNoThrow(opCtx);
