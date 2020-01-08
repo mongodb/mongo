@@ -1402,6 +1402,27 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     return {Timestamp(static_cast<unsigned long long>(recordId.repr()))};
 }
 
+StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(OperationContext* opCtx) {
+    invariant(_isOplog);
+    dassert(opCtx->lockState()->isReadLocked());
+
+    stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
+
+    if (_cappedFirstRecord == RecordId()) {
+        WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+        auto sessRaii = cache->getSession();
+        WT_SESSION* sess = sessRaii->getSession();
+        WT_CURSOR* cursor;
+        invariantWTOK(sess->open_cursor(sess, _uri.c_str(), nullptr, nullptr, &cursor));
+        invariantWTOK(cursor->next(cursor));
+
+        _cappedFirstRecord = getKey(cursor);
+        invariantWTOK(sess->reset(sess));
+    }
+
+    return {Timestamp(static_cast<unsigned long long>(_cappedFirstRecord.repr()))};
+}
+
 Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                                            const RecordId& id,
                                            const char* data,

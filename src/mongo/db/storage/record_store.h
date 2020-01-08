@@ -533,7 +533,7 @@ public:
     /**
      * If supported, this method returns the timestamp value for the latest storage engine committed
      * oplog document. Note that this method will not include uncommitted writes on the input
-     * OperationContext. A new transaction is always created and destroyed to service this call.
+     * OperationContext. A new transaction may be created and destroyed to service this call.
      *
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
@@ -541,6 +541,18 @@ public:
         return Status(ErrorCodes::OplogOperationUnsupported,
                       "The current storage engine doesn't support an optimized implementation for "
                       "getting the latest oplog timestamp.");
+    }
+
+    /**
+     * If supported, this method returns the timestamp value for the earliest storage engine
+     * committed oplog document.
+     *
+     * Unsupported RecordStores return the OplogOperationUnsupported error code.
+     */
+    virtual StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) {
+        return Status(ErrorCodes::OplogOperationUnsupported,
+                      "The current storage engine doesn't support an optimized implementation for "
+                      "getting the earliest oplog timestamp.");
     }
 
 protected:
