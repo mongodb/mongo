@@ -150,7 +150,8 @@ selector:
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable if SERVER-43310 is backported to 4.0
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
-
+   # Enable after SERVER-44477 is backported and available on 4.0 binaries
+  - jstests/sharding/mr_merge_to_existing.js
 executor:
   config:
     shell_options:

@@ -46,14 +46,14 @@ function reduce(key, values) {
 // sharded src sharded dst
 var suffix = "InShardedOutSharded";
 
-// Check that merge to an existing empty sharded collection works and creates a new UUID after
+// Check that merge to an existing empty sharded collection works and preserves the UUID after
 // M/R
 st.adminCommand({shardcollection: "mrShard.outSharded", key: {"_id": 1}});
 var origUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
 var out = db.srcSharded.mapReduce(map, reduce, {out: {merge: "outSharded", sharded: true}});
 verifyOutput(out, 512);
 var newUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
-assert.neq(origUUID, newUUID);
+assert.eq(origUUID, newUUID);
 
 // Shard1 is the primary shard and only one chunk should have been written, so the chunk with
 // the new UUID should have been written to it.
