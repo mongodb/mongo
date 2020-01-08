@@ -170,6 +170,7 @@
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/latch_analyzer.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -313,6 +314,8 @@ ExitCode _initAndListen(int listenPort) {
 #if defined(_WIN32)
     VersionInfoInterface::instance().logTargetMinOS();
 #endif
+
+    OCSPManager::get()->startThreadPool();
 
     logProcessDetails();
 

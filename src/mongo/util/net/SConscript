@@ -121,6 +121,8 @@ if not get_option('ssl') == 'off':
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/service_context',
+            '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         ],
         LIBDEPS_PRIVATE=[
             'http_client',

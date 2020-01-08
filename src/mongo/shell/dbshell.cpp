@@ -78,6 +78,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
 #include "mongo/util/quick_exit.h"
@@ -752,6 +753,9 @@ int _main(int argc, char* argv[], char** envp) {
     setGlobalServiceContext(ServiceContext::make());
     // TODO This should use a TransportLayerManager or TransportLayerFactory
     auto serviceContext = getGlobalServiceContext();
+
+    OCSPManager::get()->startThreadPool();
+
     transport::TransportLayerASIO::Options opts;
     opts.enableIPv6 = shellGlobalParams.enableIPv6;
     opts.mode = transport::TransportLayerASIO::Options::kEgress;
@@ -803,7 +807,6 @@ int _main(int argc, char* argv[], char** envp) {
 
         boost::log::core::get()->add_sink(std::move(consoleSink));
     }
-
 
     // Get the URL passed to the shell
     std::string& cmdlineURI = shellGlobalParams.url;

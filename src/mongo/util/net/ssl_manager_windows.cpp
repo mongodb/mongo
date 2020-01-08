@@ -273,11 +273,10 @@ public:
                                                           const std::string& remoteHost,
                                                           const HostAndPort& hostForLogging) final;
 
-    StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
-        PCtxtHandle ssl,
-        boost::optional<std::string> sni,
-        const std::string& remoteHost,
-        const HostAndPort& hostForLogging) final;
+    Future<SSLPeerInfo> parseAndValidatePeerCertificate(PCtxtHandle ssl,
+                                                        boost::optional<std::string> sni,
+                                                        const std::string& remoteHost,
+                                                        const HostAndPort& hostForLogging) final;
 
 
     const SSLConfiguration& getSSLConfiguration() const final {
@@ -1601,17 +1600,19 @@ SSLPeerInfo SSLManagerWindows::parseAndValidatePeerCertificateDeprecated(
     const SSLConnectionInterface* conn,
     const std::string& remoteHost,
     const HostAndPort& hostForLogging) {
-    auto swPeerSubjectName = parseAndValidatePeerCertificate(
-        const_cast<SSLConnectionWindows*>(static_cast<const SSLConnectionWindows*>(conn))
-            ->_engine.native_handle(),
-        boost::none,
-        remoteHost,
-        hostForLogging);
+
+    auto swPeerSubjectName =
+        parseAndValidatePeerCertificate(
+            const_cast<SSLConnectionWindows*>(static_cast<const SSLConnectionWindows*>(conn))
+                ->_engine.native_handle(),
+            boost::none,
+            remoteHost,
+            hostForLogging)
+            .getNoThrow();
     // We can't use uassertStatusOK here because we need to throw a SocketException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
     }
-
     return swPeerSubjectName.getValue();
 }
 
@@ -1859,7 +1860,7 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
     }
 }
 
-StatusWith<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
+Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     PCtxtHandle ssl,
     boost::optional<std::string> sni,
     const std::string& remoteHost,
@@ -1876,7 +1877,7 @@ StatusWith<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
-        return SSLPeerInfo(sni);
+        return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sni));
 
     SECURITY_STATUS ss = QueryContextAttributes(ssl, SECPKG_ATTR_REMOTE_CERT_CONTEXT, &cert);
 
@@ -1928,7 +1929,7 @@ StatusWith<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     }
 
     if (peerSubjectName.empty()) {
-        return SSLPeerInfo(sni);
+        return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sni));
     }
 
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
@@ -1945,9 +1946,10 @@ StatusWith<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
             return swPeerCertificateRoles.getStatus();
         }
 
-        return SSLPeerInfo(peerSubjectName, sni, std::move(swPeerCertificateRoles.getValue()));
+        return Future<SSLPeerInfo>::makeReady(
+            SSLPeerInfo(peerSubjectName, sni, std::move(swPeerCertificateRoles.getValue())));
     } else {
-        return SSLPeerInfo(peerSubjectName);
+        return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(peerSubjectName));
     }
 }
 

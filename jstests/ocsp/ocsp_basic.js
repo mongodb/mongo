@@ -39,6 +39,12 @@ assert.throws(() => {
     new Mongo(conn.host);
 });
 
-mock_ocsp.stop();
 MongoRunner.stopMongod(conn);
+
+// The mongoRunner spawns a shell to validate the collections which races
+// with the shutdown logic of the mock_ocsp responder on some platforms.
+// We need this sleep to make sure that the threads don't interfere with
+// each other.
+sleep(1000);
+mock_ocsp.stop();
 }());

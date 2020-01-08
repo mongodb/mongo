@@ -29,27 +29,83 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/net/http_client.h"
+#include "mongo/db/client.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 
 namespace mongo {
 
-StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, StringData responderURI) {
-    auto client = HttpClient::create();
-    if (!client) {
-        return Status(ErrorCodes::InternalErrorNotSupported, "HTTP Client not supported");
-    }
-    client->allowInsecureHTTP(true);
-    client->setTimeout(kOCSPRequestTimeoutSeconds);
-    client->setHeaders({"Content-Type: application/ocsp-request"});
-    auto dataBuilder = client->post("http://" + responderURI, data);
-    if (dataBuilder.size() == 0) {
-        return Status(ErrorCodes::SSLHandshakeFailed, "OCSP Validation Failed");
+namespace {
+
+auto makeTaskExecutor() {
+    ThreadPool::Options tpOptions;
+    tpOptions.poolName = "OCSPManagerHTTP";
+    tpOptions.maxThreads = 10;
+    tpOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    return std::make_unique<ThreadPool>(tpOptions);
+}
+
+}  // namespace
+
+OCSPManager::OCSPManager() {
+    _pool = makeTaskExecutor();
+
+    _client = HttpClient::create();
+    if (!_client) {
+        return;
     }
 
-    auto blobSize = dataBuilder.size();
-    auto blobData = dataBuilder.release();
-    return std::vector<uint8_t>(blobData.get(), blobData.get() + blobSize);
+    _client->allowInsecureHTTP(true);
+    _client->setTimeout(kOCSPRequestTimeoutSeconds);
+    _client->setHeaders({"Content-Type: application/ocsp-request"});
+}
+
+void OCSPManager::startThreadPool() {
+    if (_pool) {
+        _pool->startup();
+    }
+}
+
+/**
+ * Constructs the HTTP client and sends the OCSP request to the responder.
+ * Returns a vector of bytes to be constructed into a OCSP response.
+ */
+Future<std::vector<uint8_t>> OCSPManager::requestStatus(std::vector<uint8_t> data,
+                                                        StringData responderURI) {
+    if (!this->_client) {
+        return Future<std::vector<uint8_t>>::makeReady(
+            Status(ErrorCodes::InternalErrorNotSupported, "HTTP Client not supported"));
+    }
+
+    auto pf = makePromiseFuture<DataBuilder>();
+    std::string uri("http://" + responderURI);
+
+    _pool->schedule(
+        [this, promise = std::move(pf.promise), uri = std::move(uri), data = std::move(data)](
+            auto status) mutable {
+            if (!status.isOK()) {
+                return;
+            }
+            try {
+                auto result = this->_client->post(uri, data);
+                promise.emplaceValue(std::move(result));
+            } catch (...) {
+                promise.setError(exceptionToStatus());
+            }
+        });
+
+    return std::move(pf.future).then(
+        [](DataBuilder dataBuilder) mutable -> Future<std::vector<uint8_t>> {
+            if (dataBuilder.size() == 0) {
+                return Status(ErrorCodes::SSLHandshakeFailed, "Failed to acquire OCSP Response.");
+            }
+
+            auto blobSize = dataBuilder.size();
+            auto blobData = dataBuilder.release();
+            return std::vector<uint8_t>(blobData.get(), blobData.get() + blobSize);
+        });
 }
 
 }  // namespace mongo

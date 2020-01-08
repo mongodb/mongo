@@ -259,7 +259,7 @@ public:
      * X509 authorization will be returned in `roles`.
      * Further, the SNI Name will be captured into the `sni` value, when available.
      */
-    virtual StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
+    virtual Future<SSLPeerInfo> parseAndValidatePeerCertificate(
         SSLConnectionType ssl,
         boost::optional<std::string> sni,
         const std::string& remoteHost,

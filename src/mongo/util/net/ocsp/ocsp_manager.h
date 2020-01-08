@@ -30,17 +30,33 @@
 
 
 #include "mongo/base/data_range.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/http_client.h"
 
 namespace mongo {
 
 constexpr Seconds kOCSPRequestTimeoutSeconds(5);
+class OCSPManager {
 
-/**
- * Constructs the HTTP client and sends the OCSP request to the responder.
- * Returns a vector of bytes to be constructed into a OCSP response.
- */
-StatusWith<std::vector<uint8_t>> ocspRequestStatus(ConstDataRange data, StringData responderURI);
+public:
+    OCSPManager();
+
+    static OCSPManager* get() {
+        static OCSPManager manager = OCSPManager();
+
+        return &manager;
+    };
+
+    Future<std::vector<uint8_t>> requestStatus(std::vector<uint8_t> data, StringData responderURI);
+
+    void startThreadPool();
+
+private:
+    std::unique_ptr<HttpClient> _client;
+    std::unique_ptr<ThreadPool> _pool;
+};
 
 }  // namespace mongo

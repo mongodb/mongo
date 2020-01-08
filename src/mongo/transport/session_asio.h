@@ -258,9 +258,12 @@ protected:
         return doHandshake().then([this, target] {
             _ranHandshake = true;
 
-            SSLPeerInfo::forSession(shared_from_this()) =
-                uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
-                    _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target));
+            return getSSLManager()
+                ->parseAndValidatePeerCertificate(
+                    _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target)
+                .then([this](SSLPeerInfo info) {
+                    SSLPeerInfo::forSession(shared_from_this()) = info;
+                });
         });
     }
 
@@ -634,13 +637,17 @@ private:
                 }
             };
             return doHandshake().then([this](size_t size) {
-                auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
-
-                if (sslPeerInfo.subjectName.empty()) {
-                    sslPeerInfo = uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
-                        _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote));
+                if (SSLPeerInfo::forSession(shared_from_this()).subjectName.empty()) {
+                    return getSSLManager()
+                        ->parseAndValidatePeerCertificate(
+                            _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote)
+                        .then([this](SSLPeerInfo info) -> bool {
+                            SSLPeerInfo::forSession(shared_from_this()) = info;
+                            return true;
+                        });
                 }
-                return true;
+
+                return Future<bool>::makeReady(true);
             });
         } else if (_tl->_sslMode() == SSLParams::SSLMode_requireSSL) {
             uasserted(ErrorCodes::SSLHandshakeFailed,
