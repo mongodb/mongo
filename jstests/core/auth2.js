@@ -1,4 +1,5 @@
 // just make sure logout doesn't break anything
+// @tags: [requires_non_retryable_commands]
 
 // SERVER-724
 db.runCommand({logout: 1});
