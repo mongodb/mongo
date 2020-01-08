@@ -330,6 +330,7 @@ def run_generate_tasks(expansion_file, evergreen_config=None):
 @click.option("--is-generated-suite", type=bool, required=True,
               help="Indicates whether the suite yaml to update is generated or static.")
 def generate_exclude_yaml(suite, task_path_suffix, is_generated_suite):
+    # pylint: disable=too-many-locals
     """
     Update the given multiversion suite configuration yaml to exclude tests.
 
@@ -388,7 +389,7 @@ def generate_exclude_yaml(suite, task_path_suffix, is_generated_suite):
         for file_name in os.listdir(CONFIG_DIR):
             suites_dir = CONFIG_DIR
             # Update the 'exclude_files' for each of the appropriate generated suites.
-            if suite_name in file_name and file_name.endswith('.yml'):
+            if file_name.endswith('.yml'):
                 suite_config = generate_resmoke.read_yaml(CONFIG_DIR, file_name)
                 selected_files = suite_config["selector"]["roots"]
                 # Only exclude the files that we want to exclude in the first place and have been
