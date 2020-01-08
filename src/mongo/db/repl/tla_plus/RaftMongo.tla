@@ -134,7 +134,7 @@ Init == /\ InitServerVars
 \* Receive one or more oplog entries from j.
 AppendOplog(i, j) ==
     /\ CanSyncFrom(i, j)
-    /\ state[i] = "Follower"  \* Disable primary catchup and draining
+    /\ state[i] = "Follower"
     /\ \E lastAppended \in (Len(log[i]) + 1)..Len(log[j]):
         LET appendedEntries == SubSeq(log[j], Len(log[i]) + 1, lastAppended)
          IN log' = [log EXCEPT ![i] = log[i] \o appendedEntries]
@@ -167,6 +167,14 @@ BecomePrimaryByMagic(i, ayeVoters) ==
                                             THEN currentTerm[i] + 1
                                             ELSE currentTerm[index]]
     /\ UNCHANGED <<committedEntries, commitPoint, logVars>>
+    
+    
+\* ACTION
+\* Node i is leader and steps down for any reason.
+Stepdown(i) ==
+    /\ state[i] = "Leader"
+    /\ state' = [state EXCEPT ![i] = "Follower"]
+    /\ UNCHANGED <<committedEntries, currentTerm, commitPoint, logVars>>
 
 \* ACTION
 \* Leader i receives a client request to add one or more entries to the log.
@@ -183,23 +191,25 @@ ClientWrite(i) ==
 
 \* ACTION
 AdvanceCommitPoint ==
-    \E leader \in Leaders : \E acknowledgers \in SUBSET Server :
-        /\ acknowledgers \subseteq Agree(leader, Len(log[leader]))
+    \E leader \in Leaders :
+    \E acknowledgers \in SUBSET Server :
+    \* New commitPoint is any committed log index after current commitPoint
+    \E committedIndex \in (commitPoint[leader].index + 1)..Len(log[leader]) :
         /\ IsMajority(acknowledgers)
-        \* New commitPoint is any committed log index after current commitPoint
-        /\ \E committedIndex \in (commitPoint[leader].index + 1)..Len(log[leader]) :
-            /\ LogTerm(leader, Len(log[leader])) = currentTerm[leader]
-            \* If an acknowledger has a higher term, the leader would step down.
-            /\ \A j \in acknowledgers : currentTerm[j] <= currentTerm[leader]
-            /\ LET newCommitPoint == [
-                       term |-> LogTerm(leader, committedIndex),
-                       index |-> committedIndex
-                   ]
-                IN /\ commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
-            /\ committedEntries' = committedEntries \union {[
-                   term |-> LogTerm(leader, i),
-                   index |-> i
-               ] : i \in commitPoint[leader].index + 1..committedIndex}
+        /\ acknowledgers \subseteq Agree(leader, committedIndex)
+        \* New commitPoint is an entry written by this leader.
+        /\ LogTerm(leader, committedIndex) = currentTerm[leader]
+        \* If an acknowledger has a higher term, the leader would step down.
+        /\ \A j \in acknowledgers : currentTerm[j] <= currentTerm[leader]
+        /\ LET newCommitPoint == [
+                   term |-> LogTerm(leader, committedIndex),
+                   index |-> committedIndex
+               ]
+            IN /\ commitPoint' = [commitPoint EXCEPT ![leader] = newCommitPoint]
+        /\ committedEntries' = committedEntries \union {[
+               term |-> LogTerm(leader, i),
+               index |-> i
+           ] : i \in commitPoint[leader].index + 1..committedIndex}
     /\ UNCHANGED <<electionVars, log>>
 
 \* ACTION
@@ -240,6 +250,9 @@ RollbackOplogAction ==
 BecomePrimaryByMagicAction ==
     \E i \in Server : \E ayeVoters \in SUBSET(Server) : BecomePrimaryByMagic(i, ayeVoters)
 
+StepdownAction ==
+    \E i \in Server : Stepdown(i)
+
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
 
@@ -266,6 +279,7 @@ Next ==
     \/ AppendOplogAction
     \/ RollbackOplogAction
     \/ BecomePrimaryByMagicAction
+    \/ StepdownAction
     \/ ClientWriteAction
     \*
     \* --- Commit point learning protocol
