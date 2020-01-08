@@ -850,6 +850,7 @@ void LockManager::_buildBucketBSON(const LockRequest* iter,
     info.append("convertMode", modeName(iter->convertMode));
     info.append("enqueueAtFront", iter->enqueueAtFront);
     info.append("compatibleFirst", iter->compatibleFirst);
+    info.append("debugInfo", iter->locker->getDebugInfo());
 
     LockerId lockerId = iter->locker->getId();
     std::map<LockerId, BSONObj>::const_iterator it = lockToClientMap.find(lockerId);
