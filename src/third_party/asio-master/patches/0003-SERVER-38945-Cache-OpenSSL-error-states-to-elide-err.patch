@@ -1,0 +1,62 @@
+From 5f1ffc409805a3279b09e2d2a005f3f744895348 Mon Sep 17 00:00:00 2001
+From: Spencer Jackson <spencer.jackson@mongodb.com>
+Date: Fri, 17 May 2019 12:58:57 -0400
+Subject: [PATCH 3/4] SERVER-38945: Cache OpenSSL error states to elide error
+ clearing
+
+---
+ asio/include/asio/ssl/detail/engine.hpp      |  2 ++
+ asio/include/asio/ssl/detail/impl/engine.ipp | 19 ++++++++++++++++++-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/asio/include/asio/ssl/detail/engine.hpp b/asio/include/asio/ssl/detail/engine.hpp
+index 061a50dd..b256b063 100644
+--- a/asio/include/asio/ssl/detail/engine.hpp
++++ b/asio/include/asio/ssl/detail/engine.hpp
+@@ -121,6 +121,8 @@ private:
+   ASIO_DECL static asio::detail::static_mutex& accept_mutex();
+ #endif // (OPENSSL_VERSION_NUMBER < 0x10000000L)
+ 
++  ASIO_DECL void purge_error_state();
++
+   // Perform one operation. Returns >= 0 on success or error, want_read if the
+   // operation needs more input, or want_write if it needs to write some output
+   // before the operation can complete.
+diff --git a/asio/include/asio/ssl/detail/impl/engine.ipp b/asio/include/asio/ssl/detail/impl/engine.ipp
+index 345461b1..310c838d 100644
+--- a/asio/include/asio/ssl/detail/impl/engine.ipp
++++ b/asio/include/asio/ssl/detail/impl/engine.ipp
+@@ -225,12 +225,29 @@ asio::detail::static_mutex& engine::accept_mutex()
+ }
+ #endif // (OPENSSL_VERSION_NUMBER < 0x10000000L)
+ 
++void engine::purge_error_state() {
++#if (OPENSSL_VERSION_NUMBER < 0x1010000fL && !defined(__APPLE__))
++    // OpenSSL 1.1.0 introduced a thread local state storage mechanism.
++    // Versions prior sometimes had contention issues on global mutexes
++    // which protected thread local state.
++    // If we are compiled against a version without native thread local
++    // support, cache a pointer to this thread's error state, which we can
++    // access without contention. If that state requires no cleanup,
++    // we can avoid invoking OpenSSL's more expensive machinery.
++    const static thread_local ERR_STATE* es = ERR_get_state();
++    if (es->bottom == es->top) {
++        return;
++    }
++#endif  // (OPENSSL_VERSION_NUMBER < 0x1010000fL && !defined(__APPLE__))
++    ::ERR_clear_error();
++}
++
+ engine::want engine::perform(int (engine::* op)(void*, std::size_t),
+     void* data, std::size_t length, asio::error_code& ec,
+     std::size_t* bytes_transferred)
+ {
+   std::size_t pending_output_before = ::BIO_ctrl_pending(ext_bio_);
+-  ::ERR_clear_error();
++  purge_error_state();
+   int result = (this->*op)(data, length);
+   int ssl_error = ::SSL_get_error(ssl_, result);
+   int sys_error = static_cast<int>(::ERR_get_error());
+-- 
+2.24.1
+

@@ -1,0 +1,34 @@
+From 346f05a77bbc3a4d882d1e15b8f70cf5920a656b Mon Sep 17 00:00:00 2001
+From: Spencer Jackson <spencer.jackson@mongodb.com>
+Date: Fri, 17 May 2019 13:08:29 -0400
+Subject: [PATCH] SERVER-40393 Disable SSL_MODE_RELEASE_BUFFERS in ASIO
+
+---
+ asio/include/asio/ssl/detail/impl/engine.ipp | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/asio/include/asio/ssl/detail/impl/engine.ipp b/asio/include/asio/ssl/detail/impl/engine.ipp
+index d001723b..96aeeb76 100644
+--- a/asio/include/asio/ssl/detail/impl/engine.ipp
++++ b/asio/include/asio/ssl/detail/impl/engine.ipp
+@@ -44,13 +44,14 @@ engine::engine(SSL_CTX* context)
+   accept_mutex().init();
+ #endif // (OPENSSL_VERSION_NUMBER < 0x10000000L)
+ 
+   ::SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE);
+   ::SSL_set_mode(ssl_, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+-#if defined(SSL_MODE_RELEASE_BUFFERS)
+-  ::SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
+-#endif // defined(SSL_MODE_RELEASE_BUFFERS)
++  // SERVER-40393 - Disable SSL_MODE_RELEASE_BUFFERS in ASIO
++  //#if defined(SSL_MODE_RELEASE_BUFFERS)
++    //::SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
++  //#endif // defined(SSL_MODE_RELEASE_BUFFERS)
+ 
+   ::BIO* int_bio = 0;
+   ::BIO_new_bio_pair(&int_bio, 0, &ext_bio_, 0);
+   ::SSL_set_bio(ssl_, int_bio, int_bio);
+ }
+-- 
+2.21.0
+
