@@ -68,6 +68,11 @@ public:
         uassertStatusOK(cmdResponse.commandStatus);
         uassertStatusOK(cmdResponse.writeConcernStatus);
 
+        // Quickly pick up the new defaults by setting them in the cache.
+        auto newDefaults = RWConcernDefault::parse(
+            IDLParserErrorContext("ClusterSetDefaultRWConcern"), cmdResponse.response);
+        ReadWriteConcernDefaults::get(opCtx).setDefault(std::move(newDefaults));
+
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
