@@ -5264,6 +5264,61 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
 
+- name: enterprise-rhel-80-64-bit
+  display_name: "Enterprise RHEL 8.0"
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel80
+    mh_target: dist-mh
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel80-build
+  - name: compile_all
+    distros:
+    - rhel80-build
+  - name: audit_WT
+  - name: auth_audit_WT
+  - name: dbtest_WT
+  - name: ese_WT
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: external_auth_WT
+  - name: replica_sets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
 - name: windows-64-2k8-ssl
   display_name: SSL Windows 2008R2
   run_on:
@@ -5595,6 +5650,96 @@ buildvariants:
     distros:
     - rhel70-small
 
+- name: rhel80
+  display_name: SSL RHEL 8.0
+  run_on:
+  - rhel80-test
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-rhel80
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: org
+    scons_cache_scope: shared
+    tooltags: "ssl"
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel80-build
+  - name: compile_all
+    distros:
+    - rhel80-build
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth_WT
+  - name: dbtest_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_auth
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: mongosTest
+  - name: multiversion_WT
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: parallel_WT
+  - name: parallel_compatibility_WT
+  - name: concurrency_WT
+    distros:
+    - rhel80-build
+  - name: concurrency_replication_WT
+    distros:
+    - rhel80-build
+  - name: concurrency_sharded_WT
+    distros:
+    - rhel80-build
+  - name: concurrency_simultaneous_WT
+    distros:
+    - rhel80-build
+  - name: replica_sets_WT
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough_WT
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough_WT
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
 - name: osx-108-debug
   display_name: "* OS X 10.8 DEBUG"
   run_on:
@@ -5637,6 +5782,7 @@ buildvariants:
 
 - name: enterprise-osx-108
   display_name: Enterprise OS X 10.8
+
   modules:
   - enterprise
   run_on:

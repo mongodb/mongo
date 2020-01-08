@@ -101,7 +101,7 @@ class EnterpriseDistro(packager.Distro):
             raise Exception("BUG: unsupported platform?")
 
     def build_os(self, arch):
-        """Return the build os label in the binary package to download ("rhel57", "rhel62", "rhel67" and "rhel70"
+        """Return the build os label in the binary package to download ("rhel57", "rhel62", "rhel67", "rhel70" and "rhel80"
         for redhat, the others are delegated to the super class
         """
         if arch == "ppc64le":
@@ -127,7 +127,7 @@ class EnterpriseDistro(packager.Distro):
                 return []
 
         if re.search("(redhat|fedora|centos)", self.n):
-            return [ "rhel70", "rhel62", "rhel57" ]
+            return [ "rhel80", "rhel70", "rhel62", "rhel57" ]
         else:
             return super(EnterpriseDistro, self).build_os(arch)
 
