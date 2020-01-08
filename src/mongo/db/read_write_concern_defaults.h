@@ -114,7 +114,7 @@ public:
 
     /**
      * Manually looks up the latest defaults, and if their epoch is more recent than the cached
-     * defaults, then update the cache with the new defaults.
+     * defaults or indicates there are no defaults, then update the cache with the new defaults.
      */
     void refreshIfNecessary(OperationContext* opCtx);
 
