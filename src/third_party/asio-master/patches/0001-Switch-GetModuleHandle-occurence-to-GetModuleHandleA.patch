@@ -1,0 +1,29 @@
+From 8f8db1e1aa589c4cfe5bee3fd2d36b88397625a2 Mon Sep 17 00:00:00 2001
+From: Spencer Jackson <spencer.jackson@mongodb.com>
+Date: Fri, 28 Apr 2017 11:19:41 -0400
+Subject: [PATCH 1/2] Switch GetModuleHandle occurence to GetModuleHandleA
+
+---
+ asio/include/asio/detail/impl/win_iocp_socket_service_base.ipp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/asio/include/asio/detail/impl/win_iocp_socket_service_base.ipp b/asio/include/asio/detail/impl/win_iocp_socket_service_base.ipp
+index 37e41ec4..758726f6 100644
+--- a/asio/include/asio/detail/impl/win_iocp_socket_service_base.ipp
++++ b/asio/include/asio/detail/impl/win_iocp_socket_service_base.ipp
+@@ -742,11 +742,11 @@ win_iocp_socket_service_base::nt_set_info_fn
+ win_iocp_socket_service_base::get_nt_set_info()
+ {
+   void* ptr = interlocked_compare_exchange_pointer(&nt_set_info_, 0, 0);
+   if (!ptr)
+   {
+-    if (HMODULE h = GetModuleHandle("NTDLL.DLL"))
++    if (HMODULE h = GetModuleHandleA("NTDLL.DLL"))
+       ptr = reinterpret_cast<void*>(GetProcAddress(h, "NtSetInformationFile"));
+ 
+     // On failure, set nt_set_info_ to a special value to indicate that the
+     // NtSetInformationFile function is unavailable. That way we won't bother
+     // trying to look it up again.
+-- 
+2.12.2
+

@@ -1,0 +1,31 @@
+From bf6b0974903d15c97eeb24fdbfa6385e37ba5176 Mon Sep 17 00:00:00 2001
+From: Spencer Jackson <spencer.jackson@mongodb.com>
+Date: Fri, 28 Apr 2017 11:22:56 -0400
+Subject: [PATCH 2/2] MONGO HACK - prevent ASIO from initializing OpenSSL
+
+---
+ asio/include/asio/ssl/context.hpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/asio/include/asio/ssl/context.hpp b/asio/include/asio/ssl/context.hpp
+index 6e3f2ad3..e1b19d18 100644
+--- a/asio/include/asio/ssl/context.hpp
++++ b/asio/include/asio/ssl/context.hpp
+@@ -739,12 +739,13 @@ private:
+   ASIO_DECL BIO* make_buffer_bio(const const_buffer& b);
+ 
+   // The underlying native implementation.
+   native_handle_type handle_;
+ 
++  // MONGO HACK - prevent ASIO from initializing OpenSSL
+   // Ensure openssl is initialised.
+-  asio::ssl::detail::openssl_init<> init_;
++  //asio::ssl::detail::openssl_init<> init_;
+ };
+ 
+ } // namespace ssl
+ } // namespace asio
+ 
+-- 
+2.12.2
+
