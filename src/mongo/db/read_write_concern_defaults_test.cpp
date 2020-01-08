@@ -480,5 +480,29 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     ASSERT_LT(*oldDefaults.getLocalSetTime(), *newDefaults.getLocalSetTime());
 }
 
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestRefreshDefaultsWithDeletedDefaults) {
+    RWConcernDefault origDefaults;
+    origDefaults.setEpoch(Timestamp(10, 20));
+    origDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
+    _lookupMock.setLookupCallReturnValue(std::move(origDefaults));
+
+    auto origCachedDefaults = _rwcd.getDefault(operationContext());
+    ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getEpoch());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getSetTime());
+
+    getClock()->reserveTicks(1);
+    getMockClockSource()->advance(Milliseconds(1));
+
+    _lookupMock.setLookupCallReturnValue(RWConcernDefault());
+
+    _rwcd.refreshIfNecessary(operationContext());
+
+    // The cache should now contain default constructed defaults.
+    auto newCachedDefaults = _rwcd.getDefault(operationContext());
+    ASSERT(!newCachedDefaults.getEpoch());
+    ASSERT(!newCachedDefaults.getSetTime());
+    ASSERT_LT(*origCachedDefaults.getLocalSetTime(), *newCachedDefaults.getLocalSetTime());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -54,7 +54,7 @@ public:
                           const boost::optional<BSONObj>& newDefaultsDoc)
         : _service(service), _rwcDefaults(rwcDefaults) {
         // Note this will throw if the document can't be parsed. In the case of a delete, there will
-        // be no new defaults document and the RWConcern will be default constructed, which  matches
+        // be no new defaults document and the RWConcern will be default constructed, which matches
         // the behavior when lookup discovers a non-existent defaults document.
         _rwc = newDefaultsDoc
             ? RWConcernDefault::parse(IDLParserErrorContext("RWDefaultsWriteObserver"),
@@ -173,9 +173,10 @@ void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
         return;
     }
     auto currentDefaultsHandle = _defaults.acquire(opCtx, Type::kReadWriteConcernEntry);
-    if (!currentDefaultsHandle ||
+    if (!currentDefaultsHandle || !possibleNewDefaults->getEpoch() ||
         (possibleNewDefaults->getEpoch() > (**currentDefaultsHandle)->getEpoch())) {
-        // Use the new defaults if they have a higher epoch, or if there are currently no defaults.
+        // Use the new defaults if they have a higher epoch, if there are no defaults in the cache,
+        // or if the found defaults have no epoch, meaning there are no defaults in config.settings.
         log() << "refreshed RWC defaults to " << possibleNewDefaults->toBSON();
         setDefault(std::move(*possibleNewDefaults));
     }

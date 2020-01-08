@@ -23,18 +23,12 @@ ReadWriteConcernDefaultsPropagation.runTests(st.s0, mongosAndConfigNodes);
 // Verify the in-memory defaults are updated correctly. This verifies the cache is invalidated
 // properly on secondaries when an update to the defaults document is replicated because the
 // in-memory value will only be updated after an invalidation.
-ReadWriteConcernDefaultsPropagation.runTests(st.s0, [...mongosAndConfigNodes], true /* inMemory */);
+ReadWriteConcernDefaultsPropagation.runTests(st.s0, mongosAndConfigNodes, true /* inMemory */);
 
-// TODO SERVER-45282: When the defaults document is deleted, later lookups with find a document with
-// no epoch, so the current defaults will not be overwritten on a mongos. After this is resolved,
-// this case should use "mongosAndConfigNodes" as the checkConns.
-ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.s0, [...st.configRS.nodes]);
+ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.s0, mongosAndConfigNodes);
 
-// TODO SERVER-45282: When the defaults document is deleted, later lookups with find a document with
-// no epoch, so the current defaults will not be overwritten on a mongos. After this is resolved,
-// this case should use "mongosAndConfigNodes" as the checkConns.
 ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.configRS.getPrimary(),
-                                                          [...st.configRS.nodes]);
+                                                          mongosAndConfigNodes);
 
 st.stop();
 })();
