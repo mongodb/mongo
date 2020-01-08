@@ -207,6 +207,7 @@ void Balancer::interruptBalancer() {
         return;
 
     _state = kStopping;
+    _thread.detach();
 
     // Interrupt the balancer thread if it has been started. We are guaranteed that the operation
     // context of that thread is still alive, because we hold the balancer mutex.
@@ -225,22 +226,9 @@ void Balancer::interruptBalancer() {
 }
 
 void Balancer::waitForBalancerToStop() {
-    {
-        stdx::lock_guard<Latch> scopedLock(_mutex);
-        if (_state == kStopped)
-            return;
+    stdx::unique_lock<Latch> scopedLock(_mutex);
 
-        invariant(_state == kStopping);
-        invariant(_thread.joinable());
-    }
-
-    _thread.join();
-
-    stdx::lock_guard<Latch> scopedLock(_mutex);
-    _state = kStopped;
-    _thread = {};
-
-    LOG(1) << "Balancer thread terminated";
+    _joinCond.wait(scopedLock, [this] { return _state == kStopped; });
 }
 
 void Balancer::joinCurrentRound(OperationContext* opCtx) {
@@ -313,6 +301,15 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_mainThread() {
+    ON_BLOCK_EXIT([this] {
+        stdx::lock_guard<Latch> scopedLock(_mutex);
+
+        _state = kStopped;
+        _joinCond.notify_all();
+
+        LOG(1) << "Balancer thread terminated";
+    });
+
     Client::initThread("Balancer");
     auto opCtx = cc().makeOperationContext();
     auto shardingContext = Grid::get(opCtx.get());
