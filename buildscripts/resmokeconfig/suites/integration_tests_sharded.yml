@@ -3,7 +3,7 @@ test_kind: cpp_integration_test
 selector:
   root: build/integration_tests.txt
   exclude_files:
-  - build/integration_tests/client_dbclient_connection_integration_test* # Needs sleep command
+  - build/**/mongo/client/client_dbclient_connection_integration_test* # Needs sleep command
 
 executor:
   archive:
