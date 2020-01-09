@@ -103,8 +103,8 @@ class HookTestArchival(object):
         """Trigger archive of data files for a test or hook."""
 
         # We can still attempt archiving even if the teardown fails.
-        if not manager.teardown_fixture(logger, kill=True):
-            logger.warning("Error while killing test fixtures; data files may be invalid.")
+        if not manager.teardown_fixture(logger, abort=True):
+            logger.warning("Error while aborting test fixtures; data files may be invalid.")
         with self._lock:
             # Test repeat number is how many times the particular test has been archived.
             if test_name not in self._tests_repeat:

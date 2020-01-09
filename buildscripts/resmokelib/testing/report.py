@@ -374,7 +374,9 @@ def test_order(test_name):
         return 1
     elif 'fixture_teardown' in test_name:
         return 2
-    elif ':' in test_name:
+    elif 'fixture_abort' in test_name:
         return 3
-    else:
+    elif ':' in test_name:
         return 4
+    else:
+        return 5

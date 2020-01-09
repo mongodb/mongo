@@ -191,7 +191,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Started the balancer")
 
-    def _do_teardown(self, kill=False):
+    def _do_teardown(self, mode=None):
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
@@ -200,21 +200,22 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             self.logger.warning("All members of the sharded cluster were expected to be running, "
                                 "but weren't.")
 
-        # If we're killing to archive data files, stopping the balancer will execute
+        # If we're killing or aborting to archive data files, stopping the balancer will execute
         # server commands that might lead to on-disk changes from the point of failure.
-        if self.enable_balancer and not kill:
+        if self.enable_balancer and mode not in (interface.TeardownMode.KILL,
+                                                 interface.TeardownMode.ABORT):
             self.stop_balancer()
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
         if self.configsvr is not None:
-            teardown_handler.teardown(self.configsvr, "config server", kill=kill)
+            teardown_handler.teardown(self.configsvr, "config server", mode=mode)
 
         for mongos in self.mongos:
-            teardown_handler.teardown(mongos, "mongos", kill=kill)
+            teardown_handler.teardown(mongos, "mongos", mode=mode)
 
         for shard in self.shards:
-            teardown_handler.teardown(shard, "shard", kill=kill)
+            teardown_handler.teardown(shard, "shard", mode=mode)
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the sharded cluster.")
@@ -431,12 +432,18 @@ class _MongoSFixture(interface.Fixture):
 
         self.logger.info("Successfully contacted the mongos on port %d.", self.port)
 
-    def _do_teardown(self, kill=False):
+    def _do_teardown(self, mode=None):
         if self.mongos is None:
             self.logger.warning("The mongos fixture has not been set up yet.")
             return  # Teardown is still a success even if nothing is running.
 
-        self.logger.info("Stopping mongos on port %d with pid %d...", self.port, self.mongos.pid)
+        if mode == interface.TeardownMode.ABORT:
+            self.logger.info(
+                "Attempting to send SIGABRT from resmoke to mongos on port %d with pid %d...",
+                self.port, self.mongos.pid)
+        else:
+            self.logger.info("Stopping mongos on port %d with pid %d...", self.port,
+                             self.mongos.pid)
         if not self.is_running():
             exit_code = self.mongos.poll()
             msg = ("mongos on port {:d} was expected to be running, but wasn't. "
@@ -444,12 +451,12 @@ class _MongoSFixture(interface.Fixture):
             self.logger.warning(msg)
             raise errors.ServerFailure(msg)
 
-        self.mongos.stop(kill=kill)
+        self.mongos.stop(mode=mode)
         exit_code = self.mongos.wait()
 
-        # SIGKILL has an exit code of 9 and Python's subprocess module returns
-        # negative versions of system calls.
-        if exit_code == 0 or (exit_code == -9 and kill):
+        # Python's subprocess module returns negative versions of system calls.
+        # pylint: disable=invalid-unary-operand-type
+        if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongos on port {:d}".format(self.port))
         else:
             self.logger.warning("Stopped the mongos on port {:d}. "

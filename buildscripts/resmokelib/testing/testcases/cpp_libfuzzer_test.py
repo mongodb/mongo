@@ -42,7 +42,7 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             self.return_code = process.wait(self.DEFAULT_TIMEOUT.total_seconds())
         except subprocess.TimeoutExpired:
             # If the test timeout, then no errors were detected. Thus, the return code should be 0.
-            process.stop(kill=True)
+            process.stop(mode=interface.TerminationMode.KILL)
             process.wait()
             self.logger.info("%s timed out. No errors were found.", self.short_description())
             self.return_code = 0

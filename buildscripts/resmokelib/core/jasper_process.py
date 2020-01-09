@@ -10,6 +10,7 @@ try:
 except ImportError:
     pass
 
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from . import process as _process
 
 
@@ -49,11 +50,13 @@ class Process(_process.Process):
         self._id = self.jasper_pb2.JasperProcessID(value=val.id)
         self._return_code = None
 
-    def stop(self, kill=False):
+    def stop(self, mode=None):
         """Terminate the process."""
+
+        should_kill = mode == fixture_interface.TerminationMode.KILL
         signal = self.jasper_pb2.Signals.Value("TERMINATE")
         if sys.platform == "win32":
-            if not kill:
+            if not should_kill:
                 event_name = self.jasper_pb2.EventName(value="Global\\Mongo_" + str(self.pid))
                 signal_event = self._stub.SignalEvent(event_name)
                 if signal_event.success:
@@ -64,7 +67,7 @@ class Process(_process.Process):
                 processID=self._id,
                 signalTriggerID=self.jasper_pb2.SignalTriggerID.Value("CLEANTERMINATION"))
             self._stub.RegisterSignalTriggerID(clean_termination_params)
-        elif kill:
+        elif should_kill:
             signal = self.jasper_pb2.Signals.Value("KILL")
 
         signal_process = self.jasper_pb2.SignalProcess(ProcessID=self._id, signal=signal)

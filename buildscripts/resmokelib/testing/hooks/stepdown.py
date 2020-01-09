@@ -14,6 +14,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 
 
 class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-attributes
@@ -481,7 +482,8 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             # We send the mongod process the signal to exit but don't immediately wait for it to
             # exit because clean shutdown may take a while and we want to restore write availability
             # as quickly as possible.
-            primary.mongod.stop(kill=should_kill)
+            teardown_mode = fixture_interface.TeardownMode.KILL if should_kill else fixture_interface.TeardownMode.TERMINATE
+            primary.mongod.stop(mode=teardown_mode)
         elif not self._stepdown_via_heartbeats:
             self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
                              primary.port, rs_fixture.replset_name)

@@ -111,12 +111,18 @@ class MongoDFixture(interface.Fixture):
 
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
-    def _do_teardown(self, kill=False):
+    def _do_teardown(self, mode=None):
         if self.mongod is None:
             self.logger.warning("The mongod fixture has not been set up yet.")
             return  # Still a success even if nothing is running.
 
-        self.logger.info("Stopping mongod on port %d with pid %d...", self.port, self.mongod.pid)
+        if mode == interface.TeardownMode.ABORT:
+            self.logger.info(
+                "Attempting to send SIGABRT from resmoke to mongod on port %d with pid %d...",
+                self.port, self.mongod.pid)
+        else:
+            self.logger.info("Stopping mongod on port %d with pid %d...", self.port,
+                             self.mongod.pid)
         if not self.is_running():
             exit_code = self.mongod.poll()
             msg = ("mongod on port {:d} was expected to be running, but wasn't. "
@@ -124,12 +130,12 @@ class MongoDFixture(interface.Fixture):
             self.logger.warning(msg)
             raise errors.ServerFailure(msg)
 
-        self.mongod.stop(kill)
+        self.mongod.stop(mode)
         exit_code = self.mongod.wait()
 
-        # SIGKILL has an exit code of 9 and Python's subprocess module returns
-        # negative versions of system calls.
-        if exit_code == 0 or (exit_code == -9 and kill):
+        # Python's subprocess module returns negative versions of system calls.
+        # pylint: disable=invalid-unary-operand-type
+        if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(self.port))
         else:
             self.logger.warning("Stopped the mongod on port {:d}. "
