@@ -152,43 +152,50 @@ TEST_F(QueryPlannerHashedTest, QueryOnObject) {
 // Null comparison and existence tests for compound hashed index.
 //
 TEST_F(QueryPlannerHashedTest, ExistsTrueQueries) {
-    // $exists:true query on hashed prefix field cannot use index.
+    // $exists:true query can use index regardless of prefix field type.
     addIndex(BSON("x"
                   << "hashed"
                   << "y" << 1 << "z" << -1));
-    runQuery(fromjson("{x: {$exists: true}}"));
-    assertHasOnlyCollscan();
-
-    // $exists:true query on non-hashed prefix field can use index.
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    runQuery(fromjson("{x: {$exists: true}}"));
+    runQuery(fromjson("{x: {$exists: true}, y: {$exists: true}, z: {$exists: true}}"));
+    assertNumSolutions(2);
     assertSolutionExists(
-        "{fetch: {filter: {x: {$exists: true}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z:-1},"
-        "bounds: {x: [['MinKey','MaxKey',true,true]],y: [['MinKey','MaxKey',true,true]], z: "
+        "{fetch: {filter: {x: {$exists: true}, y: {$exists: true}, z: {$exists: true}}, node: "
+        "{ixscan: {pattern: {x: 'hashed', y: 1, z:-1}, bounds: {x: "
+        "[['MinKey','MaxKey',true,true]],y: [['MinKey','MaxKey',true,true]], z: "
+        "[['MaxKey','MinKey',true,true]] }}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$exists: true}, y: {$exists: true}, z: {$exists: true}}, node: "
+        "{ixscan: {pattern: {x: 1, y: 'hashed', z:-1}, bounds: {x: "
+        "[['MinKey','MaxKey',true,true]],y: [['MinKey','MaxKey',true,true]], z: "
         "[['MaxKey','MinKey',true,true]] }}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest, ExistsFalseQueries) {
-    // $exists:false query on hashed prefix field cannot use index.
-    // TODO SERVER-44011: This can be optimised to use index scan on 'null'.
+    // $exists:false query can use index regardless of prefix field type.
     addIndex(BSON("x"
                   << "hashed"
                   << "y" << 1 << "z" << -1));
-    runQuery(fromjson("{x: {$exists: false}}"));
-    assertHasOnlyCollscan();
-
-    // $exists:false query on non-hashed prefix field cannot use index.
-    // TODO SERVER-44011: This can be optimised to use index.
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    runQuery(fromjson("{x: {$exists: false}}"));
-    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$exists: false}, y: {$exists: false}, z: {$exists: false}}"));
+    assertNumSolutions(2);
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$exists: false}, y: {$exists: false}, z: {$exists: false}}, node: "
+        "{ixscan: {pattern: {x: 'hashed', y: 1, z:-1}, bounds: {x: [" +
+        getHashedBound(BSONNULL) +
+        "], y: [[null, null, true, true]], z: [[null, null, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$exists: false}, y: {$exists: false}, z: {$exists: false}}, node: "
+        "{ixscan: {pattern: {x: 1, y: 'hashed', z:-1}, bounds: {x: [[null, null, true, true]], y: "
+        "[" +
+        getHashedBound(BSONNULL) + "], z: [[null, null, true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerHashedTest, NotEqualsNullQueries) {
+TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedPrefix) {
     // $not queries on a hashed prefix field cannot use index.
     addIndex(BSON("x"
                   << "hashed"
@@ -196,19 +203,41 @@ TEST_F(QueryPlannerHashedTest, NotEqualsNullQueries) {
     runQuery(fromjson("{x: {$ne: null}}"));
     assertHasOnlyCollscan();
 
-    runQuery(fromjson("{x: {$not: {$eq: null}}}"));
+    runQuery(fromjson("{x: {$not: {$eq: 5}}}"));
     assertHasOnlyCollscan();
 
-    // $not queries on a non-hashed prefix field cannot use index.
-    // TODO SERVER-44011: This can be optimised to use index.
+    // $not queries on non-hashed fields of a hashed-prefix index can use index.
+    runQuery(fromjson("{x: null, y: {$nin: [1, 2]}, z: {$ne: null}}"));
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$eq: null}}, node: {ixscan: {pattern: {x: 'hashed', y: 1, z: -1}, "
+        "bounds: {x: [" +
+        getHashedBound(BSONUndefined) + "," + getHashedBound(BSONNULL) +
+        "], y: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, true]], z: "
+        "[['MaxKey', null, true, false], [undefined, 'MinKey', false, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
+    // $not queries on a non-hashed prefix field can use the compound hashed index. A negated
+    // predicate on the hashed field will produce bounds of [MinKey, MaxKey].
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    runQuery(fromjson("{x: {$ne: null}}"));
-    assertHasOnlyCollscan();
 
-    runQuery(fromjson("{x: {$not: {$eq: null}}}"));
-    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$nin: [1, 2]}, y: {$not: {$eq: null}}, z: {$ne: null}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{fetch: {filter: {y: {$ne: null}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z: -1}, "
+        "bounds: {x: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, "
+        "true]], y: [['MinKey', 'MaxKey', true, true]], z: [['MaxKey', null, true, false], "
+        "[undefined, 'MinKey', false, true]]}}}}}");
+
+    runQuery(fromjson("{x: {$nin: [1, 2]}, y: {$ne: 5}, z: {$ne: null}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{fetch: {filter: {y: {$ne: 5}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z: -1}, "
+        "bounds: {x: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, "
+        "true]], y: [['MinKey', 'MaxKey', true, true]], z: [['MaxKey', null, true, false], "
+        "[undefined, 'MinKey', false, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {

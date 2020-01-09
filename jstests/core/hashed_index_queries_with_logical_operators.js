@@ -1,12 +1,8 @@
 /**
  * Test to verify the behaviour of compound hashed indexes when the queries use logical operators
- * like $or, $not etc.
- * For $not, we test two case
- *  1. When hashed field is a prefix, we cannot use index because the index could
- * incorrectly filter out matching documents which collide with the same hash value as the one given
- * in the query predicate.
- * 2. When non-hashed field is prefix, we can always use index for $not, but we currently don't.
- * SERVER-44011 is intended to address that.
+ * like $or, $not etc. In particular, the hashed field of a compound hashed index cannot generate
+ * bounds for $not predicates, since we may incorrectly filter out matching documents that collide
+ * with the same hash value as the one given in the predicate.
  *
  * @tags: [requires_fcv_44]
  */
@@ -70,12 +66,18 @@ validateFindCmdOutputAndPlan({
     stagesNotExpected: ["COLLSCAN"]
 });
 
-// Verify that query cannot use index for $exists=true (which internally generate a $not query)
-// query.
+// Verify that {$exists:true} predicates can be answered by the hashed prefix field.
 validateFindCmdOutputAndPlan({
     filter: {a: {$exists: true}, b: 12},
     expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}],
-    expectedStages: ["COLLSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"]
+});
+
+// Verify that {$exists:false} predicates can be answered by the hashed prefix field.
+validateFindCmdOutputAndPlan({
+    filter: {a: {$exists: false}, b: 12},
+    expectedOutput: [{b: 12}],
+    expectedStages: ["FETCH", "IXSCAN"]
 });
 
 // Verify that query can use index for matching 'null'.
@@ -88,18 +90,14 @@ validateFindCmdOutputAndPlan({
 // Verify that query cannot use index for $not queries on hashed field.
 validateFindCmdOutputAndPlan({filter: {a: {$not: {$eq: 12}}, b: 12}, expectedStages: ["COLLSCAN"]});
 
-// Currently $exists:false predicates cannot use a hashed index.
-// TODO SERVER-44011: Allow $exists:false predicates to use a hashed index.
-validateFindCmdOutputAndPlan({filter: {a: {$exists: false}, b: 12}, expectedStages: ["COLLSCAN"]});
-
 /**
  * Tests when hashed field is not a prefix.
  */
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1, b: "hashed", c: -1}));
 
-// Verify that sub-queries of $or opertor can use index. The first element of $or should not require
-// a FETCH.
+// Verify that sub-queries of $or operator can use index. The first element of $or should not
+// require a FETCH.
 validateFindCmdOutputAndPlan({
     filter: {$or: [{a: 1}, {a: 12, b: 12}]},
     projection: {a: 1, c: 1, _id: 0},
@@ -108,10 +106,31 @@ validateFindCmdOutputAndPlan({
     stagesNotExpected: ["COLLSCAN"],
 });
 
-// Verify that can use index for $exists:true query and differentiate null from missing.
+// Verify that {$exists:true} queries can use the index and differentiate null from missing.
 validateFindCmdOutputAndPlan({
     filter: {a: {$exists: true}, b: 12},
     expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}],
+    expectedStages: ["FETCH", "IXSCAN"]
+});
+
+// Verify that {$exists:true} predicates behave as expected for hashed non-prefix fields.
+validateFindCmdOutputAndPlan({
+    filter: {a: null, b: {$exists: true}},
+    expectedOutput: [{a: null, b: 12}, {b: 12}],
+    expectedStages: ["FETCH", "IXSCAN"]
+});
+
+// Verify that {$exists:false} queries on non-hashed prefixes can use a compound hashed index.
+validateFindCmdOutputAndPlan({
+    filter: {a: {$exists: false}, b: 12},
+    expectedOutput: [{b: 12}],
+    expectedStages: ["FETCH", "IXSCAN"]
+});
+
+// Verify that {$exists:false} predicates behave as expected for hashed non-prefix fields.
+validateFindCmdOutputAndPlan({
+    filter: {a: null, b: {$exists: false}},
+    expectedOutput: [{a: null}, {}],
     expectedStages: ["FETCH", "IXSCAN"]
 });
 
@@ -126,8 +145,10 @@ validateFindCmdOutputAndPlan({
 validateFindCmdOutputAndPlan(
     {filter: {a: 12, b: null}, expectedOutput: [], expectedStages: ["FETCH", "IXSCAN"]});
 
-// Currently $not queries on non-hashed prefixes cannot use a hashed index.
-// TODO SERVER-44011: Allow $not queries on non-hashed prefixes to use index.
-validateFindCmdOutputAndPlan({filter: {a: {$not: {$gt: 12}}, b: 12}, expectedStages: ["COLLSCAN"]});
-validateFindCmdOutputAndPlan({filter: {a: {$exists: false}, b: 12}, expectedStages: ["COLLSCAN"]});
+// Verify that $not queries on non-hashed prefixes can use a compound hashed index.
+validateFindCmdOutputAndPlan({
+    filter: {a: {$not: {$gt: 12}}, b: 12},
+    expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}, {b: 12}],
+    expectedStages: ["IXSCAN"]
+});
 })();

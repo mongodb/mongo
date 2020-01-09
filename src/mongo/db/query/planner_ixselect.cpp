@@ -396,13 +396,19 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
         // There are restrictions on when we can use the index if the expression is a NOT.
         if (exprtype == MatchExpression::NOT) {
-            // Don't allow indexed NOT on special index types such as geo or text indices. The
-            // exception is that $** indexes may be used for {$ne: null} queries.
+            // Don't allow indexed NOT on special index types such as geo or text indices. There are
+            // two exceptions to this rule:
+            // - Wildcard indexes can answer {$ne: null} queries. We allow wildcard indexes to pass
+            //   the test here because we subsequently enforce that {$ne:null} is the only accepted
+            //   negation predicate for sparse indexes, and wildcard indexes are always sparse.
+            // - Any non-hashed field in a compound hashed index can answer negated predicates. We
+            //   have already determined that the specific field under consideration is not hashed,
+            //   so we can safely permit a hashed index to pass the test below.
             //
             // TODO: SERVER-30994 should remove this check entirely and allow $not on the
             // 'non-special' fields of non-btree indices (e.g. {a: 1, geo: "2dsphere"}).
             if (INDEX_BTREE != index.type && INDEX_WILDCARD != index.type &&
-                !isChildOfElemMatchValue) {
+                INDEX_HASHED != index.type && !isChildOfElemMatchValue) {
                 return false;
             }
 
@@ -520,14 +526,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         // above.
         MONGO_UNREACHABLE;
     } else if (IndexNames::HASHED == indexedFieldType) {
-        if (ComparisonMatchExpressionBase::isEquality(exprtype)) {
-            return true;
-        }
-        if (exprtype == MatchExpression::MATCH_IN) {
-            const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
-            return expr->getRegexes().empty();
-        }
-        return false;
+        return nodeIsSupportedByHashedIndex(node);
     } else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {
         if (exprtype == MatchExpression::GEO) {
             // within or intersect.
@@ -641,6 +640,24 @@ bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression*
     }
 
     return true;
+}
+
+bool QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr) {
+    // Hashed fields can answer simple equality predicates.
+    if (ComparisonMatchExpressionBase::isEquality(queryExpr->matchType())) {
+        return true;
+    }
+    // An $in can be answered so long as its operand contains only simple equalities.
+    if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+        const InMatchExpression* expr = static_cast<const InMatchExpression*>(queryExpr);
+        return expr->getRegexes().empty();
+    }
+    // {$exists:false} produces a single point-interval index bound on [null,null].
+    if (queryExpr->matchType() == MatchExpression::NOT) {
+        return queryExpr->getChild(0)->matchType() == MatchExpression::EXISTS;
+    }
+    // {$exists:true} can be answered using [MinKey, MaxKey] bounds.
+    return (queryExpr->matchType() == MatchExpression::EXISTS);
 }
 
 // static
