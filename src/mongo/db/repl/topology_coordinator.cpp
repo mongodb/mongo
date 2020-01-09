@@ -2323,7 +2323,7 @@ void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* const respons
             response->addTag(tagKey, tagConfig.getTagValue(*tag));
         }
     }
-    response->setMe(selfConfig.getHostAndPort());
+    response->setMe(selfConfig.getHostAndPort(horizon));
     if (_iAmPrimary()) {
         response->setElectionId(_electionId);
     }
