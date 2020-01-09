@@ -222,21 +222,11 @@ public:
         // TODO(siyuan) Output term of OpTime
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
-        AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
-        auto earliestOplogTimestampFetch =
-            oplog.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
-        Timestamp earliestOplogTimestamp;
-        if (earliestOplogTimestampFetch.isOK()) {
-            earliestOplogTimestamp = earliestOplogTimestampFetch.getValue();
-        } else {
-            BSONObj o;
-            uassert(
-                17347,
+        BSONObj o;
+        uassert(17347,
                 "Problem reading earliest entry from oplog",
                 Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o));
-            earliestOplogTimestamp = o["ts"].timestamp();
-        }
-        result.append("earliestOptime", earliestOplogTimestamp);
+        result.append("earliestOptime", o["ts"].timestamp());
         return result.obj();
     }
 } oplogInfoServerStatus;

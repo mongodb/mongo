@@ -251,7 +251,6 @@ public:
     void reclaimOplog(OperationContext* opCtx) override;
 
     StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const override;
-    StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) override;
 
     /**
      * The `recoveryTimestamp` is when replication recovery would need to replay from for
