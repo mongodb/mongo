@@ -33,8 +33,10 @@
 #include <boost/optional.hpp>
 #include <climits>
 #include <cstdint>
+#include <fmt/format.h>
 #include <ostream>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/util/bufreader.h"
@@ -155,6 +157,14 @@ public:
     }
     RecordId getOwned() const {
         return *this;
+    }
+
+    void serialize(fmt::memory_buffer& buffer) const {
+        fmt::format_to(buffer, "RecordId({})", _repr);
+    }
+
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("RecordId"_sd, _repr);
     }
 
 private:
