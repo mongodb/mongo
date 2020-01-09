@@ -105,9 +105,7 @@ MongoRunner.validateCollectionsCallback = function(port) {
                   function(conn) {
                       const res = conn.adminCommand({listDatabases: 1});
                       if (!res.ok) {
-                          // TODO: SERVER-31916 for the KeyNotFound error
-                          assert.commandFailedWithCode(
-                              res, [ErrorCodes.Unauthorized, ErrorCodes.KeyNotFound]);
+                          assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
                           return {shouldStop: true, reason: "cannot run listDatabases"};
                       }
                       assert.commandWorked(res);
