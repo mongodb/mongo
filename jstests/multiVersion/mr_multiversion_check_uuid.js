@@ -60,7 +60,7 @@ function reduceFn(key, values) {
 }
 
 (function testShardedOutput() {
-    // Check that merge to an existing empty sharded collection works and creates a new UUID after
+    // Check that merge to an existing empty sharded collection works and preserves the UUID after
     // M/R.
     st.adminCommand({shardCollection: outputColl.getFullName(), key: {_id: 1}});
     let origUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
@@ -68,7 +68,7 @@ function reduceFn(key, values) {
         mapFn, reduceFn, {out: {merge: outputColl.getName(), sharded: true}});
     verifyOutput(out, nDistinctKeys);
     let newUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
-    assert.neq(origUUID, newUUID);
+    assert.eq(origUUID, newUUID);
 
     // Shard1 is the primary shard and only one chunk should have been written, so the chunk with
     // the new UUID should have been written to it.
@@ -103,23 +103,19 @@ function reduceFn(key, values) {
 
     // Check that merge to an existing sharded collection that has data only on the non-primary
     // shard works and that the collection uses the same UUID after M/R.
-    // TODO Once SERVER-44477 is part of the last-stable mongos, this should start to work. Without
-    // that fix, this test will incorrectly and drop and reshard the target collection.
-    // assert.commandWorked(outputColl.remove({}));
-    // assert.commandWorked(outputColl.insert({_id: 2001}));
+    assert.commandWorked(outputColl.remove({}));
+    assert.commandWorked(outputColl.insert({_id: 2001}));
 
-    // out = testDB.srcSharded.mapReduce(
-    //     mapFn, reduceFn, {out: {merge: outputColl.getName(), sharded: true}});
-    // verifyOutput(out, nDistinctKeys);
+    out = testDB.srcSharded.mapReduce(
+        mapFn, reduceFn, {out: {merge: outputColl.getName(), sharded: true}});
+    verifyOutput(out, nDistinctKeys + 1);
 
-    // newUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
-    // assert.eq(origUUID, newUUID);
-    // assert.eq(newUUID,
-    //           getUUIDFromListCollections(st.shard0.getDB(testDB.getName()),
-    //           outputColl.getName()));
-    // assert.eq(newUUID,
-    //           getUUIDFromListCollections(st.shard1.getDB(testDB.getName()),
-    //           outputColl.getName()));
+    newUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
+    assert.eq(origUUID, newUUID);
+    assert.eq(newUUID,
+              getUUIDFromListCollections(st.shard0.getDB(testDB.getName()), outputColl.getName()));
+    assert.eq(newUUID,
+              getUUIDFromListCollections(st.shard1.getDB(testDB.getName()), outputColl.getName()));
 
     // Check that merge to an existing sharded collection that has data on all shards works and that
     // the collection uses the same UUID after M/R.
