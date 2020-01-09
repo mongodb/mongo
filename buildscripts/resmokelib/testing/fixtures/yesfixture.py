@@ -35,7 +35,7 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
         logger = self.logger.new_fixture_node_logger("yes{:d}".format(index))
         return programs.generic_program(logger, ["yes", self.__message])
 
-    def _do_teardown(self, kill=False):
+    def _do_teardown(self, mode=None):
         running_at_start = self.is_running()
         success = True  # Still a success even if nothing is running.
 
@@ -49,7 +49,7 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
             if process is not None:
                 if running_at_start:
                     self.logger.info("Stopping yes process with pid %d...", process.pid)
-                    process.stop(kill)
+                    process.stop(mode)
 
                 exit_code = process.wait()
                 success = (exit_code == -signal.SIGTERM) and success

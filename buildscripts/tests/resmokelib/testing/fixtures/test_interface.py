@@ -51,6 +51,6 @@ class UnitTestFixture(interface.Fixture):  # pylint: disable=abstract-method
         interface.Fixture.__init__(self, logger, 99)
         self._should_raise = should_raise
 
-    def _do_teardown(self, kill=False):
+    def _do_teardown(self, mode=None):
         if self._should_raise:
             raise errors.ServerFailure(self.ERROR_MESSAGE)

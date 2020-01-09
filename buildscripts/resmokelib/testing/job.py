@@ -332,16 +332,16 @@ class FixtureTestCaseManager:
 
         return True
 
-    def teardown_fixture(self, logger, kill=False):
+    def teardown_fixture(self, logger, abort=False):
         """
         Run a test that tears down the job's fixture.
 
         Return True if the teardown was successful, False otherwise.
         """
-        if kill:
-            test_case = _fixture.FixtureKillTestCase(self.test_queue_logger, self.fixture,
-                                                     "job{}".format(self.job_num),
-                                                     self.times_set_up)
+        if abort:
+            test_case = _fixture.FixtureAbortTestCase(self.test_queue_logger, self.fixture,
+                                                      "job{}".format(self.job_num),
+                                                      self.times_set_up)
             self.times_set_up += 1
         else:
             test_case = _fixture.FixtureTeardownTestCase(self.test_queue_logger, self.fixture,

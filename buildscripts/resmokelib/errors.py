@@ -50,3 +50,13 @@ class PortAllocationError(ResmokeError):  # noqa: D204
     fixture requests more ports than were reserved for that job.
     """
     pass
+
+
+class ProcessError(ResmokeError):
+    """Exception raised in the process wrapper.
+
+    Raised if a termination mode is given to the process wrapper that it doesn't
+    know how to send a signal for.
+    """
+
+    pass

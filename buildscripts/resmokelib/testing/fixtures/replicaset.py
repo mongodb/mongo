@@ -400,7 +400,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         primary = self.nodes[0]
         primary.mongo_client().admin.command(cmd)
 
-    def _do_teardown(self, kill=False):
+    def _do_teardown(self, mode=None):
         self.logger.info("Stopping all members of the replica set...")
 
         running_at_start = self.is_running()
@@ -411,11 +411,11 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
         if self.initial_sync_node:
-            teardown_handler.teardown(self.initial_sync_node, "initial sync node", kill=kill)
+            teardown_handler.teardown(self.initial_sync_node, "initial sync node", mode=mode)
 
         # Terminate the secondaries first to reduce noise in the logs.
         for node in reversed(self.nodes):
-            teardown_handler.teardown(node, "replica set member on port %d" % node.port, kill=kill)
+            teardown_handler.teardown(node, "replica set member on port %d" % node.port, mode=mode)
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the replica set.")

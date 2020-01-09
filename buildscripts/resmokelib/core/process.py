@@ -12,6 +12,8 @@ import sys
 import threading
 import subprocess
 
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib import errors
 from . import pipe  # pylint: disable=wrong-import-position
 from .. import utils  # pylint: disable=wrong-import-position
 
@@ -130,12 +132,16 @@ class Process(object):
                 if return_code == win32con.STILL_ACTIVE:
                     raise
 
-    def stop(self, kill=False):  # pylint: disable=too-many-branches
+    def stop(self, mode=None):  # pylint: disable=too-many-branches
         """Terminate the process."""
+        if mode is None:
+            mode = fixture_interface.TeardownMode.TERMINATE
+
         if sys.platform == "win32":
 
             # Attempt to cleanly shutdown mongod.
-            if not kill and self.args and self.args[0].find("mongod") != -1:
+            if mode != fixture_interface.TeardownMode.KILL and self.args and self.args[0].find(
+                    "mongod") != -1:
                 mongo_signal_handle = None
                 try:
                     mongo_signal_handle = win32event.OpenEvent(
@@ -180,10 +186,16 @@ class Process(object):
                     raise
         else:
             try:
-                if kill:
+                if mode == fixture_interface.TeardownMode.KILL:
                     self._process.kill()
-                else:
+                elif mode == fixture_interface.TeardownMode.TERMINATE:
                     self._process.terminate()
+                elif mode == fixture_interface.TeardownMode.ABORT:
+                    self._process.send_signal(mode.value)
+                else:
+                    raise errors.ProcessError("Process wrapper given unrecognized teardown mode: " +
+                                              mode.value)
+
             except OSError as err:
                 # ESRCH (errno=3) is received when the process has already died.
                 if err.errno != 3:

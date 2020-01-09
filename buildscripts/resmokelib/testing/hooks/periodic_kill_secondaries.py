@@ -169,7 +169,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     " PeriodicKillSecondaries.after_test(), but wasn't.".format(secondary.port))
 
             self.logger.info("Killing the secondary on port %d...", secondary.port)
-            secondary.mongod.stop(kill=True)
+            secondary.mongod.stop(mode=fixture.TeardownMode.KILL)
 
         try:
             self.fixture.teardown()
