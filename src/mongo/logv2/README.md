@@ -119,7 +119,7 @@ Many types basic types have built in support
 * String types
   * std::string
   * StringData
-  * char*
+  * const char*
 * BSON types
   * BSONObj
   * BSONArray
@@ -142,6 +142,26 @@ Stringification (**4** or **5**) is required to be able to produce human readabl
 
 *NOTE: `operator<<` is not used even if available*
 
+#### Examples
+
+```
+class UserDefinedType {
+public:
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("str"_sd, _str);
+        builder->append("int"_sd, _int);
+    }
+
+    void serialize(fmt::memory_buffer& buffer) const {
+        fmt::format_to(buffer, "UserDefinedType: (str: {}, int: {})", _str, _int);
+    }
+
+private:
+    std::string _str;
+    int32_t _int;
+};
+```
+
 ### Container support
 
 STL containers and data structures that have STL like interfaces are loggable as long as they contain loggable elements (built-in, user-defined or other containers).
@@ -161,7 +181,7 @@ Ranges is loggable via helpers to indicate what type of range it is
 * `seqLog(begin, end)`
 * `mapLog(begin, end)`
 
-##### Examples
+#### Examples
 
 ```
 std::array<int, 20> arrayOfInts = ...;
