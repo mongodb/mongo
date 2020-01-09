@@ -1,5 +1,8 @@
 // Tests that the mapReduce command works correctly under all combinations of the input and output
 // collections being sharded or unsharded.
+// Map Reduce before 4.4. does not support outputting to a sharded collection whose shard key is
+// {_id: "hashed"}.
+// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 
