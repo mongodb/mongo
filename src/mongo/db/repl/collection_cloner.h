@@ -108,6 +108,15 @@ public:
         _collectionClonerBatchSize = batchSize;
     }
 
+    /**
+     * Overrides how executor schedules database work.
+     *
+     * For testing only.
+     */
+    void setScheduleDbWorkFn_forTest(ScheduleDbWorkFn scheduleDbWorkFn) {
+        _scheduleDbWorkFn = std::move(scheduleDbWorkFn);
+    }
+
 protected:
     ClonerStages getStages() final;
 
