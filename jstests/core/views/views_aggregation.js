@@ -8,7 +8,7 @@
  *         requires_getmore,
  *         requires_non_retryable_commands,
  *         # Requires FCV 4.4 because the test checks explain() output, and in 4.4 the conditions
- *         # under which sorts are pushed down were changed.
+ *         # under which sorts are pushed down were changed. Also uses $unionWith.
  *         requires_fcv_44]
  */
 (function() {
@@ -356,5 +356,45 @@ assert.commandWorked(viewsDB.runCommand({
         coll.aggregate(
                 [{$unionWith: {coll: "identityView", pipeline: [{$match: {_id: "New York"}}]}}])
             .itcount());
+}());
+
+(function testUnionInViewDefinition() {
+    const secondCollection = viewsDB.secondCollection;
+    secondCollection.drop();
+    assert.commandWorked(secondCollection.insert(allDocuments));
+    const viewName = "unionView";
+
+    // Test with a simple $unionWith with no custom pipeline.
+    assert.commandWorked(viewsDB.runCommand({
+        create: viewName,
+        viewOn: coll.getName(),
+        pipeline: [{$unionWith: secondCollection.getName()}]
+    }));
+    assert.eq(2 * allDocuments.length, viewsDB[viewName].find().itcount());
+    assert.eq(allDocuments.length,
+              viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount());
+    assert.eq(
+        [
+            {_id: "New York"},
+            {_id: "Newark"},
+            {_id: "Palo Alto"},
+            {_id: "San Francisco"},
+            {_id: "Trenton"}
+        ],
+        viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}, {$sort: {_id: 1}}]).toArray());
+    assert.eq(allDocuments.length, viewsDB[viewName].distinct("_id").length);
+    viewsDB[viewName].drop();
+
+    // Now test again with a custom pipeline in the view definition.
+    assert.commandWorked(viewsDB.runCommand({
+        create: viewName,
+        viewOn: coll.getName(),
+        pipeline:
+            [{$unionWith: {coll: secondCollection.getName(), pipeline: [{$match: {state: "NY"}}]}}]
+    }));
+    assert.eq(allDocuments.length + 1, viewsDB[viewName].find().itcount());
+    assert.eq(allDocuments.length,
+              viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount());
+    assert.eq(allDocuments.length, viewsDB[viewName].distinct("_id").length);
 })();
 })();

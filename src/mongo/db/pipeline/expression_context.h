@@ -60,6 +60,7 @@ namespace mongo {
 
 class ExpressionContext : public RefCountable {
 public:
+    static constexpr size_t kMaxSubPipelineViewDepth = 20;
     struct ResolvedNamespace {
         ResolvedNamespace() = default;
         ResolvedNamespace(NamespaceString ns, std::vector<BSONObj> pipeline);
@@ -208,6 +209,16 @@ public:
         NamespaceString ns,
         boost::optional<UUID> uuid = boost::none,
         boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none) const;
+
+    boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(NamespaceString nss) const {
+        uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
+                str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
+                              << ExpressionContext::kMaxSubPipelineViewDepth,
+                subPipelineDepth < kMaxSubPipelineViewDepth);
+        auto newCopy = copyWith(std::move(nss));
+        newCopy->subPipelineDepth += 1;
+        return newCopy;
+    }
 
     /**
      * Returns the ResolvedNamespace corresponding to 'nss'. It is an error to call this method on a

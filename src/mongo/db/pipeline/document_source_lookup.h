@@ -48,7 +48,6 @@ namespace mongo {
  */
 class DocumentSourceLookUp final : public DocumentSource {
 public:
-    static constexpr size_t kMaxSubPipelineDepth = 20;
     static constexpr StringData kStageName = "$lookup"_sd;
 
     struct LetVariable {

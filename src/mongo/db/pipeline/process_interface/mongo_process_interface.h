@@ -106,14 +106,6 @@ public:
      */
     static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
 
-    struct MakePipelineOptions {
-        MakePipelineOptions(){};
-
-        bool optimize = true;
-        bool attachCursorSource = true;
-        bool allowTargetingShards = true;
-    };
-
     /**
      * This structure holds the result of a batched update operation, such as the number of
      * documents that matched the query predicate, and the number of documents modified by the
@@ -248,20 +240,6 @@ public:
                                                 const std::vector<BSONObj>& indexSpecs) = 0;
 
     virtual void dropCollection(OperationContext* opCtx, const NamespaceString& collection) = 0;
-
-    /**
-     * Parses a Pipeline from a vector of BSONObjs representing DocumentSources. The state of the
-     * returned pipeline will depend upon the supplied MakePipelineOptions:
-     * - The boolean opts.optimize determines whether the pipeline will be optimized.
-     * - If opts.attachCursorSource is false, the pipeline will be returned without attempting to
-     *   add an initial cursor source.
-     *
-     * This function throws if parsing the pipeline failed.
-     */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions opts = MakePipelineOptions{}) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying

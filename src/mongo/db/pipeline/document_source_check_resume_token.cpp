@@ -327,7 +327,7 @@ void DocumentSourceShardCheckResumability::_assertOplogHasEnoughHistory(
     // Look up the first document in the oplog and compare it with the resume token's clusterTime.
     auto firstEntryExpCtx = pExpCtx->copyWith(NamespaceString::kRsOplogNamespace);
     auto matchSpec = BSON("$match" << BSONObj());
-    auto pipeline = pExpCtx->mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx);
+    auto pipeline = Pipeline::makePipeline({matchSpec}, firstEntryExpCtx);
     if (auto first = pipeline->getNext()) {
         auto firstOplogEntry = Value(*first);
         // If the first entry in the oplog is the replset initialization, then it doesn't matter

@@ -50,8 +50,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ExpressionContext::ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline) {
+    // Copy the ExpressionContext of the base aggregation, using the inner namespace instead.
+    auto unionExpCtx = expCtx->copyForSubPipeline(resolvedNs.ns);
+
     if (resolvedNs.pipeline.empty()) {
-        return uassertStatusOK(Pipeline::parse(currentPipeline, expCtx->copyWith(resolvedNs.ns)));
+        return uassertStatusOK(Pipeline::parse(std::move(currentPipeline), unionExpCtx));
     }
     auto resolvedPipeline = std::move(resolvedNs.pipeline);
     resolvedPipeline.reserve(currentPipeline.size() + resolvedPipeline.size());
@@ -59,8 +62,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
                             std::make_move_iterator(currentPipeline.begin()),
                             std::make_move_iterator(currentPipeline.end()));
 
-    return uassertStatusOK(
-        Pipeline::parse(std::move(resolvedPipeline), expCtx->copyWith(resolvedNs.ns)));
+    return uassertStatusOK(Pipeline::parse(std::move(resolvedPipeline), unionExpCtx));
 }
 
 }  // namespace

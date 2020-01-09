@@ -81,10 +81,6 @@ public:
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final override;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions opts = MakePipelineOptions{}) final;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;

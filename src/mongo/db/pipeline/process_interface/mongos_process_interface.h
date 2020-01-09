@@ -173,11 +173,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions pipelineOptions) final;
-
     /**
      * The following methods only make sense for data-bearing nodes and should never be called on
      * a mongos.

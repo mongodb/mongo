@@ -214,13 +214,12 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
             // We've already allocated space for the trailing $match stage in '_fromPipeline'.
             _fromPipeline.back() = *matchStage;
-            MongoProcessInterface::MakePipelineOptions pipelineOpts;
+            MakePipelineOptions pipelineOpts;
             pipelineOpts.optimize = true;
             pipelineOpts.attachCursorSource = true;
             // By default, $graphLookup doesn't support a sharded 'from' collection.
             pipelineOpts.allowTargetingShards = internalQueryAllowShardedLookup.load();
-            auto pipeline = pExpCtx->mongoProcessInterface->makePipeline(
-                _fromPipeline, _fromExpCtx, pipelineOpts);
+            auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()

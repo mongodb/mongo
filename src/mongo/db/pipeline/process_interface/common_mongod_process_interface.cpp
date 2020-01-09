@@ -277,24 +277,6 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
     return collectionOptions;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> CommonMongodProcessInterface::makePipeline(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const MakePipelineOptions opts) {
-    auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
-
-    if (opts.optimize) {
-        pipeline->optimizePipeline();
-    }
-
-    if (opts.attachCursorSource) {
-        pipeline =
-            attachCursorSourceToPipeline(expCtx, pipeline.release(), opts.allowTargetingShards);
-    }
-
-    return pipeline;
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter>
 CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
@@ -355,11 +337,10 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocument(
             _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
         // When looking up on a mongoD, we only ever want to read from the local collection. By
         // default, makePipeline will attach a cursor source which may read from remote if the
-        // collection is sharded, so we manually attach a local-only cursor source here.
+        // collection is sharded, so we configure it to not allow that here.
         MakePipelineOptions opts;
-        opts.attachCursorSource = false;
-        pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
-        pipeline = attachCursorSourceToPipelineForLocalRead(foreignExpCtx, pipeline.release());
+        opts.allowTargetingShards = false;
+        pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
     }

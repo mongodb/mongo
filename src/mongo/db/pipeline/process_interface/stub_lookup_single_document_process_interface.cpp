@@ -33,27 +33,11 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-std::unique_ptr<Pipeline, PipelineDeleter> StubLookupSingleDocumentProcessInterface::makePipeline(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const MakePipelineOptions opts) {
-    auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
-
-    if (opts.optimize) {
-        pipeline->optimizePipeline();
-    }
-
-    if (opts.attachCursorSource) {
-        pipeline =
-            attachCursorSourceToPipeline(expCtx, pipeline.release(), opts.allowTargetingShards);
-    }
-
-    return pipeline;
-}
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
@@ -85,7 +69,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID, boost::none);
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
-        pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
+        pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
     }

@@ -302,9 +302,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             // If 'involvedNs' refers to a view namespace, then we resolve its definition.
             auto resolvedView = viewCatalog->resolveView(opCtx, involvedNs);
             if (!resolvedView.isOK()) {
-                return {ErrorCodes::FailedToParse,
-                        str::stream() << "Failed to resolve view '" << involvedNs.ns()
-                                      << "': " << resolvedView.getStatus().toString()};
+                return resolvedView.getStatus().withContext(
+                    str::stream() << "Failed to resolve view '" << involvedNs.ns());
             }
 
             resolvedNamespaces[involvedNs.coll()] = {resolvedView.getValue().getNamespace(),

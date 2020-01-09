@@ -63,6 +63,12 @@ class PipelineDeleter;
  */
 extern FailPoint disablePipelineOptimization;
 
+struct MakePipelineOptions {
+    bool optimize = true;
+    bool attachCursorSource = true;
+    bool allowTargetingShards = true;
+};
+
 /**
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
  * pipeline.
@@ -140,6 +146,20 @@ public:
      * Returns true if the provided aggregation command has an $out or $merge stage.
      */
     static bool aggHasWriteStage(const BSONObj& cmd);
+
+    /**
+     * Parses a Pipeline from a vector of BSONObjs representing DocumentSources. The state of the
+     * returned pipeline will depend upon the supplied MakePipelineOptions:
+     * - The boolean opts.optimize determines whether the pipeline will be optimized.
+     * - If opts.attachCursorSource is false, the pipeline will be returned without attempting to
+     * add an initial cursor source.
+     *
+     * This function throws if parsing the pipeline failed.
+     */
+    static std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const MakePipelineOptions opts = MakePipelineOptions{});
 
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;

@@ -100,25 +100,6 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::makePipeline(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const MakePipelineOptions pipelineOptions) {
-    // Explain is not supported for auxiliary lookups.
-    invariant(!expCtx->explain);
-
-    auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
-    if (pipelineOptions.optimize) {
-        pipeline->optimizePipeline();
-    }
-    if (pipelineOptions.attachCursorSource) {
-        // 'attachCursorSourceToPipeline' handles any complexity related to sharding.
-        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release(), false);
-    }
-
-    return pipeline;
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
