@@ -70,6 +70,9 @@ std::string extractKeyStringInternal(const BSONObj& shardKeyValue, Ordering orde
 
 }  // namespace
 
+ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch)
+    : shardVersion(0, 0, epoch) {}
+
 RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
                                          boost::optional<UUID> uuid,
                                          KeyPattern shardKeyPattern,
@@ -87,6 +90,19 @@ RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
       _chunkMap(std::move(chunkMap)),
       _collectionVersion(collectionVersion),
       _shardVersions(_constructShardVersionMap()) {}
+
+void RoutingTableHistory::setShardStale(const ShardId& shardId) {
+    auto it = _shardVersions.find(shardId);
+    if (it != _shardVersions.end()) {
+        it->second.isStale.store(true);
+    }
+}
+
+void RoutingTableHistory::setAllShardsRefreshed() {
+    for (auto& [shard, targetingInfo] : _shardVersions) {
+        targetingInfo.isStale.store(false);
+    }
+}
 
 Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey, const BSONObj& collation) const {
     const bool hasSimpleCollation = (collation.isEmpty() && !_rt->getDefaultCollator()) ||
@@ -393,7 +409,7 @@ ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
         return ChunkVersion(0, 0, _collectionVersion.epoch());
     }
 
-    return it->second;
+    return it->second.shardVersion;
 }
 
 std::string RoutingTableHistory::toString() const {
@@ -407,7 +423,7 @@ std::string RoutingTableHistory::toString() const {
 
     sb << "Shard versions:\n";
     for (const auto& entry : _shardVersions) {
-        sb << "\t" << entry.first << ": " << entry.second.toString() << '\n';
+        sb << "\t" << entry.first << ": " << entry.second.shardVersion.toString() << '\n';
     }
 
     return sb.str();
@@ -429,11 +445,10 @@ ShardVersionMap RoutingTableHistory::_constructShardVersionMap() const {
         // Tracks the max shard version for the shard on which the current range will reside
         auto shardVersionIt = shardVersions.find(currentRangeShardId);
         if (shardVersionIt == shardVersions.end()) {
-            shardVersionIt =
-                shardVersions.emplace(currentRangeShardId, ChunkVersion(0, 0, epoch)).first;
+            shardVersionIt = shardVersions.emplace(currentRangeShardId, epoch).first;
         }
 
-        auto& maxShardVersion = shardVersionIt->second;
+        auto& maxShardVersion = shardVersionIt->second.shardVersion;
 
         current =
             std::find_if(current,
@@ -585,6 +600,7 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
     // sequence number to detect batch writes not making progress because of chunks moving across
     // shards too frequently.
     if (collectionVersion == startingCollectionVersion) {
+        setAllShardsRefreshed();
         return shared_from_this();
     }
 

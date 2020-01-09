@@ -47,6 +47,8 @@ struct TargeterStats {
         SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()};
 };
 
+using StaleShardVersionMap = std::map<ShardId, ChunkVersion>;
+
 /**
  * NSTargeter based on a ChunkManager implementation. Wraps all exception codepaths and returns
  * NamespaceNotFound status on applicable failures.
@@ -114,8 +116,6 @@ public:
     int getNShardsOwningChunks() const override;
 
 private:
-    using ShardVersionMap = std::map<ShardId, ChunkVersion>;
-
     /**
      * Performs an actual refresh from the config server.
      */
@@ -163,7 +163,7 @@ private:
     boost::optional<OID> _targetEpoch;
 
     // Map of shard->remote shard version reported from stale errors
-    ShardVersionMap _remoteShardVersions;
+    StaleShardVersionMap _remoteShardVersions;
 
     // remote db version reported from stale errors
     boost::optional<DatabaseVersion> _remoteDbVersion;

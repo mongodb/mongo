@@ -256,7 +256,7 @@ ChunkVersion getShardVersion(const CachedCollectionRoutingInfo& routingInfo,
  * ChunkManager or is implicit in the primary shard of the collection.
  */
 CompareResult compareAllShardVersions(const CachedCollectionRoutingInfo& routingInfo,
-                                      const ShardVersionMap& remoteShardVersions) {
+                                      const StaleShardVersionMap& remoteShardVersions) {
     CompareResult finalResult = CompareResult_GTE;
 
     for (const auto& shardVersionEntry : remoteShardVersions) {
@@ -694,7 +694,7 @@ void ChunkManagerTargeter::noteStaleShardResponse(const ShardEndpoint& endpoint,
         remoteShardVersion = *staleInfo.getVersionWanted();
     }
 
-    ShardVersionMap::iterator it = _remoteShardVersions.find(endpoint.shardName);
+    StaleShardVersionMap::iterator it = _remoteShardVersions.find(endpoint.shardName);
     if (it == _remoteShardVersions.end()) {
         _remoteShardVersions.insert(std::make_pair(endpoint.shardName, remoteShardVersion));
     } else {
