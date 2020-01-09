@@ -33,6 +33,8 @@
 
 #include "mongo/util/latch_analyzer.h"
 
+#include <deque>
+
 #include <fmt/format.h>
 
 #include "mongo/util/hierarchical_acquisition.h"
@@ -122,11 +124,39 @@ public:
 
 // Latching state object to pin onto the Client (i.e. thread)
 struct LatchSetState {
+    using LatchIdentitySet = std::deque<const latch_detail::Identity*>;
+
+    LatchSetState() {
+        if (getTestCommandsEnabled()) {
+            identities = std::make_unique<LatchIdentitySet>();
+        }
+    }
+
     HierarchicalAcquisitionSet levelsHeld;
+
+    // This is a set of latches by unique Identity alone. It is not and cannot be in order of
+    // acquisition or release. We only populate this when shouldAnalyzeLatches() is true.
     stdx::unordered_set<const latch_detail::Identity*> latchesHeld;
+
+    // This is an ordered list of latch Identities. Each acquired Latch will add itself to the end
+    // of this list and each released Latch will remove itself from the end. This is populated when
+    // getTestCommandsEnabled() is true, i.e. in a testing environment.
+    std::unique_ptr<LatchIdentitySet> identities;
 };
 
 const auto getLatchSetState = Client::declareDecoration<LatchSetState>();
+
+void dumpLevels(const LatchSetState& state) {
+    if (!state.identities) {
+        return;
+    }
+
+    log() << "Dumping Latch Identities:";
+    auto& identities = *state.identities;
+    for (auto& identity : identities) {
+        log() << "- " << identity->name();
+    }
+}
 
 }  // namespace
 
@@ -195,6 +225,8 @@ void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
                 identity.name());
 
         if (allowExitOnViolation()) {
+            dumpLevels(handle);
+
             fassert(31360, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
         } else {
             warning() << errorMessage;
@@ -206,6 +238,11 @@ void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
                 ++violation.onAcquire;
             }
         }
+    }
+
+    if (handle.identities) {
+        // Since this latch has a verified Level, we can add it to the stack of identities
+        handle.identities->push_back(&identity);
     }
 }
 
@@ -247,6 +284,8 @@ void LatchAnalyzer::onRelease(const latch_detail::Identity& identity) {
                 identity.name());
 
         if (allowExitOnViolation()) {
+            dumpLevels(handle);
+
             fassert(31361, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
         } else {
             warning() << errorMessage;
@@ -258,6 +297,11 @@ void LatchAnalyzer::onRelease(const latch_detail::Identity& identity) {
                 ++violation.onRelease;
             }
         }
+    }
+
+    if (handle.identities) {
+        // Since this latch has a verified Level, we can remove it from the stack of identities
+        handle.identities->pop_back();
     }
 }
 
