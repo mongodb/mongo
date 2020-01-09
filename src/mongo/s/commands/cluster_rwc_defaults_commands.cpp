@@ -84,7 +84,11 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const override {
-        // TODO SERVER-45038: add and use privilege action
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
+                                                      ActionType::setDefaultRWConcern})) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
         return Status::OK();
     }
 
@@ -141,8 +145,12 @@ public:
             return false;
         }
 
-        void doCheckAuthorization(OperationContext*) const override {
-            // TODO SERVER-45038: add and use privilege action
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
+                                                             ActionType::getDefaultRWConcern}));
         }
 
         NamespaceString ns() const override {
