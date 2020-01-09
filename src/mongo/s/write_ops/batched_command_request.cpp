@@ -134,7 +134,9 @@ void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
         builder->append(kWriteConcern, *_writeConcern);
     }
 
-    builder->append(kAllowImplicitCollectionCreation, _allowImplicitCollectionCreation);
+    if (!_allowImplicitCollectionCreation) {
+        builder->append(kAllowImplicitCollectionCreation, _allowImplicitCollectionCreation);
+    }
 }
 
 BSONObj BatchedCommandRequest::toBSON() const {

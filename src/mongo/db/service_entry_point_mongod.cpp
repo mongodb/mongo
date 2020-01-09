@@ -210,7 +210,9 @@ public:
             }
         } else if (auto cannotImplicitCreateCollInfo =
                        e.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-            if (ShardingState::get(opCtx)->enabled()) {
+            if (ShardingState::get(opCtx)->enabled() &&
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
                 onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
                     .ignore();
             }

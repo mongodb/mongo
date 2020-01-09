@@ -111,9 +111,6 @@ const auto kAllowImplicitCollectionCreation = "allowImplicitCollectionCreation"_
 std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForShards(
     OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
     auto cmdToSend = cmdObj;
-    if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
-        cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
-    }
 
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto&& shardId : shardIds)
@@ -138,9 +135,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const BSONObj& collation) {
 
     auto cmdToSend = cmdObj;
-    if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
-        cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
-    }
 
     if (!routingInfo.cm()) {
         // The collection is unsharded. Target only the primary shard for the database.
