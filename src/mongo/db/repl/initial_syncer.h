@@ -99,8 +99,8 @@ struct InitialSyncerOptions {
     Milliseconds getApplierBatchCallbackRetryWait{1000};
 
     // Replication settings
-    NamespaceString localOplogNS = NamespaceString("local.oplog.rs");
-    NamespaceString remoteOplogNS = NamespaceString("local.oplog.rs");
+    NamespaceString localOplogNS = NamespaceString::kRsOplogNamespace;
+    NamespaceString remoteOplogNS = NamespaceString::kRsOplogNamespace;
 
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
