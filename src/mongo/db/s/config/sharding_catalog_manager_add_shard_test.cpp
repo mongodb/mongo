@@ -357,8 +357,7 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
         << "writeConcern"
         << BSON("w"
                 << "majority"
-                << "wtimeout" << 60000)
-        << "allowImplicitCollectionCreation" << false);
+                << "wtimeout" << 60000));
     auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
     auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
     ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);

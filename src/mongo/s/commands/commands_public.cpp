@@ -290,10 +290,8 @@ public:
             NamespaceString::kAdminDb,
             fromNss,
             fromRoutingInfo,
-            appendAllowImplicitCreate(
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-                true),
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             Shard::RetryPolicy::kNoRetry,
             &result);
     }

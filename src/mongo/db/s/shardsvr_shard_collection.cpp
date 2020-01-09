@@ -185,7 +185,7 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
     createIndexes.append("createIndexes", nss.coll());
     createIndexes.append("indexes", BSON_ARRAY(index.obj()));
     createIndexes.append("writeConcern", WriteConcernOptions::Majority);
-    return appendAllowImplicitCreate(createIndexes.obj(), true);
+    return createIndexes.obj();
 }
 
 /**

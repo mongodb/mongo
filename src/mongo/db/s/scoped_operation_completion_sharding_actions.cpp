@@ -101,7 +101,9 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
                   << causedBy(redact(handleMismatchStatus));
     } else if (auto cannotImplicitCreateCollInfo =
                    status->extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-        if (ShardingState::get(_opCtx)->enabled()) {
+        if (ShardingState::get(_opCtx)->enabled() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
             auto handleCannotImplicitCreateStatus =
                 onCannotImplicitlyCreateCollection(_opCtx, cannotImplicitCreateCollInfo->getNss());
             if (!handleCannotImplicitCreateStatus.isOK())

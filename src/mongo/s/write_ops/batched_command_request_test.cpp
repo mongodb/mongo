@@ -45,8 +45,7 @@ TEST(BatchedCommandRequest, BasicInsert) {
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
                                         << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true
-                                        << "allowImplicitCollectionCreation" << false);
+                                        << BSON("w" << 1) << "ordered" << true);
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -54,7 +53,6 @@ TEST(BatchedCommandRequest, BasicInsert) {
 
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
         ASSERT(!insertRequest.hasShardVersion());
-        ASSERT_FALSE(insertRequest.isImplicitCreateAllowed());
     }
 }
 

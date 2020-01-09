@@ -191,7 +191,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards[AggregationRequest::kUseNewUpsert] = Value(true);
     }
 
-    return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), false);
+    return cmdForShards.freeze().toBson();
 }
 
 std::vector<RemoteCursor> establishShardCursors(
@@ -507,7 +507,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         mergeCmd.remove("readConcern");
     }
 
-    return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), false);
+    return mergeCmd.freeze().toBson();
 }
 
 BSONObj createPassthroughCommandForShard(

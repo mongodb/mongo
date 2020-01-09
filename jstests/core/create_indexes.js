@@ -1,7 +1,5 @@
 /**
- * @tags: [
- *   assumes_superuser_permissions,
- * ]
+ * @tags: [assumes_superuser_permissions, requires_fcv_44]
  */
 (function() {
 'use strict';
@@ -37,9 +35,8 @@ var extractResult = function(obj) {
     return result;
 };
 
-var checkImplicitCreate = function(createIndexResult, isMongos) {
-    let allowImplicit = !isMongos;
-    assert.eq(allowImplicit, createIndexResult.createdCollectionAutomatically);
+var checkImplicitCreate = function(createIndexResult) {
+    assert.eq(true, createIndexResult.createdCollectionAutomatically);
 };
 
 var dbTest = db.getSisterDB('create_indexes_db');
@@ -50,7 +47,7 @@ var collDbNotExist = dbTest.create_indexes_no_db;
 var res = assert.commandWorked(
     collDbNotExist.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
-checkImplicitCreate(res, isMongos);
+checkImplicitCreate(res);
 assert.eq(1, res.numIndexesBefore);
 assert.eq(2, res.numIndexesAfter);
 assert.isnull(
@@ -62,7 +59,7 @@ var t = dbTest.create_indexes;
 var res =
     assert.commandWorked(t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
-checkImplicitCreate(res, isMongos);
+checkImplicitCreate(res);
 assert.eq(1, res.numIndexesBefore);
 assert.eq(2, res.numIndexesAfter);
 assert.isnull(
