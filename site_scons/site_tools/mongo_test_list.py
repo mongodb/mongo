@@ -19,17 +19,17 @@ from collections import defaultdict
 TEST_REGISTRY = defaultdict(list)
 
 
-def register_test(env, file_name, test):
+def register_test(env, file, test):
     """Register test into the dictionary of tests for file_name"""
     test_path = test.path
     if getattr(test.attributes, "AIB_INSTALL_ACTIONS", []):
         test_path = getattr(test.attributes, "AIB_INSTALL_ACTIONS")[0].path
 
-    if SCons.Util.is_String(file_name):
-        file_name = env.File(file_name).path
-    else:
-        file_name = file_name.path
+    if SCons.Util.is_String(file):
+        file = env.File(file)
 
+    env.Depends(file, test)
+    file_name = file.path
     TEST_REGISTRY[file_name].append(test_path)
     env.GenerateTestExecutionAliases(test)
 
