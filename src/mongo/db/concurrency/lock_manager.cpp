@@ -828,12 +828,13 @@ LockManager::Partition* LockManager::_getPartition(LockRequest* request) const {
 void LockManager::dump() const {
     log() << "Dumping LockManager @ " << static_cast<const void*>(this) << '\n';
 
+    auto lockToClientMap = getLockToClientMap(getGlobalServiceContext());
     for (unsigned i = 0; i < _numLockBuckets; i++) {
         LockBucket* bucket = &_lockBuckets[i];
         stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
         if (!bucket->data.empty()) {
-            _dumpBucket(bucket);
+            _dumpBucket(lockToClientMap, bucket);
         }
     }
 }
@@ -903,7 +904,8 @@ void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClien
     result->append("lockInfo", lockInfo.arr());
 }
 
-void LockManager::_dumpBucket(const LockBucket* bucket) const {
+void LockManager::_dumpBucket(const std::map<LockerId, BSONObj>& lockToClientMap,
+                              const LockBucket* bucket) const {
     for (LockBucket::Map::const_iterator it = bucket->data.begin(); it != bucket->data.end();
          it++) {
         const LockHead* lock = it->second;
@@ -922,13 +924,20 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
             std::stringstream threadId;
             threadId << iter->locker->getThreadId() << " | " << std::showbase << std::hex
                      << iter->locker->getThreadId();
-            sb << '\t' << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
+            auto lockerId = iter->locker->getId();
+            sb << '\t' << "LockRequest " << lockerId << " @ " << iter->locker << ": "
                << "Mode = " << modeName(iter->mode) << "; "
                << "Thread = " << threadId.str() << "; "
                << "ConvertMode = " << modeName(iter->convertMode) << "; "
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                << "CompatibleFirst = " << iter->compatibleFirst << "; "
-               << "DebugInfo = " << iter->locker->getDebugInfo() << '\n';
+               << "DebugInfo = " << iter->locker->getDebugInfo();
+            auto it = lockToClientMap.find(lockerId);
+            if (it != lockToClientMap.end()) {
+                sb << "; ClientInfo = ";
+                sb << it->second;
+            }
+            sb << '\n';
         }
 
         sb << "PENDING:\n";
@@ -937,13 +946,20 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
             std::stringstream threadId;
             threadId << iter->locker->getThreadId() << " | " << std::showbase << std::hex
                      << iter->locker->getThreadId();
-            sb << '\t' << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
+            auto lockerId = iter->locker->getId();
+            sb << '\t' << "LockRequest " << lockerId << " @ " << iter->locker << ": "
                << "Mode = " << modeName(iter->mode) << "; "
                << "Thread = " << threadId.str() << "; "
                << "ConvertMode = " << modeName(iter->convertMode) << "; "
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                << "CompatibleFirst = " << iter->compatibleFirst << "; "
-               << "DebugInfo = " << iter->locker->getDebugInfo() << '\n';
+               << "DebugInfo = " << iter->locker->getDebugInfo();
+            auto it = lockToClientMap.find(lockerId);
+            if (it != lockToClientMap.end()) {
+                sb << "; ClientInfo = ";
+                sb << it->second;
+            }
+            sb << '\n';
         }
 
         sb << "-----------------------------------------------------------\n";
