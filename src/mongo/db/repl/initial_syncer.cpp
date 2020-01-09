@@ -691,13 +691,18 @@ void InitialSyncer::_rollbackCheckerResetCallback(
         return;
     }
 
+    // Since the beginFetchingOpTime is retrieved before significant work is done copying
+    // data from the sync source, we allow the OplogEntryFetcher to use its default retry strategy
+    // which retries up to 'numInitialSyncOplogFindAttempts' times'.  This will fail relatively
+    // quickly in the presence of network errors, allowing us to choose a different sync source.
     status = _scheduleLastOplogEntryFetcher_inlock(
         [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
             mongo::Fetcher::NextAction*,
             mongo::BSONObjBuilder*) mutable {
             _lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime(response,
                                                                         onCompletionGuard);
-        });
+        },
+        kFetcherHandlesRetries);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
@@ -834,13 +839,18 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
         initialSyncHangAfterGettingBeginFetchingTimestamp.pauseWhileSet();
     }
 
+    // Since the beginFetchingOpTime is retrieved before significant work is done copying
+    // data from the sync source, we allow the OplogEntryFetcher to use its default retry strategy
+    // which retries up to 'numInitialSyncOplogFindAttempts' times'.  This will fail relatively
+    // quickly in the presence of network errors, allowing us to choose a different sync source.
     status = _scheduleLastOplogEntryFetcher_inlock(
         [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
             mongo::Fetcher::NextAction*,
             mongo::BSONObjBuilder*) mutable {
             _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
                 response, onCompletionGuard, beginFetchingOpTime);
-        });
+        },
+        kFetcherHandlesRetries);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
@@ -1145,12 +1155,18 @@ void InitialSyncer::_allDatabaseClonerCallback(
         return;
     }
 
+    // Since the stopTimestamp is retrieved after we have done all the work of retrieving collection
+    // data, we handle retries within this class by retrying for
+    // 'initialSyncTransientErrorRetryPeriodSeconds' (default 24 hours).  This is the same retry
+    // strategy used when retrieving collection data, and avoids retrieving all the data and then
+    // throwing it away due to a transient network outage.
     status = _scheduleLastOplogEntryFetcher_inlock(
         [=](const StatusWith<mongo::Fetcher::QueryResponse>& status,
             mongo::Fetcher::NextAction*,
             mongo::BSONObjBuilder*) {
             _lastOplogEntryFetcherCallbackForStopTimestamp(status, onCompletionGuard);
-        });
+        },
+        kInitialSyncerHandlesRetries);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
@@ -1165,6 +1181,35 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         stdx::lock_guard<Latch> lock(_mutex);
         auto status = _checkForShutdownAndConvertStatus_inlock(
             result.getStatus(), "error fetching last oplog entry for stop timestamp");
+        if (_shouldRetryNetworkError(lock, status)) {
+            auto scheduleStatus = _exec->scheduleWork(
+                [this, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
+                    // It is not valid to schedule the retry from within this callback,
+                    // hence we schedule a lambda to schedule the retry.
+                    stdx::lock_guard<Latch> lock(_mutex);
+                    // Since the stopTimestamp is retrieved after we have done all the work of
+                    // retrieving collection data, we handle retries within this class by retrying
+                    // for 'initialSyncTransientErrorRetryPeriodSeconds' (default 24 hours).  This
+                    // is the same retry strategy used when retrieving collection data, and avoids
+                    // retrieving all the data and then throwing it away due to a transient network
+                    // outage.
+                    auto status = _scheduleLastOplogEntryFetcher_inlock(
+                        [=](const StatusWith<mongo::Fetcher::QueryResponse>& status,
+                            mongo::Fetcher::NextAction*,
+                            mongo::BSONObjBuilder*) {
+                            _lastOplogEntryFetcherCallbackForStopTimestamp(status,
+                                                                           onCompletionGuard);
+                        },
+                        kInitialSyncerHandlesRetries);
+                    if (!status.isOK()) {
+                        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
+                    }
+                });
+            if (scheduleStatus.isOK())
+                return;
+            // If scheduling failed, we're shutting down and cannot retry.
+            // So just continue with the original failed status.
+        }
         if (!status.isOK()) {
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
             return;
@@ -1529,7 +1574,8 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
     }
 }
 
-Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback) {
+Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(
+    Fetcher::CallbackFn callback, LastOplogEntryFetcherRetryStrategy retryStrategy) {
     BSONObj query = BSON("find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1)
                                 << "limit" << 1);
 
@@ -1542,8 +1588,11 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn 
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         RemoteCommandRequest::kNoTimeout /* find network timeout */,
         RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-            numInitialSyncOplogFindAttempts.load(), executor::RemoteCommandRequest::kNoTimeout));
+        (retryStrategy == kFetcherHandlesRetries)
+            ? RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
+                  numInitialSyncOplogFindAttempts.load(),
+                  executor::RemoteCommandRequest::kNoTimeout)
+            : RemoteCommandRetryScheduler::makeNoRetryPolicy());
     Status scheduleStatus = _lastOplogEntryFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _lastOplogEntryFetcher.reset();
