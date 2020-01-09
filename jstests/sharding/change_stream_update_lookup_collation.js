@@ -14,6 +14,9 @@ if (!supportsMajorityReadConcern()) {
     return;
 }
 
+// Shard key index has collation, which is not compatible with $min/$max
+TestData.skipCheckOrphans = true;
+
 const st = new ShardingTest({
     shards: 2,
     config: 1,

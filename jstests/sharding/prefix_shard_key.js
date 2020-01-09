@@ -10,6 +10,9 @@
 (function() {
 'use strict';
 
+// Shard key index does not exactly match shard key, so it is not compatible with $min/$max.
+TestData.skipCheckOrphans = true;
+
 var checkDocCounts = function(expectedShardCount) {
     for (var shardName in expectedShardCount) {
         var shard = (shardName == s.shard0.shardName ? s.shard0 : s.shard1);

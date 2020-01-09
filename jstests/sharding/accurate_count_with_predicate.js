@@ -9,6 +9,9 @@
 (function() {
 "use strict";
 
+// Deliberately inserts orphans outside of migration.
+TestData.skipCheckOrphans = true;
+
 const st = new ShardingTest({shards: 2});
 const shard0Coll = st.shard0.getCollection("test.slowcount");
 const num = 10;

@@ -389,6 +389,7 @@ var ShardingTest = function(params) {
     this.stop = function(opts = {}) {
         this.checkUUIDsConsistentAcrossCluster();
         this.checkIndexesConsistentAcrossCluster();
+        this.checkOrphansAreDeleted();
 
         if (jsTestOptions().alwaysUseLogFiles) {
             if (opts.noCleanData === false) {
@@ -1750,3 +1751,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {};
 
 // Stub for a hook to check that indexes are consistent across shards.
 ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {};
+
+ShardingTest.prototype.checkOrphansAreDeleted = function() {
+    print("Unhooked function");
+};

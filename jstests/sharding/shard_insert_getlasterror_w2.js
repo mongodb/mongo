@@ -5,6 +5,7 @@
 // stops 2/3 nodes of a replica set.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
 
 (function() {
 "use strict";

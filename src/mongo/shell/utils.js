@@ -353,6 +353,7 @@ jsTestOptions = function() {
             // in dbpath; additionally, prevent the dbpath from being cleared after a node
             // is shut down.
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
+            skipCheckOrphans: TestData.skipCheckOrphans || false,
         });
     }
     return _jsTestOptions;

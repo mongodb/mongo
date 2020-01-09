@@ -6,7 +6,11 @@
  * test suite. This suite does not use ssl so it cannot test modes with ssl.
  */
 
+// Test setup randomly have auth/no auth setting on shards, which make hooks targetting shard
+// directly more complicated. Skip the hooks since this test doesn't really do migrations.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
+
 load('jstests/ssl/libs/ssl_helpers.js');
 
 (function() {
