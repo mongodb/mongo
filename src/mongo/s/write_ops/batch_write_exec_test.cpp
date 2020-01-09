@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
@@ -38,6 +39,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -48,9 +50,15 @@
 namespace mongo {
 namespace {
 
-const HostAndPort kTestShardHost = HostAndPort("FakeHost", 12345);
+using executor::RemoteCommandRequest;
+
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
-const std::string shardName = "FakeShard";
+
+const HostAndPort kTestShardHost1 = HostAndPort("FakeHost1", 12345);
+const std::string kShardName1 = "FakeShard1";
+const HostAndPort kTestShardHost2 = HostAndPort("FakeHost2", 12345);
+const std::string kShardName2 = "FakeShard2";
+
 const int kMaxRoundsWithoutProgress = 5;
 
 BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
@@ -111,29 +119,38 @@ public:
         ShardingTestFixture::setUp();
         setRemote(HostAndPort("ClientHost", 12345));
 
-        // Set up the RemoteCommandTargeter for the config shard.
+        // Set up the RemoteCommandTargeter for the config shard
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
+        // Add a RemoteCommandTargeter for the data shard2
+        targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHost1), [] {
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                std::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHost1));
+            targeter->setFindHostReturnValue(kTestShardHost1);
+            return targeter;
+        }());
 
-        // Add a RemoteCommandTargeter for the data shard.
-        std::unique_ptr<RemoteCommandTargeterMock> targeter(
-            stdx::make_unique<RemoteCommandTargeterMock>());
-        targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHost));
-        targeter->setFindHostReturnValue(kTestShardHost);
-        targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHost),
-                                               std::move(targeter));
+        targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHost2), [] {
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                std::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHost2));
+            targeter->setFindHostReturnValue(kTestShardHost2);
+            return targeter;
+        }());
 
-        // Set up the shard registry to contain the fake shard.
-        ShardType shardType;
-        shardType.setName(shardName);
-        shardType.setHost(kTestShardHost.toString());
-        std::vector<ShardType> shards{shardType};
-        setupShards(shards);
-
-        // Set up the namespace targeter to target the fake shard.
-        nsTargeter.init(nss,
-                        {MockRange(ShardEndpoint(shardName, ChunkVersion::IGNORED()),
-                                   BSON("x" << MINKEY),
-                                   BSON("x" << MAXKEY))});
+        // Set up the shard registry to contain the fake shards
+        setupShards({[] {
+                         ShardType shardType;
+                         shardType.setName(kShardName1);
+                         shardType.setHost(kTestShardHost1.toString());
+                         return shardType;
+                     }(),
+                     [] {
+                         ShardType shardType;
+                         shardType.setName(kShardName2);
+                         shardType.setHost(kTestShardHost2.toString());
+                         return shardType;
+                     }()});
     }
 
     void expectInsertsReturnSuccess(const std::vector<BSONObj>& expected) {
@@ -168,7 +185,7 @@ public:
         });
     }
 
-    virtual void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) {
+    void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             return expectInsertsReturnStaleVersionErrorsBase(nss, expected, request);
         });
@@ -204,10 +221,13 @@ public:
         });
     }
 
-    ConnectionString shardHost{kTestShardHost};
-    NamespaceString nss{"foo.bar"};
+    const NamespaceString nss{"foo.bar"};
 
-    MockNSTargeter nsTargeter;
+    MockNSTargeter singleShardNSTargeter{
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, OID::gen())),
+                   BSON("x" << MINKEY),
+                   BSON("x" << MAXKEY))}};
 };
 
 //
@@ -231,7 +251,8 @@ TEST_F(BatchWriteExecTest, SingleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQ(1LL, response.getN());
         ASSERT_EQ(1, stats.numRounds);
@@ -267,7 +288,8 @@ TEST_F(BatchWriteExecTest, MultiOpLarge) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
         ASSERT_EQUALS(response.getN(), kNumDocsToInsert);
@@ -299,7 +321,8 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
@@ -313,6 +336,467 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
     expectInsertsReturnError({BSON("x" << 1)}, errResponse);
 
     future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrite) {
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        updateOp.setUpdates(
+            std::vector{write_ops::UpdateOpEntry(BSON("_id" << 100), {BSON("Key" << 100)})});
+        return updateOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    static const auto epoch = OID::gen();
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+            return std::vector<ShardEndpoint>{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, request, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(0);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(2);
+
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(3, response.getNModified());
+}
+
+TEST_F(BatchWriteExecTest,
+       RetryableErrorReturnedFromMultiWriteWithShard1AllOKShard2AllStaleShardVersion) {
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        updateOp.setUpdates(
+            std::vector{write_ops::UpdateOpEntry(BSON("id" << 150), {BSON("x" << 1)}),
+                        write_ops::UpdateOpEntry(BSON("id" << 200), {BSON("y" << 2)})});
+        return updateOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    static const auto epoch = OID::gen();
+
+    // This allows the batch to target each write operation
+    // to a specific shard (kShardName2), to perform this test
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+            return std::vector<ShardEndpoint>{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                   BSON("sk" << MINKEY),
+                   BSON("sk" << 10)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+                   BSON("sk" << 10),
+                   BSON("sk" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, request, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(0);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(1);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(2);
+
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(3, response.getNModified());
+}
+
+TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        updateOp.setUpdates(
+            std::vector{write_ops::UpdateOpEntry(BSON("id" << 150), {BSON("x" << 1)}),
+                        write_ops::UpdateOpEntry(BSON("id" << 200), {BSON("y" << 2)})});
+        return updateOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    static const auto epoch = OID::gen();
+
+    // This allows the batch to target each write operation
+    // to a specific shard (kShardName2), to perform this test
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+            return std::vector<ShardEndpoint>{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                   BSON("sk" << MINKEY),
+                   BSON("sk" << 10)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+                   BSON("sk" << 10),
+                   BSON("sk" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, request, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(1);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(0);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+
+        return response.toBSON();
+    });
+
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(2, response.getNModified());
+}
+
+TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOKShard2FirstOK) {
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        updateOp.setUpdates(
+            std::vector{write_ops::UpdateOpEntry(BSON("id" << 150), {BSON("x" << 1)}),
+                        write_ops::UpdateOpEntry(BSON("id" << 200), {BSON("y" << 2)})});
+        return updateOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    static const auto epoch = OID::gen();
+
+    // This allows the batch to target each write operation
+    // to a specific shard (kShardName2), to perform this test
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+            return std::vector<ShardEndpoint>{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                   BSON("sk" << MINKEY),
+                   BSON("sk" << 10)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+                   BSON("sk" << 10),
+                   BSON("sk" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, request, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(1);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(1);
+            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
+            errDetail->setErrInfo([&] {
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch),
+                                                 ChunkVersion(105, 200, epoch)),
+                                 "Stale shard version");
+                BSONObjBuilder builder;
+                ssvStatus.serializeErrorToBSON(&builder);
+                return builder.obj();
+            }());
+            return errDetail;
+        }());
+
+        return response.toBSON();
+    });
+
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(2, response.getNModified());
 }
 
 //
@@ -336,7 +820,8 @@ TEST_F(BatchWriteExecTest, StaleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
         ASSERT(response.getOk());
 
         ASSERT_EQUALS(1, stats.numStaleBatches);
@@ -366,7 +851,8 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
         ASSERT(response.getOk());
 
         ASSERT_EQUALS(3, stats.numStaleBatches);
@@ -384,10 +870,11 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
     future.default_timed_get();
 }
 
-TEST_F(BatchWriteExecTest, TooManyStaleOp) {
-    // Retry op in exec too many times (without refresh) b/c of stale config (the mock nsTargeter
-    // doesn't report progress on refresh). We should report a no progress error for everything in
-    // the batch.
+TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
+    // Retry op in exec too many times (without refresh) b/c of stale config (the mock
+    // singleShardNSTargeter doesn't report progress on refresh). We should report a no progress
+    // error for everything in the batch.
+
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
         insertOp.setWriteCommandBase([] {
@@ -403,7 +890,8 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
@@ -451,7 +939,8 @@ TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
         ASSERT_EQUALS(response.getN(), kNumDocsToInsert);
@@ -485,7 +974,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
@@ -526,7 +1016,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
         ASSERT(!response.isErrDetailsSet());
@@ -563,7 +1054,8 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
@@ -604,7 +1096,8 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
@@ -652,15 +1145,15 @@ public:
         BatchWriteExecTest::tearDown();
     }
 
-    void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) override {
+    void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             BSONObjBuilder bob;
 
             bob.appendElementsUnique(
                 expectInsertsReturnStaleVersionErrorsBase(nss, expected, request));
 
-            // Because this is the transaction-specific fixture, return transaction metadata in the
-            // response.
+            // Because this is the transaction-specific fixture, return transaction metadata in
+            // the response.
             TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
             txnResponseMetadata.serialize(&bob);
 
@@ -693,8 +1186,8 @@ public:
             bob.append("code", ErrorCodes::WriteConflict);
             bob.append("codeName", ErrorCodes::errorString(ErrorCodes::WriteConflict));
 
-            // Because this is the transaction-specific fixture, return transaction metadata in the
-            // response.
+            // Because this is the transaction-specific fixture, return transaction metadata in
+            // the response.
             TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
             txnResponseMetadata.serialize(&bob);
 
@@ -722,7 +1215,8 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
@@ -753,7 +1247,8 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteError) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
@@ -782,7 +1277,8 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrdered) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
@@ -811,10 +1307,11 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientTxnError) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        ASSERT_THROWS_CODE(BatchWriteExec::executeBatch(
-                               operationContext(), nsTargeter, request, &response, &stats),
-                           AssertionException,
-                           ErrorCodes::WriteConflict);
+        ASSERT_THROWS_CODE(
+            BatchWriteExec::executeBatch(
+                operationContext(), singleShardNSTargeter, request, &response, &stats),
+            AssertionException,
+            ErrorCodes::WriteConflict);
     });
 
     expectInsertsReturnTransientTxnErrors({BSON("x" << 1), BSON("x" << 2)});
@@ -839,7 +1336,8 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_DispatchError) {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
@@ -870,10 +1368,11 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientDispatchError) {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        ASSERT_THROWS_CODE(BatchWriteExec::executeBatch(
-                               operationContext(), nsTargeter, request, &response, &stats),
-                           AssertionException,
-                           ErrorCodes::InterruptedAtShutdown);
+        ASSERT_THROWS_CODE(
+            BatchWriteExec::executeBatch(
+                operationContext(), singleShardNSTargeter, request, &response, &stats),
+            AssertionException,
+            ErrorCodes::InterruptedAtShutdown);
     });
 
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {

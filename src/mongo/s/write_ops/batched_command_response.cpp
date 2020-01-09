@@ -420,17 +420,6 @@ OID BatchedCommandResponse::getElectionId() const {
     return _electionId;
 }
 
-void BatchedCommandResponse::setErrDetails(const std::vector<WriteErrorDetail*>& errDetails) {
-    unsetErrDetails();
-    for (std::vector<WriteErrorDetail*>::const_iterator it = errDetails.begin();
-         it != errDetails.end();
-         ++it) {
-        unique_ptr<WriteErrorDetail> tempBatchErrorDetail(new WriteErrorDetail);
-        (*it)->cloneTo(tempBatchErrorDetail.get());
-        addToErrDetails(tempBatchErrorDetail.release());
-    }
-}
-
 void BatchedCommandResponse::addToErrDetails(WriteErrorDetail* errDetails) {
     if (_writeErrorDetails.get() == NULL) {
         _writeErrorDetails.reset(new std::vector<WriteErrorDetail*>);
