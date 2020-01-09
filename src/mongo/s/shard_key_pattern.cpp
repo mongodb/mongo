@@ -58,8 +58,9 @@ const BSONObj kNullObj = BSON("" << BSONNULL);
 
 /**
  * Currently the allowable shard keys are either:
- * i) a hashed single field, e.g. { a : "hashed" }, or
+ * i) a single field, e.g. { a : "hashed" }, {a: 1} or
  * ii) a compound list of ascending, potentially-nested field paths, e.g. { a : 1 , b.c : 1 }
+ * iii) a compound hashed shard key with exactly one hashed field e.g. {a: 1, b: 'hashed', c: 1}
  */
 std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPattern) {
     uassert(ErrorCodes::BadValue, "Shard key is empty", !keyPattern.isEmpty());
@@ -93,14 +94,12 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
         auto isHashedPattern = ShardKeyPattern::isHashedPatternEl(patternEl);
         numHashedFields += isHashedPattern ? 1 : 0;
         uassert(ErrorCodes::BadValue,
-                str::stream()
-                    << "Shard key " << keyPattern.toString()
-                    << " can contain either a single 'hashed' field"
-                    << " or multiple numerical fields set to a value of 1. Failed to parse field "
-                    << patternEl.fieldNameStringData(),
+                str::stream() << "Shard key " << keyPattern.toString()
+                              << " can contain at most one 'hashed' field, and/or multiple "
+                                 "numerical fields set to a value of 1. Failed to parse field "
+                              << patternEl.fieldNameStringData(),
                 (patternEl.isNumber() && patternEl.numberInt() == 1) ||
                     (isHashedPattern && numHashedFields == 1));
-
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
 
