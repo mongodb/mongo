@@ -287,6 +287,11 @@ public:
     void setAllowedOutageDuration_forTest(Milliseconds allowedOutageDuration);
 
 private:
+    enum LastOplogEntryFetcherRetryStrategy {
+        kFetcherHandlesRetries,
+        kInitialSyncerHandlesRetries
+    };
+
     /**
      * Returns true if we are still processing initial sync tasks (_state is either Running or
      * Shutdown).
@@ -559,8 +564,13 @@ private:
 
     /**
      * Schedules a fetcher to get the last oplog entry from the sync source.
+     *
+     * If 'retryStrategy' is 'kFetcherHandlesRetries', the fetcher will retry up to the server
+     * parameter 'numInitialSyncOplogFindAttempts' times. Otherwise any failures must be handled by
+     * the caller.
      */
-    Status _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback);
+    Status _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback,
+                                                 LastOplogEntryFetcherRetryStrategy retryStrategy);
 
     /**
      * Checks the current oplog application progress (begin and end timestamps).
