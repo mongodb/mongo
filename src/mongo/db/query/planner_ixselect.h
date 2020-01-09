@@ -140,6 +140,11 @@ public:
      */
     static bool nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr);
 
+    /**
+     * Check if this match expression is a leaf and is supported by a hashed index.
+     */
+    static bool nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr);
+
     /*
      * Return true if the given match expression can use a sparse index, false otherwise. This will
      * not traverse the children of the given match expression.

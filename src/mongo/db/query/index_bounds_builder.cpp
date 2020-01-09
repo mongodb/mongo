@@ -127,6 +127,14 @@ const Interval kHashedUndefinedInterval = IndexBoundsBuilder::makePointInterval(
 const Interval kHashedNullInterval =
     IndexBoundsBuilder::makePointInterval(ExpressionMapping::hash(kNullElementObj.firstElement()));
 
+Interval makeUndefinedPointInterval(bool isHashed) {
+    return isHashed ? kHashedUndefinedInterval
+                    : IndexBoundsBuilder::makePointInterval(kUndefinedElementObj);
+}
+Interval makeNullPointInterval(bool isHashed) {
+    return isHashed ? kHashedNullInterval : IndexBoundsBuilder::makePointInterval(kNullElementObj);
+}
+
 void makeNullEqualityBounds(const IndexEntry& index,
                             bool isHashed,
                             OrderedIntervalList* oil,
@@ -136,11 +144,9 @@ void makeNullEqualityBounds(const IndexEntry& index,
     *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
 
     // There are two values that could possibly be equal to null in an index: undefined and null.
-    oil->intervals.push_back(isHashed
-                                 ? kHashedUndefinedInterval
-                                 : IndexBoundsBuilder::makePointInterval(kUndefinedElementObj));
-    oil->intervals.push_back(isHashed ? kHashedNullInterval
-                                      : IndexBoundsBuilder::makePointInterval(kNullElementObj));
+    oil->intervals.push_back(makeUndefinedPointInterval(isHashed));
+    oil->intervals.push_back(makeNullPointInterval(isHashed));
+
     // Just to be sure, make sure the bounds are in the right order if the hash values are opposite.
     IndexBoundsBuilder::unionize(oil);
 }
@@ -436,10 +442,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         isHashed = true;
     }
 
-    if (isHashed) {
-        invariant(MatchExpression::MATCH_IN == expr->matchType() ||
-                  ComparisonMatchExpressionBase::isEquality(expr->matchType()));
-    }
+    // We should never be asked to translate an unsupported predicate for a hashed index.
+    invariant(!isHashed || QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(expr));
 
     if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
         OrderedIntervalList acc;
@@ -475,13 +479,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         if (MatchExpression::EXISTS == child->matchType()) {
             // We should never try to use a sparse index for $exists:false.
             invariant(!index.sparse);
-            BSONObjBuilder bob;
-            bob.appendNull("");
-            bob.appendNull("");
-            BSONObj dataObj = bob.obj();
-            oilOut->intervals.push_back(
-                makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
-
+            // {$exists:false} is a point-interval on [null,null] that requires a fetch.
+            oilOut->intervals.push_back(makeNullPointInterval(isHashed));
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             return;
         }
@@ -526,8 +525,10 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         //
         // We can safely use an index in the following cases:
         // {a:{ $exists:true }} - normal index helps, but we must still fetch
+        // {a:{ $exists:true }} - hashed index helps, but we must still fetch
         // {a:{ $exists:true }} - sparse index is exact
         // {a:{ $exists:false }} - normal index requires a fetch
+        // {a:{ $exists:false }} - hashed index requires a fetch
         // {a:{ $exists:false }} - sparse indexes cannot be used at all.
         //
         // Noted in SERVER-12869, in case this ever changes some day.
