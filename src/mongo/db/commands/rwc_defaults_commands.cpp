@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/dbdirectclient.h"
@@ -125,8 +126,12 @@ public:
             return true;
         }
 
-        void doCheckAuthorization(OperationContext*) const override {
-            // TODO SERVER-45038: add and use privilege action
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
+                                                             ActionType::setDefaultRWConcern}));
         }
 
         NamespaceString ns() const override {
@@ -172,8 +177,12 @@ public:
             return false;
         }
 
-        void doCheckAuthorization(OperationContext*) const override {
-            // TODO SERVER-45038: add and use privilege action
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
+                                                             ActionType::getDefaultRWConcern}));
         }
 
         NamespaceString ns() const override {

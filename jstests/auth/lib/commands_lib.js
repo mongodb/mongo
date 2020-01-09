@@ -3756,14 +3756,18 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "getDefaultRWConcern",
-          command: {getDefaultRWConcern: 1},
-          skipUnlessReplicaSet: true,
-          testcases: [
-              {runOnDb: adminDbName, roles: roles_all, privileges: []},
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
+            testname: "getDefaultRWConcern",
+            command: {getDefaultRWConcern: 1},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: Object.merge(roles_monitoring, roles_clusterManager),
+                    privileges: [{resource: {cluster: true}, actions: ["getDefaultRWConcern"]}],
+                    expectFail: true,  // Will fail on standalone servers.
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}}
+            ]
         },
         {
           testname: "getDiagnosticData",
@@ -5104,14 +5108,22 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "setDefaultRWConcern",
-          command: {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}},
-          skipUnlessReplicaSet: true,
-          testcases: [
-              {runOnDb: adminDbName, roles: roles_all, privileges: []},
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
+            testname: "setDefaultRWConcern",
+            command: {
+                setDefaultRWConcern: 1,
+                defaultReadConcern: {level: "local"},
+                defaultWriteConcern: {w: 1},
+            },
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_clusterManager,
+                    privileges: [{resource: {cluster: true}, actions: ["setDefaultRWConcern"]}],
+                    expectFail: true,  // Will fail on standalone servers.
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}}
+            ]
         },
         {
           testname: "setFeatureCompatibilityVersion",

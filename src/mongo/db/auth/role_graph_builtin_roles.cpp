@@ -179,6 +179,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::checkFreeMonitoringStatus
         << ActionType::connPoolStats
         << ActionType::getCmdLineOpts
+        << ActionType::getDefaultRWConcern // clusterManager gets this also
         << ActionType::getLog
         << ActionType::getParameter
         << ActionType::getShardMap
@@ -244,6 +245,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::listShards  // clusterMonitor gets this also
         << ActionType::flushRouterConfig  // hostManager gets this also
         << ActionType::cleanupOrphaned
+        << ActionType::getDefaultRWConcern // clusterMonitor gets this also
+        << ActionType::setDefaultRWConcern
         << ActionType::setFeatureCompatibilityVersion
         << ActionType::setFreeMonitoring;
 
