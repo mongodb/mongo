@@ -197,6 +197,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		if err != nil {
 			return fmt.Errorf("error creating collection %v: %v", intent.Namespace(), err)
 		}
+		restore.addToKnownCollections(intent)
 	} else {
 		log.Logvf(log.Info, "collection %v already exists - skipping collection create", intent.Namespace())
 	}

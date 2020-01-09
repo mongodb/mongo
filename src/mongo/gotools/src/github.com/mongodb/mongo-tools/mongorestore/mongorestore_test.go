@@ -250,3 +250,97 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 
 	})
 }
+
+func TestRestoreUsersOrRoles(t *testing.T) {
+	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+
+	nsOptions := &NSOptions{}
+	provider, toolOpts, err := testutil.GetBareSessionProvider()
+	if err != nil {
+		log.Logvf(log.Always, "error connecting to host: %v", err)
+		os.Exit(util.ExitError)
+	}
+
+	Convey("With a test MongoRestore", t, func() {
+		inputOptions := &InputOptions{}
+		outputOptions := &OutputOptions{
+			NumParallelCollections: 1,
+			NumInsertionWorkers:    1,
+			TempUsersColl:          "tempusers",
+			TempRolesColl:          "temproles",
+		}
+		restore := MongoRestore{
+			ToolOptions:     toolOpts,
+			OutputOptions:   outputOptions,
+			InputOptions:    inputOptions,
+			NSOptions:       nsOptions,
+			SessionProvider: provider,
+		}
+		session, _ := provider.GetSession()
+		defer session.Close()
+
+		db := session.DB("admin")
+
+		Convey("Restoring users and roles should drop tempusers and temproles", func() {
+			restore.TargetDirectory = "testdata/usersdump"
+			err := restore.Restore()
+			So(err, ShouldBeNil)
+
+			adminCollections, err := db.CollectionNames()
+			So(err, ShouldBeNil)
+
+			for _, collName := range adminCollections {
+				So(collName, ShouldNotEqual, "tempusers")
+				So(collName, ShouldNotEqual, "temproles")
+			}
+		})
+	})
+}
+
+func TestKnownCollections(t *testing.T) {
+	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+
+	Convey("With a test MongoRestore", t, func() {
+		inputOptions := &InputOptions{}
+		outputOptions := &OutputOptions{
+			NumParallelCollections: 1,
+			NumInsertionWorkers:    1,
+		}
+		nsOptions := &NSOptions{}
+		provider, toolOpts, err := testutil.GetBareSessionProvider()
+		if err != nil {
+			log.Logvf(log.Always, "error connecting to host: %v", err)
+			os.Exit(util.ExitError)
+		}
+		restore := MongoRestore{
+			ToolOptions:     toolOpts,
+			OutputOptions:   outputOptions,
+			InputOptions:    inputOptions,
+			NSOptions:       nsOptions,
+			SessionProvider: provider,
+		}
+		session, _ := provider.GetSession()
+		defer session.Close()
+
+		db := session.DB("test")
+		defer func() {
+			db.C("foo").DropCollection()
+		}()
+
+		Convey("Once collection foo has been restored, it should exist in restore.knownCollections", func() {
+			restore.TargetDirectory = "testdata/foodump"
+			err := restore.Restore()
+			So(err, ShouldBeNil)
+
+			var namespaceExistsInCache bool
+			if cols, ok := restore.knownCollections["test"]; ok {
+				for _, collName := range cols {
+					if collName == "foo" {
+						namespaceExistsInCache = true
+					}
+				}
+			}
+			So(namespaceExistsInCache, ShouldBeTrue)
+		})
+	})
+}
