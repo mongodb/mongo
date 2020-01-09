@@ -107,6 +107,11 @@
 
     var checkExpectedHorizon = function(url, memberIndex, expectedHostname) {
         // Run isMaster in the shell and check that we get the expected hostname back
+        const assertion = (memberIndex === "me")
+            ? ("assert(db.runCommand({isMaster: 1})['me'] == '" + expectedHostname + "')")
+            : ("assert(db.runCommand({isMaster: 1})['hosts'][" + memberIndex + "] == '" +
+               expectedHostname + "')");
+
         var argv = [
             'env',
             "HOSTALIASES=" + hostsFile,
@@ -114,8 +119,7 @@
             './mongo',
             url,
             '--eval',
-            ("assert(db.runCommand({isMaster: 1})['hosts'][" + memberIndex + "] == '" +
-             expectedHostname + "')")
+            assertion
         ];
         return runMongoProgram(...argv);
     };
@@ -124,6 +128,9 @@
     var defaultURL = `mongodb://${node0localHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
     jsTestLog(`URL without horizon: ${defaultURL}`);
     assert.eq(checkExpectedHorizon(defaultURL, 0, node0localHostname),
+              0,
+              "localhost does not return horizon");
+    assert.eq(checkExpectedHorizon(defaultURL, "me", node0localHostname),
               0,
               "localhost does not return horizon");
     assert.eq(checkExpectedHorizon(defaultURL, 1, node1localHostname),
@@ -136,6 +143,9 @@
     assert.eq(checkExpectedHorizon(horizonURL, 0, node0horizonHostname),
               0,
               "does not return horizon as expected");
+    assert.eq(checkExpectedHorizon(horizonURL, "me", node0horizonHostname),
+              0,
+              "does not return horizon as expected");
     assert.eq(checkExpectedHorizon(horizonURL, 1, node1horizonHostname),
               0,
               "does not return horizon as expected");
@@ -145,6 +155,9 @@
         `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
     jsTestLog(`URL with horizon: ${horizonMissingURL}`);
     assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0localHostname),
+              0,
+              "does not return localhost as expected");
+    assert.eq(checkExpectedHorizon(horizonMissingURL, "me", node0localHostname),
               0,
               "does not return localhost as expected");
     assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1localHostname),
@@ -163,6 +176,9 @@
         `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
     jsTestLog(`URL with horizon: ${horizonMissingURL}`);
     assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0horizonMissingHostname),
+              0,
+              "does not return horizon as expected");
+    assert.eq(checkExpectedHorizon(horizonMissingURL, "me", node0horizonMissingHostname),
               0,
               "does not return horizon as expected");
     assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1horizonMissingHostname),
@@ -186,6 +202,10 @@
     assert.eq(checkExpectedHorizon(horizonDifferentPortURL, 0, node0horizonHostnameDifferentPort),
               0,
               "does not return horizon as expected");
+    assert.eq(
+        checkExpectedHorizon(horizonDifferentPortURL, "me", node0horizonHostnameDifferentPort),
+        0,
+        "does not return horizon as expected");
     assert.eq(checkExpectedHorizon(horizonDifferentPortURL, 1, node1horizonHostnameDifferentPort),
               0,
               "does not return horizon as expected");
