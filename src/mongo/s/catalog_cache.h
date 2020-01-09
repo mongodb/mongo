@@ -365,11 +365,31 @@ private:
 
     /**
      * Marks a collection entry as needing refresh. Will create the collection entry if one does
-     * not exist. If 'markEpochAsChanged' is true, will cause all further targetting requests
+     * not exist. Also marks the epoch as changed, which will cause all further targetting requests
      * against this namespace to block upon a catalog cache refresh.
      */
-    void _createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss,
-                                                          bool markEpochAsChanged);
+    void _createOrGetCollectionEntryAndMarkEpochStale(const NamespaceString& nss);
+
+    /**
+     * Marks a collection entry as needing refresh. Will create the collection entry if one does
+     * not exist. Will mark the given shard ID as stale, which will cause all further targetting
+     * requests for the given shard for this namespace to block upon a catalog cache refresh.
+     */
+    void _createOrGetCollectionEntryAndMarkShardStale(const NamespaceString& nss,
+                                                      const ShardId& shardId);
+
+    /**
+     * Marks a collection entry as needing refresh. Will create the collection entry if one does
+     * not exist.
+     */
+    void _createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss);
+
+    /**
+     * Retrieves the collection entry for the given namespace, creating the entry if one does not
+     * already exist.
+     */
+    boost::optional<CollectionRoutingInfoEntry&> _createOrGetCollectionEntry(
+        WithLock wl, const NamespaceString& nss);
 
     /**
      * Used as a flag to indicate whether or not this thread performed its own
