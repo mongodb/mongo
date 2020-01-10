@@ -3988,7 +3988,8 @@ if split_dwarf.exists(env):
 
 # Load the compilation_db tool. We want to do this after configure so we don't end up with
 # compilation database entries for the configure tests, which is weird.
-env.Tool("compilation_db")
+if get_option('ninja') == 'false':
+    env.Tool("compilation_db")
 
 # If we can, load the dagger tool for build dependency graph introspection.
 # Dagger is only supported on Linux and OSX (not Windows or Solaris).
@@ -4191,8 +4192,9 @@ def injectModule(env, module, **kwargs):
     return env
 env.AddMethod(injectModule, 'InjectModule')
 
-compileCommands = env.CompilationDatabase('compile_commands.json')
-compileDb = env.Alias("compiledb", compileCommands)
+if get_option('ninja') == 'false':
+    compileCommands = env.CompilationDatabase('compile_commands.json')
+    compileDb = env.Alias("compiledb", compileCommands)
 
 
 msvc_version = ""
@@ -4200,11 +4202,12 @@ if 'MSVC_VERSION' in env and env['MSVC_VERSION']:
     msvc_version = "--version " + env['MSVC_VERSION'] + " "
 
 # Microsoft Visual Studio Project generation for code browsing
-vcxprojFile = env.Command(
-    "mongodb.vcxproj",
-    compileCommands,
-    r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb")
-vcxproj = env.Alias("vcxproj", vcxprojFile)
+if get_option("ninja") == "false":
+    vcxprojFile = env.Command(
+        "mongodb.vcxproj",
+        compileCommands,
+        r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb")
+    vcxproj = env.Alias("vcxproj", vcxprojFile)
 
 distSrc = env.DistSrc("mongodb-src-${MONGO_VERSION}.tar")
 env.NoCache(distSrc)
