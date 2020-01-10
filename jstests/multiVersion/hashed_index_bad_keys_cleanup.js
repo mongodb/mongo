@@ -37,6 +37,19 @@
     assert.commandWorked(coll.insert({_id: 4, a: 1, p: [{q: 1}]}));
     assert.commandWorked(coll.insert({_id: 5, a: 1, p: [{q: 1}]}));
 
+    // Assert that the collection has expected number of documents and index keys.
+    function assertCollectionHasExpectedDocs(expectedNumDocs) {
+        const collState = {
+            documents: coll.find().toArray(),
+            indexKeys: coll.find().hint({"p.q.r": "hashed"}).returnKey().toArray()
+        };
+        assert.eq(collState.documents.length, expectedNumDocs, collState);
+        assert.eq(collState.indexKeys.length, expectedNumDocs, collState);
+    }
+
+    // Verify that the documents inserted have the corresponding index keys.
+    assertCollectionHasExpectedDocs(5);
+
     // Helper function which runs validate() on primary and secondary nodes, then verifies that the
     // command returned the expected result.
     function assertValidateCmdReturned(expectedResult) {
@@ -58,9 +71,8 @@
     testDB = rst.getPrimary().getDB(jsTestName());
     coll = testDB.coll;
 
-    // Verify that the five documents inserted earlier have their index keys.
-    let res = coll.find().hint({"p.q.r": "hashed"}).returnKey().itcount();
-    assert.eq(res, 5);
+    // Verify that the five documents inserted earlier have their index keys after the upgrade.
+    assertCollectionHasExpectedDocs(5);
 
     // Verify that after upgrade, inserting bad documents is not allowed.
     const arrayAlongPathFailCode = 16766;
@@ -97,7 +109,7 @@
     assert.commandWorked(coll.update({_id: 2}, {p: {q: {r: 4}}}));
 
     // Verify that the index key is updated correctly by quering with hashed index.
-    res = coll.find({"p.q.r": 4}).hint({"p.q.r": "hashed"}).toArray();
+    let res = coll.find({"p.q.r": 4}).hint({"p.q.r": "hashed"}).toArray();
     assert.eq(res, [{_id: 2, p: {q: {r: 4}}}]);
 
     // Validate should still fail since a bad document {_id: 3} exists.
