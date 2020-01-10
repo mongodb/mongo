@@ -10,22 +10,18 @@ TestData.skipGossipingClusterTime = true;
 
 (function() {
     var testInvalidAuthStates = function(replSetTest) {
-        print("check that 0 is in recovering");
+        jsTestLog("check that 0 is in recovering");
         replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
 
-        print("shut down 1, 0 still in recovering.");
+        jsTestLog("shut down 1, 0 still in recovering.");
         replSetTest.stop(1);
         sleep(5);
 
         replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
 
-        print("shut down 2, 0 becomes a secondary.");
+        jsTestLog("shut down 2, 0 becomes a secondary.");
         replSetTest.stop(2);
-
         replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.SECONDARY);
-
-        replSetTest.restart(1, {"keyFile": key1});
-        replSetTest.restart(2, {"keyFile": key1});
     };
 
     var name = "rs_auth2";
@@ -49,12 +45,12 @@ TestData.skipGossipingClusterTime = true;
 
     var master = replSetTest.getPrimary();
 
-    print("add an admin user");
+    jsTestLog("add an admin user");
     master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
                                      {w: 3, wtimeout: replSetTest.kDefaultTimeoutMS});
     var m = replSetTest.nodes[0];
 
-    print("starting 1 and 2 with key file");
+    jsTestLog("starting 1 and 2 with key file");
     replSetTest.stop(1);
     replSetTest.restart(1, {"keyFile": key1});
     replSetTest.stop(2);
@@ -65,19 +61,20 @@ TestData.skipGossipingClusterTime = true;
     replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
     testInvalidAuthStates(replSetTest);
 
-    print("restart mongod with bad keyFile");
+    jsTestLog("restart mongod with bad keyFile");
 
     replSetTest.stop(0);
     m = replSetTest.restart(0, {"keyFile": key2});
+
+    jsTestLog("restart nodes 1 and 2");
+    replSetTest.restart(1, {"keyFile": key1});
+    replSetTest.restart(2, {"keyFile": key1});
 
     // auth to all nodes
     replSetTest.nodes[0].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[1].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
     testInvalidAuthStates(replSetTest);
-
-    replSetTest.stop(0);
-    m = replSetTest.restart(0, {"keyFile": key1});
 
     replSetTest.stopSet();
 }());
