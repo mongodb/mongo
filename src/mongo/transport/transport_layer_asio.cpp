@@ -188,6 +188,7 @@ public:
     }
 
     void drain() override {
+        ThreadIdGuard threadIdGuard(this);
         _ioContext.restart();
         while (_ioContext.poll()) {
             LOG(2) << "Draining remaining work in reactor.";
@@ -223,10 +224,12 @@ private:
     class ThreadIdGuard {
     public:
         ThreadIdGuard(TransportLayerASIO::ASIOReactor* reactor) {
+            invariant(!_reactorForThread);
             _reactorForThread = reactor;
         }
 
         ~ThreadIdGuard() {
+            invariant(_reactorForThread);
             _reactorForThread = nullptr;
         }
     };
