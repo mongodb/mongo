@@ -10,7 +10,9 @@ The log system is made available with the following header:
 
 Logging is performed using function style macros:
 
-`LOGV2(message-string, "name0"_attr = var0, ..., "nameN"_attr = varN);`
+`LOGV2(ID, message-string, "name0"_attr = var0, ..., "nameN"_attr = varN);`
+
+The ID is a signed 32bit integer in the same number space as the error code numbers. It is used to uniquely identify a log statement. If changing existing code, using a new ID is strongly advised to avoid any parsing ambiguity. 
 
 The message string contains the description of the log event with libfmt style replacement fields optionally embedded within it. The message string must comply with the [format syntax](https://fmt.dev/latest/syntax.html) from libfmt. 
 
@@ -29,15 +31,15 @@ Last, the message string must be a compile time constant. This is to be able to 
 #### Examples
 
 ```
-LOGV2("Logging event, no replacement fields is OK");
+LOGV2(1000, "Logging event, no replacement fields is OK");
 ```
 ```
 const BSONObj& slowOperation = ...;
 Milliseconds time = ...;
-LOGV2("Operation {} is slow, took: {}", "op"_attr = slowOperation, "opTime"_attr = time);
+LOGV2(1001, "Operation {} is slow, took: {}", "op"_attr = slowOperation, "opTime"_attr = time);
 ```
 ```
-LOGV2("Replication state change", "from"_attr = getOldState(), "to"_attr = getNewState());
+LOGV2(1002, "Replication state change", "from"_attr = getOldState(), "to"_attr = getNewState());
 ```
 
 ### Log Component
@@ -55,7 +57,7 @@ To override the default component, a separate logging API can be used that takes
 #### Examples
 
 ```
-LOGV2_OPTIONS({LogComponent::kCommand}, "Log event to specified component");
+LOGV2_OPTIONS(1003, {LogComponent::kCommand}, "Log event to specified component");
 ```
 
 ### Log Severity
@@ -72,13 +74,13 @@ There is also variations that take `LogOptions` if needed:
 * `LOGV2_ERROR_OPTIONS`
 * `LOGV2_FATAL_OPTIONS`
 
-Fatal level log statements perform `fassert` after logging 
+Fatal level log statements perform `fassert` after logging, using the provided ID as assert id. 
 
 Debug-level logging is slightly different where an additional parameter (as integer) required to indicate the desired debug level:
 
-`LOGV2_DEBUG(debug-level, message-string, attr0, ..., attrN);`
+`LOGV2_DEBUG(ID, debug-level, message-string, attr0, ..., attrN);`
 
-`LOGV2_DEBUG_OPTIONS(debug-level, options, message-string, attr0, ..., attrN);`
+`LOGV2_DEBUG_OPTIONS(ID, debug-level, options, message-string, attr0, ..., attrN);`
 
 #### Examples
 
@@ -86,7 +88,7 @@ Debug-level logging is slightly different where an additional parameter (as inte
 // Index specifier in replacement field
 Status status = ...;
 int remainingAttempts = ...;
-LOGV2_ERROR("Initial sync failed. {1} attempts left. Reason: {0}", "reason"_attr = status, "remaining"_attr = remainingAttempts);
+LOGV2_ERROR(1004, "Initial sync failed. {1} attempts left. Reason: {0}", "reason"_attr = status, "remaining"_attr = remainingAttempts);
 ```
 
 ### Log Tags
@@ -100,7 +102,7 @@ Multiple tags can be attached to a log statement using the bitwise or operator `
 #### Examples
 
 ```
-LOGV2_WARNING_OPTIONS({LogTag::kStartupWarnings}, "XFS filesystem is recommended with WiredTiger");
+LOGV2_WARNING_OPTIONS(1005, {LogTag::kStartupWarnings}, "XFS filesystem is recommended with WiredTiger");
 ```
 
 # Type Support
@@ -185,13 +187,76 @@ Ranges is loggable via helpers to indicate what type of range it is
 
 ```
 std::array<int, 20> arrayOfInts = ...;
-LOGV2("log container directly: {}", "values"_attr = arrayOfInts);
-LOGV2("log iterator range: {}", "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
-LOGV2("log first five elements: {}", "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
+LOGV2(1010, "log container directly: {}", "values"_attr = arrayOfInts);
+LOGV2(1011, "log iterator range: {}", "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
+LOGV2(1012, "log first five elements: {}", "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
 ``` 
 
 ```
 StringMap<BSONObj> bsonMap = ...;
-LOGV2("log map directly: {}", "values"_attr = bsonMap);
-LOGV2("log map iterator range: {}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
+LOGV2(1013, "log map directly: {}", "values"_attr = bsonMap);
+LOGV2(1014, "log map iterator range: {}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
 ``` 
+
+# Output formats
+
+Desired log output format is set to mongod, mongos and the mongo shell using the `-logFormat` option. Available values are `text` and `json`. Currently text formatting is default.
+
+## Text
+
+Produces legacy log statements matching the old log system. This format may or may not be removed for the 4.4 server release. 
+
+## JSON
+
+Produces structured logs of the [Relaxed Extended JSON 2.0.0](https://github.com/mongodb/specifications/blob/master/source/extended-json.rst) format. Below is an example of a log statement in C++ and a pretty-printed JSON output:
+
+```
+BSONObjBuilder builder;
+builder.append("first"_sd, 1);
+builder.append("second"_sd, "str");
+
+std::vector<int> vec = {1, 2, 3};
+
+LOGV2_ERROR(1020, "Example (b: {}), (vec: {})", 
+            "bson"_attr = builder.obj(), 
+            "vector"_attr = vec,
+            "optional"_attr = boost::none);
+```
+
+```
+{  
+    "t": {  
+        "$date": "2020-01-06T19:10:54.246Z"
+    },
+    "s": "E",
+    "c": "NETWORK",
+    "ctx": "conn1",
+    "msg": "Example (b: {bson}), (vec: {vector})",
+    "attr": {  
+        "bson": {
+            "first": 1,
+            "second": "str"
+        },
+        "vector": [1, 2, 3],
+        "optional": null
+    }
+}
+```
+
+## BSON
+
+The BSON formatter is an internal formatter that may or may not be removed. It produces BSON documents close to the JSON document above. Due to the lack of unsigned integer types in BSON, logged C++ types are handled according to the table below for BSON:
+
+C++ Type | BSON Type
+-------- | ---------
+char | int32 (0x10)
+signed char | int32 (0x10)
+unsigned char | int32 (0x10)
+short | int32 (0x10)
+unsigned short | int32 (0x10)
+int | int32 (0x10)
+unsigned int | int64 (0x12)
+long | int64 (0x12)
+unsigned long | int64 (0x12)
+long long | int64 (0x12)
+unsigned long long | int64 (0x12)
