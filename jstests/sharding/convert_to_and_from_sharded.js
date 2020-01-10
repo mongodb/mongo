@@ -1,7 +1,7 @@
 /**
  * Test that a replica set member can process basic CRUD operations after switching from being
  * a shardsvr and back to non shardsvr.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, multiversion_incompatible]
  */
 (function() {
 "use strict";

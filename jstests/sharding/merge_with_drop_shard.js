@@ -1,5 +1,6 @@
 // Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
+// @tags: [multiversion_incompatible]
 (function() {
 'use strict';
 
