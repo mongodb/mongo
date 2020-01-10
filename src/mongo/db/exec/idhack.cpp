@@ -103,7 +103,8 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
             _recordCursor = collection()->getCursor(getOpCtx());
 
         // Find the document associated with 'id' in the collection's record store.
-        if (!WorkingSetCommon::fetch(getOpCtx(), _workingSet, id, _recordCursor)) {
+        if (!WorkingSetCommon::fetch(
+                getOpCtx(), _workingSet, id, _recordCursor, collection()->ns())) {
             // We didn't find a document with RecordId 'id'.
             _workingSet->free(id);
             _commonStats.isEOF = true;

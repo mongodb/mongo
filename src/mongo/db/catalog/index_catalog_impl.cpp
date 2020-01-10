@@ -79,6 +79,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(skipUnindexingDocumentWhenDeleted);
+
 using std::endl;
 using std::string;
 using std::unique_ptr;
@@ -1475,6 +1477,15 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                    nullptr,
                                    loc);
 
+    // Tests can enable this failpoint to produce index corruption scenarios where an index has
+    // extra keys.
+    if (auto failpoint = skipUnindexingDocumentWhenDeleted.scoped();
+        MONGO_unlikely(failpoint.isActive())) {
+        auto indexName = failpoint.getData()["indexName"].valueStringDataSafe();
+        if (indexName == entry->descriptor()->indexName()) {
+            return;
+        }
+    }
     _unindexKeys(opCtx, entry, {keys.begin(), keys.end()}, obj, loc, logIfError, keysDeletedOut);
 }
 

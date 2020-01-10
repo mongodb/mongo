@@ -612,7 +612,9 @@ public:
 
             // An attempt to fetch the WSM should show that the key is no longer present in the
             // index.
-            ASSERT_FALSE(WorkingSetCommon::fetch(&_opCtx, &ws, id, coll->getCursor(&_opCtx)));
+            NamespaceString fakeNS("test", "coll");
+            ASSERT_FALSE(
+                WorkingSetCommon::fetch(&_opCtx, &ws, id, coll->getCursor(&_opCtx), fakeNS));
 
             ++it;
             ++count;
