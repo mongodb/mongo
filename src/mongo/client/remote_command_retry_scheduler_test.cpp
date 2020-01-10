@@ -164,10 +164,10 @@ std::vector<ResponseStatus> CallbackResponseSaver::getResponses() const {
     return _responses;
 }
 
-const executor::RemoteCommandRequest request(HostAndPort("h1:12345"),
-                                             "db1",
-                                             BSON("ping" << 1),
-                                             nullptr);
+executor::RemoteCommandRequest makeRemoteCommandRequest() {
+    return executor::RemoteCommandRequest{
+        HostAndPort("h1:12345"), "db1", BSON("ping" << 1), nullptr};
+}
 
 TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryPolicy) {
     auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
@@ -201,6 +201,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryPolicy) {
 TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
     auto callback = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
     auto makeRetryPolicy = [] { return RemoteCommandRetryScheduler::makeNoRetryPolicy(); };
+    auto request = makeRemoteCommandRequest();
 
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -290,6 +291,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
 TEST_F(RemoteCommandRetrySchedulerTest, StartupFailsWhenExecutorIsShutDown) {
     auto callback = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
     auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
+    auto request = makeRemoteCommandRequest();
 
     RemoteCommandRetryScheduler scheduler(&getExecutor(), request, callback, std::move(policy));
     ASSERT_FALSE(scheduler.isActive());
@@ -303,6 +305,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, StartupFailsWhenExecutorIsShutDown) {
 TEST_F(RemoteCommandRetrySchedulerTest, StartupFailsWhenSchedulerIsShutDown) {
     auto callback = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
     auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
+    auto request = makeRemoteCommandRequest();
 
     RemoteCommandRetryScheduler scheduler(&getExecutor(), request, callback, std::move(policy));
     ASSERT_FALSE(scheduler.isActive());
@@ -318,6 +321,8 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         10U, Milliseconds(1));
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -340,6 +345,8 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         10U, Milliseconds(1));
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -355,6 +362,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnNonRetryableEr
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::NotMasterError>(
         10U, Milliseconds(1));
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -372,6 +381,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfu
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         10U, Milliseconds(1));
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -391,6 +402,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfu
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         10U, Milliseconds(1));
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -412,6 +425,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         3U, executor::RemoteCommandRequest::kNoTimeout);
+    auto request = makeRemoteCommandRequest();
     TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
     RemoteCommandRetryScheduler scheduler(
         &badExecutor, request, std::ref(callback), std::move(policy));
@@ -433,6 +447,8 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         3U, executor::RemoteCommandRequest::kNoTimeout);
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -449,6 +465,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerShouldRetryUntilSuccessfulRespo
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         3U, executor::RemoteCommandRequest::kNoTimeout);
+    auto request = makeRemoteCommandRequest();
+
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
@@ -495,6 +513,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     CallbackResponseSaver callback;
     auto policy = std::make_unique<ShutdownSchedulerRetryPolicy>();
     auto policyPtr = policy.get();
+    auto request = makeRemoteCommandRequest();
     TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
     RemoteCommandRetryScheduler scheduler(
         &badExecutor, request, std::ref(callback), std::move(policy));
@@ -529,6 +548,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
 
     Status result = getDetectableErrorStatus();
     auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
+    auto request = makeRemoteCommandRequest();
 
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(),
