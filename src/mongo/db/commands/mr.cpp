@@ -664,11 +664,16 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
                                                 CurOp* curOp,
                                                 ProgressMeterHolder& pm,
                                                 bool callerHoldsGlobalLock) {
-    if (_config.outputOptions.finalNamespace == _config.tempNamespace)
-        return _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
+    auto outputCount =
+        _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 
-    if (_config.outputOptions.outType == Config::REPLACE ||
-        _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock) == 0) {
+    // Determine whether the temp collection should be renamed to the final output collection and
+    // thus preserve the UUID. This is possible in the following cases:
+    //  * Output mode "replace"
+    //  * If this mapReduce is creating a new sharded output collection, which can be determined by
+    //  whether mongos sent the UUID that the final output collection should have (that is, whether
+    //  _config.finalOutputCollUUID is set).
+    if (_config.outputOptions.outType == Config::REPLACE || _config.finalOutputCollUUID) {
         // This must be global because we may write across different databases.
         Lock::GlobalWrite lock(opCtx);
         // replace: just rename from temp to final collection name, dropping previous collection
@@ -687,12 +692,11 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         _db.dropCollection(_config.tempNamespace.ns());
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
+
         {
-            const auto count =
-                _collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
             curOp->setMessage_inlock(
-                "m/r: merge post processing", "M/R Merge Post Processing Progress", count);
+                "m/r: merge post processing", "M/R Merge Post Processing Progress", outputCount);
         }
         unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace.ns(), BSONObj());
         while (cursor->more()) {
@@ -708,12 +712,11 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         BSONList values;
 
         {
-            const auto count =
-                _collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
             curOp->setMessage_inlock(
-                "m/r: reduce post processing", "M/R Reduce Post Processing Progress", count);
+                "m/r: reduce post processing", "M/R Reduce Post Processing Progress", outputCount);
         }
+
         unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace.ns(), BSONObj());
         while (cursor->more()) {
             // This must be global because we may write across different databases.
@@ -721,14 +724,11 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
             BSONObj temp = cursor->nextSafe();
             BSONObj old;
 
-            bool found;
-            {
-                OldClientContext tx(opCtx, _config.outputOptions.finalNamespace.ns());
-                Collection* coll =
-                    getCollectionOrUassert(opCtx, tx.db(), _config.outputOptions.finalNamespace);
-                found = Helpers::findOne(opCtx, coll, temp["_id"].wrap(), old, true);
-            }
-
+            const bool found = [&] {
+                AutoGetCollection autoColl(opCtx, _config.outputOptions.finalNamespace, MODE_IS);
+                return Helpers::findOne(
+                    opCtx, autoColl.getCollection(), temp["_id"].wrap(), old, true);
+            }();
             if (found) {
                 // need to reduce
                 values.clear();
