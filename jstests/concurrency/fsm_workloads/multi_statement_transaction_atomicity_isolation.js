@@ -357,7 +357,11 @@ var $config = (function() {
             getAllDocuments,
             getDocIdsToUpdate,
             numDocs: 10,
-            retryOnKilledSession: false,
+            // Because of the usage of 'getMore' command in this test, we may receive
+            // 'CursorNotFound' exception from the server, if a node was stepped down between the
+            // 'find' and subsequent 'getMore' command. We retry the entire transaction in this
+            // case.
+            retryOnKilledSession: TestData.runningWithShardStepdowns,
             updatedDocsClientHistory: [],
         },
         setup: setup,
