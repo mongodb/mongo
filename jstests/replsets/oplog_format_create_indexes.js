@@ -39,8 +39,8 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     const allOplogEntriesJson = tojson(allOplogEntries);
     const indexSpecJson = tojson(indexSpec);
 
-    // Because of differences between the new and old oplog entries for createIndexes,
-    // treat the namespace part separately and compare entries without ns field.
+    // Compare entries without ns field, which may still be present in 4.2 index specs.
+    delete indexSpec.ns;
     const found = allOplogEntries.filter((entry) => {
         const entrySpec = entry.o;
 
@@ -57,6 +57,7 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
             return true;
         }
 
+        delete entrySpec.ns;
         delete entrySpec.createIndexes;
         return bsonWoCompare(indexSpec, entrySpec) === 0;
     });
