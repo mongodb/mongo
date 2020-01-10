@@ -137,6 +137,8 @@ public:
                                 BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const;
 
+    virtual int64_t freeStorageSize(OperationContext* opCtx) const;
+
     // CRUD related
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& id, RecordData* out) const;
