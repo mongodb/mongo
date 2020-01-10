@@ -254,6 +254,15 @@ public:
                                 BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const = 0;
 
+    /**
+     * @return file bytes available for reuse
+     * A return value of zero can mean either no bytes are available, or that the real value is
+     * unknown.
+     */
+    virtual int64_t freeStorageSize(OperationContext* opCtx) const {
+        return 0;
+    }
+
     // CRUD related
 
     /**

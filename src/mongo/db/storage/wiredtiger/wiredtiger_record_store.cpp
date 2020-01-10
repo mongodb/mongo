@@ -872,6 +872,18 @@ int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
     return size;
 }
 
+int64_t WiredTigerRecordStore::freeStorageSize(OperationContext* opCtx) const {
+    invariant(opCtx->lockState()->isReadLocked());
+
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
+                                                     "statistics:" + getURI(),
+                                                     "statistics=(fast)",
+                                                     WT_STAT_DSRC_BLOCK_REUSE_BYTES);
+    uassertStatusOK(result.getStatus());
+    return result.getValue();
+}
+
 // Retrieve the value from a positioned cursor.
 RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const {
     WT_ITEM value;
