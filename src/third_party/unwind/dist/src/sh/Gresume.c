@@ -55,7 +55,7 @@ sh_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
         char x[sizeof(regs)];
       };
 
-      asm volatile (
+      __asm__ __volatile__ (
         "mov.l @%0+, r8\n"
         "mov.l @%0+, r9\n"
         "mov.l @%0+, r10\n"
@@ -99,7 +99,7 @@ sh_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
 
       /* Set the SP and the PC in order to continue execution at the modified
          trampoline which restores the signal mask and the registers.  */
-      asm __volatile__ (
+      __asm__ __volatile__ (
         "mov %0, r15\n"
         "lds %1, pr\n"
         "rts\n"

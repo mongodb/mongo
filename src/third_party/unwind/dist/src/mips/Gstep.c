@@ -111,85 +111,91 @@ mips_handle_signal_frame (unw_cursor_t *cursor)
 }
 
 
-int _step_n64(struct cursor *c)
-{
-  //TODO:handle plt entry
-  struct dwarf_loc fp_loc, pc_loc;
-  int ret;
-  unw_word_t fp = 0;
-  unw_word_t ra = 0;
 
-  ret = dwarf_get (&c->dwarf, c->dwarf.loc[UNW_MIPS_R30], &fp);
+static inline
+int is_valid_fp_val(unw_word_t cfa_val, unw_word_t fp_val)
+{
+  return fp_val > 0 && cfa_val > 0 && fp_val >cfa_val && (fp_val - cfa_val < 0x4000);
+}
+
+static int _step_n64(struct cursor *c)
+{
+  #define FP_REG UNW_MIPS_R30
+  #define SP_REG UNW_MIPS_R29
+  #define RA_REG UNW_MIPS_R31
+
+  //TODO:handle plt entry
+  int ret;
+  unw_word_t current_fp_val = 0;
+  unw_word_t current_ra_val = 0;
+  unw_word_t current_sp_val = 0;
+  struct dwarf_loc up_fp_loc = DWARF_NULL_LOC;
+  struct dwarf_loc up_ra_loc = DWARF_NULL_LOC;
+
+  ret = dwarf_get (&c->dwarf, c->dwarf.loc[SP_REG], &current_sp_val);
+  if (ret < 0)
+    {
+      Debug (2, "returning %d [SP=0x%lx]\n", ret,
+             DWARF_GET_LOC (c->dwarf.loc[FP_REG]));
+      return ret;
+    }
+  ret = dwarf_get (&c->dwarf, c->dwarf.loc[FP_REG], &current_fp_val);
   if (ret < 0)
     {
       Debug (2, "returning %d [FP=0x%lx]\n", ret,
-             DWARF_GET_LOC (c->dwarf.loc[UNW_MIPS_R30]));
+             DWARF_GET_LOC (c->dwarf.loc[FP_REG]));
       return ret;
     }
-  ret = dwarf_get (&c->dwarf, c->dwarf.loc[UNW_MIPS_R31], &ra);
+  ret = dwarf_get (&c->dwarf, c->dwarf.loc[RA_REG], &current_ra_val);
   if (ret < 0)
     {
       Debug (2, "returning %d [RA=0x%lx]\n", ret,
-             DWARF_GET_LOC (c->dwarf.loc[UNW_MIPS_R31]));
+             DWARF_GET_LOC (c->dwarf.loc[RA_REG]));
       return ret;
     }
 
-  if (!fp) {
-    fp_loc = DWARF_NULL_LOC;
-    pc_loc = DWARF_NULL_LOC;
-  } else {
-    fp_loc = DWARF_LOC(fp+16, 0);
-    pc_loc = DWARF_LOC (fp+24, 0);
-#if UNW_DEBUG
-    unw_word_t fp1 = 0;
-    ret = dwarf_get (&c->dwarf, fp_loc, &fp1);
-    Debug (1, "RET:%d [FP=0x%lx] = 0x%lx (cfa = 0x%lx) -> 0x%lx. SAVED PC:0x%lx\n",
-           ret,
-           (unsigned long) DWARF_GET_LOC (c->dwarf.loc[UNW_MIPS_R30]),
-           fp, c->dwarf.cfa, fp1, ra);
-#endif
+  Debug(2, "BEGIN GUESSING WITH SP:%p FP:%p CFA:%p at %p, RA:%p\n",
+         current_sp_val, current_fp_val, c->dwarf.cfa,
+         c->dwarf.ip, current_ra_val
+         );
+
+  if (current_fp_val == current_sp_val) {
+    // Don't adjust FP
+    up_fp_loc = c->dwarf.loc[FP_REG];
+    up_ra_loc = c->dwarf.loc[RA_REG];
+  } else if (is_valid_fp_val(c->dwarf.cfa, current_fp_val)) {
     /* Heuristic to determine incorrect guess.  For FP to be a
        valid frame it needs to be above current CFA, but don't
        let it go more than a little.  Note that we can't deduce
        anything about new FP (fp1) since it may not be a frame
        pointer in the frame above.  Just check we get the value. */
-    if (ret < 0
-        || fp < c->dwarf.cfa
-        || (fp - c->dwarf.cfa) > 0x4000)
-      {
-        pc_loc = DWARF_NULL_LOC;
-        fp_loc = DWARF_NULL_LOC;
-      }
+    up_fp_loc = DWARF_MEM_LOC (c, current_fp_val+16);
+    up_ra_loc = DWARF_MEM_LOC (c, current_fp_val+24);
+    unw_word_t up_fp_val = 0;
+    ret = dwarf_get (&c->dwarf, up_fp_loc, &up_fp_val);
+    if (ret > 0 && is_valid_fp_val(current_fp_val, up_fp_val)) {
+      c->dwarf.loc[FP_REG] = up_fp_loc;
+    }
   }
 
-  c->dwarf.loc[UNW_MIPS_R30] = fp_loc;
-
-  c->dwarf.loc[UNW_MIPS_PC] = c->dwarf.loc[UNW_MIPS_R31];
-  c->dwarf.loc[UNW_MIPS_R31] = pc_loc;
-  c->dwarf.use_prev_instr = 1;
-
-  if (DWARF_IS_NULL_LOC (c->dwarf.loc[UNW_MIPS_R30]))
+  if (DWARF_IS_NULL_LOC (up_fp_loc))
     {
       ret = 0;
       Debug (2, "NULL %%fp loc, returning %d\n", ret);
       return ret;
     }
 
-  if (!DWARF_IS_NULL_LOC (c->dwarf.loc[UNW_MIPS_PC]))
-    {
-      ret = dwarf_get (&c->dwarf, c->dwarf.loc[UNW_MIPS_PC], &c->dwarf.ip);
-      Debug (1, "Frame Chain [IP=0x%Lx] = 0x%Lx\n",
-             (unsigned long long) DWARF_GET_LOC (c->dwarf.loc[UNW_MIPS_PC]),
-             (unsigned long long) c->dwarf.ip);
-      if (ret < 0)
-        {
-          Debug (2, "returning %d\n", ret);
-          return ret;
-        }
-      ret = 1;
-    }
-  else {
+  c->dwarf.loc[UNW_MIPS_PC] = c->dwarf.loc[RA_REG];
+  c->dwarf.loc[RA_REG] = up_ra_loc;
+  c->dwarf.loc[SP_REG] = up_fp_loc;
+  c->dwarf.loc[FP_REG] = up_fp_loc;
+  c->dwarf.use_prev_instr = 1;
+
+  if (c->dwarf.ip == current_ra_val && current_fp_val == current_sp_val) {
+    // Backtrace stopped: frame did not save the PC
     c->dwarf.ip = 0;
+  } else {
+    c->dwarf.ip = current_ra_val;
   }
   return (c->dwarf.ip == 0) ? 0 : 1;
 }

@@ -93,7 +93,7 @@ write_maps(char *fname)
 #pragma GCC optimize "-O1"
 #endif
 int c(int x) NOINLINE ALIAS(b);
-#define compiler_barrier() asm volatile("");
+#define compiler_barrier() __asm__ __volatile__ ("");
 #else
 int c(int x);
 #define compiler_barrier()
