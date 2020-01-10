@@ -381,11 +381,13 @@ class NinjaState:
                 "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
                 "description": "Building $out",
             },
-            # We add the deps processing variables to this below.
-            "CMD_W_DEPS": {
-                "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
-                "description": "Building $out",
-            },
+            # We add the deps processing variables to this below. We
+            # don't pipe this through cmd.exe on Windows because we
+            # use this to generate a compile_commands.json database
+            # which can't use the shell command as it's compile
+            # command. This does mean that we assume anything using
+            # CMD_W_DEPS is a straight up compile which is true today.
+            "CMD_W_DEPS": {"command": "$cmd", "description": "Building $out"},
             "SYMLINK": {
                 "command": (
                     "cmd /c mklink $out $in"
@@ -623,7 +625,10 @@ class NinjaState:
         ninja.build(
             ninja_file,
             rule="REGENERATE",
-            implicit=[self.env.File("#SConstruct").get_abspath()]
+            implicit=[
+                self.env.File("#SConstruct").get_abspath(),
+                os.path.abspath(__file__),
+            ]
             + glob("src/**/SConscript", recursive=True),
         )
 
@@ -632,6 +637,26 @@ class NinjaState:
             rule="CMD",
             pool="console",
             variables={"cmd": "echo $SCONS_INVOCATION_W_TARGETS"},
+        )
+
+        # Note the use of CMD_W_DEPS below. CMD_W_DEPS are always
+        # compile commands in this generator. If we ever change the
+        # name/s of the rules that include compile commands
+        # (i.e. something like CC/CXX) we will need to update this
+        # build to reflect that complete list.
+        ninja.build(
+            "compile_commands.json",
+            rule="CMD",
+            pool="console",
+            variables={
+                "cmd": "ninja -f {} -t compdb CMD_W_DEPS > compile_commands.json".format(
+                    ninja_file
+                )
+            },
+        )
+
+        ninja.build(
+            "compiledb", rule="phony", implicit=["compile_commands.json"],
         )
 
         # Look in SCons's list of DEFAULT_TARGETS, find the ones that
@@ -788,7 +813,16 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         outputs = outputs[0:1]
 
     command_env = getattr(node.attributes, "NINJA_ENV_ENV", "")
-    if not command_env:
+    # If win32 and rule == CMD_W_DEPS then we don't want to calculate
+    # an environment for this command. It's a compile command and
+    # compiledb doesn't support shell syntax on Windows. We need the
+    # shell syntax to use environment variables on Windows so we just
+    # skip this platform / rule combination to keep the compiledb
+    # working.
+    #
+    # On POSIX we can still set environment variables even for compile
+    # commands so we do so.
+    if not command_env and not (env["PLATFORM"] == "win32" and rule == "CMD_W_DEPS"):
         ENV = get_default_ENV(sub_env)
 
         # This is taken wholesale from SCons/Action.py
@@ -812,7 +846,7 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
             if env["PLATFORM"] == "win32":
                 command_env += "set '{}={}' && ".format(key, value)
             else:
-                command_env += "export {}={}; ".format(key, value)
+                command_env += "{}={} ".format(key, value)
 
         setattr(node.attributes, "NINJA_ENV_ENV", command_env)
 
