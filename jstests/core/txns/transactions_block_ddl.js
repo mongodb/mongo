@@ -16,12 +16,28 @@ const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB[collName];
 
 /**
+ * Drops the test collection, recreates the collection and index before running each test.
+ */
+function runSetup() {
+    sessionDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(sessionColl.runCommand({
+        createIndexes: collName,
+        indexes: [{
+            key: {
+                "b": 1,
+            },
+            name: "b_1"
+        }],
+        writeConcern: {w: "majority"}
+    }));
+}
+
+/**
  * Tests that DDL operations block on transactions and fail when their maxTimeMS expires.
  */
 function testTimeout(cmdDBName, ddlCmd) {
     // Setup.
-    sessionDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
-    assert.commandWorked(sessionColl.createIndex({b: 1}, {name: "b_1"}));
+    runSetup();
 
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
@@ -36,8 +52,7 @@ function testTimeout(cmdDBName, ddlCmd) {
  */
 function testSuccessOnTxnCommit(cmdDBName, ddlCmd, currentOpFilter) {
     // Setup.
-    sessionDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
-    assert.commandWorked(sessionColl.createIndex({b: 1}, {name: "b_1"}));
+    runSetup();
 
     jsTestLog("About to start tranasction");
     session.startTransaction();
