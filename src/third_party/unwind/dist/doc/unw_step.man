@@ -1,7 +1,5 @@
-.\" *********************************** start of \input{common.tex}
-.\" *********************************** end of \input{common.tex}
 '\" t
-.\" Manual page created with latex2man on Sat Apr 20 19:14:02 EDT 2019
+.\" Manual page created with latex2man on Thu Aug 16 09:44:45 MDT 2007
 .\" NOTE: This file is generated, DO NOT EDIT.
 .de Vb
 .ft CW
@@ -12,7 +10,7 @@
 
 .fi
 ..
-.TH "UNW\\_STEP" "3" "20 April 2019" "Programming Library " "Programming Library "
+.TH "UNW\\_STEP" "3" "16 August 2007" "Programming Library " "Programming Library "
 .SH NAME
 unw_step
 \-\- advance to next stack frame 

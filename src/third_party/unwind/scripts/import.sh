@@ -7,7 +7,7 @@ IFS=$'\n\t'
 set -vx
 
 NAME=libunwind
-REVISION=334047a04e59287463348a9e333947b5e59ddd91 # 2019-04-02
+REVISION="v1.4-stable-mongo" # 2020-01-10
 VERSION="1.4-rc1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/unwind

@@ -71,7 +71,7 @@ aarch64_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
         char x[sizeof(regs)];
       };
 
-      asm volatile (
+      __asm__ __volatile__ (
         "mov x4, %0\n"
         "mov x5, %1\n"
         "ldp x0,  x1,  [x4]\n"
@@ -134,7 +134,7 @@ aarch64_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
       sc->pc = uc->uc_mcontext.pc;
       sc->pstate = uc->uc_mcontext.pstate;
 
-      asm volatile (
+      __asm__ __volatile__ (
         "mov sp, %0\n"
         "ret %1\n"
         : : "r" (c->sigcontext_sp), "r" (c->sigcontext_pc)

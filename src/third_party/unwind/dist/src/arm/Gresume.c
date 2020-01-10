@@ -56,7 +56,7 @@ arm_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
               char x[sizeof(regs)];
       };
 
-      asm __volatile__ (
+      __asm__ __volatile__ (
         "ldmia %0, {r4-r12, lr}\n"
         "mov sp, r12\n"
         "bx lr\n"
@@ -90,7 +90,7 @@ arm_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
 
       /* Set the SP and the PC in order to continue execution at the modified
          trampoline which restores the signal mask and the registers.  */
-      asm __volatile__ (
+      __asm__ __volatile__ (
         "mov sp, %0\n"
         "bx %1\n"
         : : "r" (c->sigcontext_sp), "r" (c->sigcontext_pc)
