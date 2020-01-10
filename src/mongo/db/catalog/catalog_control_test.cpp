@@ -155,6 +155,7 @@ public:
     }
     void setCachePressureForTest(int pressure) final {}
     void triggerJournalFlush() const final {}
+    void waitForJournalFlush(OperationContext* opCtx) const final {}
     StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx) final {
         return ReconcileResult{};

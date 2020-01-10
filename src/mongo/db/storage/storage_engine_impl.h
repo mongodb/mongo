@@ -167,6 +167,8 @@ public:
 
     void triggerJournalFlush() const final;
 
+    void waitForJournalFlush(OperationContext* opCtx) const final;
+
     SnapshotManager* getSnapshotManager() const final;
 
     void setJournalListener(JournalListener* jl) final;

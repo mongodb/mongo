@@ -852,6 +852,10 @@ void StorageEngineImpl::triggerJournalFlush() const {
     return _engine->triggerJournalFlush();
 }
 
+void StorageEngineImpl::waitForJournalFlush(OperationContext* opCtx) const {
+    return _engine->waitForJournalFlush(opCtx);
+}
+
 Timestamp StorageEngineImpl::getAllDurableTimestamp() const {
     return _engine->getAllDurableTimestamp();
 }

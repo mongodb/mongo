@@ -255,6 +255,8 @@ public:
 
     void triggerJournalFlush() const override;
 
+    void waitForJournalFlush(OperationContext* opCtx) const override;
+
     bool isCacheUnderPressure(OperationContext* opCtx) const override;
 
     bool supportsReadConcernMajority() const final;

@@ -38,7 +38,7 @@
 namespace mongo {
 namespace {
 
-class WaitForMajorityServiceTest : public ServiceContextTest {
+class WaitForMajorityServiceTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
         auto service = getServiceContext();

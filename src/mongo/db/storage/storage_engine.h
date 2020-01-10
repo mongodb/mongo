@@ -542,6 +542,13 @@ public:
      */
     virtual void triggerJournalFlush() const = 0;
 
+    /**
+     * Initiates if needed and waits for a complete round of journal flushing to execute.
+     *
+     * Can throw ShutdownInProgress if the storage engine is being closed.
+     */
+    virtual void waitForJournalFlush(OperationContext* opCtx) const = 0;
+
     struct IndexIdentifier {
         const RecordId catalogId;
         const NamespaceString nss;
