@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/working_set_common.h"
@@ -37,13 +39,34 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
+namespace {
+std::string indexKeyVectorDebugString(const std::vector<IndexKeyDatum>& keyData) {
+    StringBuilder sb;
+    sb << "[";
+    if (keyData.size() > 0) {
+        auto it = keyData.begin();
+        sb << "(key: " << redact(it->keyData) << ", index key pattern: " << it->indexKeyPattern
+           << ")";
+        while (++it != keyData.end()) {
+            sb << ", (key: " << redact(it->keyData)
+               << ", index key pattern: " << it->indexKeyPattern << ")";
+        }
+    }
+    sb << "]";
+    return sb.str();
+}
+}  // namespace
+
+// static
 bool WorkingSetCommon::fetch(OperationContext* opCtx,
                              WorkingSet* workingSet,
                              WorkingSetID id,
-                             unowned_ptr<SeekableRecordCursor> cursor) {
+                             unowned_ptr<SeekableRecordCursor> cursor,
+                             const NamespaceString& ns) {
     WorkingSetMember* member = workingSet->get(id);
 
     // We should have a RecordId but need to retrieve the obj. Get the obj now and reset all WSM
@@ -52,6 +75,27 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
 
     auto record = cursor->seekExact(member->recordId);
     if (!record) {
+        // The record referenced by this index entry is gone. If the query yielded some time after
+        // we first examined the index entry, then it's likely that the record was deleted while we
+        // were yielding. However, if the snapshot id hasn't changed since the index lookup, then
+        // there could not have been a yield, and the only explanation is corruption.
+        std::vector<IndexKeyDatum>::iterator keyDataIt;
+        if (member->getState() == WorkingSetMember::RID_AND_IDX &&
+            (keyDataIt = std::find_if(member->keyData.begin(),
+                                      member->keyData.end(),
+                                      [currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId()](
+                                          const auto& keyDatum) {
+                                          return keyDatum.snapshotId == currentSnapshotId;
+                                      })) != member->keyData.end()) {
+            std::stringstream ss;
+            ss << "Erroneous index key found with reference to non-existent record id "
+               << member->recordId << ": " << indexKeyVectorDebugString(member->keyData)
+               << ". Consider dropping and then re-creating the index with key pattern "
+               << keyDataIt->indexKeyPattern << " and then running the validate command on the "
+               << ns << " collection.";
+            error() << ss.str();
+            uasserted(ErrorCodes::DataCorruptionDetected, ss.str());
+        }
         return false;
     }
 

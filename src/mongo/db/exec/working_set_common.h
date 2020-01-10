@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
@@ -53,7 +54,8 @@ public:
     static bool fetch(OperationContext* opCtx,
                       WorkingSet* workingSet,
                       WorkingSetID id,
-                      unowned_ptr<SeekableRecordCursor> cursor);
+                      unowned_ptr<SeekableRecordCursor> cursor,
+                      const NamespaceString& ns);
 
     /**
      * Build a Document which represents a Status to return in a WorkingSet.

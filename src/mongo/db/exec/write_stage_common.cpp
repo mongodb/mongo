@@ -50,7 +50,7 @@ bool ensureStillMatches(const Collection* collection,
     if (opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
         std::unique_ptr<SeekableRecordCursor> cursor(collection->getCursor(opCtx));
 
-        if (!WorkingSetCommon::fetch(opCtx, ws, id, cursor)) {
+        if (!WorkingSetCommon::fetch(opCtx, ws, id, cursor, collection->ns())) {
             // Doc is already deleted.
             return false;
         }
