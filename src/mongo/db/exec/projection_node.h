@@ -162,12 +162,6 @@ protected:
     // Whether this node or any child of this node contains a computed field.
     bool _subtreeContainsComputedFields{false};
 
-    // TODO SERVER-37791: This flag is only necessary due to a bug in exclusion semantics.
-    // Whether to project fields not present in the input document. For example, for the
-    // specification {a: 0, b: 0}, if 'b' is not present in the input document, it will be projected
-    // into the output document as an empty/missing Value.
-    bool _projectMissingFields{false};
-
 private:
     // Iterates 'inputDoc' for each projected field, adding to or removing from 'outputDoc'. Also
     // copies over enough information to preserve the structure of the incoming document for the

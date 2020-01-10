@@ -44,9 +44,7 @@ namespace mongo::projection_executor {
 class ExclusionNode final : public ProjectionNode {
 public:
     ExclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
-        : ProjectionNode(policies, std::move(pathToNode)) {
-        _projectMissingFields = true;
-    }
+        : ProjectionNode(policies, std::move(pathToNode)) {}
 
     ExclusionNode* addOrGetChild(const std::string& field) {
         return static_cast<ExclusionNode*>(ProjectionNode::addOrGetChild(field));

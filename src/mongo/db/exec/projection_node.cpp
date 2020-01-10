@@ -146,16 +146,6 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
             break;
         }
     }
-
-    // Ensure we project all specified fields, including those not present in the input document.
-    // TODO SERVER-37791: This block is only necessary due to a bug in exclusion semantics.
-    if (_projectMissingFields) {
-        for (auto&& fieldName : _projectedFields) {
-            if (inputDoc[fieldName].missing()) {
-                outputProjectedField(fieldName, Value(), outputDoc);
-            }
-        }
-    }
 }
 
 Value ProjectionNode::applyProjectionsToValue(Value inputValue) const {
