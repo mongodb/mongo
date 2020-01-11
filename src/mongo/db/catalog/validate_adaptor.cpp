@@ -255,7 +255,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         auto dataSize = record->data.size();
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
-        size_t validatedSize;
+        size_t validatedSize = 0;
         Status status = validateRecord(opCtx, record->id, record->data, &validatedSize);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
