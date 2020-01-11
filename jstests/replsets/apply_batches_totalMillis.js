@@ -1,7 +1,9 @@
 /**
  * serverStatus.metrics.repl.apply.batches.totalMillis is a cumulative measure of how much time a
  * node spends applying batches. This test checks that it includes the time spent waiting for
- * batches to finish, by comparing the time recorded after replicating a small and a large load.
+ * batches to finish by making sure that the timer is cumulative and monotonic. We cannot make
+ * any assumptions about how long batches actually take as that can vary enormously between
+ * machines and test runs.
  */
 
 (function() {
@@ -37,27 +39,25 @@
     // Perform an initial write on the system and ensure steady state.
     assert.writeOK(coll.insert({init: 0}));
     rst.awaitReplication();
+
     let baseTime = getTotalMillis(secondary);
+    jsTestLog(`Base time recorded: ${baseTime}ms`);
 
     // Introduce a small load and wait for it to be replicated.
     performBulkInsert(coll, "small", 1000);
 
-    // Record the time spent applying the small load.
+    // Record the time spent applying the small load. The timer should not move backwards.
     let timeAfterSmall = getTotalMillis(secondary);
-    let deltaSmall = timeAfterSmall - baseTime;
+    jsTestLog(`Time recorded after smaller batch: ${timeAfterSmall}ms`);
+    assert.gte(timeAfterSmall, baseTime);
 
     // Insert a significantly larger load.
     performBulkInsert(coll, "large", 20000);
 
     // Record the time spent applying the large load.
     let timeAfterLarge = getTotalMillis(secondary);
-    let deltaLarge = timeAfterLarge - timeAfterSmall;
+    jsTestLog(`Time recorded after larger batch: ${timeAfterLarge}ms`);
+    assert.gte(timeAfterLarge, timeAfterSmall);
 
-    jsTestLog(`Recorded deltas: {small: ${deltaSmall}ms, large: ${deltaLarge}ms}.`);
-
-    // We should have recorded at least as much time on the second load as we did on the first.
-    // This is a crude comparison that is only taken to check that the timer is used correctly.
-    assert(deltaLarge >= deltaSmall, "Expected a higher net totalMillis for the larger load.");
     rst.stopSet();
-
 })();
