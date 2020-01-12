@@ -2,7 +2,7 @@
  * Tests that read operations that encounter prepare conflicts are killed during
  * stepdown to prevent deadlocks between prepare conflicts and state transitions.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
  */
 
 (function() {
