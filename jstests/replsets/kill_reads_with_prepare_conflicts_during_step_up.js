@@ -2,7 +2,7 @@
  * Tests that a read operation on a secondary that encounters a prepare conflict gets killed
  * when we cause the secondary to step up.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
  */
 
 (function() {
