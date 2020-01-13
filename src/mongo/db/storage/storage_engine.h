@@ -300,8 +300,23 @@ public:
      */
     virtual void endBackup(OperationContext* opCtx) = 0;
 
+    /**
+     * When performing an incremental backup, we first need a basis for future incremental backups.
+     * The basis will be a full backup called 'thisBackupName'. For future incremental backups, the
+     * storage engine will take a backup called 'thisBackupName' which will contain the changes made
+     * to data files since the backup named 'srcBackupName'.
+     *
+     * The first full backup meant for incremental and future incremental backups must pass
+     * 'incrementalBackup' as true.
+     * 'thisBackupName' must exist only if 'incrementalBackup' is true.
+     * 'srcBackupName' must not exist when 'incrementalBackup' is false but may or may not exist
+     * when 'incrementalBackup' is true.
+     */
     virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
-        OperationContext* opCtx) = 0;
+        OperationContext* opCtx,
+        bool incrementalBackup,
+        boost::optional<std::string> thisBackupName,
+        boost::optional<std::string> srcBackupName) = 0;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
 

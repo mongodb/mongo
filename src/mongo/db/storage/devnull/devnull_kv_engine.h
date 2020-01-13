@@ -140,7 +140,10 @@ public:
     virtual void endBackup(OperationContext* opCtx) {}
 
     virtual StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
-        OperationContext* opCtx) override;
+        OperationContext* opCtx,
+        bool incrementalBackup,
+        boost::optional<std::string> thisBackupName,
+        boost::optional<std::string> srcBackupName) override;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override {}
 
