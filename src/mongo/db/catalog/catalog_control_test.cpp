@@ -87,7 +87,10 @@ public:
     }
     void endBackup(OperationContext* opCtx) final {}
     StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
-        OperationContext* opCtx) final {
+        OperationContext* opCtx,
+        bool incrementalBackup,
+        boost::optional<std::string> thisBackupName,
+        boost::optional<std::string> srcBackupName) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine does not support a concurrent mode.");
     }

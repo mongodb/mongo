@@ -40,6 +40,7 @@
 #endif
 
 #include <fmt/format.h>
+#include <iomanip>
 #include <memory>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -1136,8 +1137,24 @@ void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
 }
 
 StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNonBlockingBackup(
-    OperationContext* opCtx) {
+    OperationContext* opCtx,
+    bool incrementalBackup,
+    boost::optional<std::string> thisBackupName,
+    boost::optional<std::string> srcBackupName) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
+
+    std::stringstream ss;
+    if (incrementalBackup) {
+        invariant(thisBackupName);
+        ss << "incremental=(enabled=true,force_stop=false,";
+        ss << "this_id=" << std::quoted(str::escape(*thisBackupName)) << ",";
+
+        if (srcBackupName) {
+            ss << "src_id=" << std::quoted(str::escape(*srcBackupName)) << ",";
+        }
+
+        ss << ")";
+    }
 
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
@@ -1153,7 +1170,8 @@ StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNon
     auto sessionRaii = std::make_unique<WiredTigerSession>(_conn);
     WT_CURSOR* cursor = nullptr;
     WT_SESSION* session = sessionRaii->getSession();
-    int wtRet = session->open_cursor(session, "backup:", nullptr, nullptr, &cursor);
+    const std::string config = ss.str();
+    int wtRet = session->open_cursor(session, "backup:", nullptr, config.c_str(), &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
