@@ -240,9 +240,6 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
  * to ensure the db and log mutexes aren't held.
  */
 void signalProcessingThread(LogFileStatus rotate) {
-#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
-    markAsStackTraceProcessingThread();
-#endif
     setThreadName("signalProcessingThread");
 
     LogRotationState logRotationState{rotate, logRotationState.kNever};
@@ -264,6 +261,12 @@ void signalProcessingThread(LogFileStatus rotate) {
         severe() << "pthread_sigmask failed with error:" << strerror(errsv);
         fassertFailed(31377);
     }
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+    // Must happen after blocking the signal, so this thread doesn't get
+    // confused and forward the stack trace signal to itself.
+    markAsStackTraceProcessingThread();
+#endif
 
     while (true) {
         SignalWaitResult waited;
