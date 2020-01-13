@@ -1,5 +1,12 @@
-// Test RetryableWriteError label in retryable writes and in transactions.
-// @tags: [uses_transactions]
+/**
+ * Test RetryableWriteError label in retryable writes and in transactions.
+ *
+ * The "requires_find_command" tag excludes this test from the op_query suites, which are
+ * incompatible with implicit sessions.
+ *
+ * @tags: [uses_transactions, requires_fcv_44, requires_find_command]
+ */
+
 (function() {
 "use strict";
 

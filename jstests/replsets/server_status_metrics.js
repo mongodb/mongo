@@ -1,3 +1,8 @@
+/**
+ * Tests metrics in serverStatus related to replication.
+ *
+ * @tags: [requires_fcv_44]
+ */
 
 (function() {
 "use strict";

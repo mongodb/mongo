@@ -7,7 +7,7 @@
  * the RECOVERING state. A restarted node with an ephemeral storage engine will not have an oplog
  * upon restart, so will immediately resync.
  *
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_fcv_44]
  *
  * Replica Set Setup:
  *
