@@ -44,3 +44,10 @@ types:
     cpp_type: mongo::SHA1Block
     serializer: "mongo::SHA1Block::toCDR"
     deserializer: "mongo::SHA1Block::fromBinData"
+
+  sha1BlockHex:
+    bson_serialization_type: string
+    description: "A fixed size hex string representing a SHA1 computation"
+    cpp_type: mongo::SHA1Block
+    serializer: "mongo::SHA1Block::toHexString"
+    deserializer: "mongo::SHA1Block::fromHexString"

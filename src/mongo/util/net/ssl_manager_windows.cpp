@@ -1851,6 +1851,8 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
 StatusWith<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     PCtxtHandle ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) {
     auto sniName = getSNIServerName_impl();
+    invariant(!sslGlobalParams.tlsCATrusts);
+
     PCCERT_CONTEXT cert;
 
     auto tlsVersionStatus = mapTLSVersion(ssl);
