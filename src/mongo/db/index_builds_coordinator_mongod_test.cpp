@@ -89,6 +89,14 @@ void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& n
     CollectionOptions options;
     options.uuid = uuid;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    // Insert document into collection to avoid optimization for index creation on an empty
+    // collection. This allows us to pause index builds on the collection using the test function
+    // IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly().
+    ASSERT_OK(storageInterface()->insertDocument(operationContext(),
+                                                 nss,
+                                                 {BSON("_id" << 0), Timestamp()},
+                                                 repl::OpTime::kUninitializedTerm));
 }
 
 std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::string> keys) {

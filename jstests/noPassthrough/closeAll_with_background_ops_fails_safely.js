@@ -27,6 +27,10 @@ let testDB = replSet.getPrimary().getDB("test");
 // SERVER-44405, will not occur in this test unless the collection is created beforehand.
 assert.commandWorked(testDB.runCommand({create: "coll"}));
 
+// Insert document into collection to avoid optimization for index creation on an empty collection.
+// This allows us to pause index builds on the collection using a fail point.
+assert.commandWorked(testDB.getCollection("coll").insert({a: 1}));
+
 setFailpointBool(testDB, "hangAfterStartingIndexBuildUnlocked", true);
 
 // Blocks because of failpoint

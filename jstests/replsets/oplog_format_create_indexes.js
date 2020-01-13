@@ -69,6 +69,9 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     assert.commandWorked(coll.dropIndex(keyPattern));
 }
 
+// Insert document into collection to avoid optimization for index creation on an empty collection.
+assert.commandWorked(testDB.oplog_format.insert({a: 1}));
+
 // Test that options both explicitly included in the command and implicitly filled in with
 // defaults by the server are serialized into the corresponding oplog entry.
 testOplogEntryContainsIndexInfoObj(testDB.oplog_format, {withoutAnyOptions: 1});
@@ -80,6 +83,10 @@ testOplogEntryContainsIndexInfoObj(
 // non-simple default collation exactly matches that of the index's full specification.
 assert.commandWorked(
     testDB.runCommand({create: "oplog_format_collation", collation: {locale: "fr"}}));
+
+// Insert document into collection to avoid optimization for index creation on an empty collection.
+assert.commandWorked(testDB.oplog_format_collation.insert({a: 1}));
+
 testOplogEntryContainsIndexInfoObj(testDB.oplog_format_collation, {withDefaultCollation: 1});
 testOplogEntryContainsIndexInfoObj(
     testDB.oplog_format_collation, {withNonDefaultCollation: 1}, {collation: {locale: "en"}});

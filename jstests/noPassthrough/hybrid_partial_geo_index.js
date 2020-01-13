@@ -29,6 +29,10 @@ const coll = testDB.getCollection('test');
 
 assert.commandWorked(testDB.createCollection(coll.getName()));
 
+// Insert document into collection to avoid optimization for index creation on an empty collection.
+// This allows us to pause index builds on the collection using a fail point.
+assert.commandWorked(coll.insert({a: 1}));
+
 IndexBuildTest.pauseIndexBuilds(primary);
 
 // Create a 2dsphere partial index for documents where 'a', the field in the filter expression,
