@@ -272,7 +272,6 @@ variables:
   modules:
   - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
-    platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
@@ -528,7 +527,7 @@ functions:
       working_dir: src
       script: |
         set -o errexit
-        ${decompress} mongo-binaries.tgz
+        ${decompress|tar xzvf} mongo-binaries.tgz
         cp mongodb*/bin/* .
 
   "check binary version": &check_binary_version
@@ -3713,7 +3712,7 @@ tasks:
           # Create separate shell archive
           mkdir -p shell-archive/build
           cd shell-archive
-          ${platform_decompress|tar xzvf} ../mongodb-binaries.tgz
+          ${decompress|tar xzvf} ../mongodb-binaries.tgz
           find . -mindepth 3 ! -name "mongo${exe}" -type f -exec rm {} \; # delete bin/* except bin/mongo
           $python ../buildscripts/make_archive.py -o mongodb-shell.${ext|tgz} $(find mongodb-* -type f)
           cd ..
@@ -3721,7 +3720,7 @@ tasks:
           # Create separate cryptd archive if mongocryptd is in the tarball
           mkdir -p cryptd-archive/build
           cd cryptd-archive
-          ${platform_decompress|tar xzvf} ../mongodb-binaries.tgz
+          ${decompress|tar xzvf} ../mongodb-binaries.tgz
           find . -mindepth 3 ! -name "mongocryptd${exe}" -type f -exec rm {} \; # delete bin/* except bin/mongocryptd
           if [ $(find . -name mongocryptd${exe} | wc -l) -eq 1 ] ; then
             $python ../buildscripts/make_archive.py -o mongodb-cryptd.${ext|tgz} $(find mongodb-* -type f)
@@ -9212,7 +9211,6 @@ buildvariants:
     - windows-64-vs2017-test
   expansions: &enterprise_windows_expansions
     burn_in_tests_build_variant: enterprise-windows
-    platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     mh_target: archive-mh archive-mh-debug
@@ -9252,7 +9250,6 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
-    platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
     compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=windows
@@ -9404,7 +9401,6 @@ buildvariants:
   stepback: true
   batchtime: 10080 # 7 days
   expansions:
-    platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
@@ -9436,7 +9432,6 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
-    platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
@@ -9485,7 +9480,6 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
-    platform_decompress: unzip
     exe: ".exe"
     push_path: windows
     push_bucket: downloads.mongodb.org
@@ -9549,7 +9543,6 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
-    platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
     compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
