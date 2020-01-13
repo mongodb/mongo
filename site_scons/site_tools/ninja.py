@@ -349,7 +349,14 @@ class NinjaState:
         self.writer_class = writer_class
         self.__generated = False
         self.translator = SConsToNinjaTranslator(env)
+
+        # List of generated builds that will be written at a later stage
         self.builds = list()
+
+        # List of targets for which we have generated a build. This
+        # allows us to take multiple Alias nodes as sources and to not
+        # fail to build if they have overlapping targets.
+        self.built = set()
 
         # SCons sets this variable to a function which knows how to do
         # shell quoting on whatever platform it's run on. Here we use it
@@ -357,7 +364,6 @@ class NinjaState:
         # like CCFLAGS
         escape = env.get("ESCAPE", lambda x: x)
 
-        self.built = set()
         self.variables = {
             "COPY": "cmd.exe /c copy" if sys.platform == "win32" else "cp",
             "SCONS_INVOCATION": "{} {} __NINJA_NO=1 $out".format(
@@ -480,8 +486,6 @@ class NinjaState:
             return
 
         stack = [[node]]
-        self.built = set()
-
         while stack:
             frame = stack.pop()
             for child in frame:
