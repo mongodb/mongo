@@ -112,7 +112,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
         // Get the token for authenticating with Instance Metadata Version 2
         // Set a lifetime of 30 seconds since we are only going to use this token for one set of
         // requests.
-        std::vector<std::string> headers{"X-aws-ec2-metadata-token-ttl-seconds: 30"};
+        std::vector<std::string> headers{"X-aws-ec2-metadata-token-ttl-seconds: 30", "Expect:"};
         httpClient->setHeaders(headers);
         DataBuilder getToken = httpClient->put(getDefaultEC2Host() + "/latest/api/token",
                                                ConstDataRange(nullptr, nullptr));
