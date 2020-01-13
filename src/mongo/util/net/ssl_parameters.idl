@@ -32,6 +32,18 @@ global:
     - "mongo/util/net/ssl_options.h"
     - "mongo/util/net/ssl_parameters.h"
 
+imports:
+    - "mongo/crypto/sha256_block.idl"
+    - "mongo/db/auth/auth_types.idl"
+
+structs:
+  TLSCATrust:
+    description:
+    strict: true
+    fields:
+        sha256: sha256BlockHex
+        roles: array<RoleName>
+
 server_parameters:
   opensslDiffieHellmanParameters:
     description: "OpenSSL Diffie-Hellman parameters"
@@ -95,3 +107,15 @@ server_parameters:
     default: 30
     validator:
         gte: 0
+
+  tlsCATrusts:
+    description: >-
+        Specify by fingerprint the certificate authorities which are allowed to
+        accept role authorizations from an X509 certificate and the specific roles
+        they are allowed to impart.
+    set_at: startup
+    cpp_class:
+        name: TLSCATrustsSetParameter
+        override_set: true
+    condition:
+        preprocessor: 'defined(__linux__)'

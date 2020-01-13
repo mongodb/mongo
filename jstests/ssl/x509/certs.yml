@@ -517,6 +517,16 @@ certs:
     subjectAltName:
       DNS: ['localhost', '127.0.0.1']
 
+- name: 'trusted-client-testdb-roles.pem'
+  description: Client certificate with X509 role grants via trusted chain.
+  Subject: {OU: 'Kernel Users', CN: 'Trusted Kernel Test Client With Roles'}
+  Issuer: 'trusted-ca.pem'
+  output_path: 'jstests/ssl/x509/'
+  extensions:
+    mongoRoles:
+    - {role: role1, db: testDB}
+    - {role: role2, db: testDB}
+
 # Both ca.pem and trusted-ca.pem
 - name: 'root-and-trusted-ca.pem'
   description: Combined ca.pem and trusted-ca.pem

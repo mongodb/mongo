@@ -40,7 +40,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/secure_compare_memory.h"
 
 namespace mongo {
@@ -120,6 +122,20 @@ public:
         HashType newHash;
         memcpy(newHash.data(), input, inputLen);
         return HashBlock(newHash);
+    }
+
+    static StatusWith<HashBlock> fromHexStringNoThrow(StringData hex) {
+        if (!isValidHex(hex)) {
+            return {ErrorCodes::BadValue, "Hash input is not a hex string"};
+        }
+
+        BufBuilder buf;
+        mongo::fromHexString(hex, &buf);
+        return fromBuffer(reinterpret_cast<const uint8_t*>(buf.buf()), buf.len());
+    }
+
+    static HashBlock fromHexString(StringData hex) {
+        return uassertStatusOK(fromHexStringNoThrow(hex));
     }
 
     static void computeHash(std::initializer_list<ConstDataRange> input, HashBlock* const output) {
@@ -254,12 +270,23 @@ public:
             StringData(reinterpret_cast<const char*>(_hash.data()), _hash.size()));
     }
 
+    /**
+     * Hex encoded hash block.
+     */
+    std::string toHexString() const {
+        return toHex(_hash.data(), _hash.size());
+    }
+
     bool operator==(const HashBlock& other) const {
         return consttimeMemEqual(this->_hash.data(), other._hash.data(), kHashLength);
     }
 
     bool operator!=(const HashBlock& other) const {
         return !(*this == other);
+    }
+
+    bool operator<(const HashBlock& other) const {
+        return this->_hash < other._hash;
     }
 
     bool operator==(const HashBlock::Secure& other) const {
