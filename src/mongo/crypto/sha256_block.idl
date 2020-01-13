@@ -44,3 +44,10 @@ types:
     cpp_type: mongo::SHA256Block
     serializer: "mongo::SHA256Block::toCDR"
     deserializer: "mongo::SHA256Block::fromBinData"
+
+  sha256BlockHex:
+    bson_serialization_type: string
+    description: "A fixed size hex string representing a SHA256 computation"
+    cpp_type: mongo::SHA256Block
+    serializer: "mongo::SHA256Block::toHexString"
+    deserializer: "mongo::SHA256Block::fromHexString"

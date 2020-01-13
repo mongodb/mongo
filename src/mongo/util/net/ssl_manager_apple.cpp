@@ -1425,6 +1425,8 @@ StatusWith<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     boost::optional<std::string> sniName,
     const std::string& remoteHost,
     const HostAndPort& hostForLogging) {
+    invariant(!sslGlobalParams.tlsCATrusts);
+
     // Record TLS version stats
     auto tlsVersionStatus = mapTLSVersion(ssl);
     if (!tlsVersionStatus.isOK()) {

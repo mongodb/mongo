@@ -1864,6 +1864,8 @@ StatusWith<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     boost::optional<std::string> sni,
     const std::string& remoteHost,
     const HostAndPort& hostForLogging) {
+    invariant(!sslGlobalParams.tlsCATrusts);
+
     PCCERT_CONTEXT cert;
 
     auto tlsVersionStatus = mapTLSVersion(ssl);
