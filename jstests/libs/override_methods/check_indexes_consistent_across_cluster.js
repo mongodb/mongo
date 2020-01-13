@@ -94,7 +94,7 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
         }
 
         // Find inconsistent indexes. For the example above:
-        // {"rs0": [{"spec" : {"v" : 2, "key" : {"_id" : 1}, "name" : "_id_"}}], "rs1" : []};
+        // {"rs0": [{"spec" : {"v" : 2, "key" : {"x" : 1}, "name" : "x_1"}}], "rs1" : []};
         const inconsistentIndexesOnShard = {};
         let isConsistent = true;
         for (const indexDoc of indexDocs) {

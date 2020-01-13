@@ -105,7 +105,15 @@ stepNames.forEach((stepName) => {
 
     // Verify that the index command succeeds.
     ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard0, dbName, collName, index);
-    ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, index);
+
+    // If dropIndexes is run after the migration has reached the steady state, shard1
+    // is expected to finish cloning the collection options and indexes before the migration
+    // aborts. However, if dropIndexes is run after the cloning step starts but before the
+    // steady state is reached, the migration could abort before shard1 gets to clone the
+    // collection options and indexes so listIndexes could fail with NamespaceNotFound.
+    if (stepName == moveChunkStepNames.reachedSteadyState) {
+        ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, index);
+    }
 });
 
 stepNames.forEach((stepName) => {
@@ -124,7 +132,16 @@ stepNames.forEach((stepName) => {
     // Verify that the index command succeeds.
     assert.commandFailedWithCode(st.shard0.getCollection(ns).insert({x: 1}),
                                  ErrorCodes.DocumentValidationFailure);
-    assert.commandWorked(st.shard1.getCollection(ns).insert({x: 1}));
+
+    // If collMod is run after the migration has reached the steady state, shard1
+    // will not perform schema validation because the validation rule just does not
+    // exist when shard1 clones the collection options from shard0. However, if collMod
+    // is run after the cloning step starts but before the steady state is reached,
+    // shard0 may have the validation rule when shard1 does the cloning so shard1 may
+    // or may not perform schema validation.
+    if (stepName == moveChunkStepNames.reachedSteadyState) {
+        assert.commandWorked(st.shard1.getCollection(ns).insert({x: 1}));
+    }
 });
 
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
