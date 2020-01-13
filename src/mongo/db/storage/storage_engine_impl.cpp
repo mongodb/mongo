@@ -648,8 +648,11 @@ void StorageEngineImpl::endBackup(OperationContext* opCtx) {
 }
 
 StatusWith<std::vector<StorageEngine::BackupBlock>> StorageEngineImpl::beginNonBlockingBackup(
-    OperationContext* opCtx) {
-    return _engine->beginNonBlockingBackup(opCtx);
+    OperationContext* opCtx,
+    bool incrementalBackup,
+    boost::optional<std::string> thisBackupName,
+    boost::optional<std::string> srcBackupName) {
+    return _engine->beginNonBlockingBackup(opCtx, incrementalBackup, thisBackupName, srcBackupName);
 }
 
 void StorageEngineImpl::endNonBlockingBackup(OperationContext* opCtx) {
