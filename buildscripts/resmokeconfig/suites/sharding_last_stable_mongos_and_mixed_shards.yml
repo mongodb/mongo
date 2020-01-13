@@ -116,7 +116,8 @@ selector:
   - jstests/sharding/explain_cmd.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
-
+   # Enable after SERVER-44477 is backported and available on older binaries.
+  - jstests/sharding/mr_merge_to_existing.js
 executor:
   config:
     shell_options:

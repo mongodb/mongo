@@ -479,18 +479,16 @@ public:
             // We need to determine whether we need to drop and shard the output collection and
             // send the UUID to the shards. We will always do this if we are using replace so we
             // can skip this check in that case. If using merge or reduce, we only want to do this
-            // if the output collection does not exist or if it exists and is an empty sharded
-            // collection.
+            // if the output collection does not exist.
             bool shouldDropAndShard = replaceOutput;
             if (!replaceOutput && outputCollNss.isValid()) {
-                const auto primaryShard =
-                    uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
-                ScopedDbConnection conn(primaryShard->getConnString());
-
                 if (!outputRoutingInfo.cm()) {
                     // The output collection either exists and is unsharded, or does not exist. If
                     // the output collection exists and is unsharded, fail because we should not go
                     // from unsharded to sharded.
+                    const auto primaryShard =
+                        uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
+                    ScopedDbConnection conn(primaryShard->getConnString());
                     BSONObj listCollsCmdResponse;
                     ok = conn->runCommand(
                         outDB,
@@ -507,15 +505,8 @@ public:
 
                     // If we reach here, the collection does not exist at all.
                     shouldDropAndShard = true;
-                } else {
-                    // The output collection exists and is sharded. We need to determine whether the
-                    // collection is empty in order to decide whether we should drop and re-shard
-                    // it.
-                    // We don't want to do this if the collection is not empty.
-                    shouldDropAndShard = (conn->count(outputCollNss.ns()) == 0);
+                    conn.done();
                 }
-
-                conn.done();
             }
 
             // If we are using replace, the output collection exists and is sharded, or the output
