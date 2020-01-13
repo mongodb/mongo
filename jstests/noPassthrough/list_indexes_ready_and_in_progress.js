@@ -19,6 +19,10 @@ IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);
 assert.commandWorked(coll.createIndex({a: 1}));
 IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
+// Insert document into collection to avoid optimization for index creation on an empty collection.
+// This allows us to pause index builds on the collection using a fail point.
+assert.commandWorked(coll.insert({a: 1}));
+
 IndexBuildTest.pauseIndexBuilds(conn);
 const createIdx =
     IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {b: 1}, {background: true});

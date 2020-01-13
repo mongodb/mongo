@@ -47,6 +47,11 @@ function CommonOps(node) {
     const testDB = node.getDB(dbName);
     assert.commandWorked(testDB.createCollection(collName));
 
+    // Insert document into collection to avoid optimization for index creation on an empty
+    // collection. This allows us to pause index builds on the collection using a fail point.
+    const testColl = testDB.getCollection(collName);
+    assert.commandWorked(testColl.insert({a: 1}));
+
     // Hang background index builds.
     hangIndexBuildsFailpoint(node, "alwaysOn");
 

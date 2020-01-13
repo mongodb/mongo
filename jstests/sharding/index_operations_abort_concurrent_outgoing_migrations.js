@@ -64,7 +64,13 @@ stepNames.forEach((stepName) => {
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
 
     assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
-        assert.commandWorked(st.s.getCollection(ns).createIndexes([index]));
+        const coll = st.s.getCollection(ns);
+
+        // Insert document into collection to avoid optimization for index creation on an empty
+        // collection. This allows us to pause index builds on the collection using a fail point.
+        assert.commandWorked(coll.insert({a: 1}));
+
+        assert.commandWorked(coll.createIndexes([index]));
     });
 
     // Verify that the index command succeeds.
@@ -133,7 +139,13 @@ stepNames.forEach((stepName) => {
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
 
     assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
-        assert.commandWorked(st.s.getCollection(ns).createIndexes([index]));
+        const coll = st.s.getCollection(ns);
+
+        // Insert document into collection to avoid optimization for index creation on an empty
+        // collection. This allows us to pause index builds on the collection using a fail point.
+        assert.commandWorked(coll.insert({a: 1}));
+
+        assert.commandWorked(coll.createIndexes([index]));
     });
 
     // Verify that the index command succeeds.

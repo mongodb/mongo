@@ -58,6 +58,10 @@ const runFailedIndexBuildInTxn = function(dbName, collName, indexSpec, requestNu
                                  ErrorCodes.NoSuchTransaction);
 };
 
+// Insert document into collection to avoid optimization for index creation on an empty collection.
+// This allows us to pause index builds on the collection using a fail point.
+assert.commandWorked(testColl.insert({a: 1}));
+
 assert.commandWorked(
     testDB.adminCommand({configureFailPoint: 'hangAfterSettingUpIndexBuild', mode: 'alwaysOn'}));
 let joinFirstIndexBuild;
