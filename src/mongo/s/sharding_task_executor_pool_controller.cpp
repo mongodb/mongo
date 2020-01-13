@@ -147,22 +147,22 @@ public:
     explicit ReplicaSetChangeListener(ShardingTaskExecutorPoolController* controller)
         : _controller(controller) {}
 
-    void onFoundSet(const Key& key) override {
+    void onFoundSet(const Key& key) noexcept override {
         // Do nothing
     }
 
-    void onConfirmedSet(const State& state) override {
+    void onConfirmedSet(const State& state) noexcept override {
         stdx::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, state.connStr.getSetName());
         _controller->_addGroup(lk, state);
     }
 
-    void onPossibleSet(const State& state) override {
+    void onPossibleSet(const State& state) noexcept override {
         // Do nothing
     }
 
-    void onDroppedSet(const Key& key) override {
+    void onDroppedSet(const Key& key) noexcept override {
         stdx::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, key);

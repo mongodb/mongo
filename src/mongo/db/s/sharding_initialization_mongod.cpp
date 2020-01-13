@@ -93,10 +93,10 @@ public:
         : _serviceContext(serviceContext) {}
     ~ShardingReplicaSetChangeListener() final = default;
 
-    void onFoundSet(const Key&) final {}
+    void onFoundSet(const Key&) noexcept final {}
 
     // Update the shard identy config string
-    void onConfirmedSet(const State& state) final {
+    void onConfirmedSet(const State& state) noexcept final {
         Grid::get(_serviceContext)
             ->getExecutorPool()
             ->getFixedExecutor()
@@ -134,10 +134,14 @@ public:
                 }
             });
     }
-    void onPossibleSet(const State& state) final {
-        Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
+    void onPossibleSet(const State& state) noexcept final {
+        try {
+            Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
+        } catch (const DBException& ex) {
+            LOG(2) << "Unable to update config server with possible set due to " << ex;
+        }
     }
-    void onDroppedSet(const Key&) final {}
+    void onDroppedSet(const Key&) noexcept final {}
 
 private:
     ServiceContext* _serviceContext;
