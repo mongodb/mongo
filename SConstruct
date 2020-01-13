@@ -3782,12 +3782,18 @@ if get_option('ninja') == 'true':
     if get_option("install-mode") == "hygienic":
         ninja_build = env.Ninja(
             target="new.build.ninja",
-            source=env.Alias("install-all-meta"),
+            source=[
+                env.Alias("install-all-meta"),
+                env.Alias("test-execution-aliases"),
+            ],
         )
     else:
         ninja_build = env.Ninja(
             target="new.build.ninja",
-            source=env.Alias("all"),
+            source=[
+                env.Alias("all"),
+                env.Alias("test-execution-aliases"),
+            ],
         )
 
     from glob import glob
