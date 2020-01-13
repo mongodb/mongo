@@ -223,6 +223,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual Status disableIncrementalBackup(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
+
     virtual StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
         OperationContext* opCtx,
         bool incrementalBackup,

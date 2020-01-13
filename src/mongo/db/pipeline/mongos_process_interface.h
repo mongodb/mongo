@@ -191,9 +191,7 @@ public:
      * a mongos.
      */
     BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                       bool incrementalBackup,
-                                       boost::optional<std::string> thisBackupName,
-                                       boost::optional<std::string> srcBackupName) final {
+                                       const BackupOptions& options) final {
         MONGO_UNREACHABLE;
     }
 

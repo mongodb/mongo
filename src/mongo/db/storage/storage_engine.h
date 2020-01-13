@@ -274,6 +274,14 @@ public:
     }
 
     /**
+     * Disables the storage of incremental backup history until a subsequent incremental backup
+     * cursor is requested.
+     *
+     * The storage engine must release all incremental backup information and resources.
+     */
+    virtual Status disableIncrementalBackup(OperationContext* opCtx) = 0;
+
+    /**
      * When performing an incremental backup, we first need a basis for future incremental backups.
      * The basis will be a full backup called 'thisBackupName'. For future incremental backups, the
      * storage engine will take a backup called 'thisBackupName' which will contain the changes made
