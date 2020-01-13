@@ -80,6 +80,7 @@ if not get_option('ssl') == 'off':
             "ssl_parameters.cpp",
             "ssl_manager_%s.cpp" % (ssl_provider),
             "ssl_stream.cpp",
+            env.Idlc('ssl_parameters.idl')[0],
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',

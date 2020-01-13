@@ -1398,6 +1398,7 @@ StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
 StatusWith<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     ::SSLContextRef ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) {
     auto sniName = getRawSNIServerName(ssl);
+    invariant(!sslGlobalParams.tlsCATrusts);
 
     // Record TLS version stats
     auto tlsVersionStatus = mapTLSVersion(ssl);

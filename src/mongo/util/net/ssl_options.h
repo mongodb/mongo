@@ -30,11 +30,16 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/role_name.h"
 
 namespace mongo {
 
@@ -49,6 +54,8 @@ class Environment;
 }  // namespace optionenvironment
 
 struct SSLParams {
+    using TLSCATrusts = std::map<SHA256Block, std::set<RoleName>>;
+
     enum class Protocols { TLS1_0, TLS1_1, TLS1_2, TLS1_3 };
     AtomicInt32 sslMode;            // --sslMode - the TLS operation mode, see enum SSLModes
     std::string sslPEMTempDHParam;  // --setParameter OpenSSLDiffieHellmanParameters=file : PEM file
@@ -61,6 +68,8 @@ struct SSLParams {
     std::string sslClusterCAFile;    // --sslClusterCAFile
     std::string sslCRLFile;          // --sslCRLFile
     std::string sslCipherConfig;     // --sslCipherConfig
+
+    boost::optional<TLSCATrusts> tlsCATrusts;  // --setParameter tlsCATrusts
 
     struct CertificateSelector {
         std::string subject;
