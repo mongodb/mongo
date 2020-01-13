@@ -571,15 +571,11 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-BackupCursorState MongoInterfaceStandalone::openBackupCursor(
-    OperationContext* opCtx,
-    bool incrementalBackup,
-    boost::optional<std::string> thisBackupName,
-    boost::optional<std::string> srcBackupName) {
+BackupCursorState MongoInterfaceStandalone::openBackupCursor(OperationContext* opCtx,
+                                                             const BackupOptions& options) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
-        return backupCursorHooks->openBackupCursor(
-            opCtx, incrementalBackup, thisBackupName, srcBackupName);
+        return backupCursorHooks->openBackupCursor(opCtx, options);
     } else {
         uasserted(50956, "Backup cursors are an enterprise only feature.");
     }

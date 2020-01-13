@@ -206,9 +206,7 @@ public:
     }
 
     BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                       bool incrementalBackup,
-                                       boost::optional<std::string> thisBackupName,
-                                       boost::optional<std::string> srcBackupName) final {
+                                       const BackupOptions& options) final {
         return BackupCursorState{UUID::gen(), boost::none, {}};
     }
 
