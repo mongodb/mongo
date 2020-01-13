@@ -377,6 +377,9 @@ struct __wt_connection_stats {
     int64_t cache_eviction_target_page_ge128;
     int64_t cache_eviction_target_page_lt64;
     int64_t cache_eviction_target_page_lt128;
+    int64_t cache_eviction_target_strategy_both_clean_and_dirty;
+    int64_t cache_eviction_target_strategy_clean;
+    int64_t cache_eviction_target_strategy_dirty;
     int64_t cache_eviction_walks_abandoned;
     int64_t cache_eviction_walks_stopped;
     int64_t cache_eviction_walks_gave_up_no_targets;
@@ -407,6 +410,9 @@ struct __wt_connection_stats {
     int64_t cache_inmem_splittable;
     int64_t cache_inmem_split;
     int64_t cache_eviction_internal;
+    int64_t cache_eviction_internal_pages_queued;
+    int64_t cache_eviction_internal_pages_seen;
+    int64_t cache_eviction_internal_pages_already_queued;
     int64_t cache_eviction_split_internal;
     int64_t cache_eviction_split_leaf;
     int64_t cache_bytes_max;
@@ -433,7 +439,12 @@ struct __wt_connection_stats {
     int64_t cache_read_lookaside_delay_checkpoint;
     int64_t cache_pages_requested;
     int64_t cache_eviction_pages_seen;
+    int64_t cache_eviction_pages_already_queued;
     int64_t cache_eviction_fail;
+    int64_t cache_eviction_fail_parent_has_overflow_items;
+    int64_t cache_eviction_fail_active_children_on_an_internal_page;
+    int64_t cache_eviction_fail_in_reconciliation;
+    int64_t cache_eviction_fail_with_newer_modifications_on_a_clean_page;
     int64_t cache_eviction_walk;
     int64_t cache_write;
     int64_t cache_write_restore;

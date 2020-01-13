@@ -387,7 +387,7 @@ worker_async(void *arg)
                 break;
             goto op_err;
         default:
-        op_err:
+op_err:
             lprintf(wtperf, ret, 0, "%s failed for: %s, range: %" PRIu64, op_name(op), key_buf,
               wtperf_value_range(wtperf));
             goto err; /* can't happen */
@@ -717,7 +717,7 @@ worker(void *arg)
             if (ret == WT_NOTFOUND)
                 break;
 
-        op_err:
+op_err:
             if (ret == WT_ROLLBACK && ops_per_txn != 0) {
                 /*
                  * If we are running with explicit transactions configured and we hit a WT_ROLLBACK,

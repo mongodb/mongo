@@ -1425,10 +1425,10 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             recno = WT_INSERT_RECNO(supd->ins);
 
             /* Search the page. */
-            WT_ERR(__wt_col_search(session, recno, ref, &cbt, true));
+            WT_ERR(__wt_col_search(&cbt, recno, ref, true, NULL));
 
             /* Apply the modification. */
-            WT_ERR(__wt_col_modify(session, &cbt, recno, NULL, upd, WT_UPDATE_INVALID, true));
+            WT_ERR(__wt_col_modify(&cbt, recno, NULL, upd, WT_UPDATE_INVALID, true));
             break;
         case WT_PAGE_ROW_LEAF:
             /* Build a key. */
@@ -1447,15 +1447,13 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             WT_ASSERT(session, __wt_count_birthmarks(upd) <= 1);
 
             /* Search the page. */
-            WT_ERR(__wt_row_search(session, key, ref, &cbt, true, true));
+            WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
 
-            /*
-             * Birthmarks should only be applied to on-page values.
-             */
+            /* Birthmarks should only be applied to on-page values. */
             WT_ASSERT(session, cbt.compare == 0 || upd->type != WT_UPDATE_BIRTHMARK);
 
             /* Apply the modification. */
-            WT_ERR(__wt_row_modify(session, &cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
+            WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
             break;
         default:
             WT_ERR(__wt_illegal_value(session, orig->type));

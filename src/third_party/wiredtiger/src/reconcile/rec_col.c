@@ -576,6 +576,7 @@ __wt_rec_col_var(
     last = r->last;
     vpack = &_vpack;
     cbt = &r->update_modify_cbt;
+    cbt->iface.session = (WT_SESSION *)session;
 
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 
@@ -671,7 +672,7 @@ __wt_rec_col_var(
             WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_COL_VAR, vpack, orig));
         }
 
-    record_loop:
+record_loop:
         /*
          * Generate on-page entries: loop repeat records, looking for WT_INSERT entries matching the
          * record number. The WT_INSERT lists are in sorted order, so only need check the next one.
@@ -691,8 +692,7 @@ __wt_rec_col_var(
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
                     cbt->slot = WT_COL_SLOT(page, cip);
-                    WT_ERR(
-                      __wt_value_return_upd(session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                    WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;
@@ -906,8 +906,7 @@ compare:
                      * Impossible slot, there's no backing on-page item.
                      */
                     cbt->slot = UINT32_MAX;
-                    WT_ERR(
-                      __wt_value_return_upd(session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                    WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;

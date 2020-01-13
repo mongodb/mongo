@@ -643,7 +643,10 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction walk target pages histogram - 10-31",
   "cache: eviction walk target pages histogram - 128 and higher",
   "cache: eviction walk target pages histogram - 32-63",
-  "cache: eviction walk target pages histogram - 64-128", "cache: eviction walks abandoned",
+  "cache: eviction walk target pages histogram - 64-128",
+  "cache: eviction walk target strategy both clean and dirty pages",
+  "cache: eviction walk target strategy only clean pages",
+  "cache: eviction walk target strategy only dirty pages", "cache: eviction walks abandoned",
   "cache: eviction walks gave up because they restarted their walk twice",
   "cache: eviction walks gave up because they saw too many pages and found no candidates",
   "cache: eviction walks gave up because they saw too many pages and found too few candidates",
@@ -665,10 +668,12 @@ static const char *const __stats_connection_desc[] = {
   "cache: hazard pointer blocked page eviction", "cache: hazard pointer check calls",
   "cache: hazard pointer check entries walked", "cache: hazard pointer maximum array length",
   "cache: in-memory page passed criteria to be split", "cache: in-memory page splits",
-  "cache: internal pages evicted", "cache: internal pages split during eviction",
-  "cache: leaf pages split during eviction", "cache: maximum bytes configured",
-  "cache: maximum page size at eviction", "cache: modified pages evicted",
-  "cache: modified pages evicted by application threads",
+  "cache: internal pages evicted", "cache: internal pages queued for eviction",
+  "cache: internal pages seen by eviction walk",
+  "cache: internal pages seen by eviction walk that are already queued",
+  "cache: internal pages split during eviction", "cache: leaf pages split during eviction",
+  "cache: maximum bytes configured", "cache: maximum page size at eviction",
+  "cache: modified pages evicted", "cache: modified pages evicted by application threads",
   "cache: operations timed out waiting for space in cache", "cache: overflow pages read into cache",
   "cache: page split during eviction deepened the tree",
   "cache: page written requiring cache overflow records",
@@ -683,9 +688,17 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages read into cache with skipped cache overflow entries needed later",
   "cache: pages read into cache with skipped cache overflow entries needed later by checkpoint",
   "cache: pages requested from the cache", "cache: pages seen by eviction walk",
-  "cache: pages selected for eviction unable to be evicted", "cache: pages walked for eviction",
-  "cache: pages written from cache", "cache: pages written requiring in-memory restoration",
-  "cache: percentage overhead", "cache: tracked bytes belonging to internal pages in the cache",
+  "cache: pages seen by eviction walk that are already queued",
+  "cache: pages selected for eviction unable to be evicted",
+  "cache: pages selected for eviction unable to be evicted as the parent page has overflow items",
+  "cache: pages selected for eviction unable to be evicted because of active children on an "
+  "internal page",
+  "cache: pages selected for eviction unable to be evicted because of failure in reconciliation",
+  "cache: pages selected for eviction unable to be evicted due to newer modifications on a clean "
+  "page",
+  "cache: pages walked for eviction", "cache: pages written from cache",
+  "cache: pages written requiring in-memory restoration", "cache: percentage overhead",
+  "cache: tracked bytes belonging to internal pages in the cache",
   "cache: tracked bytes belonging to leaf pages in the cache",
   "cache: tracked dirty bytes in the cache", "cache: tracked dirty pages in the cache",
   "cache: unmodified pages evicted", "capacity: background fsync file handles considered",
@@ -970,6 +983,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_target_page_ge128 = 0;
     stats->cache_eviction_target_page_lt64 = 0;
     stats->cache_eviction_target_page_lt128 = 0;
+    stats->cache_eviction_target_strategy_both_clean_and_dirty = 0;
+    stats->cache_eviction_target_strategy_clean = 0;
+    stats->cache_eviction_target_strategy_dirty = 0;
     stats->cache_eviction_walks_abandoned = 0;
     stats->cache_eviction_walks_stopped = 0;
     stats->cache_eviction_walks_gave_up_no_targets = 0;
@@ -1000,6 +1016,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_inmem_splittable = 0;
     stats->cache_inmem_split = 0;
     stats->cache_eviction_internal = 0;
+    stats->cache_eviction_internal_pages_queued = 0;
+    stats->cache_eviction_internal_pages_seen = 0;
+    stats->cache_eviction_internal_pages_already_queued = 0;
     stats->cache_eviction_split_internal = 0;
     stats->cache_eviction_split_leaf = 0;
     /* not clearing cache_bytes_max */
@@ -1026,7 +1045,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_read_lookaside_delay_checkpoint = 0;
     stats->cache_pages_requested = 0;
     stats->cache_eviction_pages_seen = 0;
+    stats->cache_eviction_pages_already_queued = 0;
     stats->cache_eviction_fail = 0;
+    stats->cache_eviction_fail_parent_has_overflow_items = 0;
+    stats->cache_eviction_fail_active_children_on_an_internal_page = 0;
+    stats->cache_eviction_fail_in_reconciliation = 0;
+    stats->cache_eviction_fail_with_newer_modifications_on_a_clean_page = 0;
     stats->cache_eviction_walk = 0;
     stats->cache_write = 0;
     stats->cache_write_restore = 0;
@@ -1378,6 +1402,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_target_page_ge128 += WT_STAT_READ(from, cache_eviction_target_page_ge128);
     to->cache_eviction_target_page_lt64 += WT_STAT_READ(from, cache_eviction_target_page_lt64);
     to->cache_eviction_target_page_lt128 += WT_STAT_READ(from, cache_eviction_target_page_lt128);
+    to->cache_eviction_target_strategy_both_clean_and_dirty +=
+      WT_STAT_READ(from, cache_eviction_target_strategy_both_clean_and_dirty);
+    to->cache_eviction_target_strategy_clean +=
+      WT_STAT_READ(from, cache_eviction_target_strategy_clean);
+    to->cache_eviction_target_strategy_dirty +=
+      WT_STAT_READ(from, cache_eviction_target_strategy_dirty);
     to->cache_eviction_walks_abandoned += WT_STAT_READ(from, cache_eviction_walks_abandoned);
     to->cache_eviction_walks_stopped += WT_STAT_READ(from, cache_eviction_walks_stopped);
     to->cache_eviction_walks_gave_up_no_targets +=
@@ -1412,6 +1442,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_inmem_splittable += WT_STAT_READ(from, cache_inmem_splittable);
     to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
     to->cache_eviction_internal += WT_STAT_READ(from, cache_eviction_internal);
+    to->cache_eviction_internal_pages_queued +=
+      WT_STAT_READ(from, cache_eviction_internal_pages_queued);
+    to->cache_eviction_internal_pages_seen +=
+      WT_STAT_READ(from, cache_eviction_internal_pages_seen);
+    to->cache_eviction_internal_pages_already_queued +=
+      WT_STAT_READ(from, cache_eviction_internal_pages_already_queued);
     to->cache_eviction_split_internal += WT_STAT_READ(from, cache_eviction_split_internal);
     to->cache_eviction_split_leaf += WT_STAT_READ(from, cache_eviction_split_leaf);
     to->cache_bytes_max += WT_STAT_READ(from, cache_bytes_max);
@@ -1442,7 +1478,17 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_READ(from, cache_read_lookaside_delay_checkpoint);
     to->cache_pages_requested += WT_STAT_READ(from, cache_pages_requested);
     to->cache_eviction_pages_seen += WT_STAT_READ(from, cache_eviction_pages_seen);
+    to->cache_eviction_pages_already_queued +=
+      WT_STAT_READ(from, cache_eviction_pages_already_queued);
     to->cache_eviction_fail += WT_STAT_READ(from, cache_eviction_fail);
+    to->cache_eviction_fail_parent_has_overflow_items +=
+      WT_STAT_READ(from, cache_eviction_fail_parent_has_overflow_items);
+    to->cache_eviction_fail_active_children_on_an_internal_page +=
+      WT_STAT_READ(from, cache_eviction_fail_active_children_on_an_internal_page);
+    to->cache_eviction_fail_in_reconciliation +=
+      WT_STAT_READ(from, cache_eviction_fail_in_reconciliation);
+    to->cache_eviction_fail_with_newer_modifications_on_a_clean_page +=
+      WT_STAT_READ(from, cache_eviction_fail_with_newer_modifications_on_a_clean_page);
     to->cache_eviction_walk += WT_STAT_READ(from, cache_eviction_walk);
     to->cache_write += WT_STAT_READ(from, cache_write);
     to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);

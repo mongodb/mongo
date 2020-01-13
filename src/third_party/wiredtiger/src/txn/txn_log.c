@@ -81,7 +81,16 @@ __txn_op_log(
 #endif
         switch (upd->type) {
         case WT_UPDATE_MODIFY:
-            WT_RET(__wt_logop_row_modify_pack(session, logrec, fileid, &cursor->key, &value));
+            /*
+             * Write full updates to the log for size-changing modify operations: they aren't
+             * idempotent and recovery cannot guarantee that they will be applied exactly once. We
+             * rely on the cursor value already having the modify applied.
+             */
+            if (__wt_modify_idempotent(upd->data))
+                WT_RET(__wt_logop_row_modify_pack(session, logrec, fileid, &cursor->key, &value));
+            else
+                WT_RET(
+                  __wt_logop_row_put_pack(session, logrec, fileid, &cursor->key, &cursor->value));
             break;
         case WT_UPDATE_STANDARD:
             WT_RET(__wt_logop_row_put_pack(session, logrec, fileid, &cursor->key, &value));
@@ -98,7 +107,10 @@ __txn_op_log(
 
         switch (upd->type) {
         case WT_UPDATE_MODIFY:
-            WT_RET(__wt_logop_col_modify_pack(session, logrec, fileid, recno, &value));
+            if (__wt_modify_idempotent(upd->data))
+                WT_RET(__wt_logop_col_modify_pack(session, logrec, fileid, recno, &value));
+            else
+                WT_RET(__wt_logop_col_put_pack(session, logrec, fileid, recno, &cursor->value));
             break;
         case WT_UPDATE_STANDARD:
             WT_RET(__wt_logop_col_put_pack(session, logrec, fileid, recno, &value));

@@ -41,14 +41,15 @@ err:
  *     Row-store insert, update and delete.
  */
 int
-__wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, const WT_ITEM *key,
-  const WT_ITEM *value, WT_UPDATE *upd_arg, u_int modify_type, bool exclusive)
+__wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, WT_UPDATE *upd_arg,
+  u_int modify_type, bool exclusive)
 {
     WT_DECL_RET;
     WT_INSERT *ins;
     WT_INSERT_HEAD *ins_head, **ins_headp;
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
+    WT_SESSION_IMPL *session;
     WT_UPDATE *old_upd, *upd, **upd_entry;
     size_t ins_size, upd_size;
     uint32_t ins_slot;
@@ -57,6 +58,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, const WT_ITEM *k
 
     ins = NULL;
     page = cbt->ref->page;
+    session = (WT_SESSION_IMPL *)cbt->iface.session;
     upd = upd_arg;
     logged = false;
 
@@ -295,6 +297,7 @@ __wt_update_obsolete_check(
     WT_UPDATE *first, *next, *prev;
     size_t size;
     u_int count;
+    bool upd_visible_all_seen;
 
     txn_global = &S2C(session)->txn_global;
 
@@ -309,21 +312,38 @@ __wt_update_obsolete_check(
      * Only updates with globally visible, self-contained data can terminate
      * update chains.
      *
-     * Birthmarks are a special case: once a birthmark becomes obsolete, it
-     * can be discarded and subsequent reads will see the on-page value (as
-     * expected).  Inserting updates into the lookaside table relies on
-     * this behavior to avoid creating update chains with multiple
-     * birthmarks.
+     * Birthmarks are a special case: once a birthmark becomes obsolete, it can be discarded if
+     * there is a globally visible update before it and subsequent reads will see the on-page value
+     * (as expected). Inserting updates into the lookaside table relies on this behavior to avoid
+     * creating update chains with multiple birthmarks. We cannot discard the birthmark if it's the
+     * first globally visible update as the previous updates can be aborted and be freed causing the
+     * entire update chain being removed.
      */
-    for (first = prev = NULL, count = 0; upd != NULL; prev = upd, upd = upd->next, count++) {
+    for (first = prev = NULL, upd_visible_all_seen = false, count = 0; upd != NULL;
+         prev = upd, upd = upd->next, count++) {
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
+
         if (!__wt_txn_upd_visible_all(session, upd))
             first = NULL;
-        else if (first == NULL && upd->type == WT_UPDATE_BIRTHMARK)
-            first = prev;
-        else if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
-            first = upd;
+        else {
+            if (first == NULL) {
+                /*
+                 * If we have seen a globally visible update before the birthmark, the birthmark can
+                 * be discarded.
+                 */
+                if (upd_visible_all_seen && upd->type == WT_UPDATE_BIRTHMARK)
+                    first = prev;
+                /*
+                 * We cannot discard the birthmark if it is the first globally visible update as the
+                 * previous updates can be aborted resulting the entire update chain being removed.
+                 */
+                else if (upd->type == WT_UPDATE_BIRTHMARK || WT_UPDATE_DATA_VALUE(upd))
+                    first = upd;
+            }
+
+            upd_visible_all_seen = true;
+        }
     }
 
     /*

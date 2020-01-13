@@ -491,6 +491,12 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     if (page->modify->page_state < WT_PAGE_DIRTY &&
       __wt_atomic_add32(&page->modify->page_state, 1) == WT_PAGE_DIRTY_FIRST) {
         __wt_cache_dirty_incr(session, page);
+        /*
+         * In the event we dirty a page which is flagged for eviction soon, we update its read
+         * generation to avoid evicting a dirty page prematurely.
+         */
+        if (page->read_gen == WT_READGEN_WONT_NEED)
+            __wt_cache_read_gen_new(session, page);
 
         /*
          * We won the race to dirty the page, but another thread could
@@ -1348,8 +1354,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * overflow item, because the split into the parent frees the backing blocks for any
      * no-longer-used overflow keys, which will corrupt the checkpoint's block management.
      */
-    if (!__wt_btree_can_evict_dirty(session) && F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
+    if (!__wt_btree_can_evict_dirty(session) && F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_fail_parent_has_overflow_items);
         return (false);
+    }
 
     /*
      * Check for in-memory splits before other eviction tests. If the page should split in-memory,
@@ -1393,8 +1401,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     /*
      * If the page is clean but has modifications that appear too new to evict, skip it.
      */
-    if (!modified && !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp))
+    if (!modified && !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp)) {
+        WT_STAT_CONN_INCR(session, cache_eviction_fail_with_newer_modifications_on_a_clean_page);
         return (false);
+    }
 
     return (true);
 }

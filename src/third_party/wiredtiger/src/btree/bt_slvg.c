@@ -869,7 +869,7 @@ __slvg_col_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
      * Case #5: a_trk is a superset of b_trk and a_trk is more desirable -- discard b_trk.
      */
     if (a_trk->trk_gen > b_trk->trk_gen) {
-    delete_b:
+delete_b:
         /*
          * After page and overflow reconciliation, one (and only one)
          * page can reference an overflow record.  But, if we split a
@@ -1460,7 +1460,7 @@ __slvg_row_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
      * Case #5: a_trk is a superset of b_trk and a_trk is more desirable -- discard b_trk.
      */
     if (a_trk->trk_gen > b_trk->trk_gen) {
-    delete_b:
+delete_b:
         /*
          * After page and overflow reconciliation, one (and only one)
          * page can reference an overflow record.  But, if we split a

@@ -2,6 +2,9 @@
 
 set -o pipefail
 
+t=__wt.$$
+trap 'rm -rf $t' 0 1 2 3 13 15
+
 download_clang_format() {
 	if [ `uname` = "Linux" ]; then
 		curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-3.8-rhel55.tar.gz -o dist/clang-format.tar.gz
@@ -45,16 +48,15 @@ esac
 # Don't format inplace with -i flag.
 # We want to be able to detect modifications.
 for f in $search; do
-	tempfile=$(mktemp)
 	cat "$f" | \
             clang-format --fallback-style=none | \
             python dist/s_goto.py | \
-            python dist/s_comment.py > "$tempfile" || exit 1
-	cmp --silent "$f" "$tempfile"
+            python dist/s_comment.py > "$t" || exit 1
+	cmp --silent "$f" "$t"
 	if test $? -ne 0; then
 		if test $# -eq 0 ; then
 			echo "Modifying $f"
 		fi
-		mv "$tempfile" "$f"
+		cp "$t" "$f"
 	fi
 done

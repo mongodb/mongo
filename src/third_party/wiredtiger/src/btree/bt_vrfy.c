@@ -366,7 +366,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
         goto recno_chk;
     case WT_PAGE_COL_VAR:
         recno = ref->ref_recno;
-    recno_chk:
+recno_chk:
         if (recno != vs->record_total + 1)
             WT_RET_MSG(session, WT_ERROR, "page at %s has a starting record of %" PRIu64
                                           " when the expected starting record is %" PRIu64,
@@ -422,7 +422,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
         case WT_PAGE_COL_INT:
         case WT_PAGE_ROW_INT:
             if (unpack->raw != WT_CELL_ADDR_INT)
-            celltype_err:
+celltype_err:
             WT_RET_MSG(session, WT_ERROR,
               "page at %s, of type %s, is referenced in "
               "its parent by a cell of type %s",

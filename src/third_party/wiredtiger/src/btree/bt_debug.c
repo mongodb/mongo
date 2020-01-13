@@ -700,6 +700,28 @@ __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
 }
 
 /*
+ * __wt_debug_cursor_las --
+ *     Dump the LAS tree given a user cursor.
+ */
+int
+__wt_debug_cursor_las(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_CURSOR *cursor;
+    WT_CURSOR_BTREE *cbt;
+    WT_SESSION_IMPL *las_session;
+
+    cursor = cursor_arg;
+    conn = S2C((WT_SESSION_IMPL *)cursor->session);
+    las_session = conn->cache->las_session[0];
+    if (las_session == NULL)
+        return (0);
+    cbt = (WT_CURSOR_BTREE *)las_session->las_cursor;
+    return (__wt_debug_tree_all(las_session, cbt->btree, NULL, ofile));
+}
+
+/*
  * __debug_tree --
  *     Dump the in-memory information for a tree.
  */

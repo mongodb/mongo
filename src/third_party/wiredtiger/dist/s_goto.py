@@ -6,7 +6,7 @@ import re, sys
 # 1. Zero or more whitespace characters.
 # 2. One or more lowercase ASCII characters.
 # 3. Colon character.
-p = re.compile('^\s*[a-z]+:$')
+p = re.compile('^\s*[a-z_]+:$')
 for line in sys.stdin:
     m = p.search(line)
     if m is not None:

@@ -798,7 +798,7 @@ ops(void *arg)
                 READ_OP_FAILED(true);
             break;
         case REMOVE:
-        remove_instead_of_truncate:
+remove_instead_of_truncate:
             switch (g.type) {
             case ROW:
                 ret = row_remove(tinfo, cursor, positioned);
@@ -886,7 +886,7 @@ ops(void *arg)
                 WRITE_OP_FAILED(false);
             break;
         case UPDATE:
-        update_instead_of_chosen_op:
+update_instead_of_chosen_op:
             ++tinfo->update;
             switch (g.type) {
             case ROW:
@@ -1204,7 +1204,7 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
             } else if (tinfo->keyno > keyno || (!record_gaps && keyno != tinfo->keyno + 1))
                 goto order_error_col;
             if (0) {
-            order_error_col:
+order_error_col:
                 testutil_die(
                   0, "%s returned %" PRIu64 " then %" PRIu64, which, tinfo->keyno, keyno);
             }
@@ -1238,7 +1238,7 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
                     goto order_error_row;
             }
             if (0) {
-            order_error_row:
+order_error_row:
                 testutil_die(0, "%s returned {%.*s} then {%.*s}", which, (int)tinfo->key->size,
                   (char *)tinfo->key->data, (int)key.size, (char *)key.data);
             }

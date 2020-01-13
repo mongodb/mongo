@@ -1605,7 +1605,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     WT_EVICT_ENTRY *end, *evict, *start;
     WT_PAGE *last_parent, *page;
     WT_REF *ref;
-    uint64_t min_pages, pages_seen, pages_queued, refs_walked;
+    uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
+    uint64_t min_pages, pages_already_queued, pages_seen, pages_queued, refs_walked;
     uint32_t read_flags, remaining_slots, target_pages, walk_flags;
     int restarts;
     bool give_up, modified, urgent_queued;
@@ -1666,8 +1667,13 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
      * only looking for dirty pages, search the tree for longer.
      */
     min_pages = 10 * (uint64_t)target_pages;
-    if (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) && !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
+    if (!F_ISSET(cache, WT_CACHE_EVICT_DIRTY) && F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
+        WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_clean);
+    else if (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) && !F_ISSET(cache, WT_CACHE_EVICT_CLEAN)) {
         min_pages *= 10;
+        WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_dirty);
+    } else
+        WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_both_clean_and_dirty);
 
     if (btree->evict_ref == NULL) {
         WT_STAT_CONN_INCR(session, cache_eviction_walk_from_root);
@@ -1723,7 +1729,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
      * Once we hit the page limit, do one more step through the walk in
      * case we are appending and only the last page in the file is live.
      */
-    for (evict = start, pages_queued = pages_seen = refs_walked = 0;
+    internal_pages_already_queued = internal_pages_queued = internal_pages_seen = 0;
+    for (evict = start, pages_already_queued = pages_queued = pages_seen = refs_walked = 0;
          evict < end && (ret == 0 || ret == WT_NOTFOUND);
          last_parent = ref == NULL ? NULL : ref->home,
         ret = __wt_tree_walk_count(session, &ref, &refs_walked, walk_flags)) {
@@ -1791,11 +1798,19 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         modified = __wt_page_is_modified(page);
         page->evict_pass_gen = cache->evict_pass_gen;
 
+        /* count internal pages seen. */
+        if (WT_PAGE_IS_INTERNAL(page))
+            internal_pages_seen++;
+
         /*
          * Use the EVICT_LRU flag to avoid putting pages onto the list multiple times.
          */
-        if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+        if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU)) {
+            pages_already_queued++;
+            if (WT_PAGE_IS_INTERNAL(page))
+                internal_pages_already_queued++;
             continue;
+        }
 
         /* Don't queue dirty pages in trees during checkpoints. */
         if (modified && WT_BTREE_SYNCING(btree))
@@ -1896,6 +1911,10 @@ fast:
         ++pages_queued;
         ++btree->evict_walk_progress;
 
+        /* count internal pages queued. */
+        if (WT_PAGE_IS_INTERNAL(page))
+            internal_pages_queued++;
+
         __wt_verbose(session, WT_VERB_EVICTSERVER, "select: %p, size %" WT_SIZET_FMT, (void *)page,
           page->memory_footprint);
     }
@@ -1950,6 +1969,11 @@ fast:
     WT_STAT_CONN_INCRV(session, cache_eviction_walk, refs_walked);
     WT_STAT_CONN_INCRV(session, cache_eviction_pages_seen, pages_seen);
     WT_STAT_DATA_INCRV(session, cache_eviction_pages_seen, pages_seen);
+    WT_STAT_CONN_INCRV(session, cache_eviction_pages_already_queued, pages_already_queued);
+    WT_STAT_CONN_INCRV(session, cache_eviction_internal_pages_seen, internal_pages_seen);
+    WT_STAT_CONN_INCRV(
+      session, cache_eviction_internal_pages_already_queued, internal_pages_already_queued);
+    WT_STAT_CONN_INCRV(session, cache_eviction_internal_pages_queued, internal_pages_queued);
     WT_STAT_CONN_INCRV(session, cache_eviction_walk_passes, 1);
     WT_STAT_DATA_INCRV(session, cache_eviction_walk_passes, 1);
 

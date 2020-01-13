@@ -1794,7 +1794,7 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session, const char *uri, WT_CO
         goto bad_name;
     p = uri + strlen("helium:");
     if (p[0] == '/' || (t = strchr(p, '/')) == NULL || t[1] == '\0')
-    bad_name:
+bad_name:
     ERET(wt_api, session, EINVAL, "%s: illegal name format", uri);
     len = (size_t)(t - p);
 

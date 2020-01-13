@@ -8,6 +8,55 @@
 
 #include "wt_internal.h"
 
+#define WT_MODIFY_FOREACH_BEGIN(mod, p, nentries, napplied)                    \
+    do {                                                                       \
+        const size_t *__p = p;                                                 \
+        const uint8_t *__data = (const uint8_t *)(__p + (size_t)(nentries)*3); \
+        int __i;                                                               \
+        for (__i = 0; __i < (nentries); ++__i) {                               \
+            memcpy(&(mod).data.size, __p++, sizeof(size_t));                   \
+            memcpy(&(mod).offset, __p++, sizeof(size_t));                      \
+            memcpy(&(mod).size, __p++, sizeof(size_t));                        \
+            (mod).data.data = __data;                                          \
+            __data += (mod).data.size;                                         \
+            if (__i < (napplied))                                              \
+                continue;
+
+#define WT_MODIFY_FOREACH_END \
+    }                         \
+    }                         \
+    while (0)
+
+/*
+ * __wt_modify_idempotent --
+ *     Check if a modify operation is idempotent.
+ */
+bool
+__wt_modify_idempotent(const void *modify)
+{
+    WT_MODIFY mod;
+    size_t tmp;
+    const size_t *p;
+    int nentries;
+
+    /* Get the number of modify entries. */
+    p = modify;
+    memcpy(&tmp, p++, sizeof(size_t));
+    nentries = (int)tmp;
+
+    WT_MODIFY_FOREACH_BEGIN (mod, p, nentries, 0) {
+        /*
+         * If the number of bytes being replaced doesn't match the number of bytes being written,
+         * we're resizing and the operation isn't idempotent.
+         */
+        if (mod.size != mod.data.size)
+            return (false);
+    }
+    WT_MODIFY_FOREACH_END;
+
+    return (true);
+}
+
 /*
  * __wt_modify_pack --
  *     Pack a modify structure into a buffer.

@@ -505,7 +505,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
     bool ovfl_key, upd_saved;
 
     btree = S2BT(session);
+
     cbt = &r->update_modify_cbt;
+    cbt->iface.session = (WT_SESSION *)session;
 
     key = &r->k;
     val = &r->v;
@@ -539,7 +541,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
              * Impossible slot, there's no backing on-page item.
              */
             cbt->slot = UINT32_MAX;
-            WT_RET(__wt_value_return_upd(session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+            WT_RET(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
             WT_RET(__wt_rec_cell_build_val(
               session, r, cbt->iface.value.data, cbt->iface.value.size, (uint64_t)0));
             break;
@@ -620,8 +622,10 @@ __wt_rec_row_leaf(
     const void *p;
 
     btree = S2BT(session);
-    cbt = &r->update_modify_cbt;
     slvg_skip = salvage == NULL ? 0 : salvage->skip;
+
+    cbt = &r->update_modify_cbt;
+    cbt->iface.session = (WT_SESSION *)session;
 
     key = &r->k;
     val = &r->v;
@@ -759,7 +763,7 @@ __wt_rec_row_leaf(
             switch (upd->type) {
             case WT_UPDATE_MODIFY:
                 cbt->slot = WT_ROW_SLOT(page, rip);
-                WT_ERR(__wt_value_return_upd(session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
                 WT_ERR(__wt_rec_cell_build_val(
                   session, r, cbt->iface.value.data, cbt->iface.value.size, (uint64_t)0));
                 dictionary = true;
@@ -911,7 +915,7 @@ build:
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
 
-    leaf_insert:
+leaf_insert:
         /* Write any K/V pairs inserted into the page after this key. */
         if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT(page, rip))) != NULL)
             WT_ERR(__rec_row_leaf_insert(session, r, ins));

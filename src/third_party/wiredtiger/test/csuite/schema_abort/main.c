@@ -487,7 +487,7 @@ thread_ts_run(void *arg)
                 printf("SET STABLE: %" PRIx64 " %" PRIu64 "\n", oldest_ts, oldest_ts);
             }
         } else
-        ts_wait:
+ts_wait:
         __wt_sleep(0, 1000);
     }
     /* NOTREACHED */

@@ -59,7 +59,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, W
  */
 int
 __wt_col_search(
-  WT_SESSION_IMPL *session, uint64_t search_recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt, bool restore)
+  WT_CURSOR_BTREE *cbt, uint64_t search_recno, WT_REF *leaf, bool leaf_safe, bool *leaf_foundp)
 {
     WT_BTREE *btree;
     WT_COL *cip;
@@ -69,10 +69,12 @@ __wt_col_search(
     WT_PAGE *page;
     WT_PAGE_INDEX *pindex, *parent_pindex;
     WT_REF *current, *descent;
+    WT_SESSION_IMPL *session;
     uint64_t recno;
     uint32_t base, indx, limit, read_flags;
     int depth;
 
+    session = (WT_SESSION_IMPL *)cbt->iface.session;
     btree = S2BT(session);
     current = NULL;
 
@@ -88,23 +90,18 @@ __wt_col_search(
     /*
      * We may be searching only a single leaf page, not the full tree. In the normal case where we
      * are searching a tree, check the page's parent keys before doing the full search, it's faster
-     * when the cursor is being re-positioned. Skip this if the page is being re-instantiated in
-     * memory.
+     * when the cursor is being re-positioned. Skip that check if we know the page is the right one
+     * (for example, when re-instantiating a page in memory, in that case we know the target must be
+     * on the current page).
      */
     if (leaf != NULL) {
         WT_ASSERT(session, search_recno != WT_RECNO_OOB);
 
-        if (!restore) {
+        if (!leaf_safe) {
             WT_RET(__check_leaf_key_range(session, recno, leaf, cbt));
-            if (cbt->compare != 0) {
-                /*
-                 * !!!
-                 * WT_CURSOR.search_near uses the slot value to
-                 * decide if there was an on-page match.
-                 */
-                cbt->slot = 0;
+            *leaf_foundp = cbt->compare == 0;
+            if (!*leaf_foundp)
                 return (0);
-            }
         }
 
         current = leaf;

@@ -357,7 +357,7 @@ __verify_dsk_row(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER
             current->size = prefix + unpack->size;
         }
 
-    key_compare:
+key_compare:
         /*
          * Compare the current key against the last key.
          *
@@ -550,7 +550,7 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HE
                 goto match_err;
         } else if (cell_type == WT_CELL_VALUE && last_data != NULL && last_size == unpack->size &&
           memcmp(last_data, unpack->data, last_size) == 0)
-        match_err:
+match_err:
         WT_RET_VRFY(session, "data entries %" PRIu32 " and %" PRIu32
                              " on page at %s are identical and should "
                              "have been run-length encoded",
