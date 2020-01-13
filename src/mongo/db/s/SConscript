@@ -56,6 +56,7 @@ env.Library(
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
         'periodic_balancer_config_refresher.cpp',
+        'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
         'session_catalog_migration_destination.cpp',
@@ -410,7 +411,8 @@ env.CppUnitTest(
         'collection_sharding_state_test.cpp',
         'metadata_manager_test.cpp',
         'persistent_task_store_test.cpp',
-        'persistent_task_queue_test.cpp'
+        'persistent_task_queue_test.cpp',
+        'range_deletion_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',

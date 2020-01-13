@@ -333,6 +333,7 @@ error_codes:
     - {code: 297,name: HierarchicalAcquisitionLevelViolation}
     - {code: 298,name: InvalidServerType}
     - {code: 299,name: OCSPCertificateStatusRevoked}
+    - {code: 300,name: RangeDeletionAbandonedDueToCollectionDrop}
 
     # Error codes 4000-8999 are reserved.
 
