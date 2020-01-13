@@ -39,6 +39,7 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/basic.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/clock_source.h"
 
 namespace mongo::sdam {
@@ -60,7 +61,9 @@ public:
      */
     ServerDescription(ClockSource* clockSource,
                       const IsMasterOutcome& isMasterOutcome,
-                      boost::optional<IsMasterRTT> lastRtt = boost::none);
+                      boost::optional<IsMasterRTT> lastRtt = boost::none,
+                      boost::optional<TopologyVersion> topologyVersion = boost::none,
+                      boost::optional<int> poolResetCounter = boost::none);
 
     /**
      * This determines if a server description is equivalent according to the Server Discovery and
@@ -80,11 +83,13 @@ public:
     const boost::optional<std::string>& getError() const;
     const boost::optional<IsMasterRTT>& getRtt() const;
     const boost::optional<int>& getLogicalSessionTimeoutMinutes() const;
+    int getPoolResetCounter();
 
     // server capabilities
     int getMinWireVersion() const;
     int getMaxWireVersion() const;
     bool isDataBearingServer() const;
+    bool isStreamable() const;
 
     // server 'time'
     const Date_t getLastUpdateTime() const;
@@ -98,6 +103,7 @@ public:
     const std::set<ServerAddress>& getArbiters() const;
     const boost::optional<int>& getSetVersion() const;
     const boost::optional<OID>& getElectionId() const;
+    const boost::optional<TopologyVersion>& getTopologyVersion() const;
 
     BSONObj toBson() const;
     std::string toString() const;
@@ -119,6 +125,8 @@ private:
     void saveHosts(const BSONObj response);
     void saveTags(BSONObj tagsObj);
     void saveElectionId(BSONElement electionId);
+    void saveTopologyVersion(BSONElement topologyVersionField);
+    void saveStreamable(BSONElement streamableField);
 
     static inline const std::string kIsDbGrid = "isdbgrid";
     static inline const double kRttAlpha = 0.2;
@@ -127,6 +135,9 @@ private:
     // is not the server's ismaster.me field, in the case that the server reports an address
     // different from the address the client uses.
     ServerAddress _address;
+
+    // topologyVersion: the server's topology version. Updated upon a significant topology change.
+    boost::optional<TopologyVersion> _topologyVersion;
 
     // error: information about the last error related to this server. Default null.
     boost::optional<std::string> _error;
@@ -183,6 +194,13 @@ private:
 
     // (=) logicalSessionTimeoutMinutes: integer or null. Default null.
     boost::optional<int> _logicalSessionTimeoutMinutes;
+
+    // (=) streamable: whether this server can stream isMaster responses. Default false.
+    bool _streamable = false;
+
+    // (=) poolResetCounter: integer, default 0. Initialized when client first creates connection
+    // pool for server. Incremented on network error or timeout.
+    int _poolResetCounter = 0;
 
     friend class ServerDescriptionBuilder;
 };

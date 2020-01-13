@@ -176,6 +176,30 @@ TEST(ServerDescriptionEqualityTest, ShouldCompareLogicalSessionTimeout) {
     ASSERT_EQUALS(a, a);
 }
 
+TEST(ServerDescriptionEqualityTest, ShouldCompareTopologyVersion) {
+    auto a =
+        *ServerDescriptionBuilder().withTopologyVersion(TopologyVersion(OID::max(), 0)).instance();
+    auto b = *ServerDescriptionBuilder()
+                  .withTopologyVersion(TopologyVersion(OID("000000000000000000000000"), 0))
+                  .instance();
+    ASSERT_NOT_EQUALS(a, b);
+    ASSERT_EQUALS(a, a);
+}
+
+TEST(ServerDescriptionEqualityTest, ShouldCompareStreamable) {
+    auto a = *ServerDescriptionBuilder().withStreamable(true).instance();
+    // Default for _streamble is false.
+    auto b = *ServerDescriptionBuilder().instance();
+    ASSERT_NOT_EQUALS(a, b);
+    ASSERT_EQUALS(a, a);
+}
+
+TEST(ServerDescriptionEqualityTest, ShouldComparePoolResetCounter) {
+    auto a = *ServerDescriptionBuilder().withPoolResetCounter(1).instance();
+    auto b = *ServerDescriptionBuilder().withPoolResetCounter(2).instance();
+    ASSERT_NOT_EQUALS(a, b);
+    ASSERT_EQUALS(a, a);
+}
 
 class ServerDescriptionTestFixture : public SdamTestFixture {
 protected:
@@ -252,10 +276,13 @@ protected:
     static inline const auto kBsonPrimary = okBuilder().append("primary", "foo:1234").obj();
     static inline const auto kBsonLogicalSessionTimeout =
         okBuilder().append("logicalSessionTimeoutMinutes", 1).obj();
+    static inline const auto kTopologyVersion =
+        okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 0).toBSON()).obj();
+    static inline const auto kStreamable = okBuilder().append("streamable", true).obj();
 };
 
 TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsUnknownForIsMasterError) {
-    auto response = IsMasterOutcome("foo:1234", "an error occurred");
+    auto response = IsMasterOutcome("foo:1234", kTopologyVersion, "an error occurred");
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(ServerType::kUnknown, description.getType());
 }
@@ -317,7 +344,7 @@ TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsGhost) {
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreErrorDescription) {
     auto errorMsg = "an error occurred";
-    auto response = IsMasterOutcome("foo:1234", errorMsg);
+    auto response = IsMasterOutcome("foo:1234", kTopologyVersion, errorMsg);
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(errorMsg, *description.getError());
 }
@@ -428,9 +455,37 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreLogicalSessionTimeout) {
                   description.getLogicalSessionTimeoutMinutes());
 }
 
+TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
+    auto response = IsMasterOutcome("foo:1234", kTopologyVersion, mongo::Milliseconds(40));
+    auto topologyVersion =
+        TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+                               kTopologyVersion.getObjectField("topologyVersion"));
+
+    auto description = ServerDescription(clockSource,
+                                         response,
+                                         boost::none /*lastRtt*/,
+                                         topologyVersion,
+                                         boost::none /*poolResetCounter*/);
+    ASSERT_EQUALS(topologyVersion.getProcessId(), description.getTopologyVersion()->getProcessId());
+    ASSERT_EQUALS(topologyVersion.getCounter(), description.getTopologyVersion()->getCounter());
+}
+
+TEST_F(ServerDescriptionTestFixture, ShouldStoreStreamable) {
+    auto response = IsMasterOutcome("foo:1234", kStreamable, mongo::Milliseconds(40));
+    auto description = ServerDescription(clockSource, response);
+    ASSERT_EQUALS(true, description.isStreamable());
+}
+
+TEST_F(ServerDescriptionTestFixture, ShouldStorePoolResetCounter) {
+    auto response = IsMasterOutcome("foo:1234", kStreamable, mongo::Milliseconds(40));
+    auto description = ServerDescription(
+        clockSource, response, boost::none /*lastRtt*/, boost::none /*topologyVersion*/, 1);
+    ASSERT_EQUALS(1, description.getPoolResetCounter());
+}
+
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreServerAddressOnError) {
-    auto response = IsMasterOutcome("foo:1234", "an error occurred");
+    auto response = IsMasterOutcome("foo:1234", kTopologyVersion, "an error occurred");
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(std::string("foo:1234"), description.getAddress());
 }
@@ -451,11 +506,14 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnSuccess) {
     ASSERT_EQUALS(boost::none, description.getElectionId());
     ASSERT_EQUALS(boost::none, description.getPrimary());
     ASSERT_EQUALS(boost::none, description.getLogicalSessionTimeoutMinutes());
+    ASSERT(boost::none == description.getTopologyVersion());
+    ASSERT_EQUALS(false, description.isStreamable());
+    ASSERT_EQUALS(0, description.getPoolResetCounter());
 }
 
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnFailure) {
-    auto response = IsMasterOutcome("foo:1234", "an error occurred");
+    auto response = IsMasterOutcome("foo:1234", kTopologyVersion, "an error occurred");
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(boost::none, description.getLastWriteDate());
     ASSERT_EQUALS(ServerType::kUnknown, description.getType());
@@ -470,5 +528,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnFailure) {
     ASSERT_EQUALS(boost::none, description.getElectionId());
     ASSERT_EQUALS(boost::none, description.getPrimary());
     ASSERT_EQUALS(boost::none, description.getLogicalSessionTimeoutMinutes());
+    ASSERT(boost::none == description.getTopologyVersion());
+    ASSERT_EQUALS(false, description.isStreamable());
+    ASSERT_EQUALS(0, description.getPoolResetCounter());
 }
 };  // namespace mongo::sdam

@@ -276,5 +276,50 @@ TEST_F(TopologyDescriptionTestFixture,
 
     ASSERT_EQUALS(boost::none, topologyDescription.getLogicalSessionTimeoutMinutes());
 }
+
+TEST_F(TopologyDescriptionTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
+    const auto config = SdamConfiguration(kThreeServers);
+    TopologyDescription topologyDescription(config);
+
+    // Deafult topologyVersion is null
+    ASSERT_EQUALS(topologyDescription.getServers().size(), 3);
+    auto serverDescription = topologyDescription.getServers()[1];
+    ASSERT(serverDescription->getTopologyVersion() == boost::none);
+
+    // Create new serverDescription with topologyVersion, topologyDescription should have the new
+    // topologyVersion
+    auto processId = OID("000000000000000000000001");
+    auto newDescription = ServerDescriptionBuilder()
+                              .withType(ServerType::kRSSecondary)
+                              .withAddress(serverDescription->getAddress())
+                              .withMe(serverDescription->getAddress())
+                              .withTopologyVersion(TopologyVersion(processId, 1))
+                              .instance();
+
+    topologyDescription.installServerDescription(newDescription);
+    ASSERT_EQUALS(topologyDescription.getServers().size(), 3);
+    auto topologyVersion = topologyDescription.getServers()[1]->getTopologyVersion();
+    ASSERT(topologyVersion == TopologyVersion(processId, 1));
+}
+
+TEST_F(TopologyDescriptionTestFixture, ShouldNotUpdateTopologyVersionOnError) {
+    const auto config = SdamConfiguration(kThreeServers);
+    TopologyDescription topologyDescription(config);
+
+    // Deafult topologyVersion is null
+    ASSERT_EQUALS(topologyDescription.getServers().size(), 3);
+    auto serverDescription = topologyDescription.getServers()[1];
+    ASSERT(serverDescription->getTopologyVersion() == boost::none);
+
+    auto newDescription = ServerDescriptionBuilder()
+                              .withAddress(serverDescription->getAddress())
+                              .withError("error")
+                              .instance();
+
+    topologyDescription.installServerDescription(newDescription);
+    ASSERT_EQUALS(topologyDescription.getServers().size(), 3);
+    auto topologyVersion = topologyDescription.getServers()[1]->getTopologyVersion();
+    ASSERT(topologyVersion == boost::none);
+}
 };  // namespace sdam
 };  // namespace mongo

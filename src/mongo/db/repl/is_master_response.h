@@ -35,7 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/db/repl/topology_version_gen.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"

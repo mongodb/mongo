@@ -112,7 +112,7 @@ boost::optional<ServerDescriptionPtr> TopologyDescription::installServerDescript
     if (getType() == TopologyType::kSingle) {
         // For Single, there is always one ServerDescription in TopologyDescription.servers;
         // the ServerDescription in TopologyDescription.servers MUST be replaced with the new
-        // ServerDescription.
+        // ServerDescription if the new topologyVersion is >= the old.
         invariant(_servers.size() == 1);
         previousDescription = _servers[0];
         _servers[0] = std::shared_ptr<ServerDescription>(newServerDescription);
@@ -121,6 +121,7 @@ boost::optional<ServerDescriptionPtr> TopologyDescription::installServerDescript
             const auto& currentDescription = *it;
             if (currentDescription->getAddress() == newServerDescription->getAddress()) {
                 previousDescription = *it;
+
                 *it = std::shared_ptr<ServerDescription>(newServerDescription);
                 break;
             }

@@ -56,10 +56,12 @@ public:
     ServerDescriptionBuilder& withError(const std::string& error);
     ServerDescriptionBuilder& withLogicalSessionTimeoutMinutes(
         const boost::optional<int> logicalSessionTimeoutMinutes);
+    ServerDescriptionBuilder& withPoolResetCounter(int poolResetCounter);
 
     // server capabilities
     ServerDescriptionBuilder& withMinWireVersion(int minVersion);
     ServerDescriptionBuilder& withMaxWireVersion(int maxVersion);
+    ServerDescriptionBuilder& withStreamable(bool isStreamable);
 
     // server 'time'
     ServerDescriptionBuilder& withLastWriteDate(const Date_t& lastWriteDate);
@@ -73,6 +75,7 @@ public:
     ServerDescriptionBuilder& withArbiter(const ServerAddress& arbiter);
     ServerDescriptionBuilder& withSetVersion(const int setVersion);
     ServerDescriptionBuilder& withElectionId(const OID& electionId);
+    ServerDescriptionBuilder& withTopologyVersion(TopologyVersion topologyVersion);
 
 private:
     constexpr static auto kServerAddressNotSet = "address.not.set:1234";

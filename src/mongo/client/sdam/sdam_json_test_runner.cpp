@@ -186,7 +186,7 @@ public:
             const auto bsonIsMaster = pair[1].Obj();
 
             if (bsonIsMaster.nFields() == 0) {
-                _isMasterResponses.push_back(IsMasterOutcome(address, "network error"));
+                _isMasterResponses.push_back(IsMasterOutcome(address, BSONObj(), "network error"));
             } else {
                 _isMasterResponses.push_back(IsMasterOutcome(address, bsonIsMaster, kLatency));
             }
