@@ -9,7 +9,9 @@ Import("debugBuild")
 # libunwind.h and link with '-lunwind'. We only need to build enough
 # for that to work.
 #
-# Limited to linux_x86_64 right now.
+# Supported:
+#      linux_x86_64
+#      linux_aarch64
 
 env = env.Clone()
 
@@ -26,6 +28,14 @@ unwind_src_dir = env.Dir("dist/src")
 #     - Replace each .o with the source file (.c or .S) that generated it.
 #     - Ensure the the ${CC} arguments are preserved by SCons.
 unwind_sources = [
+    'dwarf/global.c',
+    'dwarf/Lexpr.c',
+    'dwarf/Lfde.c',
+    'dwarf/Lfind_proc_info-lsb.c',
+    'dwarf/Lfind_unwind_table.c',
+    'dwarf/Lparser.c',
+    'dwarf/Lpe.c',
+    'elf64.c',
     'mi/backtrace.c',
     'mi/dyn-cancel.c',
     'mi/dyn-info-list.c',
@@ -47,48 +57,43 @@ unwind_sources = [
     'mi/Lset_reg.c',
     'mi/mempool.c',
     'mi/strerror.c',
-    'os-linux.c',
-    #
-    # x86_64
-    'x86_64/is_fpreg.c',
-    'x86_64/Lapply_reg_state.c',
-    'x86_64/Lcreate_addr_space.c',
-    'x86_64/Lget_proc_info.c',
-    'x86_64/Lget_save_loc.c',
-    'x86_64/Lglobal.c',
-    'x86_64/Linit.c',
-    'x86_64/Linit_local.c',
-    'x86_64/Linit_remote.c',
-    'x86_64/Los-linux.c',
-    'x86_64/Lregs.c',
-    'x86_64/Lreg_states_iterate.c',
-    'x86_64/Lresume.c',
-    'x86_64/Lstash_frame.c',
-    'x86_64/Lstep.c',
-    'x86_64/Ltrace.c',
-    'x86_64/regname.c',
-    'x86_64/getcontext.S',
-    'x86_64/setcontext.S',
-    #
-    # orig in unwind-elf64
-    'elf64.c',
-    #
-    # orig in unwind-dwarf-local
-    'dwarf/Lexpr.c',
-    'dwarf/Lfde.c',
-    'dwarf/Lfind_proc_info-lsb.c',
-    'dwarf/Lfind_unwind_table.c',
-    'dwarf/Lparser.c',
-    'dwarf/Lpe.c',
-    #
-    # orig in unwind-dwarf-common
-    'dwarf/global.c',
+    'os-${TARGET_OS}.c',
+    '${TARGET_ARCH}/getcontext.S',
+    '${TARGET_ARCH}/is_fpreg.c',
+    '${TARGET_ARCH}/Lapply_reg_state.c',
+    '${TARGET_ARCH}/Lcreate_addr_space.c',
+    '${TARGET_ARCH}/Lget_proc_info.c',
+    '${TARGET_ARCH}/Lget_save_loc.c',
+    '${TARGET_ARCH}/Lglobal.c',
+    '${TARGET_ARCH}/Linit.c',
+    '${TARGET_ARCH}/Linit_local.c',
+    '${TARGET_ARCH}/Linit_remote.c',
+    '${TARGET_ARCH}/Lregs.c',
+    '${TARGET_ARCH}/Lreg_states_iterate.c',
+    '${TARGET_ARCH}/Lresume.c',
+    '${TARGET_ARCH}/Lstash_frame.c',
+    '${TARGET_ARCH}/Lstep.c',
+    '${TARGET_ARCH}/Ltrace.c',
+    '${TARGET_ARCH}/regname.c',
 ]
+
+if env['TARGET_ARCH'] == 'x86_64':
+    unwind_sources.extend([
+        '${TARGET_ARCH}/setcontext.S',
+        '${TARGET_ARCH}/Los-${TARGET_OS}.c',
+    ])
+
+if env['TARGET_ARCH'] == 'aarch64':
+    unwind_sources.extend([
+        '${TARGET_ARCH}/Lis_signal_frame.c',
+    ])
 
 env.Append(
     CCFLAGS=[
         '-fexceptions',
         '-Wno-unused-result',
+        '-Wno-unused-value',
+        '-Wno-unused-variable',
     ])
 
 if env.ToolchainIs('clang'):
@@ -117,7 +122,6 @@ env.Append(
         '_GNU_SOURCE',
     ])
 
-unwind_sources_files = [unwind_src_dir.File(f) for f in unwind_sources]
 env.Library(
     target='unwind',
-    source=unwind_sources_files)
+    source=env.File(unwind_sources, unwind_src_dir))
