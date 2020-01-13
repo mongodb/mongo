@@ -28,7 +28,7 @@
 # This IDL file specifies the fields for TopologyVersion.
 
 global:
-    cpp_namespace: "mongo::repl"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -37,6 +37,7 @@ structs:
     TopologyVersion:
         description: "Clients and servers exchange topologyVersions to determine the relative
                      freshness of topology information in concurrent messages."
+        generate_comparison_operators: true
         fields:
             processId:
                 type: objectid

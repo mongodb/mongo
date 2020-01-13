@@ -139,6 +139,9 @@ const boost::optional<BSONObj>& IsMasterOutcome::getResponse() const {
 const boost::optional<IsMasterRTT>& IsMasterOutcome::getRtt() const {
     return _rtt;
 }
+const boost::optional<TopologyVersion>& IsMasterOutcome::getTopologyVersion() const {
+    return _topologyVersion;
+}
 const std::string& IsMasterOutcome::getErrorMsg() const {
     return _errorMsg;
 }

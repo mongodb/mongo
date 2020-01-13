@@ -41,9 +41,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/split_horizon.h"
-#include "mongo/db/repl/topology_version_gen.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

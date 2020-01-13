@@ -17,7 +17,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/util/clock_sources',
-        '$BUILD_DIR/mongo/db/wire_version'
+        '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/rpc/metadata',
     ],
 )
 
@@ -56,6 +57,12 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='server_description_test',
     source=['server_description_test.cpp'],
+    LIBDEPS=['sdam', 'sdam_test'],
+)
+
+env.CppUnitTest(
+    target='topology_manager_test',
+    source=['topology_manager_test.cpp'],
     LIBDEPS=['sdam', 'sdam_test'],
 )
 

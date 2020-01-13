@@ -491,7 +491,7 @@ void ReplicationCoordinatorEmbedded::updateAndLogStateTransitionMetrics(
 std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::awaitIsMasterResponse(
     OperationContext* opCtx,
     const repl::SplitHorizon::Parameters& horizonParams,
-    boost::optional<repl::TopologyVersion> previous,
+    boost::optional<TopologyVersion> previous,
     boost::optional<Date_t> deadline) const {
     UASSERT_NOT_IMPLEMENTED;
 };

@@ -26,11 +26,31 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/client/sdam/topology_manager.h"
 
 #include "mongo/client/sdam/topology_state_machine.h"
+#include "mongo/util/log.h"
 
 namespace mongo::sdam {
+
+namespace {
+
+// Compare topologyVersions. If the isMaster response has topologyVersion < lastServerDescription's
+// toplogyVersion, we will ignore this reply because the lastServerDescription is fresher.
+bool isStaleTopologyVersion(boost::optional<TopologyVersion> lastTopologyVersion,
+                            boost::optional<TopologyVersion> newTopologyVersion) {
+    if (lastTopologyVersion && newTopologyVersion &&
+        (lastTopologyVersion.get() > newTopologyVersion.get())) {
+        return true;
+    }
+
+    return false;
+}
+
+}  // namespace
+
 TopologyManager::TopologyManager(SdamConfiguration config, ClockSource* clockSource)
     : _config(std::move(config)),
       _clockSource(clockSource),
@@ -40,13 +60,40 @@ TopologyManager::TopologyManager(SdamConfiguration config, ClockSource* clockSou
 void TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome) {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
 
+    boost::optional<IsMasterRTT> lastRTT;
+    boost::optional<TopologyVersion> lastTopologyVersion;
+    boost::optional<int> lastPoolResetCounter;
+
     const auto& lastServerDescription =
         _topologyDescription->findServerByAddress(isMasterOutcome.getServer());
-    boost::optional<IsMasterRTT> lastRTT =
-        (lastServerDescription) ? (*lastServerDescription)->getRtt() : boost::none;
+    if (lastServerDescription) {
+        lastRTT = (*lastServerDescription)->getRtt();
+        lastTopologyVersion = (*lastServerDescription)->getTopologyVersion();
+        lastPoolResetCounter = (*lastServerDescription)->getPoolResetCounter();
+    }
 
-    auto newServerDescription =
-        std::make_shared<ServerDescription>(_clockSource, isMasterOutcome, lastRTT);
+    boost::optional<TopologyVersion> newTopologyVersion = isMasterOutcome.getTopologyVersion();
+    boost::optional<int> poolResetCounter = boost::none;
+    if (isMasterOutcome.isSuccess()) {
+        if (isStaleTopologyVersion(lastTopologyVersion, newTopologyVersion)) {
+            log() << "Ignoring this isMaster response because our topologyVersion: "
+                  << lastTopologyVersion->toBSON()
+                  << "is fresher than the provided topologyVersion: "
+                  << newTopologyVersion->toBSON();
+            return;
+        }
+
+        // Maintain the poolResetCounter.
+        poolResetCounter = lastPoolResetCounter;
+    } else {
+        // Bump the poolResetCounter on error if we have one established already.
+        if (lastServerDescription) {
+            poolResetCounter = ++lastPoolResetCounter.get();
+        }
+    }
+
+    auto newServerDescription = std::make_shared<ServerDescription>(
+        _clockSource, isMasterOutcome, lastRTT, newTopologyVersion, poolResetCounter);
 
     auto newTopologyDescription = std::make_unique<TopologyDescription>(*_topologyDescription);
     _topologyStateMachine->onServerDescription(*newTopologyDescription, newServerDescription);

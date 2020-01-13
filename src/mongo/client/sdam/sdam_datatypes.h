@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/duration.h"
 
 
@@ -80,16 +81,29 @@ class IsMasterOutcome {
 public:
     // success constructor
     IsMasterOutcome(ServerAddress server, BSONObj response, IsMasterRTT rtt)
-        : _server(std::move(server)), _success(true), _response(response), _rtt(rtt) {}
+        : _server(std::move(server)), _success(true), _response(response), _rtt(rtt) {
+        const auto topologyVersionField = response.getField("topologyVersion");
+        if (topologyVersionField) {
+            _topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+                                                      topologyVersionField.Obj());
+        }
+    }
 
     // failure constructor
-    IsMasterOutcome(ServerAddress server, std::string errorMsg)
-        : _server(std::move(server)), _success(false), _errorMsg(errorMsg) {}
+    IsMasterOutcome(ServerAddress server, BSONObj response, std::string errorMsg)
+        : _server(std::move(server)), _success(false), _errorMsg(errorMsg) {
+        const auto topologyVersionField = response.getField("topologyVersion");
+        if (topologyVersionField) {
+            _topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+                                                      topologyVersionField.Obj());
+        }
+    }
 
     const ServerAddress& getServer() const;
     bool isSuccess() const;
     const boost::optional<BSONObj>& getResponse() const;
     const boost::optional<IsMasterRTT>& getRtt() const;
+    const boost::optional<TopologyVersion>& getTopologyVersion() const;
     const std::string& getErrorMsg() const;
 
 private:
@@ -102,6 +116,9 @@ private:
     boost::optional<BSONObj> _response;
     // the round trip time to execute the command (or null if it failed)
     boost::optional<IsMasterRTT> _rtt;
+    // indicates how fresh the topology information in this reponse is (or boost::none if it failed
+    // or the response did not include this)
+    boost::optional<TopologyVersion> _topologyVersion;
 };
 
 class ServerDescription;
