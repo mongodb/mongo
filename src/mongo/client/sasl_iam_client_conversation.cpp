@@ -92,6 +92,22 @@ iam::AWSCredentials SaslIAMClientConversation::_getUserCredentials() const {
 }
 
 iam::AWSCredentials SaslIAMClientConversation::_getLocalAWSCredentials() const {
+    // Check the environment variables
+    // These are set by AWS Lambda to pass in credentials and can be set by users.
+    StringData awsAccessKeyId = getenv("AWS_ACCESS_KEY_ID");
+    StringData awsSecretAccessKey = getenv("AWS_SECRET_ACCESS_KEY");
+    StringData awsSessionToken = getenv("AWS_SESSION_TOKEN");
+
+    if (!awsAccessKeyId.empty() && !awsSecretAccessKey.empty()) {
+        if (!awsSessionToken.empty()) {
+            return iam::AWSCredentials(awsAccessKeyId.toString(),
+                                       awsSecretAccessKey.toString(),
+                                       awsSessionToken.toString());
+        }
+
+        return iam::AWSCredentials(awsAccessKeyId.toString(), awsSecretAccessKey.toString());
+    }
+
     StringData ecsMetadata = getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
     if (!ecsMetadata.empty()) {
         return _getEcsCredentials(ecsMetadata);
