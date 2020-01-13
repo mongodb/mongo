@@ -1136,6 +1136,27 @@ void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
     _backupSession.reset();
 }
 
+Status WiredTigerKVEngine::disableIncrementalBackup(OperationContext* opCtx) {
+    // Opening an incremental backup cursor with the "force_stop=true" configuration option then
+    // closing the cursor will set a flag in WiredTiger that causes it to release all incremental
+    // information and resources.
+    // Opening a subsequent incremental backup cursor will reset the flag in WiredTiger and
+    // reinstate incremental backup history.
+    uassert(31401, "Cannot open backup cursor with in-memory storage engine.", !isEphemeral());
+
+    auto sessionRaii = std::make_unique<WiredTigerSession>(_conn);
+    WT_CURSOR* cursor = nullptr;
+    WT_SESSION* session = sessionRaii->getSession();
+    int wtRet =
+        session->open_cursor(session, "backup:", nullptr, "incremental=(force_stop=true)", &cursor);
+    if (wtRet != 0) {
+        error() << "Could not open a backup cursor to disable incremental backups";
+        return wtRCToStatus(wtRet);
+    }
+
+    return Status::OK();
+}
+
 StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx,
     bool incrementalBackup,

@@ -666,6 +666,10 @@ void StorageEngineImpl::endBackup(OperationContext* opCtx) {
     _inBackupMode = false;
 }
 
+Status StorageEngineImpl::disableIncrementalBackup(OperationContext* opCtx) {
+    return _engine->disableIncrementalBackup(opCtx);
+}
+
 StatusWith<std::vector<StorageEngine::BackupBlock>> StorageEngineImpl::beginNonBlockingBackup(
     OperationContext* opCtx,
     bool incrementalBackup,

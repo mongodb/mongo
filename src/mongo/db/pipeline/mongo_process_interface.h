@@ -50,6 +50,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/s/chunk_version.h"
 
@@ -370,9 +371,7 @@ public:
      * The following methods forward to the BackupCursorHooks decorating the ServiceContext.
      */
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                               bool incrementalBackup,
-                                               boost::optional<std::string> thisBackupName,
-                                               boost::optional<std::string> srcBackupName) = 0;
+                                               const BackupOptions& options) = 0;
 
     virtual void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) = 0;
 
