@@ -273,10 +273,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * be replicated to all nodes and should not be rolled back.
      */
     this.transitionToSteadyStateOperations = function({skipDataConsistencyChecks = false} = {}) {
-        const isMajorityReadConcernEnabledOnRollbackNode =
-            assert.commandWorked(curSecondary.adminCommand({serverStatus: 1}))
-                .storageEngine.supportsCommittedReads;
-        if (isMajorityReadConcernEnabledOnRollbackNode) {
+        if (this.isMajorityReadConcernEnabledOnRollbackNode) {
             log(`Waiting for rollback to complete on ${curSecondary.host}`, true);
             let rbid = -1;
             assert.soon(() => {
@@ -361,6 +358,12 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // rolled back.
         rst.awaitSecondaryNodes(null, [curSecondary, tiebreakerNode]);
         rst.awaitReplication(null, null, [curSecondary]);
+
+        // The current primary will be the node that rolls back. Check if it supports majority reads
+        // here while we are in a steady state.
+        this.isMajorityReadConcernEnabledOnRollbackNode =
+            assert.commandWorked(curPrimary.adminCommand({serverStatus: 1}))
+                .storageEngine.supportsCommittedReads;
 
         transitionIfAllowed(State.kRollbackOps);
 
