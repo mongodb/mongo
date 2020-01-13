@@ -39,6 +39,7 @@
 #include <boost/filesystem.hpp>
 #include <fstream>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
@@ -63,6 +64,7 @@ using std::stringstream;
  * threads.
  */
 namespace shell_utils {
+namespace {
 
 BSONObj listFiles(const BSONObj& _args, void* data) {
     BSONObj cd = BSON("0"
@@ -370,6 +372,71 @@ BSONObj getFileMode(const BSONObj& a, void* data) {
     return BSON("" << fileStatus.permissions());
 }
 
+// The name of the file to dump is provided as a string in the first
+// field of the 'a' object. Other arguments in the BSONObj are
+// ignored. The void* argument is unused.
+BSONObj readDumpFile(const BSONObj& a, void*) {
+    uassert(31404,
+            "readDumpFile() takes one argument: the path to a file",
+            a.nFields() == 1 && a.firstElementType() == String);
+
+    // Open the file for reading in binary mode.
+    const auto pathStr = a.firstElement().String();
+    boost::filesystem::ifstream stream(pathStr, std::ios::in | std::ios::binary);
+    uassert(31405,
+            str::stream() << "readDumpFile(): Unable to open file \"" << pathStr
+                          << "\" for reading",
+            stream);
+
+    // Consume the contents of the file into a std::string, or bail out
+    // if there is more data in the file or stream than we can handle.
+    std::string contents;
+    while (stream) {
+        char buffer[4096];
+        stream.read(buffer, sizeof(buffer));
+        contents.append(buffer, stream.gcount());
+
+        // Check that the size of the data can fit into the BSON shape
+        // { "" : [ ... ] }, which has 12 bytes of overhead.
+        uassert(31406,
+                str::stream() << "readDumpFile(): file \"" << pathStr
+                              << "\" too big to load as a variable",
+                contents.size() <= (BSONObj::DefaultSizeTrait::MaxSize - 12));
+    }
+
+    // Construct our return shape
+    BSONObjBuilder builder;
+    BSONArrayBuilder array(builder.subarrayStart(""));
+
+    // Walk the data we read out of the file and interpret it as a series
+    // of contiguous BSON objects. Validate the BSON objects we find and insert
+    // them into the results array.
+    ConstDataRangeCursor cursor(contents.data(), contents.size());
+    while (!cursor.empty()) {
+
+        // Record the amount of valid data ahead of us before
+        // advancing the cursor so we can use it as an argument to
+        // validate below. It would be nice and proper to use
+        // Validated<BSONObj> for all of this instead, but
+        // unfortunately the BSONObj specialization of Validated
+        // depends on a server parameter, so we do it manually.
+        const auto valid = cursor.length();
+
+        const auto swObj = cursor.readAndAdvanceNoThrow<BSONObj>();
+        uassertStatusOK(swObj);
+
+        const auto obj = swObj.getValue();
+        uassertStatusOK(validateBSON(obj.objdata(), valid, BSONVersion::kLatest));
+
+        array.append(obj);
+    }
+
+    array.doneFast();
+    return builder.obj();
+}
+
+}  // namespace
+
 void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getHostName", getHostName);
     scope.injectNative("removeFile", removeFile);
@@ -386,6 +453,8 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("passwordPrompt", passwordPrompt);
     scope.injectNative("umask", changeUmask);
     scope.injectNative("getFileMode", getFileMode);
+    scope.injectNative("_readDumpFile", readDumpFile);
 }
+
 }  // namespace shell_utils
 }  // namespace mongo

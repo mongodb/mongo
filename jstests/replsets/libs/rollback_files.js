@@ -60,19 +60,14 @@ function checkRollbackFiles(dbPath, nss, uuid, expectedDocs) {
         return;
     }
 
-    // Windows doesn't always play nice with the bsondump tool and the way we pass arguments to it.
-    // Checking the existence of the rollback directory above should be sufficient on Windows.
-    if (_isWindows()) {
-        print("Bypassing check of rollback file data on Windows.");
-        return;
-    }
-
-    // Parse the BSON rollback file and check for the right documents. The documents may be written
-    // out in an arbitrary order so we just check the document set.
-    let tmpJSONFile = rollbackDir + "/rollback_tmp.json";
-    let exitCode =
-        MongoRunner.runMongoTool("bsondump", {outFile: tmpJSONFile, bsonFile: rollbackFile});
-    assert.eq(exitCode, 0, "bsondump failed to parse the rollback file");
-    let docs = cat(tmpJSONFile).split("\n").filter(l => l.length).map(JSON.parse);
-    assert.sameMembers(docs, expectedDocs);
+    // Parse the BSON rollback file and check for the right
+    // documents. The documents may be written out in an arbitrary
+    // order so we just check the document set.
+    //
+    // Users are expected to consume these files with
+    // bsondump. However, we use a shell builtin do do this testing so
+    // that we don't have a dependency on the go tools in order to
+    // test the server.
+    const rollbackContents = _readDumpFile(rollbackFile);
+    assert.sameMembers(rollbackContents, expectedDocs);
 }
