@@ -53,7 +53,7 @@ void ReplicaSetChangeNotifier::_removeListener(Listener* listener) {
     listeners.erase(std::remove(listeners.begin(), listeners.end(), listener), listeners.end());
 }
 
-void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) {
+void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
     LOG(2) << "Signaling found set " << name;
 
     stdx::unique_lock<Latch> lk(_mutex);
@@ -68,7 +68,7 @@ void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) {
     };
 }
 
-void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) {
+void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) noexcept {
     LOG(2) << "Signaling possible set " << connectionString;
 
     const auto& name = connectionString.getSetName();
@@ -95,7 +95,7 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
 
 void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
                                               HostAndPort primary,
-                                              std::set<HostAndPort> passives) {
+                                              std::set<HostAndPort> passives) noexcept {
     LOG(2) << "Signaling confirmed set " << connectionString << " with primary " << primary;
 
     const auto& name = connectionString.getSetName();
@@ -120,7 +120,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
     };
 }
 
-void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) {
+void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) noexcept {
     LOG(2) << "Signaling dropped set " << name;
 
     stdx::unique_lock<Latch> lk(_mutex);

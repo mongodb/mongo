@@ -457,9 +457,9 @@ public:
         : _serviceContext(serviceContext) {}
     ~ShardingReplicaSetChangeListener() final = default;
 
-    void onFoundSet(const Key& key) final {}
+    void onFoundSet(const Key& key) noexcept final {}
 
-    void onConfirmedSet(const State& state) final {
+    void onConfirmedSet(const State& state) noexcept final {
         auto connStr = state.connStr;
 
         auto fun = [serviceContext = _serviceContext, connStr](auto args) {
@@ -491,11 +491,15 @@ public:
         uassertStatusOK(schedStatus);
     }
 
-    void onPossibleSet(const State& state) final {
-        Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
+    void onPossibleSet(const State& state) noexcept final {
+        try {
+            Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
+        } catch (const DBException& ex) {
+            LOG(2) << "Unable to update sharding state with possible set due to " << ex;
+        }
     }
 
-    void onDroppedSet(const Key& key) final {}
+    void onDroppedSet(const Key& key) noexcept final {}
 
 private:
     ServiceContext* _serviceContext;

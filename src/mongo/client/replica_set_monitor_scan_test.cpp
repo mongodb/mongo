@@ -1423,21 +1423,21 @@ public:
               << "(" << state.generation << ") " << state.connStr << " | " << state.primary;
     }
 
-    void onFoundSet(const Key& key) override {
+    void onFoundSet(const Key& key) noexcept override {
         lastFoundSetId = ++eventId;
         logEvent("FoundSet", key);
     }
-    void onPossibleSet(const State& state) override {
+    void onPossibleSet(const State& state) noexcept override {
         lastPossibleSetId = ++eventId;
         logEvent("PossibleSet", state);
         lastState = state;
     }
-    void onConfirmedSet(const State& state) override {
+    void onConfirmedSet(const State& state) noexcept override {
         lastConfirmedSetId = ++eventId;
         logEvent("ConfirmedSet", state);
         lastState = state;
     }
-    void onDroppedSet(const Key& key) override {
+    void onDroppedSet(const Key& key) noexcept override {
         lastDroppedSetId = ++eventId;
         logEvent("DroppedSet", key);
     }
