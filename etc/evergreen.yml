@@ -307,6 +307,7 @@ variables:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.gcm
   - name: external_auth
+  - name: external_auth_aws
   - name: external_auth_windows
     distros:
     - windows-64-2016
@@ -5842,6 +5843,55 @@ tasks:
       resmoke_args: --suites=external_auth --excludeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: external_auth_aws
+  commands:
+  - func: "do setup"
+  - command: shell.exec
+    params:
+      working_dir: src
+      silent: true
+      shell: bash
+      script: |
+        set -o errexit
+        cat <<EOF > aws_e2e_setup.json
+        {
+            "iam_auth_ecs_account" : "${iam_auth_ecs_account}",
+            "iam_auth_ecs_secret_access_key" : "${iam_auth_ecs_secret_access_key}",
+            "iam_auth_ecs_account_arn": "arn:aws:iam::557821124784:user/authtest_fargate_user",
+            "iam_auth_ecs_cluster": "${iam_auth_ecs_cluster}",
+            "iam_auth_ecs_task_definition": "${iam_auth_ecs_task_definition}",
+            "iam_auth_ecs_subnet_a": "${iam_auth_ecs_subnet_a}",
+            "iam_auth_ecs_subnet_b": "${iam_auth_ecs_subnet_b}",
+            "iam_auth_ecs_security_group": "${iam_auth_ecs_security_group}"
+
+        }
+        EOF
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${activate_virtualenv}
+
+        # Not all git get project calls clone into ${workdir}/src so we allow
+        # callers to tell us where the pip requirements files are.
+        pip_dir="${pip_dir}"
+        if [[ -z $pip_dir ]]; then
+          # Default to most common location
+          pip_dir="${workdir}/src/etc/pip"
+        fi
+
+        # Same as above we have to use quotes to preserve the
+        # Windows path separator
+        external_auth_txt="$pip_dir/components/aws.req"
+        python -m pip install -r "$external_auth_txt"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=external_auth_aws --storageEngine=wiredTiger
+
+
+- <<: *task_template
   name: external_auth_windows
   commands:
   - func: "do setup"
@@ -8561,6 +8611,8 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common
@@ -9294,6 +9346,7 @@ buildvariants:
     - windows-64-vs2017-compile
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
+  - name: external_auth_aws
   - name: external_auth_windows
     distros:
     - windows-64-2016
@@ -10162,6 +10215,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
+  - name: external_auth_aws
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -10222,6 +10276,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
+  - name: external_auth_aws
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -10300,6 +10355,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
+  - name: external_auth_aws
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -11798,6 +11854,7 @@ buildvariants:
   - name: .encrypt
   - name: free_monitoring
   - name: external_auth
+  - name: external_auth_aws
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
   - name: .jscore .common
