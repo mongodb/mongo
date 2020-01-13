@@ -461,15 +461,17 @@ add_option("cxx-std",
 
 def find_mongo_custom_variables():
     files = []
-    for path in sys.path:
+    paths = [path for path in sys.path if 'site_scons' in path]
+    for path in paths:
         probe = os.path.join(path, 'mongo_custom_variables.py')
         if os.path.isfile(probe):
             files.append(probe)
     return files
 
 add_option('variables-files',
-    default=find_mongo_custom_variables(),
-    help="Specify variables files to load",
+    default=[],
+    action="append",
+    help="Specify variables files to load.",
 )
 
 link_model_choices = ['auto', 'object', 'static', 'dynamic', 'dynamic-strict', 'dynamic-sdk']
@@ -651,9 +653,23 @@ def variable_distsrc_converter(val):
         return val + "/"
     return val
 
-variables_files = variable_shlex_converter(get_option('variables-files'))
-for file in variables_files:
-    print("Using variable customization file {}".format(file))
+# Apply the default variables files, and walk the provided
+# arguments. Interpret any falsy argument (like the empty string) as
+# resetting any prior state. This makes the argument
+# --variables-files= destructive of any prior variables files
+# arguments, including the default.
+variables_files_args = get_option('variables-files')
+variables_files = find_mongo_custom_variables()
+for variables_file in variables_files_args:
+    if variables_file:
+        variables_files.append(variables_file)
+    else:
+        variables_files = []
+for vf in variables_files:
+    if os.path.isfile(vf):
+        print("Using variable customization file {}".format(vf))
+    else:
+        print("IGNORING missing variable customization file {}".format(vf))
 
 # Attempt to prevent confusion between the different ways of
 # specifying file placement between hygienic and non-hygienic
