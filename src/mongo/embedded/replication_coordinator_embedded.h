@@ -263,6 +263,11 @@ public:
 
     void attemptToAdvanceStableTimestamp() override;
 
+    void updateAndLogStateTransitionMetrics(
+        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        const size_t numOpsKilled,
+        const size_t numOpsRunning) const override;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

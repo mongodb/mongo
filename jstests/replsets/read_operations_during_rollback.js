@@ -1,23 +1,15 @@
 /*
  * This test makes sure 'find' and 'getMore' commands fail correctly during rollback.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
 "use strict";
 
 load("jstests/replsets/libs/rollback_test.js");
+load("jstests/replsets/rslib.js");
 
 const dbName = "test";
 const collName = "coll";
-
-let setFailPoint = (node, failpoint) => {
-    jsTestLog("Setting fail point " + failpoint);
-    assert.commandWorked(node.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
-};
-
-let clearFailPoint = (node, failpoint) => {
-    jsTestLog("Clearing fail point " + failpoint);
-    assert.commandWorked(node.adminCommand({configureFailPoint: failpoint, mode: "off"}));
-};
 
 // Set up Rollback Test.
 let rollbackTest = new RollbackTest();
@@ -90,6 +82,15 @@ assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand(
 clearFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 
 rollbackTest.transitionToSteadyStateOperations();
+
+const replMetrics = assert.commandWorked(rollbackNode.adminCommand({serverStatus: 1})).metrics.repl;
+assert.eq(replMetrics.stateTransition.lastStateTransition, "rollback");
+assert(replMetrics.stateTransition.userOperationsRunning,
+       () => "Response should have a 'stateTransition.userOperationsRunning' field: " +
+           tojson(replMetrics));
+assert(replMetrics.stateTransition.userOperationsKilled,
+       () => "Response should have a 'stateTransition.userOperationsKilled' field: " +
+           tojson(replMetrics));
 
 // Check the replica set.
 rollbackTest.stop();

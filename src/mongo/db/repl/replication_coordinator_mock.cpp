@@ -558,5 +558,12 @@ void ReplicationCoordinatorMock::attemptToAdvanceStableTimestamp() {
     return;
 }
 
+void ReplicationCoordinatorMock::updateAndLogStateTransitionMetrics(
+    const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+    const size_t numOpsKilled,
+    const size_t numOpsRunning) const {
+    return;
+}
+
 }  // namespace repl
 }  // namespace mongo

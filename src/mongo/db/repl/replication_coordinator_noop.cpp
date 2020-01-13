@@ -466,5 +466,12 @@ void ReplicationCoordinatorNoOp::attemptToAdvanceStableTimestamp() {
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorNoOp::updateAndLogStateTransitionMetrics(
+    const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+    const size_t numOpsKilled,
+    const size_t numOpsRunning) const {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

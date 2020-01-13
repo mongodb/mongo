@@ -99,8 +99,8 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
-MONGO_FAIL_POINT_DEFINE(waitAfterReadCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
+MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not master error resulted in network disconnection.
@@ -587,18 +587,23 @@ bool runCommandImpl(OperationContext* opCtx,
         }
     }
 
-    // This failpoint should affect both getMores and commands which are read-only and thus don't
-    // support writeConcern.
-    if (!shouldWaitForWriteConcern || command->getLogicalOp() == LogicalOp::opGetMore) {
-        MONGO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
-            const BSONObj& data = options.getData();
-            auto db = data["db"].str();
-            if (db.empty() || request.getDatabase() == db) {
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &waitAfterReadCommandFinishesExecution,
-                    opCtx,
-                    "waitAfterReadCommandFinishesExecution");
-            }
+    // This fail point blocks all commands which are running on the specified namespace, or which
+    // are present in the given list of commands. If no namespace or command list are provided, then
+    // the fail point will block all commands.
+    MONGO_FAIL_POINT_BLOCK(waitAfterCommandFinishesExecution, options) {
+        const BSONObj& data = options.getData();
+        auto ns = data["ns"].valueStringDataSafe();
+        auto commands =
+            data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
+
+        // If 'ns' or 'commands' is not set, block for all the namespaces or commands respectively.
+        if ((ns.empty() || invocation->ns().ns() == ns) &&
+            (commands.empty() ||
+             std::any_of(commands.begin(), commands.end(), [&request](auto& element) {
+                 return element.valueStringDataSafe() == request.getCommandName();
+             }))) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
         }
     }
 

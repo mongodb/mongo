@@ -102,15 +102,20 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 
-// Tracks the number of operations killed on step down.
+// Tracks the last state transition performed in this replca set.
+std::string lastStateTransition;
+ServerStatusMetricField<std::string> displayLastStateTransition(
+    "repl.stateTransition.lastStateTransition", &lastStateTransition);
+
+// Tracks the number of operations killed on state transition.
 Counter64 userOpsKilled;
-ServerStatusMetricField<Counter64> displayuserOpsKilled("repl.stepDown.userOperationsKilled",
+ServerStatusMetricField<Counter64> displayUserOpsKilled("repl.stateTransition.userOperationsKilled",
                                                         &userOpsKilled);
 
-// Tracks the number of operations left running on step down.
+// Tracks the number of operations left running on state transition.
 Counter64 userOpsRunning;
-ServerStatusMetricField<Counter64> displayUserOpsRunning("repl.stepDown.userOperationsRunning",
-                                                         &userOpsRunning);
+ServerStatusMetricField<Counter64> displayUserOpsRunning(
+    "repl.stateTransition.userOperationsRunning", &userOpsRunning);
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
@@ -1024,7 +1029,8 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     // internal operations. Although secondaries cannot accept writes, a step up can kill writes
     // that were blocked behind the RSTL lock held by a step down attempt. These writes will be
     // killed with a retryable error code during step up.
-    AutoGetRstlForStepUpStepDown arsu(this, opCtx);
+    AutoGetRstlForStepUpStepDown arsu(
+        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp);
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
@@ -1051,10 +1057,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         }
         invariant(status);
     }
-
-    // Reset the counters on step up.
-    userOpsKilled.decrement(userOpsKilled.get());
-    userOpsRunning.decrement(userOpsRunning.get());
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
     // our election in onTransitionToPrimary(), above.
@@ -1819,15 +1821,38 @@ void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     }
 }
 
-void ReplicationCoordinatorImpl::_updateAndLogStatsOnStepDown(
-    const AutoGetRstlForStepUpStepDown* arsd) const {
-    userOpsRunning.increment(arsd->getUserOpsRunning());
+void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
+    const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+    const size_t numOpsKilled,
+    const size_t numOpsRunning) const {
+
+    // Clear the current metrics before setting.
+    userOpsKilled.decrement(userOpsKilled.get());
+    userOpsRunning.decrement(userOpsRunning.get());
+
+    switch (stateTransition) {
+        case ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp:
+            lastStateTransition = "stepUp";
+            break;
+        case ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown:
+            lastStateTransition = "stepDown";
+            break;
+        case ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback:
+            lastStateTransition = "rollback";
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    userOpsKilled.increment(numOpsKilled);
+    userOpsRunning.increment(numOpsRunning);
 
     BSONObjBuilder bob;
+    bob.append("lastStateTransition", lastStateTransition);
     bob.appendNumber("userOpsKilled", userOpsKilled.get());
     bob.appendNumber("userOpsRunning", userOpsRunning.get());
 
-    log() << "Stepping down from primary, stats: " << bob.obj();
+    log() << "State transition ops metrics: " << bob.obj();
 }
 
 void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
@@ -1850,18 +1875,24 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
             if (locker->wasGlobalLockTakenInModeConflictingWithWrites() ||
                 PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict()) {
                 serviceCtx->killOperation(lk, toKill, reason);
-                userOpsKilled.increment();
+                arsc->incrementUserOpsKilled();
             } else {
-                arsc->incrUserOpsRunningBy();
+                arsc->incrementUserOpsRunning();
             }
         }
     }
 }
 
 ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
-    ReplicationCoordinatorImpl* repl, OperationContext* opCtx, Date_t deadline)
-    : _replCord(repl), _opCtx(opCtx) {
+    ReplicationCoordinatorImpl* repl,
+    OperationContext* opCtx,
+    const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+    Date_t deadline)
+    : _replCord(repl), _opCtx(opCtx), _stateTransition(stateTransition) {
     invariant(_replCord && _opCtx);
+
+    // The state transition should never be rollback within this class.
+    invariant(_stateTransition != ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback);
 
     // Enqueues RSTL in X mode.
     _rstlLock.emplace(_opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
@@ -1912,6 +1943,8 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn()
             if (_stopKillingOps.wait_for(
                     lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
                 log() << "Stopped killing user operations";
+                _replCord->updateAndLogStateTransitionMetrics(
+                    _stateTransition, getUserOpsKilled(), getUserOpsRunning());
                 _killSignaled = false;
                 return;
             }
@@ -1932,11 +1965,19 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_stopAndWaitForKi
     _killOpThread.reset();
 }
 
+size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getUserOpsKilled() const {
+    return _userOpsKilled;
+}
+
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementUserOpsKilled(size_t val) {
+    _userOpsKilled += val;
+}
+
 size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getUserOpsRunning() const {
     return _userOpsRunning;
 }
 
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrUserOpsRunningBy(size_t val) {
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementUserOpsRunning(size_t val) {
     _userOpsRunning += val;
 }
 
@@ -1982,7 +2023,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
     // stepDownUntil deadline instead.
     auto deadline = force ? stepDownUntil : waitUntil;
-    AutoGetRstlForStepUpStepDown arsd(this, opCtx, deadline);
+    AutoGetRstlForStepUpStepDown arsd(
+        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
 
     stdx::unique_lock<Latch> lk(_mutex);
 
@@ -2099,7 +2141,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     yieldLocksForPreparedTransactions(opCtx);
 
     lk.lock();
-    _updateAndLogStatsOnStepDown(&arsd);
 
     // Clear the node's election candidate metrics since it is no longer primary.
     ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
@@ -2672,7 +2713,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
         // Primary node won't be electable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
-        arsd.emplace(this, opCtx);
+        arsd.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
 
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
@@ -2686,7 +2727,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             yieldLocksForPreparedTransactions(opCtx);
 
             lk.lock();
-            _updateAndLogStatsOnStepDown(&arsd.get());
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();

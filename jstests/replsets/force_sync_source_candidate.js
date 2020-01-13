@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/rslib.js");
+
 const failpointName = "forceSyncSourceCandidate";
 
 const rst = new ReplSetTest({
@@ -18,15 +20,13 @@ const rst = new ReplSetTest({
 });
 const nodes = rst.startSet();
 
-function setFailPoint(node, syncSource) {
-    const dataObj = {hostAndPort: syncSource.host};
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn", data: dataObj}));
+function getDataObj(syncSource) {
+    return {hostAndPort: syncSource.host};
 }
 
-setFailPoint(nodes[1], nodes[0]);
-setFailPoint(nodes[2], nodes[1]);
-setFailPoint(nodes[3], nodes[2]);
+setFailPoint(nodes[1], failpointName, getDataObj(nodes[0]));
+setFailPoint(nodes[2], failpointName, getDataObj(nodes[1]));
+setFailPoint(nodes[3], failpointName, getDataObj(nodes[2]));
 
 rst.initiate();
 const primary = rst.getPrimary();

@@ -316,6 +316,11 @@ public:
 
     virtual void attemptToAdvanceStableTimestamp() override;
 
+    virtual void updateAndLogStateTransitionMetrics(
+        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        const size_t numOpsKilled,
+        const size_t numOpsRunning) const override;
+
     virtual void setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites);
 
 private:

@@ -255,6 +255,11 @@ public:
 
     void attemptToAdvanceStableTimestamp() final;
 
+    void updateAndLogStateTransitionMetrics(
+        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        const size_t numOpsKilled,
+        const size_t numOpsRunning) const final;
+
 private:
     ServiceContext* const _service;
 };
