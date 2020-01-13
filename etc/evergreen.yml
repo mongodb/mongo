@@ -5862,8 +5862,11 @@ tasks:
             "iam_auth_ecs_task_definition": "${iam_auth_ecs_task_definition}",
             "iam_auth_ecs_subnet_a": "${iam_auth_ecs_subnet_a}",
             "iam_auth_ecs_subnet_b": "${iam_auth_ecs_subnet_b}",
-            "iam_auth_ecs_security_group": "${iam_auth_ecs_security_group}"
+            "iam_auth_ecs_security_group": "${iam_auth_ecs_security_group}",
 
+            "iam_auth_assume_aws_account" : "${iam_auth_assume_aws_account}",
+            "iam_auth_assume_aws_secret_access_key" : "${iam_auth_assume_aws_secret_access_key}",
+            "iam_auth_assume_role_name" : "${iam_auth_assume_role_name}"
         }
         EOF
   - command: shell.exec
