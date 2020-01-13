@@ -32,9 +32,14 @@
 
 #include "mongo/util/net/ssl_manager.h"
 
+#include <boost/optional.hpp>
+#include <map>
+#include <set>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/role_name.h"
 
 namespace mongo {
 
@@ -44,6 +49,8 @@ class Environment;
 }  // namespace optionenvironment
 
 struct SSLParams {
+    using TLSCATrusts = std::map<SHA256Block, std::set<RoleName>>;
+
     enum class Protocols { TLS1_0, TLS1_1, TLS1_2, TLS1_3 };
     AtomicInt32 sslMode;            // --sslMode - the TLS operation mode, see enum SSLModes
     std::string sslPEMTempDHParam;  // --setParameter OpenSSLDiffieHellmanParameters=file : PEM file
@@ -51,11 +58,14 @@ struct SSLParams {
     std::string sslPEMKeyFile;      // --sslPEMKeyFile
     std::string sslPEMKeyPassword;  // --sslPEMKeyPassword
     std::string sslClusterFile;     // --sslInternalKeyFile
-    std::string sslClusterPassword;               // --sslInternalKeyPassword
-    std::string sslCAFile;                        // --sslCAFile
-    std::string sslClusterCAFile;                 // --sslClusterCAFile
-    std::string sslCRLFile;                       // --sslCRLFile
-    std::string sslCipherConfig;                  // --sslCipherConfig
+    std::string sslClusterPassword;  // --sslInternalKeyPassword
+    std::string sslCAFile;           // --sslCAFile
+    std::string sslClusterCAFile;    // --sslClusterCAFile
+    std::string sslCRLFile;          // --sslCRLFile
+    std::string sslCipherConfig;     // --sslCipherConfig
+
+    boost::optional<TLSCATrusts> tlsCATrusts;  // --setParameter tlsCATrusts
+
     std::vector<Protocols> sslDisabledProtocols;  // --sslDisabledProtocols
     std::vector<Protocols> tlsLogVersions;        // --tlsLogVersion
     bool sslWeakCertificateValidation = false;    // --sslWeakCertificateValidation

@@ -32,28 +32,61 @@
 
 #pragma once
 
+#include <cctype>
 #include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 // can't use hex namespace because it conflicts with hex iostream function
-inline int fromHex(char c) {
+inline StatusWith<char> fromHex(char c) {
     if ('0' <= c && c <= '9')
         return c - '0';
     if ('a' <= c && c <= 'f')
         return c - 'a' + 10;
     if ('A' <= c && c <= 'F')
         return c - 'A' + 10;
-    verify(false);
-    return 0xff;
+    return Status(ErrorCodes::FailedToParse,
+                  str::stream() << "The character " << c << " failed to parse from hex.");
 }
-inline char fromHex(const char* c) {
-    return (char)((fromHex(c[0]) << 4) | fromHex(c[1]));
+inline StatusWith<char> fromHex(const char* c) {
+    if (fromHex(c[0]).isOK() && fromHex(c[1]).isOK()) {
+        return (char)((fromHex(c[0]).getValue() << 4) | fromHex(c[1]).getValue());
+    }
+    return Status(ErrorCodes::FailedToParse,
+                  str::stream() << "The character " << c[0] << c[1]
+                                << " failed to parse from hex.");
 }
-inline char fromHex(StringData c) {
-    return (char)((fromHex(c[0]) << 4) | fromHex(c[1]));
+inline StatusWith<char> fromHex(StringData c) {
+    if (fromHex(c[0]).isOK() && fromHex(c[1]).isOK()) {
+        return (char)((fromHex(c[0]).getValue() << 4) | fromHex(c[1]).getValue());
+    }
+    return Status(ErrorCodes::FailedToParse,
+                  str::stream() << "The character " << c[0] << c[1]
+                                << " failed to parse from hex.");
+}
+
+/**
+ * Decodes 'hexString' into raw bytes, appended to the out parameter 'buf'. Callers must first
+ * ensure that 'hexString' is a valid hex encoding.
+ */
+inline void fromHexString(StringData hexString, BufBuilder* buf) {
+    invariant(hexString.size() % 2 == 0);
+    // Combine every pair of two characters into one byte.
+    for (std::size_t i = 0; i < hexString.size(); i += 2) {
+        buf->appendChar(uassertStatusOK(fromHex(StringData(&hexString.rawData()[i], 2))));
+    }
+}
+
+/**
+ * Returns true if 'hexString' is a valid hexadecimal encoding.
+ */
+inline bool isValidHex(StringData hexString) {
+    // There must be an even number of characters, since each pair encodes a single byte.
+    return hexString.size() % 2 == 0 &&
+        std::all_of(hexString.begin(), hexString.end(), [](char c) { return std::isxdigit(c); });
 }
 
 inline std::string toHex(const void* inRaw, int len) {

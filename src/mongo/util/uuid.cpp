@@ -74,10 +74,10 @@ StatusWith<UUID> UUID::parse(const std::string& s) {
         if (s[j] == '-')
             j++;
 
-        char high = s[j++];
-        char low = s[j++];
+        auto high = uassertStatusOK(fromHex(s[j++]));
+        auto low = uassertStatusOK(fromHex(s[j++]));
 
-        uuid[i] = ((fromHex(high) << 4) | fromHex(low));
+        uuid[i] = ((high << 4) | low);
     }
 
     return UUID{std::move(uuid)};

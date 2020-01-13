@@ -88,6 +88,7 @@ std::string removeFQDNRoot(std::string name) {
     return name;
 };
 
+#ifdef MONGO_CONFIG_SSL
 struct UniqueX509StoreCtxDeleter {
     void operator()(X509_STORE_CTX* ctx) {
         if (ctx) {
@@ -96,6 +97,7 @@ struct UniqueX509StoreCtxDeleter {
     }
 };
 using UniqueX509StoreCtx = std::unique_ptr<X509_STORE_CTX, UniqueX509StoreCtxDeleter>;
+#endif
 
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
@@ -1582,6 +1584,68 @@ StatusWith<TLSVersion> mapTLSVersion(const SSL* conn) {
     }
 }
 
+namespace {
+Status _validatePeerRoles(const stdx::unordered_set<RoleName>& embeddedRoles, SSL* conn) {
+    if (embeddedRoles.empty()) {
+        // Nothing offered, nothing to restrict.
+        return Status::OK();
+    }
+
+    if (!sslGlobalParams.tlsCATrusts) {
+        // Nothing restricted.
+        return Status::OK();
+    }
+
+    const auto& tlsCATrusts = sslGlobalParams.tlsCATrusts.get();
+    if (tlsCATrusts.empty()) {
+        // Nothing permitted.
+        return {ErrorCodes::BadValue,
+                "tlsCATrusts parameter prohibits role based authorization via X509 certificates"};
+    }
+
+    auto stack = SSLgetVerifiedChain(conn);
+    if (!stack || !sk_X509_num(stack.get())) {
+        return {ErrorCodes::BadValue, "Unable to obtain certificate chain"};
+    }
+
+    auto root = sk_X509_value(stack.get(), sk_X509_num(stack.get()) - 1);
+    SHA256Block::HashType digest;
+    if (!X509_digest(root, EVP_sha256(), digest.data(), nullptr)) {
+        return {ErrorCodes::BadValue, "Unable to digest root certificate"};
+    }
+
+    SHA256Block sha256(digest);
+    auto it = tlsCATrusts.find(sha256);
+    if (it == tlsCATrusts.end()) {
+        return {
+            ErrorCodes::BadValue,
+            str::stream() << "CA: " << sha256.toHexString()
+                          << " is not authorized to grant any roles due to tlsCATrusts parameter"};
+    }
+
+    auto allowedRoles = it->second;
+    // See TLSCATrustsSetParameter::set() for a description of tlsCATrusts format.
+    if (allowedRoles.count(RoleName("", ""))) {
+        // CA is authorized for all role assignments.
+        return Status::OK();
+    }
+
+    for (const auto& role : embeddedRoles) {
+        // Check for exact match or wildcard matches.
+        if (!allowedRoles.count(role) && !allowedRoles.count(RoleName(role.getRole(), "")) &&
+            !allowedRoles.count(RoleName("", role.getDB()))) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "CA: " << sha256.toHexString()
+                                  << " is not authorized to grant role "
+                                  << role.toString()
+                                  << " due to tlsCATrusts parameter"};
+        }
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
 StatusWith<SSLPeerInfo> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
     auto sniName = getRawSNIServerName(conn);
@@ -1637,6 +1701,13 @@ StatusWith<SSLPeerInfo> SSLManager::parseAndValidatePeerCertificate(
     StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {
         return swPeerCertificateRoles.getStatus();
+    }
+
+    {
+        auto status = _validatePeerRoles(swPeerCertificateRoles.getValue(), conn);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     // If this is an SSL client context (on a MongoDB server or client)

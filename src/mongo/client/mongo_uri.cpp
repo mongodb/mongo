@@ -92,7 +92,11 @@ mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
                 return Status(ErrorCodes::FailedToParse,
                               "Encountered partial escape sequence at end of string");
             }
-            out << fromHex(toDecode.substr(i + 1, 2));
+            auto swHex = fromHex(toDecode.substr(i + 1, 2));
+            if (!swHex.isOK()) {
+                return swHex.getStatus();
+            }
+            out << swHex.getValue();
             i += 2;
         } else {
             out << c;
