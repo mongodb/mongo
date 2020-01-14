@@ -47,7 +47,6 @@ enums:
             kClientWrite: "ClientWrite"
             kLearnCommitPointFromSyncSourceNeverBeyondLastApplied: "LearnCommitPointFromSyncSourceNeverBeyondLastApplied"
             kLearnCommitPointWithTermCheck: "LearnCommitPointWithTermCheck"
-            kReplSetInitiate: "ReplSetInitiate"
             kRollbackOplog: "RollbackOplog"
 
     RaftMongoSpecServerState:

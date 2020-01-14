@@ -421,10 +421,6 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // fail if it finds its sync source has an empty oplog.  Thus, we
                                // need to wait here until the seed document is visible in our oplog.
                                _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
-                               if (MONGO_unlikely(logForTLAPlusSpecs.shouldFail())) {
-                                   repl::ReplicationCoordinator::get(opCtx)->tlaPlusRaftMongoEvent(
-                                       opCtx, repl::RaftMongoSpecActionEnum::kReplSetInitiate);
-                               }
                            });
 
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
