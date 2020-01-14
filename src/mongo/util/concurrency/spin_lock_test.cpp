@@ -47,7 +47,7 @@ class LockTester {
 public:
     LockTester(SpinLock* spin, int* counter) : _spin(spin), _counter(counter), _requests(0) {}
 
-    virtual ~LockTester() {
+    ~LockTester() {
         delete _t;
     }
 
@@ -72,7 +72,7 @@ private:
 
     void test(int increments) {
         while (increments-- > 0) {
-            acquireLock();
+            _spin->lock();
             ++(*_counter);
             ++_requests;
             _spin->unlock();
@@ -81,70 +81,35 @@ private:
 
     LockTester(LockTester&);
     LockTester& operator=(LockTester&);
-
-protected:
-    SpinLock* spin() const {
-        return _spin;
-    }
-
-    virtual void acquireLock() {
-        spin()->lock();
-    }
-};
-
-class TryLockTester final : public LockTester {
-public:
-    TryLockTester(SpinLock* spin, int* counter) : LockTester(spin, counter) {}
-
-protected:
-    void acquireLock() override {
-        while (!spin()->try_lock()) {
-        }
-    }
-};
-
-class SpinLockTester {
-public:
-    template <class T>
-    void run(std::string testName) {
-        SpinLock spin;
-        int counter = 0;
-
-        T* testers[_threads];
-        Timer timer;
-
-        for (int i = 0; i < _threads; i++) {
-            testers[i] = new T(&spin, &counter);
-        }
-        for (int i = 0; i < _threads; i++) {
-            testers[i]->start(_incs);
-        }
-        for (int i = 0; i < _threads; i++) {
-            testers[i]->join();
-            ASSERT_EQUALS(testers[i]->requests(), _incs);
-            delete testers[i];
-        }
-
-        int ms = timer.millis();
-        mongo::unittest::log() << "spinlock " << testName << " time: " << ms << std::endl;
-
-        ASSERT_EQUALS(counter, _threads * _incs);
-    }
-
-private:
-    const int _threads = 64;
-    const int _incs = 50000;
 };
 
 
 TEST(Concurrency, ConcurrentIncs) {
-    SpinLockTester tester;
-    tester.run<LockTester>("ConcurrentIncs");
-}
+    SpinLock spin;
+    int counter = 0;
 
-TEST(Concurrency, ConcurrentIncsWithTryLock) {
-    SpinLockTester tester;
-    tester.run<TryLockTester>("ConcurrentIncsWithTryLock");
+    const int threads = 64;
+    const int incs = 50000;
+    LockTester* testers[threads];
+
+    Timer timer;
+
+    for (int i = 0; i < threads; i++) {
+        testers[i] = new LockTester(&spin, &counter);
+    }
+    for (int i = 0; i < threads; i++) {
+        testers[i]->start(incs);
+    }
+    for (int i = 0; i < threads; i++) {
+        testers[i]->join();
+        ASSERT_EQUALS(testers[i]->requests(), incs);
+        delete testers[i];
+    }
+
+    int ms = timer.millis();
+    mongo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << std::endl;
+
+    ASSERT_EQUALS(counter, threads * incs);
 }
 
 }  // namespace

@@ -152,9 +152,6 @@ public:
     void unlock() {
         _lock.unlock();
     }
-    bool try_lock() {
-        return _lock.try_lock();
-    }
 
     /**
      * Makes a new operation context representing an operation on this client.  At most
