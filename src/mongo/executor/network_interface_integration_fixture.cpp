@@ -46,7 +46,7 @@
 namespace mongo {
 namespace executor {
 
-void NetworkInterfaceIntegrationFixture::startNet(
+void NetworkInterfaceIntegrationFixture::createNet(
     std::unique_ptr<NetworkConnectionHook> connectHook) {
     ConnectionPool::Options options;
 #ifdef _WIN32
@@ -58,8 +58,13 @@ void NetworkInterfaceIntegrationFixture::startNet(
 #endif
     _net = makeNetworkInterface(
         "NetworkInterfaceIntegrationFixture", std::move(connectHook), nullptr, std::move(options));
+}
 
-    _net->startup();
+void NetworkInterfaceIntegrationFixture::startNet(
+    std::unique_ptr<NetworkConnectionHook> connectHook) {
+
+    createNet(std::move(connectHook));
+    net().startup();
 }
 
 void NetworkInterfaceIntegrationFixture::tearDown() {

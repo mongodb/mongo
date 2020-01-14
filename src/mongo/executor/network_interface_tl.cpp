@@ -57,7 +57,25 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
       _connPoolOpts(std::move(connPoolOpts)),
       _onConnectHook(std::move(onConnectHook)),
       _metadataHook(std::move(metadataHook)),
-      _state(kDefault) {}
+      _state(kDefault) {
+    if (_svcCtx) {
+        _tl = _svcCtx->getTransportLayer();
+    }
+
+    // Even if you have a service context, it may not have a transport layer (mostly for unittests).
+    if (!_tl) {
+        warning() << "No TransportLayer configured during NetworkInterface startup";
+        _ownedTransportLayer =
+            transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer();
+        _tl = _ownedTransportLayer.get();
+    }
+
+    _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
+    auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
+        _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
+    _pool = std::make_shared<ConnectionPool>(
+        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
+}
 
 std::string NetworkInterfaceTL::getDiagnosticString() {
     return "DEPRECATED: getDiagnosticString is deprecated in NetworkInterfaceTL";
@@ -84,22 +102,7 @@ std::string NetworkInterfaceTL::getHostName() {
 
 void NetworkInterfaceTL::startup() {
     stdx::lock_guard<Latch> lk(_mutex);
-    if (_svcCtx) {
-        _tl = _svcCtx->getTransportLayer();
-    }
 
-    if (!_tl) {
-        warning() << "No TransportLayer configured during NetworkInterface startup";
-        _ownedTransportLayer =
-            transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer();
-        _tl = _ownedTransportLayer.get();
-    }
-
-    _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
-    auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-        _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
-    _pool = std::make_shared<ConnectionPool>(
-        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
     _ioThread = stdx::thread([this] {
         setThreadName(_instanceName);
         _run();
