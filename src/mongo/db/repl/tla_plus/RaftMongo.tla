@@ -20,7 +20,7 @@
 \* "Additional Spec Options"
 \*     "State Constraint"
 \*         Add a state constraint to limit the state space like:
-\*             /\ globalCurrentTerm <= 3
+\*             /\ GlobalCurrentTerm <= 3
 \*             /\ \forall i \in Server: Len(log[i]) <= 5
 
 EXTENDS Integers, FiniteSets, Sequences, TLC
@@ -32,9 +32,8 @@ CONSTANT Server
 \* action. For model-checking, this can be 1 or a small number.
 CONSTANT MaxClientWriteSize
 
-\* The set of log entries that have been acknowledged as committed, i.e.
-\* "immediately committed" entries. It does not include "prefix committed"
-\* entries, which are allowed to roll back on minority nodes.
+\* The set of log entries that have been acknowledged as committed, both "immediately committed" and
+\* "prefix committed".
 VARIABLE committedEntries
 
 ----
@@ -72,16 +71,12 @@ GetTerm(xlog, index) == IF index = 0 THEN 0 ELSE xlog[index].term
 LogTerm(i, index) == GetTerm(log[i], index)
 LastTerm(xlog) == GetTerm(xlog, Len(xlog))
 Leaders == {s \in Server : state[s] = "Leader"}
-
-\* The maximum currentTerm.
-GlobalCurrentTerm == 
-    LET server ==
-        CHOOSE x \in Server :
-            \A y \in Server : currentTerm[y] <= currentTerm[x]
-     IN currentTerm[server]
+Range(f) == {f[x] : x \in DOMAIN f}
 
 \* Return the maximum value from a set, or undefined if the set is empty.
 Max(s) == CHOOSE x \in s : \A y \in s : x >= y
+
+GlobalCurrentTerm == Max(Range(currentTerm))
 
 \* Server i is allowed to sync from server j.
 CanSyncFrom(i, j) ==
@@ -189,6 +184,12 @@ ClientWrite(i) ==
         IN  log' = [log EXCEPT ![i] = newLog]
     /\ UNCHANGED <<committedEntries, serverVars>>
 
+UpdateTermThroughHeartbeat(i, j) ==
+    /\ currentTerm[j] > currentTerm[i]
+    /\ currentTerm' = [currentTerm EXCEPT ![i] = currentTerm[j]]
+    /\ state' = [state EXCEPT ![i] = "Follower"]
+    /\ UNCHANGED <<commitPoint, logVars>>
+
 \* ACTION
 AdvanceCommitPoint ==
     \E leader \in Leaders :
@@ -222,7 +223,8 @@ LearnCommitPointWithTermCheck(i, j) ==
 \* Node i learns the commit point from j while tailing j's oplog
 LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
     \* j is a potential sync source, either ahead of or equal to i's oplog
-    /\ CanSyncFrom(i, j) \/ log[i] = log[j]
+    /\ \/ CanSyncFrom(i, j)
+       \/ log[i] = log[j]
     /\ CommitPointLessThan(i, j)
     \* Never beyond last applied
     /\ LET myCommitPoint ==
@@ -232,13 +234,6 @@ LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j) ==
             ELSE [term |-> LastTerm(log[i]), index |-> Len(log[i])]
        IN commitPoint' = [commitPoint EXCEPT ![i] = myCommitPoint]
     /\ UNCHANGED <<committedEntries, electionVars, logVars>>
-
-UpdateTermThroughHeartbeat(i, j) ==
-    /\ currentTerm[j] > currentTerm[i]
-    /\ currentTerm' = [currentTerm EXCEPT ![i] = currentTerm[j]]
-    \* If i is a Leader it steps down when it sees a higher term
-    /\ state' = [state EXCEPT ![i] = "Follower"]
-    /\ UNCHANGED <<logVars>>
 
 ----
 AppendOplogAction ==
@@ -256,14 +251,14 @@ StepdownAction ==
 ClientWriteAction ==
     \E i \in Server : ClientWrite(i)
 
+UpdateTermThroughHeartbeatAction ==
+    \E i, j \in Server : UpdateTermThroughHeartbeat(i, j)
+
 LearnCommitPointWithTermCheckAction ==
     \E i, j \in Server : LearnCommitPointWithTermCheck(i, j)
 
 LearnCommitPointFromSyncSourceNeverBeyondLastAppliedAction ==
     \E i, j \in Server : LearnCommitPointFromSyncSourceNeverBeyondLastApplied(i, j)
-
-UpdateTermThroughHeartbeatAction ==
-    \E i, j \in Server : UpdateTermThroughHeartbeat(i, j)
 
 ----
 
@@ -281,6 +276,7 @@ Next ==
     \/ BecomePrimaryByMagicAction
     \/ StepdownAction
     \/ ClientWriteAction
+    \/ UpdateTermThroughHeartbeatAction
     \*
     \* --- Commit point learning protocol
     \/ AdvanceCommitPoint
