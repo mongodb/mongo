@@ -322,6 +322,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     }
     if (_inShutdown) {
         log() << "Not starting replication storage threads because replication is shutting down.";
+        return;
     }
 
     log() << "Starting replication storage threads";
