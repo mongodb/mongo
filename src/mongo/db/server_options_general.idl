@@ -90,7 +90,7 @@ configs:
         arg_vartype: Int
         default: { expr: 'static_cast<int>(DEFAULT_MAX_CONN)' }
     'net.maxIncomingConnectionsOverride':
-        description: 'CIDR ranges that do not count towards the maxIncomingConnections limit'
+        description: 'CIDR ranges that are exempt from the maxIncomingConnections limit'
         arg_vartype: StringVector
         source: yaml
         hidden: true
