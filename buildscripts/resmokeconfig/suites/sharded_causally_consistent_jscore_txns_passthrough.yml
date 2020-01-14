@@ -14,7 +14,7 @@ selector:
   # No featureCompatibilityVersion parameter on mongos.
   - jstests/core/txns/abort_unprepared_transactions_on_FCV_downgrade.js
 
-  # TODO(SERVER-44852) Implicitly creates a database through a collection rename, which does not
+  # Implicitly creates a database through a collection rename, which does not
   # work in a sharded cluster.
   - jstests/core/txns/transactions_block_ddl.js
 
@@ -30,8 +30,7 @@ selector:
   # attached to statements in a transaction beyond the first one.
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
 
-  # TODO(SERVER-44852) re-enable once secondary oplog application supports collection creation
-  # inside multi-document transactions.
+  # TODO(SERVER-45368) re-enable once collection creation is permitted in cross-shard transactions.
   - jstests/core/txns/create_collection.js
 
   exclude_with_any_tags:

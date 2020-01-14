@@ -29,27 +29,6 @@ selector:
   # Extracts error code from write error, which is obscured by runInsideTransaction.
   - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
 
-  # TODO(SERVER-44852) re-enable once secondary oplog application supports collection creation
-  # inside multi-document transactions.
-  - jstests/concurrency/fsm_workloads/create_database.js
-  - jstests/concurrency/fsm_workloads/create_capped_collection.js
-  - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
-  - jstests/concurrency/fsm_workloads/create_collection.js
-  - jstests/concurrency/fsm_workloads/drop_collection.js
-  - jstests/concurrency/fsm_workloads/drop_database.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_base_capped.js
-  - jstests/concurrency/fsm_workloads/map_reduce_reduce.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
-  - jstests/concurrency/fsm_workloads/rename_collection_chain.js
-  - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
-  - jstests/concurrency/fsm_workloads/rename_collection_dbname_droptarget.js
-  - jstests/concurrency/fsm_workloads/rename_collection_droptarget.js
-  - jstests/concurrency/fsm_workloads/update_inc_capped.js
-
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_sharding

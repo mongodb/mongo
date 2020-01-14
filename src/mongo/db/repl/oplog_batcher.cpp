@@ -103,22 +103,16 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
 }
 
 /**
- * Returns whether an oplog entry represents an applyOps which doesn't imply prepare.
- * It could be a partial transaction oplog entry, an implicit commit applyOps or an applyOps outside
- * of transaction.
- */
-bool isUnpreparedApplyOps(const OplogEntry& entry) {
-    return entry.getCommandType() == OplogEntry::CommandType::kApplyOps && !entry.shouldPrepare();
-}
-
-/**
  * Returns true if this oplog entry must be processed in its own batch and cannot be grouped with
  * other entries.
  *
- * Commands must be processed one at a time. The exceptions to this are unprepared applyOps, because
- * applyOps oplog entries are effectively containers for CRUD operations, and unprepared
- * commitTransaction, because that also expands to CRUD operations. Therefore, it is safe to batch
- * applyOps commands with CRUD operations when reading from the oplog buffer.
+ * Commands, in most cases, must be processed one at a time. The exceptions to this rule are
+ * unprepared applyOps and unprepared commitTransaction for transactions that only contain CRUD
+ * operations. These two cases expand to CRUD operations, which can be safely batched with other
+ * CRUD operations. All other command oplog entries, including unprepared applyOps/commitTransaction
+ * for transactions that contain commands, must be processed in their own batch.
+ * Note that 'unprepared applyOps' could mean a partial transaction oplog entry, an implicit commit
+ * applyOps oplog entry, or an atomic applyOps oplog entry outside of a transaction.
  *
  * Oplog entries on 'system.views' should also be processed one at a time. View catalog immediately
  * reflects changes for each oplog entry so we can see inconsistent view catalog if multiple oplog
@@ -129,12 +123,13 @@ bool isUnpreparedApplyOps(const OplogEntry& entry) {
  */
 bool mustProcessIndividually(const OplogEntry& entry) {
     if (entry.isCommand()) {
-        if (isUnpreparedCommit(entry)) {
-            return false;
-        } else if (isUnpreparedApplyOps(entry)) {
+        if (entry.getCommandType() != OplogEntry::CommandType::kApplyOps || entry.shouldPrepare() ||
+            entry.isTransactionWithCommand()) {
+            return true;
+        } else {
+            // This branch covers unprepared CRUD applyOps and unprepared CRUD commits.
             return false;
         }
-        return true;
     } else if (entry.getNss().isSystemDotViews()) {
         return true;
     } else if (entry.getNss().isServerConfigurationCollection()) {

@@ -19,9 +19,6 @@ selector:
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
   - jstests/core/set_param1.js
-  # TODO(SERVER-44852) re-enable once secondary oplog application supports collection creation
-  # inside multi-document transactions.
-  - jstests/core/txns/create_collection.js
 
 executor:
   archive:

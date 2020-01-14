@@ -491,6 +491,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
+   LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/namespace_string',
+    ],
 )
 
 env.Library(

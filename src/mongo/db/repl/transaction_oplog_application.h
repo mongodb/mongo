@@ -66,6 +66,22 @@ std::vector<repl::OplogEntry> readTransactionOperationsFromOplogChain(
     const std::vector<repl::OplogEntry*>& cachedOps) noexcept;
 
 /**
+ * Like readTransactionOperationsFromOplogChain, but also returns a boolean representing whether at
+ * least one of the transaction operations is a command.
+ */
+std::pair<std::vector<repl::OplogEntry>, bool>
+readTransactionOperationsFromOplogChainAndCheckForCommands(
+    OperationContext* opCtx,
+    const repl::OplogEntry& lastEntryInTxn,
+    const std::vector<repl::OplogEntry*>& cachedOps) noexcept;
+
+std::pair<std::vector<repl::OplogEntry>, bool> _readTransactionOperationsFromOplogChain(
+    OperationContext* opCtx,
+    const repl::OplogEntry& lastEntryInTxn,
+    const std::vector<repl::OplogEntry*>& cachedOps,
+    const bool checkForCommands) noexcept;
+
+/**
  * Apply `prepareTransaction` oplog entry.
  */
 Status applyPrepareTransaction(OperationContext* opCtx,
