@@ -44,55 +44,37 @@
 
 namespace mongo {
 
+struct SplitPolicyParams {
+    NamespaceString nss;
+    ShardId primaryShardId;
+};
+
 class InitialSplitPolicy {
 public:
     /**
-     * Indicates the optimization allowed for sharding a collection given the collection's initial
-     * properties.
+     * Returns the optimization strategy for building initial chunks based on the input parameters
+     * and the collection state.
      */
-    enum ShardingOptimizationType {
-        // If split points are provided, we directly generate corresponding initial chunks.
-        SplitPointsProvided,
-
-        // If tags are provided and the collection is empty, we directly write corresponding zones
-        // to the config server.
-        TagsProvidedWithEmptyCollection,
-
-        // If tags are provided and the collection is not empty, we create one chunk on the primary
-        // shard and leave the balancer to do zone splitting and placement.
-        TagsProvidedWithNonEmptyCollection,
-
-        // If the chunk is empty, we create one chunk on the primary shard.
-        EmptyCollection,
-
-        // If no optimizations are available, we calculate split points on the primary shard.
-        None,
-    };
-
-    static ShardingOptimizationType calculateOptimizationType(
-        const std::vector<BSONObj>& splitPoints,
+    static std::unique_ptr<InitialSplitPolicy> calculateOptimizationStrategy(
+        OperationContext* opCtx,
+        const ShardKeyPattern& shardKeyPattern,
+        const ShardsvrShardCollection& request,
         const std::vector<TagsType>& tags,
+        size_t numShards,
         bool collectionIsEmpty);
 
-
     /**
-     * For new collections which use hashed shard keys, we can can pre-split the range of possible
-     * hashes into a large number of chunks, and distribute them evenly at creation time.
-     *
-     * Until we design a better initialization scheme, the most performant way to pre-split is to
-     * make one big chunk for each shard and migrate them one at a time. Because of this:
-     * - 'initialSplitPoints' is populated with the split points to use on the primary shard to
-     * produce the initial "big chunks."
-     * - 'finalSplitPoints' is populated with the additional split points to use on the "big chunks"
-     * after the "big chunks" have been spread evenly across shards through migrations.
+     * Returns split points to use for creating chunks in cases where the shard key contains a
+     * hashed field. For new collections which use hashed shard keys, we can can pre-split the range
+     * of possible hashes into a large number of chunks, and distribute them evenly at creation
+     * time. In the case where the shard key is compound hashed, the 'prefix' object specifies the
+     * non-hashed prefix to be prepended to each hashed splitpoint. If no such prefix exists, this
+     * will be an empty BSONObj. It is an error to pass a 'prefix' object which is not consistent
+     * with the given ShardKeyPattern.
      */
-    static void calculateHashedSplitPointsForEmptyCollection(
-        const ShardKeyPattern& shardKeyPattern,
-        bool isEmpty,
-        int numShards,
-        int numInitialChunks,
-        std::vector<BSONObj>* initialSplitPoints,
-        std::vector<BSONObj>* finalSplitPoints);
+    static std::vector<BSONObj> calculateHashedSplitPoints(const ShardKeyPattern& shardKeyPattern,
+                                                           BSONObj prefix,
+                                                           int numInitialChunks);
 
     struct ShardCollectionConfig {
         std::vector<ChunkType> chunks;
@@ -129,51 +111,6 @@ public:
         const int numContiguousChunksPerShard = 1);
 
     /**
-     * Produces the initial chunks that need to be written for an *empty* collection which is being
-     * sharded based on the given 'tags'.
-     *
-     * NOTE: The function performs some basic validation of the input parameters, but there is no
-     * checking whether the collection contains any data or not.
-     *
-     * The contents of 'tags' will be used to create chunks, which correspond to these zones and
-     * chunks will be assigned to shards from 'tagToShards'. If there are any holes in between the
-     * zones (zones are not contiguous), these holes will be assigned to 'shardIdsForGaps' in
-     * round-robin fashion.
-     */
-    static ShardCollectionConfig generateShardCollectionInitialZonedChunks(
-        const NamespaceString& nss,
-        const ShardKeyPattern& shardKeyPattern,
-        const Timestamp& validAfter,
-        const std::vector<TagsType>& tags,
-        const StringMap<std::vector<ShardId>>& tagToShards,
-        const std::vector<ShardId>& shardIdsForGaps);
-
-    /**
-     * Generates a list with what are the most optimal first chunks and placement for a newly
-     * sharded collection.
-     *
-     * If the collection 'isEmpty', chunks will be spread across all available (appropriate based on
-     * zoning rules) shards. Otherwise, they will all end up on the primary shard after which the
-     * balancer will take care of properly distributing them around.
-     */
-    static ShardCollectionConfig createFirstChunksOptimized(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ShardKeyPattern& shardKeyPattern,
-        const ShardId& primaryShardId,
-        const std::vector<BSONObj>& splitPoints,
-        const std::vector<TagsType>& tags,
-        ShardingOptimizationType optimizationType,
-        bool isEmpty,
-        int numContiguousChunksPerShard = 1);
-
-    static ShardCollectionConfig createFirstChunksUnoptimized(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ShardKeyPattern& shardKeyPattern,
-        const ShardId& primaryShardId);
-
-    /**
      * Throws an exception if the collection is already sharded with different options.
      *
      * If the collection is already sharded with the same options, returns the existing
@@ -184,5 +121,169 @@ public:
         const NamespaceString& nss,
         const ShardsvrShardCollection& request,
         repl::ReadConcernLevel readConcernLevel);
+
+    /**
+     * Generates a list of initial chunks to be created during a shardCollection operation.
+     */
+    virtual ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                                    const ShardKeyPattern& shardKeyPattern,
+                                                    SplitPolicyParams params) = 0;
+
+    /**
+     * Returns whether the chunk generation strategy being used is optimized or not. Since there is
+     * only a single unoptimized policy, we return true by default here.
+     */
+    virtual bool isOptimized() {
+        return true;
+    }
+
+    virtual ~InitialSplitPolicy() {}
 };
+
+/**
+ * Default optimization strategy where we create a single chunk on the primary shard.
+ */
+class SingleChunkOnPrimarySplitPolicy : public InitialSplitPolicy {
+public:
+    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                            const ShardKeyPattern& shardKeyPattern,
+                                            SplitPolicyParams params);
+};
+
+/**
+ * Split point building strategy to be used when no optimizations are available. We send a
+ * splitVector command to the primary shard in order to calculate the appropriate split points.
+ */
+class UnoptimizedSplitPolicy : public InitialSplitPolicy {
+public:
+    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                            const ShardKeyPattern& shardKeyPattern,
+                                            SplitPolicyParams params);
+    bool isOptimized() {
+        return false;
+    }
+};
+
+/**
+ * Split point building strategy to be used when explicit split points are supplied, or where the
+ * appropriate splitpoints can be trivially deduced from the shard key.
+ */
+class SplitPointsBasedSplitPolicy : public InitialSplitPolicy {
+public:
+    /**
+     * Constructor used when split points are provided.
+     */
+    SplitPointsBasedSplitPolicy(std::vector<BSONObj> explicitSplitPoints)
+        : _splitPoints(std::move(explicitSplitPoints)) {
+        _numContiguousChunksPerShard = 1;
+    }
+
+    /**
+     * Constructor used when generating split points for a hashed-prefix shard key.
+     */
+    SplitPointsBasedSplitPolicy(const ShardKeyPattern& shardKeyPattern,
+                                size_t numShards,
+                                size_t numInitialChunks) {
+        // If 'numInitialChunks' was not specified, use default value.
+        numInitialChunks = numInitialChunks ? numInitialChunks : numShards * 2;
+        _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numInitialChunks);
+        _numContiguousChunksPerShard =
+            std::max(numInitialChunks / numShards, static_cast<size_t>(1));
+    }
+
+    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                            const ShardKeyPattern& shardKeyPattern,
+                                            SplitPolicyParams params);
+
+    // Helpers for unit testing.
+    const std::vector<BSONObj>& getSplitPoints() const {
+        return _splitPoints;
+    }
+    size_t getNumContiguousChunksPerShard() const {
+        return _numContiguousChunksPerShard;
+    }
+
+private:
+    std::vector<BSONObj> _splitPoints;
+    size_t _numContiguousChunksPerShard;
+};
+
+/**
+ * Abstract base class for all split policies which depend upon zones having already been defined at
+ * the moment the collection is sharded.
+ */
+class AbstractTagsBasedSplitPolicy : public InitialSplitPolicy {
+public:
+    /**
+     * Records the splitpoints and chunk distribution among shards within a particular tag range.
+     */
+    struct SplitInfo {
+        std::vector<BSONObj> splitPoints;
+        std::vector<std::pair<ShardId, size_t>> chunkDistribution;
+    };
+
+    AbstractTagsBasedSplitPolicy(OperationContext* opCtx, std::vector<TagsType> tags);
+
+    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                            const ShardKeyPattern& shardKeyPattern,
+                                            SplitPolicyParams params);
+
+    /**
+     * Returns the split points to be used for generating chunks within a given tag.
+     */
+    virtual SplitInfo buildSplitInfoForTag(TagsType tag,
+                                           const ShardKeyPattern& shardKeyPattern) = 0;
+
+    const std::vector<TagsType>& getTags() const {
+        return _tags;
+    }
+
+    const StringMap<std::vector<ShardId>>& getTagsToShardIds() const {
+        return _tagToShardIds;
+    }
+
+private:
+    const std::vector<TagsType> _tags;
+    StringMap<std::vector<ShardId>> _tagToShardIds;
+};
+
+/**
+ * In this strategy we directly generate a single chunk for each tag range.
+ */
+class SingleChunkPerTagSplitPolicy : public AbstractTagsBasedSplitPolicy {
+public:
+    SingleChunkPerTagSplitPolicy(OperationContext* opCtx, std::vector<TagsType> tags)
+        : AbstractTagsBasedSplitPolicy(opCtx, tags) {}
+
+    SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern);
+
+private:
+    StringMap<size_t> _nextShardIndexForZone;
+};
+
+/**
+ * Split point building strategy to be used when 'presplitHashedZones' flag is set. This policy is
+ * only relevant when the zones are set up before sharding and the shard key is hashed. In this
+ * case, we generate one chunk per tag range and then further split each of these using the hashed
+ * field of the shard key.
+ */
+class PresplitHashedZonesSplitPolicy : public AbstractTagsBasedSplitPolicy {
+public:
+    PresplitHashedZonesSplitPolicy(OperationContext* opCtx,
+                                   const ShardKeyPattern& shardKeyPattern,
+                                   std::vector<TagsType> tags,
+                                   size_t numInitialChunks,
+                                   bool isCollectionEmpty);
+
+    SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern);
+
+private:
+    /**
+     * Validates that each of tags are set up correctly so that the tags can be split further.
+     */
+    void _validate(const ShardKeyPattern& shardKeyPattern, bool isCollectionEmpty);
+    size_t _numInitialChunks;
+    StringMap<size_t> _numTagsPerShard;
+};
+
 }  // namespace mongo
