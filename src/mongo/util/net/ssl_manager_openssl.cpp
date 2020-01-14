@@ -87,6 +87,10 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(disableStapling);
 
+using UniqueX509StoreCtx =
+    std::unique_ptr<X509_STORE_CTX,
+                    OpenSSLDeleter<decltype(X509_STORE_CTX_free), ::X509_STORE_CTX_free>>;
+
 // Modulus for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919
 constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58, 0xA2, 0xBB, 0x4A, 0x9A,
@@ -276,9 +280,31 @@ X509* X509_OBJECT_get0_X509(const X509_OBJECT* a) {
     return a->data.x509;
 }
 
-// TODO SERVER-44325 add polyfill for getting verified cert chain
+// On OpenSSL < 1.1.0, this chain isn't attached to
+// the SSL session, so we need it to dispose of itself.
+struct VerifiedChainDeleter {
+    void operator()(STACK_OF(X509) * chain) {
+        if (chain) {
+            sk_X509_pop_free(chain, X509_free);
+        }
+    }
+};
+
 STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
-    return SSL_get_peer_cert_chain(s);
+    auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
+    auto* peer = SSL_get_peer_certificate(s);
+    auto* peerChain = SSL_get_peer_cert_chain(s);
+
+    UniqueX509StoreCtx ctx(X509_STORE_CTX_new());
+    if (!X509_STORE_CTX_init(ctx.get(), store, peer, peerChain)) {
+        return nullptr;
+    }
+
+    if (X509_verify_cert(ctx.get()) <= 0) {
+        return nullptr;
+    }
+
+    return X509_STORE_CTX_get1_chain(ctx.get());
 }
 
 const OCSP_CERTID* OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP* single) {
@@ -307,7 +333,17 @@ void DH_get0_pqg(const DH* dh, const BIGNUM** p, const BIGNUM** q, const BIGNUM*
         *g = dh->g;
     }
 }
+#else
+// No-op deleter for OpenSSL >= 1.1.0
+struct VerifiedChainDeleter {
+    void operator()(STACK_OF(X509) * chain) {}
+};
 #endif
+
+using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), VerifiedChainDeleter>;
+UniqueVerifiedChainPolyfill SSLgetVerifiedChain(SSL* s) {
+    return UniqueVerifiedChainPolyfill(SSL_get0_verified_chain(s));
+}
 
 class SSLConnectionOpenSSL : public SSLConnectionInterface {
 public:
@@ -766,10 +802,6 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     return status;
 }
 
-using UniqueX509StoreCtx =
-    std::unique_ptr<X509_STORE_CTX,
-                    OpenSSLDeleter<decltype(X509_STORE_CTX_free), ::X509_STORE_CTX_free>>;
-
 using UniqueOCSPRequest =
     std::unique_ptr<OCSP_REQUEST, OpenSSLDeleter<decltype(OCSP_REQUEST_free), ::OCSP_REQUEST_free>>;
 
@@ -1124,7 +1156,7 @@ StatusWith<bool> verifyStapledResponse(SSL* conn, X509* peerCert, OCSP_RESPONSE*
 
     // OCSP checks. AIA stands for the Authority Information Access x509 extension.
     ERR_clear_error();
-    STACK_OF(X509)* intermediateCerts = SSL_get0_verified_chain(conn);
+    auto intermediateCerts = SSLgetVerifiedChain(conn);
     OCSPCertIDSet emptyCertIDSet{};
 
     auto swCertId = getCertIdForCert(SSL_get_SSL_CTX(conn), peerCert);
@@ -1132,7 +1164,7 @@ StatusWith<bool> verifyStapledResponse(SSL* conn, X509* peerCert, OCSP_RESPONSE*
         return swCertId.getStatus();
     }
 
-    auto swCertIDSet = validateResponse(SSL_get_SSL_CTX(conn), response, intermediateCerts);
+    auto swCertIDSet = validateResponse(SSL_get_SSL_CTX(conn), response, intermediateCerts.get());
 
     if (swCertIDSet.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
         return swCertIDSet.getStatus();
@@ -1158,9 +1190,9 @@ Status verifyPeerCertWithOCSP(SSL* conn, X509* peerCert) {
 
     // OCSP checks. AIA stands for the Authority Information Access x509 extension.
     ERR_clear_error();
-    STACK_OF(X509)* intermediateCerts = SSL_get0_verified_chain(conn);
+    auto intermediateCerts = SSLgetVerifiedChain(conn);
 
-    auto swOCSPContext = extractOcspUris(SSL_get_SSL_CTX(conn), peerCert, intermediateCerts);
+    auto swOCSPContext = extractOcspUris(SSL_get_SSL_CTX(conn), peerCert, intermediateCerts.get());
     if (!swOCSPContext.isOK()) {
         return swOCSPContext.getStatus();
     }
@@ -1179,7 +1211,7 @@ Status verifyPeerCertWithOCSP(SSL* conn, X509* peerCert) {
         auto& response = swResponse.getValue();
 
         auto swCertIDSet =
-            validateResponse(SSL_get_SSL_CTX(conn), response.get(), intermediateCerts);
+            validateResponse(SSL_get_SSL_CTX(conn), response.get(), intermediateCerts.get());
 
         // The only error that will fail is an OCSPCertificateStatusRevoked. Even if a
         // response has an unknown error, we don't want to discredit all the responses
