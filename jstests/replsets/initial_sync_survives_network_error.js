@@ -23,9 +23,8 @@ const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
         'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-        // TODO(SERVER-43279): Stopping the oplog fetcher avoids interference from the oplog
-        // fetcher failing.  When SERVER-43279 is done, this will not be necessary as the oplog
-        // fetcher will follow the same restart strategy as the cloners.
+        // This test is specifically testing that the cloners stop, so we turn off the
+        // oplog fetcher to ensure that we don't inadvertently test that instead.
         'failpoint.hangBeforeStartingOplogFetcher': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,
     }
