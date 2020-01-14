@@ -130,6 +130,13 @@ void NumberLongInfo::Functions::floatApprox::call(JSContext* cx, JS::CallArgs ar
     ValueReader(cx, args.rval()).fromDouble(numLong);
 }
 
+void NumberLongInfo::Functions::exactValueString::call(JSContext* cx, JS::CallArgs args) {
+    str::stream ss;
+    int64_t val = NumberLongInfo::ToNumberLong(cx, args.thisv());
+    ss << val;
+    ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
+}
+
 void NumberLongInfo::Functions::top::call(JSContext* cx, JS::CallArgs args) {
     auto numULong = static_cast<uint64_t>(NumberLongInfo::ToNumberLong(cx, args.thisv()));
     ValueReader(cx, args.rval()).fromDouble(numULong >> 32);
@@ -232,6 +239,17 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
             proto,
             getScope(cx)->getInternedStringId(InternedString::bottom),
             smUtils::wrapConstrainedMethod<Functions::bottom, false, NumberLongInfo>,
+            nullptr,
+            JSPROP_ENUMERATE)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
+    }
+
+    // exactValueString
+    if (!JS_DefinePropertyById(
+            cx,
+            proto,
+            getScope(cx)->getInternedStringId(InternedString::exactValueString),
+            smUtils::wrapConstrainedMethod<Functions::exactValueString, false, NumberLongInfo>,
             nullptr,
             JSPROP_ENUMERATE)) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");

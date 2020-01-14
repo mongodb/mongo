@@ -680,6 +680,7 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
             return;
         }
         uassertStatusOK(mgr.killCursor(opCtx, *cursorNss, id));
+        log() << "killing cursor: " << id << " as part of killing session(s)";
     };
 
     auto bySessionCursorKiller = makeKillCursorsBySessionAdaptor(opCtx, matcher, std::move(eraser));
