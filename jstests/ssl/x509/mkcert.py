@@ -26,6 +26,9 @@ CONFIGFILE = 'jstests/ssl/x509/certs.yml'
 
 CONFIG = Dict[str, Any]
 
+MUST_STAPLE_KEY = b'1.3.6.1.5.5.7.1.24'
+MUST_STAPLE_VALUE = str('DER:30:03:02:01:05').encode('utf-8')
+
 def glbl(key, default=None):
     """Fetch a key from the global dict."""
     return CONFIG.get('global', {}).get(key, default)
@@ -194,10 +197,10 @@ def set_no_check_extension(x509, exts, cert):
 
 def set_tls_feature_extension(x509, exts, cert):
     """Set the OCSP Must Staple extension"""
-    tlsfeature = cert.get('extensions', {}).get('tlsfeature')
-    if not tlsfeature:
+    mustStaple = cert.get('extensions', {}).get('mustStaple')
+    if not mustStaple:
         return
-    exts.append(OpenSSL.crypto.X509Extension(b'tlsfeature', False, tlsfeature.encode('utf8'), subject=x509))
+    exts.append(OpenSSL.crypto.X509Extension(MUST_STAPLE_KEY, False, MUST_STAPLE_VALUE, subject=x509))
 
 def set_san_extension(x509, exts, cert):
     """Set the Subject Alternate Name extension."""
