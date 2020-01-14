@@ -1331,6 +1331,8 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
                                                  << "; Database: " << replState->dbName));
     }
 
+    // Unlock the RSTL to avoid deadlocks with state transitions.
+    unlockRSTLForIndexCleanup(opCtx);
     Lock::CollectionLock collLock(opCtx, nss, MODE_X);
 
     // If we started the build as a primary and are now unable to accept writes, this build was
