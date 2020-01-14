@@ -206,19 +206,24 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     size_t numWorks = getTrialPeriodWorks(getOpCtx(), collection());
     size_t numResults = getTrialPeriodNumToReturn(*_query);
 
-    // Work the plans, stopping when a plan hits EOF or returns some
-    // fixed number of results.
-    for (size_t ix = 0; ix < numWorks; ++ix) {
-        bool moreToDo = workAllPlans(numResults, yieldPolicy);
-        if (!moreToDo) {
-            break;
+    try {
+        // Work the plans, stopping when a plan hits EOF or returns some fixed number of results.
+        for (size_t ix = 0; ix < numWorks; ++ix) {
+            bool moreToDo = workAllPlans(numResults, yieldPolicy);
+            if (!moreToDo) {
+                break;
+            }
         }
+    } catch (DBException& e) {
+        e.addContext("exception thrown while multiplanner was selecting best plan");
+        throw;
     }
 
     if (_failure) {
         invariant(WorkingSet::INVALID_ID != _statusMemberId);
         WorkingSetMember* member = _candidates[0].ws->get(_statusMemberId);
-        return WorkingSetCommon::getMemberStatus(*member);
+        return WorkingSetCommon::getMemberStatus(*member).withContext(
+            "multiplanner encountered a failure while selecting best plan");
     }
 
     // After picking best plan, ranking will own plan stats from
