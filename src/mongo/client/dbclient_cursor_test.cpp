@@ -146,6 +146,51 @@ protected:
     }
 };
 
+TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss("test", "coll");
+    DBClientCursor cursor(&conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, 0, 0);
+    cursor.setBatchSize(2);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1), docObj(2)});
+    conn.setCallResponse(findResponseMsg);
+
+    int numMetaRead = 0;
+    conn.setReplyMetadataReader(
+        [&](OperationContext* opCtx, const BSONObj& metadataObj, StringData target) {
+            numMetaRead++;
+            return Status::OK();
+        });
+
+    // Trigger a find command.
+    ASSERT(cursor.init());
+
+    // First batch from the initial find command.
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+    // Test that the metadata reader callback is called once.
+    ASSERT_EQ(1, numMetaRead);
+
+    // Set a terminal getMore response with cursorId 0.
+    auto getMoreResponseMsg = mockGetMoreResponse(nss, 0, {docObj(3), docObj(4)});
+    conn.setCallResponse(getMoreResponseMsg);
+
+    // Trigger a subsequent getMore command.
+    ASSERT_TRUE(cursor.more());
+
+    // Second batch from the getMore command.
+    ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(4), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+    ASSERT_TRUE(cursor.isDead());
+    // Test that the metadata reader callback is called twice.
+    ASSERT_EQ(2, numMetaRead);
+}
+
 TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
 
     // Set up the DBClientCursor and a mock client connection.
