@@ -176,6 +176,19 @@ public:
     }
 
     /**
+     * Returns all voting members in this ReplSetConfig.
+     */
+    std::vector<MemberConfig> votingMembers() const {
+        std::vector<MemberConfig> votingMembers;
+        for (const MemberConfig& m : _members) {
+            if (m.getNumVotes() > 0) {
+                votingMembers.push_back(m);
+            }
+        }
+        return votingMembers;
+    };
+
+    /**
      * Access a MemberConfig element by index.
      */
     const MemberConfig& getMemberAt(size_t i) const;

@@ -217,7 +217,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             repl_config["version"] = 2
             repl_config["members"] = members
             self.logger.info("Issuing replSetReconfig command: %s", repl_config)
-            self._configure_repl_set(client, {"replSetReconfig": repl_config})
+            # Temporarily use 'force: true' to allow multi-node reconfig.
+            self._configure_repl_set(client, {"replSetReconfig": repl_config, "force": True})
             self._await_secondaries()
 
     def pids(self):

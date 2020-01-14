@@ -7,9 +7,11 @@ load("jstests/replsets/rslib.js");
 var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 
 var nodes = replTest.startSet();
+replTest.initiate();
 
-// Initiate set with default for write concern
-var config = replTest.getReplSetConfig();
+// Set default for write concern
+var config = replTest.getReplSetConfigFromNode();
+config.version++;
 config.settings = {};
 config.settings.getLastErrorDefaults = {
     'w': 3,
@@ -18,8 +20,7 @@ config.settings.getLastErrorDefaults = {
 config.settings.heartbeatTimeoutSecs = 15;
 // Prevent node 2 from becoming primary, as we will attempt to set it to hidden later.
 config.members[2].priority = 0;
-
-replTest.initiate(config);
+reconfig(replTest, config);
 
 //
 var master = replTest.getPrimary();

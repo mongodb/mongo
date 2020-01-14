@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/repl_set_config_checks.h"
 
+#include <algorithm>
 #include <iterator>
 
 #include "mongo/db/repl/repl_set_config.h"
@@ -132,6 +133,50 @@ Status validateArbiterPriorities(const ReplSetConfig& config) {
                                         << " is an arbiter but has priority " << iter->getPriority()
                                         << ". Arbiter priority must be 0.");
         }
+    }
+    return Status::OK();
+}
+
+/**
+ * Compares two initialized and validated replica set configurations and checks to see if the
+ * transition from 'oldConfig' to 'newConfig' adds or removes at most 1 voting node.
+ *
+ * Assumes that the member id uniquely identifies a logical replica set node. We use the set of
+ * member ids in the old and new config to determine the safety of the single node change.
+ */
+Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
+    // Add MemberId of voting nodes from each config into respective sets.
+    std::set<MemberId> oldIdSet, newIdSet;
+    for (MemberConfig m : oldConfig.votingMembers()) {
+        oldIdSet.insert(m.getId());
+    }
+    for (MemberConfig m : newConfig.votingMembers()) {
+        newIdSet.insert(m.getId());
+    }
+
+    //
+    // The symmetric difference between the id sets of each config is the set of ids that are
+    // present in either set but not in their intersection. A set X can be transformed into set Y
+    // with 1 addition or removal operation if and only if their symmetric difference is equal to 1.
+    // If the symmetric difference is 1, there are two possibilities:
+    //
+    // (1) There is exactly 1 element e in Y that does not appear in X. In this case we can
+    // transform X to Y by adding the element e to X.
+    //
+    // (2) There is exactly 1 element in X that does not appear in Y. In this case we can transform
+    // X to Y by removing the element e from X.
+    //
+
+    // The symmetric difference can't be larger than the union of both sets.
+    std::vector<MemberId> symmDiff(oldIdSet.size() + newIdSet.size());
+    auto diffEndIt = std::set_symmetric_difference(
+        oldIdSet.begin(), oldIdSet.end(), newIdSet.begin(), newIdSet.end(), symmDiff.begin());
+    auto symmDiffSize = std::distance(symmDiff.begin(), diffEndIt);
+
+    if (symmDiffSize > 1) {
+        return Status(ErrorCodes::InvalidReplicaSetConfig,
+                      str::stream() << "Non force replica set reconfig can only add or remove at "
+                                       "most 1 voting member.");
     }
     return Status::OK();
 }
@@ -307,6 +352,15 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
     status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
     if (!status.isOK()) {
         return StatusWith<int>(status);
+    }
+
+    // For non-force reconfigs, verify that the reconfig only adds or removes a single node. This
+    // ensures that all quorums of the new config overlap with all quorums of the old config.
+    if (!force) {
+        status = validateSingleNodeChange(oldConfig, newConfig);
+        if (!status.isOK()) {
+            return StatusWith<int>(status);
+        }
     }
 
     status = validateArbiterPriorities(newConfig);
