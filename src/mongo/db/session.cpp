@@ -630,6 +630,9 @@ Session::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
         _locker->releaseTicket();
     }
     _locker->unsetThreadId();
+    if (opCtx->getLogicalSessionId()) {
+        _locker->setDebugInfo("lsid: " + opCtx->getLogicalSessionId()->toBSON().toString());
+    }
 
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
