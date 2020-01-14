@@ -38,6 +38,8 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_gen.h"
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <limits>
 #include <string>
 
@@ -73,6 +75,8 @@ MONGO_FAIL_POINT_DEFINE(voteYesInDryRunButNoInRealElection);
 MONGO_FAIL_POINT_DEFINE(disableMaxSyncSourceLagSecs);
 
 constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
+
+using namespace fmt::literals;
 
 std::string TopologyCoordinator::roleToString(TopologyCoordinator::Role role) {
     switch (role) {
@@ -277,6 +281,16 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         } else if (_currentPrimaryIndex == _selfIndex) {
             LOG(1)
                 << "Cannot select a sync source because chaining is not allowed and we are primary";
+            _syncSource = HostAndPort();
+            return _syncSource;
+        } else if (_memberData.at(_currentPrimaryIndex).getHeartbeatAppliedOpTime() <
+                   lastOpTimeFetched) {
+            LOG(1) << "Cannot select a sync source because chaining is not allowed and the primary "
+                      "is behind me. Last oplog optime of primary {}: {}, my last fetched oplog "
+                      "optime: {}"_format(
+                          _currentPrimaryMember()->getHostAndPort(),
+                          _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime().toBSON(),
+                          lastOpTimeFetched.toBSON());
             _syncSource = HostAndPort();
             return _syncSource;
         } else {
