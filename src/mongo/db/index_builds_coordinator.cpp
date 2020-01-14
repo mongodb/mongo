@@ -53,6 +53,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -94,6 +95,39 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
             str::stream() << "cannot create unique index over " << newIdxKey
                           << " with shard key pattern " << shardKeyPattern.toBSON(),
             shardKeyPattern.isUniqueIndexCompatible(newIdxKey));
+}
+
+/**
+ * Returns true if we should build the indexes an empty collection using the IndexCatalog and
+ * bypass the index build registration.
+ */
+bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
+                                                     Collection* collection) {
+    const auto& nss = collection->ns();
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), str::stream() << nss);
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+    // Check whether the replica set member's config has {buildIndexes:false} set, which means
+    // we are not allowed to build non-_id indexes on this server.
+    if (!replCoord->buildsIndexes()) {
+        return false;
+    }
+
+    // We use the fast count information, through Collection::numRecords(), to determine if the
+    // collection is empty. However, this information is either unavailable or inaccurate when the
+    // node is in certain replication states, such as recovery or rollback. In these cases, we
+    // have to build the index by scanning the collection.
+    auto memberState = replCoord->getMemberState();
+    if (memberState.rollback()) {
+        return false;
+    }
+    if (inReplicationRecovery(opCtx->getServiceContext())) {
+        return false;
+    }
+
+    // Now it's fine to trust Collection::numRecords().
+    return 0U == collection->numRecords(opCtx);
 }
 
 /**
@@ -1036,6 +1070,37 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
         int numIndexes = getNumIndexesTotal(opCtx, collection);
         indexCatalogStats.numIndexesBefore = numIndexes;
         indexCatalogStats.numIndexesAfter = numIndexes;
+        return SharedSemiFuture(indexCatalogStats);
+    }
+
+    // Bypass the thread pool if we are building indexes on an empty collection.
+    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection)) {
+        ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
+        indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
+        try {
+            // Replicate this index build using the old-style createIndexes oplog entry to avoid
+            // timestamping issues that would result from this empty collection optimization on a
+            // secondary. If we tried to generate two phase index build startIndexBuild and
+            // commitIndexBuild oplog entries, this optimization will fail to accurately timestamp
+            // the catalog update when it uses the timestamp from the startIndexBuild, rather than
+            // the commitIndexBuild, oplog entry.
+            auto opObserver = opCtx->getServiceContext()->getOpObserver();
+            auto fromMigrate = false;
+            auto indexCatalog = collection->getIndexCatalog();
+            writeConflictRetry(
+                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss.ns(), [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    for (const auto& spec : filteredSpecs) {
+                        opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
+                        uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
+                    }
+                    wuow.commit();
+                });
+        } catch (DBException& ex) {
+            ex.addContext(str::stream() << "index build on empty collection failed: " << buildUUID);
+            return ex.toStatus();
+        }
+        indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
         return SharedSemiFuture(indexCatalogStats);
     }
 
