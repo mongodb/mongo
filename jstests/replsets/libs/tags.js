@@ -133,7 +133,8 @@ var TagsTest = function(options) {
             version: nextVersion,
         };
 
-        reconfig(replTest, replSetConfig);
+        const force = true;  // TODO (SERVER-45575): Update this to be a non-force reconfig.
+        reconfig(replTest, replSetConfig, force);
 
         assert.soonNoExcept(() => replTest.nodes[2].adminCommand({replSetStepUp: 1}).ok);
         replTest.waitForState(replTest.nodes[2], ReplSetTest.State.PRIMARY);

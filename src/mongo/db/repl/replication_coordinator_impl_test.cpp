@@ -3675,13 +3675,13 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 }
 
-void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status) {
+void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status, bool force = false) {
     auto client = getGlobalServiceContext()->makeClient("rsr");
     auto opCtx = client->makeOperationContext();
 
     BSONObjBuilder garbage;
     ReplSetReconfigArgs args;
-    args.force = false;
+    args.force = force;
     args.newConfigObj = BSON("_id"
                              << "mySet"
                              << "version" << 3 << "protocolVersion" << 1 << "members"
@@ -3961,7 +3961,8 @@ TEST_F(ReplCoordTest,
 
     // reconfig to three nodes
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status); });
+    stdx::thread reconfigThread(
+        [&] { doReplSetReconfig(getReplCoord(), &status, true /* force */); });
 
     replyToReceivedHeartbeatV1();
     reconfigThread.join();

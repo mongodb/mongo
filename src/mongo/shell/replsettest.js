@@ -1229,9 +1229,15 @@ var ReplSetTest = function(opts) {
                 config.configsvr = true;
             }
 
-            cmd = {replSetReconfig: config};
+            // Add in nodes 1 at a time since non-force reconfig allows only single node
+            // addition/removal.
             print("Reconfiguring replica set to add in other nodes");
-            replSetCommandWithRetry(master, cmd);
+            for (let i = 2; i <= originalMembers.length; i++) {
+                print("ReplSetTest adding in node " + i);
+                config.members = originalMembers.slice(0, i);
+                replSetCommandWithRetry(master, {replSetReconfig: config});
+                config.version++;
+            }
         }
 
         // Setup authentication if running test with authentication

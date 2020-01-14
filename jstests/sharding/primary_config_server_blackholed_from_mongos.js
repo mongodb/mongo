@@ -36,7 +36,8 @@ for (let i = 0; i < conf.members.length; i++) {
     }
 }
 conf.version++;
-const response = admin.runCommand({replSetReconfig: conf});
+// TODO (SERVER-45575): Update this to be a non-force reconfig.
+const response = admin.runCommand({replSetReconfig: conf, force: true});
 assert.commandWorked(response);
 
 jsTest.log('Partitioning the config server primary from the mongos');
