@@ -601,6 +601,32 @@ TEST(IndexBoundsBuilderTest, TranslateGtMinKey) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
+TEST_F(IndexBoundsBuilderTest, DontCrashOnNegationOfArrayInequality) {
+    BSONObj keyPattern = BSON("a" << 1);
+    auto testIndex = IndexEntry(keyPattern,
+                                IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                true,  // multikey
+                                {},
+                                {},
+                                false,  // sparse
+                                false,  // unique
+                                IndexEntry::Identifier{"test_foo"},
+                                nullptr,  // filterExpr
+                                BSONObj(),
+                                nullptr,
+                                nullptr);
+
+    BSONObj obj = fromjson("{a: {$not: {$lt: [\"here\", {}, false]}}}");
+    auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    // TODO: SERVER-45233 This should succeed rather than throwing code.
+    ASSERT_THROWS_CODE(IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness),
+                       DBException,
+                       ErrorCodes::InternalError);
+}
+
 // Nothing can be greater than MaxKey so the resulting index bounds would be a useless empty range.
 TEST(IndexBoundsBuilderTest, TranslateGtMaxKeyDoesNotGenerateBounds) {
     auto testIndex = buildSimpleIndexEntry();

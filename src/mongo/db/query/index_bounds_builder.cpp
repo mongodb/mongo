@@ -447,10 +447,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             *tightnessOut = IndexBoundsBuilder::EXACT;
         }
 
-        // If this invariant would fail, we would return incorrect query results. The invariant is
-        // intentionally commented out because the risk of having it crash the server outweighs the
-        // benefit of picking up a subtle correctness issue on a stable version.
-        // invariant(*tightnessOut == IndexBoundsBuilder::EXACT);
+        // This disables indexed negation of array inequality.
+        // TODO: SERVER-45233 Perform correct behavior here once indexed array inequality without
+        // negation's semantics are correctly determined and implemented.
+        massert(ErrorCodes::InternalError,
+                "Indexed negation of array inequality not supported.",
+                *tightnessOut == IndexBoundsBuilder::EXACT);
 
         // If the index is multikey on this path, it doesn't matter what the tightness of the child
         // is, we must return INEXACT_FETCH. Consider a multikey index on 'a' with document
