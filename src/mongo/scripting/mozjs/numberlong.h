@@ -64,6 +64,7 @@ struct NumberLongInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(floatApprox);
         MONGO_DECLARE_JS_FUNCTION(top);
         MONGO_DECLARE_JS_FUNCTION(bottom);
+        MONGO_DECLARE_JS_FUNCTION(exactValueString);
     };
 
     static const JSFunctionSpec methods[6];
