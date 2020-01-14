@@ -4,7 +4,9 @@
  *
  * @tags: [
  *   # freeStorageSize is currently only supported by WT.
- *   requires_wiredtiger
+ *   requires_wiredtiger,
+ *   # inMemory will not have the freeStorageSize field.
+ *   requires_persistence
  * ]
  */
 
