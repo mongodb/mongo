@@ -174,7 +174,6 @@ selector:
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/retryable_writes.js
-  - jstests/sharding/pending_chunk.js
   - jstests/sharding/basic_merge.js
   - jstests/sharding/migration_critical_section_concurrency.js
   - jstests/sharding/sort1.js

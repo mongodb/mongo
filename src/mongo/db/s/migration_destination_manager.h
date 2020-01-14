@@ -188,6 +188,9 @@ private:
 
     stdx::thread _migrateThreadHandle;
 
+    bool _useFCV44Protocol{false};
+
+    UUID _migrationId;
     NamespaceString _nss;
     ConnectionString _fromShardConnString;
     ShardId _fromShard;

@@ -72,7 +72,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // writeConcernMajorityJournalDefault is set to true
                                                 // in the ReplSetConfig.
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                -1);
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 // Tests can pause and resume moveChunk's progress at each step by enabling/disabling each failpoint
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
@@ -174,6 +174,7 @@ public:
             writeConcernResult.wTimedOut = false;
             Status majorityStatus = waitForWriteConcern(
                 opCtx, replClient.getLastOp(), kMajorityWriteConcern, &writeConcernResult);
+
             if (!majorityStatus.isOK()) {
                 if (!writeConcernResult.wTimedOut) {
                     uassertStatusOK(majorityStatus);

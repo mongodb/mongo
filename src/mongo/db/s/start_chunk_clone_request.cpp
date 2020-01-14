@@ -77,7 +77,8 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
     // TODO (SERVER-44787): Remove this FCV check after 4.4 is released.
     if (serverGlobalParams.featureCompatibility.getVersion() ==
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        request._migrationId = UUID::parse(obj);
+        if (obj.getField("uuid"))
+            request._migrationId = UUID::parse(obj);
     }
 
     {
@@ -177,6 +178,33 @@ void StartChunkCloneRequest::appendAsCommand(
 
     builder->append(kRecvChunkStart, nss.ns());
     migrationId.appendToBuilder(builder, kMigrationId);
+    sessionId.append(builder);
+    builder->append(kFromShardConnectionString, fromShardConnectionString.toString());
+    builder->append(kFromShardId, fromShardId.toString());
+    builder->append(kToShardId, toShardId.toString());
+    builder->append(kChunkMinKey, chunkMinKey);
+    builder->append(kChunkMaxKey, chunkMaxKey);
+    builder->append(kShardKeyPattern, shardKeyPattern);
+    secondaryThrottle.append(builder);
+}
+
+// TODO (SERVER-44787): Remove this overload after 4.4 is released.
+void StartChunkCloneRequest::appendAsCommand(
+    BSONObjBuilder* builder,
+    const NamespaceString& nss,
+    const MigrationSessionId& sessionId,
+    const ConnectionString& fromShardConnectionString,
+    const ShardId& fromShardId,
+    const ShardId& toShardId,
+    const BSONObj& chunkMinKey,
+    const BSONObj& chunkMaxKey,
+    const BSONObj& shardKeyPattern,
+    const MigrationSecondaryThrottleOptions& secondaryThrottle) {
+    invariant(builder->asTempObj().isEmpty());
+    invariant(nss.isValid());
+    invariant(fromShardConnectionString.isValid());
+
+    builder->append(kRecvChunkStart, nss.ns());
     sessionId.append(builder);
     builder->append(kFromShardConnectionString, fromShardConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());

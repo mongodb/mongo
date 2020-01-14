@@ -179,6 +179,9 @@ selector:
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
 
+  # SERVER-44160 Modify cleanupOrphaned to wait for overlapping ranges to finish
+  - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+
   exclude_with_any_tags:
   - assumes_balancer_off
   - requires_replication

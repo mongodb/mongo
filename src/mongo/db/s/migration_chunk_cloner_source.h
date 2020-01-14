@@ -37,6 +37,7 @@ class BSONObj;
 class OperationContext;
 class Status;
 class Timestamp;
+class UUID;
 
 namespace repl {
 class OpTime;
@@ -71,7 +72,7 @@ public:
      * NOTE: Must be called without any locks and must succeed, before any other methods are called
      * (except for cancelClone and [insert/update/delete]Op).
      */
-    virtual Status startClone(OperationContext* opCtx) = 0;
+    virtual Status startClone(OperationContext* opCtx, const UUID& migrationId) = 0;
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate

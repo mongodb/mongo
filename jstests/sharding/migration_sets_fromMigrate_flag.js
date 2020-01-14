@@ -57,12 +57,11 @@ jsTest.log('Inserting 5 docs into donor shard, ensuring one orphan on the recipi
 assert.commandWorked(coll.insert({_id: 2}));
 assert.eq(1, donorColl.count());
 assert.commandWorked(
-    recipient.adminCommand({configureFailPoint: "failMigrationLeaveOrphans", mode: "alwaysOn"}));
+    recipient.adminCommand({configureFailPoint: "failMigrationOnRecipient", mode: "alwaysOn"}));
 assert.commandFailed(
     admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 2}, to: st.shard1.shardName}));
-assert.eq(1, recipientColl.count());
 assert.commandWorked(
-    recipient.adminCommand({configureFailPoint: "failMigrationLeaveOrphans", mode: "off"}));
+    recipient.adminCommand({configureFailPoint: "failMigrationOnRecipient", mode: "off"}));
 
 // Insert the remaining documents into the collection.
 assert.commandWorked(coll.insert({_id: 0}));

@@ -133,6 +133,9 @@ selector:
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
 
+  # SERVER-44160 Modify cleanupOrphaned to wait for overlapping ranges to finish
+  - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_replication

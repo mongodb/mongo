@@ -214,7 +214,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
             onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
         });
 
-        ASSERT_OK(cloner.startClone(operationContext()));
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen()));
         futureStartClone.default_timed_get();
     }
 
@@ -312,7 +312,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
         kDonorConnStr,
         kRecipientConnStr.getServers()[0]);
 
-    ASSERT_NOT_OK(cloner.startClone(operationContext()));
+    ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen()));
     cloner.cancelClone(operationContext());
 }
 
@@ -325,7 +325,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
         kDonorConnStr,
         kRecipientConnStr.getServers()[0]);
 
-    ASSERT_NOT_OK(cloner.startClone(operationContext()));
+    ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen()));
     cloner.cancelClone(operationContext());
 }
 
@@ -351,7 +351,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
             });
         });
 
-        auto startCloneStatus = cloner.startClone(operationContext());
+        auto startCloneStatus = cloner.startClone(operationContext(), UUID::gen());
         ASSERT_EQ(ErrorCodes::NetworkTimeout, startCloneStatus.code());
         futureStartClone.default_timed_get();
     }

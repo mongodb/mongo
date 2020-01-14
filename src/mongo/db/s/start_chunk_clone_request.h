@@ -71,6 +71,18 @@ public:
                                 const BSONObj& shardKeyPattern,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle);
 
+    // TODO (SERVER-44787): Remove this overload after 4.4 is released.
+    static void appendAsCommand(BSONObjBuilder* builder,
+                                const NamespaceString& nss,
+                                const MigrationSessionId& sessionId,
+                                const ConnectionString& fromShardConnectionString,
+                                const ShardId& fromShardId,
+                                const ShardId& toShardId,
+                                const BSONObj& chunkMinKey,
+                                const BSONObj& chunkMaxKey,
+                                const BSONObj& shardKeyPattern,
+                                const MigrationSecondaryThrottleOptions& secondaryThrottle);
+
     const NamespaceString& getNss() const {
         return _nss;
     }
@@ -83,9 +95,16 @@ public:
         return _fromShardCS;
     }
 
+    // TODO (SERVER-44787): Remove this function after 4.4 is released.
+    // Use this check so that getMigrationId() is never called in a cluster that's not fully
+    // upgraded to 4.4.
+    bool hasMigrationId() const {
+        return _migrationId.is_initialized();
+    }
+
     const UUID& getMigrationId() const {
-        // getMigrationId() should never be called in a cluster that's not fully upgraded to 4.4.
-        // TODO (SERVER-44787): Remove this invariant after 4.4 is released.
+        // TODO (SERVER-44787): change _migrationId to non-optional and remove invariant after 4.4
+        // is released.
         invariant(_migrationId);
         return *_migrationId;
     }

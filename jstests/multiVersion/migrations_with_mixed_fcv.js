@@ -204,11 +204,8 @@ function testSetFCVBlocksWhileMigratingChunk() {
     assert.commandWorked(
         st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
-    // Set shard1 to FCV 4.4 and leave shard0 at FCV 4.2
-    assert.commandWorked(
-        st.shard1.getDB("admin").runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(st.shard0.getDB("admin"), lastStableFCV);
-    checkFCV(st.shard1.getDB("admin"), latestFCV);
+    checkFCV(st.shard1.getDB("admin"), lastStableFCV);
 
     // Start migration and block with failpoint.
     let shard0Primary = st.rs0.getPrimary();

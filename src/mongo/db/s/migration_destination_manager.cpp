@@ -213,7 +213,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
 
-MONGO_FAIL_POINT_DEFINE(failMigrationLeaveOrphans);
+MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
 MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
 
 }  // namespace
@@ -341,9 +341,23 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
         return Status(ErrorCodes::ConflictingOperationInProgress,
                       "Can't receive chunk while FCV is upgrading/downgrading");
 
+    // Note: It is expected that the FCV cannot change while the node is donating or receiving a
+    // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
+    // chunks via the ActiveMigrationsRegistry.
+    _useFCV44Protocol =
+        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
+
     _state = READY;
     _stateChangedCV.notify_all();
     _errmsg = "";
+
+    if (_useFCV44Protocol) {
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Missing migrationId in FCV 4.4",
+                cloneRequest.hasMigrationId());
+
+        _migrationId = cloneRequest.getMigrationId();
+    }
 
     _nss = nss;
     _fromShard = cloneRequest.getFromShardId();
@@ -748,8 +762,10 @@ void MigrationDestinationManager::_migrateThread() {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
 
-    if (getState() != DONE && !MONGO_unlikely(failMigrationLeaveOrphans.shouldFail())) {
-        _forgetPending(opCtx.get(), ChunkRange(_min, _max));
+    if (!_useFCV44Protocol) {
+        if (getState() != DONE) {
+            _forgetPending(opCtx.get(), ChunkRange(_min, _max));
+        }
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
@@ -799,39 +815,46 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
     {
         const ChunkRange range(_min, _max);
 
-        while (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUuid)) {
-            LOG(0) << "Migration paused because range overlaps with a "
-                      "range that is scheduled for deletion: collection: "
-                   << _nss.ns() << " range: " << redact(range.toString());
+        // 2. Ensure any data which might have been left orphaned in the range being moved has been
+        // deleted.
+        if (_useFCV44Protocol) {
+            while (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUuid)) {
+                LOG(0) << "Migration paused because range overlaps with a "
+                          "range that is scheduled for deletion: collection: "
+                       << _nss.ns() << " range: " << redact(range.toString());
 
+                auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
+
+                if (!status.isOK()) {
+                    _setStateFail(redact(status.reason()));
+                    return;
+                }
+
+                opCtx->sleepFor(Milliseconds(1000));
+            }
+
+            RangeDeletionTask recipientDeletionTask(
+                _migrationId, _nss, collectionUuid, _fromShard, range, CleanWhenEnum::kNow);
+            recipientDeletionTask.setPending(true);
+
+            migrationutil::persistRangeDeletionTaskLocally(opCtx, recipientDeletionTask);
+        } else {
+            // Synchronously delete any data which might have been left orphaned in the range
+            // being moved, and wait for completion
+
+            auto notification = _notePending(opCtx, range);
+            // Wait for the range deletion to report back
+            if (!notification.waitStatus(opCtx).isOK()) {
+                _setStateFail(redact(notification.waitStatus(opCtx).reason()));
+                return;
+            }
+
+            // Wait for any other, overlapping queued deletions to drain
             auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
-
             if (!status.isOK()) {
                 _setStateFail(redact(status.reason()));
                 return;
             }
-
-            opCtx->sleepFor(Milliseconds(1000));
-        }
-
-        // TODO(SERVER-44163): Delete this block after the MigrationCoordinator has been integrated
-        // into the source. It will be replaced by the checkForOverlapping call.
-
-        // 2. Synchronously delete any data which might have been left orphaned in the range
-        // being moved, and wait for completion
-
-        auto notification = _notePending(opCtx, range);
-        // Wait for the range deletion to report back
-        if (!notification.waitStatus(opCtx).isOK()) {
-            _setStateFail(redact(notification.waitStatus(opCtx).reason()));
-            return;
-        }
-
-        // Wait for any other, overlapping queued deletions to drain
-        auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
-        if (!status.isOK()) {
-            _setStateFail(redact(status.reason()));
-            return;
         }
 
         timing.done(2);
@@ -934,9 +957,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         timing.done(3);
         migrateThreadHangAtStep3.pauseWhileSet();
 
-        if (MONGO_unlikely(failMigrationLeaveOrphans.shouldFail())) {
+        if (MONGO_unlikely(failMigrationOnRecipient.shouldFail())) {
             _setStateFail(str::stream() << "failing migration after cloning " << _numCloned
-                                        << " docs due to failMigrationLeaveOrphans failpoint");
+                                        << " docs due to failMigrationOnRecipient failpoint");
             return;
         }
     }

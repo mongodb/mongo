@@ -65,7 +65,7 @@ function assertEventuallyDoesNotHaveMigrationCoordinatorDoc(conn) {
     });
 }
 
-function assertHasRangeDeletionDoc({conn, pending, ns, uuid}) {
+function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid}) {
     const query = {
         nss: ns,
         collectionUuid: uuid,
@@ -73,7 +73,7 @@ function assertHasRangeDeletionDoc({conn, pending, ns, uuid}) {
         "range.min._id": MinKey,
         "range.max._id": MaxKey,
         pending: (pending ? true : {$exists: false}),
-        whenToClean: "delayed"
+        whenToClean: whenToClean
     };
     assert.neq(null,
                conn.getDB("config").getCollection("rangeDeletions").findOne(query),
@@ -106,19 +106,18 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // Run the moveChunk asynchronously, pausing during cloning to allow the test to make
     // assertions.
-    let step3Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep3");
+    let step4Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     const awaitResult = startParallelShell(
         funWithArgs(function(ns, toShardName) {
             assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
         }, ns, st.shard1.shardName), st.s.port);
 
     // Assert that the durable state for coordinating the migration was written correctly.
-    step3Failpoint.wait();
+    step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
     assertHasRangeDeletionDoc({conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid});
-    // TODO (SERVER-45179): Add the FCV 4.4 behavior to the MigrationDestinationManager
-    // assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
-    step3Failpoint.off();
+    assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
+    step4Failpoint.off();
 
     // Allow the moveChunk to finish.
     awaitResult();
@@ -159,7 +158,7 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // Run the moveChunk asynchronously, pausing during cloning to allow the test to make
     // assertions.
-    let step3Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep3");
+    let step4Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     let step5Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep5");
     const awaitResult = startParallelShell(
         funWithArgs(function(ns, toShardName) {
@@ -170,12 +169,11 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
         }, ns, st.shard1.shardName), st.s.port);
 
     // Assert that the durable state for coordinating the migration was written correctly.
-    step3Failpoint.wait();
+    step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
     assertHasRangeDeletionDoc({conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid});
-    // TODO (SERVER-45179): Add the FCV 4.4 behavior to the MigrationDestinationManager
-    // assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
-    step3Failpoint.off();
+    assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
+    step4Failpoint.off();
 
     // Assert that the recipient has 'numDocs' orphans.
     step5Failpoint.wait();
@@ -186,10 +184,9 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     awaitResult();
 
     // Recipient shard eventually cleans up the orphans.
-    // TODO (SERVER-45179): Add the FCV 4.4 behavior to the MigrationDestinationManager
-    // assert.soon(function() {
-    //    return st.shard1.getDB(dbName).getCollection(collName).count() === 0;
-    //});
+    assert.soon(function() {
+        return st.shard1.getDB(dbName).getCollection(collName).count() === 0;
+    });
     assert.eq(numDocs, st.s.getDB(dbName).getCollection(collName).find().itcount());
 
     // The durable state for coordinating the migration is eventually cleaned up.
