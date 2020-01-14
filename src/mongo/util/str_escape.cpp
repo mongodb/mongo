@@ -38,18 +38,18 @@ namespace {
 constexpr char kHexChar[] = "0123456789abcdef";
 
 // 'singleHandler' Function to write a valid single byte UTF-8 sequence with desired escaping.
-// 'singleEscaper' Function to write a byte of invalid UTF-8 encoding
+// 'invalidByteHandler' Function to write a byte of invalid UTF-8 encoding
 // 'twoEscaper' Function to write a valid two byte UTF-8 sequence with desired escaping, for C1
 // control codes.
 // All these functions take a function object as their first parameter to perform the
 // writing of any escaped data. This function expects the number of handled bytes as its first
 // parameter and the corresponding escaped string as the second. They are templates to they can be
 // inlined.
-template <typename SingleByteHandler, typename SingleByteEscaper, typename TwoByteEscaper>
+template <typename SingleByteHandler, typename InvalidByteHandler, typename TwoByteEscaper>
 void escape(fmt::memory_buffer& buffer,
             StringData str,
             SingleByteHandler singleHandler,
-            SingleByteEscaper singleEscaper,
+            InvalidByteHandler invalidByteHandler,
             TwoByteEscaper twoEscaper) {
     // The range [begin, it) contains input that does not need to be escaped and that has not been
     // written to output yet.
@@ -95,7 +95,7 @@ void escape(fmt::memory_buffer& buffer,
     // Helper function to write an invalid UTF-8 sequence from the input stream
     // Will try and write up to num bytes but bail if we reach the end of the input.
     // Updates the position of 'it'.
-    auto writeInvalid = [&](uint8_t c) { singleEscaper(flushAndWrite, c); };
+    auto writeInvalid = [&](uint8_t c) { invalidByteHandler(flushAndWrite, c); };
 
 
     while (it != end) {
@@ -268,9 +268,8 @@ void escapeForText(fmt::memory_buffer& buffer, StringData str) {
                 break;
         }
     };
-    auto twoByteHandler = [](const auto& writer, uint8_t unescaped) {
-        std::array<char, 4> buffer = {
-            '\\', 'x', kHexChar[unescaped >> 4], kHexChar[unescaped & 0xf]};
+    auto invalidByteHandler = [](const auto& writer, uint8_t invalid) {
+        std::array<char, 4> buffer = {'\\', 'x', kHexChar[invalid >> 4], kHexChar[invalid & 0xf]};
         writer(1, StringData(buffer.data(), buffer.size()));
     };
     auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {
@@ -287,7 +286,7 @@ void escapeForText(fmt::memory_buffer& buffer, StringData str) {
     return escape(buffer,
                   str,
                   std::move(singleByteHandler),
-                  std::move(twoByteHandler),
+                  std::move(invalidByteHandler),
                   std::move(twoByteEscaper));
 }
 
@@ -409,24 +408,25 @@ void escapeForJSON(fmt::memory_buffer& buffer, StringData str) {
                 break;
         }
     };
-    auto twoByteHandler = [](const auto& writer, uint8_t unescaped) {
-        std::array<char, 6> buffer = {
-            '\\', 'u', '0', '0', kHexChar[unescaped >> 4], kHexChar[unescaped & 0xf]};
-        writer(1, StringData(buffer.data(), buffer.size()));
+    auto invalidByteHandler = [](const auto& writer, uint8_t) {
+        // Write Unicode Replacement Character when the encoding is bad
+        writer(1, "\\ufffd"_sd);
     };
     auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {
+        // Decode the UTF-8 and write the codepoint with \u
+        uint16_t codepoint = ((first & 0b0001'1111) << 6) | (second & 0b0011'1111);
         std::array<char, 6> buffer = {'\\',
                                       'u',
-                                      kHexChar[first >> 4],
-                                      kHexChar[first & 0xf],
-                                      kHexChar[second >> 4],
-                                      kHexChar[second & 0xf]};
+                                      kHexChar[codepoint >> 12],
+                                      kHexChar[(codepoint >> 8) & 0b0000'1111],
+                                      kHexChar[(codepoint >> 4) & 0b0000'1111],
+                                      kHexChar[codepoint & 0b0000'1111]};
         writer(2, StringData(buffer.data(), buffer.size()));
     };
     return escape(buffer,
                   str,
                   std::move(singleByteHandler),
-                  std::move(twoByteHandler),
+                  std::move(invalidByteHandler),
                   std::move(twoByteEscaper));
 }
 std::string escapeForJSON(StringData str) {

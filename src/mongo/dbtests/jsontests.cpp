@@ -98,12 +98,12 @@ TEST(JsonStringTest, BasicTest) {
 }
 
 TEST(JsonStringTest, UnicodeTest) {
-    // Extended Canonical/Relaxed escapes invalid UTF-8 while LegacyStricts treats it as Extended
-    // Ascii
+    // Extended Canonical/Relaxed replaces invalid UTF-8 with Unicode Replacement Character while
+    // LegacyStricts treats it as Extended Ascii
     ASSERT_JSON_EQUALS(B().append("a", "\x80").obj().jsonString(ExtendedCanonicalV2_0_0),
-                       R"({ "a" : "\u0080" })");
+                       R"({ "a" : "\ufffd" })");
     ASSERT_JSON_EQUALS(B().append("a", "\x80").obj().jsonString(ExtendedRelaxedV2_0_0),
-                       R"({ "a" : "\u0080" })");
+                       R"({ "a" : "\ufffd" })");
     // Can't use ASSERT_JSON_EQUALS because property_tree does not allow invalid unicode
     ASSERT_EQUALS(B().append("a", "\x80").obj().jsonString(LegacyStrict), "{ \"a\" : \"\x80\" }");
 }
