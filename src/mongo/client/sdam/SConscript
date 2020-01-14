@@ -11,7 +11,7 @@ env.Library(
         'server_description.cpp',
         'topology_description.cpp',
         'topology_state_machine.cpp',
-        'topology_manager.cpp'
+        'topology_manager.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
