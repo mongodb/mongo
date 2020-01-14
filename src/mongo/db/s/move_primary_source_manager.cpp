@@ -386,11 +386,6 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {
-
-        // TODO SERVER-32608
-        // Wait for writes to 'config.cache.databases' to flush before removing the 'minOpTime
-        // 'recovery' document.
-
         // Clear the 'minOpTime recovery' document so that the next time a node from this shard
         // becomes a primary, it won't have to recover the config server optime.
         ShardingStateRecovery::endMetadataOp(opCtx);
