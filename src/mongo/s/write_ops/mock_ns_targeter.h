@@ -59,12 +59,10 @@ struct MockRange {
  */
 class MockNSTargeter : public NSTargeter {
 public:
-    void init(const NamespaceString& nss, std::vector<MockRange> mockRanges) {
-        ASSERT(nss.isValid());
-        _nss = nss;
-
-        ASSERT(!mockRanges.empty());
-        _mockRanges = std::move(mockRanges);
+    MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges)
+        : _nss(nss), _mockRanges(std::move(mockRanges)) {
+        ASSERT(_nss.isValid());
+        ASSERT(!_mockRanges.empty());
     }
 
     const NamespaceString& getNS() const {

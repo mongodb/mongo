@@ -104,8 +104,7 @@ TEST(WriteOpTests, TargetSingle) {
     WriteOp writeOp(BatchItemRef(&request, 0));
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    MockNSTargeter targeter;
-    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
+    MockNSTargeter targeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -139,11 +138,10 @@ TEST(WriteOpTests, TargetMultiOneShard) {
     WriteOp writeOp(BatchItemRef(&request, 0));
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    MockNSTargeter targeter;
-    targeter.init(nss,
-                  {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
-                   MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
-                   MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
+    MockNSTargeter targeter(nss,
+                            {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                             MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
+                             MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -178,11 +176,10 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     WriteOp writeOp(BatchItemRef(&request, 0));
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    MockNSTargeter targeter;
-    targeter.init(nss,
-                  {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
-                   MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
-                   MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
+    MockNSTargeter targeter(nss,
+                            {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                             MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
+                             MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -206,6 +203,55 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
 }
 
+TEST(WriteOpTests, TargetMultiAllShardsAndErrorSingleChildOp) {
+    OperationContextNoop opCtx;
+
+    NamespaceString nss("foo.bar");
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion(10, 0, OID()));
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion(20, 0, OID()));
+
+    BatchedCommandRequest request([&] {
+        write_ops::Delete deleteOp(nss);
+        deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), false)});
+        return deleteOp;
+    }());
+
+    // Do multi-target write op
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+
+    MockNSTargeter targeter(nss,
+                            {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                             MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
+
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 2u);
+    sortByEndpoint(&targeted);
+    ASSERT_EQUALS(targeted[0]->endpoint.shardName, endpointA.shardName);
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[0]->endpoint.shardVersion));
+    ASSERT_EQUALS(targeted[1]->endpoint.shardName, endpointB.shardName);
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[1]->endpoint.shardVersion));
+
+    // Simulate retryable error.
+    WriteErrorDetail retryableError;
+    retryableError.setIndex(0);
+    retryableError.setStatus({ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
+    writeOp.noteWriteError(*targeted[0], retryableError);
+
+    // State should not change until we have result from all nodes.
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+
+    writeOp.noteWriteComplete(*targeted[1]);
+
+    // State resets back to ready because of retryable error.
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+}
+
 // Single error after targeting test
 TEST(WriteOpTests, ErrorSingle) {
     OperationContextNoop opCtx;
@@ -224,8 +270,7 @@ TEST(WriteOpTests, ErrorSingle) {
     WriteOp writeOp(BatchItemRef(&request, 0));
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    MockNSTargeter targeter;
-    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
+    MockNSTargeter targeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -265,8 +310,7 @@ TEST(WriteOpTests, CancelSingle) {
     WriteOp writeOp(BatchItemRef(&request, 0));
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    MockNSTargeter targeter;
-    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
+    MockNSTargeter targeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -304,8 +348,7 @@ TEST(WriteOpTests, RetrySingleOp) {
     WriteOp writeOp(BatchItemRef(&request, 0));
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    MockNSTargeter targeter;
-    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
+    MockNSTargeter targeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();

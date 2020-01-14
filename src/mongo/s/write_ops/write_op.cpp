@@ -95,19 +95,23 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
     auto& endpoints = swEndpoints.getValue();
 
     for (auto&& endpoint : endpoints) {
-        _childOps.emplace_back(this);
+        // if the operation was already successfull on that shard, there is no need to repeat the
+        // write
+        if (!_successfulShardSet.count(endpoint.shardName)) {
+            _childOps.emplace_back(this);
 
-        WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
+            WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
 
-        // For now, multiple endpoints imply no versioning - we can't retry half a multi-write
-        if (endpoints.size() > 1u) {
-            endpoint.shardVersion = ChunkVersion::IGNORED();
+            // For now, multiple endpoints imply no versioning - we can't retry half a multi-write
+            if (endpoints.size() > 1u) {
+                endpoint.shardVersion = ChunkVersion::IGNORED();
+            }
+
+            targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));
+
+            _childOps.back().pendingWrite = targetedWrites->back();
+            _childOps.back().state = WriteOpState_Pending;
         }
-
-        targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));
-
-        _childOps.back().pendingWrite = targetedWrites->back();
-        _childOps.back().state = WriteOpState_Pending;
     }
 
     _state = WriteOpState_Pending;
@@ -175,8 +179,6 @@ void WriteOp::_updateOpState() {
     }
 
     if (!childErrors.empty() && isRetryError) {
-        // Since we're using broadcast mode for multi-shard writes, which cannot SCE
-        invariant(childErrors.size() == 1u);
         _state = WriteOpState_Ready;
     } else if (!childErrors.empty()) {
         _error.reset(new WriteErrorDetail);
@@ -213,6 +215,7 @@ void WriteOp::noteWriteComplete(const TargetedWrite& targetedWrite) {
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
 
+    _successfulShardSet.emplace(targetedWrite.endpoint.shardName);
     childOp.pendingWrite = NULL;
     childOp.endpoint.reset(new ShardEndpoint(targetedWrite.endpoint));
     childOp.state = WriteOpState_Completed;

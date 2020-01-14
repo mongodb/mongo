@@ -262,10 +262,7 @@ public:
     /**
      * TargetedWrite is owned here once given to the TargetedWriteBatch.
      */
-    void addWrite(TargetedWrite* targetedWrite, int estWriteSize) {
-        _writes.mutableVector().push_back(targetedWrite);
-        _estimatedSizeBytes += estWriteSize;
-    }
+    void addWrite(TargetedWrite* targetedWrite, int estWriteSize);
 
 private:
     // Where to send the batch

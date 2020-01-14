@@ -177,6 +177,9 @@ private:
 
     // filled when state == _Error
     std::unique_ptr<WriteErrorDetail> _error;
+
+    // stores the shards where this write operation succeeded
+    stdx::unordered_set<ShardId, ShardId::Hasher> _successfulShardSet;
 };
 
 /**

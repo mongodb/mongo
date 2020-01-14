@@ -41,26 +41,21 @@
 namespace mongo {
 namespace {
 
-void initTargeterFullRange(const NamespaceString& nss,
-                           const ShardEndpoint& endpoint,
-                           MockNSTargeter* targeter) {
-    targeter->init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
+auto initTargeterFullRange(const NamespaceString& nss, const ShardEndpoint& endpoint) {
+    return MockNSTargeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 }
 
-void initTargeterSplitRange(const NamespaceString& nss,
+auto initTargeterSplitRange(const NamespaceString& nss,
                             const ShardEndpoint& endpointA,
-                            const ShardEndpoint& endpointB,
-                            MockNSTargeter* targeter) {
-    targeter->init(nss,
-                   {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
-                    MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
+                            const ShardEndpoint& endpointB) {
+    return MockNSTargeter(nss,
+                          {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                           MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
 }
 
-void initTargeterHalfRange(const NamespaceString& nss,
-                           const ShardEndpoint& endpoint,
-                           MockNSTargeter* targeter) {
+auto initTargeterHalfRange(const NamespaceString& nss, const ShardEndpoint& endpoint) {
     // x >= 0 values are untargetable
-    targeter->init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << 0))});
+    return MockNSTargeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << 0))});
 }
 
 write_ops::DeleteOpEntry buildDelete(const BSONObj& query, bool multi) {
@@ -130,8 +125,8 @@ using BatchWriteOpTest = WriteOpTestFixture;
 TEST_F(BatchWriteOpTest, SingleOp) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request([&] {
@@ -163,8 +158,8 @@ TEST_F(BatchWriteOpTest, SingleOp) {
 TEST_F(BatchWriteOpTest, SingleError) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request([&] {
@@ -202,8 +197,8 @@ TEST_F(BatchWriteOpTest, SingleError) {
 TEST_F(BatchWriteOpTest, SingleTargetError) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterHalfRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterHalfRange(nss, endpoint);
 
     // Do untargetable delete op
     BatchedCommandRequest request([&] {
@@ -237,8 +232,8 @@ TEST_F(BatchWriteOpTest, SingleTargetError) {
 TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -279,8 +274,8 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
 TEST_F(BatchWriteOpTest, SingleStaleError) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -333,8 +328,8 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
 TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     // Do single-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
@@ -370,8 +365,8 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
 TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     // Do single-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
@@ -414,8 +409,8 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
@@ -481,8 +476,8 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
@@ -527,8 +522,8 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
@@ -583,8 +578,8 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
@@ -631,8 +626,8 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Delete deleteOp(nss);
@@ -726,8 +721,8 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Update updateOp(nss);
@@ -780,8 +775,8 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -841,8 +836,8 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -899,8 +894,8 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Delete deleteOp(nss);
@@ -962,8 +957,8 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Delete deleteOp(nss);
@@ -1023,8 +1018,8 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
 TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1068,8 +1063,8 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Update updateOp(nss);
@@ -1123,8 +1118,8 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
 TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterHalfRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterHalfRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1178,8 +1173,8 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
 TEST_F(BatchWriteOpTest, MultiOpFailedTargetUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterHalfRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterHalfRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1233,8 +1228,8 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1281,8 +1276,8 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1338,8 +1333,8 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1383,8 +1378,8 @@ TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1424,8 +1419,8 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -1473,8 +1468,8 @@ using BatchWriteOpLimitTests = WriteOpTestFixture;
 TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     // Create a BSONObj (slightly) bigger than the maximum size by including a max-size string
     const std::string bigString(BSONObjMaxUserSize, 'x');
@@ -1509,8 +1504,8 @@ TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
 TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
 
     // Create a BSONObj (slightly) bigger than the maximum size by including a max-size string
     const std::string bigString(BSONObjMaxUserSize, 'x');
