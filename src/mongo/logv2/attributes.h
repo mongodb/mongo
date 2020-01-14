@@ -42,7 +42,7 @@ const boost::log::attribute_name& component();
 const boost::log::attribute_name& timeStamp();
 const boost::log::attribute_name& threadName();
 const boost::log::attribute_name& tags();
-const boost::log::attribute_name& stableId();
+const boost::log::attribute_name& id();
 const boost::log::attribute_name& message();
 const boost::log::attribute_name& attributes();
 

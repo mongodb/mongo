@@ -40,23 +40,23 @@ namespace mongo {
 namespace logv2 {
 namespace detail {
 
-void doLogImpl(LogSeverity const& severity,
-               StringData stable_id,
+void doLogImpl(int32_t id,
+               LogSeverity const& severity,
                LogOptions const& options,
                StringData message,
                TypeErasedAttributeStorage const& attrs);
 
 
 template <typename S, typename... Args>
-void doLog(LogSeverity const& severity,
-           StringData stable_id,
+void doLog(int32_t id,
+           LogSeverity const& severity,
            LogOptions const& options,
            S const& message,
            const fmt::internal::named_arg<Args, char>&... args) {
     auto attributes = makeAttributeStorage(args...);
 
     auto msg = static_cast<fmt::string_view>(message);
-    doLogImpl(severity, stable_id, options, StringData(msg.data(), msg.size()), attributes);
+    doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), attributes);
 }
 
 }  // namespace detail

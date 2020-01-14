@@ -138,12 +138,6 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
     // Build a JSON object for the user attributes.
     const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
 
-    std::string id;
-    auto stable_id = extract<StringData>(attributes::stableId(), rec).get();
-    if (!stable_id.empty()) {
-        id = fmt::format("\"{}\":\"{}\",", constants::kStableIdFieldName, stable_id);
-    }
-
     StringData severity =
         extract<LogSeverity>(attributes::severity(), rec).get().toStringDataCompact();
     StringData component =
@@ -166,7 +160,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    R"("{}":"{}"{: <{}})"        // severity with padding for the comma
                    R"("{}":"{}"{: <{}})"        // component with padding for the comma
                    R"("{}":"{}",)"              // context
-                   R"({})"                      // optional stable id
+                   R"("{}":{},)"                // id
                    R"("{}":")",                 // message
                                                 // timestamp
                    constants::kTimestampFieldName,
@@ -184,8 +178,9 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    // context
                    constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get(),
-                   // stable id
-                   id,
+                   // id
+                   constants::kIdFieldName,
+                   extract<int32_t>(attributes::id(), rec).get(),
                    // message
                    constants::kMessageFieldName);
 

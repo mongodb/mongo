@@ -177,7 +177,7 @@ void BM_NoopLogV2(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
-        LOGV2_DEBUG(1, "noop log");
+        LOGV2_DEBUG(20074, 1, "noop log");
 }
 
 void BM_NoopLogArg(benchmark::State& state) {
@@ -191,7 +191,7 @@ void BM_NoopLogV2Arg(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
-        LOGV2_DEBUG(1, "noop log {}", "str"_attr = createLongString());
+        LOGV2_DEBUG(20075, 1, "noop log {}", "str"_attr = createLongString());
 }
 
 void BM_EnabledLog(benchmark::State& state) {
@@ -206,7 +206,7 @@ void BM_EnabledLogV2(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
-        LOGV2("enabled log");
+        LOGV2(20071, "enabled log");
 }
 
 void BM_EnabledLogExpensiveArg(benchmark::State& state) {
@@ -221,7 +221,7 @@ void BM_EnabledLogV2ExpensiveArg(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
-        LOGV2("enabled log {}", "str"_attr = createLongString());
+        LOGV2(20072, "enabled log {}", "str"_attr = createLongString());
 }
 
 void BM_EnabledLogManySmallArg(benchmark::State& state) {
@@ -238,7 +238,8 @@ void BM_EnabledLogV2ManySmallArg(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state) {
-        LOGV2("enabled log {}{}{}{}{}{}{}{}{}{}",
+        LOGV2(20073,
+              "enabled log {}{}{}{}{}{}{}{}{}{}",
               "1"_attr = 1,
               "2"_attr = 2,
               "3"_attr = "3",

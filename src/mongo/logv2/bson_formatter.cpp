@@ -124,10 +124,7 @@ void BSONFormatter::operator()(boost::log::record_view const& rec,
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog());
     builder.append(constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get());
-    auto stable_id = extract<StringData>(attributes::stableId(), rec).get();
-    if (!stable_id.empty()) {
-        builder.append(constants::kStableIdFieldName, stable_id);
-    }
+    builder.append(constants::kIdFieldName, extract<int32_t>(attributes::id(), rec).get());
 
     detail::NameExtractor nameExtractor;
     attrs.apply(nameExtractor);
