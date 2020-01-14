@@ -244,6 +244,15 @@ void assertIsValidCollectionState(const boost::intrusive_ptr<ExpressionContext>&
     }
 }
 
+void lookupPipeValidator(const Pipeline& pipeline) {
+    const auto& sources = pipeline.getSources();
+    std::for_each(sources.begin(), sources.end(), [](auto& src) {
+        uassert(51047,
+                str::stream() << src->getSourceName()
+                              << " is not allowed within a $lookup's sub-pipeline",
+                src->constraints().isAllowedInLookupPipeline());
+    });
+}
 }  // namespace
 
 DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
@@ -309,6 +318,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
         MakePipelineOptions pipelineOpts;
         pipelineOpts.optimize = true;
         pipelineOpts.attachCursorSource = true;
+        pipelineOpts.validator = lookupPipeValidator;
         // By default, $lookup doesnt support sharded 'from' collections.
         pipelineOpts.allowTargetingShards = internalQueryAllowShardedLookup.load();
         return Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
@@ -319,6 +329,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     MakePipelineOptions pipelineOpts;
     pipelineOpts.optimize = false;
     pipelineOpts.attachCursorSource = false;
+    pipelineOpts.validator = lookupPipeValidator;
     auto pipeline = Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
 
     // Add the cache stage at the end and optimize. During the optimization process, the cache will
@@ -664,15 +675,7 @@ void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variabl
 void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
     _resolvedIntrospectionPipeline =
-        Pipeline::parse(_resolvedPipeline, _fromExpCtx, [](const Pipeline& pipeline) {
-            const auto& sources = pipeline.getSources();
-            std::for_each(sources.begin(), sources.end(), [](auto& src) {
-                uassert(51047,
-                        str::stream() << src->getSourceName()
-                                      << " is not allowed within a $lookup's sub-pipeline",
-                        src->constraints().isAllowedInLookupPipeline());
-            });
-        });
+        Pipeline::parse(_resolvedPipeline, _fromExpCtx, lookupPipeValidator);
 }
 
 void DocumentSourceLookUp::serializeToArray(

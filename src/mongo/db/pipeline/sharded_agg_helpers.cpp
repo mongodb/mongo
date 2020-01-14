@@ -600,20 +600,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
     // Generate the command object for the targeted shards.
-    std::vector<BSONObj> rawStages = [&pipeline]() {
-        auto serialization = pipeline->serialize();
-        std::vector<BSONObj> stages;
-        stages.reserve(serialization.size());
-
-        for (const auto& stageObj : serialization) {
-            invariant(stageObj.getType() == BSONType::Object);
-            stages.push_back(stageObj.getDocument().toBson());
-        }
-
-        return stages;
-    }();
-
-    AggregationRequest aggRequest(expCtx->ns, rawStages);
+    AggregationRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
 
     // The default value for 'allowDiskUse' in the AggregationRequest may not match what was set
     // on the originating command, so copy it from the ExpressionContext.

@@ -149,15 +149,9 @@ Pipeline::~Pipeline() {
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone() const {
-    const auto& serialized = serialize();
-    std::vector<BSONObj> asBson;
-    asBson.reserve(serialized.size());
-    for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::Object);
-        asBson.push_back(stage.getDocument().toBson());
-    }
+    const auto& serialized = serializeToBson();
     try {
-        return parse(asBson, getContext());
+        return parse(serialized, getContext());
     } catch (DBException& ex) {
         ex.addContext(str::stream()
                       << "Failed to copy pipeline. Could not parse serialized version: "
@@ -421,6 +415,17 @@ vector<Value> Pipeline::serialize() const {
     return serializedSources;
 }
 
+vector<BSONObj> Pipeline::serializeToBson() const {
+    const auto serialized = serialize();
+    std::vector<BSONObj> asBson;
+    asBson.reserve(serialized.size());
+    for (auto&& stage : serialized) {
+        invariant(stage.getType() == BSONType::Object);
+        asBson.push_back(stage.getDocument().toBson());
+    }
+    return asBson;
+}
+
 void Pipeline::unstitch() {
     for (auto&& stage : _sources) {
         stage->setSource(nullptr);
@@ -641,7 +646,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx, opts.validator);
 
     if (opts.optimize) {
         pipeline->optimizePipeline();

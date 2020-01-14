@@ -262,7 +262,6 @@ auto shardVersionRetry(OperationContext* opCtx,
             if (!logAndTestMaxRetries(e)) {
                 throw;
             }
-            continue;
         }
     }
 }

@@ -68,10 +68,6 @@ public:
         return kStageName.rawData();
     }
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
     GetModPathsReturn getModifiedPaths() const final {
         // Since we might have a document arrive from the foreign pipeline with the same path as a
         // document in the main pipeline. Without introspecting the sub-pipeline, we must report
@@ -152,15 +148,11 @@ private:
         kFinished
     };
 
-    /**
-     * Should not be called; use serializeToArray instead.
-     */
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+
+    void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-    bool _cursorAttached = false;
     bool _usedDisk = false;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
 };

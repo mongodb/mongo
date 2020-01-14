@@ -54,6 +54,7 @@ class CollatorInterface;
 class DocumentSource;
 class ExpressionContext;
 class OperationContext;
+class Pipeline;
 class PipelineDeleter;
 
 /**
@@ -63,10 +64,13 @@ class PipelineDeleter;
  */
 extern FailPoint disablePipelineOptimization;
 
+using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
+
 struct MakePipelineOptions {
     bool optimize = true;
     bool attachCursorSource = true;
     bool allowTargetingShards = true;
+    PipelineValidatorCallback validator = nullptr;
 };
 
 /**
@@ -111,8 +115,6 @@ public:
      * will not be used during execution of the pipeline. Doing so may cause comparisons made during
      * parse-time to return the wrong results.
      */
-    using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
-
     static std::unique_ptr<Pipeline, PipelineDeleter> parse(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -244,6 +246,7 @@ public:
      * Serializes the pipeline into a form that can be parsed into an equivalent pipeline.
      */
     std::vector<Value> serialize() const;
+    std::vector<BSONObj> serializeToBson() const;
 
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);

@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -75,7 +76,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
                             std::make_move_iterator(currentPipeline.begin()),
                             std::make_move_iterator(currentPipeline.end()));
 
-    return Pipeline::parse(std::move(resolvedPipeline), unionExpCtx, validatorCallback);
+    MakePipelineOptions opts;
+    opts.attachCursorSource = false;
+    opts.validator = validatorCallback;
+    return Pipeline::makePipeline(std::move(resolvedPipeline), unionExpCtx, opts);
 }
 
 }  // namespace
@@ -173,14 +177,30 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     }
 
     if (_executionState == ExecutionProgress::kStartingSubPipeline) {
+        auto serializedPipe = _pipeline->serializeToBson();
         LOGV2_DEBUG(23869,
                     3,
                     "$unionWith attaching cursor to pipeline {pipeline}",
-                    "pipeline"_attr = Value(_pipeline->serialize()));
+                    "pipeline"_attr = serializedPipe);
         auto expCtxCopy = _pipeline->getContext();
-        _pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            expCtxCopy, _pipeline.release());
-        _executionState = ExecutionProgress::kIteratingSubPipeline;
+        try {
+            _pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+                expCtxCopy, _pipeline.release());
+            _executionState = ExecutionProgress::kIteratingSubPipeline;
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+            _pipeline = buildPipelineFromViewDefinition(
+                pExpCtx,
+                ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                serializedPipe);
+            LOGV2_DEBUG(4556300,
+                        0,
+                        "$unionWith found view definition. ns: {ns}, pipeline: {pipeline}. New "
+                        "$unionWith sub-pipeline: {new_pipe}",
+                        "ns"_attr = e->getNamespace(),
+                        "pipeline"_attr = Value(e->getPipeline()),
+                        "new_pipe"_attr = _pipeline->serializeToBson());
+            return doGetNext();
+        }
     }
 
     auto res = _pipeline->getNext();
@@ -224,8 +244,7 @@ void DocumentSourceUnionWith::doDispose() {
     }
 }
 
-void DocumentSourceUnionWith::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         auto ctx = _pipeline->getContext();
         auto containers = _pipeline->getSources();
@@ -235,18 +254,15 @@ void DocumentSourceUnionWith::serializeToArray(
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
         invariant(explainObj.nFields() == 1);
-        Document doc =
+        return Value(
             DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline"
-                                              << explainObj.firstElement()));
-        array.push_back(Value(doc));
-        return;
+                                              << explainObj.firstElement())));
     } else {
         BSONArrayBuilder bab;
         for (auto&& stage : _pipeline->serialize())
             bab << stage;
-        Document doc = DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll()
-                                                         << "pipeline" << bab.arr()));
-        array.push_back(Value(doc));
+        return Value(DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll()
+                                                       << "pipeline" << bab.arr())));
     }
 }
 

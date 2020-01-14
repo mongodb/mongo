@@ -337,11 +337,6 @@ assert.commandWorked(viewsDB.runCommand({
     })();
 
 (function testUnionReadFromView() {
-    if (FixtureHelpers.isMongos(db)) {
-        // TODO SERVER-45563 enable these tests in sharded environments.
-        jsTest.log("Tests are being run on a mongos; skipping all $unionWith view tests.");
-        return;
-    }
     assert.eq(allDocuments.length, coll.aggregate([]).itcount());
     assert.eq(2 * allDocuments.length,
               coll.aggregate([{$unionWith: "emptyPipelineView"}]).itcount());
