@@ -591,7 +591,10 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(serviceContext()->getFastClockSource());
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, multiPlanStage.pickBestPlan(&alwaysTimeOutPolicy));
+    const auto status = multiPlanStage.pickBestPlan(&alwaysTimeOutPolicy);
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "multiplanner encountered a failure while selecting best plan");
 }
 
 TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
@@ -633,6 +636,61 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled,
               multiPlanStage.pickBestPlan(&alwaysPlanKilledYieldPolicy));
+}
+
+/**
+ * A PlanStage for testing which always throws exceptions.
+ */
+class ThrowyPlanStage : public PlanStage {
+protected:
+    StageState doWork(WorkingSetID* out) {
+        uasserted(ErrorCodes::InternalError, "Mwahahaha! You've fallen into my trap.");
+    }
+
+public:
+    ThrowyPlanStage(OperationContext* opCtx) : PlanStage("throwy", opCtx) {}
+    bool isEOF() final {
+        return false;
+    }
+    StageType stageType() const final {
+        return STAGE_UNKNOWN;
+    }
+    virtual std::unique_ptr<PlanStageStats> getStats() final {
+        return nullptr;
+    }
+    virtual const SpecificStats* getSpecificStats() const final {
+        return nullptr;
+    }
+};
+
+TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
+    insert(BSON("foo" << 10));
+    AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
+
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
+    queryRequest->setFilter(BSON("fake"
+                                 << "query"));
+    auto canonicalQuery =
+        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
+    MultiPlanStage multiPlanStage(opCtx(),
+                                  ctx.getCollection(),
+                                  canonicalQuery.get(),
+                                  MultiPlanStage::CachingMode::NeverCache);
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    multiPlanStage.addPlan(
+        createQuerySolution(), std::make_unique<ThrowyPlanStage>(opCtx()), sharedWs.get());
+    multiPlanStage.addPlan(
+        createQuerySolution(), std::make_unique<ThrowyPlanStage>(opCtx()), sharedWs.get());
+
+    PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
+    ASSERT_THROWS_WITH_CHECK(multiPlanStage.pickBestPlan(&yieldPolicy),
+                             AssertionException,
+                             [](const AssertionException& ex) {
+                                 ASSERT_EQ(ex.toStatus().code(), ErrorCodes::InternalError);
+                                 ASSERT_STRING_CONTAINS(
+                                     ex.what(),
+                                     "exception thrown while multiplanner was selecting best plan");
+                             });
 }
 
 }  // namespace
