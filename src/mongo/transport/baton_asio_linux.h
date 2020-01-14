@@ -267,8 +267,11 @@ public:
                 auto toRun = std::exchange(_scheduled, {});
 
                 lk.unlock();
-                for (auto& job : toRun) {
+                while (toRun.size()) {
+                    // While there are jobs to run, run and dtor in sequence
+                    auto& job = toRun.back();
                     job(Status::OK());
+                    toRun.pop_back();
                 }
                 lk.lock();
             }
