@@ -41,7 +41,7 @@ namespace mongo {
  */
 class MongosProcessInterface : public CommonProcessInterface {
 public:
-    MongosProcessInterface() = default;
+    using CommonProcessInterface::CommonProcessInterface;
 
     virtual ~MongosProcessInterface() = default;
 
@@ -148,11 +148,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards = true) final;
-
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         // It is not meaningful to perform a "local read" on mongos.
@@ -222,6 +217,17 @@ public:
                                            boost::optional<std::set<FieldPath>> fieldPaths,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const override;
+
+    /**
+     * If 'allowTargetingShards' is true, splits the pipeline and dispatch half to the shards,
+     * leaving the merging half executing in this process after attaching a $mergeCursors. Will
+     * retry on network errors and also on StaleConfig errors to avoid restarting the entire
+     * operation.
+     */
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* pipeline,
+        bool allowTargetingShards) final;
 
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,

@@ -59,7 +59,7 @@ public:
 class ProcessInterfaceStandaloneTest : public AggregationContextFixture {
 public:
     auto makeProcessInterface() {
-        return std::make_unique<MongoProcessInterfaceForTest>(getExpCtx()->opCtx);
+        return std::make_unique<MongoProcessInterfaceForTest>(nullptr);
     }
 };
 

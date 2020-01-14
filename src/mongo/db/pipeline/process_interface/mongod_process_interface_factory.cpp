@@ -35,18 +35,21 @@
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
 std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
     if (ShardingState::get(opCtx)->enabled()) {
-        return std::make_shared<ShardServerProcessInterface>(opCtx);
+        return std::make_shared<ShardServerProcessInterface>(
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
     } else if (getTestCommandsEnabled()) {
         if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx))
-            return std::make_shared<ReplicaSetNodeProcessInterface>(opCtx, executor);
+            return std::make_shared<ReplicaSetNodeProcessInterface>(std::move(executor));
     }
-    return std::make_shared<StandaloneProcessInterface>(opCtx);
+    return std::make_shared<StandaloneProcessInterface>(nullptr);
 }
 
 auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(

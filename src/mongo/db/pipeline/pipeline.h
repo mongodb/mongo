@@ -146,6 +146,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{});
 
+    std::unique_ptr<Pipeline, PipelineDeleter> clone() const;
+
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;
     }

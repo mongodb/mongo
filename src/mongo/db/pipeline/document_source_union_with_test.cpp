@@ -324,6 +324,23 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     ASSERT_TRUE(unionWithTwo.getNext().isEOF());
 }
 
+TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
+    const auto mockInput = DocumentSourceMock::createForTest({Document(), Document()});
+    const auto mockUnionInput = std::deque<DocumentSource::GetNextResult>{};
+    const auto mockCtx = getExpCtx()->copyWith({});
+    mockCtx->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockUnionInput);
+    auto unionWith = DocumentSourceUnionWith(
+        mockCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
+    unionWith.setSource(mockInput.get());
+
+    ASSERT_TRUE(unionWith.getNext().isAdvanced());
+
+    unionWith.dispose();
+    ASSERT_TRUE(unionWith.getNext().isEOF());
+    ASSERT_TRUE(unionWith.getNext().isEOF());
+    ASSERT_TRUE(unionWith.getNext().isEOF());
+}
+
 TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
     auto expCtx = getExpCtx();
     const auto replaceRoot =

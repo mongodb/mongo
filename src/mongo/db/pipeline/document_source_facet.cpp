@@ -293,10 +293,6 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
 
         auto pipeline = Pipeline::parse(rawFacet.second, expCtx, [](const Pipeline& pipeline) {
             auto sources = pipeline.getSources();
-            uassert(ErrorCodes::BadValue,
-                    "sub-pipeline in $facet stage cannot be empty",
-                    !sources.empty());
-
             std::for_each(sources.begin(), sources.end(), [](auto& stage) {
                 auto stageConstraints = stage->constraints();
                 uassert(40600,

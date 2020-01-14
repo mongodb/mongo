@@ -42,6 +42,7 @@ namespace mongo {
  */
 class CommonProcessInterface : public MongoProcessInterface {
 public:
+    using MongoProcessInterface::MongoProcessInterface;
     virtual ~CommonProcessInterface() = default;
 
     /**

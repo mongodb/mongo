@@ -33,7 +33,6 @@
 
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/establish_cursors.h"
 
@@ -46,13 +45,11 @@ REGISTER_DOCUMENT_SOURCE(mergeCursors,
 constexpr StringData DocumentSourceMergeCursors::kStageName;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    std::shared_ptr<executor::TaskExecutor> executor,
-    AsyncResultsMergerParams armParams,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AsyncResultsMergerParams armParams,
     boost::optional<BSONObj> ownedParamsSpec)
     : DocumentSource(kStageName, expCtx),
       _armParamsObj(std::move(ownedParamsSpec)),
-      _executor(std::move(executor)),
       _armParams(std::move(armParams)) {}
 
 std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
@@ -83,7 +80,7 @@ void DocumentSourceMergeCursors::populateMerger() {
 
     _blockingResultsMerger.emplace(pExpCtx->opCtx,
                                    std::move(*_armParams),
-                                   _executor,
+                                   pExpCtx->mongoProcessInterface->taskExecutor,
                                    pExpCtx->mongoProcessInterface->getResourceYielder());
     _armParams = boost::none;
     // '_blockingResultsMerger' now owns the cursors.
@@ -92,7 +89,8 @@ void DocumentSourceMergeCursors::populateMerger() {
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
     invariant(!_blockingResultsMerger, "Expected conversion to happen before execution");
-    return std::make_unique<RouterStageMerge>(pExpCtx->opCtx, _executor, std::move(*_armParams));
+    return std::make_unique<RouterStageMerge>(
+        pExpCtx->opCtx, pExpCtx->mongoProcessInterface->taskExecutor, std::move(*_armParams));
 }
 
 DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
@@ -121,18 +119,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
             elem.type() == BSONType::Object);
     auto ownedObj = elem.embeddedObject().getOwned();
     auto armParams = AsyncResultsMergerParams::parse(IDLParserErrorContext(kStageName), ownedObj);
-    return new DocumentSourceMergeCursors(
-        Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        std::move(armParams),
-        expCtx,
-        std::move(ownedObj));
+    return new DocumentSourceMergeCursors(expCtx, std::move(armParams), std::move(ownedObj));
 }
 
 boost::intrusive_ptr<DocumentSourceMergeCursors> DocumentSourceMergeCursors::create(
-    std::shared_ptr<executor::TaskExecutor> executor,
-    AsyncResultsMergerParams params,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceMergeCursors(std::move(executor), std::move(params), expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, AsyncResultsMergerParams params) {
+    return new DocumentSourceMergeCursors(expCtx, std::move(params));
 }
 
 void DocumentSourceMergeCursors::detachFromOperationContext() {

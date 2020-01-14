@@ -48,7 +48,6 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -110,7 +109,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     aggReq.setBatchSize(0);
     auto configCursor =
         establishCursors(expCtx->opCtx,
-                         Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                         expCtx->mongoProcessInterface->taskExecutor,
                          aggReq.getNamespaceString(),
                          ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
                          {{configShard->getId(), aggReq.serializeToCommandObj().toBson()}},
@@ -165,6 +164,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
 
 std::vector<RemoteCursor> establishShardCursors(
     OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
     bool hasChangeStream,
     boost::optional<CachedCollectionRoutingInfo>& routingInfo,
@@ -216,7 +216,7 @@ std::vector<RemoteCursor> establishShardCursors(
     }
 
     return establishCursors(opCtx,
-                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            std::move(executor),
                             nss,
                             readPref,
                             requests,
@@ -581,6 +581,72 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
     }
 }
 
+/**
+ * For a sharded collection, establishes remote cursors on each shard that may have results, and
+ * creates a DocumentSourceMergeCursors stage to merge the remote cursors. Returns a pipeline
+ * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
+ * be this node itself.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                        PipelineDeleter(expCtx->opCtx));
+
+    invariant(pipeline->getSources().empty() ||
+              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+
+    // Generate the command object for the targeted shards.
+    std::vector<BSONObj> rawStages = [&pipeline]() {
+        auto serialization = pipeline->serialize();
+        std::vector<BSONObj> stages;
+        stages.reserve(serialization.size());
+
+        for (const auto& stageObj : serialization) {
+            invariant(stageObj.getType() == BSONType::Object);
+            stages.push_back(stageObj.getDocument().toBson());
+        }
+
+        return stages;
+    }();
+
+    AggregationRequest aggRequest(expCtx->ns, rawStages);
+
+    // The default value for 'allowDiskUse' in the AggregationRequest may not match what was set
+    // on the originating command, so copy it from the ExpressionContext.
+    aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
+
+    LiteParsedPipeline liteParsedPipeline(aggRequest);
+    auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    auto shardDispatchResults = dispatchShardPipeline(
+        aggRequest.serializeToCommandObj(), hasChangeStream, std::move(pipeline));
+
+    std::vector<ShardId> targetedShards;
+    targetedShards.reserve(shardDispatchResults.remoteCursors.size());
+    for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
+        targetedShards.emplace_back(remoteCursor->getShardId().toString());
+    }
+
+    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
+    boost::optional<BSONObj> shardCursorsSortSpec = boost::none;
+    if (shardDispatchResults.splitPipeline) {
+        mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
+        shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
+    } else {
+        // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
+        // empty local pipeline which we will attach the merge cursors stage to.
+        mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
+    }
+
+    addMergeCursorsSource(mergePipeline.get(),
+                          shardDispatchResults.commandForTargetedShards,
+                          std::move(shardDispatchResults.remoteCursors),
+                          targetedShards,
+                          shardCursorsSortSpec,
+                          hasChangeStream);
+
+    return mergePipeline;
+}
+
 }  // namespace
 
 boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationContext* opCtx,
@@ -840,6 +906,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         }
     } else {
         cursors = establishShardCursors(opCtx,
+                                        expCtx->mongoProcessInterface->taskExecutor,
                                         expCtx->ns,
                                         hasChangeStream,
                                         executionNsRoutingInfo,
@@ -886,7 +953,6 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
                            std::vector<OwnedRemoteCursor> ownedCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           std::shared_ptr<executor::TaskExecutor> executor,
                            bool hasChangeStream) {
     auto* opCtx = mergePipeline->getContext()->opCtx;
     AsyncResultsMergerParams armParams;
@@ -924,80 +990,15 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
 
     // For change streams, we need to set up a custom stage to establish cursors on new shards when
     // they are added, to ensure we don't miss results from the new shards.
-    auto mergeCursorsStage = DocumentSourceMergeCursors::create(
-        std::move(executor), std::move(armParams), mergePipeline->getContext());
+    auto mergeCursorsStage =
+        DocumentSourceMergeCursors::create(mergePipeline->getContext(), std::move(armParams));
 
     if (hasChangeStream) {
         mergePipeline->addInitialSource(DocumentSourceUpdateOnAddShard::create(
-            mergePipeline->getContext(),
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            mergeCursorsStage,
-            targetedShards,
-            cmdSentToShards));
+            mergePipeline->getContext(), mergeCursorsStage, targetedShards, cmdSentToShards));
     }
 
     mergePipeline->addInitialSource(std::move(mergeCursorsStage));
-}
-
-std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                        PipelineDeleter(expCtx->opCtx));
-
-    invariant(pipeline->getSources().empty() ||
-              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-
-    // Generate the command object for the targeted shards.
-    std::vector<BSONObj> rawStages = [&pipeline]() {
-        auto serialization = pipeline->serialize();
-        std::vector<BSONObj> stages;
-        stages.reserve(serialization.size());
-
-        for (const auto& stageObj : serialization) {
-            invariant(stageObj.getType() == BSONType::Object);
-            stages.push_back(stageObj.getDocument().toBson());
-        }
-
-        return stages;
-    }();
-
-    AggregationRequest aggRequest(expCtx->ns, rawStages);
-
-    // The default value for 'allowDiskUse' in the AggregationRequest may not match what was set
-    // on the originating command, so copy it from the ExpressionContext.
-    aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
-
-    LiteParsedPipeline liteParsedPipeline(aggRequest);
-    auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto shardDispatchResults = dispatchShardPipeline(
-        aggRequest.serializeToCommandObj(), hasChangeStream, std::move(pipeline));
-
-    std::vector<ShardId> targetedShards;
-    targetedShards.reserve(shardDispatchResults.remoteCursors.size());
-    for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
-        targetedShards.emplace_back(remoteCursor->getShardId().toString());
-    }
-
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
-    boost::optional<BSONObj> shardCursorsSortSpec = boost::none;
-    if (shardDispatchResults.splitPipeline) {
-        mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
-        shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
-    } else {
-        // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
-        // empty local pipeline which we will attach the merge cursors stage to.
-        mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
-    }
-
-    addMergeCursorsSource(mergePipeline.get(),
-                          shardDispatchResults.commandForTargetedShards,
-                          std::move(shardDispatchResults.remoteCursors),
-                          targetedShards,
-                          shardCursorsSortSpec,
-                          Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                          hasChangeStream);
-
-    return mergePipeline;
 }
 
 StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
@@ -1035,4 +1036,34 @@ bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream) {
     return nss.isCollectionlessAggregateNS() || hasChangeStream;
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                        PipelineDeleter(expCtx->opCtx));
+    invariant(pipeline->getSources().empty() ||
+              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+
+    auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+    return shardVersionRetry(
+        expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
+            auto pipelineToTarget = pipeline->clone();
+            if (!allowTargetingShards || expCtx->ns.db() == "local") {
+                // If the db is local, this may be a change stream examining the oplog. We know the
+                // oplog (and any other local collections) will not be sharded.
+                return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+                    expCtx, pipeline.release());
+            }
+            return targetShardsAndAddMergeCursors(expCtx, pipelineToTarget.release());
+        });
+}
+
+void logFailedRetryAttempt(StringData taskDescription, const DBException& exception) {
+    LOGV2_DEBUG(4553800,
+                3,
+                "Retrying {task_description}. Got error: {exception}",
+                "task_description"_attr = taskDescription,
+                "exception"_attr = exception);
+}
 }  // namespace mongo::sharded_agg_helpers

@@ -149,18 +149,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
                            std::vector<OwnedRemoteCursor> ownedCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           std::shared_ptr<executor::TaskExecutor> executor,
                            bool hasChangeStream);
-
-/**
- * For a sharded collection, establishes remote cursors on each shard that may have results, and
- * creates a DocumentSourceMergeCursors stage to merge the remove cursors. Returns a pipeline
- * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
- * be this node itself.
- */
-std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline);
-
 
 /**
  * Returns the proper routing table to use for targeting shards: either a historical routing table
@@ -183,5 +172,85 @@ bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream);
  */
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
 
+/**
+ * Uses sharded_agg_helpers to split the pipeline and dispatch half to the shards, leaving the
+ * merging half executing in this process after attaching a $mergeCursors. Will retry on network
+ * errors and also on StaleConfig errors to avoid restarting the entire operation.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards);
+
+/**
+ * Adds a log message with the given message. Simple helper to avoid defining the log component in a
+ * header file.
+ */
+void logFailedRetryAttempt(StringData taskDescription, const DBException&);
+
+/**
+ * A retry loop which handles errors in ErrorCategory::StaleShardVersionError. When such an error is
+ * encountered, the CatalogCache is marked for refresh and 'callback' is retried. When retried,
+ * 'callback' will trigger a refresh of the CatalogCache and block until it's done when it next
+ * consults the CatalogCache.
+ */
+template <typename F>
+auto shardVersionRetry(OperationContext* opCtx,
+                       CatalogCache* catalogCache,
+                       NamespaceString nss,
+                       StringData taskDescription,
+                       F&& callbackFn) {
+    size_t numAttempts = 0;
+    auto logAndTestMaxRetries = [&numAttempts, taskDescription](auto& exception) {
+        if (++numAttempts <= kMaxNumStaleVersionRetries) {
+            logFailedRetryAttempt(taskDescription, exception);
+            return true;
+        }
+        exception.addContext(str::stream()
+                             << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
+                             << " retries attempting " << taskDescription);
+        return false;
+    };
+    while (true) {
+        catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, numAttempts);
+        try {
+            return callbackFn();
+        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+            invariant(ex->getDb() == nss.db(),
+                      str::stream() << "StaleDbVersion error on unexpected database. Expected "
+                                    << nss.db() << ", received " << ex->getDb());
+            // If the database version is stale, refresh its entry in the catalog cache.
+            catalogCache->onStaleDatabaseVersion(ex->getDb(), ex->getVersionReceived());
+            if (!logAndTestMaxRetries(ex)) {
+                throw;
+            }
+        } catch (ExceptionForCat<ErrorCategory::StaleShardVersionError>& e) {
+            // If the exception provides a shardId, add it to the set of shards requiring a refresh.
+            // If the cache currently considers the collection to be unsharded, this will trigger an
+            // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
+            if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
+                invariant(staleInfo->getNss() == nss,
+                          str::stream() << "StaleConfig error on unexpected namespace. Expected "
+                                        << nss << ", received " << staleInfo->getNss());
+                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                    opCtx,
+                    nss,
+                    staleInfo->getVersionWanted(),
+                    staleInfo->getVersionReceived(),
+                    staleInfo->getShardId());
+            } else {
+                catalogCache->onEpochChange(nss);
+            }
+            if (!logAndTestMaxRetries(e)) {
+                throw;
+            }
+        } catch (ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>& e) {
+            if (!logAndTestMaxRetries(e)) {
+                throw;
+            }
+            continue;
+        }
+    }
+}
 }  // namespace sharded_agg_helpers
 }  // namespace mongo

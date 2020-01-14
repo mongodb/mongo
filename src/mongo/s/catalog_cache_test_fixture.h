@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 
@@ -90,8 +91,10 @@ protected:
     /**
      * Ensures that there are 'numShards' available in the shard registry. The shard ids are
      * generated as "0", "1", etc.
+     *
+     * Returns the mock shard descriptors that were used for the setup.
      */
-    void setupNShards(int numShards);
+    std::vector<ShardType> setupNShards(int numShards);
 
     /**
      * Triggers a refresh for the given namespace and mocks network calls to simulate loading

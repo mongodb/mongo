@@ -60,25 +60,19 @@ bool isShardConfigEvent(const Document& eventDoc) {
 
 boost::intrusive_ptr<DocumentSourceUpdateOnAddShard> DocumentSourceUpdateOnAddShard::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::shared_ptr<executor::TaskExecutor> executor,
     const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
     std::vector<ShardId> shardsWithCursors,
     BSONObj cmdToRunOnNewShards) {
-    return new DocumentSourceUpdateOnAddShard(expCtx,
-                                              std::move(executor),
-                                              mergeCursors,
-                                              std::move(shardsWithCursors),
-                                              cmdToRunOnNewShards);
+    return new DocumentSourceUpdateOnAddShard(
+        expCtx, mergeCursors, std::move(shardsWithCursors), cmdToRunOnNewShards);
 }
 
 DocumentSourceUpdateOnAddShard::DocumentSourceUpdateOnAddShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::shared_ptr<executor::TaskExecutor> executor,
     const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
     std::vector<ShardId>&& shardsWithCursors,
     BSONObj cmdToRunOnNewShards)
     : DocumentSource(kStageName, expCtx),
-      _executor(std::move(executor)),
       _mergeCursors(mergeCursors),
       _shardsWithCursors(shardsWithCursors.begin(), shardsWithCursors.end()),
       _cmdToRunOnNewShards(cmdToRunOnNewShards.getOwned()) {}
@@ -133,7 +127,7 @@ std::vector<RemoteCursor> DocumentSourceUpdateOnAddShard::establishShardCursorsO
 
     const bool allowPartialResults = false;  // partial results are not allowed
     return establishCursors(opCtx,
-                            _executor,
+                            pExpCtx->mongoProcessInterface->taskExecutor,
                             pExpCtx->ns,
                             ReadPreferenceSetting::get(opCtx),
                             {{newShard.getName(), cmdObj}},

@@ -48,21 +48,21 @@ namespace mongo {
 
 namespace {
 const auto replicaSetNodeExecutor =
-    ServiceContext::declareDecoration<std::unique_ptr<executor::TaskExecutor>>();
+    ServiceContext::declareDecoration<std::shared_ptr<executor::TaskExecutor>>();
 }  // namespace
 
-executor::TaskExecutor* ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
+std::shared_ptr<executor::TaskExecutor> ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
     ServiceContext* service) {
-    return replicaSetNodeExecutor(service).get();
+    return replicaSetNodeExecutor(service);
 }
 
-executor::TaskExecutor* ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
+std::shared_ptr<executor::TaskExecutor> ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
     OperationContext* opCtx) {
     return getReplicaSetNodeExecutor(opCtx->getServiceContext());
 }
 
 void ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
-    ServiceContext* service, std::unique_ptr<executor::TaskExecutor> executor) {
+    ServiceContext* service, std::shared_ptr<executor::TaskExecutor> executor) {
     replicaSetNodeExecutor(service) = std::move(executor);
 }
 
@@ -196,7 +196,7 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));
-    auto scheduleResult = _executor->scheduleRemoteCommand(
+    auto scheduleResult = taskExecutor->scheduleRemoteCommand(
         std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
     if (!scheduleResult.isOK()) {
         // Since the command failed to be scheduled, the callback above did not and will not run.

@@ -56,7 +56,7 @@ public:
     }
 
     auto makeProcessInterface() {
-        return std::make_unique<MongosProcessInterfaceForTest>();
+        return std::make_unique<MongosProcessInterfaceForTest>(nullptr);
     }
 };
 

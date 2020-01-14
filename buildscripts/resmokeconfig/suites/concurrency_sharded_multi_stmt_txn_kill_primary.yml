@@ -186,9 +186,10 @@ selector:
   ##
 
   # Uses getMore in the same state function as a command not supported in a transaction.
-  - jstests/concurrency/fsm_workloads/list_indexes.js
+  - jstests/concurrency/fsm_workloads/agg_union_with_chunk_migrations.js
   - jstests/concurrency/fsm_workloads/create_capped_collection.js
   - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
+  - jstests/concurrency/fsm_workloads/list_indexes.js
 
   # Uses non-retryable commands in the same state function as a command not supported in a
   # transaction.

@@ -176,7 +176,6 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
         std::move(shardDispatchResults.remoteCursors),
         targetedShards,
         shardDispatchResults.splitPipeline->shardCursorsSortSpec,
-        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         hasChangeStream);
 
     // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
@@ -382,7 +381,6 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
             std::move(producers),
             {},
             shardDispatchResults->splitPipeline->shardCursorsSortSpec,
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
             false);
 
         consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
@@ -754,6 +752,7 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
 }
 
 Status dispatchPipelineAndMerge(OperationContext* opCtx,
+                                std::shared_ptr<executor::TaskExecutor> executor,
                                 AggregationTargeter targeter,
                                 Document serializedCommand,
                                 long long batchSize,

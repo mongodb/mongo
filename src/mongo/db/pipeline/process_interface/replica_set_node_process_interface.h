@@ -44,15 +44,17 @@ class ReplicaSetNodeProcessInterface final : public NonShardServerProcessInterfa
 public:
     using NonShardServerProcessInterface::NonShardServerProcessInterface;
 
-    static executor::TaskExecutor* getReplicaSetNodeExecutor(ServiceContext* service);
+    static std::shared_ptr<executor::TaskExecutor> getReplicaSetNodeExecutor(
+        ServiceContext* service);
 
-    static executor::TaskExecutor* getReplicaSetNodeExecutor(OperationContext* opCtx);
+    static std::shared_ptr<executor::TaskExecutor> getReplicaSetNodeExecutor(
+        OperationContext* opCtx);
 
     static void setReplicaSetNodeExecutor(ServiceContext* service,
-                                          std::unique_ptr<executor::TaskExecutor> executor);
+                                          std::shared_ptr<executor::TaskExecutor> executor);
 
-    ReplicaSetNodeProcessInterface(OperationContext* opCtx, executor::TaskExecutor* executor)
-        : NonShardServerProcessInterface(opCtx), _executor(executor) {}
+    ReplicaSetNodeProcessInterface(std::shared_ptr<executor::TaskExecutor> executor)
+        : NonShardServerProcessInterface(std::move(executor)) {}
 
     virtual ~ReplicaSetNodeProcessInterface() = default;
 
@@ -112,8 +114,6 @@ private:
      * immediately stale upon return.
      */
     bool _canWriteLocally(OperationContext* opCtx, const NamespaceString& ns) const;
-
-    executor::TaskExecutor* _executor;
 };
 
 }  // namespace mongo

@@ -83,27 +83,26 @@ CatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceStrin
     });
 }
 
-void CatalogCacheTestFixture::setupNShards(int numShards) {
-    setupShards([&]() {
-        std::vector<ShardType> shards;
-        for (int i = 0; i < numShards; i++) {
-            ShardId name(str::stream() << i);
-            HostAndPort host(str::stream() << "Host" << i << ":12345");
+std::vector<ShardType> CatalogCacheTestFixture::setupNShards(int numShards) {
+    std::vector<ShardType> shards;
+    for (int i = 0; i < numShards; i++) {
+        ShardId name(str::stream() << i);
+        HostAndPort host(str::stream() << "Host" << i << ":12345");
 
-            ShardType shard;
-            shard.setName(name.toString());
-            shard.setHost(host.toString());
-            shards.emplace_back(std::move(shard));
+        ShardType shard;
+        shard.setName(name.toString());
+        shard.setHost(host.toString());
+        shards.emplace_back(std::move(shard));
 
-            std::unique_ptr<RemoteCommandTargeterMock> targeter(
-                std::make_unique<RemoteCommandTargeterMock>());
-            targeter->setConnectionStringReturnValue(ConnectionString(host));
-            targeter->setFindHostReturnValue(host);
-            targeterFactory()->addTargeterToReturn(ConnectionString(host), std::move(targeter));
-        }
+        std::unique_ptr<RemoteCommandTargeterMock> targeter(
+            std::make_unique<RemoteCommandTargeterMock>());
+        targeter->setConnectionStringReturnValue(ConnectionString(host));
+        targeter->setFindHostReturnValue(host);
+        targeterFactory()->addTargeterToReturn(ConnectionString(host), std::move(targeter));
+    }
 
-        return shards;
-    }());
+    setupShards(shards);
+    return shards;
 }
 
 std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(

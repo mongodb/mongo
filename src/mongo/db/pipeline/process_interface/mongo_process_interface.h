@@ -52,6 +52,7 @@
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/backup_cursor_state.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -115,6 +116,9 @@ public:
         int64_t nMatched{0};
         int64_t nModified{0};
     };
+
+    MongoProcessInterface(std::shared_ptr<executor::TaskExecutor> executor)
+        : taskExecutor(std::move(executor)) {}
 
     virtual ~MongoProcessInterface(){};
 
@@ -420,6 +424,8 @@ public:
                                            boost::optional<std::set<FieldPath>> fieldPaths,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const = 0;
+
+    std::shared_ptr<executor::TaskExecutor> taskExecutor;
 };
 
 }  // namespace mongo

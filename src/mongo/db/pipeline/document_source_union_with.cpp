@@ -157,27 +157,37 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
 }
 
 DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
-    if (!_sourceExhausted) {
+    if (!_pipeline) {
+        // We must have already been disposed, so we're finished.
+        return GetNextResult::makeEOF();
+    }
+
+    if (_executionState == ExecutionProgress::kIteratingSource) {
         auto nextInput = pSource->getNext();
         if (!nextInput.isEOF()) {
             return nextInput;
         }
-        _sourceExhausted = true;
+        _executionState = ExecutionProgress::kStartingSubPipeline;
         // All documents from the base collection have been returned, switch to iterating the sub-
         // pipeline by falling through below.
     }
 
-    if (!_cursorAttached) {
-        auto ctx = _pipeline->getContext();
-        _pipeline =
-            pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(ctx, _pipeline.release());
-        _cursorAttached = true;
-        LOGV2_DEBUG(23869, 3, "$unionWith attached cursor to pipeline");
+    if (_executionState == ExecutionProgress::kStartingSubPipeline) {
+        LOGV2_DEBUG(23869,
+                    3,
+                    "$unionWith attaching cursor to pipeline {pipeline}",
+                    "pipeline"_attr = Value(_pipeline->serialize()));
+        auto expCtxCopy = _pipeline->getContext();
+        _pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+            expCtxCopy, _pipeline.release());
+        _executionState = ExecutionProgress::kIteratingSubPipeline;
     }
 
-    if (auto res = _pipeline->getNext())
+    auto res = _pipeline->getNext();
+    if (res)
         return std::move(*res);
 
+    _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
 }
 

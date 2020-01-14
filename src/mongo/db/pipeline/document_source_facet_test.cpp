@@ -112,17 +112,6 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectNonArrayFacets) {
                   AssertionException);
 }
 
-TEST_F(DocumentSourceFacetTest, ShouldRejectEmptyPipelines) {
-    auto ctx = getExpCtx();
-    auto spec = BSON("$facet" << BSON("a" << BSONArray()));
-    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
-                  AssertionException);
-
-    spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 4)) << "b" << BSONArray()));
-    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
-                  AssertionException);
-}
-
 TEST_F(DocumentSourceFacetTest, ShouldSucceedWhenNamespaceIsCollectionless) {
     auto ctx = getExpCtx();
     auto spec = fromjson("{$facet: {a: [{$match: {}}]}}");
@@ -365,6 +354,34 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
     ASSERT_EQ(output.getDocument().computeSize(), 2ULL);
     ASSERT_VALUE_EQ(output.getDocument()["first"], Value(expectedOutputs));
     ASSERT_VALUE_EQ(output.getDocument()["second"], Value(expectedOutputs));
+
+    // Should be exhausted now.
+    ASSERT(facetStage->getNext().isEOF());
+    ASSERT(facetStage->getNext().isEOF());
+    ASSERT(facetStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
+    auto ctx = getExpCtx();
+    auto spec = BSON("$facet" << BSON("a" << BSONArray()));
+
+    deque<DocumentSource::GetNextResult> inputs = {
+        Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
+    auto mock = DocumentSourceMock::createForTest(inputs);
+
+    auto facetStage = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
+    facetStage->setSource(mock.get());
+
+    auto output = facetStage->getNext();
+
+    // The output fields are in no guaranteed order.
+    vector<Value> expectedOutputs;
+    for (auto&& input : inputs) {
+        expectedOutputs.emplace_back(input.releaseDocument());
+    }
+    ASSERT(output.isAdvanced());
+    ASSERT_EQ(output.getDocument().computeSize(), 1ULL);
+    ASSERT_VALUE_EQ(output.getDocument()["a"], Value(expectedOutputs));
 
     // Should be exhausted now.
     ASSERT(facetStage->getNext().isEOF());

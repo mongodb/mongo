@@ -98,7 +98,8 @@ auto makeExpressionContext(OperationContext* opCtx,
         nss,
         runtimeConstants,
         std::move(resolvedCollator),
-        std::make_shared<MongosProcessInterface>(),
+        std::make_shared<MongosProcessInterface>(
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
         std::move(resolvedNamespaces),
         boost::none);  // uuid
     expCtx->inMongos = true;
@@ -216,6 +217,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 // a pointer to the constructed ExpressionContext.
                 uassertStatusOK(cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
+                    expCtx->mongoProcessInterface->taskExecutor,
                     std::move(targeter),
                     std::move(serialized),
                     std::numeric_limits<long long>::max(),

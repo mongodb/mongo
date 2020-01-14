@@ -46,8 +46,7 @@ namespace {
 class MapReduceFixture : public ServiceContextMongoDTest {
 protected:
     MapReduceFixture() : _expCtx((new ExpressionContextForTest())) {
-        _expCtx->mongoProcessInterface =
-            std::make_shared<StandaloneProcessInterface>(_expCtx->opCtx);
+        _expCtx->mongoProcessInterface = std::make_shared<StandaloneProcessInterface>(nullptr);
     }
 
     boost::intrusive_ptr<ExpressionContextForTest>& getExpCtx() {

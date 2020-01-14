@@ -62,9 +62,7 @@ public:
      * Creates a new DocumentSourceMergeCursors from the given parameters.
      */
     static boost::intrusive_ptr<DocumentSourceMergeCursors> create(
-        std::shared_ptr<executor::TaskExecutor>,
-        AsyncResultsMergerParams,
-        const boost::intrusive_ptr<ExpressionContext>&);
+        const boost::intrusive_ptr<ExpressionContext>&, AsyncResultsMergerParams);
 
     /**
      * Extracts the remote cursors and converts the execution machinery from a DocumentSource to a
@@ -151,9 +149,8 @@ protected:
     void doDispose() final;
 
 private:
-    DocumentSourceMergeCursors(std::shared_ptr<executor::TaskExecutor>,
+    DocumentSourceMergeCursors(const boost::intrusive_ptr<ExpressionContext>&,
                                AsyncResultsMergerParams,
-                               const boost::intrusive_ptr<ExpressionContext>&,
                                boost::optional<BSONObj> ownedParamsSpec = boost::none);
 
     /**
@@ -165,8 +162,6 @@ private:
     // When we have parsed the params out of a BSONObj, the object needs to stay around while the
     // params are in use. We store them here.
     boost::optional<BSONObj> _armParamsObj;
-
-    std::shared_ptr<executor::TaskExecutor> _executor;
 
     // '_blockingResultsMerger' is lazily populated. Until we need to use it, '_armParams' will be
     // populated with the parameters. Once we start using '_blockingResultsMerger', '_armParams'

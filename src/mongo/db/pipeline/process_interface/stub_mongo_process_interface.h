@@ -44,6 +44,8 @@ namespace mongo {
  */
 class StubMongoProcessInterface : public MongoProcessInterface {
 public:
+    StubMongoProcessInterface() : MongoProcessInterface(nullptr) {}
+    using MongoProcessInterface::MongoProcessInterface;
     virtual ~StubMongoProcessInterface() = default;
 
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(

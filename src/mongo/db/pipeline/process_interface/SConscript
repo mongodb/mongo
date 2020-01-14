@@ -76,6 +76,7 @@ env.Library(
         'mongod_process_interface_factory.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'mongod_process_interfaces',
         'shardsvr_process_interface',
     ],
@@ -88,6 +89,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/s/query/async_results_merger',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'common_process_interface',

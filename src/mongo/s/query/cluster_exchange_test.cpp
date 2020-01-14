@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -38,11 +37,9 @@
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/query/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -53,84 +50,17 @@ using MergeStrategyDescriptor = DocumentSourceMerge::MergeStrategyDescriptor;
 using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 
-const NamespaceString kTestAggregateNss = NamespaceString{"unittests", "cluster_exchange"};
-const NamespaceString kTestOutNss = NamespaceString{"unittests", "out_ns"};
+const NamespaceString kTestTargetNss = NamespaceString{"unittests", "out_ns"};
 
-/**
- * For the purposes of this test, assume every collection is sharded. Stages may ask this during
- * setup. For example, to compute its constraints, the $merge stage needs to know if the output
- * collection is sharded.
- */
-class FakeMongoProcessInterface : public StubMongoProcessInterface {
-public:
-    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
-        return true;
-    }
-};
-
-class ClusterExchangeTest : public CatalogCacheTestFixture {
-public:
-    void setUp() {
-        CatalogCacheTestFixture::setUp();
-        _expCtx = new ExpressionContextForTest(operationContext(),
-                                               AggregationRequest{kTestAggregateNss, {}});
-        _expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
-        _expCtx->inMongos = true;
-    }
-
-    boost::intrusive_ptr<ExpressionContext> expCtx() {
-        return _expCtx;
-    }
-
-    boost::intrusive_ptr<DocumentSource> parse(const std::string& json) {
-        auto stages = DocumentSource::parse(_expCtx, fromjson(json));
-        ASSERT_EQ(stages.size(), 1UL);
-        return stages.front();
-    }
-
-    std::vector<ChunkType> makeChunks(const NamespaceString& nss,
-                                      const OID epoch,
-                                      std::vector<std::pair<ChunkRange, ShardId>> chunkInfos) {
-        ChunkVersion version(1, 0, epoch);
-        std::vector<ChunkType> chunks;
-        for (auto&& pair : chunkInfos) {
-            chunks.emplace_back(nss, pair.first, version, pair.second);
-            chunks.back().setName(OID::gen());
-            version.incMinor();
-        }
-        return chunks;
-    }
-
-    void loadRoutingTable(NamespaceString nss,
-                          const OID epoch,
-                          const ShardKeyPattern& shardKey,
-                          const std::vector<ChunkType>& chunkDistribution) {
-        auto future = scheduleRoutingInfoUnforcedRefresh(nss);
-
-        // Mock the expected config server queries.
-        expectGetDatabase(nss);
-        expectGetCollection(nss, epoch, shardKey);
-        expectGetCollection(nss, epoch, shardKey);
-        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            std::vector<BSONObj> response;
-            for (auto&& chunk : chunkDistribution) {
-                response.push_back(chunk.toConfigBSON());
-            }
-            return response;
-        }());
-
-        future.default_timed_get().get();
-    }
-
+class ClusterExchangeTest : public ShardedAggTestFixture {
 protected:
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::optional<BSONObj> _mergeLetVariables;
     boost::optional<std::vector<BSONObj>> _mergePipeline;
     std::set<FieldPath> _mergeOnFields{"_id"};
     boost::optional<ChunkVersion> _mergeTargetCollectionVersion;
 };
 
-TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineDoesNotEndWithOut) {
+TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineDoesNotEndWithMerge) {
     setupNShards(2);
     auto mergePipe = Pipeline::create({DocumentSourceLimit::create(expCtx(), 1)}, expCtx());
     ASSERT_FALSE(
@@ -143,19 +73,20 @@ TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineDoesNotEndWithOut) {
 TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineEndsWithOut) {
     setupNShards(2);
 
-    // For this test pretend 'kTestOutNss' is not sharded so that we can use $out.
+    // For this test pretend 'kTestTargetNss' is not sharded so that we can use $out.
     const auto originalMongoProcessInterface = expCtx()->mongoProcessInterface;
     expCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
     ON_BLOCK_EXIT([&]() { expCtx()->mongoProcessInterface = originalMongoProcessInterface; });
 
-    auto mergePipe = Pipeline::create({DocumentSourceOut::create(kTestOutNss, expCtx())}, expCtx());
+    auto mergePipe =
+        Pipeline::create({DocumentSourceOut::create(kTestTargetNss, expCtx())}, expCtx());
     ASSERT_FALSE(
         sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
 }
 
 TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputDatabaseDoesNotExist) {
     setupNShards(2);
-    auto mergePipe = Pipeline::create({DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -183,7 +114,7 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputDataba
 // cannot insert an $exchange. The $merge stage should later create a new, unsharded collection.
 TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollectionDoesNotExist) {
     setupNShards(2);
-    auto mergePipe = Pipeline::create({DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -199,7 +130,7 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollec
             sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
     });
 
-    expectGetDatabase(kTestOutNss);
+    expectGetDatabase(kTestTargetNss);
     // Pretend there are no collections in this database.
     expectFindSendBSONObjVector(kConfigHostAndPort, std::vector<BSONObj>());
 
@@ -210,10 +141,10 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollec
 TEST_F(ClusterExchangeTest, LimitFollowedByMergeStageIsNotEligibleForExchange) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
     auto mergePipe = Pipeline::create({DocumentSourceLimit::create(expCtx(), 6),
-                                       DocumentSourceMerge::create(kTestOutNss,
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -234,10 +165,10 @@ TEST_F(ClusterExchangeTest, LimitFollowedByMergeStageIsNotEligibleForExchange) {
 TEST_F(ClusterExchangeTest, GroupFollowedByMergeIsEligbleForExchange) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
-    auto mergePipe = Pipeline::create({parse("{$group: {_id: '$x', $doingMerge: true}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {_id: '$x', $doingMerge: true}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -268,12 +199,12 @@ TEST_F(ClusterExchangeTest, GroupFollowedByMergeIsEligbleForExchange) {
 TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
-    auto mergePipe = Pipeline::create({parse("{$group: {_id: '$x', $doingMerge: true}}"),
-                                       parse("{$project: {temporarily_renamed: '$_id'}}"),
-                                       parse("{$project: {_id: '$temporarily_renamed'}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {_id: '$x', $doingMerge: true}}"),
+                                       parseStage("{$project: {temporarily_renamed: '$_id'}}"),
+                                       parseStage("{$project: {_id: '$temporarily_renamed'}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -308,11 +239,11 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
 TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
-    auto mergePipe = Pipeline::create({parse("{$group: {_id: '$x', $doingMerge: true}}"),
-                                       parse("{$match: {_id: {$gte: 0}}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {_id: '$x', $doingMerge: true}}"),
+                                       parseStage("{$match: {_id: {$gte: 0}}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -347,7 +278,7 @@ TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
 TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
     // This would be the merging half of the pipeline if the original pipeline was
     // [{$sort: {x: 1}},
@@ -355,8 +286,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
     //  {$out: {to: "sharded_by_id", mode: "replaceDocuments"}}].
     // No $sort stage appears in the merging half since we'd expect that to be absorbed by the
     // $mergeCursors and AsyncResultsMerger.
-    auto mergePipe = Pipeline::create({parse("{$group: {_id: '$x'}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {_id: '$x'}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -391,7 +322,7 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
 TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
     // Sharded by {_id: "hashed"}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShardsHash(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShardsHash(kTestTargetNss);
 
     // This would be the merging half of the pipeline if the original pipeline was
     // [{$sort: {x: 1}},
@@ -399,8 +330,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
     //  {$merge: {into: "sharded_by_id",  whenMatched: "fail", whenNotMatched: "insert"}}].
     // No $sort stage appears in the merging half since we'd expect that to be absorbed by the
     // $mergeCursors and AsyncResultsMerger.
-    auto mergePipe = Pipeline::create({parse("{$group: {_id: '$x'}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {_id: '$x'}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -437,17 +368,17 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
 TEST_F(ClusterExchangeTest, ProjectThroughDottedFieldDoesNotPreserveShardKey) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
     auto mergePipe = Pipeline::create(
-        {parse("{$group: {"
-               "  _id: {region: '$region', country: '$country'},"
-               "  population: {$sum: '$population'},"
-               "  cities: {$push: {name: '$city', population: '$population'}}"
-               "}}"),
-         parse(
+        {parseStage("{$group: {"
+                    "  _id: {region: '$region', country: '$country'},"
+                    "  population: {$sum: '$population'},"
+                    "  cities: {$push: {name: '$city', population: '$population'}}"
+                    "}}"),
+         parseStage(
              "{$project: {_id: '$_id.country', region: '$_id.region', population: 1, cities: 1}}"),
-         DocumentSourceMerge::create(kTestOutNss,
+         DocumentSourceMerge::create(kTestTargetNss,
                                      expCtx(),
                                      WhenMatched::kFail,
                                      WhenNotMatched::kInsert,
@@ -472,17 +403,17 @@ TEST_F(ClusterExchangeTest, ProjectThroughDottedFieldDoesNotPreserveShardKey) {
 TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestTargetNss);
 
     // As an example of a pipeline that might replace a map reduce, imagine that we are performing a
     // word count, and the shards part of the pipeline tokenized some text field of each document
     // into {word: <token>, count: 1}. Then this is the merging half of the pipeline:
-    auto mergePipe = Pipeline::create({parse("{$group: {"
-                                             "  _id: '$word',"
-                                             "  count: {$sum: 1},"
-                                             "  $doingMerge: true"
-                                             "}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {"
+                                                  "  _id: '$word',"
+                                                  "  count: {$sum: 1},"
+                                                  "  $doingMerge: true"
+                                                  "}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -518,10 +449,10 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
     setupNShards(2);
     const OID epoch = OID::gen();
     ShardKeyPattern shardKey(BSON("word" << 1));
-    loadRoutingTable(kTestOutNss,
+    loadRoutingTable(kTestTargetNss,
                      epoch,
                      shardKey,
-                     makeChunks(kTestOutNss,
+                     makeChunks(kTestTargetNss,
                                 epoch,
                                 {{ChunkRange{BSON("word" << MINKEY),
                                              BSON("word"
@@ -540,13 +471,13 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
     // As an example of a pipeline that might replace a map reduce, imagine that we are performing a
     // word count, and the shards part of the pipeline tokenized some text field of each document
     // into {word: <token>, count: 1}. Then this is the merging half of the pipeline:
-    auto mergePipe = Pipeline::create({parse("{$group: {"
-                                             "  _id: '$word',"
-                                             "  count: {$sum: 1},"
-                                             "  $doingMerge: true"
-                                             "}}"),
-                                       parse("{$project: {word: '$_id', count: 1}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {"
+                                                  "  _id: '$word',"
+                                                  "  count: {$sum: 1},"
+                                                  "  $doingMerge: true"
+                                                  "}}"),
+                                       parseStage("{$project: {word: '$_id', count: 1}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,
@@ -598,21 +529,21 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     auto chunks = [&]() {
         std::vector<ChunkType> chunks;
         ChunkVersion version(1, 0, epoch);
-        chunks.emplace_back(kTestOutNss,
+        chunks.emplace_back(kTestTargetNss,
                             ChunkRange{BSON("x" << MINKEY << "y" << MINKEY),
                                        BSON("x" << xBoundaries[0] << "y" << MINKEY)},
                             version,
                             ShardId("0"));
         chunks.back().setName(OID::gen());
         for (std::size_t i = 0; i < xBoundaries.size() - 1; ++i) {
-            chunks.emplace_back(kTestOutNss,
+            chunks.emplace_back(kTestTargetNss,
                                 ChunkRange{BSON("x" << xBoundaries[i] << "y" << MINKEY),
                                            BSON("x" << xBoundaries[i + 1] << "y" << MINKEY)},
                                 version,
                                 ShardId(str::stream() << (i + 1) % 3));
             chunks.back().setName(OID::gen());
         }
-        chunks.emplace_back(kTestOutNss,
+        chunks.emplace_back(kTestTargetNss,
                             ChunkRange{BSON("x" << xBoundaries.back() << "y" << MINKEY),
                                        BSON("x" << MAXKEY << "y" << MAXKEY)},
                             version,
@@ -621,14 +552,14 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
         return chunks;
     }();
 
-    loadRoutingTable(kTestOutNss, epoch, shardKey, chunks);
+    loadRoutingTable(kTestTargetNss, epoch, shardKey, chunks);
 
-    auto mergePipe = Pipeline::create({parse("{$group: {"
-                                             "  _id: '$x',"
-                                             "  $doingMerge: true"
-                                             "}}"),
-                                       parse("{$project: {x: '$_id', y: '$_id'}}"),
-                                       DocumentSourceMerge::create(kTestOutNss,
+    auto mergePipe = Pipeline::create({parseStage("{$group: {"
+                                                  "  _id: '$x',"
+                                                  "  $doingMerge: true"
+                                                  "}}"),
+                                       parseStage("{$project: {x: '$_id', y: '$_id'}}"),
+                                       DocumentSourceMerge::create(kTestTargetNss,
                                                                    expCtx(),
                                                                    WhenMatched::kFail,
                                                                    WhenNotMatched::kInsert,

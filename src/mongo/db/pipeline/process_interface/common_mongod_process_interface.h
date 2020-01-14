@@ -49,7 +49,7 @@ using write_ops::Update;
  */
 class CommonMongodProcessInterface : public CommonProcessInterface {
 public:
-    CommonMongodProcessInterface(OperationContext* opCtx);
+    using CommonProcessInterface::CommonProcessInterface;
 
     virtual ~CommonMongodProcessInterface() = default;
 

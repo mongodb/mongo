@@ -80,6 +80,21 @@ public:
         : ExpressionContext(
               opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}) {}
 
+    ExpressionContextForTest(OperationContext* opCtx, NamespaceString nss)
+        : ExpressionContext(opCtx,
+                            boost::none,  // explain
+                            false,        // fromMongos,
+                            false,        // needsMerge,
+                            false,        // allowDiskUse,
+                            false,        // bypassDocumentValidation,
+                            false,        // isMapReduce
+                            nss,
+                            RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            {},  // collator
+                            std::make_shared<StubMongoProcessInterface>(),
+                            {},  // resolvedNamespaces
+                            {}   // collUUID
+          ) {}
     /**
      * Sets the resolved definition for an involved namespace.
      */

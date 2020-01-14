@@ -143,8 +143,6 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-CommonMongodProcessInterface::CommonMongodProcessInterface(OperationContext* opCtx) {}
-
 std::unique_ptr<TransactionHistoryIteratorBase>
 CommonMongodProcessInterface::createTransactionHistoryIterator(repl::OpTime time) const {
     bool permitYield = true;

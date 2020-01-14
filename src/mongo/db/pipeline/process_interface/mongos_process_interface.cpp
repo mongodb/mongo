@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
@@ -50,6 +52,7 @@
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -100,14 +103,6 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    // On mongos we can't have local cursors.
-    return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, ownedPipeline);
-}
-
 boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
@@ -134,94 +129,79 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
         cmdBuilder.append("allowSpeculativeMajorityRead", true);
     }
 
-    auto shardResults = std::vector<RemoteCursor>();
-    auto findCmd = cmdBuilder.obj();
-    for (size_t numRetries = 0; numRetries <= kMaxNumStaleVersionRetries; ++numRetries) {
-        // Obtain the catalog cache. If we are retrying after a stale shard error, mark this
-        // operation as needing to block on the next catalog cache refresh.
+    try {
+        auto findCmd = cmdBuilder.obj();
         auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
-        catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(expCtx->opCtx, numRetries);
+        auto shardResults = sharded_agg_helpers::shardVersionRetry(
+            expCtx->opCtx,
+            catalogCache,
+            expCtx->ns,
+            str::stream() << "Looking up document matching " << redact(filter.toBson()),
+            [&]() -> std::vector<RemoteCursor> {
+                // Verify that the collection exists, with the correct UUID.
+                auto routingInfo = uassertStatusOK(getCollectionRoutingInfo(foreignExpCtx));
 
-        // Verify that the collection exists, with the correct UUID.
-        auto swRoutingInfo = getCollectionRoutingInfo(foreignExpCtx);
-        if (swRoutingInfo == ErrorCodes::NamespaceNotFound) {
-            return boost::none;
+                // Finalize the 'find' command object based on the routing table information.
+                if (findCmdIsByUuid && routingInfo.cm()) {
+                    // Find by UUID and shard versioning do not work together (SERVER-31946).  In
+                    // the sharded case we've already checked the UUID, so find by namespace is
+                    // safe.  In the unlikely case that the collection has been deleted and a new
+                    // collection with the same name created through a different mongos, the shard
+                    // version will be detected as stale, as shard versions contain an 'epoch' field
+                    // unique to the collection.
+                    findCmd = findCmd.addField(BSON("find" << nss.coll()).firstElement());
+                    findCmdIsByUuid = false;
+                }
+
+                // Build the versioned requests to be dispatched to the shards. Typically, only a
+                // single shard will be targeted here; however, in certain cases where only the _id
+                // is present, we may need to scatter-gather the query to all shards in order to
+                // find the document.
+                auto requests = getVersionedRequestsForTargetedShards(expCtx->opCtx,
+                                                                      nss,
+                                                                      routingInfo,
+                                                                      findCmd,
+                                                                      filterObj,
+                                                                      CollationSpec::kSimpleSpec);
+
+                // Dispatch the requests. The 'establishCursors' method conveniently prepares the
+                // result into a vector of cursor responses for us.
+                return establishCursors(
+                    expCtx->opCtx,
+                    Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                    nss,
+                    ReadPreferenceSetting::get(expCtx->opCtx),
+                    std::move(requests),
+                    false);
+            });
+
+        // Iterate all shard results and build a single composite batch. We also enforce the
+        // requirement that only a single document should have been returned from across the
+        // cluster.
+        std::vector<BSONObj> finalBatch;
+        for (auto&& shardResult : shardResults) {
+            auto& shardCursor = shardResult.getCursorResponse();
+            finalBatch.insert(
+                finalBatch.end(), shardCursor.getBatch().begin(), shardCursor.getBatch().end());
+            // We should have at most 1 result, and the cursor should be exhausted.
+            uassert(ErrorCodes::ChangeStreamFatalError,
+                    str::stream() << "Shard cursor was unexpectedly open after lookup: "
+                                  << shardResult.getHostAndPort()
+                                  << ", id: " << shardCursor.getCursorId(),
+                    shardCursor.getCursorId() == 0);
+            uassert(ErrorCodes::ChangeStreamFatalError,
+                    str::stream() << "found more than one document matching " << filter.toString()
+                                  << " [" << finalBatch.begin()->toString() << ", "
+                                  << std::next(finalBatch.begin())->toString() << "]",
+                    finalBatch.size() <= 1u);
         }
-        auto routingInfo = uassertStatusOK(std::move(swRoutingInfo));
 
-        // Finalize the 'find' command object based on the routing table information.
-        if (findCmdIsByUuid && routingInfo.cm()) {
-            // Find by UUID and shard versioning do not work together (SERVER-31946).  In the
-            // sharded case we've already checked the UUID, so find by namespace is safe.  In the
-            // unlikely case that the collection has been deleted and a new collection with the same
-            // name created through a different mongos, the shard version will be detected as stale,
-            // as shard versions contain an 'epoch' field unique to the collection.
-            findCmd = findCmd.addField(BSON("find" << nss.coll()).firstElement());
-            findCmdIsByUuid = false;
-        }
-
-        try {
-            // Build the versioned requests to be dispatched to the shards. Typically, only a single
-            // shard will be targeted here; however, in certain cases where only the _id is present,
-            // we may need to scatter-gather the query to all shards in order to find the document.
-            auto requests = getVersionedRequestsForTargetedShards(
-                expCtx->opCtx, nss, routingInfo, findCmd, filterObj, CollationSpec::kSimpleSpec);
-
-            // Dispatch the requests. The 'establishCursors' method conveniently prepares the result
-            // into a vector of cursor responses for us.
-            shardResults = establishCursors(
-                expCtx->opCtx,
-                Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                nss,
-                ReadPreferenceSetting::get(expCtx->opCtx),
-                std::move(requests),
-                false);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // If it's an unsharded collection which has been deleted and re-created, we may get a
-            // NamespaceNotFound error when looking up by UUID.
-            return boost::none;
-        } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>&) {
-            // If the database version is stale, refresh its entry in the catalog cache.
-            catalogCache->onStaleDatabaseVersion(nss.db(), routingInfo.db().databaseVersion());
-            continue;  // Try again if allowed.
-        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& e) {
-            // If the exception provides a shardId, add it to the set of shards requiring a refresh.
-            // If the cache currently considers the collection to be unsharded, this will trigger an
-            // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
-            auto staleInfo = e.extraInfo<StaleConfigInfo>();
-            if (auto staleShardId = (staleInfo ? staleInfo->getShardId() : boost::none)) {
-                catalogCache->onStaleShardVersion(std::move(routingInfo), *staleShardId);
-            } else {
-                catalogCache->onEpochChange(nss);
-            }
-            continue;  // Try again if allowed.
-        } catch (const ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>&) {
-            continue;
-        }
-        break;  // Success!
+        return (!finalBatch.empty() ? Document(finalBatch.front()) : boost::optional<Document>{});
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If it's an unsharded collection which has been deleted and re-created, we may get a
+        // NamespaceNotFound error when looking up by UUID.
+        return boost::none;
     }
-
-    // Iterate all shard results and build a single composite batch. We also enforce the requirement
-    // that only a single document should have been returned from across the cluster.
-    std::vector<BSONObj> finalBatch;
-    for (auto&& shardResult : shardResults) {
-        auto& shardCursor = shardResult.getCursorResponse();
-        finalBatch.insert(
-            finalBatch.end(), shardCursor.getBatch().begin(), shardCursor.getBatch().end());
-        // We should have at most 1 result, and the cursor should be exhausted.
-        uassert(ErrorCodes::ChangeStreamFatalError,
-                str::stream() << "Shard cursor was unexpectedly open after lookup: "
-                              << shardResult.getHostAndPort()
-                              << ", id: " << shardCursor.getCursorId(),
-                shardCursor.getCursorId() == 0);
-        uassert(ErrorCodes::ChangeStreamFatalError,
-                str::stream() << "found more than one document matching " << filter.toString()
-                              << " [" << finalBatch.begin()->toString() << ", "
-                              << std::next(finalBatch.begin())->toString() << "]",
-                finalBatch.size() <= 1u);
-    }
-
-    return (!finalBatch.empty() ? Document(finalBatch.front()) : boost::optional<Document>{});
 }
 
 BSONObj MongosProcessInterface::_reportCurrentOpForClient(
@@ -256,10 +236,11 @@ void MongosProcessInterface::_reportCurrentOpsForIdleSessions(OperationContext* 
     const bool authEnabled =
         AuthorizationSession::get(opCtx->getClient())->getAuthorizationManager().isAuthEnabled();
 
-    // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers to
-    // create a pattern that will match against all authenticated usernames for the current client.
-    // If the user is listing ops for all users, we create an empty pattern; constructing an
-    // instance of SessionKiller::Matcher with this empty pattern will return all sessions.
+    // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers
+    // to create a pattern that will match against all authenticated usernames for the current
+    // client. If the user is listing ops for all users, we create an empty pattern;
+    // constructing an instance of SessionKiller::Matcher with this empty pattern will return
+    // all sessions.
     auto sessionFilter = (authEnabled && userMode == CurrentOpUserMode::kExcludeOthers
                               ? makeSessionFilterForAuthenticatedUsers(opCtx)
                               : KillAllSessionsByPatternSet{{}});
@@ -334,30 +315,37 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
                 "Cannot find index to verify that join fields will be unique",
                 fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths));
 
-        // If the user supplies the 'fields' array, we don't need to attach a ChunkVersion for the
-        // shards since we are not at risk of 'guessing' the wrong shard key.
+        // If the user supplies the 'fields' array, we don't need to attach a ChunkVersion for
+        // the shards since we are not at risk of 'guessing' the wrong shard key.
         return {*fieldPaths, boost::none};
     }
 
     // In case there are multiple shards which will perform this stage in parallel, we need to
-    // figure out and attach the collection's shard version to ensure each shard is talking about
-    // the same version of the collection. This mongos will coordinate that. We force a catalog
-    // refresh to do so because there is no shard versioning protocol on this namespace and so we
-    // otherwise could not be sure this node is (or will become) at all recent. We will also
-    // figure out and attach the 'joinFields' to send to the shards.
+    // figure out and attach the collection's shard version to ensure each shard is talking
+    // about the same version of the collection. This mongos will coordinate that. We force a
+    // catalog refresh to do so because there is no shard versioning protocol on this namespace
+    // and so we otherwise could not be sure this node is (or will become) at all recent. We
+    // will also figure out and attach the 'joinFields' to send to the shards.
 
-    // There are edge cases when the collection could be dropped or re-created during or near the
-    // time of the operation (for example, during aggregation). This is okay - we are mostly
+    // There are edge cases when the collection could be dropped or re-created during or near
+    // the time of the operation (for example, during aggregation). This is okay - we are mostly
     // paranoid that this mongos is very stale and want to prevent returning an error if the
-    // collection was dropped a long time ago. Because of this, we are okay with piggy-backing off
-    // another thread's request to refresh the cache, simply waiting for that request to return
-    // instead of forcing another refresh.
+    // collection was dropped a long time ago. Because of this, we are okay with piggy-backing
+    // off another thread's request to refresh the cache, simply waiting for that request to
+    // return instead of forcing another refresh.
     targetCollectionVersion = refreshAndGetCollectionVersion(expCtx, outputNs);
 
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                 std::make_move_iterator(docKeyPaths.end())),
             targetCollectionVersion};
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
+    return sharded_agg_helpers::attachCursorToPipeline(expCtx, ownedPipeline, allowTargetingShards);
 }
 
 }  // namespace mongo

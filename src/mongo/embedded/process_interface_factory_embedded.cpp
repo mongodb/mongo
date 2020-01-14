@@ -36,7 +36,7 @@ namespace mongo {
 namespace {
 
 std::shared_ptr<MongoProcessInterface> mongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
-    return std::make_shared<StandaloneProcessInterface>(opCtx);
+    return std::make_shared<StandaloneProcessInterface>(nullptr);
 }
 
 auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(

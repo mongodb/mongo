@@ -148,6 +148,24 @@ Pipeline::~Pipeline() {
     invariant(_disposed);
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone() const {
+    const auto& serialized = serialize();
+    std::vector<BSONObj> asBson;
+    asBson.reserve(serialized.size());
+    for (auto&& stage : serialized) {
+        invariant(stage.getType() == BSONType::Object);
+        asBson.push_back(stage.getDocument().toBson());
+    }
+    try {
+        return parse(asBson, getContext());
+    } catch (DBException& ex) {
+        ex.addContext(str::stream()
+                      << "Failed to copy pipeline. Could not parse serialized version: "
+                      << Value(serialized).toString());
+        throw;
+    }
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
     const std::vector<BSONObj>& rawPipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,

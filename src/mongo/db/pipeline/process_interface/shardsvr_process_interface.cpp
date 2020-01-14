@@ -47,7 +47,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
@@ -143,23 +142,6 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
         return status;
     }
     return {{response.getN(), response.getNModified()}};
-}
-
-unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                        PipelineDeleter(expCtx->opCtx));
-    invariant(pipeline->getSources().empty() ||
-              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-
-    if (!allowTargetingShards || expCtx->ns.db() == "local") {
-        // If the db is local, this may be a change stream examining the oplog. We know the oplog
-        // (and any other local collections) will not be sharded.
-        return attachCursorSourceToPipelineForLocalRead(expCtx, pipeline.release());
-    }
-    return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, pipeline.release());
 }
 
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
@@ -313,6 +295,14 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
                                str::stream()
                                    << "write concern failed while running command " << cmdObj);
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter>
+ShardServerProcessInterface::attachCursorSourceToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
+    return sharded_agg_helpers::attachCursorToPipeline(expCtx, ownedPipeline, allowTargetingShards);
 }
 
 }  // namespace mongo

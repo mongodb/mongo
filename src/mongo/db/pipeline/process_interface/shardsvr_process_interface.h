@@ -87,11 +87,6 @@ public:
                                     bool multi,
                                     boost::optional<OID> targetEpoch) final;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards = true) final;
-
     std::unique_ptr<ShardFilterer> getShardFilterer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override final;
 
@@ -110,6 +105,17 @@ public:
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) final;
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final;
+
+    /**
+     * If 'allowTargetingShards' is true, splits the pipeline and dispatch half to the shards,
+     * leaving the merging half executing in this process after attaching a $mergeCursors. Will
+     * retry on network errors and also on StaleConfig errors to avoid restarting the entire
+     * operation.
+     */
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* pipeline,
+        bool allowTargetingShards) final;
 };
 
 }  // namespace mongo

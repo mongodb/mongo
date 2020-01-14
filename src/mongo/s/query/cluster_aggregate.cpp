@@ -116,12 +116,14 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     // Create the expression context, and set 'inMongos' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
-    auto mergeCtx = new ExpressionContext(opCtx,
-                                          request,
-                                          std::move(collation),
-                                          std::make_shared<MongosProcessInterface>(),
-                                          std::move(resolvedNamespaces),
-                                          uuid);
+    auto mergeCtx =
+        new ExpressionContext(opCtx,
+                              request,
+                              std::move(collation),
+                              std::make_shared<MongosProcessInterface>(
+                                  Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
+                              std::move(resolvedNamespaces),
+                              uuid);
 
     mergeCtx->inMongos = true;
     return mergeCtx;
@@ -330,6 +332,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
                 return cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
+                    expCtx->mongoProcessInterface->taskExecutor,
                     std::move(targeter),
                     request.serializeToCommandObj(),
                     request.getBatchSize(),
