@@ -145,6 +145,24 @@ struct TypeWithBSONArray {
     }
 };
 
+enum UnscopedEnumWithToString { UnscopedEntryWithToString };
+
+std::string toString(UnscopedEnumWithToString val) {
+    return "UnscopedEntryWithToString";
+}
+
+struct TypeWithNonMemberFormatting {};
+
+std::string toString(const TypeWithNonMemberFormatting&) {
+    return "TypeWithNonMemberFormatting";
+}
+
+BSONObj toBSON(const TypeWithNonMemberFormatting&) {
+    BSONObjBuilder builder;
+    builder.append("first"_sd, "TypeWithNonMemberFormatting");
+    return builder.obj();
+}
+
 class LogTestBackend
     : public boost::log::sinks::
           basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
@@ -385,6 +403,12 @@ TEST_F(LogTestV2, Types) {
     validateJSON(expectedScoped);
     ASSERT_EQUALS(lastBSONElement().Number(), expectedScoped);
 
+    LOGV2("{}", "name"_attr = UnscopedEntryWithToString);
+    ASSERT_EQUALS(text.back(), toString(UnscopedEntryWithToString));
+    validateJSON(toString(UnscopedEntryWithToString));
+    ASSERT_EQUALS(lastBSONElement().String(), toString(UnscopedEntryWithToString));
+
+
     // string types
     const char* c_str = "a c string";
     LOGV2("c string {}", "name"_attr = c_str);
@@ -603,6 +627,10 @@ TEST_F(LogTestV2, TextFormat) {
     TypeWithoutBSON t2(1.0, 2.0);
     LOGV2("{} custom formatting, no bson", "name"_attr = t2);
     ASSERT(lines.back().rfind(t.toString() + " custom formatting, no bson") != std::string::npos);
+
+    TypeWithNonMemberFormatting t3;
+    LOGV2("{}", "name"_attr = t3);
+    ASSERT(lines.back().rfind(toString(t3)) != std::string::npos);
 }
 
 TEST_F(LogTestV2, JsonBsonFormat) {
@@ -768,6 +796,16 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     };
     validateCustomAttrBSONArray(mongo::fromjson(lines.back()));
     validateCustomAttrBSONArray(BSONObj(linesBson.back().data()));
+
+    TypeWithNonMemberFormatting t6;
+    LOGV2("{}", "name"_attr = t6);
+    auto validateNonMemberToBSON = [&t6](const BSONObj& obj) {
+        ASSERT(
+            obj.getField(kAttributesFieldName).Obj().getField("name").Obj().woCompare(toBSON(t6)) ==
+            0);
+    };
+    validateNonMemberToBSON(mongo::fromjson(lines.back()));
+    validateNonMemberToBSON(BSONObj(linesBson.back().data()));
 }
 
 TEST_F(LogTestV2, Containers) {
