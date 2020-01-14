@@ -82,8 +82,8 @@ public:
 
         if (event.isTruncatable() && message.size() > maxSizeKB * 1024) {
             logv2::detail::doLog(
+                0,
                 logv2::LogSeverity::cast(event.getSeverity().toInt()),
-                StringData{},
                 logv2::LogOptions{
                     logComponentV1toV2(event.getComponent()),
                     _domain,
@@ -97,12 +97,9 @@ public:
         }
 
         logv2::detail::doLog(
-
+            0,
             // We need to cast from the v1 logging severity to the equivalent v2 severity
             logv2::LogSeverity::cast(event.getSeverity().toInt()),
-
-            // stable id doesn't exist in logv1
-            StringData{},
 
             // Similarly, we need to transcode the options. They don't offer a cast
             // operator, so we need to do some metaprogramming on the types.

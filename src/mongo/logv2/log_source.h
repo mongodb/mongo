@@ -60,12 +60,12 @@ public:
           _severity(LogSeverity::Log()),
           _component(LogComponent::kDefault),
           _tags(LogTag::kNone),
-          _id(StringData{}) {
+          _id(-1) {
         add_attribute_unlocked(attributes::domain(), _domain);
         add_attribute_unlocked(attributes::severity(), _severity);
         add_attribute_unlocked(attributes::component(), _component);
         add_attribute_unlocked(attributes::tags(), _tags);
-        add_attribute_unlocked(attributes::stableId(), _id);
+        add_attribute_unlocked(attributes::id(), _id);
         add_attribute_unlocked(attributes::timeStamp(), boost::log::attributes::make_function([]() {
                                    return Date_t::now();
                                }));
@@ -74,16 +74,16 @@ public:
             boost::log::attributes::make_function([]() { return getThreadName(); }));
     }
 
-    boost::log::record open_record(LogSeverity severity,
+    boost::log::record open_record(int32_t id,
+                                   LogSeverity severity,
                                    LogComponent component,
-                                   LogTag tags,
-                                   StringData stable_id) {
+                                   LogTag tags) {
         // Perform a quick check first
         if (this->core()->get_logging_enabled()) {
             _severity.set(severity);
             _component.set(component);
             _tags.set(tags);
-            _id.set(stable_id);
+            _id.set(id);
             return Base::open_record_unlocked();
         } else
             return boost::log::record();
@@ -94,7 +94,7 @@ public:
         _severity.set(LogSeverity::Log());
         _component.set(LogComponent::kDefault);
         _tags.set(LogTag::kNone);
-        _id.set(StringData{});
+        _id.set(-1);
     }
 
 private:
@@ -102,7 +102,7 @@ private:
     boost::log::attributes::mutable_constant<LogSeverity> _severity;
     boost::log::attributes::mutable_constant<LogComponent> _component;
     boost::log::attributes::mutable_constant<LogTag> _tags;
-    boost::log::attributes::mutable_constant<StringData> _id;
+    boost::log::attributes::mutable_constant<int32_t> _id;
 };
 
 

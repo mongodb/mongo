@@ -63,7 +63,7 @@ const boost::log::attribute_name& tags() {
     return attr;
 }
 
-const boost::log::attribute_name& stableId() {
+const boost::log::attribute_name& id() {
     static const boost::log::attribute_name attr("id");
     return attr;
 }
