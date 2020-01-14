@@ -312,6 +312,12 @@ public:
     }
 
     /**
+     * Returns whether the oplog entry represents an applyOps with a commnd inside. This will occur
+     * if a multi-document transaction performs a command.
+     */
+    bool isTransactionWithCommand() const;
+
+    /**
      * Returns if the oplog entry is for a CRUD operation.
      */
     static bool isCrudOpType(OpTypeEnum opType);

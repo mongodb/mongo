@@ -25,8 +25,7 @@ selector:
   # View tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/txns/view_reads_in_transaction.js
 
-  # TODO(SERVER-44852) re-enable once secondary oplog application supports collection creation
-  # inside multi-document transactions.
+  # TODO(SERVER-45368) re-enable once collection creation is permitted in cross-shard transactions.
   - jstests/core/txns/create_collection.js
 
   exclude_with_any_tags:

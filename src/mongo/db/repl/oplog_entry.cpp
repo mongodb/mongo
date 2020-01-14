@@ -336,6 +336,28 @@ bool OplogEntry::shouldPrepare() const {
         getObject()[ApplyOpsCommandInfoBase::kPrepareFieldName].booleanSafe();
 }
 
+bool OplogEntry::isTransactionWithCommand() const {
+    auto applyOps = getObject().getField("applyOps");
+    if (applyOps.eoo()) {
+        return false;
+    }
+    if (!getTxnNumber() || !getSessionId()) {
+        // Only transactions can produce applyOps oplog entries with transaction numbers and
+        // session IDs.
+        return false;
+    }
+    // Iterating through the entire applyOps array is not optimal for performance. A potential
+    // optimization, if necessary, could be to ensure the primary always constructs applyOps oplog
+    // entries with commands at the beginning.
+    for (BSONElement e : applyOps.Array()) {
+        auto ns = e.Obj().getField("ns");
+        if (!ns.eoo() && NamespaceString(ns.String()).isCommand()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 BSONElement OplogEntry::getIdElement() const {
     invariant(isCrudOpType());
     if (getOpType() == OpTypeEnum::kUpdate) {

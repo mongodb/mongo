@@ -36,9 +36,6 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
-  # TODO(SERVER-44852) re-enable once secondary oplog application supports collection creation
-  # inside multi-document transactions.
-  - jstests/core/txns/create_collection.js
 
 run_hook_interval: &run_hook_interval 20
 executor:

@@ -220,19 +220,52 @@ void addToWriterVector(OplogEntry* op,
 
 /**
  * Adds a set of derivedOps to writerVectors.
+ * If `serial` is true, assign all derived operations to the writer vector corresponding to the hash
+ * of the first operation in `derivedOps`.
  */
 void addDerivedOps(OperationContext* opCtx,
                    std::vector<OplogEntry>* derivedOps,
                    std::vector<std::vector<const OplogEntry*>>* writerVectors,
-                   CachedCollectionProperties* collPropertiesCache) {
+                   CachedCollectionProperties* collPropertiesCache,
+                   bool serial) {
+
+    boost::optional<uint32_t>
+        serialWriterId;  // Used to determine which writer vector to assign serial ops.
+
     for (auto&& op : *derivedOps) {
         auto hashedNs = StringMapHasher().hashed_key(op.getNss().ns());
         uint32_t hash = static_cast<uint32_t>(hashedNs.hash());
+        if (!serialWriterId && serial) {
+            serialWriterId.emplace(hash);
+        }
         if (op.isCrudOpType()) {
             processCrudOp(opCtx, &op, &hash, &hashedNs, collPropertiesCache);
         }
-        addToWriterVector(&op, writerVectors, hash);
+        if (serial) {
+            // Serial derived ops go to the writer vector corresponding to the first op of
+            // derivedOps.
+            addToWriterVector(&op, writerVectors, serialWriterId.get());
+        } else {
+            addToWriterVector(&op, writerVectors, hash);
+        }
     }
+}
+
+void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
+                                      std::vector<OplogEntry*>* partialTxnList,
+                                      std::vector<std::vector<OplogEntry>>* derivedOps,
+                                      OplogEntry* op,
+                                      CachedCollectionProperties* collPropertiesCache,
+                                      std::vector<std::vector<const OplogEntry*>>* writerVectors) {
+    std::vector<OplogEntry> txnOps;
+    bool shouldSerialize = false;
+    std::tie(txnOps, shouldSerialize) =
+        readTransactionOperationsFromOplogChainAndCheckForCommands(opCtx, *op, *partialTxnList);
+    derivedOps->emplace_back(txnOps);
+    partialTxnList->clear();
+
+    // Transaction entries cannot have different session updates.
+    addDerivedOps(opCtx, &derivedOps->back(), writerVectors, collPropertiesCache, shouldSerialize);
 }
 
 void stableSortByNamespace(std::vector<const OplogEntry*>* oplogEntryPointers) {
@@ -759,7 +792,11 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
         if (sessionUpdateTracker) {
             if (auto newOplogWrites = sessionUpdateTracker->updateSession(op)) {
                 derivedOps->emplace_back(std::move(*newOplogWrites));
-                addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
+                addDerivedOps(opCtx,
+                              &derivedOps->back(),
+                              writerVectors,
+                              &collPropertiesCache,
+                              false /*serial*/);
             }
         }
 
@@ -797,13 +834,8 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 // oplog and fill writers with those operations.
                 // Flush partialTxnList operations for current transaction.
                 auto& partialTxnList = partialTxnOps[*logicalSessionId];
-
-                derivedOps->emplace_back(
-                    readTransactionOperationsFromOplogChain(opCtx, op, partialTxnList));
-                partialTxnList.clear();
-
-                // Transaction entries cannot have different session updates.
-                addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
+                _addOplogChainOpsToWriterVectors(
+                    opCtx, &partialTxnList, derivedOps, &op, &collPropertiesCache, writerVectors);
             } else {
                 // The applyOps entry was not generated as part of a transaction.
                 invariant(!op.getPrevWriteOpTimeInTransaction());
@@ -811,7 +843,11 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
 
                 // Nested entries cannot have different session updates.
-                addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
+                addDerivedOps(opCtx,
+                              &derivedOps->back(),
+                              writerVectors,
+                              &collPropertiesCache,
+                              false /*serial*/);
             }
             continue;
         }
@@ -822,12 +858,8 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
         if (op.isPreparedCommit() && (getOptions().mode == OplogApplication::Mode::kInitialSync)) {
             auto logicalSessionId = op.getSessionId();
             auto& partialTxnList = partialTxnOps[*logicalSessionId];
-
-            derivedOps->emplace_back(
-                readTransactionOperationsFromOplogChain(opCtx, op, partialTxnList));
-            partialTxnList.clear();
-
-            addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
+            _addOplogChainOpsToWriterVectors(
+                opCtx, &partialTxnList, derivedOps, &op, &collPropertiesCache, writerVectors);
             continue;
         }
 

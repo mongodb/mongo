@@ -64,8 +64,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : ops) {
         try {
+            Status status = Status::OK();
             AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
-            auto status = repl::applyOperation_inlock(
+            status = repl::applyOperation_inlock(
                 opCtx, coll.getDb(), &op, false /*alwaysUpsert*/, oplogApplicationMode);
             if (!status.isOK()) {
                 return status;
@@ -228,10 +229,12 @@ Status applyAbortTransaction(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-std::vector<OplogEntry> readTransactionOperationsFromOplogChain(
+std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const OplogEntry& lastEntryInTxn,
-    const std::vector<OplogEntry*>& cachedOps) noexcept {
+    const std::vector<OplogEntry*>& cachedOps,
+    const bool checkForCommands) noexcept {
+    bool isTransactionWithCommand = false;
     // Traverse the oplog chain with its own snapshot and read timestamp.
     ReadSourceScope readSourceScope(opCtx);
 
@@ -293,7 +296,35 @@ std::vector<OplogEntry> readTransactionOperationsFromOplogChain(
 
     // Reconstruct the operations from the prepare or unprepared commit oplog entry.
     repl::ApplyOps::extractOperationsTo(prepareOrUnpreparedCommit, lastEntryInTxnObj, &ops);
-    return ops;
+
+    // It is safe to assume that any commands inside `ops` are real commands to be applied, as
+    // opposed to auxiliary commands such as "commit" and "abort".
+    if (checkForCommands) {
+        for (auto&& op : ops) {
+            if (op.isCommand()) {
+                isTransactionWithCommand = true;
+                break;
+            }
+        }
+    }
+    return std::make_pair(ops, isTransactionWithCommand);
+}
+
+std::vector<OplogEntry> readTransactionOperationsFromOplogChain(
+    OperationContext* opCtx,
+    const OplogEntry& lastEntryInTxn,
+    const std::vector<OplogEntry*>& cachedOps) noexcept {
+    auto result = _readTransactionOperationsFromOplogChain(
+        opCtx, lastEntryInTxn, cachedOps, false /*checkForCommands*/);
+    return std::get<0>(result);
+}
+
+std::pair<std::vector<OplogEntry>, bool> readTransactionOperationsFromOplogChainAndCheckForCommands(
+    OperationContext* opCtx,
+    const OplogEntry& lastEntryInTxn,
+    const std::vector<OplogEntry*>& cachedOps) noexcept {
+    return _readTransactionOperationsFromOplogChain(
+        opCtx, lastEntryInTxn, cachedOps, true /*checkForCommands*/);
 }
 
 namespace {
