@@ -45,7 +45,6 @@
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/constants.h"
-#include "mongo/logv2/formatter_base.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
