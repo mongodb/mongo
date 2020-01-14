@@ -2640,15 +2640,16 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCt
                                                           const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
     Status result(ErrorCodes::InternalError, "didn't set status in prepareSyncFromResponse");
-    auto doResync = false;
+    std::shared_ptr<InitialSyncer> initialSyncerCopy;
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _topCoord->prepareSyncFromResponse(target, resultObj, &result);
-        // If we are in the middle of an initial sync, do a resync.
-        doResync = result.isOK() && _initialSyncer && _initialSyncer->isActive();
+        // _initialSyncer must not be called with repl mutex held.
+        initialSyncerCopy = _initialSyncer;
     }
 
-    if (doResync) {
+    // If we are in the middle of an initial sync, do a resync.
+    if (result.isOK() && initialSyncerCopy && initialSyncerCopy->isActive()) {
         return resyncData(opCtx, false);
     }
 
