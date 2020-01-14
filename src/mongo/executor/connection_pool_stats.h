@@ -67,10 +67,15 @@ struct ConnectionPoolStats {
     size_t totalCreated = 0u;
     size_t totalRefreshing = 0u;
 
-    stdx::unordered_map<std::string, ConnectionStatsPer> statsByPool;
-    stdx::unordered_map<HostAndPort, ConnectionStatsPer> statsByHost;
-    stdx::unordered_map<std::string, stdx::unordered_map<HostAndPort, ConnectionStatsPer>>
-        statsByPoolHost;
+    using StatsByHost = std::map<HostAndPort, ConnectionStatsPer>;
+
+    struct PoolStats final : public ConnectionStatsPer {
+        StatsByHost statsByHost;
+    };
+    using StatsByPool = std::map<std::string, PoolStats>;
+
+    StatsByHost statsByHost;
+    StatsByPool statsByPool;
 };
 
 }  // namespace executor

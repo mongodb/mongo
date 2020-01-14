@@ -57,10 +57,18 @@ ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& oth
 void ConnectionPoolStats::updateStatsForHost(std::string pool,
                                              HostAndPort host,
                                              ConnectionStatsPer newStats) {
+    if (newStats.created == 0) {
+        // A pool that has never been successfully used does not get listed
+        return;
+    }
+
+    // Update stats for this pool
+    auto& byPool = statsByPool[pool];
+    byPool += newStats;
+
     // Update stats for this host.
-    statsByPool[pool] += newStats;
     statsByHost[host] += newStats;
-    statsByPoolHost[pool][host] += newStats;
+    byPool.statsByHost[host] += newStats;
 
     // Update total connection stats.
     totalInUse += newStats.inUse;
@@ -81,7 +89,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool.first));
             auto& poolStats = pool.second;
             poolInfo.appendNumber("poolInUse", poolStats.inUse);
-            for (const auto& host : statsByPoolHost[pool.first]) {
+            for (const auto& host : poolStats.statsByHost) {
                 auto hostStats = host.second;
                 poolInfo.appendNumber(host.first.toString(), hostStats.inUse);
             }
@@ -99,7 +107,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             poolInfo.appendNumber("poolAvailable", poolStats.available);
             poolInfo.appendNumber("poolCreated", poolStats.created);
             poolInfo.appendNumber("poolRefreshing", poolStats.refreshing);
-            for (const auto& host : statsByPoolHost[pool.first]) {
+
+            for (const auto& host : poolStats.statsByHost) {
                 BSONObjBuilder hostInfo(poolInfo.subobjStart(host.first.toString()));
                 auto& hostStats = host.second;
                 hostInfo.appendNumber("inUse", hostStats.inUse);
