@@ -191,6 +191,7 @@ clientDriverEnv.Library(
         'replica_set_change_notifier.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
+        'server_ping_monitor.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
