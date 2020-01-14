@@ -141,6 +141,19 @@ struct HasToString : std::false_type {};
 template <class T>
 struct HasToString<T, std::void_t<decltype(std::declval<T>().toString())>> : std::true_type {};
 
+template <class T, class = void>
+struct HasNonMemberToString : std::false_type {};
+
+template <class T>
+struct HasNonMemberToString<T, std::void_t<decltype(toString(std::declval<T>()))>>
+    : std::true_type {};
+
+template <class T, class = void>
+struct HasNonMemberToBSON : std::false_type {};
+
+template <class T>
+struct HasNonMemberToBSON<T, std::void_t<decltype(toBSON(std::declval<T>()))>> : std::true_type {};
+
 }  // namespace
 
 // Mapping functions on how to map a logged value to how it is stored in variant (reused by
@@ -209,7 +222,13 @@ inline CustomAttributeValue mapValue(boost::none_t val) {
 
 template <typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 auto mapValue(T val) {
-    return mapValue(static_cast<std::underlying_type_t<T>>(val));
+    if constexpr (HasNonMemberToString<T>::value) {
+        CustomAttributeValue custom;
+        custom.toString = [val]() { return toString(val); };
+        return custom;
+    } else {
+        return mapValue(static_cast<std::underlying_type_t<T>>(val));
+    }
 }
 
 template <typename T, std::enable_if_t<IsContainer<T>::value && !HasMappedType<T>::value, int> = 0>
@@ -233,7 +252,8 @@ template <typename T,
                                !std::is_enum_v<T> && !IsContainer<T>::value,
                            int> = 0>
 CustomAttributeValue mapValue(const T& val) {
-    static_assert(HasToString<T>::value || HasStringSerialize<T>::value,
+    static_assert(HasToString<T>::value || HasStringSerialize<T>::value ||
+                      HasNonMemberToString<T>::value,
                   "custom type needs toString() or serialize(fmt::memory_buffer&) implementation");
 
     CustomAttributeValue custom;
@@ -250,11 +270,17 @@ CustomAttributeValue mapValue(const T& val) {
         };
     } else if constexpr (HasToBSONArray<T>::value) {
         custom.toBSONArray = [&val]() { return val.toBSONArray(); };
+    } else if constexpr (HasNonMemberToBSON<T>::value) {
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+            builder.appendElements(toBSON(val));
+        };
     }
     if constexpr (HasStringSerialize<T>::value) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { val.serialize(buffer); };
     } else if constexpr (HasToString<T>::value) {
         custom.toString = [&val]() { return val.toString(); };
+    } else if constexpr (HasNonMemberToString<T>::value) {
+        custom.toString = [&val]() { return toString(val); };
     }
 
     return custom;
