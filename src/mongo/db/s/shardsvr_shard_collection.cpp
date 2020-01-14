@@ -82,8 +82,6 @@ struct ShardCollectionTargetState {
     ShardKeyPattern shardKeyPattern;
     std::vector<TagsType> tags;
     bool collectionIsEmpty;
-    std::vector<BSONObj> splitPoints;
-    int numContiguousChunksPerShard;
 };
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
@@ -445,34 +443,6 @@ int getNumShards(OperationContext* opCtx) {
     return shardIds.size();
 }
 
-struct SplitPoints {
-    std::vector<BSONObj> initialPoints;
-    std::vector<BSONObj> finalPoints;
-};
-
-SplitPoints calculateInitialAndFinalSplitPoints(const ShardsvrShardCollection& request,
-                                                const ShardKeyPattern& shardKeyPattern,
-                                                std::vector<TagsType>& tags,
-                                                int numShards,
-                                                bool collectionIsEmpty) {
-    std::vector<BSONObj> initialSplitPoints;
-    std::vector<BSONObj> finalSplitPoints;
-
-    if (request.getInitialSplitPoints()) {
-        finalSplitPoints = *request.getInitialSplitPoints();
-    } else if (tags.empty()) {
-        InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
-            shardKeyPattern,
-            collectionIsEmpty,
-            numShards,
-            request.getNumInitialChunks(),
-            &initialSplitPoints,
-            &finalSplitPoints);
-    }
-
-    return {std::move(initialSplitPoints), std::move(finalSplitPoints)};
-}
-
 ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const ShardsvrShardCollection& request) {
@@ -488,25 +458,7 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
     auto uuid = getOrGenerateUUID(opCtx, nss, request);
 
     const bool isEmpty = checkIfCollectionIsEmpty(opCtx, nss);
-
-    int numShards = getNumShards(opCtx);
-
-    auto splitPoints =
-        calculateInitialAndFinalSplitPoints(request, shardKeyPattern, tags, numShards, isEmpty);
-
-    auto initialSplitPoints = splitPoints.initialPoints;
-    auto finalSplitPoints = splitPoints.finalPoints;
-
-    const int numContiguousChunksPerShard = initialSplitPoints.empty()
-        ? 1
-        : (finalSplitPoints.size() + 1) / (initialSplitPoints.size() + 1);
-
-    return {uuid,
-            std::move(shardKeyPattern),
-            tags,
-            isEmpty,
-            finalSplitPoints,
-            numContiguousChunksPerShard};
+    return {uuid, std::move(shardKeyPattern), tags, isEmpty};
 }
 
 void logStartShardCollection(OperationContext* opCtx,
@@ -531,8 +483,6 @@ void logStartShardCollection(OperationContext* opCtx,
         prerequisites.uuid.appendToBuilder(&collectionDetail, "uuid");
         collectionDetail.append("empty", prerequisites.collectionIsEmpty);
         collectionDetail.append("primary", primaryShard->toString());
-        collectionDetail.append("numChunks",
-                                static_cast<int>(prerequisites.splitPoints.size() + 1));
         uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "shardCollection.start",
@@ -689,7 +639,7 @@ UUID shardCollection(OperationContext* opCtx,
         return *collectionOptional->getUUID();
     }
 
-    InitialSplitPolicy::ShardingOptimizationType optimizationType;
+    std::unique_ptr<InitialSplitPolicy> splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig initialChunks;
     boost::optional<ShardCollectionTargetState> targetState;
 
@@ -733,23 +683,18 @@ UUID shardCollection(OperationContext* opCtx,
         critSec.enterCommitPhase();
 
         pauseShardCollectionCommitPhase.pauseWhileSet();
-
         logStartShardCollection(opCtx, cmdObj, nss, request, *targetState, dbPrimaryShardId);
 
-        optimizationType = InitialSplitPolicy::calculateOptimizationType(
-            targetState->splitPoints, targetState->tags, targetState->collectionIsEmpty);
-        if (optimizationType != InitialSplitPolicy::ShardingOptimizationType::None) {
-            initialChunks = InitialSplitPolicy::createFirstChunksOptimized(
-                opCtx,
-                nss,
-                targetState->shardKeyPattern,
-                dbPrimaryShardId,
-                targetState->splitPoints,
-                targetState->tags,
-                optimizationType,
-                targetState->collectionIsEmpty,
-                targetState->numContiguousChunksPerShard);
-
+        splitPolicy =
+            InitialSplitPolicy::calculateOptimizationStrategy(opCtx,
+                                                              targetState->shardKeyPattern,
+                                                              request,
+                                                              targetState->tags,
+                                                              getNumShards(opCtx),
+                                                              targetState->collectionIsEmpty);
+        if (splitPolicy->isOptimized()) {
+            initialChunks = splitPolicy->createFirstChunks(
+                opCtx, targetState->shardKeyPattern, {nss, dbPrimaryShardId});
             createCollectionOnShardsReceivingChunks(
                 opCtx, nss, initialChunks.chunks, dbPrimaryShardId);
 
@@ -760,11 +705,11 @@ UUID shardCollection(OperationContext* opCtx,
     // We have now left the critical section.
     pauseShardCollectionAfterCriticalSection.pauseWhileSet();
 
-    if (optimizationType == InitialSplitPolicy::ShardingOptimizationType::None) {
+    if (!splitPolicy->isOptimized()) {
         invariant(initialChunks.chunks.empty());
 
-        initialChunks = InitialSplitPolicy::createFirstChunksUnoptimized(
-            opCtx, nss, targetState->shardKeyPattern, dbPrimaryShardId);
+        initialChunks = splitPolicy->createFirstChunks(
+            opCtx, targetState->shardKeyPattern, {nss, dbPrimaryShardId});
 
         writeChunkDocumentsAndRefreshShards(*targetState, initialChunks);
     }
@@ -777,7 +722,8 @@ UUID shardCollection(OperationContext* opCtx,
         opCtx,
         "shardCollection.end",
         nss.ns(),
-        BSON("version" << initialChunks.collVersion().toString()),
+        BSON("version" << initialChunks.collVersion().toString() << "numChunks"
+                       << static_cast<int>(initialChunks.chunks.size())),
         ShardingCatalogClient::kMajorityWriteConcern);
 
     return targetState->uuid;

@@ -116,6 +116,7 @@ public:
         configShardCollRequest.setKey(shardCollRequest.getKey());
         configShardCollRequest.setUnique(shardCollRequest.getUnique());
         configShardCollRequest.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
+        configShardCollRequest.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
         configShardCollRequest.setCollation(shardCollRequest.getCollation());
 
         // Invalidate the routing table cache entry for this collection so that we reload the

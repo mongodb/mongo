@@ -337,6 +337,7 @@ public:
         shardsvrShardCollectionRequest.setKey(request.getKey());
         shardsvrShardCollectionRequest.setUnique(request.getUnique());
         shardsvrShardCollectionRequest.setNumInitialChunks(request.getNumInitialChunks());
+        shardsvrShardCollectionRequest.setPresplitHashedZones(request.getPresplitHashedZones());
         shardsvrShardCollectionRequest.setInitialSplitPoints(request.getInitialSplitPoints());
         shardsvrShardCollectionRequest.setCollation(request.getCollation());
         shardsvrShardCollectionRequest.setGetUUIDfromPrimaryShard(

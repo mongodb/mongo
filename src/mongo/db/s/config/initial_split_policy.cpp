@@ -65,8 +65,8 @@ void appendChunk(const NamespaceString& nss,
 /*
  * Returns a map mapping each tag name to a vector of shard ids with that tag name
  */
-StringMap<std::vector<ShardId>> getTagToShardIds(OperationContext* opCtx,
-                                                 const std::vector<TagsType>& tags) {
+StringMap<std::vector<ShardId>> buildTagsToShardIdsMap(OperationContext* opCtx,
+                                                       const std::vector<TagsType>& tags) {
     StringMap<std::vector<ShardId>> tagToShardIds;
     if (tags.empty()) {
         return tagToShardIds;
@@ -101,33 +101,14 @@ StringMap<std::vector<ShardId>> getTagToShardIds(OperationContext* opCtx,
 
 }  // namespace
 
-void InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
-    const ShardKeyPattern& shardKeyPattern,
-    bool isEmpty,
-    int numShards,
-    int numInitialChunks,
-    std::vector<BSONObj>* initialSplitPoints,
-    std::vector<BSONObj>* finalSplitPoints) {
-    if (!shardKeyPattern.isHashedPattern() || !shardKeyPattern.hasHashedPrefix() || !isEmpty) {
-        // TODO SERVER-43917: Fix the error message when pre-splitting is enabled for non-hashed
-        // prefixes.
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "numInitialChunks is only supported when the collection is empty "
-                                 "and has a hashed field as shard key prefix",
-                !numInitialChunks);
-        return;
-    }
+std::vector<BSONObj> InitialSplitPolicy::calculateHashedSplitPoints(
+    const ShardKeyPattern& shardKeyPattern, BSONObj prefix, int numInitialChunks) {
+    invariant(shardKeyPattern.isHashedPattern());
+    invariant(numInitialChunks > 0);
 
-    // no split points are needed
+    std::vector<BSONObj> splitPoints;
     if (numInitialChunks == 1) {
-        return;
-    }
-
-    // If initial split points are not specified, only pre-split when using a hashed shard key and
-    // the collection is empty
-    if (numInitialChunks <= 0) {
-        // Default the number of initial chunks it they are not specified
-        numInitialChunks = 2 * numShards;
+        return splitPoints;
     }
 
     // Hashes are signed, 64-bit integers. So we divide the range (-MIN long, +MAX long) into
@@ -140,35 +121,40 @@ void InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
     const auto proposedKey(shardKeyPattern.getKeyPattern().toBSON());
 
     auto buildSplitPoint = [&](long long value) {
-        return shardKeyPattern.getKeyPattern().extendRangeBound(
-            BSON(proposedKey.firstElementFieldName() << value), false);
+        // Forward the iterator until hashed field is reached.
+        auto shardKeyPatternItr = BSONObjIterator(shardKeyPattern.getKeyPattern().toBSON());
+        while (shardKeyPattern.getHashedField().fieldNameStringData() !=
+               (*shardKeyPatternItr++).fieldNameStringData()) {
+        }
+
+        // Append the prefix fields to the new splitpoint, if any such fields exist.
+        BSONObjBuilder bob(prefix);
+
+        // Append the value of the hashed field for the current splitpoint.
+        bob.append(shardKeyPattern.getHashedField().fieldNameStringData(), value);
+
+        // Set all subsequent shard key fields to MinKey.
+        while (shardKeyPatternItr.more()) {
+            bob.appendMinKey((*shardKeyPatternItr++).fieldNameStringData());
+        }
+        return bob.obj();
     };
 
     if (numInitialChunks % 2 == 0) {
-        finalSplitPoints->push_back(buildSplitPoint(current));
+        splitPoints.push_back(buildSplitPoint(current));
         current += intervalSize;
     } else {
         current += intervalSize / 2;
     }
 
     for (int i = 0; i < (numInitialChunks - 1) / 2; i++) {
-        finalSplitPoints->push_back(buildSplitPoint(current));
-        finalSplitPoints->push_back(buildSplitPoint(-current));
+        splitPoints.push_back(buildSplitPoint(current));
+        splitPoints.push_back(buildSplitPoint(-current));
         current += intervalSize;
     }
 
-    sort(finalSplitPoints->begin(),
-         finalSplitPoints->end(),
-         SimpleBSONObjComparator::kInstance.makeLessThan());
-
-    // The initial splits define the "big chunks" that we will subdivide later.
-    int lastIndex = -1;
-    for (int i = 1; i < numShards; i++) {
-        if (lastIndex < (i * numInitialChunks) / numShards - 1) {
-            lastIndex = (i * numInitialChunks) / numShards - 1;
-            initialSplitPoints->push_back(finalSplitPoints->at(lastIndex));
-        }
-    }
+    sort(splitPoints.begin(), splitPoints.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
+    return splitPoints;
 }
 
 InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardCollectionInitialChunks(
@@ -216,194 +202,57 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
     return {std::move(chunks)};
 }
 
-InitialSplitPolicy::ShardCollectionConfig
-InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
-    const NamespaceString& nss,
+std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStrategy(
+    OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
-    const Timestamp& validAfter,
+    const ShardsvrShardCollection& request,
     const std::vector<TagsType>& tags,
-    const StringMap<std::vector<ShardId>>& tagToShards,
-    const std::vector<ShardId>& shardIdsForGaps) {
-    invariant(!shardIdsForGaps.empty());
-    invariant(!tags.empty());
-
-    const auto& keyPattern = shardKeyPattern.getKeyPattern();
-
-    auto nextShardIdForHole = [&, indx = 0]() mutable {
-        return shardIdsForGaps[indx++ % shardIdsForGaps.size()];
-    };
-
-    auto nextShardIdForTag = [&, tagToIndx = StringMap<size_t>()](const auto& tag) mutable {
-        const auto it = tagToShards.find(tag.getTag());
-        invariant(it != tagToShards.end());
-        const auto& shardIdsForTag = it->second;
-        uassert(50973,
-                str::stream()
-                    << "Cannot shard collection " << nss.ns() << " due to zone " << tag.getTag()
-                    << " which is not assigned to a shard. Please assign this zone to a shard.",
-                !shardIdsForTag.empty());
-        const auto nextShardIndx = tagToIndx[tag.getTag()]++;
-        return shardIdsForTag[nextShardIndx % shardIdsForTag.size()];
-    };
-
-    std::vector<ChunkType> chunks;
-
-    ChunkVersion version(1, 0, OID::gen());
-    auto lastChunkMax = keyPattern.globalMin();
-
-    for (const auto& tag : tags) {
-        // Create a chunk for the hole [lastChunkMax, tag.getMinKey)
-        if (tag.getMinKey().woCompare(lastChunkMax) > 0) {
-            appendChunk(nss,
-                        lastChunkMax,
-                        tag.getMinKey(),
-                        &version,
-                        validAfter,
-                        nextShardIdForHole(),
-                        &chunks);
-        }
-
-        // Create chunk for the actual tag - [tag.getMinKey, tag.getMaxKey)
-        appendChunk(nss,
-                    tag.getMinKey(),
-                    tag.getMaxKey(),
-                    &version,
-                    validAfter,
-                    nextShardIdForTag(tag),
-                    &chunks);
-        lastChunkMax = tag.getMaxKey();
-    }
-
-    // Create a chunk for the hole [lastChunkMax, MaxKey]
-    if (lastChunkMax.woCompare(keyPattern.globalMax()) < 0) {
-        appendChunk(nss,
-                    lastChunkMax,
-                    keyPattern.globalMax(),
-                    &version,
-                    validAfter,
-                    nextShardIdForHole(),
-                    &chunks);
-    }
-
-    return {std::move(chunks)};
-}
-
-InitialSplitPolicy::ShardingOptimizationType InitialSplitPolicy::calculateOptimizationType(
-    const std::vector<BSONObj>& splitPoints,
-    const std::vector<TagsType>& tags,
+    size_t numShards,
     bool collectionIsEmpty) {
-    if (!splitPoints.empty()) {
-        return SplitPointsProvided;
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "numInitialChunks is only supported when the collection is empty "
+                             "and has a hashed field in the shard key pattern",
+            !request.getNumInitialChunks() ||
+                (shardKeyPattern.isHashedPattern() && collectionIsEmpty));
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream()
+                << "When the prefix of the hashed shard key is a range field, "
+                   "'numInitialChunks' can only be used when the 'presplitHashedZones' is true",
+            !request.getNumInitialChunks() || shardKeyPattern.hasHashedPrefix() ||
+                request.getPresplitHashedZones());
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Cannot have both initial split points and tags set",
+            !request.getInitialSplitPoints() || tags.empty());
+
+    // If 'presplitHashedZones' flag is set, we always use 'PresplitHashedZonesSplitPolicy', to make
+    // sure we throw the correct assertion if further validation fails.
+    if (request.getPresplitHashedZones()) {
+        return std::make_unique<PresplitHashedZonesSplitPolicy>(
+            opCtx, shardKeyPattern, tags, request.getNumInitialChunks(), collectionIsEmpty);
+    }
+
+    // The next preference is to use split points based strategy. This is only possible if
+    // 'initialSplitPoints' is set, or if the collection is empty with shard key having a hashed
+    // prefix.
+    if (request.getInitialSplitPoints()) {
+        return std::make_unique<SplitPointsBasedSplitPolicy>(*request.getInitialSplitPoints());
+    }
+    if (tags.empty() && shardKeyPattern.hasHashedPrefix() && collectionIsEmpty) {
+        return std::make_unique<SplitPointsBasedSplitPolicy>(
+            shardKeyPattern, numShards, request.getNumInitialChunks());
     }
 
     if (!tags.empty()) {
         if (collectionIsEmpty) {
-            return TagsProvidedWithEmptyCollection;
+            return std::make_unique<SingleChunkPerTagSplitPolicy>(opCtx, tags);
         }
-        return TagsProvidedWithNonEmptyCollection;
+        return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
     }
 
     if (collectionIsEmpty) {
-        return EmptyCollection;
+        return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
     }
-
-    return None;
-}
-
-InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunksOptimized(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardKeyPattern& shardKeyPattern,
-    const ShardId& primaryShardId,
-    const std::vector<BSONObj>& splitPoints,
-    const std::vector<TagsType>& tags,
-    ShardingOptimizationType optimizationType,
-    bool isEmpty,
-    int numContiguousChunksPerShard) {
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot generate initial chunks based on both split points and zones",
-            tags.empty() || splitPoints.empty());
-
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-    const auto& keyPattern = shardKeyPattern.getKeyPattern();
-
-    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-
-    // On which shards are the generated chunks allowed to be placed
-    std::vector<ShardId> shardIds;
-    if (isEmpty) {
-        shardRegistry->getAllShardIdsNoReload(&shardIds);
-    } else {
-        shardIds.push_back(primaryShardId);
-    }
-
-    ShardCollectionConfig initialChunks;
-
-    if (optimizationType == ShardingOptimizationType::SplitPointsProvided) {
-        initialChunks = generateShardCollectionInitialChunks(nss,
-                                                             shardKeyPattern,
-                                                             primaryShardId,
-                                                             validAfter,
-                                                             splitPoints,
-                                                             shardIds,
-                                                             numContiguousChunksPerShard);
-    } else if (optimizationType == ShardingOptimizationType::TagsProvidedWithEmptyCollection) {
-        initialChunks = generateShardCollectionInitialZonedChunks(
-            nss, shardKeyPattern, validAfter, tags, getTagToShardIds(opCtx, tags), shardIds);
-    } else if (optimizationType == ShardingOptimizationType::TagsProvidedWithNonEmptyCollection ||
-               optimizationType == ShardingOptimizationType::EmptyCollection) {
-        ChunkVersion version(1, 0, OID::gen());
-        appendChunk(nss,
-                    keyPattern.globalMin(),
-                    keyPattern.globalMax(),
-                    &version,
-                    validAfter,
-                    primaryShardId,
-                    &initialChunks.chunks);
-    } else {
-        MONGO_UNREACHABLE;
-    }
-
-    return initialChunks;
-}
-
-InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunksUnoptimized(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardKeyPattern& shardKeyPattern,
-    const ShardId& primaryShardId) {
-    const auto& keyPattern = shardKeyPattern.getKeyPattern();
-    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-
-    // On which shards are the generated chunks allowed to be placed
-    std::vector<ShardId> shardIds{primaryShardId};
-
-    auto primaryShard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-
-    // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
-    // the splitVector command and affects the number of chunks returned, has been loaded.
-    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
-
-    const auto shardSelectedSplitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
-        opCtx,
-        primaryShardId,
-        nss,
-        shardKeyPattern,
-        ChunkRange(keyPattern.globalMin(), keyPattern.globalMax()),
-        balancerConfig->getMaxChunkSizeBytes(),
-        0));
-
-    return generateShardCollectionInitialChunks(nss,
-                                                shardKeyPattern,
-                                                primaryShardId,
-                                                validAfter,
-                                                shardSelectedSplitPoints,
-                                                shardIds,
-                                                1  // numContiguousChunksPerShard
-    );
+    return std::make_unique<UnoptimizedSplitPolicy>();
 }
 
 boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
@@ -443,6 +292,334 @@ boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShar
             requestedOptions.hasSameOptions(existingOptions));
 
     return existingOptions;
+}
+
+InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::createFirstChunks(
+    OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
+    ShardCollectionConfig initialChunks;
+    ChunkVersion version(1, 0, OID::gen());
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
+    appendChunk(params.nss,
+                keyPattern.globalMin(),
+                keyPattern.globalMax(),
+                &version,
+                LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
+                params.primaryShardId,
+                &initialChunks.chunks);
+    return initialChunks;
+}
+
+InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChunks(
+    OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
+    // Under this policy, chunks are only placed on the primary shard.
+    std::vector<ShardId> shardIds{params.primaryShardId};
+
+    // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
+    // the splitVector command and affects the number of chunks returned, has been loaded.
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+    uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
+    const auto shardSelectedSplitPoints = uassertStatusOK(
+        shardutil::selectChunkSplitPoints(opCtx,
+                                          params.primaryShardId,
+                                          params.nss,
+                                          shardKeyPattern,
+                                          ChunkRange(shardKeyPattern.getKeyPattern().globalMin(),
+                                                     shardKeyPattern.getKeyPattern().globalMax()),
+                                          balancerConfig->getMaxChunkSizeBytes(),
+                                          0));
+    return generateShardCollectionInitialChunks(
+        params.nss,
+        shardKeyPattern,
+        params.primaryShardId,
+        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
+        shardSelectedSplitPoints,
+        shardIds,
+        1  // numContiguousChunksPerShard
+    );
+}
+
+InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
+    OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
+
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    // On which shards are the generated chunks allowed to be placed.
+    std::vector<ShardId> shardIds;
+    shardRegistry->getAllShardIdsNoReload(&shardIds);
+
+    return generateShardCollectionInitialChunks(
+        params.nss,
+        shardKeyPattern,
+        params.primaryShardId,
+        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
+        _splitPoints,
+        shardIds,
+        _numContiguousChunksPerShard);
+}
+
+AbstractTagsBasedSplitPolicy::AbstractTagsBasedSplitPolicy(OperationContext* opCtx,
+                                                           std::vector<TagsType> tags)
+    : _tags(tags) {
+    _tagToShardIds = buildTagsToShardIdsMap(opCtx, tags);
+}
+
+AbstractTagsBasedSplitPolicy::SplitInfo SingleChunkPerTagSplitPolicy::buildSplitInfoForTag(
+    TagsType tag, const ShardKeyPattern& shardKeyPattern) {
+    const auto nextShardIndex = _nextShardIndexForZone[tag.getTag()]++;
+    const auto& shardIdsForTag = getTagsToShardIds().find(tag.getTag())->second;
+    auto shardId = shardIdsForTag[nextShardIndex % shardIdsForTag.size()];
+
+    // Do not generate any split points when using this strategy. We create one chunk on a shard
+    // choosen using round-robin.
+    return {{}, {std::make_pair(shardId, 1)}};
+}
+
+InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFirstChunks(
+    OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
+    invariant(!_tags.empty());
+
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    std::vector<ShardId> shardIds;
+    shardRegistry->getAllShardIdsNoReload(&shardIds);
+    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
+
+    auto tagToShards = getTagsToShardIds();
+
+    auto nextShardIdForHole = [&, indx = 0L]() mutable {
+        return shardIds[indx++ % shardIds.size()];
+    };
+
+    ChunkVersion version(1, 0, OID::gen());
+    auto lastChunkMax = keyPattern.globalMin();
+    std::vector<ChunkType> chunks;
+    for (const auto& tag : _tags) {
+        // Create a chunk for the hole [lastChunkMax, tag.getMinKey)
+        if (tag.getMinKey().woCompare(lastChunkMax) > 0) {
+            appendChunk(params.nss,
+                        lastChunkMax,
+                        tag.getMinKey(),
+                        &version,
+                        validAfter,
+                        nextShardIdForHole(),
+                        &chunks);
+        }
+        // Create chunk for the actual tag - [tag.getMinKey, tag.getMaxKey)
+        const auto it = tagToShards.find(tag.getTag());
+        invariant(it != tagToShards.end());
+        uassert(50973,
+                str::stream()
+                    << "Cannot shard collection " << params.nss.ns() << " due to zone "
+                    << tag.getTag()
+                    << " which is not assigned to a shard. Please assign this zone to a shard.",
+                !it->second.empty());
+
+        // The buildSplitInfoForTag() should provide split points which are in sorted order. So we
+        // don't need to sort them again while generating chunks.
+        auto splitInfo = buildSplitInfoForTag(tag, shardKeyPattern);
+
+        // Ensure that the number of splitPoints is consistent with the computed chunk distribution.
+        // The resulting number of chunks will be one more than the number of split points to
+        // accommodate boundaries.
+        invariant(splitInfo.splitPoints.size() + 1 ==
+                  std::accumulate(splitInfo.chunkDistribution.begin(),
+                                  splitInfo.chunkDistribution.end(),
+                                  static_cast<size_t>(0),  // initial value for 'runningSum'.
+                                  [](size_t runningSum, const auto& currentElem) {
+                                      return runningSum + currentElem.second;
+                                  }));
+
+        // Generate chunks using 'splitPoints' and distribute them among shards based on
+        // 'chunkDistributionPerShard'.
+        size_t splitPointIdx = 0;
+        for (auto&& chunksOnShard : splitInfo.chunkDistribution) {
+            const auto [targetShard, numChunksForShard] = chunksOnShard;
+            for (size_t i = 0; i < numChunksForShard; ++i, ++splitPointIdx) {
+                const BSONObj min = (splitPointIdx == 0) ? tag.getMinKey()
+                                                         : splitInfo.splitPoints[splitPointIdx - 1];
+                const BSONObj max = (splitPointIdx == splitInfo.splitPoints.size())
+                    ? tag.getMaxKey()
+                    : splitInfo.splitPoints[splitPointIdx];
+                appendChunk(params.nss, min, max, &version, validAfter, targetShard, &chunks);
+            }
+        }
+        lastChunkMax = tag.getMaxKey();
+    }
+
+    // Create a chunk for the hole [lastChunkMax, MaxKey]
+    if (lastChunkMax.woCompare(keyPattern.globalMax()) < 0) {
+        appendChunk(params.nss,
+                    lastChunkMax,
+                    keyPattern.globalMax(),
+                    &version,
+                    validAfter,
+                    nextShardIdForHole(),
+                    &chunks);
+    }
+
+    return {std::move(chunks)};
+}
+
+AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSplitInfoForTag(
+    TagsType tag, const ShardKeyPattern& shardKeyPattern) {
+    // Returns the ceiling number for the decimal value of x/y.
+    auto ceilOfXOverY = [](auto x, auto y) { return (x / y) + (x % y != 0); };
+
+    // This strategy presplits each tag such that at least 1 chunk is placed on every shard to which
+    // the tag is assigned. We distribute the chunks such that at least '_numInitialChunks' are
+    // created across the cluster, and we make a best-effort attempt to ensure that an equal number
+    // of chunks are created on each shard regardless of how the zones are laid out.
+
+    //  We take the ceiling when the number is not divisible so that the final number of chunks
+    //  we generate are at least '_numInitialChunks'.
+    auto numChunksPerShard = ceilOfXOverY(_numInitialChunks, _numTagsPerShard.size());
+
+    const auto& tagsToShardsMap = getTagsToShardIds();
+    invariant(tagsToShardsMap.find(tag.getTag()) != tagsToShardsMap.end());
+    const auto& shardsForCurrentTag = tagsToShardsMap.find(tag.getTag())->second;
+
+    // For each shard in the current zone, find the quota of chunks that can be allocated to that
+    // zone. We distribute chunks equally to all the zones present on a shard.
+    std::vector<std::pair<ShardId, size_t>> chunkDistribution;
+    chunkDistribution.reserve((shardsForCurrentTag.size()));
+    auto numChunksForCurrentTag = 0;
+    for (auto&& shard : shardsForCurrentTag) {
+        auto numChunksForCurrentTagOnShard =
+            ceilOfXOverY(numChunksPerShard, _numTagsPerShard[shard.toString()]);
+        chunkDistribution.push_back({shard, numChunksForCurrentTagOnShard});
+        numChunksForCurrentTag += (numChunksForCurrentTagOnShard);
+    }
+
+    // Extract the fields preceding the hashed field. We use this object as a base for building
+    // split points.
+    BSONObjBuilder bob;
+    for (auto&& elem : tag.getMinKey()) {
+        if (elem.fieldNameStringData() == shardKeyPattern.getHashedField().fieldNameStringData()) {
+            break;
+        }
+        bob.append(elem);
+    }
+    auto prefixBSON = bob.obj();
+
+    return {calculateHashedSplitPoints(shardKeyPattern, prefixBSON, numChunksForCurrentTag),
+            std::move(chunkDistribution)};
+}
+
+PresplitHashedZonesSplitPolicy::PresplitHashedZonesSplitPolicy(
+    OperationContext* opCtx,
+    const ShardKeyPattern& shardKeyPattern,
+    std::vector<TagsType> tags,
+    size_t numInitialChunks,
+    bool isCollectionEmpty)
+    : AbstractTagsBasedSplitPolicy(opCtx, tags) {
+    // Verify that tags have been set up correctly for this split policy.
+    _validate(shardKeyPattern, isCollectionEmpty);
+
+    // Calculate the count of zones on each shard and save it in a map for later.
+    const auto& tagsToShards = getTagsToShardIds();
+    for (auto&& tag : tags) {
+        auto& shardsForCurrentTag = tagsToShards.find(tag.getTag())->second;
+        for (auto&& shard : shardsForCurrentTag) {
+            _numTagsPerShard[shard.toString()]++;
+        }
+    }
+    // If we are here, we have confirmed that at least one tag is already set up. A tag can only be
+    // created if they are associated with a zone and the zone has to be assigned to a shard.
+    invariant(!_numTagsPerShard.empty());
+
+    // If 'numInitialChunks' was not specified, use default value.
+    _numInitialChunks = numInitialChunks ? numInitialChunks : _numTagsPerShard.size() * 2;
+}
+
+/**
+ * If 'presplitHashedZones' flag is set with shard key prefix being a non-hashed field then all
+ * zones must be set up according to the following rules:
+ *  1. All lower-bound prefix fields of the shard key must have a value other than MinKey or
+ * MaxKey.
+ *  2. All lower-bound fields from the hash field onwards must be MinKey.
+ *  3. At least one upper-bound prefix field must be different than the lower bound counterpart.
+ *
+ * Examples for shard key {country : 1, hashedField: "hashed", suffix : 1}:
+ * Zone with range : [{country : "US", hashedField: MinKey, suffix: MinKey}, {country :MaxKey,
+ * hashedField: MaxKey, suffix: MaxKey}) is valid.
+ * Zone with range : [{country : MinKey, hashedField: MinKey, suffix: MinKey}, {country : "US",
+ * hashedField: MinKey, suffix: MinKey}) is invalid since it violates #1 rule.
+ * Zone with range: [{country : "US", hashedField: MinKey, suffix: "someVal"}, {country :MaxKey,
+ * hashedField: MaxKey, suffix: MaxKey}) is invalid since it violates #2 rule.
+ * Zone with range: [{country : "US", hashedField: MinKey, suffix: MinKey}, {country : "US",
+ * hashedField: MaxKey, suffix: MaxKey}) is invalid since it violates #3 rule.
+ *
+ * If the shard key has a hashed prefix, then pre-splitting is only supported if there is a single
+ * zone defined from global MinKey to global MaxKey. i.e, if the shard key is {x: "hashed", y: 1}
+ * then there should be exactly one zone ranging from {x:MinKey, y:MinKey} to {x:MaxKey, y:MaxKey}.
+ */
+void PresplitHashedZonesSplitPolicy::_validate(const ShardKeyPattern& shardKeyPattern,
+                                               bool isCollectionEmpty) {
+    const auto& tags = getTags();
+    uassert(
+        31387,
+        "'presplitHashedZones' is only supported when the collection is empty, zones are set up "
+        "and shard key pattern has a hashed field",
+        isCollectionEmpty && !tags.empty() && shardKeyPattern.isHashedPattern());
+
+    if (shardKeyPattern.hasHashedPrefix()) {
+        uassert(31412,
+                "For hashed prefix shard keys, 'presplitHashedZones' is only supported when there "
+                "is a single zone defined which covers entire shard key range",
+                (tags.size() == 1) &&
+                    !shardKeyPattern.getKeyPattern().globalMin().woCompare(tags[0].getMinKey()) &&
+                    !shardKeyPattern.getKeyPattern().globalMax().woCompare(tags[0].getMaxKey()));
+        return;
+    }
+    for (auto&& tag : tags) {
+        auto startItr = BSONObjIterator(tag.getMinKey());
+        auto endItr = BSONObjIterator(tag.getMaxKey());
+
+        // We cannot pre-split if the lower bound fields preceding the hashed field are same as
+        // the upper bound. We validate that at least one of the preceding field is different.
+        // Additionally we all make sure that none of the lower-bound prefix fields have Minkey
+        // or MaxKey.
+        bool isPrefixDifferent = false;
+        do {
+            uassert(31388,
+                    str::stream()
+                        << "One or more zones are not defined in a manner that supports hashed "
+                           "pre-splitting. Cannot have MinKey or MaxKey in the lower bound for "
+                           "fields preceding the hashed field but found one, for zone "
+                        << tag.getTag(),
+                    (*startItr).type() != BSONType::MinKey &&
+                        (*startItr).type() != BSONType::MaxKey);
+            isPrefixDifferent = isPrefixDifferent || (*startItr).woCompare(*endItr);
+            ++endItr;
+            // Forward the iterator until hashed field is reached.
+        } while ((*++startItr).fieldNameStringData() !=
+                 shardKeyPattern.getHashedField().fieldNameStringData());
+        uassert(31390,
+                str::stream() << "One or more zones are not defined in a manner that supports "
+                                 "hashed pre-splitting. The value preceding hashed field of the "
+                                 "upper bound should be greater than that of lower bound, for zone "
+                              << tag.getTag(),
+                isPrefixDifferent);
+
+        uassert(
+            31389,
+            str::stream() << "One or more zones are not defined in a manner that supports "
+                             "hashed pre-splitting. The hashed field value for lower bound must "
+                             "be MinKey, for zone "
+                          << tag.getTag(),
+            (*startItr).type() == BSONType::MinKey);
+
+        // Each field in the lower bound after the hashed field must be set to MinKey.
+        while (startItr.more()) {
+            uassert(31391,
+                    str::stream() << "One or more zones are not defined in a manner that supports "
+                                     "hashed pre-splitting. The fields after the hashed field must "
+                                     "have MinKey value, for zone "
+                                  << tag.getTag(),
+                    (*startItr++).type() == BSONType::MinKey);
+        }
+    }
 }
 
 }  // namespace mongo
