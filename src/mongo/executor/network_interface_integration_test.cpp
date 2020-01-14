@@ -73,6 +73,18 @@ TEST_F(NetworkInterfaceIntegrationFixture, Ping) {
     assertCommandOK("admin", BSON("ping" << 1));
 }
 
+TEST_F(NetworkInterfaceIntegrationFixture, PingWithoutStartup) {
+    createNet();
+
+    RemoteCommandRequest request{
+        fixture().getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr, Minutes(5)};
+
+    auto fut = runCommand(makeCallbackHandle(), request);
+    ASSERT_FALSE(fut.isReady());
+    net().startup();
+    ASSERT(fut.get().isOK());
+}
+
 // Hook that intentionally never finishes
 class HangingHook : public executor::NetworkConnectionHook {
     Status validateHost(const HostAndPort&,
