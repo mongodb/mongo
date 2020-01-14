@@ -56,7 +56,7 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     ThreadPool::Options options;
     options.poolName = "IndexBuildsCoordinatorMongod";
     options.minThreads = 0;
-    options.maxThreads = 10;
+    options.maxThreads = 3;
 
     // Ensure all threads have a client.
     options.onCreateThread = [](const std::string& threadName) {
@@ -70,6 +70,11 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
 
 IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
     : _threadPool(makeDefaultThreadPoolOptions()) {
+    _threadPool.startup();
+}
+
+IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod(ThreadPool::Options options)
+    : _threadPool(std::move(options)) {
     _threadPool.startup();
 }
 
