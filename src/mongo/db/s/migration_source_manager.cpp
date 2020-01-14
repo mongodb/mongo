@@ -251,6 +251,8 @@ Status MigrationSourceManager::startClone() {
     auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
     auto replEnabled = replCoord->isReplEnabled();
 
+    UUID migrationId = UUID::gen();
+
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch();
 
@@ -283,10 +285,6 @@ Status MigrationSourceManager::startClone() {
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
 
         if (_useFCV44Protocol) {
-            // TODO (SERVER-45175): Unify the migration UUID used by the MigrationCoordinator and
-            // MigrationChunkClonerSourceLegacy
-            UUID migrationId = UUID::gen();
-
             // TODO (SERVER-xxx): Allow re-using the same session (though different transaction
             // number) across migrations.
             auto lsid = makeLogicalSessionId(_opCtx);
@@ -320,7 +318,7 @@ Status MigrationSourceManager::startClone() {
         _coordinator->startMigration(_opCtx, _args.getWaitForDelete());
     }
 
-    Status startCloneStatus = _cloneDriver->startClone(_opCtx);
+    Status startCloneStatus = _cloneDriver->startClone(_opCtx, migrationId);
     if (!startCloneStatus.isOK()) {
         return startCloneStatus;
     }
@@ -648,16 +646,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
-    auto notification = [&] {
-        auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingRuntime::kNow
-                                                          : CollectionShardingRuntime::kDelayed;
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-        AutoGetCollection autoColl(_opCtx, getNss(), MODE_IS);
-        return CollectionShardingRuntime::get(_opCtx, getNss())->cleanUpRange(range, whenToClean);
-    }();
-
     if (!MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
-        // Best-effort make the recipient refresh its routing table to the new collection version.
+        // Best-effort make the recipient refresh its routing table to the new collection
+        // version.
         refreshRecipientRoutingTable(_opCtx,
                                      getNss(),
                                      _args.getToShardId(),
@@ -669,24 +660,51 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         << "Moved chunks successfully but failed to clean up " << getNss().ns() << " range "
         << redact(range.toString()) << " due to: ";
 
-    if (_args.getWaitForDelete()) {
-        log() << "Waiting for cleanup of " << getNss().ns() << " range "
-              << redact(range.toString());
-        auto deleteStatus = notification.waitStatus(_opCtx);
-        if (!deleteStatus.isOK()) {
-            return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                    orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
-        }
-        return Status::OK();
-    }
+    if (_useFCV44Protocol) {
+        if (_args.getWaitForDelete()) {
+            log() << "Waiting for cleanup of " << getNss().ns() << " range "
+                  << redact(range.toString());
 
-    if (notification.ready() && !notification.waitStatus(_opCtx).isOK()) {
-        return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                orphanedRangeCleanUpErrMsg + redact(notification.waitStatus(_opCtx))};
+            auto deleteStatus =
+                CollectionShardingRuntime::waitForClean(_opCtx, getNss(), _collectionEpoch, range);
+
+            if (!deleteStatus.isOK()) {
+                return {ErrorCodes::OrphanedRangeCleanUpFailed,
+                        orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
+            }
+        }
     } else {
-        log() << "Leaving cleanup of " << getNss().ns() << " range " << redact(range.toString())
-              << " to complete in background";
-        notification.abandon();
+        auto notification = [&] {
+            auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingRuntime::kNow
+                                                              : CollectionShardingRuntime::kDelayed;
+            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+            AutoGetCollection autoColl(_opCtx, getNss(), MODE_IS);
+            return CollectionShardingRuntime::get(_opCtx, getNss())
+                ->cleanUpRange(range, whenToClean);
+        }();
+
+        if (_args.getWaitForDelete()) {
+            log() << "Waiting for cleanup of " << getNss().ns() << " range "
+                  << redact(range.toString());
+
+            auto deleteStatus = notification.waitStatus(_opCtx);
+
+            if (!deleteStatus.isOK()) {
+                return {ErrorCodes::OrphanedRangeCleanUpFailed,
+                        orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
+            }
+
+            return Status::OK();
+        }
+
+        if (notification.ready() && !notification.waitStatus(_opCtx).isOK()) {
+            return {ErrorCodes::OrphanedRangeCleanUpFailed,
+                    orphanedRangeCleanUpErrMsg + redact(notification.waitStatus(_opCtx))};
+        } else {
+            log() << "Leaving cleanup of " << getNss().ns() << " range " << redact(range.toString())
+                  << " to complete in background";
+            notification.abandon();
+        }
     }
 
     return Status::OK();

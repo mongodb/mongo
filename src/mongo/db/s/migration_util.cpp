@@ -348,6 +348,7 @@ void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId) {
         QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
         BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName << "aborted")));
 }
+
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
                                         const UUID& migrationId,

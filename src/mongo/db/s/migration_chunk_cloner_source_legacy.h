@@ -90,7 +90,7 @@ public:
                                      HostAndPort recipientHost);
     ~MigrationChunkClonerSourceLegacy();
 
-    Status startClone(OperationContext* opCtx) override;
+    Status startClone(OperationContext* opCtx, const UUID& migrationId) override;
 
     Status awaitUntilCriticalSectionIsAppropriate(OperationContext* opCtx,
                                                   Milliseconds maxTimeToWait) override;

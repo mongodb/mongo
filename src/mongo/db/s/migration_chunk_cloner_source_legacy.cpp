@@ -236,7 +236,8 @@ MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(_state == kDone);
 }
 
-Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
+Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
+                                                    const UUID& migrationId) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
@@ -276,19 +277,33 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
 
     // Tell the recipient shard to start cloning
     BSONObjBuilder cmdBuilder;
-    StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
-                                            _args.getNss(),
-                                            // TODO (SERVER-44161): Replace with UUID provided by
-                                            // migration donor.
-                                            UUID::gen(),
-                                            _sessionId,
-                                            _donorConnStr,
-                                            _args.getFromShardId(),
-                                            _args.getToShardId(),
-                                            _args.getMinKey(),
-                                            _args.getMaxKey(),
-                                            _shardKeyPattern.toBSON(),
-                                            _args.getSecondaryThrottle());
+
+    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
+    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
+                                                _args.getNss(),
+                                                migrationId,
+                                                _sessionId,
+                                                _donorConnStr,
+                                                _args.getFromShardId(),
+                                                _args.getToShardId(),
+                                                _args.getMinKey(),
+                                                _args.getMaxKey(),
+                                                _shardKeyPattern.toBSON(),
+                                                _args.getSecondaryThrottle());
+    } else {
+        // TODO (SERVER-44787): Remove this overload after 4.4 is released.
+        StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
+                                                _args.getNss(),
+                                                _sessionId,
+                                                _donorConnStr,
+                                                _args.getFromShardId(),
+                                                _args.getToShardId(),
+                                                _args.getMinKey(),
+                                                _args.getMaxKey(),
+                                                _shardKeyPattern.toBSON(),
+                                                _args.getSecondaryThrottle());
+    }
 
     auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
     if (!startChunkCloneResponseStatus.isOK()) {
