@@ -83,6 +83,7 @@ selector:
   - jstests/sharding/json_schema.js
   - jstests/sharding/current_op_no_shards.js
   - jstests/sharding/mapReduce_outSharded_checkUUID.js
+  - jstests/sharding/mr_merge_to_existing.js
   # New feature in v3.6 mongo shell.
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/keys_rotation_interval_sec.js
@@ -121,7 +122,6 @@ selector:
   - jstests/sharding/explain_cmd.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
-
 executor:
   config:
     shell_options:
