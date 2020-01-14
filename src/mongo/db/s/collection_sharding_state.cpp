@@ -206,9 +206,6 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
         return ScopedCollectionMetadata(kUnshardedCollection);
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
-    if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
-        return boost::none;
-    }
 
     // An operation with read concern 'available' should never have shardVersion set.
     invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
@@ -238,16 +235,23 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
                   str::stream() << "migration commit in progress for " << _nss.ns());
     }
 
-    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
-        return metadata;
-    }
-
     //
     // Figure out exactly why not compatible, send appropriate error message
     // The versions themselves are returned in the error, so not needed in messages here
     //
 
     StaleConfigInfo sci(_nss, receivedShardVersion, wantedShardVersion);
+
+    if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
+        uassert(std::move(sci),
+                "no metadata found on multi-write operation, need to refresh",
+                !receivedShardVersion.canThrowSSVOnIgnored() || metadata);
+        return boost::none;
+    }
+
+    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
+        return metadata;
+    }
 
     uassert(std::move(sci),
             str::stream() << "epoch mismatch detected for " << _nss.ns() << ", "
