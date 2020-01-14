@@ -48,8 +48,6 @@ namespace mongo {
 namespace repl {
 
 namespace {
-// TODO(SERVER-43279): This failpoint is needed to test cloner network error behavior until
-// OplogFetcher error behavior is made the same.  It may be removed if not needed after that.
 MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 
 Counter64 readersCreatedStats;
