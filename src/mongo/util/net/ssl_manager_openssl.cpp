@@ -79,6 +79,15 @@ namespace mongo {
 
 namespace {
 
+struct UniqueX509StoreCtxDeleter {
+    void operator()(X509_STORE_CTX* ctx) {
+        if (ctx) {
+            ::X509_STORE_CTX_free(ctx);
+        }
+    }
+};
+using UniqueX509StoreCtx = std::unique_ptr<X509_STORE_CTX, UniqueX509StoreCtxDeleter>;
+
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
 // `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
@@ -186,7 +195,45 @@ const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
 inline int X509_NAME_ENTRY_set(const X509_NAME_ENTRY* ne) {
     return ne->set;
 }
+
+// On OpenSSL < 1.1.0, this chain isn't attached to
+// the SSL session, so we need it to dispose of itself.
+struct VerifiedChainDeleter {
+    void operator()(STACK_OF(X509) * chain) {
+        if (chain) {
+            sk_X509_pop_free(chain, X509_free);
+        }
+    }
+};
+
+STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
+    auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
+    auto* peer = SSL_get_peer_certificate(s);
+    auto* peerChain = SSL_get_peer_cert_chain(s);
+
+    UniqueX509StoreCtx ctx(X509_STORE_CTX_new());
+    if (!X509_STORE_CTX_init(ctx.get(), store, peer, peerChain)) {
+        return nullptr;
+    }
+
+    if (X509_verify_cert(ctx.get()) <= 0) {
+        return nullptr;
+    }
+
+    return X509_STORE_CTX_get1_chain(ctx.get());
+}
+
+#else
+// No-op deleter for OpenSSL >= 1.1.0
+struct VerifiedChainDeleter {
+    void operator()(STACK_OF(X509) * chain) {}
+};
 #endif
+
+using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), VerifiedChainDeleter>;
+UniqueVerifiedChainPolyfill SSLgetVerifiedChain(SSL* s) {
+    return UniqueVerifiedChainPolyfill(SSL_get0_verified_chain(s));
+}
 
 /**
  * Multithreaded Support for SSL.
