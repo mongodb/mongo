@@ -374,9 +374,12 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         translate(child, elt, index, oilOut, tightnessOut);
         oilOut->complement();
 
-        // TODO SERVER-27646: We cannot assume this invariant is true unless we build exact bounds
-        // for $ne: null queries.
-        // invariant(*tightnessOut == IndexBoundsBuilder::EXACT);
+        // This disables indexed negation of array inequality.
+        // TODO: SERVER-45233 Perform correct behavior here once indexed array inequality without
+        // negation's semantics are correctly determined and implemented.
+        massert(ErrorCodes::InternalError,
+                "Indexed negation of array inequality not supported.",
+                *tightnessOut == IndexBoundsBuilder::EXACT);
 
         // If the index is multikey, it doesn't matter what the tightness of the child is, we must
         // return INEXACT_FETCH. Consider a multikey index on 'a' with document {a: [1, 2, 3]} and
