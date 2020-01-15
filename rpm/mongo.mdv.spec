@@ -134,21 +134,9 @@ fi
 
 %{_bindir}/install_compass
 %{_bindir}/mongo
-%{_bindir}/mongodump
-%{_bindir}/mongoexport
-%{_bindir}/mongofiles
-%{_bindir}/mongoimport
-%{_bindir}/mongorestore
-%{_bindir}/mongostat
 
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongod.1*
-%{_mandir}/man1/mongodump.1*
-%{_mandir}/man1/mongoexport.1*
-%{_mandir}/man1/mongofiles.1*
-%{_mandir}/man1/mongoimport.1*
-%{_mandir}/man1/mongostat.1*
-%{_mandir}/man1/mongorestore.1*
 
 %files server
 %defattr(-,root,root,-)

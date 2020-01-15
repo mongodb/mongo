@@ -101,42 +101,6 @@ released binary artifacts.
 | testscenarios   |
 | testtools       |
 
-## Libraries Imported by Tools
-
-The following Go libraries are vendored into the MongoDB tools. Their
-license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
-
-| Name                                                                |
-| :------------------------------------------------------------------ |
-| Go (language runtime and JSON/CSV codecs)                           |
-| [assertions](https://github.com/smartystreets/assertions)           |
-| [crypto](https://golang.org/x/crypto)                               |
-| [escaper](https://github.com/10gen/escaper)                         |
-| [gls](https://github.com/jtolds/gls)                                |
-| [go-cache](https://github.com/patrickmn/go-cache)                   |
-| [go-flags](https://github.com/jessevdk/go-flags)                    |
-| [go-runewidth](https://github.com/mattn/go-runewidth)               |
-| [goconvey](https://github.com/smartystreets/goconvey)               |
-| [gopacket](https://github.com/google/gopacket)                      |
-| [gopass](https://github.com/howeyc/gopass)                          |
-| [gopherjs](https://github.com/gopherjs/gopherjs)                    |
-| [llmgo](https://github.com/10gen/llmgo)                             |
-| [mgo](https://github.com/10gen/mgo)                                 |
-| [mongo-go-driver](https://github.com/mongodb/mongo-go-driver)       |
-| [mongo-lint](https://github.com/3rf/mongo-lint)                     |
-| [mongo-tools-common](https://github.com/mongodb/mongo-tools-common) |
-| [openssl](https://github.com/10gen/openssl)                         |
-| [oglematchers](https://github.com/jacobsa/oglematchers)             |
-| [scram](https://github.com/xdg/scram)                               |
-| [snappy](https://github.com/golang/snappy)                          |
-| [spacelog](https://github.com/spacemonkeygo/spacelog)               |
-| [stack](https://github.com/go-stack/stack)                          |
-| [stringprep](https://github.com/xdg/stringprep)                     |
-| [sync](https://golang.org/x/sync)                                   |
-| [termbox-go](https://github.com/nsf/termbox-go)                     |
-| [text](https://golang.org/x/text)                                   |
-| [tomb](https://gopkg.in/tomb.v2)                                    |
-
 ## Dynamically Linked Libraries
 
 Sometimes MongoDB needs to load libraries provided and managed by the

@@ -284,8 +284,6 @@ variables:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
     large_distro_name: windows-64-vs2017-compile
   tasks:
@@ -657,7 +655,7 @@ functions:
       background: true
       system_log: true
       script: |
-        proc_list="(bsondump|java|lein|mongo|python|_test$|_test\.exe$)"
+        proc_list="(java|lein|mongo|python|_test$|_test\.exe$)"
         if [ "Windows_NT" = "$OS" ]; then
           get_pids() {
             proc_pids=$(tasklist /fo:csv |
@@ -958,39 +956,6 @@ functions:
                 $sudo umount /efs || true
             fi
         fi
-
-  "build new tools":
-    command: shell.exec
-    params:
-      working_dir: src/src/mongo/gotools/src/github.com/mongodb/mongo-tools
-      script: |
-        set -o verbose
-        set -o errexit
-
-        # make sure newlines in the scripts are handled correctly by windows
-        if [ "Windows_NT" = "$OS" ]; then
-            set -o igncr
-        fi;
-
-        # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
-        . ./set_goenv.sh
-        GOROOT="" set_goenv || exit
-        env | grep ^GO
-        go version
-
-        build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
-
-        if [ "${build_mongoreplay}" = "true" ]; then
-            build_tools="$build_tools mongoreplay"
-        fi
-
-        for i in $build_tools; do
-            go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
-            "../../../../../../mongo-tools/$i${exe|}" --version
-        done
-
-        mkdir -p ../../../../../../mongo-tools/distsrc
-        cp THIRD-PARTY-NOTICES ../../../../../../mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools
 
   "get all modified patch files":
     command: shell.exec
@@ -2336,7 +2301,7 @@ functions:
     params:
       silent: true
       script: |
-        process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
+        process_kill_list="(^cl\.exe$|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
         # Exclude Evergreen agent processes and other system daemons
         process_exclude_list="(main|tuned|evergreen)"
 
@@ -3416,7 +3381,7 @@ functions:
       script: |
         set -o verbose
 
-        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongoreplay,mongorestore,mongostat,mongotop"
+        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test}"
 
         if [ ${hang_analyzer_dump_core|true} = true ]; then
           hang_analyzer_option="-c $hang_analyzer_option"
@@ -3649,7 +3614,6 @@ tasks:
 - name: compile
   depends_on: []
   commands:
-    - func: "build new tools"
     - func: "scons compile"
       vars:
         targets: >-
@@ -3662,8 +3626,6 @@ tasks:
           ${msi_target|}
           ${mh_target|}
         task_compile_flags: >-
-          --use-new-tools
-          --build-mongoreplay="${build_mongoreplay}"
           --detect-odr-violations
           --install-mode=hygienic
           --separate-debug
@@ -3888,15 +3850,12 @@ tasks:
 - name: compile_core_tools
   depends_on: []
   commands:
-    - func: "build new tools"
     - func: "scons compile"
       vars:
         targets: install-core install-tools archive-dist ${mh_target|}
         compiling_for_test: true
         additional_targets: ""
         task_compile_flags: >-
-          --use-new-tools
-          --build-mongoreplay="${build_mongoreplay}"
           --detect-odr-violations
           --install-mode=hygienic
           --separate-debug
@@ -3918,14 +3877,11 @@ tasks:
 ## compile_all - build all scons targets ##
 - name: compile_all
   commands:
-    - func: "build new tools"
     - func: "scons compile"
       vars:
         targets: all
         compiling_for_test: true
         task_compile_flags: >-
-          --use-new-tools
-          --build-mongoreplay="${build_mongoreplay}"
           --detect-odr-violations
     - command: s3.put
       params:
@@ -8448,8 +8404,6 @@ buildvariants:
     # generated suites. Once everything is converted to generated suites, we should remove the
     # '--repeatSuites=10' from the test_flags. This will be done in SERVER-38817.
     scons_cache_scope: shared
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8479,8 +8433,6 @@ buildvariants:
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_http_client
-    tooltags: ""
-    build_mongoreplay: true
     target_resmoke_time: 15
   tasks:
   - name: compile_all_run_unittests_TG
@@ -8521,7 +8473,6 @@ buildvariants:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
     use_scons_cache: true
-    build_mongoreplay: true
     test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
@@ -8537,8 +8488,6 @@ buildvariants:
     # exclude those tests as well.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
     scons_cache_scope: shared
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8575,8 +8524,6 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8630,8 +8577,6 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8682,8 +8627,6 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8745,8 +8688,6 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
@@ -8793,8 +8734,6 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1804
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
@@ -8839,8 +8778,6 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1804
     repo_edition: org
-    tooltags: "ssl"
-    build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
@@ -8872,8 +8809,6 @@ buildvariants:
     packager_arch: ppc64le
     packager_distro: ubuntu1804
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
@@ -8928,8 +8863,6 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1804
     repo_edition: org
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8961,8 +8894,6 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1804
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: s390x
     multiversion_edition: enterprise
@@ -9019,8 +8950,6 @@ buildvariants:
     packager_distro: amazon
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9070,8 +8999,6 @@ buildvariants:
     packager_distro: amazon
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9129,8 +9056,6 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9183,8 +9108,6 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9252,8 +9175,6 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     large_distro_name: windows-64-vs2017-compile
@@ -9289,8 +9210,6 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: ""
-    build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9443,8 +9362,6 @@ buildvariants:
         --serviceExecutor=adaptive \
         --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
         --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: false
   tasks:
   - name: compile_TG
     distros:
@@ -9473,8 +9390,6 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9524,8 +9439,6 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9580,8 +9493,6 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: false
   tasks:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
@@ -9608,8 +9519,6 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.auth !.encrypt !.unwind
@@ -9653,8 +9562,6 @@ buildvariants:
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -9685,8 +9592,6 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
   - name: audit
@@ -9784,8 +9689,6 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
@@ -9886,8 +9789,6 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     large_distro_name: rhel62-large
     test_flags: >-
         --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
@@ -9961,8 +9862,6 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10040,8 +9939,6 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     large_distro_name: rhel62-large
   tasks:
   - name: compile_TG
@@ -10117,8 +10014,6 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: false
     large_distro_name: rhel62-large
   tasks:
   - name: compile_TG
@@ -10156,8 +10051,6 @@ buildvariants:
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
     - name: compile_all_run_unittests_TG
     - name: .aggregation !.unwind
@@ -10222,8 +10115,6 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10283,8 +10174,6 @@ buildvariants:
     packager_distro: rhel80
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10407,8 +10296,6 @@ buildvariants:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_TG
     distros:
@@ -10440,8 +10327,6 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10489,8 +10374,6 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10540,8 +10423,6 @@ buildvariants:
     packager_distro: rhel80
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10608,8 +10489,6 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
@@ -10667,8 +10546,6 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
@@ -10722,8 +10599,6 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel67
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10771,8 +10646,6 @@ buildvariants:
     push_name: linux
     push_arch: s390x-rhel72
     repo_edition: org
-    build_mongoreplay: true
-    tooltags: "ssl"
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10799,8 +10672,6 @@ buildvariants:
     push_name: linux
     push_arch: s390x-rhel67
     repo_edition: org
-    build_mongoreplay: true
-    tooltags: "ssl"
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10838,8 +10709,6 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10880,8 +10749,6 @@ buildvariants:
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
     scons_cache_scope: shared
     scons_cache_mode: all
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10916,8 +10783,6 @@ buildvariants:
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10948,8 +10813,6 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10991,8 +10854,6 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: suse12
     multiversion_architecture: s390x
     multiversion_edition: enterprise
@@ -11045,8 +10906,6 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: org
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     multiversion_platform: suse12
     multiversion_architecture: s390x
     multiversion_edition: targeted
@@ -11080,8 +10939,6 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11127,8 +10984,6 @@ buildvariants:
     packager_distro: suse15
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11166,8 +11021,6 @@ buildvariants:
     packager_distro: suse15
     repo_edition: org
     scons_cache_scope: shared
-    tooltags: "ssl"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11222,9 +11075,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
     scons_cache_scope: shared
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11267,9 +11118,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: org
-    tooltags: "ssl"
     scons_cache_scope: shared
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11324,9 +11173,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian10
     repo_edition: enterprise
-    tooltags: "ssl sasl gssapi"
     scons_cache_scope: shared
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11369,9 +11216,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian10
     repo_edition: org
-    tooltags: "ssl"
     scons_cache_scope: shared
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11416,8 +11261,6 @@ buildvariants:
     compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11452,8 +11295,6 @@ buildvariants:
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
@@ -11520,8 +11361,6 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
@@ -11620,8 +11459,6 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
@@ -11714,8 +11551,6 @@ buildvariants:
     multiversion_platform: rhel62
     multiversion_edition: targeted
     scons_cache_scope: shared
-    tooltags: ""
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11761,8 +11596,6 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11803,8 +11636,6 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11857,8 +11688,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    tooltags: "ssl"
-    build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory
@@ -11923,8 +11752,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    tooltags: "ssl"
-    build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     target_resmoke_time: 15
@@ -11951,8 +11778,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12013,8 +11838,6 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    tooltags: "ssl"
-    build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
   tasks:
@@ -12037,8 +11860,6 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    tooltags: "ssl"
-    build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
   display_tasks:
@@ -12062,8 +11883,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    tooltags: "ssl"
-    build_mongoreplay: false
     hang_analyzer_dump_core: false
     test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
         --serviceExecutor=adaptive \
@@ -12108,8 +11927,6 @@ buildvariants:
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --allocator=system
     scons_cache_scope: shared
     scons_cache_mode: all
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12151,8 +11968,6 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
