@@ -356,11 +356,24 @@ public:
         return ConstDataView(value()).read<LittleEndian<long long>>();
     }
 
-    /** Retrieve int value for the element safely.  Zero returned if not a number. */
+    /**
+     * Retrieves the value of this element as a 32 bit integer. If the BSON type is non-numeric,
+     * returns zero. If the element holds a double, truncates the fractional part.
+     *
+     * Results in undefined behavior if called on a double that is NaN, +/-infinity, or too
+     * large/small to be represented as an int.  Use 'safeNumberLong()' to safely convert an
+     * arbitrary BSON element to an integer without risk of UB.
+     */
     int numberInt() const;
-    /** Retrieve long value for the element safely.  Zero returned if not a number.
-     *  Behavior is not defined for double values that are NaNs, or too large/small
-     *  to be represented by long longs */
+
+    /**
+     * Retrieves the value of this element as a 64 bit integer. If the BSON type is non-numeric,
+     * returns zero. If the element holds a double, truncates the fractional part.
+     *
+     * Results in undefined behavior if called on a double that is NaN, +/-infinity, or too
+     * large/small to be repsented as a long. Use 'safeNumberLong()' to safely convert an arbitrary
+     * BSON element to an integer without risk of UB.
+     */
     long long numberLong() const;
 
     /** Like numberLong() but with well-defined behavior for doubles that
@@ -852,8 +865,6 @@ inline double BSONElement::numberDouble() const {
     }
 }
 
-/** Retrieve int value for the element safely.  Zero returned if not a number. Converted to int if
- * another numeric type. */
 inline int BSONElement::numberInt() const {
     switch (type()) {
         case NumberDouble:
@@ -869,7 +880,6 @@ inline int BSONElement::numberInt() const {
     }
 }
 
-/** Retrieve long value for the element safely.  Zero returned if not a number. */
 inline long long BSONElement::numberLong() const {
     switch (type()) {
         case NumberDouble:
