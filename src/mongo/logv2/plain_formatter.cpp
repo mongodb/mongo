@@ -56,7 +56,7 @@ struct TextValueExtractor {
         } else {
             unescapedStr = val.toString();
         }
-        _storage.push_back(str::escapeForText(unescapedStr));
+        _storage.push_back(unescapedStr);
         operator()(name, _storage.back());
     }
 
@@ -67,11 +67,6 @@ struct TextValueExtractor {
 
     void operator()(StringData name, const BSONArray* val) {
         _storage.push_back(val->jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
-        operator()(name, _storage.back());
-    }
-
-    void operator()(StringData name, StringData val) {
-        _storage.push_back(str::escapeForText(val));
         operator()(name, _storage.back());
     }
 
