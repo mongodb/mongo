@@ -232,7 +232,7 @@ private:
  *
  * An oplog fetcher is an abstract async component, which takes care of startup and shutdown logic.
  *
- * TODO SERVER-44709: remove this flowchart when the NewOplogFetcher is implemented.
+ * TODO SERVER-45574: edit or remove this flowchart when the NewOplogFetcher is implemented.
  *
  * NewOplogFetcher flowchart:
  *
