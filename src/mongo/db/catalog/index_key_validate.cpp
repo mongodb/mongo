@@ -40,7 +40,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
@@ -310,8 +309,7 @@ StatusWith<BSONObj> validateIndexSpec(
             const auto isFeatureDisabled =
                 (featureCompatibility.isVersionInitialized() &&
                  featureCompatibility.getVersion() <
-                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) ||
-                !getTestCommandsEnabled();
+                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
             if (isFeatureDisabled && (indexSpecElem.embeddedObject().nFields() > 1) &&
                 (IndexNames::findPluginName(indexSpecElem.embeddedObject()) ==
                  IndexNames::HASHED)) {

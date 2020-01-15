@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 
 #include <limits>
 
@@ -288,18 +287,11 @@ TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV44) {
     ServerGlobalParams::FeatureCompatibility fcv;
     fcv.setVersion(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
-    // Validation fails when 'enableTestCommands' flag is not set.
-    auto status = index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.getStatus().code(), 16763);
-
-    // Validation succeeds with hashed prefix in the index and 'enableTestCommands' flag enabled.
-    setTestCommandsEnabled(true);
+    // Validation succeeds with hashed prefix in the index.
     ASSERT_OK(index_key_validate::validateIndexSpec(
         nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv));
 
-    // Validation succeeds with hashed non-prefix in the index.
+    // Validation succeeds with non-hashed prefix in the index.
     ASSERT_OK(index_key_validate::validateIndexSpec(
         nullptr, fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}"), fcv));
 }
@@ -314,13 +306,6 @@ TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV42) {
 
     // Validation fails with compound hashed index.
     auto status = index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.getStatus().code(), 16763);
-
-    // validation fails even with 'enableTestCommands' flag enabled.
-    setTestCommandsEnabled(true);
-    status = index_key_validate::validateIndexSpec(
         nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.getStatus().code(), 16763);
