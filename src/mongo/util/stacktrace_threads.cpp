@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/util/stacktrace.h"
 
@@ -37,13 +38,13 @@
 #include <atomic>
 #include <boost/filesystem.hpp>
 #include <cctype>
-#include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
 #include <fmt/format.h>
 #include <signal.h>
+#include <string>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <time.h>
@@ -52,7 +53,9 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/config.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
@@ -73,6 +76,10 @@ StringData getBaseName(StringData path) {
     if (lastSlash == std::string::npos)
         return path;
     return path.substr(lastSlash + 1);
+}
+
+ptrdiff_t offsetFromBase(uintptr_t base, uintptr_t addr) {
+    return addr - base;
 }
 
 class CachedMetaGenerator {
@@ -315,8 +322,8 @@ public:
 
 class State {
 public:
-    /** if `redactAddr`, suppress any raw address fields, consistent with ASLR. */
-    void printStacks(StackTraceSink& sink, bool redactAddrs = true);
+    void printStacks(StackTraceSink& sink);
+    void printStacks();
 
     /**
      * We need signals for two purpposes in the stack tracing system.
@@ -350,29 +357,23 @@ private:
         AsyncStack<ThreadBacktrace> results;
     };
 
-    void messageToJson(CheapJson::Value& jsonThreads,
-                       const ThreadBacktrace& msg,
-                       bool redact,
-                       CachedMetaGenerator* metaGen);
+    struct AbstractEmitter {
+        virtual void open() = 0;
+        virtual void prologue(const BSONObj& obj) = 0;
+        virtual void threadRecordsOpen() = 0;
+        virtual void threadRecord(const BSONObj& obj) = 0;
+        virtual void threadRecordsClose() = 0;
+        virtual void close() = 0;
+    };
 
-    void printAllThreadStacksFormat(StackTraceSink& sink,
-                                    const std::vector<ThreadBacktrace*>& received,
-                                    const std::vector<int>& missedTids,
-                                    bool redactAddrs);
+    /** Write several log statements, one per thread. */
+    void printToEmitter(AbstractEmitter& emitter);
 
-    ThreadBacktrace* acquireBacktraceBuffer() {
-        while (true) {
-            auto coll = _stackCollection.load();
-            if (!coll) {
-                // Brute sanity check. Should not really happen.
-                // A raise(SIGUSR2) could cause it, but we aren't supporting that.
-                return nullptr;
-            }
-            if (ThreadBacktrace* msg = coll->pool.tryPop(); msg != nullptr)
-                return msg;
-            sleepMicros(1);
-        }
-    }
+    void collectStacks(std::vector<ThreadBacktrace>& messageStorage,
+                       std::vector<ThreadBacktrace*>& received,
+                       std::vector<int>& missedTids);
+
+    ThreadBacktrace* acquireBacktraceBuffer();
 
     void postBacktrace(ThreadBacktrace* msg) {
         _stackCollection.load()->results.push(msg);
@@ -386,78 +387,33 @@ private:
     MONGO_STATIC_ASSERT(decltype(_stackCollection)::is_always_lock_free);
 };
 
-// TODO: Format is still TBD here.
-void State::printAllThreadStacksFormat(StackTraceSink& sink,
-                                       const std::vector<ThreadBacktrace*>& received,
-                                       const std::vector<int>& missedTids,
-                                       bool redactAddrs) {
-    CheapJson jsonEnv{sink};
-    auto jsonDoc = jsonEnv.doc();
-    jsonDoc.setPretty(true);
-    auto jsonRootObj = jsonDoc.appendObj();
-    CachedMetaGenerator metaGen;
-    {
-        auto jsonThreadInfoKey = jsonRootObj.appendKey("threadInfo");
-        auto jsonThreadInfoArr = jsonThreadInfoKey.appendArr();
-
-        // Missed threads are minimally represented with just a "tid" field.
-        for (int tid : missedTids) {
-            auto obj = jsonThreadInfoArr.appendObj();
-            obj.appendKey("tid").append(tid);
+ThreadBacktrace* State::acquireBacktraceBuffer() {
+    while (true) {
+        auto coll = _stackCollection.load();
+        if (!coll) {
+            // Brute sanity check. Should not really happen.
+            // A raise(SIGUSR2) could cause it, but we aren't supporting that.
+            return nullptr;
         }
-
-        for (ThreadBacktrace* message : received) {
-            messageToJson(jsonThreadInfoArr, *message, redactAddrs, &metaGen);
-        }
-    }
-    // `metaGen` remembers all the bases from which it ever produced a frame.
-    // We can use it to do somap filtering.
-    {
-        auto jsonProcInfoKey = jsonRootObj.appendKey("processInfo");
-        auto jsonProcInfo = jsonProcInfoKey.appendObj();
-        const BSONObj& bsonProcInfo = globalSharedObjectMapInfo().obj();
-        for (const BSONElement& be : bsonProcInfo) {
-            // special case handling for the `somap` array.
-            // Everything else is passed through.
-            StringData key = be.fieldNameStringData();
-            if (be.type() == BSONType::Array && key == "somap"_sd) {
-                auto jsonSoMapKey = jsonProcInfo.appendKey(key);
-                auto jsonSoMap = jsonSoMapKey.appendArr();
-                for (const BSONElement& ae : be.Array()) {
-                    BSONObj bRec = ae.embeddedObject();
-                    uintptr_t soBase = Hex::fromHex(bRec.getStringField("b"));
-                    if (const auto* file = metaGen.findFile(soBase); file != nullptr) {
-                        StringData id = file->id();
-                        // Irrelevant somap entries are omitted.
-                        // Remove the base addr "b" and add the file's "id".
-                        // Everything else is passed through.
-                        auto jsonSoMapElemObj = jsonSoMap.appendObj();
-                        jsonSoMapElemObj.setPretty(false);
-                        jsonSoMapElemObj.appendKey("id"_sd).append(file->id());
-                        for (auto&& be : bRec) {
-                            if (be.fieldNameStringData() == "b"_sd)
-                                continue;
-                            jsonSoMapElemObj.append(be);
-                        }
-                    }
-                }
-            } else {
-                jsonProcInfo.append(be);
-            }
-        }
+        if (ThreadBacktrace* msg = coll->pool.tryPop(); msg != nullptr)
+            return msg;
+        sleepMicros(1);
     }
 }
 
-void State::printStacks(StackTraceSink& sink, bool redactAddrs) {
+void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
+                          std::vector<ThreadBacktrace*>& received,
+                          std::vector<int>& missedTids) {
     std::set<int> pendingTids;
-    std::vector<int> missedTids;
     iterateTids([&](int tid) { pendingTids.insert(tid); });
     log() << "Preparing to dump up to " << pendingTids.size() << " thread stacks";
+
+    messageStorage.resize(pendingTids.size());
+    received.reserve(pendingTids.size());
 
     // Make a StackCollectionOperation and load it with enough ThreadBacktrace buffers to serve
     // every pending thread.
     StackCollectionOperation collection;
-    std::vector<ThreadBacktrace> messageStorage(pendingTids.size());
     for (auto& m : messageStorage)
         collection.pool.push(&m);
     _stackCollection.store(&collection, std::memory_order_release);
@@ -474,9 +430,6 @@ void State::printStacks(StackTraceSink& sink, bool redactAddrs) {
         }
     }
     log() << "signalled " << pendingTids.size() << " threads";
-
-    std::vector<ThreadBacktrace*> received;
-    received.reserve(pendingTids.size());
 
     size_t napMicros = 0;
     while (!pendingTids.empty()) {
@@ -505,38 +458,145 @@ void State::printStacks(StackTraceSink& sink, bool redactAddrs) {
         }
     }
     _stackCollection.store(nullptr, std::memory_order_release);
-    printAllThreadStacksFormat(sink, received, missedTids, redactAddrs);
 }
 
-void State::messageToJson(CheapJson::Value& jsonThreads,
-                          const ThreadBacktrace& msg,
-                          bool redact,
-                          CachedMetaGenerator* metaGen) {
-    auto jsonThreadObj = jsonThreads.appendObj();
-    if (auto threadName = readThreadName(msg.tid); !threadName.empty())
-        jsonThreadObj.appendKey("name").append(threadName);
-    jsonThreadObj.appendKey("tid").append(msg.tid);
-    auto jsonFrames = jsonThreadObj.appendKey("backtrace").appendArr();
 
-    for (void* const addrPtr : msg.addrRange()) {
-        const uintptr_t addr = reinterpret_cast<uintptr_t>(addrPtr);
-        auto jsonFrame = jsonFrames.appendObj();
-        jsonFrame.setPretty(false);  // Compactly print one frame object per line.
-        if (!redact)
-            jsonFrame.appendKey("a").append(Hex(addr));
-        const auto& meta = metaGen->load(addrPtr);
-        if (const auto& mf = meta.file(); mf) {
-            jsonFrame.appendKey("id").append(mf->id());
-            jsonFrame.appendKey("f").append(mf->path().filename().native());
-            if (!redact)
-                jsonFrame.appendKey("bAddr").append(Hex(mf->base()));
-            jsonFrame.appendKey("o").append(Hex(addr - mf->base()));
+void State::printStacks(StackTraceSink& sink) {
+    struct SinkEmitter : public AbstractEmitter {
+        explicit SinkEmitter(StackTraceSink& s) : _sink{s} {}
+        void open() override {}
+        void prologue(const BSONObj& obj) override {
+            for (auto& e : obj)
+                _bob.append(e);
         }
-        if (const auto& sym = meta.symbol(); sym) {
-            jsonFrame.appendKey("s").append(sym->name());
-            jsonFrame.appendKey("sOffset").append(Hex(addr - sym->base()));
+        void threadRecordsOpen() override {
+            _threadRecords = std::make_unique<BSONArrayBuilder>(_bob.subarrayStart("threadInfo"));
         }
+        void threadRecord(const BSONObj& obj) override {
+            _threadRecords->append(obj);
+        }
+        void threadRecordsClose() override {
+            _threadRecords->done();
+        }
+        void close() override {
+            _sink << tojson(_bob.done(), ExtendedRelaxedV2_0_0);
+        }
+
+        StackTraceSink& _sink;
+        BSONObjBuilder _bob;
+        std::unique_ptr<BSONArrayBuilder> _threadRecords;
+    };
+    SinkEmitter emitter{sink};
+    printToEmitter(emitter);
+}
+
+void State::printStacks() {
+    struct LogEmitter : public AbstractEmitter {
+        void open() override {
+            LOGV2(31423, "===== multithread stacktrace session begin =====");
+        }
+        void prologue(const BSONObj& obj) override {
+            LOGV2(31424, "stacktrace prologue: {}", "prologue"_attr = obj);
+        }
+        void threadRecordsOpen() override {}
+        void threadRecord(const BSONObj& obj) override {
+            LOGV2(31425, "stacktrace record: {}", "threadRecord"_attr = obj);
+        }
+        void threadRecordsClose() override {}
+        void close() override {
+            LOGV2(31426, "===== multithread stacktrace session end =====");
+        }
+    };
+    LogEmitter emitter;
+    printToEmitter(emitter);
+}
+
+
+void State::printToEmitter(AbstractEmitter& emitter) {
+    std::vector<ThreadBacktrace> messageStorage;
+    std::vector<ThreadBacktrace*> received;
+    std::vector<int> missedTids;
+    collectStacks(messageStorage, received, missedTids);
+
+    CachedMetaGenerator metaGen;
+    const BSONObj& bsonProcInfo = globalSharedObjectMapInfo().obj();
+
+    // Load all addrs in all threads into the metaGen.
+    for (auto&& msg : received)
+        for (auto&& addrPtr : msg->addrRange())
+            metaGen.load(addrPtr);
+
+    emitter.open();
+    {
+        BSONObjBuilder prologue;
+        if (!missedTids.empty()) {
+            BSONArrayBuilder tidArray(prologue.subarrayStart("missedThreadIds"_sd));
+            for (int tid : missedTids)
+                tidArray.append(tid);
+        }
+        {
+            BSONObjBuilder procInfo(prologue.subobjStart("processInfo"_sd));
+            for (const BSONElement& be : bsonProcInfo) {
+                StringData key = be.fieldNameStringData();
+
+                // Handle 'somap' specially. Pass everything else through.
+                if (be.type() == BSONType::Array && key == "somap"_sd) {
+                    BSONArrayBuilder soMapArr(procInfo.subarrayStart(key));
+                    for (const BSONElement& ae : be.Array()) {
+                        BSONObj bRec = ae.embeddedObject();
+                        uintptr_t soBase = Hex::fromHex(bRec.getStringField("b"_sd));
+
+                        // Skip any files that aren't present in the metaGen.
+                        const auto* file = metaGen.findFile(soBase);
+                        if (file == nullptr)
+                            continue;
+                        StringData id = file->id();
+                        BSONObjBuilder outLibrary(soMapArr.subobjStart());
+
+                        // Replace "b" with the `file->id()`. Pass everything else through.
+                        for (auto&& be : bRec) {
+                            if (be.fieldNameStringData() == "b"_sd) {
+                                outLibrary.append("b"_sd, file->id());
+                            } else {
+                                outLibrary.append(be);
+                            }
+                        }
+                    }
+                } else {
+                    procInfo.append(be);
+                }
+            }
+        }
+        emitter.prologue(prologue.done());
     }
+    emitter.threadRecordsOpen();
+    for (ThreadBacktrace* msg : received) {
+        BSONObjBuilder threadRecord;
+        if (auto threadName = readThreadName(msg->tid); !threadName.empty()) {
+            threadRecord.append("name"_sd, threadName);
+        }
+        threadRecord.append("tid"_sd, msg->tid);
+        {
+            BSONArrayBuilder backtrace(threadRecord.subarrayStart("backtrace"_sd));
+            for (void* const addrPtr : msg->addrRange()) {
+                const auto& meta = metaGen.load(addrPtr);
+                const uintptr_t addr = reinterpret_cast<uintptr_t>(addrPtr);
+                BSONObjBuilder frame(backtrace.subobjStart());
+                if (const auto& mf = meta.file(); mf) {
+                    StringData base = mf->id();  // really a made-up id string
+                    frame.append("b"_sd, base);
+                    frame.append("o"_sd, Hex(offsetFromBase(mf->base(), addr)));
+                }
+                if (const auto& sym = meta.symbol(); sym) {
+                    frame.append("s"_sd, sym->name());
+                    frame.append("s+"_sd, Hex(offsetFromBase(sym->base(), addr)));
+                }
+            }
+        }
+        emitter.threadRecord(threadRecord.done());
+    }
+    emitter.threadRecordsClose();
+    emitter.close();
 }
 
 void State::action(siginfo_t* si) {
@@ -588,6 +648,10 @@ void initialize(int signal) {
 
 void printAllThreadStacks(StackTraceSink& sink) {
     stack_trace_detail::stateSingleton->printStacks(sink);
+}
+
+void printAllThreadStacks() {
+    stack_trace_detail::stateSingleton->printStacks();
 }
 
 void setupStackTraceSignalAction(int signal) {

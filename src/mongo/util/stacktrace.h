@@ -243,6 +243,7 @@ void markAsStackTraceProcessingThread();
  * function when it receives the signal for the process. This function then sends the
  * same signal via `tgkill` to every other thread and collects their responses.
  */
+void printAllThreadStacks();
 void printAllThreadStacks(StackTraceSink& sink);
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)

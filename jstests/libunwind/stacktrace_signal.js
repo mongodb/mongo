@@ -12,7 +12,6 @@ const conn = MongoRunner.runMongod();
 runMongoProgram('/bin/kill', '-s', 'SIGUSR2', conn.pid);
 MongoRunner.stopMongod(conn);
 const output = rawMongoProgramOutput();
-assert(output.search(/"threadInfo":/) >= 0, output);
 assert(output.search(/"processInfo":/) >= 0, output);
 // Will be several of these
 assert(output.search(/"backtrace":/) >= 0, output);

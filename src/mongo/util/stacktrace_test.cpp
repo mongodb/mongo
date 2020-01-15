@@ -813,12 +813,14 @@ TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
 
     BSONObj jsonObj = fromjson(dumped);
     std::map<int, BSONObj> tidDumps;  // All are references into jsonObj.
-    auto allInfoElement = jsonObj.getObjectField("threadInfo");
 
     std::set<int> mustSee;
     for (const auto& w : workers)
         mustSee.insert(w.tid);
+    for (const auto& el : jsonObj.getObjectField("missedThreadIds"))
+        mustSee.erase(el.Int());
 
+    auto allInfoElement = jsonObj.getObjectField("threadInfo");
     for (const auto& ti : allInfoElement) {
         const BSONObj& obj = ti.Obj();
         int tid = obj.getIntField("tid");

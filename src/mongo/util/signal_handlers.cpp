@@ -223,10 +223,7 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
     }
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
     if (sig == stackTraceSignal()) {
-        auto logObj = log();
-        auto& stream = logObj.setIsTruncatable(false).stream();
-        OstreamStackTraceSink sink{stream};
-        printAllThreadStacks(sink);
+        printAllThreadStacks();
         return;
     }
 #endif
@@ -240,7 +237,7 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
  * to ensure the db and log mutexes aren't held.
  */
 void signalProcessingThread(LogFileStatus rotate) {
-    setThreadName("signalProcessingThread");
+    setThreadName("SignalHandler");
 
     LogRotationState logRotationState{rotate, logRotationState.kNever};
 

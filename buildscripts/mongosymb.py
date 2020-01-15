@@ -18,7 +18,7 @@ but emits json instead of plain text.
 """
 
 import json
-import optparse
+import argparse
 import os
 import subprocess
 import sys
@@ -78,7 +78,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, i
 
     symbolizer_args = [symbolizer_path]
     for dh in dsym_hint:
-        symbolizer_args.append("-dsym-hint=%s" % dh)
+        symbolizer_args.append("-dsym-hint={}".format(dh))
     symbolizer_process = subprocess.Popen(args=symbolizer_args, close_fds=True,
                                           stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                           stderr=open("/dev/null"))
@@ -156,7 +156,8 @@ class S3BuildidDbgFileResolver(object):
                 self._get_from_s3(build_id)
             except Exception:  # pylint: disable=broad-except
                 ex = sys.exc_info()[0]
-                sys.stderr.write("Failed to find debug symbols for %s in s3: %s\n" % (build_id, ex))
+                sys.stderr.write("Failed to find debug symbols for {} in s3: {}\n".format(
+                    build_id, ex))
                 return None
         if not os.path.exists(build_id_path):
             return None
@@ -165,8 +166,7 @@ class S3BuildidDbgFileResolver(object):
     def _get_from_s3(self, build_id):
         """Download debug symbols from S3."""
         subprocess.check_call(
-            ['wget',
-             'https://s3.amazonaws.com/%s/%s.debug.gz' % (self._s3_bucket, build_id)],
+            ['wget', 'https://s3.amazonaws.com/{}/{}.debug.gz'.format(self._s3_bucket, build_id)],
             cwd=self._cache_dir)
         subprocess.check_call(['gunzip', build_id + ".debug.gz"], cwd=self._cache_dir)
 
@@ -177,32 +177,32 @@ def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argumen
         symbinfo = frame["symbinfo"]
         if symbinfo:
             for sframe in symbinfo:
-                outfile.write(" %(file)s:%(line)s:%(column)s: %(fn)s\n" % sframe)
+                outfile.write(" {file:s}:{line:d}:{column:d}: {fn:s}\n".format(**sframe))
         else:
-            outfile.write(" %(path)s!!!\n" % symbinfo)
+            outfile.write(" {path:s}!!!\n".format(**symbinfo))
 
 
-def main(argv):
+def make_argument_parser(**kwargs):
+    """Make and return an argparse."""
+    parser = argparse.ArgumentParser(**kwargs)
+    parser.add_argument('--dsym-hint', default=[], action='append')
+    parser.add_argument('--symbolizer-path', default='')
+    parser.add_argument('--input-format', choices=['classic', 'thin'], default='classic')
+    parser.add_argument('--output-format', choices=['classic', 'json'], default='classic',
+                        help='"json" shows some extra information')
+    parser.add_argument('--debug-file-resolver', choices=['path', 's3'], default='path')
+    s3_group = parser.add_argument_group(
+        "s3 options", description='Options used with \'--debug-file-resolver s3\'')
+    s3_group.add_argument('--s3-cache-dir')
+    s3_group.add_argument('--s3-bucket')
+    parser.add_argument('path_to_executable')
+    return parser
+
+
+def main():
     """Execute Main program."""
-    parser = optparse.OptionParser()
-    parser.add_option("--dsym-hint", action="append", dest="dsym_hint", default=list())
-    parser.add_option("--symbolizer-path", dest="symbolizer_path", default=str())
-    parser.add_option("--debug-file-resolver", dest="debug_file_resolver", default="path")
-    parser.add_option("--input-format", dest="input_format", default="classic")
-    parser.add_option("--output-format", dest="output_format", default="classic")
-    (options, args) = parser.parse_args(argv)
-    resolver_constructor = dict(path=PathDbgFileResolver, s3=S3BuildidDbgFileResolver).get(
-        options.debug_file_resolver, None)
-    if resolver_constructor is None:
-        sys.stderr.write("Invalid debug-file-resolver argument: %s\n" % options.debug_file_resolver)
-        sys.exit(1)
 
-    output_fn = dict(json=json.dump, classic=classic_output).get(options.output_format, None)
-    if output_fn is None:
-        sys.stderr.write("Invalid output-format argument: %s\n" % options.output_format)
-        sys.exit(1)
-
-    unnamed_args = args[1:]
+    options = make_argument_parser(description=__doc__).parse_args()
 
     # Skip over everything before the first '{' since it is likely to be log line prefixes.
     # Additionally, using raw_decode() to ignore extra data after the closing '}' to allow maximal
@@ -211,11 +211,22 @@ def main(argv):
     trace_doc = trace_doc[trace_doc.find('{'):]
     trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
 
-    resolver = resolver_constructor(*unnamed_args)
+    output_fn = None
+    if options.output_format == 'json':
+        output_fn = json.dump
+    if options.output_format == 'classic':
+        output_fn = classic_output
+
+    resolver = None
+    if options.debug_file_resolver == 'path':
+        resolver = PathDbgFileResolver(options.path_to_executable)
+    elif options.debug_file_resolver == 's3':
+        resolver = S3BuildidDbgFileResolver(options.s3_cache_dir, options.s3_bucket)
+
     frames = symbolize_frames(trace_doc, resolver, **vars(options))
     output_fn(frames, sys.stdout, indent=2)
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()
     sys.exit(0)
