@@ -6063,6 +6063,15 @@ tasks:
       resmoke_args: --suites=sharded_jscore_txns_sharded_collections --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: libunwind_tests
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=libunwind --storageEngine=wiredTiger
+
+- <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
   tags: ["causally_consistent"]
   commands:
@@ -10328,6 +10337,7 @@ buildvariants:
     distros:
     - rhel70
   - name: jsCore
+  - name: libunwind_tests
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
@@ -10375,6 +10385,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
