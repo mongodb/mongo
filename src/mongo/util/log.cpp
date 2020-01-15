@@ -55,10 +55,10 @@
 
 namespace mongo {
 
-#if defined(MONGO_CONFIG_LOGV2_DEFAULT)
-static bool _logV2Enabled = true;
-#else
+#if defined(MONGO_CONFIG_LOGV1_DEFAULT)
 static bool _logV2Enabled = false;
+#else
+static bool _logV2Enabled = true;
 #endif
 
 bool logV2Enabled() {
