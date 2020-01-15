@@ -18,6 +18,20 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
+ * __cursor_copy_release --
+ *     Release memory used by the key and value in cursor copy debug mode.
+ */
+static inline int
+__cursor_copy_release(WT_CURSOR *cursor)
+{
+    if (F_ISSET(S2C((WT_SESSION_IMPL *)cursor->session), WT_CONN_DEBUG_CURSOR_COPY)) {
+        WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->key));
+        WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->value));
+    }
+    return (0);
+}
+
+/*
  * __cursor_novalue --
  *     Release any cached value before an operation that could update the transaction context and
  *     free data a value is pointing to.

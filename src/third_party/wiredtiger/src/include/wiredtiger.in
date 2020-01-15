@@ -2202,10 +2202,15 @@ struct __wt_connection {
 	 * checkpoint_retention, adjust log archiving to retain the log records of this number of
 	 * checkpoints.  Zero or one means perform normal archiving., an integer between 0 and 1024;
 	 * default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal
-	 * algorithms to change skew to force lookaside eviction to happen more aggressively.  This
-	 * includes but is not limited to not skewing newest\, not favoring leaf pages\, and
-	 * modifying the eviction score mechanism., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system
+	 * allocator to make a copy of any data returned by a cursor operation and return the copy
+	 * instead.  The copy is freed on the next cursor operation.  This allows memory sanitizers
+	 * to detect inappropriate references to memory owned by cursors., a boolean flag; default
+	 * \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms
+	 * to change skew to force lookaside eviction to happen more aggressively.  This includes
+	 * but is not limited to not skewing newest\, not favoring leaf pages\, and modifying the
+	 * eviction score mechanism., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory will only
 	 * provide the exact amount requested.  This will help with spotting memory allocation
 	 * issues more easily., a boolean flag; default \c false.}
@@ -2806,22 +2811,28 @@ struct __wt_connection {
  * checkpoint_retention, adjust log archiving to retain the log records of this number of
  * checkpoints.  Zero or one means perform normal archiving., an integer between 0 and 1024; default
  * \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms to change
- * skew to force lookaside eviction to happen more aggressively.  This includes but is not limited
- * to not skewing newest\, not favoring leaf pages\, and modifying the eviction score mechanism., a
- * boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\,
- * reallocation of memory will only provide the exact amount requested.  This will help with
- * spotting memory allocation issues more easily., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
- * operation about every Nth operation to simulate a collision., an integer between 0 and 10M;
- * default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down checkpoint
- * creation by slowing down internal page processing., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
- * the log for all operations\, even operations for tables with logging turned off.  This setting
- * introduces a log format change that may break older versions of WiredTiger.  These operations are
- * informational and skipped in recovery., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to make a
+ * copy of any data returned by a cursor operation and return the copy instead.  The copy is freed
+ * on the next cursor operation.  This allows memory sanitizers to detect inappropriate references
+ * to memory owned by cursors., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * eviction, if true\, modify internal algorithms to change skew to force lookaside eviction to
+ * happen more aggressively.  This includes but is not limited to not skewing newest\, not favoring
+ * leaf pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory will only provide
+ * the exact amount requested.  This will help with spotting memory allocation issues more easily.,
+ * a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a
+ * WT_ROLLBACK error from a transaction operation about every Nth operation to simulate a
+ * collision., an integer between 0 and 10M; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * slow_checkpoint, if true\, slow down checkpoint creation by slowing down internal page
+ * processing., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if
+ * true\, write transaction related information to the log for all operations\, even operations for
+ * tables with logging turned off.  This setting introduces a log format change that may break older
+ * versions of WiredTiger.  These operations are informational and skipped in recovery., a boolean
+ * flag; default \c false.}
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring

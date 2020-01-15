@@ -106,14 +106,14 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
 
         # It's possible the second table can't even be opened.
         # That can happen only if the root page was not pushed out.
-        # So if we get an error, make sure we're getting the right
-        # error message.
-
-        self.captureerr.check(self)     # check error messages until now
+        # We can't depend on the text of a particular error message to be
+        # emitted, so we'll just ignore the error.
+        self.captureerr.check(self)     # check there is no error output so far
         try:
             results2 = list(self.session.open_cursor(self.uri2))
         except:
-            self.captureerr.checkAdditionalPattern(self, 'unable to read root page')
+            # Make sure there's some error, but we don't care what.
+            self.captureerr.checkAdditionalPattern(self, '.')
             results2 = []
         self.assertEqual(results1, results2)
 

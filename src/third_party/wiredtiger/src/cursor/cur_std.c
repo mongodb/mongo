@@ -228,6 +228,34 @@ __wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key) WT_GCC_FUNC_ATTRIBUTE((cold)
 }
 
 /*
+ * __wt_cursor_copy_release_item --
+ *     Release memory used by the key or value item in cursor copy debug mode.
+ */
+int
+__wt_cursor_copy_release_item(WT_CURSOR *cursor, WT_ITEM *item) WT_GCC_FUNC_ATTRIBUTE((cold))
+{
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)cursor->session;
+
+    /*
+     * Whether or not we own the memory for the item, make a copy of the data and use that instead.
+     * That allows us to overwrite and free memory owned by the item, potentially uncovering
+     * programming errors related to retaining pointers to key/value memory beyond API boundaries.
+     */
+    WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+    WT_ERR(__wt_buf_set(session, tmp, item->data, item->size));
+    __wt_explicit_overwrite(item->mem, item->memsize);
+    __wt_buf_free(session, item);
+    WT_ERR(__wt_buf_set(session, item, tmp->data, tmp->size));
+err:
+    __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
  * __wt_cursor_get_key --
  *     WT_CURSOR->get_key default implementation.
  */
@@ -346,6 +374,10 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
     if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
         WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
+    /* Force an allocated copy when using cursor copy debug. */
+    if (F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY))
+        WT_ERR(__wt_buf_grow(session, &cursor->key, cursor->key.size));
+
     if (WT_CURSOR_RECNO(cursor)) {
         if (LF_ISSET(WT_CURSTD_RAW)) {
             key = va_arg(ap, WT_ITEM *);
@@ -391,6 +423,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
     tmp.mem = NULL;
 
     CURSOR_API_CALL(cursor, session, set_key, NULL);
+    WT_ERR(__cursor_copy_release(cursor));
     if (F_ISSET(cursor, WT_CURSTD_KEY_SET) && WT_DATA_IN_ITEM(buf)) {
         tmp = *buf;
         buf->mem = NULL;
@@ -447,7 +480,7 @@ err:
      * memory in the meantime, free it.
      */
     if (tmp.mem != NULL) {
-        if (buf->mem == NULL) {
+        if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
         } else
@@ -488,6 +521,10 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 
     if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
         WT_ERR(__wt_cursor_kv_not_set(cursor, false));
+
+    /* Force an allocated copy when using cursor copy debug. */
+    if (F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY))
+        WT_ERR(__wt_buf_grow(session, &cursor->value, cursor->value.size));
 
     /* Fast path some common cases. */
     fmt = cursor->value_format;
@@ -538,6 +575,7 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
     tmp.mem = NULL;
 
     CURSOR_API_CALL(cursor, session, set_value, NULL);
+    WT_ERR(__cursor_copy_release(cursor));
     if (F_ISSET(cursor, WT_CURSTD_VALUE_SET) && WT_DATA_IN_ITEM(buf)) {
         tmp = *buf;
         buf->mem = NULL;
@@ -581,7 +619,7 @@ err:
      * memory in the meantime, free it.
      */
     if (tmp.mem != NULL) {
-        if (buf->mem == NULL) {
+        if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
         } else

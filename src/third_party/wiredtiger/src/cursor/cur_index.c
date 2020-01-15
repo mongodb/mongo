@@ -19,12 +19,13 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
     WT_SESSION_IMPL *session;
     va_list ap;
 
-    va_start(ap, cursor);
     JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
-    WT_ERR(__wt_curindex_get_valuev(cursor, ap));
+
+    va_start(ap, cursor);
+    ret = __wt_curindex_get_valuev(cursor, ap);
+    va_end(ap);
 
 err:
-    va_end(ap);
     API_END_RET(session, ret);
 }
 
