@@ -1484,15 +1484,13 @@ TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
         ASSERT_EQUALS(OID::fromTerm(term), electionId);
     }
 
-    {
-        const auto opCtx = makeOperationContext();
-        getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
-    }
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
 
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(
-        getReplCoord()->getElectionTimeout_forTest());
+        getReplCoord()->getElectionTimeout_forTest(), opCtx.get());
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
@@ -1641,8 +1639,9 @@ TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
+    const auto opCtx = makeOperationContext();
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(
-        getReplCoord()->getElectionTimeout_forTest());
+        getReplCoord()->getElectionTimeout_forTest(), opCtx.get());
 
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
@@ -1654,7 +1653,6 @@ TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
     ASSERT(termUpdated == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
 
     // Now signal that replication applier is finished draining its buffer.
-    const auto opCtx = makeOperationContext();
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
 
     // Now wait for stepdown to complete
@@ -1735,13 +1733,13 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, opTime1));
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
-    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen);
+    const auto opCtx = makeOperationContext();
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
     ASSERT_TRUE(repl->getMemberState().primary());
     ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
 
     {
         // We can't take writes yet since we're still in drain mode.
-        const auto opCtx = makeOperationContext();
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
     }
@@ -1767,13 +1765,11 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     // Ensure that the failed stepdown attempt didn't make us able to take writes since we're still
     // in drain mode.
     {
-        const auto opCtx = makeOperationContext();
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
     }
 
     // Now complete drain mode and ensure that we become capable of taking writes.
-    auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
 
@@ -3301,6 +3297,93 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionTimeout) {
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
+TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWin) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    // Become secondary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    ASSERT(getReplCoord()->getMemberState().secondary());
+
+    auto maxAwaitTime = Milliseconds(50000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    auto expectedProcessId = currentTopologyVersion.getProcessId();
+    // A topology change should increment the TopologyVersion counter.
+    auto expectedCounter = currentTopologyVersion.getCounter() + 1;
+
+    auto opCtx = makeOperationContext();
+    // Calling isMaster without a TopologyVersion field should return immediately.
+    const auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_TRUE(response->isSecondary());
+    ASSERT_FALSE(response->hasPrimary());
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        const auto responseAfterElection = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+
+        const auto topologyVersionAfterElection = responseAfterElection->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersionAfterElection->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersionAfterElection->getProcessId(), expectedProcessId);
+
+        // We expect the server to increment the TopologyVersion and respond to waiting IsMasters
+        // once an election is won even if we have yet to signal drain completion.
+        ASSERT_FALSE(responseAfterElection->isMaster());
+        ASSERT_TRUE(responseAfterElection->isSecondary());
+        ASSERT_TRUE(responseAfterElection->hasPrimary());
+        ASSERT_EQUALS(responseAfterElection->getPrimary().host(), "node1");
+        ASSERT(getReplCoord()->getMemberState().primary());
+
+        // The server TopologyVersion will increment again once we exit drain mode.
+        expectedCounter = topologyVersionAfterElection->getCounter() + 1;
+        const auto responseAfterDrainComplete = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, topologyVersionAfterElection, deadline);
+        const auto topologyVersionAfterDrainComplete =
+            responseAfterDrainComplete->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersionAfterDrainComplete->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersionAfterDrainComplete->getProcessId(), expectedProcessId);
+
+        ASSERT_TRUE(responseAfterDrainComplete->isMaster());
+        ASSERT_FALSE(responseAfterDrainComplete->isSecondary());
+        ASSERT_TRUE(responseAfterDrainComplete->hasPrimary());
+        ASSERT_EQUALS(responseAfterDrainComplete->getPrimary().host(), "node1");
+        ASSERT(getReplCoord()->getMemberState().primary());
+    });
+
+    // Ensure that awaitIsMasterResponse() is called before finishing the election.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    unittest::log() << "Election timeout scheduled at " << electionTimeoutWhen
+                    << " (simulator time)";
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
+
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 2);
+    signalDrainComplete(opCtx.get());
+    ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
+
+    getIsMasterThread.join();
+}
+
 TEST_F(ReplCoordTest, IsMasterResponseMentionsLackOfReplicaSetConfig) {
     start();
 
@@ -3825,13 +3908,13 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
     awaiterJournaled.reset();
 }
 
-void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* status) {
+void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* status, bool force) {
     auto client = getGlobalServiceContext()->makeClient("rsr");
     auto opCtx = client->makeOperationContext();
 
     BSONObjBuilder garbage;
     ReplSetReconfigArgs args;
-    args.force = false;
+    args.force = force;
     args.newConfigObj = BSON("_id"
                              << "mySet"
                              << "version" << 3 << "protocolVersion" << 1 << "members"
@@ -3840,6 +3923,70 @@ void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* sta
                                            << BSON("_id" << 2 << "host"
                                                          << "node3:12345")));
     *status = replCoord->processReplSetReconfig(opCtx.get(), args, &garbage);
+}
+
+TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfigOnSecondary) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2))),
+                       HostAndPort("node1", 12345));
+
+    // Become secondary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    ASSERT(getReplCoord()->getMemberState().secondary());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    auto expectedProcessId = currentTopologyVersion.getProcessId();
+    // A topology change should increment the TopologyVersion counter.
+    auto expectedCounter = currentTopologyVersion.getCounter() + 1;
+    auto opCtx = makeOperationContext();
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // the current TopologyVersion of the server.
+    stdx::thread getIsMasterThread([&] {
+        const auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+        auto topologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
+
+        // Ensure the isMasterResponse no longer contains the removed node.
+        const auto hosts = response->getHosts();
+        ASSERT_EQUALS(2, hosts.size());
+        ASSERT_EQUALS("node1", hosts[0].host());
+        ASSERT_EQUALS("node3", hosts[1].host());
+    });
+
+    // Ensure that awaitIsMasterResponse() is called before triggering a reconfig.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    // Do a reconfig to remove a node from the replica set. A reconfig should cause the server to
+    // respond to the waiting isMaster request.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread reconfigThread(
+        [&] { doReplSetReconfigToFewer(getReplCoord(), &status, true /* force */); });
+    replyToReceivedHeartbeatV1();
+    reconfigThread.join();
+    ASSERT_OK(status);
+    getIsMasterThread.join();
 }
 
 TEST_F(
@@ -3883,7 +4030,8 @@ TEST_F(
 
     // reconfig to fewer nodes
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread([&] { doReplSetReconfigToFewer(getReplCoord(), &status); });
+    stdx::thread reconfigThread(
+        [&] { doReplSetReconfigToFewer(getReplCoord(), &status, false /* force */); });
 
     replyToReceivedHeartbeatV1();
 

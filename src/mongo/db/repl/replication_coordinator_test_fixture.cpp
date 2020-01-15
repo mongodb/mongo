@@ -314,7 +314,8 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
     simulateSuccessfulV1ElectionAt(electionTimeoutWhen);
 }
 
-void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime) {
+void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
+                                                                        OperationContext* opCtx) {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
 
@@ -364,17 +365,16 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 
-    auto opCtx = makeOperationContext();
-    auto imResponse = replCoord->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+    auto imResponse = replCoord->awaitIsMasterResponse(opCtx, {}, boost::none, boost::none);
     ASSERT_FALSE(imResponse->isMaster()) << imResponse->toBSON().toString();
     ASSERT_TRUE(imResponse->isSecondary()) << imResponse->toBSON().toString();
 }
 
 void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
-    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime);
+    auto opCtx = makeOperationContext();
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx.get());
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
 
-    auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
 
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
