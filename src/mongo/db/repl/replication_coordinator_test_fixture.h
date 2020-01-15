@@ -261,7 +261,8 @@ protected:
      * Same as simulateSuccessfulV1ElectionAt, but stops short of signaling drain completion,
      * so the node stays in drain mode.
      */
-    void simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime);
+    void simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
+                                                             OperationContext* opCtx);
 
     /**
      * Transition the ReplicationCoordinator from drain mode to being fully primary/master.

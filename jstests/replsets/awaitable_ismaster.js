@@ -122,42 +122,5 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              31373);
 
-function runAwaitableIsMaster(topologyVersionField) {
-    const resAfterDisablingWrites = assert.commandWorked(db.runCommand({
-        isMaster: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
-    assert.eq(topologyVersionField.counter + 1, resAfterDisablingWrites.topologyVersion.counter);
-    // Validate that an isMaster response returns once writes have been disabled on the primary
-    // even though the node has yet to transition to secondary.
-    assert.eq(false, resAfterDisablingWrites.ismaster);
-    assert.eq(false, resAfterDisablingWrites.secondary);
-
-    // The TopologyVersion from resAfterDisablingWrites should now be stale since the old primary
-    // has completed its transition to secondary. This isMaster request should respond immediately.
-    const resAfterStepdownComplete = assert.commandWorked(db.runCommand({
-        isMaster: 1,
-        topologyVersion: resAfterDisablingWrites.topologyVersion,
-        maxAwaitTimeMS: 99999999,
-    }));
-    assert.eq(resAfterDisablingWrites.topologyVersion.counter + 1,
-              resAfterStepdownComplete.topologyVersion.counter);
-    assert.eq(false, resAfterStepdownComplete.ismaster);
-    assert.eq(true, resAfterStepdownComplete.secondary);
-}
-
-assert.commandWorked(db.adminCommand({setParameter: 1, logComponentVerbosity: {verbosity: 1}}));
-// Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
-// topology change happens.
-let awaitIsMaster =
-    startParallelShell(funWithArgs(runAwaitableIsMaster, topologyVersionField), node.port);
-checkLog.contains(node, "Waiting for an isMaster response");
-// Call stepdown to increment the server TopologyVersion and respond to the waiting isMaster
-// request. We expect stepDown to increment the TopologyVersion twice - once for when the writes are
-// disabled and once again for when the primary completes its transition to secondary.
-assert.commandWorked(db.adminCommand({replSetStepDown: 60, force: true}));
-awaitIsMaster();
-
 replTest.stopSet();
 })();
