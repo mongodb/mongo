@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-TOOLS=bsondump mongodecrypt mongodump mongoexport mongofiles mongoimport mongoldap mongorestore mongostat mongotop mongokerberos
+TOOLS=mongodecrypt mongoldap mongokerberos
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
@@ -58,11 +58,6 @@ clean:
 	rm -f mongo
 	rm -f mongod
 	rm -f mongocryptd
-	rm -f mongoimportjson
-	rm -f mongoexport
-	rm -f mongorestore
-	rm -f mongodump
-	rm -f mongofiles
 	rm -f install_compass
 	rm -f .sconsign.dblite
 	rm -f libmongoclient.a

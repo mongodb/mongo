@@ -2,9 +2,9 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <?if $(var.Edition) = Enterprise ?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongoldap)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (mongodecrypt, mongoldap)" />
     <?else?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongofiles)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools" />
     <?endif?>
     <FeatureGroup Id="fg_MongoDBAll">
       <Feature Id="ProductFeature"
@@ -59,28 +59,6 @@
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
         </Feature>
-        <Feature Id="MonitoringTools"
-                 Title ="Monitoring Tools"
-                 Description="MongoDB monitoring tools (mongostat, mongotop)"
-                 Level ="1">
-          <ComponentRef Id="c_mongostat"/>
-          <ComponentRef Id="c_mongotop"/>
-          <?if $(var.Edition) = Enterprise ?>
-            <ComponentGroupRef Id="cg_EnterpriseBase" />
-          <?endif ?>
-        </Feature>
-        <Feature Id="ImportExportTools"
-                 Title ="Import/Export Tools"
-                 Description="MongoDB import/export tools (mongodump/mongorestore and mongoexport/mongoimport)"
-                 Level ="1">
-          <ComponentRef Id="c_mongodump"/>
-          <ComponentRef Id="c_mongorestore"/>
-          <ComponentRef Id="c_mongoexport"/>
-          <ComponentRef Id="c_mongoimport"/>
-          <?if $(var.Edition) = Enterprise ?>
-            <ComponentGroupRef Id="cg_EnterpriseBase" />
-          <?endif ?>
-        </Feature>
         <Feature Id="Router"
                  Title ="Router"
                  Description="The MongoDB Router (mongos)"
@@ -95,8 +73,6 @@
                 Title ="Miscellaneous Tools"
                 Description="!(wix.MiscToolsDesc)"
                 Level ="1">
-          <ComponentRef Id="c_bsondump"/>
-          <ComponentRef Id="c_mongofiles"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
             <ComponentRef Id="c_mongodecrypt"/>

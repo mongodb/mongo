@@ -489,9 +489,6 @@ hygienic = get_option('install-mode') == 'hygienic'
 if not hygienic:
     env.Default(env.Install('#/', mongod))
 
-# tools
-rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles" ]
-
 if env.TargetOSIs('windows'):
     generatedServerManifest = env.Substfile(
         's/server.manifest.in',
@@ -756,52 +753,6 @@ def installBinary( e, name ):
     if env.TargetOSIs('posix'):
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-def installExternalBinary( e, name_str ):
-    name = env.File("#/%s" % add_exe(name_str))
-    if not name.isfile():
-        env.FatalError("ERROR: external binary not found: {0}", name)
-
-    if hygienic:
-        env.AutoInstall(
-            target='$PREFIX_BINDIR',
-            source=[
-                name
-            ],
-            AIB_COMPONENT='tools',
-            AIB_COMPONENTS_EXTRA=['dist'],
-            AIB_ROLE='runtime',
-        )
-        return
-
-    distBinaries.append(name)
-
-    inst = e.Install( "$DESTDIR/bin", name )
-
-    if env.TargetOSIs('posix'):
-        e.AddPostAction( inst, 'chmod 755 $TARGET' )
-
-# "--use-new-tools" adds dependencies for rewritten (Go) tools
-# It is required for "dist" but optional for "install"
-if has_option("use-new-tools"):
-
-    if hygienic:
-        env.AutoInstall(
-            target='$DESTDIR',
-            source=env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools'),
-            AIB_COMPONENT='tools',
-            AIB_COMPONENTS_EXTRA=['dist'],
-            AIB_ROLE='base',
-        )
-    else:
-        env.Append(MODULE_BANNERS=[env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools')])
-
-    toolsRoot = "src/mongo-tools"
-
-    for t in rewrittenTools:
-        installExternalBinary(env, "%s/%s" % (toolsRoot, t))
-    if has_option("build-mongoreplay") and get_option("build-mongoreplay") == "true":
-        installExternalBinary(env, "%s/%s" % (toolsRoot, "mongoreplay"))
-
 # legacy tools
 if not hygienic:
     env.Alias("tools", "#/" + add_exe("mongobridge"))
@@ -918,9 +869,7 @@ if env.TargetOSIs('posix'):
     env.AddPostAction( compass_script_installer, 'chmod 755 $TARGET' )
     env.AddPostAction( compass_installer, 'chmod 755 $TARGET' )
 
-# "dist" target is valid only when --use-new-tools is specified
-# Attempts to build release artifacts without tools must fail
-if has_option("use-new-tools") and not hygienic:
+if not hygienic:
     server_archive = env.Command(
         target='#/${SERVER_ARCHIVE}',
         source=['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + distBinaries,
@@ -933,8 +882,6 @@ if has_option("use-new-tools") and not hygienic:
                 '--transform $BUILD_DIR/mongo/stripped/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
                 '--transform $BUILD_DIR/mongo/stripped=$SERVER_DIST_BASENAME/bin',
                 '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
-                '--transform src/mongo-tools=$SERVER_DIST_BASENAME/bin',
                 '--transform src/mongo/installer/compass=$SERVER_DIST_BASENAME/bin',
                 '${TEMPFILE(SOURCES[1:])}'
             ],
@@ -961,12 +908,6 @@ if has_option("use-new-tools") and not hygienic:
 
     env.Alias('dist-debugsymbols', debug_symbols_dist)
     env.NoCache(debug_symbols_dist)
-
-elif not hygienic:
-    def failDist(env, target, source):
-        env.FatalError("ERROR: 'dist' target only valid with --use-new-tools.")
-    env.Alias("dist", [], [ failDist ] )
-    env.AlwaysBuild("dist")
 
 #final alias
 if not hygienic:

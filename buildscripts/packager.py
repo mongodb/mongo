@@ -491,7 +491,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     try:
         sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
         release_dir = glob('mongodb-linux-*')[0]
-        for releasefile in "bin", "LICENSE-Community.txt", "README", "THIRD-PARTY-NOTICES", "THIRD-PARTY-NOTICES.gotools", "MPL-2":
+        for releasefile in "bin", "LICENSE-Community.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             print("moving file: %s/%s" % (release_dir, releasefile))
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
@@ -524,10 +524,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongoreplay binary due to libpcap dynamic
-    # linkage.
-    if os.path.exists(sdir + "bin/mongoreplay"):
-        os.unlink(sdir + "bin/mongoreplay")
+
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 

@@ -44,10 +44,7 @@ sourcesList = [ "BinaryFragment.wxs",
 
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = env.Dir("$BUILD_DIR").path
-if has_option("use-new-tools"):
-	toolBuildDir = "src\mongo-tools"
-else:
-	toolBuildDir = buildDir + r'\mongo'
+toolBuildDir = buildDir + r'\mongo'
 
 enterprisebase = 'src\mongo\db\modules\enterprise'
 enterpriseToolBuildDir = buildDir + r'\mongo\db\modules\enterprise'
@@ -122,7 +119,6 @@ env.Command(objects,
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=' + enterprisebase + '\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
-            ' -dToolBinarySource=' + toolBuildDir +
             ' -dEnterpriseToolBinarySource=' + enterpriseToolBuildDir +
             ' -dMergeModulesBasePath=' + "\"${MSVS['VCREDISTMERGEMODULEPATH']}\"" +
             ' -dMergeModuleFileCRT=' + env.GetMergeModuleNameForFeature('CRT') +
