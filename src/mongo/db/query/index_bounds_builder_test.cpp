@@ -589,7 +589,7 @@ TEST(IndexBoundsBuilderTest, TranslateGtMinKey) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
-TEST_F(IndexBoundsBuilderTest, DontCrashOnNegationOfArrayInequality) {
+TEST(IndexBoundsBuilderTest, DontCrashOnNegationOfArrayInequality) {
     BSONObj keyPattern = BSON("a" << 1);
     auto testIndex = IndexEntry(keyPattern,
                                 IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
