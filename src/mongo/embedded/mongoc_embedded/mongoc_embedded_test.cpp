@@ -312,7 +312,7 @@ int main(int argc, char** argv, char** envp) {
         return EXIT_FAILURE;
     }
 
-    auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+    auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);
 
     if (mongo_embedded_v1_lib_fini(global_lib_handle, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "Error: " << mongo_embedded_v1_status_get_explanation(status.get());
