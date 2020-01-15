@@ -34,6 +34,7 @@
 #include <algorithm>
 
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/sequence_util.h"
@@ -47,16 +48,21 @@ TEST(RoleParsingTest, BuildRoleBSON) {
     RoleName roleA("roleA", "dbA");
     RoleName roleB("roleB", "dbB");
     RoleName roleC("roleC", "dbC");
+    RoleName roleD("roleD", "dbD");
     ActionSet actions;
     actions.addAction(ActionType::find);
     actions.addAction(ActionType::insert);
+    SharedRestrictionDocument restrictions = uassertStatusOK(parseAuthenticationRestriction(
+        BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1")))));
 
     ASSERT_OK(graph.createRole(roleA));
     ASSERT_OK(graph.createRole(roleB));
     ASSERT_OK(graph.createRole(roleC));
+    ASSERT_OK(graph.createRole(roleD));
 
     ASSERT_OK(graph.addRoleToRole(roleA, roleC));
     ASSERT_OK(graph.addRoleToRole(roleA, roleB));
+    ASSERT_OK(graph.addRoleToRole(roleA, roleD));
     ASSERT_OK(graph.addRoleToRole(roleB, roleC));
 
     ASSERT_OK(graph.addPrivilegeToRole(
@@ -65,6 +71,7 @@ TEST(RoleParsingTest, BuildRoleBSON) {
         roleB, Privilege(ResourcePattern::forExactNamespace(NamespaceString("dbB.foo")), actions)));
     ASSERT_OK(
         graph.addPrivilegeToRole(roleC, Privilege(ResourcePattern::forClusterResource(), actions)));
+    ASSERT_OK(graph.replaceRestrictionsForRole(roleD, restrictions));
     ASSERT_OK(graph.recomputePrivilegeData());
 
 
@@ -77,6 +84,8 @@ TEST(RoleParsingTest, BuildRoleBSON) {
     ASSERT_EQUALS("roleA", roleDoc["role"].String());
     ASSERT_EQUALS("dbA", roleDoc["db"].String());
 
+    ASSERT_TRUE(roleDoc["authenticationRestrictions"].Array().empty());
+
     std::vector<BSONElement> privs = roleDoc["privileges"].Array();
     ASSERT_EQUALS(1U, privs.size());
     ASSERT_EQUALS("", privs[0].Obj()["resource"].Obj()["db"].String());
@@ -88,7 +97,7 @@ TEST(RoleParsingTest, BuildRoleBSON) {
     ASSERT_EQUALS("insert", actionElements[1].String());
 
     std::vector<BSONElement> roles = roleDoc["roles"].Array();
-    ASSERT_EQUALS(2U, roles.size());
+    ASSERT_EQUALS(3U, roles.size());
     ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
     ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
     ASSERT_EQUALS("roleB", roles[1].Obj()["role"].String());
@@ -102,6 +111,8 @@ TEST(RoleParsingTest, BuildRoleBSON) {
     ASSERT_EQUALS("dbB.roleB", roleDoc["_id"].String());
     ASSERT_EQUALS("roleB", roleDoc["role"].String());
     ASSERT_EQUALS("dbB", roleDoc["db"].String());
+
+    ASSERT_TRUE(roleDoc["authenticationRestrictions"].Array().empty());
 
     privs = roleDoc["privileges"].Array();
     ASSERT_EQUALS(1U, privs.size());
@@ -127,6 +138,8 @@ TEST(RoleParsingTest, BuildRoleBSON) {
     ASSERT_EQUALS("roleC", roleDoc["role"].String());
     ASSERT_EQUALS("dbC", roleDoc["db"].String());
 
+    ASSERT_TRUE(roleDoc["authenticationRestrictions"].Array().empty());
+
     privs = roleDoc["privileges"].Array();
     ASSERT_EQUALS(1U, privs.size());
     ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].Bool());
@@ -136,6 +149,27 @@ TEST(RoleParsingTest, BuildRoleBSON) {
     ASSERT_EQUALS(2U, actionElements.size());
     ASSERT_EQUALS("find", actionElements[0].String());
     ASSERT_EQUALS("insert", actionElements[1].String());
+
+    roles = roleDoc["roles"].Array();
+    ASSERT_EQUALS(0U, roles.size());
+
+    // Role D
+    doc.reset();
+    ASSERT_OK(RoleGraph::getBSONForRole(&graph, roleD, doc.root()));
+    roleDoc = doc.getObject();
+
+    ASSERT_EQUALS("dbD.roleD", roleDoc["_id"].String());
+    ASSERT_EQUALS("roleD", roleDoc["role"].String());
+    ASSERT_EQUALS("dbD", roleDoc["db"].String());
+
+    ASSERT_FALSE(roleDoc["authenticationRestrictions"].Array().empty());
+    auto restrictionObj = BSONArray(roleDoc["authenticationRestrictions"].Obj());
+    SharedRestrictionDocument parsedRestrictions =
+        uassertStatusOK(parseAuthenticationRestriction(restrictionObj));
+    ASSERT_EQ(restrictions->toString(), parsedRestrictions->toString());
+
+    privs = roleDoc["privileges"].Array();
+    ASSERT_TRUE(privs.empty());
 
     roles = roleDoc["roles"].Array();
     ASSERT_EQUALS(0U, roles.size());
