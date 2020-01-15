@@ -167,7 +167,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCurrentMetadataReturnsNoneBeforeSetFilteringMetadataIsCalled) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor().get());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 

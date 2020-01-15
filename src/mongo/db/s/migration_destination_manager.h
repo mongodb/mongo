@@ -160,8 +160,7 @@ private:
      * it schedules deletion of any documents in the range, so that process must be seen to be
      * complete before migrating any new documents in.
      */
-    CollectionShardingRuntime::CleanupNotification _notePending(OperationContext*,
-                                                                ChunkRange const&);
+    SharedSemiFuture<void> _notePending(OperationContext*, ChunkRange const&);
 
     /**
      * Stops tracking a chunk range between 'min' and 'max' that previously was having data

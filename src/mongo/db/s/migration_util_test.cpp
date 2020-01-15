@@ -256,8 +256,7 @@ void addRangeToReceivingChunks(OperationContext* opCtx,
                                const ChunkRange& range) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
-    auto notification = CollectionShardingRuntime::get(opCtx, nss)->beginReceive(range);
-    notification.abandon();
+    std::ignore = CollectionShardingRuntime::get(opCtx, nss)->beginReceive(range);
 }
 
 RangeDeletionTask createDeletionTask(

@@ -65,7 +65,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
-#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/producer_consumer_queue.h"
@@ -842,10 +841,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
             // Synchronously delete any data which might have been left orphaned in the range
             // being moved, and wait for completion
 
-            auto notification = _notePending(opCtx, range);
+            auto cleanupCompleteFuture = _notePending(opCtx, range);
             // Wait for the range deletion to report back
-            if (!notification.waitStatus(opCtx).isOK()) {
-                _setStateFail(redact(notification.waitStatus(opCtx).reason()));
+            if (!cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
+                _setStateFail(redact(cleanupCompleteFuture.getNoThrow(opCtx).reason()));
                 return;
             }
 
@@ -1229,8 +1228,8 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
     return true;
 }
 
-CollectionShardingRuntime::CleanupNotification MigrationDestinationManager::_notePending(
-    OperationContext* opCtx, ChunkRange const& range) {
+SharedSemiFuture<void> MigrationDestinationManager::_notePending(OperationContext* opCtx,
+                                                                 ChunkRange const& range) {
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_X);
     auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
@@ -1247,13 +1246,13 @@ CollectionShardingRuntime::CleanupNotification MigrationDestinationManager::_not
     }
 
     // Start clearing any leftovers that would be in the new chunk
-    auto notification = css->beginReceive(range);
-    if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
-        return notification.waitStatus(opCtx).withContext(
+    auto cleanupCompleteFuture = css->beginReceive(range);
+    if (cleanupCompleteFuture.isReady() && !cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
+        return cleanupCompleteFuture.getNoThrow(opCtx).withContext(
             str::stream() << "Collection " << _nss.ns() << " range " << redact(range.toString())
                           << " migration aborted");
     }
-    return notification;
+    return cleanupCompleteFuture;
 }
 
 void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkRange const& range) {

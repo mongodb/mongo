@@ -106,7 +106,7 @@ protected:
         }
 
         _manager = std::make_shared<MetadataManager>(
-            getServiceContext(), kNss, executor().get(), CollectionMetadata(cm, ShardId("0")));
+            getServiceContext(), kNss, executor(), CollectionMetadata(cm, ShardId("0")));
 
         auto& oss = OperationShardingState::get(operationContext());
         const auto version = cm->getVersion(ShardId("0"));

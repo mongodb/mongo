@@ -674,7 +674,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             }
         }
     } else {
-        auto notification = [&] {
+        auto cleanupCompleteFuture = [&] {
             auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingRuntime::kNow
                                                               : CollectionShardingRuntime::kDelayed;
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
@@ -687,7 +687,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             log() << "Waiting for cleanup of " << getNss().ns() << " range "
                   << redact(range.toString());
 
-            auto deleteStatus = notification.waitStatus(_opCtx);
+            auto deleteStatus = cleanupCompleteFuture.getNoThrow(_opCtx);
 
             if (!deleteStatus.isOK()) {
                 return {ErrorCodes::OrphanedRangeCleanUpFailed,
@@ -697,13 +697,12 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             return Status::OK();
         }
 
-        if (notification.ready() && !notification.waitStatus(_opCtx).isOK()) {
+        if (cleanupCompleteFuture.isReady() && !cleanupCompleteFuture.getNoThrow(_opCtx).isOK()) {
             return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                    orphanedRangeCleanUpErrMsg + redact(notification.waitStatus(_opCtx))};
+                    orphanedRangeCleanUpErrMsg + redact(cleanupCompleteFuture.getNoThrow(_opCtx))};
         } else {
             log() << "Leaving cleanup of " << getNss().ns() << " range " << redact(range.toString())
                   << " to complete in background";
-            notification.abandon();
         }
     }
 

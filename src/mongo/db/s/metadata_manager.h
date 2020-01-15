@@ -36,12 +36,10 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
@@ -53,14 +51,11 @@ class RangePreserver;
  */
 class MetadataManager : public std::enable_shared_from_this<MetadataManager> {
 public:
-    using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
-    using Deletion = CollectionRangeDeleter::Deletion;
-
     MetadataManager(ServiceContext* serviceContext,
                     NamespaceString nss,
-                    executor::TaskExecutor* executor,
+                    std::shared_ptr<executor::TaskExecutor> executor,
                     CollectionMetadata initialMetadata);
-    ~MetadataManager();
+    ~MetadataManager() = default;
 
     MetadataManager(const MetadataManager&) = delete;
     MetadataManager& operator=(const MetadataManager&) = delete;
@@ -117,27 +112,29 @@ public:
 
     /**
      * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
-     * on them, and adds the range to the list of pending ranges. Otherwise, returns a notification
-     * that yields bad status immediately.  Does not block.  Call waitStatus(opCtx) on the result
-     * to wait for the deletion to complete or fail.
+     * on them, and adds the range to the list of ranges currently being received.
+     *
+     * Returns a future that will be resolved when the deletion either completes or fail.
      */
-    CleanupNotification beginReceive(ChunkRange const& range);
+    SharedSemiFuture<void> beginReceive(ChunkRange const& range);
 
     /**
-     * Removes `range` from the list of pending ranges, and schedules any documents in the range for
-     * immediate cleanup.  Does not block.  If no such range is scheduled, does nothing.
+     * Removes `range` from the list of ranges currently being received, and schedules any documents
+     * in the range for immediate cleanup.
      */
     void forgetReceive(const ChunkRange& range);
 
     /**
      * Schedules documents in `range` for cleanup after any running queries that may depend on them
      * have terminated. Does not block. Fails if the range overlaps any current local shard chunk.
-     * If `whenToDelete` is Date_t{}, deletion is scheduled immediately after the last dependent
-     * query completes; otherwise, deletion is postponed until the time specified.
      *
-     * Call waitStatus(opCtx) on the result to wait for the deletion to complete or fail.
+     * If shouldDelayBeforeDeletion is false, deletion is scheduled immediately after the last
+     * dependent query completes; otherwise, deletion is postponed until after
+     * orphanCleanupDelaySecs after the last dependent query completes.
+     *
+     * Returns a future that will be fulfilled when the range deletion completes or fails.
      */
-    CleanupNotification cleanUpRange(ChunkRange const& range, Date_t whenToDelete);
+    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, bool shouldDelayBeforeDeletion);
 
     /**
      * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might
@@ -155,20 +152,17 @@ public:
 
     /**
      * Reports whether any range still scheduled for deletion overlaps the argument range. If so,
-     * returns a notification n such that n.waitStatus(opCtx) will wake up when the newest
-     * overlapping range's deletion (possibly the one of interest) completes or fails.
+     * returns a future that will be resolved when the newest overlapping range's deletion (possibly
+     * the one of interest) completes or fails.
      */
-    boost::optional<CleanupNotification> trackOrphanedDataCleanup(ChunkRange const& orphans) const;
+    boost::optional<SharedSemiFuture<void>> trackOrphanedDataCleanup(
+        ChunkRange const& orphans) const;
 
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& from) const;
 
 private:
-    // For access to _managerLock, _rangesToClean, and _clearAllCleanups under task callback
-    friend class CollectionRangeDeleter;
-
     // Management of the _metadata list is implemented in RangePreserver
     friend class RangePreserver;
-
 
     /**
      * Represents an instance of what the filtering metadata for this collection was at a particular
@@ -183,29 +177,34 @@ private:
 
         ~CollectionMetadataTracker() {
             invariant(!usageCounter);
+            onDestructionPromise.emplaceValue();
         }
 
         boost::optional<CollectionMetadata> metadata;
 
-        std::list<Deletion> orphans;
+        /**
+         * Number of range deletion tasks waiting on this CollectionMetadataTracker to be destroyed
+         * before deleting documents.
+         */
+        uint32_t numContingentRangeDeletionTasks{0};
+
+        /**
+         * Promise that will be signaled when this object is destroyed.
+         *
+         * In the case where this CollectionMetadataTracker may refer to orphaned documents for one
+         * or more ranges, the corresponding futures from this promise are used as barriers to
+         * prevent range deletion tasks for those ranges from proceeding until this object is
+         * destroyed, to guarantee that ranges aren't deleted while active queries can still access
+         * them.
+         */
+        SharedPromise<void> onDestructionPromise;
 
         uint32_t usageCounter{0};
     };
 
     /**
-     * Cancels all scheduled deletions of orphan ranges, notifying listeners with specified status.
-     */
-    void _clearAllCleanups(WithLock, Status);
-
-    /**
-     * Cancels all scheduled deletions of orphan ranges, notifying listeners with status
-     * InterruptedDueToReplStateChange.
-     */
-    void _clearAllCleanups(WithLock);
-
-    /**
-     * Retires any metadata that has fallen out of use, and pushes any orphan ranges found in them
-     * to the list of ranges actively being cleaned up.
+     * Retires any metadata that has fallen out of use, potentially allowing range deletions to
+     * proceed which were waiting for active queries using these metadata objects to complete.
      */
     void _retireExpiredMetadata(WithLock);
 
@@ -228,23 +227,15 @@ private:
     bool _overlapsInUseChunk(WithLock, ChunkRange const& range);
 
     /**
-     * Returns a notification if any range (possibly) still in use, but scheduled for cleanup,
-     * overlaps the argument range.
+     * Schedule a task to delete the given range of documents once waitForActiveQueriesToComplete
+     * has been signaled, and store the resulting future for the task in
+     * _rangesScheduledForDeletion.
      */
-    boost::optional<CleanupNotification> _overlapsInUseCleanups(WithLock,
-                                                                ChunkRange const& range) const;
-
-    /**
-     * Copies the argument range to the list of ranges scheduled for immediate deletion, and
-     * schedules a a background task to perform the work.
-     */
-    CleanupNotification _pushRangeToClean(WithLock, ChunkRange const& range, Date_t when);
-
-    /**
-     * Splices the argument list elements to the list of ranges scheduled for immediate deletion,
-     * and schedules a a background task to perform the work.
-     */
-    void _pushListToClean(WithLock, std::list<Deletion> range);
+    SharedSemiFuture<void> _submitRangeForDeletion(
+        const WithLock&,
+        SemiFuture<void> waitForActiveQueriesToComplete,
+        const ChunkRange& range,
+        Seconds delayForActiveQueriesOnSecondariesToComplete);
 
     // ServiceContext from which to obtain instances of global support objects
     ServiceContext* const _serviceContext;
@@ -256,7 +247,7 @@ private:
     const UUID _collectionUuid;
 
     // The background task that deletes documents from orphaned chunk ranges.
-    executor::TaskExecutor* const _executor;
+    std::shared_ptr<executor::TaskExecutor> const _executor;
 
     // Mutex to protect the state below
     mutable Mutex _managerLock = MONGO_MAKE_LATCH("MetadataManager::_managerLock");
@@ -270,8 +261,8 @@ private:
     // Chunk ranges being migrated into to the shard. Indexed by the min key of the range.
     RangeMap _receivingChunks;
 
-    // Ranges being deleted, or scheduled to be deleted, by a background task
-    CollectionRangeDeleter _rangesToClean;
+    // Ranges being deleted, or scheduled to be deleted, by a background task.
+    std::list<std::pair<ChunkRange, SharedSemiFuture<void>>> _rangesScheduledForDeletion;
 };
 
 }  // namespace mongo

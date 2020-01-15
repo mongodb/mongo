@@ -53,6 +53,14 @@ public:
     CollectionShardingStateMap(std::unique_ptr<CollectionShardingStateFactory> factory)
         : _factory(std::move(factory)) {}
 
+    /**
+     * Joins the factory, waiting for any outstanding tasks using the factory to be finished. Must
+     * be called before destruction.
+     */
+    void join() {
+        _factory->join();
+    }
+
     CollectionShardingState& getOrCreate(const NamespaceString& nss) {
         stdx::lock_guard<Latch> lg(_mutex);
 
@@ -129,7 +137,10 @@ void CollectionShardingStateFactory::set(ServiceContext* service,
 
 void CollectionShardingStateFactory::clear(ServiceContext* service) {
     auto& collectionsMap = CollectionShardingStateMap::get(service);
-    collectionsMap.reset();
+    if (collectionsMap) {
+        collectionsMap->join();
+        collectionsMap.reset();
+    }
 }
 
 }  // namespace mongo

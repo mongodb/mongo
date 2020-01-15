@@ -46,6 +46,10 @@ public:
         : CollectionShardingStateFactory(serviceContext) {}
 
     ~CollectionShardingStateFactoryShard() {
+        join();
+    }
+
+    void join() override {
         if (_taskExecutor) {
             _taskExecutor->shutdown();
             _taskExecutor->join();
@@ -57,7 +61,7 @@ public:
     }
 
 private:
-    executor::TaskExecutor* _getExecutor() {
+    std::shared_ptr<executor::TaskExecutor> _getExecutor() {
         stdx::lock_guard<Latch> lg(_mutex);
         if (!_taskExecutor) {
             const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
@@ -65,18 +69,20 @@ private:
             auto net = executor::makeNetworkInterface(kExecName);
             auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
             auto taskExecutor =
-                std::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+                std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
             taskExecutor->startup();
 
             _taskExecutor = std::move(taskExecutor);
         }
 
-        return _taskExecutor.get();
+        return _taskExecutor;
     }
 
     // Serializes the instantiation of the task executor
     Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateFactoryShard::_mutex");
-    std::unique_ptr<executor::TaskExecutor> _taskExecutor{nullptr};
+
+    // Required to be a shared_ptr since it is used as an executor for ExecutorFutures.
+    std::shared_ptr<executor::TaskExecutor> _taskExecutor{nullptr};
 };
 
 }  // namespace

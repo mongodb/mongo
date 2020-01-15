@@ -50,7 +50,7 @@ class CollectionShardingRuntime final : public CollectionShardingState,
 public:
     CollectionShardingRuntime(ServiceContext* sc,
                               NamespaceString nss,
-                              executor::TaskExecutor* rangeDeleterExecutor);
+                              std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor);
 
     CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
     CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
@@ -126,17 +126,15 @@ public:
 
     /**
      * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
-     * on them, and adds the range to the list of pending ranges. Otherwise, returns a notification
-     * that yields bad status immediately.  Does not block.  Call waitStatus(opCtx) on the result
-     * to wait for the deletion to complete or fail.  After that, call waitForClean to ensure no
-     * other deletions are pending for the range.
+     * on them, and adds the range to the list of ranges being received.
+     *
+     * Returns a future that will be resolved when the deletion has completed or failed.
      */
-    using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
-    CleanupNotification beginReceive(ChunkRange const& range);
+    SharedSemiFuture<void> beginReceive(ChunkRange const& range);
 
     /*
-     * Removes `range` from the list of pending ranges, and schedules any documents in the range for
-     * immediate cleanup. Does not block.
+     * Removes `range` from the list of ranges being received, and schedules any documents in the
+     * range for immediate cleanup. Does not block.
      */
     void forgetReceive(const ChunkRange& range);
 
@@ -146,12 +144,11 @@ public:
      * Passed kDelayed, an additional delay (configured via server parameter orphanCleanupDelaySecs)
      * is added to permit (most) dependent queries on secondaries to complete, too.
      *
-     * Call result.waitStatus(opCtx) to wait for the deletion to complete or fail. If that succeeds,
-     * waitForClean can be called to ensure no other deletions are pending for the range. Call
-     * result.abandon(), instead of waitStatus, to ignore the outcome.
+     * Returns a future that will be resolved when the deletion completes or fails. If that
+     * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
      */
     enum CleanWhen { kNow, kDelayed };
-    CleanupNotification cleanUpRange(ChunkRange const& range, CleanWhen when);
+    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, CleanWhen when);
 
     /**
      * Returns a range _not_ owned by this shard that starts no lower than the specified
@@ -168,13 +165,6 @@ public:
 
 private:
     friend CSRLock;
-
-    friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
-        OperationContext*,
-        NamespaceString const&,
-        UUID collectionUuid,
-        int,
-        CollectionRangeDeleter*);
 
     /**
      * Returns the latest version of collection metadata with filtering configured for
@@ -197,7 +187,7 @@ private:
     const NamespaceString _nss;
 
     // The executor used for deleting ranges of orphan chunks.
-    executor::TaskExecutor* _rangeDeleterExecutor;
+    std::shared_ptr<executor::TaskExecutor> _rangeDeleterExecutor;
 
     // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects held
     // within (including the MigrationSourceManager, which is a decoration on the CSR). Use only the
