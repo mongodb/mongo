@@ -89,6 +89,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             // received by shard and config servers should always have WC explicitly specified.
             if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
+                repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
                 !opCtx->inMultiDocumentTransaction() && !opCtx->getClient()->isInDirectClient()) {
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                      .getDefaultWriteConcern(opCtx);
