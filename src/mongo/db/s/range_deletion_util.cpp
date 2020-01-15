@@ -69,8 +69,8 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kWriteConcernTimeoutSharding);
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeDoingDeletionNewRangeDeleter);
-MONGO_FAIL_POINT_DEFINE(suspendRangeDeletionNewRangeDeleter);
+MONGO_FAIL_POINT_DEFINE(hangBeforeDoingDeletion);
+MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInDeleteRange);
 MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
 
@@ -167,9 +167,9 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                                      PlanExecutor::YIELD_MANUAL,
                                                      InternalPlanner::FORWARD);
 
-    if (MONGO_unlikely(hangBeforeDoingDeletionNewRangeDeleter.shouldFail())) {
-        LOG(0) << "Hit hangBeforeDoingDeletionNewRangeDeleter failpoint";
-        hangBeforeDoingDeletionNewRangeDeleter.pauseWhileSet(opCtx);
+    if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
+        LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
+        hangBeforeDoingDeletion.pauseWhileSet(opCtx);
     }
 
     PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
@@ -344,7 +344,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
             invariant(s.isOK());
         })
         .then([=]() mutable {
-            suspendRangeDeletionNewRangeDeleter.pauseWhileSet();
+            suspendRangeDeletion.pauseWhileSet();
             // Wait for possibly ongoing queries on secondaries to complete.
             return sleepUntil(executor,
                               executor->now() + delayForActiveQueriesOnSecondariesToComplete);

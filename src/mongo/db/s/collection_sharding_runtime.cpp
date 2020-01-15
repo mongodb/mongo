@@ -100,9 +100,10 @@ boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCt
 
 }  // namespace
 
-CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* sc,
-                                                     NamespaceString nss,
-                                                     executor::TaskExecutor* rangeDeleterExecutor)
+CollectionShardingRuntime::CollectionShardingRuntime(
+    ServiceContext* sc,
+    NamespaceString nss,
+    std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor)
     : _nss(std::move(nss)),
       _rangeDeleterExecutor(rangeDeleterExecutor),
       _stateChangeMutex(nss.toString()) {
@@ -227,7 +228,7 @@ void CollectionShardingRuntime::clearFilteringMetadata() {
     }
 }
 
-auto CollectionShardingRuntime::beginReceive(ChunkRange const& range) -> CleanupNotification {
+SharedSemiFuture<void> CollectionShardingRuntime::beginReceive(ChunkRange const& range) {
     stdx::lock_guard lk(_metadataManagerLock);
     invariant(_metadataType == MetadataType::kSharded);
     return _metadataManager->beginReceive(range);
@@ -238,14 +239,11 @@ void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
     invariant(_metadataType == MetadataType::kSharded);
     _metadataManager->forgetReceive(range);
 }
-
-auto CollectionShardingRuntime::cleanUpRange(ChunkRange const& range, CleanWhen when)
-    -> CleanupNotification {
-    Date_t time =
-        (when == kNow) ? Date_t{} : Date_t::now() + Seconds(orphanCleanupDelaySecs.load());
+SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
+                                                               CleanWhen when) {
     stdx::lock_guard lk(_metadataManagerLock);
     invariant(_metadataType == MetadataType::kSharded);
-    return _metadataManager->cleanUpRange(range, time);
+    return _metadataManager->cleanUpRange(range, when == kDelayed);
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
@@ -253,7 +251,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                OID const& epoch,
                                                ChunkRange orphanRange) {
     while (true) {
-        boost::optional<CleanupNotification> stillScheduled;
+        boost::optional<SharedSemiFuture<void>> stillScheduled;
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -279,7 +277,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
         log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
 
-        Status result = stillScheduled->waitStatus(opCtx);
+        Status result = stillScheduled->getNoThrow(opCtx);
         if (!result.isOK()) {
             return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
                                                     << " range " << orphanRange.toString());

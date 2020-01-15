@@ -943,6 +943,10 @@ public:
         return ExecutorFuture<T>(std::move(exec), toFutureImpl());
     }
 
+    SemiFuture<T> semi() && noexcept {
+        return SemiFuture<T>(toFutureImpl());
+    }
+
 private:
     template <typename>
     friend class SharedPromise;

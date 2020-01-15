@@ -73,7 +73,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   std::string* errMsg) {
     BSONObj startingFromKey = startingFromKeyConst;
     boost::optional<ChunkRange> targetRange;
-    CollectionShardingRuntime::CleanupNotification notifn;
+    SharedSemiFuture<void> cleanupCompleteFuture;
 
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
@@ -109,7 +109,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
         *stoppedAtKey = targetRange->getMax();
 
-        notifn = css->cleanUpRange(*targetRange, CollectionShardingRuntime::kNow);
+        cleanupCompleteFuture = css->cleanUpRange(*targetRange, CollectionShardingRuntime::kNow);
     }
 
     // Sleep waiting for our own deletion. We don't actually care about any others, so there is no
@@ -119,7 +119,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
            << redact(startingFromKey) << ", removing next orphan range "
            << redact(targetRange->toString()) << "; waiting...";
 
-    Status result = notifn.waitStatus(opCtx);
+    Status result = cleanupCompleteFuture.getNoThrow(opCtx);
 
     LOG(1) << "Finished waiting for last " << ns.toString() << " orphan range cleanup";
 

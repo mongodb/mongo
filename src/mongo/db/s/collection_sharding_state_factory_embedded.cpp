@@ -88,6 +88,8 @@ public:
     CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext)
         : CollectionShardingStateFactory(serviceContext) {}
 
+    void join() override {}
+
     std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
         return std::make_unique<CollectionShardingStateStandalone>();
     }

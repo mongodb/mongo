@@ -156,13 +156,11 @@ bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& d
         return false;
     }
 
-    auto notification = css->cleanUpRange(deletionTask.getRange(), whenToClean);
+    auto cleanupCompleteFuture = css->cleanUpRange(deletionTask.getRange(), whenToClean);
 
-    if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
+    if (cleanupCompleteFuture.isReady() && !cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
         LOG(0) << "Failed to resubmit range for deletion: "
-               << causedBy(notification.waitStatus(opCtx));
-    } else {
-        notification.abandon();
+               << causedBy(cleanupCompleteFuture.getNoThrow(opCtx));
     }
 
     return true;

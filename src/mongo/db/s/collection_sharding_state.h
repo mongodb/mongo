@@ -178,6 +178,11 @@ public:
     virtual ~CollectionShardingStateFactory() = default;
 
     /**
+     * Must be called prior to destruction to wait for any ongoing work to complete.
+     */
+    virtual void join() = 0;
+
+    /**
      * Called by the CollectionShardingState::get method once per newly cached namespace. It is
      * invoked under a mutex and must not acquire any locks or do blocking work.
      *

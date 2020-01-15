@@ -40,125 +40,18 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
-// MetadataManager maintains pointers to CollectionMetadata objects in a member list named
-// _metadata.  Each CollectionMetadata contains an immutable _chunksMap of chunks assigned to this
-// shard, along with details related to its own lifecycle in a member _tracker.
-//
-// The current chunk mapping, used by queries starting up, is at _metadata.back().  Each query,
-// when it starts up, requests and holds a ScopedCollectionMetadata object, and destroys it on
-// termination. Each ScopedCollectionMetadata keeps a shared_ptr to its CollectionMetadata chunk
-// mapping, and to the MetadataManager itself.  CollectionMetadata mappings also keep a record of
-// chunk ranges that may be deleted when it is determined that the range can no longer be in use.
-//
-// ScopedCollectionMetadata's destructor decrements the CollectionMetadata's usageCounter.
-// Whenever a usageCounter drops to zero, we check whether any now-unused CollectionMetadata
-// elements can be popped off the front of _metadata.  We need to keep the unused elements in the
-// middle (as seen below) because they may schedule deletions of chunks depended on by older
-// mappings.
-//
-// New chunk mappings are pushed onto the back of _metadata. Subsequently started queries use the
-// new mapping while still-running queries continue using the older "snapshot" mappings.  We treat
-// _metadata.back()'s usage count differently from the snapshots because it can't reliably be
-// compared to zero; a new query may increment it at any time.
-//
-// (Note that the collection may be dropped or become unsharded, and even get made and sharded
-// again, between construction and destruction of a ScopedCollectionMetadata).
-//
-// MetadataManager also contains a CollectionRangeDeleter _rangesToClean that queues orphan ranges
-// being deleted in a background thread, and a mapping _receivingChunks of the ranges being migrated
-// in, to avoid deleting them.  Each range deletion is paired with a notification object triggered
-// when the deletion is completed or abandoned.
-//
-//                                        ____________________________
-//  (s): std::shared_ptr<>       Clients:| ScopedCollectionMetadata   |
-//   _________________________        +----(s) manager   metadata (s)------------------+
-//  | CollectionShardingState |       |  |____________________________|  |             |
-//  |  _metadataManager (s)   |       +-------(s) manager  metadata (s)--------------+ |
-//  |____________________|____|       |     |____________________________|   |       | |
-//   ____________________v________    +------------(s) manager  metadata (s)-----+   | |
-//  | MetadataManager             |   |         |____________________________|   |   | |
-//  |                             |<--+                                          |   | |
-//  |                             |        ___________________________  (1 use)  |   | |
-//  | getActiveMetadata():    /---------->| CollectionMetadata        |<---------+   | |
-//  |     back(): [(s),------/    |       |  _________________________|_             | |
-//  |              (s),-------------------->| CollectionMetadata        | (0 uses)   | |
-//  |  _metadata:  (s)]------\    |       | |  _________________________|_           | |
-//  |                         \-------------->| CollectionMetadata        |          | |
-//  |  _receivingChunks           |       | | |                           | (2 uses) | |
-//  |  _rangesToClean:            |       | | |  _tracker:                |<---------+ |
-//  |  _________________________  |       | | |  _______________________  |<-----------+
-//  | | CollectionRangeDeleter  | |       | | | | Tracker               | |
-//  | |                         | |       | | | |                       | |
-//  | |  _orphans [range,notif, | |       | | | | usageCounter          | |
-//  | |            range,notif, | |       | | | | orphans [range,notif, | |
-//  | |                 ...   ] | |       | | | |          range,notif, | |
-//  | |                         | |       | | | |              ...    ] | |
-//  | |_________________________| |       |_| | |_______________________| |
-//  |_____________________________|         | |  _chunksMap               |
-//                                          |_|  _chunkVersion            |
-//                                            |  ...                      |
-//                                            |___________________________|
-//
-//  Note that _metadata as shown here has its front() at the bottom, back() at the top. As usual,
-//  new entries are pushed onto the back, popped off the front.
-
 namespace mongo {
 namespace {
-
 using TaskExecutor = executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
-
-MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
-
-/**
- * Deletes ranges, in background, until done, normally using a task executor attached to the
- * ShardingState.
- *
- * Each time it completes cleaning up a range, it wakes up clients waiting on completion of that
- * range, which may then verify that their range has no more deletions scheduled, and proceed.
- */
-void scheduleCleanup(executor::TaskExecutor* executor,
-                     NamespaceString nss,
-                     UUID collectionUuid,
-                     Date_t when) {
-    LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
-    auto swCallbackHandle = executor->scheduleWorkAt(
-        when, [executor, nss = std::move(nss), uuid = collectionUuid](auto& args) {
-            auto& status = args.status;
-            if (ErrorCodes::isCancelationError(status.code())) {
-                return;
-            }
-            invariant(status);
-
-            ThreadClient tc("Collection-Range-Deleter", getGlobalServiceContext());
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillable(lk);
-            }
-            auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-            auto opCtx = uniqueOpCtx.get();
-
-            suspendRangeDeletion.pauseWhileSet();
-
-            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, uuid);
-            if (next) {
-                scheduleCleanup(executor, std::move(nss), std::move(uuid), *next);
-            }
-        });
-
-    if (!swCallbackHandle.isOK()) {
-        log() << "Failed to schedule the orphan data cleanup task"
-              << causedBy(redact(swCallbackHandle.getStatus()));
-    }
-}
-
 }  // namespace
 
 class RangePreserver : public ScopedCollectionMetadata::Impl {
@@ -202,7 +95,7 @@ private:
 
 MetadataManager::MetadataManager(ServiceContext* serviceContext,
                                  NamespaceString nss,
-                                 TaskExecutor* executor,
+                                 std::shared_ptr<TaskExecutor> executor,
                                  CollectionMetadata initialMetadata)
     : _serviceContext(serviceContext),
       _nss(std::move(nss)),
@@ -210,26 +103,6 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
       _executor(std::move(executor)),
       _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
-}
-
-MetadataManager::~MetadataManager() {
-    stdx::lock_guard<Latch> lg(_managerLock);
-    _clearAllCleanups(lg);
-}
-
-void MetadataManager::_clearAllCleanups(WithLock lock) {
-    _clearAllCleanups(lock,
-                      {ErrorCodes::InterruptedDueToReplStateChange,
-                       str::stream()
-                           << "Range deletions in " << _nss.ns()
-                           << " abandoned because collection was dropped or became unsharded"});
-}
-
-void MetadataManager::_clearAllCleanups(WithLock, Status status) {
-    for (auto& tracker : _metadata) {
-        std::ignore = _rangesToClean.add(std::move(tracker->orphans));
-    }
-    _rangesToClean.clear(status);
 }
 
 ScopedCollectionMetadata MetadataManager::getActiveMetadata(
@@ -329,18 +202,12 @@ void MetadataManager::_setActiveMetadata(WithLock wl, CollectionMetadata newMeta
     _retireExpiredMetadata(wl);
 }
 
-void MetadataManager::_retireExpiredMetadata(WithLock lock) {
-    // Remove entries and schedule orphans for deletion only from the front of _metadata. We cannot
-    // remove an entry from the middle of _metadata because a previous entry (whose usageCount is
-    // not 0) could have a query that is actually still accessing those documents.
+void MetadataManager::_retireExpiredMetadata(WithLock) {
+    // Remove entries with a usage count of 0 from the front of _metadata, which may schedule
+    // orphans for deletion. We cannot remove an entry from the middle of _metadata because a
+    // previous entry (whose usageCount is not 0) could have a query that is actually still
+    // accessing those documents.
     while (_metadata.size() > 1 && !_metadata.front()->usageCounter) {
-        if (!_metadata.front()->orphans.empty()) {
-            LOG(0) << "Queries possibly dependent on " << _nss.ns()
-                   << " range(s) finished; scheduling ranges for deletion";
-
-            _pushListToClean(lock, std::move(_metadata.front()->orphans));
-        }
-
         _metadata.pop_front();
     }
 
@@ -373,7 +240,12 @@ void MetadataManager::toBSONPending(BSONArrayBuilder& bb) const {
 void MetadataManager::append(BSONObjBuilder* builder) const {
     stdx::lock_guard<Latch> lg(_managerLock);
 
-    _rangesToClean.append(builder);
+    BSONArrayBuilder arr(builder->subarrayStart("rangesToClean"));
+    for (auto const& [range, _] : _rangesScheduledForDeletion) {
+        BSONObjBuilder obj;
+        range.append(&obj);
+        arr.append(obj.done());
+    }
 
     BSONArrayBuilder pcArr(builder->subarrayStart("pendingChunks"));
     for (const auto& entry : _receivingChunks) {
@@ -396,23 +268,7 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
     amrArr.done();
 }
 
-auto MetadataManager::_pushRangeToClean(WithLock lock, ChunkRange const& range, Date_t when)
-    -> CleanupNotification {
-    std::list<Deletion> ranges;
-    ranges.emplace_back(ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()), when);
-    auto& notifn = ranges.back().notification;
-    _pushListToClean(lock, std::move(ranges));
-    return notifn;
-}
-
-void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
-    auto when = _rangesToClean.add(std::move(ranges));
-    if (when) {
-        scheduleCleanup(_executor, _nss, _collectionUuid, *when);
-    }
-}
-
-auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotification {
+SharedSemiFuture<void> MetadataManager::beginReceive(ChunkRange const& range) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
 
@@ -426,7 +282,8 @@ auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotificati
     log() << "Scheduling deletion of any documents in " << _nss.ns() << " range "
           << redact(range.toString()) << " before migrating in a chunk covering the range";
 
-    return _pushRangeToClean(lg, range, Date_t{});
+    return _submitRangeForDeletion(
+        lg, SemiFuture<void>::makeReady(), range, Seconds(orphanCleanupDelaySecs.load()));
 }
 
 void MetadataManager::forgetReceive(ChunkRange const& range) {
@@ -444,11 +301,11 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
     invariant(it != _receivingChunks.end());
     _receivingChunks.erase(it);
 
-    _pushRangeToClean(lg, range, Date_t{}).abandon();
+    std::ignore = _submitRangeForDeletion(lg, SemiFuture<void>::makeReady(), range, Seconds(0));
 }
 
-auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
-    -> CleanupNotification {
+SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
+                                                     bool shouldDelayBeforeDeletion) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
 
@@ -466,48 +323,54 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
                                        " migrated in"};
     }
 
-    if (!overlapMetadata) {
-        // No running queries can depend on it, so queue it for deletion immediately.
-        const auto whenStr = (whenToDelete == Date_t{}) ? "immediate"_sd : "deferred"_sd;
-        log() << "Scheduling " << whenStr << " deletion of " << _nss.ns() << " range "
-              << redact(range.toString());
-        return _pushRangeToClean(lg, range, whenToDelete);
+    auto delayForActiveQueriesOnSecondariesToComplete =
+        shouldDelayBeforeDeletion ? Seconds(orphanCleanupDelaySecs.load()) : Seconds(0);
+
+    if (overlapMetadata) {
+        log() << "Deletion of " << _nss.ns() << " range " << redact(range.toString())
+              << " will be scheduled after all possibly dependent queries finish";
+        ++overlapMetadata->numContingentRangeDeletionTasks;
+        // Schedule the range for deletion once the overlapping metadata object is destroyed
+        // (meaning no more queries can be using the range) and obtain a future which will be
+        // signaled when deletion is complete.
+        return _submitRangeForDeletion(lg,
+                                       overlapMetadata->onDestructionPromise.getFuture().semi(),
+                                       range,
+                                       delayForActiveQueriesOnSecondariesToComplete);
+    } else {
+        // No running queries can depend on this range, so queue it for deletion immediately.
+        log() << "Scheduling deletion of " << _nss.ns() << " range " << redact(range.toString());
+
+        return _submitRangeForDeletion(
+            lg, SemiFuture<void>::makeReady(), range, delayForActiveQueriesOnSecondariesToComplete);
     }
-
-    log() << "Deletion of " << _nss.ns() << " range " << redact(range.toString())
-          << " will be scheduled after all possibly dependent queries finish";
-
-    // Put it on the oldest metadata permissible; the current one might live a long time.
-    auto& orphans = overlapMetadata->orphans;
-    orphans.emplace_back(ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()),
-                         whenToDelete);
-
-    return orphans.back().notification;
 }
 
 size_t MetadataManager::numberOfRangesToCleanStillInUse() const {
     stdx::lock_guard<Latch> lg(_managerLock);
     size_t count = 0;
     for (auto& tracker : _metadata) {
-        count += tracker->orphans.size();
+        count += tracker->numContingentRangeDeletionTasks;
     }
     return count;
 }
 
 size_t MetadataManager::numberOfRangesToClean() const {
+    auto rangesToCleanInUse = numberOfRangesToCleanStillInUse();
     stdx::lock_guard<Latch> lg(_managerLock);
-    return _rangesToClean.size();
+    return _rangesScheduledForDeletion.size() - rangesToCleanInUse;
 }
 
-auto MetadataManager::trackOrphanedDataCleanup(ChunkRange const& range) const
-    -> boost::optional<CleanupNotification> {
+boost::optional<SharedSemiFuture<void>> MetadataManager::trackOrphanedDataCleanup(
+    ChunkRange const& range) const {
     stdx::lock_guard<Latch> lg(_managerLock);
-    auto overlaps = _overlapsInUseCleanups(lg, range);
-    if (overlaps) {
-        return overlaps;
+    for (const auto& [orphanRange, deletionComplete] : _rangesScheduledForDeletion) {
+        if (orphanRange.overlapWith(range)) {
+            return deletionComplete;
+        }
     }
 
-    return _rangesToClean.overlaps(range);
+    return boost::none;
 }
 
 auto MetadataManager::_findNewestOverlappingMetadata(WithLock, ChunkRange const& range)
@@ -536,27 +399,44 @@ bool MetadataManager::_overlapsInUseChunk(WithLock lk, ChunkRange const& range) 
     return (cm != nullptr);
 }
 
-auto MetadataManager::_overlapsInUseCleanups(WithLock, ChunkRange const& range) const
-    -> boost::optional<CleanupNotification> {
-    invariant(!_metadata.empty());
-
-    for (auto it = _metadata.rbegin(); it != _metadata.rend(); ++it) {
-        const auto& orphans = (*it)->orphans;
-        for (auto itOrphans = orphans.rbegin(); itOrphans != orphans.rend(); ++itOrphans) {
-            const auto& orphan = *itOrphans;
-            if (orphan.range.overlapWith(range)) {
-                return orphan.notification;
-            }
-        }
-    }
-
-    return boost::none;
-}
-
 boost::optional<ChunkRange> MetadataManager::getNextOrphanRange(BSONObj const& from) const {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.back()->metadata->getNextOrphanRange(_receivingChunks, from);
 }
 
+SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
+    const WithLock&,
+    SemiFuture<void> waitForActiveQueriesToComplete,
+    const ChunkRange& range,
+    Seconds delayForActiveQueriesOnSecondariesToComplete) {
+
+    int maxToDelete = rangeDeleterBatchSize.load();
+    if (maxToDelete <= 0) {
+        maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
+    }
+
+    auto cleanupComplete =
+        removeDocumentsInRange(_executor,
+                               std::move(waitForActiveQueriesToComplete),
+                               _nss,
+                               *_metadata.back()->metadata->getChunkManager()->getUUID(),
+                               _metadata.back()->metadata->getKeyPattern().getOwned(),
+                               range,
+                               maxToDelete,
+                               delayForActiveQueriesOnSecondariesToComplete,
+                               Milliseconds(rangeDeleterBatchDelayMS.load()));
+
+    _rangesScheduledForDeletion.emplace_front(range, cleanupComplete);
+    // Attach a continuation so that once the range has been deleted, we will remove the deletion
+    // from the _rangesScheduledForDeletion.  std::list iterators are never invalidated, which
+    // allows us to save the iterator pointing to the newly added element for use later when
+    // deleting it.
+    cleanupComplete.thenRunOn(_executor).onCompletion(
+        [self = shared_from_this(), it = _rangesScheduledForDeletion.begin()](Status s) {
+            stdx::lock_guard<Latch> lg(self->_managerLock);
+            self->_rangesScheduledForDeletion.erase(it);
+        });
+    return cleanupComplete;
+}
 }  // namespace mongo

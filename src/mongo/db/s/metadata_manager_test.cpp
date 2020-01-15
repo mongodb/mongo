@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -65,7 +66,8 @@ protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
         _manager = std::make_shared<MetadataManager>(
-            getServiceContext(), kNss, executor().get(), makeEmptyMetadata());
+            getServiceContext(), kNss, executor(), makeEmptyMetadata());
+        orphanCleanupDelaySecs.store(1);
     }
 
     /**
@@ -168,31 +170,25 @@ TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
     ChunkRange range2(BSON("key" << 10), BSON("key" << 20));
 
     auto notif1 = _manager->beginReceive(range1);
-    ASSERT(!notif1.ready());
+    ASSERT(!notif1.isReady());
 
     auto notif2 = _manager->beginReceive(range2);
-    ASSERT(!notif2.ready());
+    ASSERT(!notif2.isReady());
 
     ASSERT_EQ(2UL, _manager->numberOfRangesToClean());
     ASSERT_EQ(0UL, _manager->numberOfRangesToCleanStillInUse());
-
-    notif1.abandon();
-    notif2.abandon();
 }
 
 TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
 
-    auto notifn1 = _manager->cleanUpRange(cr1, Date_t{});
-    ASSERT_FALSE(notifn1.ready());
+    auto notifn1 = _manager->cleanUpRange(cr1, false /*delayBeforeDeleting*/);
+    ASSERT_FALSE(notifn1.isReady());
     ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
 
     auto optNotifn = _manager->trackOrphanedDataCleanup(cr1);
-    ASSERT_FALSE(notifn1.ready());
-    ASSERT_FALSE(optNotifn->ready());
-    ASSERT(notifn1 == *optNotifn);
-    notifn1.abandon();
-    optNotifn->abandon();
+    ASSERT_FALSE(notifn1.isReady());
+    ASSERT_FALSE(optNotifn->isReady());
 }
 
 TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIsDestroyed) {
@@ -211,24 +207,31 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
     _manager->setFilteringMetadata(
         cloneMetadataMinusChunk(_manager->getActiveMetadata(boost::none), rangeToClean));
 
-    auto notif = _manager->cleanUpRange(rangeToClean, Date_t{});
-    ASSERT(!notif.ready());
+    auto notif = _manager->cleanUpRange(rangeToClean, false /*delayBeforeDeleting*/);
+    ASSERT(!notif.isReady());
 
     auto optNotif = _manager->trackOrphanedDataCleanup(rangeToClean);
     ASSERT(optNotif);
-    ASSERT(!optNotif->ready());
+    ASSERT(!optNotif->isReady());
 
     // Reset the original shared_ptr. The cursorOnMovedMetadata will still contain its own copy of
     // the shared_ptr though, so the destructor of ~MetadataManager won't yet be called.
     _manager.reset();
-    ASSERT(!notif.ready());
-    ASSERT(!optNotif->ready());
+    ASSERT(!notif.isReady());
+    ASSERT(!optNotif->isReady());
 
     // Destroys the ScopedCollectionMetadata object and causes the destructor of MetadataManager to
     // run, which should trigger all deletion notifications.
     cursorOnMovedMetadata.reset();
-    ASSERT(notif.ready());
-    ASSERT(optNotif->ready());
+
+    // Advance time to simulate orphanCleanupDelaySecs passing.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{5});
+    }
+
+    notif.wait();
+    optNotif->wait();
 }
 
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
@@ -284,11 +287,9 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
 
     ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
 
-    auto notifn = _manager->cleanUpRange(cr, Date_t{});
-    ASSERT(!notifn.ready());
+    auto notifn = _manager->cleanUpRange(cr, false /*delayBeforeDeleting*/);
+    ASSERT(!notifn.isReady());
     ASSERT_EQ(1UL, _manager->numberOfRangesToClean());
-
-    notifn.abandon();
 }
 
 TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectsLastSnapshotInList) {
