@@ -11716,9 +11716,6 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel62-large
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_clusterwide_ops_add_remove_shards
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
     distros:
@@ -11734,8 +11731,6 @@ buildvariants:
   - name: replica_sets
   - name: .replica_sets .common
   - name: rollback_fuzzer_gen
-  - name: .sharding .common !.multiversion !.csrs
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .updatefuzzer
 
 - name: enterprise-rhel-71-ppc64le-inmem
