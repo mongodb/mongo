@@ -46,9 +46,9 @@ using namespace mongo;
 
 namespace {
 
-using std::unique_ptr;
 using std::numeric_limits;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 double numberMin = -numeric_limits<double>::max();
@@ -592,20 +592,16 @@ TEST(IndexBoundsBuilderTest, TranslateGtMinKey) {
 TEST(IndexBoundsBuilderTest, DontCrashOnNegationOfArrayInequality) {
     BSONObj keyPattern = BSON("a" << 1);
     auto testIndex = IndexEntry(keyPattern,
-                                IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                                true,  // multikey
-                                {},
-                                {},
-                                false,  // sparse
-                                false,  // unique
-                                IndexEntry::Identifier{"test_foo"},
-                                nullptr,  // filterExpr
-                                BSONObj(),
+                                true,  // mk
+                                false,
+                                false,
+                                "test_foo",
                                 nullptr,
-                                nullptr);
+                                BSONObj());
 
     BSONObj obj = fromjson("{a: {$not: {$lt: [\"here\", {}, false]}}}");
-    auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+    auto expr =
+        MatchExpression::optimize(std::unique_ptr<MatchExpression>(parseMatchExpression(obj)));
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
