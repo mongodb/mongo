@@ -12,7 +12,9 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
+	"go.mongodb.org/mongo-driver/bson/bsonoptions"
 	"go.mongodb.org/mongo-driver/bson/bsonrw"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
@@ -31,24 +33,45 @@ type Zeroer interface {
 
 // StructCodec is the Codec used for struct values.
 type StructCodec struct {
-	cache  map[reflect.Type]*structDescription
-	l      sync.RWMutex
-	parser StructTagParser
+	cache                   map[reflect.Type]*structDescription
+	l                       sync.RWMutex
+	parser                  StructTagParser
+	DecodeZeroStruct        bool
+	DecodeDeepZeroInline    bool
+	EncodeOmitDefaultStruct bool
+	AllowUnexportedFields   bool
 }
 
 var _ ValueEncoder = &StructCodec{}
 var _ ValueDecoder = &StructCodec{}
 
 // NewStructCodec returns a StructCodec that uses p for struct tag parsing.
-func NewStructCodec(p StructTagParser) (*StructCodec, error) {
+func NewStructCodec(p StructTagParser, opts ...*bsonoptions.StructCodecOptions) (*StructCodec, error) {
 	if p == nil {
 		return nil, errors.New("a StructTagParser must be provided to NewStructCodec")
 	}
 
-	return &StructCodec{
+	structOpt := bsonoptions.MergeStructCodecOptions(opts...)
+
+	codec := &StructCodec{
 		cache:  make(map[reflect.Type]*structDescription),
 		parser: p,
-	}, nil
+	}
+
+	if structOpt.DecodeZeroStruct != nil {
+		codec.DecodeZeroStruct = *structOpt.DecodeZeroStruct
+	}
+	if structOpt.DecodeDeepZeroInline != nil {
+		codec.DecodeDeepZeroInline = *structOpt.DecodeDeepZeroInline
+	}
+	if structOpt.EncodeOmitDefaultStruct != nil {
+		codec.EncodeOmitDefaultStruct = *structOpt.EncodeOmitDefaultStruct
+	}
+	if structOpt.AllowUnexportedFields != nil {
+		codec.AllowUnexportedFields = *structOpt.AllowUnexportedFields
+	}
+
+	return codec, nil
 }
 
 // EncodeValue handles encoding generic struct types.
@@ -71,7 +94,31 @@ func (sc *StructCodec) EncodeValue(r EncodeContext, vw bsonrw.ValueWriter, val r
 		if desc.inline == nil {
 			rv = val.Field(desc.idx)
 		} else {
-			rv = val.FieldByIndex(desc.inline)
+			rv, err = fieldByIndexErr(val, desc.inline)
+			if err != nil {
+				continue
+			}
+		}
+
+		desc.encoder, rv, err = defaultValueEncoders.lookupElementEncoder(r, desc.encoder, rv)
+
+		if err != nil && err != errInvalidValue {
+			return err
+		}
+
+		if err == errInvalidValue {
+			if desc.omitEmpty {
+				continue
+			}
+			vw2, err := dw.WriteDocumentElement(desc.name)
+			if err != nil {
+				return err
+			}
+			err = vw2.WriteNull()
+			if err != nil {
+				return err
+			}
+			continue
 		}
 
 		if desc.encoder == nil {
@@ -80,12 +127,17 @@ func (sc *StructCodec) EncodeValue(r EncodeContext, vw bsonrw.ValueWriter, val r
 
 		encoder := desc.encoder
 
-		iszero := sc.isZero
-		if iz, ok := encoder.(CodecZeroer); ok {
-			iszero = iz.IsTypeZero
+		var isZero bool
+		rvInterface := rv.Interface()
+		if cz, ok := encoder.(CodecZeroer); ok {
+			isZero = cz.IsTypeZero(rvInterface)
+		} else if rv.Kind() == reflect.Interface {
+			// sc.isZero will not treat an interface rv as an interface, so we need to check for the zero interface separately.
+			isZero = rv.IsNil()
+		} else {
+			isZero = sc.isZero(rvInterface)
 		}
-
-		if desc.omitEmpty && iszero(rv.Interface()) {
+		if desc.omitEmpty && isZero {
 			continue
 		}
 
@@ -108,7 +160,7 @@ func (sc *StructCodec) EncodeValue(r EncodeContext, vw bsonrw.ValueWriter, val r
 			return exists
 		}
 
-		return defaultValueEncoders.mapEncodeValue(r, dw, rv, collisionFn)
+		return defaultMapCodec.mapEncodeValue(r, dw, rv, collisionFn)
 	}
 
 	return dw.WriteDocumentEnd()
@@ -133,13 +185,17 @@ func (sc *StructCodec) DecodeValue(r DecodeContext, vr bsonrw.ValueReader, val r
 		return err
 	}
 
+	if sc.DecodeZeroStruct {
+		val.Set(reflect.Zero(val.Type()))
+	}
+	if sc.DecodeDeepZeroInline && sd.inline {
+		val.Set(deepZero(val.Type()))
+	}
+
 	var decoder ValueDecoder
 	var inlineMap reflect.Value
 	if sd.inlineMap >= 0 {
 		inlineMap = val.Field(sd.inlineMap)
-		if inlineMap.IsNil() {
-			inlineMap.Set(reflect.MakeMap(inlineMap.Type()))
-		}
 		decoder, err = r.LookupDecoder(inlineMap.Type().Elem())
 		if err != nil {
 			return err
@@ -179,6 +235,10 @@ func (sc *StructCodec) DecodeValue(r DecodeContext, vr bsonrw.ValueReader, val r
 				continue
 			}
 
+			if inlineMap.IsNil() {
+				inlineMap.Set(reflect.MakeMap(inlineMap.Type()))
+			}
+
 			elem := reflect.New(inlineMap.Type().Elem()).Elem()
 			err = decoder.DecodeValue(r, vr, elem)
 			if err != nil {
@@ -192,7 +252,10 @@ func (sc *StructCodec) DecodeValue(r DecodeContext, vr bsonrw.ValueReader, val r
 		if fd.inline == nil {
 			field = val.Field(fd.idx)
 		} else {
-			field = val.FieldByIndex(fd.inline)
+			field, err = getInlineField(val, fd.inline)
+			if err != nil {
+				return err
+			}
 		}
 
 		if !field.CanSet() { // Being settable is a super set of being addressable.
@@ -249,6 +312,23 @@ func (sc *StructCodec) isZero(i interface{}) bool {
 		return v.Float() == 0
 	case reflect.Interface, reflect.Ptr:
 		return v.IsNil()
+	case reflect.Struct:
+		if sc.EncodeOmitDefaultStruct {
+			vt := v.Type()
+			if vt == tTime {
+				return v.Interface().(time.Time).IsZero()
+			}
+			for i := 0; i < v.NumField(); i++ {
+				if vt.Field(i).PkgPath != "" && !vt.Field(i).Anonymous {
+					continue // Private field
+				}
+				fld := v.Field(i)
+				if !sc.isZero(fld.Interface()) {
+					return false
+				}
+			}
+			return true
+		}
 	}
 
 	return false
@@ -258,6 +338,7 @@ type structDescription struct {
 	fm        map[string]fieldDescription
 	fl        []fieldDescription
 	inlineMap int
+	inline    bool
 }
 
 type fieldDescription struct {
@@ -290,16 +371,17 @@ func (sc *StructCodec) describeStruct(r *Registry, t reflect.Type) (*structDescr
 
 	for i := 0; i < numFields; i++ {
 		sf := t.Field(i)
-		if sf.PkgPath != "" {
-			// unexported, ignore
+		if sf.PkgPath != "" && (!sc.AllowUnexportedFields || !sf.Anonymous) {
+			// field is private or unexported fields aren't allowed, ignore
 			continue
 		}
 
-		encoder, err := r.LookupEncoder(sf.Type)
+		sfType := sf.Type
+		encoder, err := r.LookupEncoder(sfType)
 		if err != nil {
 			encoder = nil
 		}
-		decoder, err := r.LookupDecoder(sf.Type)
+		decoder, err := r.LookupDecoder(sfType)
 		if err != nil {
 			decoder = nil
 		}
@@ -319,17 +401,24 @@ func (sc *StructCodec) describeStruct(r *Registry, t reflect.Type) (*structDescr
 		description.truncate = stags.Truncate
 
 		if stags.Inline {
-			switch sf.Type.Kind() {
+			sd.inline = true
+			switch sfType.Kind() {
 			case reflect.Map:
 				if sd.inlineMap >= 0 {
 					return nil, errors.New("(struct " + t.String() + ") multiple inline maps")
 				}
-				if sf.Type.Key() != tString {
+				if sfType.Key() != tString {
 					return nil, errors.New("(struct " + t.String() + ") inline map must have a string keys")
 				}
 				sd.inlineMap = description.idx
+			case reflect.Ptr:
+				sfType = sfType.Elem()
+				if sfType.Kind() != reflect.Struct {
+					return nil, fmt.Errorf("(struct %s) inline fields must be a struct, a struct pointer, or a map", t.String())
+				}
+				fallthrough
 			case reflect.Struct:
-				inlinesf, err := sc.describeStruct(r, sf.Type)
+				inlinesf, err := sc.describeStruct(r, sfType)
 				if err != nil {
 					return nil, err
 				}
@@ -346,7 +435,7 @@ func (sc *StructCodec) describeStruct(r *Registry, t reflect.Type) (*structDescr
 					sd.fl = append(sd.fl, fd)
 				}
 			default:
-				return nil, fmt.Errorf("(struct %s) inline fields must be either a struct or a map", t.String())
+				return nil, fmt.Errorf("(struct %s) inline fields must be a struct, a struct pointer, or a map", t.String())
 			}
 			continue
 		}
@@ -364,4 +453,76 @@ func (sc *StructCodec) describeStruct(r *Registry, t reflect.Type) (*structDescr
 	sc.l.Unlock()
 
 	return sd, nil
+}
+
+func fieldByIndexErr(v reflect.Value, index []int) (result reflect.Value, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			switch r := recovered.(type) {
+			case string:
+				err = fmt.Errorf("%s", r)
+			case error:
+				err = r
+			}
+		}
+	}()
+
+	result = v.FieldByIndex(index)
+	return
+}
+
+func getInlineField(val reflect.Value, index []int) (reflect.Value, error) {
+	field, err := fieldByIndexErr(val, index)
+	if err == nil {
+		return field, nil
+	}
+
+	// if parent of this element doesn't exist, fix its parent
+	inlineParent := index[:len(index)-1]
+	var fParent reflect.Value
+	if fParent, err = fieldByIndexErr(val, inlineParent); err != nil {
+		fParent, err = getInlineField(val, inlineParent)
+		if err != nil {
+			return fParent, err
+		}
+	}
+	fParent.Set(reflect.New(fParent.Type().Elem()))
+
+	return fieldByIndexErr(val, index)
+}
+
+// DeepZero returns recursive zero object
+func deepZero(st reflect.Type) (result reflect.Value) {
+	result = reflect.Indirect(reflect.New(st))
+
+	if result.Kind() == reflect.Struct {
+		for i := 0; i < result.NumField(); i++ {
+			if f := result.Field(i); f.Kind() == reflect.Ptr {
+				if f.CanInterface() {
+					if ft := reflect.TypeOf(f.Interface()); ft.Elem().Kind() == reflect.Struct {
+						result.Field(i).Set(recursivePointerTo(deepZero(ft.Elem())))
+					}
+				}
+			}
+		}
+	}
+
+	return
+}
+
+// recursivePointerTo calls reflect.New(v.Type) but recursively for its fields inside
+func recursivePointerTo(v reflect.Value) reflect.Value {
+	v = reflect.Indirect(v)
+	result := reflect.New(v.Type())
+	if v.Kind() == reflect.Struct {
+		for i := 0; i < v.NumField(); i++ {
+			if f := v.Field(i); f.Kind() == reflect.Ptr {
+				if f.Elem().Kind() == reflect.Struct {
+					result.Elem().Field(i).Set(recursivePointerTo(f))
+				}
+			}
+		}
+	}
+
+	return result
 }

@@ -29,11 +29,7 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[constraint]]
   name = "github.com/mongodb/mongo-tools-common"
-<<<<<<< HEAD
-  version = "^v1.2.2"
-=======
-  version = "^2.0.0"
->>>>>>> cea08736... TOOLS-1826 TOOLS-2403 Revendor mongo-tools-common
+  version = "^2.0.1"
 
 [[constraint]]
   name = "go.mongodb.org/mongo-driver"

@@ -92,7 +92,7 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.D) error {
 			}
 		}
 
-		jsonOut, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == canonical, false)
+		jsonOut, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == Canonical, false)
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.D) error {
 			return err
 		}
 	} else {
-		extendedDoc, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == canonical, false)
+		extendedDoc, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == Canonical, false)
 		if err != nil {
 			return err
 		}

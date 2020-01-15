@@ -243,6 +243,14 @@ func setUpMongoDumpTestData() error {
 			if err != nil {
 				return err
 			}
+
+			idx := mongo.IndexModel{
+				Keys: bson.M{`"`: 1},
+			}
+			_, err = coll.Indexes().CreateOne(context.Background(), idx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -869,6 +877,96 @@ func TestMongoDumpTOOLS2174(t *testing.T) {
 		So(err, ShouldBeNil)
 		err = md.Dump()
 		So(err, ShouldBeNil)
+	})
+}
+
+// Test dumping a collection while respecting no index scan for wired tiger.
+func TestMongoDumpTOOLS1952(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	log.SetWriter(ioutil.Discard)
+
+	sessionProvider, _, err := testutil.GetBareSessionProvider()
+	if err != nil {
+		t.Fatalf("No cluster available: %v", err)
+	}
+
+	session, err := sessionProvider.GetSession()
+	if err != nil {
+		t.Fatalf("Failed to get session: %v", err)
+	}
+
+	collName := "tools-1952-dump"
+	dbName := "test"
+	ns := dbName + "." + collName
+
+	var r1 bson.M
+
+	dbStruct := session.Database(dbName)
+
+	sessionProvider.Run(bson.D{{"drop", collName}}, &r1, dbName)
+
+	createCmd := bson.D{
+		{"create", collName},
+	}
+	var r2 bson.M
+	err = sessionProvider.Run(createCmd, &r2, dbName)
+	if err != nil {
+		t.Fatalf("Error creating collection: %v", err)
+	}
+
+	// Check whether we are using MMAPV1.
+	isMMAPV1, err := db.IsMMAPV1(dbStruct, collName)
+	if err != nil {
+		t.Fatalf("Failed to determine storage engine %v", err)
+	}
+
+	// Turn on profiling.
+	profileCmd := bson.D{
+		{"profile", 2},
+	}
+
+	err = sessionProvider.Run(profileCmd, &r2, dbName)
+	if err != nil {
+		t.Fatalf("Failed to turn on profiling: %v", err)
+	}
+
+	profileCollection := dbStruct.Collection("system.profile")
+
+	Convey("testing dumping a collection query hints", t, func() {
+		md := simpleMongoDumpInstance()
+		md.ToolOptions.Namespace.Collection = collName
+		md.ToolOptions.Namespace.DB = dbName
+		md.OutputOptions.Out = "dump"
+		err = md.Init()
+		So(err, ShouldBeNil)
+		err = md.Dump()
+		So(err, ShouldBeNil)
+
+		count, err := profileCollection.CountDocuments(context.Background(),
+			bson.D{
+				{"ns", ns},
+				{"op", "query"},
+				{"$or", []interface{}{
+					// 4.0+
+					bson.D{{"command.hint._id", 1}},
+					// 3.6
+					bson.D{{"command.$nsapshot", true}},
+					bson.D{{"command.snapshot", true}},
+					// 3.4 and previous
+					bson.D{{"query.$snapshot", true}},
+					bson.D{{"query.snapshot", true}},
+					bson.D{{"query.hint._id", 1}},
+				}},
+			},
+		)
+		So(err, ShouldBeNil)
+		if isMMAPV1 {
+			// There should be exactly one query that matches.
+			So(count, ShouldEqual, 1)
+		} else {
+			// On modern storage engines, there should be no query that matches.
+			So(count, ShouldEqual, 0)
+		}
 	})
 }
 

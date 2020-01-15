@@ -307,7 +307,7 @@ func (op Operation) legacyKillCursors(ctx context.Context, dst []byte, srvr Serv
 
 	ridx, response := bsoncore.AppendDocumentStart(nil)
 	response = bsoncore.AppendInt32Element(response, "ok", 1)
-	response = bsoncore.AppendArrayElement(response, "cursorsKilled", startedInfo.cmd.Lookup("cursors").Array())
+	response = bsoncore.AppendArrayElement(response, "cursorsUnknown", startedInfo.cmd.Lookup("cursors").Array())
 	response, _ = bsoncore.AppendDocumentEnd(response, ridx)
 
 	finishedInfo.response = response

@@ -64,7 +64,8 @@ func WithConnString(fn func(connstring.ConnString) connstring.ConnString) Option
 		var connOpts []ConnectionOption
 
 		if cs.AppName != "" {
-			connOpts = append(connOpts, WithAppName(func(string) string { return cs.AppName }))
+			connOpts = append(connOpts, WithConnectionAppName(func(string) string { return cs.AppName }))
+			c.serverOpts = append(c.serverOpts, WithServerAppName(func(string) string { return cs.AppName }))
 		}
 
 		switch cs.Connect {
@@ -205,9 +206,14 @@ func WithConnString(fn func(connstring.ConnString) connstring.ConnString) Option
 			}))
 
 			for _, comp := range cs.Compressors {
-				if comp == "zlib" {
+				switch comp {
+				case "zlib":
 					connOpts = append(connOpts, WithZlibLevel(func(level *int) *int {
 						return &cs.ZlibLevel
+					}))
+				case "zstd":
+					connOpts = append(connOpts, WithZstdLevel(func(level *int) *int {
+						return &cs.ZstdLevel
 					}))
 				}
 			}

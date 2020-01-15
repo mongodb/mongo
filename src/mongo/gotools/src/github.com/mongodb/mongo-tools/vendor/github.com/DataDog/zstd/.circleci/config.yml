@@ -1,0 +1,48 @@
+version: 2
+
+jobs:
+  "golang-1.12":
+    docker:
+      - image: circleci/golang:1.12
+    steps:
+      - checkout
+      - run: 'wget https://github.com/DataDog/zstd/files/2246767/mr.zip'
+      - run: 'unzip mr.zip'
+      - run: 'go build'
+      - run: 'PAYLOAD=`pwd`/mr go test -v'
+      - run: 'PAYLOAD=`pwd`/mr go test -bench .'
+  "golang-1.13":
+    docker:
+      - image: circleci/golang:1.13
+    steps:
+      - checkout
+      - run: 'wget https://github.com/DataDog/zstd/files/2246767/mr.zip'
+      - run: 'unzip mr.zip'
+      - run: 'go build'
+      - run: 'PAYLOAD=`pwd`/mr go test -v'
+      - run: 'PAYLOAD=`pwd`/mr go test -bench .'
+  "golang-latest":
+    docker:
+      - image: circleci/golang:latest
+    steps:
+      - checkout
+      - run: 'wget https://github.com/DataDog/zstd/files/2246767/mr.zip'
+      - run: 'unzip mr.zip'
+      - run: 'go build'
+      - run: 'PAYLOAD=`pwd`/mr go test -v'
+      - run: 'PAYLOAD=`pwd`/mr go test -bench .'
+  "golang-i386":
+    docker:
+      - image: toopher/centos-i386:centos6
+    steps:
+      - checkout
+      - run: 'linux32 --32bit i386 ./travis_test_32.sh'
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - "golang-1.12"
+      - "golang-1.13"
+      - "golang-latest"
+      - "golang-i386"

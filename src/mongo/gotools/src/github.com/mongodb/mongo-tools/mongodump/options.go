@@ -24,7 +24,7 @@ type InputOptions struct {
 	Query          string `long:"query" short:"q" description:"query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"`
 	QueryFile      string `long:"queryFile" description:"path to a file containing a query filter (v2 Extended JSON)"`
 	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference mode (e.g. 'nearest') or a preference json object (e.g. '{mode: \"nearest\", tagSets: [{a: \"b\"}], maxStalenessSeconds: 123}')"`
-	TableScan      bool   `long:"forceTableScan" description:"force a table scan"`
+	TableScan      bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot or hint _id). Deprecated since this is default behavior on WiredTiger"`
 }
 
 // Name returns a human-readable group name for input options.

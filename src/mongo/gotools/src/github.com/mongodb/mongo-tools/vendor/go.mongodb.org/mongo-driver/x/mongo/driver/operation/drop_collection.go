@@ -27,6 +27,7 @@ type DropCollection struct {
 	clock        *session.ClusterClock
 	collection   string
 	monitor      *event.CommandMonitor
+	crypt        *driver.Crypt
 	database     string
 	deployment   driver.Deployment
 	selector     description.ServerSelector
@@ -92,6 +93,7 @@ func (dc *DropCollection) Execute(ctx context.Context) error {
 		Client:            dc.session,
 		Clock:             dc.clock,
 		CommandMonitor:    dc.monitor,
+		Crypt:             dc.crypt,
 		Database:          dc.database,
 		Deployment:        dc.deployment,
 		Selector:          dc.selector,
@@ -142,6 +144,16 @@ func (dc *DropCollection) CommandMonitor(monitor *event.CommandMonitor) *DropCol
 	}
 
 	dc.monitor = monitor
+	return dc
+}
+
+// Crypt sets the Crypt object to use for automatic encryption and decryption.
+func (dc *DropCollection) Crypt(crypt *driver.Crypt) *DropCollection {
+	if dc == nil {
+		dc = new(DropCollection)
+	}
+
+	dc.crypt = crypt
 	return dc
 }
 

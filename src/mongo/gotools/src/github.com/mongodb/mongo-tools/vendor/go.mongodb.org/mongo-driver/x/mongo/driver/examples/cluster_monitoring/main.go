@@ -28,7 +28,7 @@ func main() {
 		log.Fatalf("could not subscribe to topology: %v", err)
 	}
 
-	for desc := range sub.C {
+	for desc := range sub.Updates {
 		log.Printf("%# v", pretty.Formatter(desc))
 	}
 }

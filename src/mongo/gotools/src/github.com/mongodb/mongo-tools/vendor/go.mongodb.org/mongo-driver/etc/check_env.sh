@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-if [[ ! $TOPOLOGY =~ ^(server|replica_set|sharded_cluster)$ ]]; then
-    >&2 echo "Invalid value of TOPOLOGY. TOPOLOGY must be set to one of: server, replica_set, sharded_cluster"
-    exit 1
-fi
-
 if [ ! -z $AUTH ] && [[ ! $AUTH =~ ^(noauth|auth)$ ]]; then
     >&2 echo "Invalid value of AUTH. AUTH can optionally be set to one of: noauth, auth"
     exit 1
@@ -15,7 +10,7 @@ if [ ! -z $SSL ] && [[ ! $SSL =~ ^(nossl|ssl)$ ]]; then
     exit 1
 fi
 
-if [ ! -z $MONGO_GO_DRIVER_COMPRESSOR ] && [[ ! $MONGO_GO_DRIVER_COMPRESSOR =~ ^(snappy|zlib)$ ]]; then
-    >&2 echo "Invalid value of MONGO_GO_DRIVER_COMPRESSOR. MONGO_GO_DRIVER_COMPRESSOR can optionally be set to one of: snappy, zlib"
+if [ ! -z $MONGO_GO_DRIVER_COMPRESSOR ] && [[ ! $MONGO_GO_DRIVER_COMPRESSOR =~ ^(snappy|zlib|zstd)$ ]]; then
+    >&2 echo "Invalid value of MONGO_GO_DRIVER_COMPRESSOR. MONGO_GO_DRIVER_COMPRESSOR can optionally be set to one of: snappy, zlib, zstd"
     exit 1
 fi

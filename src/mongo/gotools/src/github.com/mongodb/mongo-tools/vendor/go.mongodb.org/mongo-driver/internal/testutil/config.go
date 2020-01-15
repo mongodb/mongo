@@ -23,6 +23,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 )
 
@@ -30,9 +31,11 @@ var connectionString connstring.ConnString
 var connectionStringOnce sync.Once
 var connectionStringErr error
 var liveTopology *topology.Topology
+var liveSessionPool *session.Pool
 var liveTopologyOnce sync.Once
 var liveTopologyErr error
 var monitoredTopology *topology.Topology
+var monitoredSessionPool *session.Pool
 var monitoredTopologyOnce sync.Once
 var monitoredTopologyErr error
 
@@ -144,6 +147,10 @@ func GlobalMonitoredTopology(t *testing.T, monitor *event.CommandMonitor) *topol
 				Database(DBName(t)).ServerSelector(description.WriteSelector()).Deployment(monitoredTopology).Execute(context.Background())
 
 			require.NoError(t, err)
+
+			sub, err := monitoredTopology.Subscribe()
+			require.NoError(t, err)
+			monitoredSessionPool = session.NewPool(sub.Updates)
 		}
 	})
 
@@ -152,6 +159,12 @@ func GlobalMonitoredTopology(t *testing.T, monitor *event.CommandMonitor) *topol
 	}
 
 	return monitoredTopology
+}
+
+// GlobalMonitoredSessionPool returns the globally configured session pool.
+// Must be called after GlobalMonitoredTopology()
+func GlobalMonitoredSessionPool() *session.Pool {
+	return monitoredSessionPool
 }
 
 // Topology gets the globally configured topology.
@@ -168,6 +181,10 @@ func Topology(t *testing.T) *topology.Topology {
 			err = operation.NewCommand(bsoncore.BuildDocument(nil, bsoncore.AppendInt32Element(nil, "dropDatabase", 1))).
 				Database(DBName(t)).ServerSelector(description.WriteSelector()).Deployment(liveTopology).Execute(context.Background())
 			require.NoError(t, err)
+
+			sub, err := liveTopology.Subscribe()
+			require.NoError(t, err)
+			liveSessionPool = session.NewPool(sub.Updates)
 		}
 	})
 
@@ -176,6 +193,11 @@ func Topology(t *testing.T) *topology.Topology {
 	}
 
 	return liveTopology
+}
+
+// SessionPool gets the globally configured session pool. Must be called after Topology().
+func SessionPool() *session.Pool {
+	return liveSessionPool
 }
 
 // TopologyWithConnString takes a connection string and returns a connected

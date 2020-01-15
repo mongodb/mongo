@@ -34,6 +34,14 @@ import (
 	"time"
 )
 
+type storageEngineType int
+
+const (
+	storageEngineUnknown = 0
+	storageEngineMMAPV1  = 1
+	storageEngineModern  = 2
+)
+
 const defaultPermissions = 0755
 
 // MongoDump is a container for the user-specified options and
@@ -57,6 +65,7 @@ type MongoDump struct {
 	oplogStart      primitive.Timestamp
 	oplogEnd        primitive.Timestamp
 	isMongos        bool
+	storageEngine   storageEngineType
 	authVersion     int
 	archive         *archive.Writer
 	// shutdownIntentsNotifier is provided to the multiplexer
@@ -123,6 +132,11 @@ func (dump *MongoDump) ValidateOptions() error {
 // Init performs preliminary setup operations for MongoDump.
 func (dump *MongoDump) Init() error {
 	log.Logvf(log.DebugHigh, "initializing mongodump object")
+
+	// this would be default, but explicit setting protects us from any
+	// redefinition of the constants.
+	dump.storageEngine = storageEngineUnknown
+
 	err := dump.ValidateOptions()
 	if err != nil {
 		return fmt.Errorf("bad option: %v", err)
@@ -157,6 +171,7 @@ func (dump *MongoDump) Init() error {
 	}
 
 	dump.manager = intents.NewIntentManager()
+
 	return nil
 }
 
@@ -511,17 +526,48 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutpu
 	if err != nil {
 		return err
 	}
-	findQuery := &db.DeferredQuery{Coll: session.Database(intent.DB).Collection(intent.C)}
+	intendedDB := session.Database(intent.DB)
+	coll := intendedDB.Collection(intent.C)
+	// it is safer to assume that a collection is a view, if we cannot determine that it is not.
+	isView := true
+	// failure to get CollectionInfo should not cause the function to exit. We only use this to
+	// determine if a collection is a view.
+	collInfo, err := db.GetCollectionInfo(coll)
+	if err != nil {
+		isView = collInfo.IsView()
+	}
+	// The storage engine cannot change from namespace to namespace,
+	// so we set it the first time we reach here, using a namespace we
+	// know must exist. If the storage engine is not mmapv1, we assume it
+	// is some modern storage engine that does not need to use an index
+	// scan for correctness.
+	// We cannot determine the storage engine, if this collection is a view,
+	// so we skip attempting to deduce the storage engine.
+	if dump.storageEngine == storageEngineUnknown && !isView {
+		if err != nil {
+			return err
+		}
+		// storageEngineModern denotes any storage engine that is not MMAPV1. For such storage
+		// engines we assume that collection scans are consistent.
+		dump.storageEngine = storageEngineModern
+		isMMAPV1, err := db.IsMMAPV1(intendedDB, intent.C)
+		if err != nil {
+			log.Logvf(log.Always,
+				"failed to determine storage engine, an mmapv1 storage engine could result in"+
+					" inconsistent dump results, error was: %v", err)
+		} else if isMMAPV1 {
+			dump.storageEngine = storageEngineMMAPV1
+		}
+	}
+
+	findQuery := &db.DeferredQuery{Coll: coll}
 	switch {
 	case len(dump.query) > 0:
 		findQuery.Filter = dump.query
-	case dump.OutputOptions.ViewsAsCollections || dump.InputOptions.TableScan || intent.IsSpecialCollection() || intent.IsOplog():
-		// ---forceTablesScan runs the query without snapshot enabled
-		// The system.profile collection has no index on _id so can't be hinted.
-		// Views have an implied aggregation which does not support snapshot.
-		// These are all a no-op.
-	default:
-		// Don't hint autoIndexId:false collections
+	// we only want to hint _id when the storage engine is MMAPV1 and this isn't a view, a
+	// special collection, the oplog, and the user is not asking to force table scans.
+	case dump.storageEngine == storageEngineMMAPV1 && !dump.InputOptions.TableScan &&
+		!isView && !intent.IsSpecialCollection() && !intent.IsOplog():
 		autoIndexId, found := intent.Options["autoIndexId"]
 		if !found || autoIndexId == true {
 			findQuery.Hint = bson.D{{"_id", 1}}

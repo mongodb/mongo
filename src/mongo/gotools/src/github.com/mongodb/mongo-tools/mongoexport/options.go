@@ -62,7 +62,7 @@ type InputOptions struct {
 	QueryFile      string `long:"queryFile" value-name:"<filename>" description:"path to a file containing a query filter (JSON)"`
 	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"false" default-mask:"-"`
 	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference mode (e.g. 'nearest') or a preference json object (e.g. '{mode: \"nearest\", tagSets: [{a: \"b\"}], maxStalenessSeconds: 123}')"`
-	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot)"`
+	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot or hint _id). Deprecated since this is default behavior on WiredTiger"`
 	Skip           int64  `long:"skip" value-name:"<count>" description:"number of documents to skip"`
 	Limit          int64  `long:"limit" value-name:"<count>" description:"limit the number of documents to export"`
 	Sort           string `long:"sort" value-name:"<json>" description:"sort order, as a JSON string, e.g. '{x:1}'"`

@@ -49,6 +49,7 @@ type Find struct {
 	clock               *session.ClusterClock
 	collection          string
 	monitor             *event.CommandMonitor
+	crypt               *driver.Crypt
 	database            string
 	deployment          driver.Deployment
 	readConcern         *readconcern.ReadConcern
@@ -90,6 +91,7 @@ func (f *Find) Execute(ctx context.Context) error {
 		Client:            f.session,
 		Clock:             f.clock,
 		CommandMonitor:    f.monitor,
+		Crypt:             f.crypt,
 		Database:          f.database,
 		Deployment:        f.deployment,
 		ReadConcern:       f.readConcern,
@@ -418,6 +420,16 @@ func (f *Find) CommandMonitor(monitor *event.CommandMonitor) *Find {
 	}
 
 	f.monitor = monitor
+	return f
+}
+
+// Crypt sets the Crypt object to use for automatic encryption and decryption.
+func (f *Find) Crypt(crypt *driver.Crypt) *Find {
+	if f == nil {
+		f = new(Find)
+	}
+
+	f.crypt = crypt
 	return f
 }
 

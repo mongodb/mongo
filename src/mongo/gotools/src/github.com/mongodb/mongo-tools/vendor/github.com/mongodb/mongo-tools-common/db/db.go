@@ -24,6 +24,7 @@ import (
 	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/options"
 	"github.com/mongodb/mongo-tools-common/password"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	mopt "go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
@@ -413,4 +414,27 @@ func CanIgnoreError(err error) bool {
 	}
 
 	return false
+}
+
+// IsMMAPV1 returns whether the storage engine is MMAPV1. Also returns false
+// if the storage engine type cannot be determined for some reason.
+func IsMMAPV1(database *mongo.Database, collectionName string) (bool, error) {
+	// mmapv1 does not announce itself like other storage engines. Instead,
+	// we check for the key 'numExtents', which only occurs on MMAPV1.
+	const numExtents = "numExtents"
+
+	var collStats map[string]interface{}
+
+	singleRes := database.RunCommand(context.Background(), bson.M{"collStats": collectionName})
+
+	if err := singleRes.Err(); err != nil {
+		return false, err
+	}
+
+	if err := singleRes.Decode(&collStats); err != nil {
+		return false, err
+	}
+
+	_, ok := collStats[numExtents]
+	return ok, nil
 }

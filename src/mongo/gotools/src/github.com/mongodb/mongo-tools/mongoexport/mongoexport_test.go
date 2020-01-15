@@ -8,6 +8,7 @@ package mongoexport
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -145,5 +146,101 @@ func TestMongoExportTOOLS2174(t *testing.T) {
 		out := &bytes.Buffer{}
 		_, err = me.Export(out)
 		So(err, ShouldBeNil)
+	})
+}
+
+// Test exporting a collection, _id should only be hinted iff
+// this is not a wired tiger collection.
+func TestMongoExportTOOLS1952(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	log.SetWriter(ioutil.Discard)
+
+	sessionProvider, _, err := testutil.GetBareSessionProvider()
+	if err != nil {
+		t.Fatalf("No cluster available: %v", err)
+	}
+
+	session, err := sessionProvider.GetSession()
+	if err != nil {
+		t.Fatalf("Failed to get session: %v", err)
+	}
+
+	collName := "tools-1952-export"
+	dbName := "test"
+	ns := dbName + "." + collName
+
+	dbStruct := session.Database(dbName)
+
+	var r1 bson.M
+	sessionProvider.Run(bson.D{{"drop", collName}}, &r1, dbName)
+
+	createCmd := bson.D{
+		{"create", collName},
+	}
+
+	var r2 bson.M
+	err = sessionProvider.Run(createCmd, &r2, dbName)
+	if err != nil {
+		t.Fatalf("Error creating collection: %v", err)
+	}
+
+	// Check whether we are using MMAPV1.
+	isMMAPV1, err := db.IsMMAPV1(dbStruct, collName)
+	if err != nil {
+		t.Fatalf("Failed to determine storage engine %v", err)
+	}
+
+	// Turn on profiling.
+	profileCmd := bson.D{
+		{"profile", 2},
+	}
+
+	err = sessionProvider.Run(profileCmd, &r2, dbName)
+	if err != nil {
+		t.Fatalf("Failed to turn on profiling: %v", err)
+	}
+
+	profileCollection := dbStruct.Collection("system.profile")
+
+	Convey("testing exporting a collection", t, func() {
+		opts := simpleMongoExportOpts()
+		opts.Collection = collName
+		opts.DB = dbName
+
+		me, err := New(opts)
+		So(err, ShouldBeNil)
+		defer me.Close()
+		out := &bytes.Buffer{}
+		_, err = me.Export(out)
+		So(err, ShouldBeNil)
+
+		// If we are using mmapv1, we should be hinting an index or using a
+		// snapshot, depending on the version.
+		count, err := profileCollection.CountDocuments(context.Background(),
+			bson.D{
+				{"ns", ns},
+				{"op", "query"},
+				{"$or", []interface{}{
+					// 4.0+
+					bson.D{{"command.hint._id", 1}},
+					// 3.6
+					bson.D{{"command.$nsapshot", true}},
+					bson.D{{"command.snapshot", true}},
+					// 3.4 and previous
+					bson.D{{"query.$snapshot", true}},
+					bson.D{{"query.snapshot", true}},
+					bson.D{{"query.hint._id", 1}},
+				}},
+			},
+		)
+		So(err, ShouldBeNil)
+		if isMMAPV1 {
+			// There should be exactly one query that matches in MMAPV1
+			So(count, ShouldEqual, 1)
+		} else {
+			// In modern storage engines, there should be no hints, so there
+			// should be 0 matches.
+			So(count, ShouldEqual, 0)
+		}
 	})
 }
