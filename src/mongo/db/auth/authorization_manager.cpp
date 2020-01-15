@@ -373,41 +373,54 @@ Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privile
 
 Status AuthorizationManager::getBSONForRole(RoleGraph* graph,
                                             const RoleName& roleName,
-                                            mutablebson::Element result) {
+                                            mutablebson::Element result) try {
     if (!graph->roleExists(roleName)) {
         return Status(ErrorCodes::RoleNotFound,
                       mongoutils::str::stream() << roleName.getFullName()
                                                 << "does not name an existing role");
     }
     std::string id = mongoutils::str::stream() << roleName.getDB() << "." << roleName.getRole();
-    result.appendString("_id", id).transitional_ignore();
-    result.appendString(ROLE_NAME_FIELD_NAME, roleName.getRole()).transitional_ignore();
-    result.appendString(ROLE_DB_FIELD_NAME, roleName.getDB()).transitional_ignore();
+    uassertStatusOK(result.appendString("_id", id));
+    uassertStatusOK(
+        result.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole()));
+    uassertStatusOK(
+        result.appendString(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB()));
 
     // Build privileges array
     mutablebson::Element privilegesArrayElement =
         result.getDocument().makeElementArray("privileges");
-    result.pushBack(privilegesArrayElement).transitional_ignore();
+    uassertStatusOK(result.pushBack(privilegesArrayElement));
     const PrivilegeVector& privileges = graph->getDirectPrivileges(roleName);
-    Status status = getBSONForPrivileges(privileges, privilegesArrayElement);
-    if (!status.isOK()) {
-        return status;
-    }
+    uassertStatusOK(getBSONForPrivileges(privileges, privilegesArrayElement));
 
     // Build roles array
     mutablebson::Element rolesArrayElement = result.getDocument().makeElementArray("roles");
-    result.pushBack(rolesArrayElement).transitional_ignore();
+    uassertStatusOK(result.pushBack(rolesArrayElement));
     for (RoleNameIterator roles = graph->getDirectSubordinates(roleName); roles.more();
          roles.next()) {
         const RoleName& subRole = roles.get();
         mutablebson::Element roleObj = result.getDocument().makeElementObject("");
-        roleObj.appendString(ROLE_NAME_FIELD_NAME, subRole.getRole()).transitional_ignore();
-        roleObj.appendString(ROLE_DB_FIELD_NAME, subRole.getDB()).transitional_ignore();
-        rolesArrayElement.pushBack(roleObj).transitional_ignore();
+        uassertStatusOK(
+            roleObj.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, subRole.getRole()));
+        uassertStatusOK(
+            roleObj.appendString(AuthorizationManager::ROLE_DB_FIELD_NAME, subRole.getDB()));
+        uassertStatusOK(rolesArrayElement.pushBack(roleObj));
+    }
+
+    // Build authentication restrictions
+    auto restrictions = graph->getDirectAuthenticationRestrictions(roleName);
+    mutablebson::Element authenticationRestrictionsElement =
+        result.getDocument().makeElementArray("authenticationRestrictions");
+    uassertStatusOK(result.pushBack(authenticationRestrictionsElement));
+    if (restrictions) {
+        uassertStatusOK(authenticationRestrictionsElement.setValueArray(restrictions->toBSON()));
     }
 
     return Status::OK();
+} catch (...) {
+    return exceptionToStatus();
 }
+
 
 Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
                                                                   const BSONObj& privDoc) {
