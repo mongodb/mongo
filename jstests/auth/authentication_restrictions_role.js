@@ -42,6 +42,14 @@
         assert.commandWorked(admin.runCommand({createRole: "role3", roles: [], privileges: []}));
 
         print("=== Role creation tests");
+        print("When a role is updated, it retains authenticationRestrictions");
+        assert.commandWorked(admin.runCommand({updateRole: "role2", roles: ["root"]}));
+        const role2Info = assert.commandWorked(
+            admin.runCommand({rolesInfo: "role2", showAuthenticationRestrictions: true}));
+        printjson(role2Info);
+        assert.eq(JSON.stringify([[{clientSource: ["127.0.0.1/32"]}]]),
+                  JSON.stringify(role2Info.roles[0].authenticationRestrictions));
+
         print(
             "When a client creates roles with empty authenticationRestrictions, the operation succeeds, though it has no effect");
         assert.commandWorked(admin.runCommand(
