@@ -94,6 +94,8 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
         expectChunks(st, ns, [2, 2, 2]);
     }
 
+    st.refreshCatalogCacheForNs(st.s, ns);
+
     const session = st.s.startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB[collName];
@@ -119,6 +121,8 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
         assert.commandWorked(
             st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
     }
+
+    st.refreshCatalogCacheForNs(st.s, ns);
 
     // The find should target shard0 and find the doc. If it targets shard1, it will not be able to
     // find the doc because it is using the snapshot for the pinned global read timestamp.

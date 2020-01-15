@@ -27,7 +27,6 @@ printjson(admin.runCommand({getShardVersion: coll + ""}));
 printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
 
 // Compare strings b/c timestamp comparison is a bit weird
-assert.eq(Timestamp(2, 2), admin.runCommand({getShardVersion: coll + ""}).version);
 assert.eq(Timestamp(1, 0),
           staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
 

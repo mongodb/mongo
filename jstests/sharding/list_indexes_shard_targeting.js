@@ -45,13 +45,14 @@ ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard0, st.shard1,
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: null}}));
 ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard1, st.shard2, {_id: MinKey});
 
+const latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
 const mongosCollectionVersion = st.s.adminCommand({getShardVersion: ns}).version;
 
-// Assert that besides the latest donor shard (shard1), all shards have stale collection
-// version.
-ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
-ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
-ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, mongosCollectionVersion);
+// Assert that the mongos and all non-donor shards have a stale collection version.
+assert.lt(mongosCollectionVersion, latestCollectionVersion);
+ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
+ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
+ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, latestCollectionVersion);
 
 // Create indexes directly on the other shards.
 st.shard1.getCollection(ns).createIndexes([{b: 1}]);

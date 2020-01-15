@@ -222,6 +222,8 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
                 catalogCache->onEpochChange(nss);
             }
 
+            catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(expCtx->opCtx, true);
+
             continue;  // Try again if allowed.
         }
         break;  // Success!

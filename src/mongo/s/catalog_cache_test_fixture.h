@@ -63,12 +63,29 @@ protected:
      * Invalidates the catalog cache for 'kNss' and schedules a thread to invoke the blocking 'get'
      * call, returning a future which can be obtained to get the specified routing information.
      *
+     * The notion of 'forced' in the function name implies that we will always indicate to the
+     * catalog cache that a refresh will happen, regardless of an epoch change or a stale shard.
+     *
      * NOTE: The returned value is always set. The reason to use optional is a deficiency of
      * std::future with the MSVC STL library, which requires the templated type to be default
      * constructible.
      */
     executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
-    scheduleRoutingInfoRefresh(const NamespaceString& nss);
+    scheduleRoutingInfoForcedRefresh(const NamespaceString& nss);
+
+    /**
+     * Invalidates the catalog cache for 'kNss' and schedules a thread to invoke the blocking 'get'
+     * call, returning a future which can be obtained to get the specified routing information.
+     *
+     * The notion of 'unforced' in the function name implies that a refresh will only happen if
+     * the epoch has been changed, or if a future targetted shard has been maked as stale.
+     *
+     * NOTE: The returned value is always set. The reason to use optional is a deficiency of
+     * std::future with the MSVC STL library, which requires the templated type to be default
+     * constructible.
+     */
+    executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
+    scheduleRoutingInfoUnforcedRefresh(const NamespaceString& nss);
 
     /**
      * Ensures that there are 'numShards' available in the shard registry. The shard ids are

@@ -409,6 +409,10 @@ ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
         return ChunkVersion(0, 0, _collectionVersion.epoch());
     }
 
+    uassert(StaleConfigInfo(_nss, {}, {}, shardName),
+            "shard has been marked stale",
+            !it->second.isStale.load());
+
     return it->second.shardVersion;
 }
 

@@ -586,6 +586,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                 catalogCache->onEpochChange(query.nss());
             }
 
+            catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
+
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName)) {
                     throw;

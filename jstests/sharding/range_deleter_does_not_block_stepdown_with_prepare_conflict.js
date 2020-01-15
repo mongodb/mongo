@@ -44,6 +44,7 @@ st.rs0.getPrimary().adminCommand({configureFailPoint: 'suspendRangeDeletion', mo
 // chunk's range. Flush its metadata to avoid StaleConfig during the later transaction.
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: st.shard1.shardName}));
 assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+st.refreshCatalogCacheForNs(st.s, ns);
 
 // Insert a doc into the chunk still owned by the donor shard in a transaction then prepare the
 // transaction so readers of that doc will enter a prepare conflict retry loop.

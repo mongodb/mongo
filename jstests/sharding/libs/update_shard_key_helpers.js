@@ -22,11 +22,13 @@ function shardCollectionMoveChunks(
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
     assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    st.refreshCatalogCacheForNs(st.s, ns);
 }
 
 function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, update, upsert) {
     let res;
     if (inTxn) {
+        st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
         session.startTransaction();
         res = assert.commandWorked(sessionDB.foo.update(query, update, {"upsert": upsert}));
         assert.commandWorked(session.commitTransaction_forTesting());
@@ -92,6 +94,7 @@ function runFindAndModifyCmdSuccess(st,
         }
 
         if (inTxn) {
+            st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
             session.startTransaction();
             res = sessionDB.foo.findAndModify(
                 {query: queries[i], update: updates[i], "upsert": upsert, "new": returnNew});
@@ -139,6 +142,7 @@ function runUpdateCmdFail(st,
                           pipelineUpdateResult) {
     let res;
     if (inTxn) {
+        st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
         session.startTransaction();
         res = sessionDB.foo.update(query, update, {multi: multiParamSet});
         assert.writeError(res);

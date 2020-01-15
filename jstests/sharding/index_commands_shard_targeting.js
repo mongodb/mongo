@@ -33,14 +33,15 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     // Assert that primary shard does not have any chunks for the collection.
     ShardVersioningUtil.assertShardVersionEquals(st.shard0, ns, Timestamp(0, 0));
 
-    const mongosCollectionVersion = st.s.adminCommand({getShardVersion: ns}).version;
+    // The donor shard for the last moveChunk will have the latest collection version.
+    const latestCollectionVersion =
+        ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
 
     // Assert that besides the latest donor shard (shard1), all shards have stale collection
     // version.
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, mongosCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard3, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, latestCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard3, ns, latestCollectionVersion);
 
     if (testCase.setUpFuncForCheckShardVersionTest) {
         testCase.setUpFuncForCheckShardVersionTest();
@@ -50,12 +51,12 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     // Assert that primary shard still has stale collection version after the command is run
     // because both the shard version in the command and in the shard's cache are UNSHARDED
     // (no chunks).
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
 
     // Assert that the other shards have the latest collection version after the command is run.
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, mongosCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, mongosCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard3, ns, mongosCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, latestCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard3, ns, latestCollectionVersion);
 }
 
 /*

@@ -167,6 +167,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+st.refreshCatalogCacheForNs(st.s, ns);
 
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
 // from the shards starting, aborting, and restarting the transaction due to needing to
