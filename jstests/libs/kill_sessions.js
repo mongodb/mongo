@@ -1,4 +1,5 @@
 load("jstests/libs/parallelTester.js");
+load("jstests/libs/check_log.js");
 
 /**
  * Implements a kill session test helper
@@ -223,8 +224,14 @@ var _kill_sessions_api_module = (function() {
         });
     };
 
-    function CursorHandle(session) {
+    Fixture.prototype.assertCursorKillLogMessages = function(cursorHandles) {
+        cursorHandles.forEach(
+            cursorHandle => cursorHandle.assertCursorKillLogMessages(this._clientsToVerifyVia));
+    };
+
+    function CursorHandle(session, cursors) {
         this._session = session;
+        this._cursors = cursors;
     }
 
     CursorHandle.prototype.getLsid = function() {
@@ -233,6 +240,19 @@ var _kill_sessions_api_module = (function() {
 
     CursorHandle.prototype.join = function() {
         this._session.endSession();
+    };
+
+    CursorHandle.prototype.assertCursorKillLogMessages = function(hostsToCheck) {
+        for (let hostToCheck of hostsToCheck) {
+            if (hostToCheck.host in this._cursors) {
+                let targetCursorId = this._cursors[hostToCheck.host].exactValueString;
+                assert.doesNotThrow(function() {
+                    checkLog.contains(
+                        hostToCheck,
+                        'killing cursor: ' + targetCursorId + ' as part of killing session(s)');
+                }, [], "cursor kill was not logged by " + hostToCheck.host);
+            }
+        }
     };
 
     /**
@@ -259,18 +279,23 @@ var _kill_sessions_api_module = (function() {
             },
         };
 
+        var cursors = {};
         var result;
         if (this._clientToExecuteViaIsdbgrid) {
             result = db.runCommand({multicast: cmd});
+            for (let host of Object.keys(result.hosts)) {
+                cursors[host] = result.hosts[host].data.cursor.id;
+            }
         } else {
             result = db.runCommand(cmd);
+            cursors[db.getMongo().host] = result.cursor.id;
         }
         if (!result.ok) {
             print(tojson(result));
         }
         assert(result.ok);
 
-        return new CursorHandle(session);
+        return new CursorHandle(session, cursors);
     };
 
     /**
@@ -309,6 +334,7 @@ var _kill_sessions_api_module = (function() {
                 fixture.assertSessionsInCursors([handle], []);
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCursors();
+                fixture.assertCursorKillLogMessages([handle]);
                 handle.join();
             },
 
@@ -319,6 +345,7 @@ var _kill_sessions_api_module = (function() {
                 fixture.assertSessionsInCursors([handle1, handle2], []);
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCursors();
+                fixture.assertCursorKillLogMessages([handle1, handle2]);
                 handle1.join();
                 handle2.join();
             },
@@ -368,6 +395,7 @@ var _kill_sessions_api_module = (function() {
                     fixture.kill("admin", obj);
                 }
                 fixture.assertSessionsInCursors([handle3], [handle1, handle2]);
+                fixture.assertCursorKillLogMessages([handle1, handle2]);
                 handle1.join();
                 handle2.join();
 
@@ -377,6 +405,7 @@ var _kill_sessions_api_module = (function() {
                     fixture.kill("admin", obj);
                 }
                 fixture.assertNoSessionsInCursors();
+                fixture.assertCursorKillLogMessages([handle3]);
                 handle3.join();
             },
         ];
@@ -524,6 +553,7 @@ var _kill_sessions_api_module = (function() {
                     fixture.kill("admin", obj);
                 }
                 fixture.assertSessionsInCursors([handle3], [handle1, handle2]);
+                fixture.assertCursorKillLogMessages([handle1, handle2]);
                 handle1.join();
                 handle2.join();
 
@@ -533,6 +563,7 @@ var _kill_sessions_api_module = (function() {
                     fixture.kill("admin", obj);
                 }
                 fixture.assertNoSessionsInCursors();
+                fixture.assertCursorKillLogMessages([handle3]);
                 handle3.join();
             },
         ];

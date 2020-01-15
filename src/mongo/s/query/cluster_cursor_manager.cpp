@@ -543,6 +543,7 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     auto eraser = [&](ClusterCursorManager& mgr, CursorId id) {
         uassertStatusOK(mgr.killCursor(getNamespaceForCursorId(id).get(), id));
+        log() << "killing cursor: " << id << " as part of killing session(s)";
     };
 
     auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
