@@ -495,6 +495,13 @@ connection_runtime_config = [
             adjust log archiving to retain the log records of this number
             of checkpoints. Zero or one means perform normal archiving.''',
             min='0', max='1024'),
+        Config('cursor_copy', 'false', r'''
+            if true, use the system allocator to make a copy of any data
+            returned by a cursor operation and return the copy instead.
+            The copy is freed on the next cursor operation. This allows
+            memory sanitizers to detect inappropriate references to memory
+            owned by cursors.''',
+            type='boolean'),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force
             lookaside eviction to happen more aggressively. This includes but

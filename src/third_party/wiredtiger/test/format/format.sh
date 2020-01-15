@@ -27,6 +27,7 @@ usage() {
 	echo "    -h home      run directory (defaults to .)"
 	echo "    -j parallel  jobs to execute in parallel (defaults to 8)"
 	echo "    -n total     total jobs to execute (defaults to no limit)"
+	echo "    -R           run timing stress split test configurations (defaults to off)"
 	echo "    -S           run smoke-test configurations (defaults to off)"
 	echo "    -t minutes   minutes to run (defaults to no limit)"
 	echo "    -v           verbose output (defaults to off)"
@@ -70,6 +71,7 @@ home="."
 minutes=0
 parallel_jobs=8
 smoke_test=0
+timing_stress_split_test=0
 total_jobs=0
 verbose=0
 format_binary="./t"
@@ -105,6 +107,9 @@ while :; do
 			exit 1
 		}
 		shift ; shift ;;
+	-R)
+		timing_stress_split_test=1
+		shift ;;
 	-S)
 		smoke_test=1
 		shift ;;
@@ -362,6 +367,12 @@ format()
 		args=${smoke_list[$smoke_next]}
 		smoke_next=$(($smoke_next + 1))
 		echo "$name: starting smoke-test job in $dir ($(date))"
+	elif [[ $timing_stress_split_test -ne 0 ]]; then
+		args=$format_args
+		for k in {1..7}; do
+			args+=" timing_stress_split_$k=$(($RANDOM%2))"
+		done
+		echo "$name: starting timing-stress-split job in $dir ($(date))"
 	else
 		args=$format_args
 

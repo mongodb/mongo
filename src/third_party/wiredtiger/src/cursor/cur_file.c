@@ -88,6 +88,7 @@ __curfile_next(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, next, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__wt_btcur_next(cbt, false));
 
@@ -114,6 +115,7 @@ __wt_curfile_next_random(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, next, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__wt_btcur_next_random(cbt));
 
@@ -139,6 +141,7 @@ __curfile_prev(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, prev, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__wt_btcur_prev(cbt, false));
 
@@ -164,6 +167,7 @@ __curfile_reset(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
 
     ret = __wt_btcur_reset(cbt);
 
@@ -189,6 +193,7 @@ __curfile_search(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, search, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
     time_start = __wt_clock(session);
@@ -219,6 +224,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
     time_start = __wt_clock(session);
@@ -249,6 +255,7 @@ __curfile_insert(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_UPDATE_API_CALL_BTREE(cursor, session, insert, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
 
     if (!F_ISSET(cursor, WT_CURSTD_APPEND))
         WT_ERR(__cursor_checkkey(cursor));
@@ -289,6 +296,7 @@ __wt_curfile_insert_check(WT_CURSOR *cursor)
     cbt = (WT_CURSOR_BTREE *)cursor;
     tret = 0;
     CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
     tret = __wt_btcur_insert_check(cbt);
@@ -315,6 +323,7 @@ __curfile_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_UPDATE_API_CALL_BTREE(cursor, session, modify, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
     /* Check for a rational modify vector count. */
@@ -349,6 +358,7 @@ __curfile_update(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
     WT_ERR(__cursor_checkvalue(cursor));
 
@@ -391,6 +401,7 @@ __curfile_remove(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
     time_start = __wt_clock(session);
@@ -427,6 +438,7 @@ __curfile_reserve(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_UPDATE_API_CALL_BTREE(cursor, session, reserve, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
     WT_ERR(__wt_txn_context_check(session, true));
@@ -470,6 +482,7 @@ __curfile_close(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, cbt->btree);
+    WT_ERR(__cursor_copy_release(cursor));
 err:
 
     /* Only try to cache the cursor if there's no error. */

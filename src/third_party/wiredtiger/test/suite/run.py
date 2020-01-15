@@ -95,10 +95,8 @@ for d in os.listdir(wt_3rdpartydir):
             sys.path.insert(1, os.path.join(wt_3rdpartydir, d, subdir))
             break
 
-import wttest
-# Use the same version of unittest found by wttest.py
-unittest = wttest.unittest
-from testscenarios.scenarios import generate_scenarios
+# unittest will be imported later, near to when it is needed.
+unittest = None
 
 def usage():
     print('Usage:\n\
@@ -106,6 +104,7 @@ def usage():
   $ python ../test/suite/run.py [ options ] [ tests ]\n\
 \n\
 Options:\n\
+            --asan               run with an ASAN enabled shared library\n\
   -C file | --configcreate file  create a config file for controlling tests\n\
   -c file | --config file        use a config file for controlling tests\n\
   -D dir  | --dir dir            use dir rather than WT_TEST.\n\
@@ -132,6 +131,32 @@ Tests:\n\
   When -C or -c are present, there may not be any tests named.\n\
   When -s is present, there must be a test named.\n\
 ')
+
+# Find an executable of the given name in the execution path.
+def which(name):
+    path = os.getenv('PATH')
+    for pathdir in path.split(os.path.pathsep):
+        fname = os.path.join(pathdir, name)
+        if os.path.exists(fname) and os.access(fname, os.X_OK):
+            return fname
+    return None
+
+# Follow a symbolic link, returning the target
+def follow_symlinks(pathname):
+    return os.path.realpath(pathname)
+
+# Find all instances of a filename under a directory
+def find(topdir, filename):
+    results = []
+    for root, dirs, files in os.walk(topdir, followlinks=True):
+        if filename in files:
+            results.append(os.path.join(root, filename))
+    return results
+
+# Show an environment variable if verbose enough.
+def show_env(verbose, envvar):
+    if verbose >= 2:
+        print(envvar + "=" + os.getenv(envvar))
 
 # capture the category (AKA 'subsuite') part of a test name,
 # e.g. test_util03 -> util
@@ -266,11 +291,14 @@ def testsFromArg(tests, loader, arg, scenario):
     for t in xrange(start, end+1):
         addScenarioTests(tests, loader, 'test%03d' % t, scenario)
 
-if __name__ == '__main__':
-    tests = unittest.TestSuite()
+def error(exitval, prefix, msg):
+    print('*** ERROR: {}: {}'.format(prefix, msg.replace('\n', '\n*** ')))
+    sys.exit(exitval)
 
+if __name__ == '__main__':
     # Turn numbers and ranges into test module names
     preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = ignoreStdout = False
+    asan = False
     parallel = 0
     random_sample = 0
     configfile = None
@@ -287,6 +315,9 @@ if __name__ == '__main__':
         # Command line options
         if arg[0] == '-':
             option = arg[1:]
+            if option == '-asan':
+                asan = True
+                continue
             if option == '-dir' or option == 'D':
                 if dirarg != None or len(args) == 0:
                     usage()
@@ -368,6 +399,83 @@ if __name__ == '__main__':
             usage()
             sys.exit(2)
         testargs.append(arg)
+
+    if asan:
+        # To run ASAN, we need to ensure these environment variables are set:
+        #    ASAN_SYMBOLIZER_PATH    full path to the llvm-symbolizer program
+        #    LD_LIBRARY_PATH         includes path with wiredtiger shared object
+        #    LD_PRELOAD              includes the ASAN runtime library
+        #
+        # Note that LD_LIBRARY_PATH has already been set above. The trouble with
+        # simply setting these variables in the Python environment is that it's
+        # too late. LD_LIBRARY_PATH is commonly cached by the shared library
+        # loader at program startup, and that's already been done before Python
+        # begins execution. Likewise, any preloading indicated by LD_PRELOAD
+        # has already been done.
+        #
+        # Our solution is to set the variables as appropriate, and then restart
+        # Python with the same argument list. The shared library loader will
+        # have everything it needs on the second go round.
+        #
+        # Note: If the ASAN stops the program with the error:
+        #    Shadow memory range interleaves with an existing memory mapping.
+        #    ASan cannot proceed correctly.
+        #
+        # try rebuilding with the clang options:
+        #    "-mllvm -asan-force-dynamic-shadow=1"
+        # and make sure that clang is used for all compiles.
+        #
+        # We'd like to show this as a message, but there's no good way to
+        # detect this error from here short of capturing/parsing all output
+        # from the test run.
+        ASAN_ENV = "__WT_TEST_SUITE_ASAN"    # if set, we've been here before
+        ASAN_SYMBOLIZER_PROG = "llvm-symbolizer"
+        ASAN_SYMBOLIZER_ENV = "ASAN_SYMBOLIZER_PATH"
+        LD_PRELOAD_ENV = "LD_PRELOAD"
+        SO_FILE_NAME = "libclang_rt.asan-x86_64.so"
+        if not os.environ.get(ASAN_ENV):
+            if verbose >= 2:
+                print('Enabling ASAN environment and rerunning python')
+            os.environ[ASAN_ENV] = "1"
+            show_env(verbose, "LD_LIBRARY_PATH")
+            if not os.environ.get(ASAN_SYMBOLIZER_ENV):
+                os.environ[ASAN_SYMBOLIZER_ENV] = which(ASAN_SYMBOLIZER_PROG)
+            if not os.environ.get(ASAN_SYMBOLIZER_ENV):
+                error(ASAN_SYMBOLIZER_ENV,
+                      'symbolizer program not found in PATH')
+            show_env(verbose, ASAN_SYMBOLIZER_ENV)
+            if not os.environ.get(LD_PRELOAD_ENV):
+                symbolizer = follow_symlinks(os.environ[ASAN_SYMBOLIZER_ENV])
+                bindir = os.path.dirname(symbolizer)
+                sofiles = []
+                if os.path.basename(bindir) == 'bin':
+                    libdir = os.path.join(os.path.dirname(bindir), 'lib')
+                    sofiles = find(libdir, SO_FILE_NAME)
+                if len(sofiles) != 1:
+                    if len(sofiles) == 0:
+                        fmt = 'ASAN shared library file not found.\n' + \
+                          'Set {} to the file location and rerun.'
+                        error(3, SO_FILE_NAME, fmt.format(LD_PRELOAD_ENV))
+                    else:
+                        fmt = 'multiple ASAN shared library files found\n' + \
+                          'under {}, expected just one.\n' + \
+                          'Set {} to the correct file location and rerun.'
+                        error(3, SO_FILE_NAME, fmt.format(libdir, LD_PRELOAD_ENV))
+                os.environ[LD_PRELOAD_ENV] = sofiles[0]
+            show_env(verbose, LD_PRELOAD_ENV)
+
+            # Restart python!
+            python = sys.executable
+            os.execl(python, python, *sys.argv)
+        elif verbose >= 2:
+            print('Python restarted for ASAN')
+
+    # We don't import wttest until after ASAN environment variables are set.
+    import wttest
+    # Use the same version of unittest found by wttest.py
+    unittest = wttest.unittest
+    tests = unittest.TestSuite()
+    from testscenarios.scenarios import generate_scenarios
 
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
