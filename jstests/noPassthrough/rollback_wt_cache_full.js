@@ -32,7 +32,7 @@ config.members[2].priority = 0;
 config.settings = {
     chainingAllowed: false
 };
-rst.initiate(config);
+rst.initiateWithHighElectionTimeout(config);
 
 // Prior to 4.0, rollback imposed a 300 MB limit on the total size of documents to refetch from
 // the sync source. Therefore, we select values for numDocs and minDocSizeMB, while accounting

@@ -114,7 +114,7 @@ function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     var rst = new ReplSetTest(
         {name: testName, nodes: initialNodes, useBridge: true, settings: {chainingAllowed: false}});
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     // Wait for both nodes to be up.
     waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY);

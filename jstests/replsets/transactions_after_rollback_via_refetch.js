@@ -61,7 +61,7 @@ let replTest = new ReplSetTest({
 replTest.startSet();
 let config = replTest.getReplSetConfig();
 config.members[2].priority = 0;
-replTest.initiate(config);
+replTest.initiateWithHighElectionTimeout(config);
 
 let rollbackTest = new RollbackTest(name, replTest);
 

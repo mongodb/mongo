@@ -23,7 +23,7 @@ const config = rst.getReplSetConfig();
 config.settings = {
     chainingAllowed: false
 };
-rst.initiate(config);
+rst.initiateWithHighElectionTimeout(config);
 // A 4.2 binVersion primary with empty data files will set FCV to 4.2 when elected. This will
 // cause an IncompatibleServerVersion error when connecting with a 4.0 binVersion node.
 // Therefore, we wait until the replica set is initiated with FCV4.0 before switching the
