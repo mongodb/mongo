@@ -405,11 +405,17 @@ private:
     // If null, the default collation is simple binary compare.
     std::unique_ptr<CollatorInterface> _collator;
 
-    // Empty means no filter.
+    // Empty means no validator.
     BSONObj _validatorDoc;
 
-    // Points into _validatorDoc. Null means no filter.
-    std::unique_ptr<MatchExpression> _validator;
+    // The collection validator MatchExpression. This is stored as a StatusWith, as we lazily
+    // enforce that collection validators are well formed.
+    // -A non-OK Status indicates that the validator is not well formed, and any attempts to enforce
+    // the validator (inserts) should error.
+    // -A value of {nullptr} indicates that there is no validator.
+    // -Anything else indicates a well formed validator. The MatchExpression will maintain
+    // pointers into _validatorDoc.
+    StatusWithMatchExpression _swValidator;
 
     ValidationAction _validationAction;
     ValidationLevel _validationLevel;
