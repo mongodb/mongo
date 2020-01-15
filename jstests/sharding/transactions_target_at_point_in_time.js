@@ -86,6 +86,8 @@ function runTest(testCase) {
 
     expectChunks(st, ns, [1, 1, 0]);
 
+    st.refreshCatalogCacheForNs(st.s, ns);
+
     const session = st.s.startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB[collName];
@@ -104,6 +106,8 @@ function runTest(testCase) {
 
     // Target a document in the chunk that was moved. The router should get a stale shard
     // version from Shard1 then retry on Shard1 and see the document.
+    st.refreshCatalogCacheForNs(st.s, ns);
+
     assert.eq(targetChunk2Func(sessionColl),
               1,
               "expected to find document in second chunk, cmd: " + cmdName);

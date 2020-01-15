@@ -1,7 +1,7 @@
 /*
  * Tests that changing the shard key value of a document using update and findAndModify works
  * correctly when the doc will change shards.
- * @tags: [uses_transactions, uses_multi_shard_transaction]
+ * @tags: [requires_find_command, uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {

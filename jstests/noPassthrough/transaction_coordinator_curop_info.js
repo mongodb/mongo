@@ -103,6 +103,7 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant.shardName}));
 assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 assert.commandWorked(participant.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+st.refreshCatalogCacheForNs(st.s, ns);
 
 let failPoints = enableFailPoints(coordinator, failPointNames);
 

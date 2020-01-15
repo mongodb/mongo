@@ -68,6 +68,7 @@ const setUp = function() {
     assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     assert.commandWorked(participant1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     assert.commandWorked(participant2.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    st.refreshCatalogCacheForNs(st.s, ns);
 
     // Start a new transaction by inserting a document onto each shard.
     assert.commandWorked(st.s.getDB(dbName).runCommand({

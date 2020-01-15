@@ -598,6 +598,9 @@ void runCommand(OperationContext* opCtx,
                     Grid::get(opCtx)->catalogCache()->onEpochChange(staleNs);
                 }
 
+                Grid::get(opCtx)->catalogCache()->setOperationShouldBlockBehindCatalogCacheRefresh(
+                    opCtx, true);
+
                 // Retry logic specific to transactions. Throws and aborts the transaction if the
                 // error cannot be retried on.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {

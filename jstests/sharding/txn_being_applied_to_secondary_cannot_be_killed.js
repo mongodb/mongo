@@ -43,6 +43,7 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
 assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+st.refreshCatalogCacheForNs(st.s, ns);
 
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
 // from the shards starting, aborting, and restarting the transaction due to needing to

@@ -93,8 +93,8 @@ assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
     epoch: res.versionEpoch,
 }));
 
-// Move a chunk so that mongos's routing entry gets marked as stale, making
-// the next getShardVersion trigger a refresh.
+// Verify that moving a chunk won't trigger mongos's routing entry to get marked as stale until
+// a request comes in to target that chunk.
 assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: splitPoint, to: otherShard.shardName}));
 
@@ -102,8 +102,8 @@ assert.commandWorked(
 // because the chunk size exceeds the limit.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});
 assert.commandWorked(res);
-assert.eq(res.version.t, 4);
-assert.eq(res.version.i, 1);
+assert.eq(res.version.t, 3);
+assert.eq(res.version.i, 10001);
 assert.eq(undefined, res.chunks);
 
 st.stop();
