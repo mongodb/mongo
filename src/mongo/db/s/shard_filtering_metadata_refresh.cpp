@@ -151,7 +151,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
         auto* const css = CollectionShardingRuntime::get(opCtx, nss);
-        css->refreshMetadata(opCtx, nullptr);
+        css->setFilteringMetadata(opCtx, CollectionMetadata());
 
         return ChunkVersion::UNSHARDED();
     }
@@ -185,10 +185,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         return metadata->getShardVersion();
     }
 
-    std::unique_ptr<CollectionMetadata> newCollectionMetadata =
-        stdx::make_unique<CollectionMetadata>(cm, shardingState->shardId());
-
-    css->refreshMetadata(opCtx, std::move(newCollectionMetadata));
+    css->setFilteringMetadata(opCtx, CollectionMetadata(cm, shardingState->shardId()));
 
     return css->getMetadata(opCtx)->getShardVersion();
 }
