@@ -38,6 +38,8 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -79,6 +81,8 @@ public:
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
     }
 
 protected:
@@ -100,6 +104,8 @@ protected:
     BSONObj getSingleOplogEntry(OperationContext* opCtx) {
         return getNOplogEntries(opCtx, 1).back();
     }
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 
 private:
     // Creates a reasonable set of ReplSettings for most tests.  We need to be able to
@@ -2131,6 +2137,46 @@ TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntri
 
     oExpected = BSON("applyOps" << BSON_ARRAY(operation2.toBSON()) << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
+}
+
+TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+    auto opCtx = getClient()->makeOperationContext();
+
+    // Put initial defaults in the cache.
+    {
+        RWConcernDefault origDefaults;
+        origDefaults.setEpoch(Timestamp(10, 20));
+        origDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
+        _lookupMock.setLookupCallReturnValue(std::move(origDefaults));
+    }
+    auto origCachedDefaults = rwcDefaults.getDefault(opCtx.get());
+    ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getEpoch());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getSetTime());
+
+    // Change the mock's defaults, but don't invalidate the cache yet. The cache should still return
+    // the original defaults.
+    {
+        RWConcernDefault newDefaults;
+        newDefaults.setEpoch(Timestamp(50, 20));
+        newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(5678));
+        _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+        auto cachedDefaults = rwcDefaults.getDefault(opCtx.get());
+        ASSERT_EQ(Timestamp(10, 20), *cachedDefaults.getEpoch());
+        ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *cachedDefaults.getSetTime());
+    }
+
+    // Rollback to a timestamp should invalidate the cache and getting the defaults should now
+    // return the latest value.
+    {
+        OpObserverImpl opObserver;
+        OpObserver::RollbackObserverInfo rbInfo;
+        opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    }
+    auto newCachedDefaults = rwcDefaults.getDefault(opCtx.get());
+    ASSERT_EQ(Timestamp(50, 20), *newCachedDefaults.getEpoch());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getSetTime());
 }
 
 }  // namespace

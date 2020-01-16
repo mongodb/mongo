@@ -60,6 +60,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
@@ -1810,6 +1811,10 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             shardRegistry->clearEntries();
         }
     }
+
+    // Force the default read/write concern cache to reload on next access in case the defaults
+    // document was rolled back.
+    ReadWriteConcernDefaults::get(opCtx).invalidate();
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
     // lastApplied value in bgsync to reflect our new last op. The rollback common point does

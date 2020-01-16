@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface.h"
@@ -125,6 +126,8 @@ protected:
 
     // DropPendingCollectionReaper used to clean up and roll back dropped collections.
     DropPendingCollectionReaper* _dropPendingCollectionReaper = nullptr;
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 class RollbackTest::StorageInterfaceRollback : public StorageInterfaceImpl {
