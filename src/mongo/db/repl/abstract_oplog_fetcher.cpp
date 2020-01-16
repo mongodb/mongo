@@ -47,9 +47,10 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
+// This failpoint is shared with oplog_fetcher.
+MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher)
 
+namespace {
 Counter64 readersCreatedStats;
 ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
                                                          &readersCreatedStats);
