@@ -42,7 +42,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/read_through_cache.h"
+#include "mongo/util/dist_cache.h"
 
 namespace mongo {
 
@@ -254,7 +254,7 @@ private:
     RestrictionDocuments _restrictions;
 };
 
-using UserCache = ReadThroughCache<UserName, User>;
-using UserHandle = UserCache::ValueHandle;
+using UserDistCache = DistCache<UserName, User>;
+using UserHandle = UserDistCache::ValueHandle;
 
 }  // namespace mongo

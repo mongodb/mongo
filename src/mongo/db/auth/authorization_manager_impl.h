@@ -160,9 +160,9 @@ private:
      * Cache which contains at most a single entry (which has key 0), whose value is the version of
      * the auth schema.
      */
-    class AuthSchemaVersionCache : public ReadThroughCache<int, int> {
+    class AuthSchemaVersionDistCache : public DistCache<int, int> {
     public:
-        AuthSchemaVersionCache(AuthzManagerExternalState* externalState);
+        AuthSchemaVersionDistCache(AuthzManagerExternalState* externalState);
 
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if
@@ -179,11 +179,11 @@ private:
     /**
      * Cache of the users known to the authentication subsystem.
      */
-    class UserCacheImpl : public UserCache {
+    class UserDistCacheImpl : public UserDistCache {
     public:
-        UserCacheImpl(AuthSchemaVersionCache* authSchemaVersionCache,
-                      AuthzManagerExternalState* externalState,
-                      int cacheSize);
+        UserDistCacheImpl(AuthSchemaVersionDistCache* authSchemaVersionCache,
+                          AuthzManagerExternalState* externalState,
+                          int cacheSize);
 
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if
@@ -193,7 +193,7 @@ private:
     private:
         Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::UserDistCacheImpl::_mutex");
 
-        AuthSchemaVersionCache* const _authSchemaVersionCache;
+        AuthSchemaVersionDistCache* const _authSchemaVersionCache;
 
         AuthzManagerExternalState* const _externalState;
     } _userCache;

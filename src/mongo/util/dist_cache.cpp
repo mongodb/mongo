@@ -29,20 +29,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/read_through_cache.h"
+#include "mongo/util/dist_cache.h"
 
 namespace mongo {
 
-ReadThroughCacheBase::ReadThroughCacheBase(Mutex& mutex) : _cacheWriteMutex(mutex) {}
+DistCacheBase::DistCacheBase(Mutex& mutex) : _cacheWriteMutex(mutex) {}
 
-ReadThroughCacheBase::~ReadThroughCacheBase() = default;
+DistCacheBase::~DistCacheBase() = default;
 
-OID ReadThroughCacheBase::getCacheGeneration() const {
+OID DistCacheBase::getCacheGeneration() const {
     stdx::lock_guard<Latch> lk(_cacheWriteMutex);
     return _fetchGeneration;
 }
 
-void ReadThroughCacheBase::_updateCacheGeneration(const CacheGuard&) {
+void DistCacheBase::_updateCacheGeneration(const CacheGuard&) {
     _fetchGeneration = OID::gen();
 }
 

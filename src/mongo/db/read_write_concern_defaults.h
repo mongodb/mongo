@@ -38,7 +38,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/read_through_cache.h"
+#include "mongo/util/dist_cache.h"
 
 namespace mongo {
 
@@ -135,7 +135,7 @@ private:
 
     boost::optional<RWConcernDefault> _getDefault(OperationContext* opCtx);
 
-    class Cache : public ReadThroughCache<Type, RWConcernDefault> {
+    class Cache : public DistCache<Type, RWConcernDefault> {
         Cache(const Cache&) = delete;
         Cache& operator=(const Cache&) = delete;
 
@@ -146,6 +146,7 @@ private:
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx, const Type& key) override;
 
     private:
+        // For exclusive use by DistCache only.
         Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::Cache");
 
         LookupFn _lookupFn;
