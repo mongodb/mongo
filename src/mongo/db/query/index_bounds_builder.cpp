@@ -109,6 +109,21 @@ bool stringMayHaveUnescapedPipe(StringData str) {
     return false;
 }
 
+bool isEqualityOrInNull(MatchExpression* me) {
+    // Because of type-bracketing, {$gte: null} and {$lte: null} are equivalent to {$eq: null}.
+    if (MatchExpression::EQ == me->matchType() || MatchExpression::GTE == me->matchType() ||
+        MatchExpression::LTE == me->matchType()) {
+        return static_cast<ComparisonMatchExpression*>(me)->getData().type() == BSONType::jstNULL;
+    }
+
+    if (me->matchType() == MatchExpression::MATCH_IN) {
+        const InMatchExpression* in = static_cast<const InMatchExpression*>(me);
+        return in->hasNull();
+    }
+
+    return false;
+}
+
 }  // namespace
 
 string IndexBoundsBuilder::simpleRegex(const char* regex,
@@ -377,9 +392,10 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         // This disables indexed negation of array inequality.
         // TODO: SERVER-45233 Perform correct behavior here once indexed array inequality without
         // negation's semantics are correctly determined and implemented.
-        massert(ErrorCodes::InternalError,
-                "Indexed negation of array inequality not supported.",
-                *tightnessOut == IndexBoundsBuilder::EXACT);
+        if (!isEqualityOrInNull(child))
+            massert(ErrorCodes::InternalError,
+                    "Indexed negation of array inequality not supported.",
+                    *tightnessOut == IndexBoundsBuilder::EXACT);
 
         // If the index is multikey, it doesn't matter what the tightness of the child is, we must
         // return INEXACT_FETCH. Consider a multikey index on 'a' with document {a: [1, 2, 3]} and
