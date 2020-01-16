@@ -899,6 +899,10 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
     _replExecutor->join();
 }
 
+void ReplicationCoordinatorImpl::markAsCleanShutdownIfPossible(OperationContext* opCtx) {
+    _externalState->clearAppliedThroughIfCleanShutdown(opCtx);
+}
+
 const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {
     return _settings;
 }

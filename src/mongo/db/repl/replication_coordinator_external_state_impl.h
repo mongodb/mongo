@@ -74,6 +74,9 @@ public:
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
     virtual void shutdown(OperationContext* opCtx);
+
+    virtual void clearAppliedThroughIfCleanShutdown(OperationContext* opCtx);
+
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual ThreadPool* getDbWorkThreadPool() const override;
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);

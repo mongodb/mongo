@@ -1626,7 +1626,7 @@ public:
         expectedMinValidWithUnsetFlag.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
 
         assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidWithUnsetFlag);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidWithUnsetFlag);
         assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidWithUnsetFlag);
         assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidWithUnsetFlag);
     }

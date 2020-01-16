@@ -43,6 +43,8 @@ void ReplicationCoordinatorNoOp::enterTerminalShutdown() {}
 
 void ReplicationCoordinatorNoOp::shutdown(OperationContext* opCtx) {}
 
+void ReplicationCoordinatorNoOp::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}
+
 ReplicationCoordinator::Mode ReplicationCoordinatorNoOp::getReplicationMode() const {
     return modeReplSet;
 }

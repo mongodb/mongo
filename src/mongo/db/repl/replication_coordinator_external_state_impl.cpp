@@ -340,6 +340,40 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     _startedThreads = true;
 }
 
+void ReplicationCoordinatorExternalStateImpl::clearAppliedThroughIfCleanShutdown(
+    OperationContext* opCtx) {
+    {
+        stdx::lock_guard<Latch> lk(_threadMutex);
+        if (!_startedThreads) {
+            return;
+        }
+        invariant(_inShutdown);
+    }
+
+    // Ensure that all writes are visible before reading. If we failed mid-batch, it would be
+    // possible to read from a kLastApplied ReadSource where not all writes to the minValid document
+    // are visible, generating a writeConflict that would not resolve.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+
+    auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
+    if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
+        loadLastOpTimeAndWallTimeResult.isOK() &&
+        loadLastOpTimeAndWallTimeResult.getValue().opTime ==
+            _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
+        // Clear the appliedThrough marker to indicate we are consistent with the top of the
+        // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
+        // checkpoints being taken, they should only reflect this write if they see all writes up
+        // to our 'lastAppliedOpTime'.
+        auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
+
+        invariant(opCtx->lockState()->isRSTLExclusive());
+        // Since we acquired RSTL in mode X, there can't be any active readers. So, it's safe to
+        // write the minvalid document to the storage.
+        _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
+            opCtx, lastAppliedOpTime.getTimestamp());
+    }
+}
+
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_threadMutex);
     _inShutdown = true;
@@ -370,25 +404,6 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // _taskExecutor outside of _threadMutex because once _startedThreads is set to true, the
     // _taskExecutor pointer never changes.
     _taskExecutor->join();
-
-    // Ensure that all writes are visible before reading. If we failed mid-batch, it would be
-    // possible to read from a kLastApplied ReadSource where not all writes to the minValid document
-    // are visible, generating a writeConflict that would not resolve.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-
-    auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
-    if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
-        loadLastOpTimeAndWallTimeResult.isOK() &&
-        loadLastOpTimeAndWallTimeResult.getValue().opTime ==
-            _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
-        // Clear the appliedThrough marker to indicate we are consistent with the top of the
-        // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
-        // checkpoints being taken, they should only reflect this write if they see all writes up
-        // to our 'lastAppliedOpTime'.
-        auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
-        _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
-            opCtx, lastAppliedOpTime.getTimestamp());
-    }
 }
 
 executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor() const {
