@@ -1,5 +1,0 @@
-uri: "mongodb+srv://test8.test.build.10gen.cc/"
-seeds: []
-hosts: []
-error: true
-comment: Should fail because the options in the TXT record are incorrectly formatted (misses value).

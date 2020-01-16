@@ -1,5 +1,0 @@
-uri: "mongodb+srv://test7.test.build.10gen.cc/"
-seeds: []
-hosts: []
-error: true
-comment: Should fail because "ssl" is not an allowed option.

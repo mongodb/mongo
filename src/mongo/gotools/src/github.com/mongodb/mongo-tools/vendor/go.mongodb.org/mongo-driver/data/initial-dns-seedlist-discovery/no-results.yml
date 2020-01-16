@@ -1,5 +1,0 @@
-uri: "mongodb+srv://test4.test.build.10gen.cc/"
-seeds: []
-hosts: []
-error: true
-comment: Should fail because no SRV records are present for this URI.

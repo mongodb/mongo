@@ -1,3 +1,0 @@
-[submodule "specifications"]
-	path = specifications
-	url = git@github.com:mongodb/specifications.git
