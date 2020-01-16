@@ -624,4 +624,241 @@ TEST(MockDBClientConnTest, Delay) {
     ASSERT_EQUALS(1U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
 }
+
+TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
+    MockDBClientConnection conn;
+
+    const NamespaceString nss("test", "coll");
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+    cursor.setBatchSize(2);
+
+    const auto docObj = [](int i) { return BSON("_id" << i); };
+    const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
+    const long long cursorId = 123;
+    const bool moreToCome = true;
+
+    // Two batches from the initial find and getMore command.
+    MockDBClientConnection::Responses callResponses = {
+        MockDBClientConnection::mockFindResponse(
+            nss, cursorId, {docObj(1), docObj(2)}, metadata(1)),
+        MockDBClientConnection::mockGetMoreResponse(
+            nss, cursorId, {docObj(3), docObj(4)}, metadata(2), moreToCome)};
+    conn.setCallResponses(callResponses);
+
+    // Two more batches from the exhaust stream.
+    MockDBClientConnection::Responses recvResponses = {
+        MockDBClientConnection::mockGetMoreResponse(
+            nss, cursorId, {docObj(5), docObj(6)}, metadata(3), moreToCome),
+        // Terminal getMore responses with cursorId 0 and no kMoreToCome flag.
+        MockDBClientConnection::mockGetMoreResponse(nss, 0, {docObj(7), docObj(8)}, metadata(4))};
+    conn.setRecvResponses(recvResponses);
+
+    int numMetaRead = 0;
+    conn.setReplyMetadataReader(
+        [&](mongo::OperationContext* opCtx, const BSONObj& metadataObj, mongo::StringData target) {
+            numMetaRead++;
+            // Verify metadata for each batch.
+            ASSERT(metadataObj.hasField("$fakeMetaData"));
+            ASSERT_EQ(numMetaRead, metadataObj["$fakeMetaData"].number());
+            return mongo::Status::OK();
+        });
+
+    // First batch from the initial find command.
+    ASSERT_TRUE(cursor.init());
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Second batch from the first getMore command.
+    ASSERT_TRUE(cursor.more());
+    ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(4), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Third batch from the exhaust stream.
+    ASSERT_TRUE(cursor.more());
+    ASSERT_BSONOBJ_EQ(docObj(5), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(6), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Last batch from the exhaust stream.
+    ASSERT_TRUE(cursor.more());
+    ASSERT_BSONOBJ_EQ(docObj(7), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(8), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // No more batches.
+    ASSERT_FALSE(cursor.more());
+    ASSERT_TRUE(cursor.isDead());
+
+    // Test that metadata reader is called four times for the four batches.
+    ASSERT_EQ(4, numMetaRead);
+}
+
+TEST(MockDBClientConnTest, SimulateCallErrors) {
+    MockDBClientConnection conn;
+
+    const NamespaceString nss("test", "coll");
+    mongo::DBClientCursor cursor(
+        &conn, mongo::NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, 0, 0);
+
+    // Test network exception and error response for the initial find.
+    MockDBClientConnection::Responses callResponses = {
+        // Network exception during call().
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        // Error response from the find command.
+        MockDBClientConnection::mockErrorResponse(mongo::ErrorCodes::Interrupted)};
+    conn.setCallResponses(callResponses);
+
+    // Throw call exception.
+    ASSERT_THROWS_CODE_AND_WHAT(cursor.init(),
+                                mongo::DBException,
+                                mongo::ErrorCodes::NetworkTimeout,
+                                "Fake socket timeout");
+    ASSERT_TRUE(cursor.isDead());
+
+    // Throw exception on non-OK response.
+    ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::Interrupted);
+    ASSERT_TRUE(cursor.isDead());
+}
+
+TEST(MockDBClientConnTest, SimulateRecvErrors) {
+    MockDBClientConnection conn;
+
+    const NamespaceString nss("test", "coll");
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+    cursor.setBatchSize(1);
+
+    const auto docObj = [](int i) { return BSON("_id" << i); };
+    const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
+    const long long cursorId = 123;
+    const bool moreToCome = true;
+
+    // Two batches from the initial find and getMore command.
+    MockDBClientConnection::Responses callResponses = {
+        MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1)),
+        MockDBClientConnection::mockGetMoreResponse(
+            nss, cursorId, {docObj(2)}, metadata(2), moreToCome)};
+    conn.setCallResponses(callResponses);
+
+    // First batch from the initial find command.
+    ASSERT_TRUE(cursor.init());
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Second batch from the first getMore command.
+    ASSERT_TRUE(cursor.more());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Test network exception and error response from exhaust stream.
+    MockDBClientConnection::Responses recvResponses = {
+        // Network exception during recv().
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        // Error response from the exhaust cursor.
+        MockDBClientConnection::mockErrorResponse(mongo::ErrorCodes::Interrupted)};
+    conn.setRecvResponses(recvResponses);
+
+    // The first recv() call gets a network exception.
+    ASSERT_THROWS_CODE_AND_WHAT(cursor.more(),
+                                mongo::DBException,
+                                mongo::ErrorCodes::NetworkTimeout,
+                                "Fake socket timeout");
+    // Cursor is still valid on network exceptions.
+    ASSERT_FALSE(cursor.isDead());
+
+    // Throw exception on non-OK response.
+    ASSERT_THROWS_CODE(cursor.more(), mongo::DBException, mongo::ErrorCodes::Interrupted);
+    // Cursor is dead on command errors.
+    ASSERT_TRUE(cursor.isDead());
+}
+
+TEST(MockDBClientConnTest, BlockingNetwork) {
+    MockDBClientConnection conn;
+
+    const NamespaceString nss("test", "coll");
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+    cursor.setBatchSize(1);
+
+    const auto docObj = [](int i) { return BSON("_id" << i); };
+    const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
+    const long long cursorId = 123;
+    const bool moreToCome = true;
+
+    mongo::stdx::thread cursorThread([&] {
+        // First batch from the initial find command.
+        ASSERT_TRUE(cursor.init());
+        ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+        ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+        // Second batch from the first getMore command.
+        ASSERT_TRUE(cursor.more());
+        ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+        ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+        // Last batch from the exhaust stream.
+        ASSERT_TRUE(cursor.more());
+        ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
+        ASSERT_FALSE(cursor.moreInCurrentBatch());
+        ASSERT_TRUE(cursor.isDead());
+    });
+
+    const auto blockedOnNetworkSoon = [&]() {
+        // Wait up to 10 seconds.
+        for (auto i = 0; i < 100; i++) {
+            if (conn.isBlockedOnNetwork()) {
+                return true;
+            }
+            mongo::sleepmillis(100);
+        }
+        return false;
+    };
+
+    // Cursor should be blocked on the first find command.
+    ASSERT_TRUE(blockedOnNetworkSoon());
+    auto m = conn.getLastSentMessage();
+    auto msg = mongo::OpMsg::parse(m);
+    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
+    // Set the response for the find command and unblock network call().
+    conn.setCallResponses(
+        {MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1))});
+
+    // Cursor should be blocked on the getMore command.
+    ASSERT_TRUE(blockedOnNetworkSoon());
+    m = conn.getLastSentMessage();
+    msg = mongo::OpMsg::parse(m);
+    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
+    // Set the response for the getMore command and unblock network call().
+    conn.setCallResponses({MockDBClientConnection::mockGetMoreResponse(
+        nss, cursorId, {docObj(2)}, metadata(2), moreToCome)});
+
+    // Cursor should be blocked on the exhaust stream.
+    ASSERT_TRUE(blockedOnNetworkSoon());
+    // Set the response for the exhaust stream and unblock network recv().
+    conn.setRecvResponses(
+        {MockDBClientConnection::mockGetMoreResponse(nss, 0, {docObj(3)}, metadata(3))});
+
+    cursorThread.join();
+}
 }  // namespace mongo_test
