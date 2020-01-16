@@ -150,7 +150,7 @@ new_page:	if (cbt->ins == NULL)
 				++cbt->page_deleted_count;
 			continue;
 		}
-		return (__wt_value_return(session, cbt, upd));
+		return (__wt_value_return(cbt, upd));
 	}
 	/* NOTREACHED */
 }
@@ -211,7 +211,7 @@ new_page:	/* Find the matching WT_COL slot. */
 					++cbt->page_deleted_count;
 				continue;
 			}
-			return (__wt_value_return(session, cbt, upd));
+			return (__wt_value_return(cbt, upd));
 		}
 
 		/*
@@ -331,7 +331,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			}
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
-			return (__wt_value_return(session, cbt, upd));
+			return (__wt_value_return(cbt, upd));
 		}
 
 		/* Check for the end of the page. */
@@ -468,8 +468,12 @@ __wt_cursor_key_order_check(
  * search.
  */
 int
-__wt_cursor_key_order_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_cursor_key_order_init(WT_CURSOR_BTREE *cbt)
 {
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
 	/*
 	 * Cursor searches set the position for cursor movements, set the
 	 * last-key value for diagnostic checking.
@@ -610,7 +614,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 			 * If the update, which returned prepared conflict is
 			 * visible, return the value.
 			 */
-			return (__cursor_kv_return(session, cbt, upd));
+			return (__cursor_kv_return(cbt, upd));
 		}
 	}
 

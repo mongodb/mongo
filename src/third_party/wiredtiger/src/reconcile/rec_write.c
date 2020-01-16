@@ -4727,7 +4727,6 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	page = pageref->page;
 	last = r->last;
 	vpack = &_vpack;
-	cbt = &r->update_modify_cbt;
 
 	WT_RET(__rec_split_init(session,
 	    r, page, pageref->ref_recno, btree->maxleafpage_precomp));
@@ -4737,6 +4736,8 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	size = 0;
 	upd = NULL;
 
+	cbt = &r->update_modify_cbt;
+	cbt->iface.session = (WT_SESSION *)session;
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
 	 * were missing records in the column-store name space.  If taking the
@@ -4856,7 +4857,7 @@ record_loop:	/*
 				case WT_UPDATE_MODIFY:
 					cbt->slot = WT_COL_SLOT(page, cip);
 					WT_ERR(__wt_value_return_upd(
-					    session, cbt, upd,
+					    cbt, upd,
 					    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 					data = cbt->iface.value.data;
 					size = (uint32_t)cbt->iface.value.size;
@@ -5101,7 +5102,7 @@ compare:		/*
 					 */
 					cbt->slot = UINT32_MAX;
 					WT_ERR(__wt_value_return_upd(
-					    session, cbt, upd,
+					    cbt, upd,
 					    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 					data = cbt->iface.value.data;
 					size = (uint32_t)cbt->iface.value.size;
@@ -5503,6 +5504,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	cbt = &r->update_modify_cbt;
+	cbt->iface.session = (WT_SESSION *)session;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 
 	key = &r->k;
@@ -5657,7 +5659,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			switch (upd->type) {
 			case WT_UPDATE_MODIFY:
 				cbt->slot = WT_ROW_SLOT(page, rip);
-				WT_ERR(__wt_value_return_upd(session, cbt, upd,
+				WT_ERR(__wt_value_return_upd(cbt, upd,
 				    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 				WT_ERR(__rec_cell_build_val(session, r,
 				    cbt->iface.value.data,
@@ -5875,6 +5877,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 	btree = S2BT(session);
 	cbt = &r->update_modify_cbt;
+	cbt->iface.session = (WT_SESSION *)session;
 
 	key = &r->k;
 	val = &r->v;
@@ -5915,7 +5918,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			 */
 			cbt->slot = UINT32_MAX;
 			WT_RET(__wt_value_return_upd(
-			    session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+			    cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
 			WT_RET(__rec_cell_build_val(session, r,
 			    cbt->iface.value.data,
 			    cbt->iface.value.size, (uint64_t)0));

@@ -205,9 +205,8 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt,
-    bool insert, bool restore)
+__wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key,
+    bool insert, WT_REF *leaf, bool leaf_safe, bool *leaf_foundp)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
@@ -218,11 +217,13 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_PAGE_INDEX *pindex, *parent_pindex;
 	WT_REF *current, *descent;
 	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
 	size_t match, skiphigh, skiplow;
 	uint32_t base, indx, limit, read_flags;
 	int cmp, depth;
 	bool append_check, descend_right, done;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
 	collator = btree->collator;
 	item = cbt->tmp;
@@ -258,18 +259,12 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 * re-instantiated in memory.
 	 */
 	if (leaf != NULL) {
-		if (!restore) {
+		if (!leaf_safe) {
 			WT_RET(__check_leaf_key_range(
 			    session, srch_key, leaf, cbt));
-			if (cbt->compare != 0) {
-				/*
-				 * !!!
-				 * WT_CURSOR.search_near uses the slot value to
-				 * decide if there was an on-page match.
-				 */
-				cbt->slot = 0;
+			*leaf_foundp = cbt->compare == 0;
+			if (!*leaf_foundp)
 				return (0);
-			}
 		}
 
 		current = leaf;

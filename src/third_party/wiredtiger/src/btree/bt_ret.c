@@ -13,15 +13,17 @@
  *	Change the cursor to reference an internal return key.
  */
 static inline int
-__key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__key_return(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
 	WT_ITEM *tmp;
 	WT_PAGE *page;
 	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
 
 	page = cbt->ref->page;
 	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		rip = &page->pg_row[cbt->slot];
@@ -78,7 +80,7 @@ __key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  *	Change the cursor to reference an internal original-page return value.
  */
 static inline int
-__value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__value_return(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -86,8 +88,10 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_PAGE *page;
 	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
 	uint8_t v;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
 
 	page = cbt->ref->page;
@@ -134,11 +138,12 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  *	value.
  */
 int
-__wt_value_return_upd(WT_SESSION_IMPL *session,
+__wt_value_return_upd(
     WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, bool ignore_visibility)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE **listp, *list[WT_MODIFY_ARRAY_SIZE];
 	size_t allocated_bytes;
 	u_int i;
@@ -146,6 +151,7 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 
 	cursor = &cbt->iface;
 	allocated_bytes = 0;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/*
 	 * We're passed a "standard" or "modified"  update that's visible to us.
@@ -237,7 +243,7 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 			 */
 			WT_ASSERT(session, cbt->slot != UINT32_MAX);
 
-			WT_ERR(__value_return(session, cbt));
+			WT_ERR(__value_return(cbt));
 		}
 	} else if (upd->type == WT_UPDATE_TOMBSTONE)
 		WT_ERR(__wt_buf_set(session, &cursor->value, "", 0));
@@ -262,7 +268,7 @@ err:	if (allocated_bytes != 0)
  *	Change the cursor to reference an internal return key.
  */
 int
-__wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_key_return(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
 
@@ -279,7 +285,7 @@ __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 */
 	F_CLR(cursor, WT_CURSTD_KEY_EXT);
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
-		WT_RET(__key_return(session, cbt));
+		WT_RET(__key_return(cbt));
 		F_SET(cursor, WT_CURSTD_KEY_INT);
 	}
 	return (0);
@@ -290,8 +296,7 @@ __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  *	Change the cursor to reference an internal return value.
  */
 int
-__wt_value_return(
-    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
 	WT_CURSOR *cursor;
 
@@ -299,9 +304,9 @@ __wt_value_return(
 
 	F_CLR(cursor, WT_CURSTD_VALUE_EXT);
 	if (upd == NULL)
-		WT_RET(__value_return(session, cbt));
+		WT_RET(__value_return(cbt));
 	else
-		WT_RET(__wt_value_return_upd(session, cbt, upd, false));
+		WT_RET(__wt_value_return_upd(cbt, upd, false));
 	F_SET(cursor, WT_CURSTD_VALUE_INT);
 	return (0);
 }

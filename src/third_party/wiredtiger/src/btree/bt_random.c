@@ -13,16 +13,18 @@
  *	Return a random key from a row-store leaf page.
  */
 int
-__wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_row_random_leaf(WT_CURSOR_BTREE *cbt)
 {
 	WT_INSERT *ins, **start, **stop;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
+	WT_SESSION_IMPL *session;
 	uint64_t samples;
 	uint32_t choice, entries, i;
 	int level;
 
 	page = cbt->ref->page;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	start = stop = NULL;		/* [-Wconditional-uninitialized] */
 	entries = 0;			/* [-Wconditional-uninitialized] */
 
@@ -425,11 +427,11 @@ random_page_entry:
 	 * Select a random entry from the leaf page. If it's not valid, move to
 	 * the next entry, if that doesn't work, move to the previous entry.
 	 */
-	WT_ERR(__wt_row_random_leaf(session, cbt));
+	WT_ERR(__wt_row_random_leaf(cbt));
 	WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
 	if (valid) {
-		WT_ERR(__wt_key_return(session, cbt));
-		WT_ERR(__wt_value_return(session, cbt, upd));
+		WT_ERR(__wt_key_return(cbt));
+		WT_ERR(__wt_value_return(cbt, upd));
 	} else {
 		if ((ret = __wt_btcur_next(cbt, false)) == WT_NOTFOUND)
 			ret = __wt_btcur_prev(cbt, false);

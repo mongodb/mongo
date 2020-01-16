@@ -296,7 +296,7 @@ new_page:	if (cbt->ins == NULL)
 				++cbt->page_deleted_count;
 			continue;
 		}
-		return (__wt_value_return(session, cbt, upd));
+		return (__wt_value_return(cbt, upd));
 	}
 	/* NOTREACHED */
 }
@@ -358,7 +358,7 @@ new_page:	if (cbt->recno < cbt->ref->ref_recno)
 					++cbt->page_deleted_count;
 				continue;
 			}
-			return (__wt_value_return(session, cbt, upd));
+			return (__wt_value_return(cbt, upd));
 		}
 
 		/*
@@ -488,7 +488,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			}
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
-			return (__wt_value_return(session, cbt, upd));
+			return (__wt_value_return(cbt, upd));
 		}
 
 		/* Check for the beginning of the page. */
@@ -564,7 +564,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 			 * If the update, which returned prepared conflict is
 			 * visible, return the value.
 			 */
-			return (__cursor_kv_return(session, cbt, upd));
+			return (__cursor_kv_return(cbt, upd));
 		}
 	}
 

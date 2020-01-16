@@ -1476,11 +1476,10 @@ __split_multi_inmem(
 			recno = WT_INSERT_RECNO(supd->ins);
 
 			/* Search the page. */
-			WT_ERR(__wt_col_search(
-			    session, recno, ref, &cbt, true));
+			WT_ERR(__wt_col_search(&cbt, recno, ref, true, NULL));
 
 			/* Apply the modification. */
-			WT_ERR(__wt_col_modify(session, &cbt,
+			WT_ERR(__wt_col_modify(&cbt,
 			    recno, NULL, upd, WT_UPDATE_INVALID, true));
 			break;
 		case WT_PAGE_ROW_LEAF:
@@ -1500,7 +1499,7 @@ __split_multi_inmem(
 
 			/* Search the page. */
 			WT_ERR(__wt_row_search(
-			    session, key, ref, &cbt, true, true));
+			    &cbt, key, true, ref, true, NULL));
 
 			/*
 			 * Birthmarks should only be applied to on-page values.
@@ -1509,7 +1508,7 @@ __split_multi_inmem(
 			    upd->type != WT_UPDATE_BIRTHMARK);
 
 			/* Apply the modification. */
-			WT_ERR(__wt_row_modify(session,
+			WT_ERR(__wt_row_modify(
 			    &cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session, orig->type);

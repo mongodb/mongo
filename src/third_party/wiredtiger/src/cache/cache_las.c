@@ -704,6 +704,12 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 	WT_ERR(__wt_txn_begin(session, NULL));
 	local_txn = true;
 
+	/*
+	 * Inserts should be on the same page absent a split, search any pinned
+	 * leaf page.
+	 */
+	F_SET(cursor, WT_CURSTD_UPDATE_LOCAL);
+
 	/* Enter each update in the boundary's list into the lookaside store. */
 	for (las_counter = 0, i = 0,
 	    list = multi->supd; i < multi->supd_entries; ++i, ++list) {
@@ -799,10 +805,8 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 				    upd->type, &las_value);
 
 			/*
-			 * Using update looks a little strange because the keys
-			 * are guaranteed to not exist, but since we're
-			 * appending, we want the cursor to stay positioned in
-			 * between inserts.
+			 * Using update instead of insert so the page stays
+			 * pinned and can be searched before the tree.
 			 */
 			WT_ERR(cursor->update(cursor));
 			++insert_cnt;
@@ -831,6 +835,7 @@ err:	/* Resolve the transaction. */
 	}
 
 	__las_restore_isolation(session, saved_isolation);
+	F_CLR(cursor, WT_CURSTD_UPDATE_LOCAL);
 
 	if (ret == 0 && insert_cnt > 0) {
 		multi->page_las.las_pageid = las_pageid;

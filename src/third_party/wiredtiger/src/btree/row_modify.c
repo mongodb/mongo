@@ -41,8 +41,8 @@ err:		__wt_free(session, modify);
  *	Row-store insert, update and delete.
  */
 int
-__wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    const WT_ITEM *key, const WT_ITEM *value,
+__wt_row_modify(
+    WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
     WT_UPDATE *upd_arg, u_int modify_type, bool exclusive)
 {
 	WT_DECL_RET;
@@ -50,6 +50,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *old_upd, *upd, **upd_entry;
 	size_t ins_size, upd_size;
 	uint32_t ins_slot;
@@ -58,6 +59,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 	ins = NULL;
 	page = cbt->ref->page;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	upd = upd_arg;
 	logged = false;
 

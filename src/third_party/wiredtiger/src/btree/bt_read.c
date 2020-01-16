@@ -31,9 +31,9 @@ __col_instantiate(WT_SESSION_IMPL *session,
 		__wt_free_update_list(session, upd);
 
 	/* Search the page and add updates. */
-	WT_RET(__wt_col_search(session, recno, ref, cbt, true));
+	WT_RET(__wt_col_search(cbt, recno, ref, true, NULL));
 	WT_RET(__wt_col_modify(
-	    session, cbt, recno, NULL, updlist, WT_UPDATE_INVALID, false));
+	    cbt, recno, NULL, updlist, WT_UPDATE_INVALID, false));
 	return (0);
 }
 
@@ -60,9 +60,9 @@ __row_instantiate(WT_SESSION_IMPL *session,
 		__wt_free_update_list(session, upd);
 
 	/* Search the page and add updates. */
-	WT_RET(__wt_row_search(session, key, ref, cbt, true, true));
+	WT_RET(__wt_row_search(cbt, key, true, ref, true, NULL));
 	WT_RET(__wt_row_modify(
-	    session, cbt, key, NULL, updlist, WT_UPDATE_INVALID, false));
+	    cbt, key, NULL, updlist, WT_UPDATE_INVALID, false));
 	return (0);
 }
 

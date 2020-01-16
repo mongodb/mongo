@@ -14,7 +14,7 @@ static int  __ckpt_load(WT_SESSION_IMPL *,
 		WT_CONFIG_ITEM *, WT_CONFIG_ITEM *, WT_CKPT *);
 static int  __ckpt_named(
 		WT_SESSION_IMPL *, const char *, const char *, WT_CKPT *);
-static int  __ckpt_set(WT_SESSION_IMPL *, const char *, const char *);
+static int  __ckpt_set(WT_SESSION_IMPL *, const char *, const char *, bool);
 static int  __ckpt_version_chk(WT_SESSION_IMPL *, const char *, const char *);
 
 /*
@@ -94,7 +94,7 @@ __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname)
 	 * metadata entry.  If no entry is found to update and we're trying to
 	 * clear the checkpoint, just ignore it.
 	 */
-	WT_RET_NOTFOUND_OK(__ckpt_set(session, fname, NULL));
+	WT_RET_NOTFOUND_OK(__ckpt_set(session, fname, NULL, false));
 
 	return (0);
 }
@@ -104,25 +104,46 @@ __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname)
  *	Set a file's checkpoint.
  */
 static int
-__ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v)
+__ckpt_set(
+    WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_base)
 {
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	const char *cfg[3];
+	const char *cfg[3], *str;
 	char *config, *newcfg;
 
+	/*
+	 * If the caller knows we're on a path like checkpoints where we
+	 * have a valid checkpoint and checkpoint LSN and should use the base,
+	 * then use that faster path. Some paths don't have a dhandle or want
+	 * to have the older value retained from the existing metadata.
+	 * In those cases, use the slower path through configuration
+	 * parsing functions.
+	 */
 	config = newcfg = NULL;
-
-	/* Retrieve the metadata for this file. */
-	WT_ERR(__wt_metadata_search(session, fname, &config));
-
-	/* Replace the checkpoint entry. */
-	cfg[0] = config;
-	cfg[1] = v == NULL ? "checkpoint=()" : v;
-	cfg[2] = NULL;
-	WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
-	WT_ERR(__wt_metadata_update(session, fname, newcfg));
-
-err:	__wt_free(session, config);
+	str = v == NULL ? "checkpoint=(),checkpoint_lsn=" : v;
+	if (use_base && session->dhandle != NULL) {
+		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+		WT_ASSERT(session, strcmp(session->dhandle->name, fname) == 0);
+		/*
+		 * Concatenate the metadata base string with the checkpoint
+		 * string.
+		 */
+		WT_ERR(__wt_buf_fmt(session,
+		    tmp, "%s,%s", session->dhandle->meta_base, str));
+		WT_ERR(__wt_metadata_update(session, fname, tmp->mem));
+	} else {
+		/* Retrieve the metadata for this file. */
+		WT_ERR(__wt_metadata_search(session, fname, &config));
+		/* Replace the checkpoint entry. */
+		cfg[0] = config;
+		cfg[1] = str;
+		cfg[2] = NULL;
+		WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
+		WT_ERR(__wt_metadata_update(session, fname, newcfg));
+	}
+err:	__wt_scr_free(session, &tmp);
+	__wt_free(session, config);
 	__wt_free(session, newcfg);
 	return (ret);
 }
@@ -375,6 +396,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 	time_t secs;
 	int64_t maxorder;
 	const char *sep;
+	bool has_lsn;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	maxorder = 0;
@@ -448,11 +470,14 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
+
+	has_lsn = ckptlsn != NULL;
 	if (ckptlsn != NULL)
 		WT_ERR(__wt_buf_catfmt(session, buf,
 		    ",checkpoint_lsn=(%" PRIu32 ",%" PRIuMAX ")",
 		    ckptlsn->l.file, (uintmax_t)ckptlsn->l.offset));
-	WT_ERR(__ckpt_set(session, fname, buf->mem));
+
+	WT_ERR(__ckpt_set(session, fname, buf->mem, has_lsn));
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);
