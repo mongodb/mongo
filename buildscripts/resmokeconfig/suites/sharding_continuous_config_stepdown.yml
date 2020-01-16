@@ -206,6 +206,9 @@ selector:
 
   # This is expected to fail if the config server steps down during moveChunk.
   - jstests/sharding/index_operations_abort_concurrent_outgoing_migrations.js
+  # Runs commands on mongos which target the primary configsvr, and then checks the outcome using
+  # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
+  - jstests/sharding/read_write_concern_defaults_application.js
 
 executor:
   config:

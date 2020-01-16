@@ -155,7 +155,10 @@ public:
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const final {
-        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
+                     level != repl::ReadConcernLevel::kSnapshotReadConcern,
+                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
+                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
     }
 
     void addRequiredPrivileges(const std::string& dbname,

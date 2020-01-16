@@ -85,8 +85,9 @@ public:
             opCtx,
             kPrimaryOnlyReadPreference,
             "admin",
-            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                cmdObj, parsedRequest.toCommandForConfig())),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(cmdObj, parsedRequest.toCommandForConfig()),
+                opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent);
 
         if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {

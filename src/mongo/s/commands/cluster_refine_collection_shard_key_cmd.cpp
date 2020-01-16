@@ -72,7 +72,8 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 "admin",
-                CommandHelpers::appendMajorityWriteConcern(configsvrRefineCollShardKey.toBSON({})),
+                CommandHelpers::appendMajorityWriteConcern(configsvrRefineCollShardKey.toBSON({}),
+                                                           opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);

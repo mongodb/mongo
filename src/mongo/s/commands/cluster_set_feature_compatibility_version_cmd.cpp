@@ -104,8 +104,10 @@ public:
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbname,
-            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                cmdObj, BSON("setFeatureCompatibilityVersion" << version))),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(
+                    cmdObj, BSON("setFeatureCompatibilityVersion" << version)),
+                opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(response.commandStatus);
 

@@ -613,7 +613,9 @@ bool runCommandImpl(OperationContext* opCtx,
             // (shard/config servers) an empty WC indicates the operation should use the implicit
             // server defaults.  So, warn if the operation has not specified writeConcern and is on
             // a shard/config server.
-            if (!opCtx->getClient()->isInDirectClient() && !opCtx->inMultiDocumentTransaction() &&
+            if (!opCtx->getClient()->isInDirectClient() &&
+                (!opCtx->inMultiDocumentTransaction() ||
+                 isTransactionCommand(command->getName())) &&
                 (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
                  serverGlobalParams.clusterRole == ClusterRole::ConfigServer) &&
                 !request.body.hasField(WriteConcernOptions::kWriteConcernField)) {

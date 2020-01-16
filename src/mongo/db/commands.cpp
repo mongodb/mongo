@@ -347,7 +347,8 @@ BSONObj CommandHelpers::appendPassthroughFields(const BSONObj& cmdObjWithPassthr
     return b.obj();
 }
 
-BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj) {
+BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
+                                                   WriteConcernOptions defaultWC) {
     WriteConcernOptions newWC = kMajorityWriteConcern;
 
     if (cmdObj.hasField(kWriteConcernField)) {
@@ -364,6 +365,13 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj) {
             newWC = WriteConcernOptions(WriteConcernOptions::kMajority,
                                         WriteConcernOptions::SyncMode::UNSET,
                                         wc["wtimeout"].Number());
+        }
+    } else if (!defaultWC.usedDefault) {
+        auto minimumAcceptableWTimeout = newWC.wTimeout;
+        newWC = defaultWC;
+        newWC.wMode = "majority";
+        if (defaultWC.wTimeout < minimumAcceptableWTimeout) {
+            newWC.wTimeout = minimumAcceptableWTimeout;
         }
     }
 

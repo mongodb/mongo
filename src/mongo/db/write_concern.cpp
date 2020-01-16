@@ -45,6 +45,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/util/fail_point.h"
@@ -90,7 +91,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
                 repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
-                !opCtx->inMultiDocumentTransaction() && !opCtx->getClient()->isInDirectClient()) {
+                (!opCtx->inMultiDocumentTransaction() ||
+                 isTransactionCommand(cmdObj.firstElementFieldName())) &&
+                !opCtx->getClient()->isInDirectClient()) {
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                      .getDefaultWriteConcern(opCtx);
                 if (wcDefault) {
