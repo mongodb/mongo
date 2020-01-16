@@ -34,6 +34,7 @@
 #include "mongo/db/repl/abstract_oplog_fetcher_test_fixture.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/oplog_fetcher.h"
+#include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -41,6 +42,7 @@
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 namespace {
@@ -1022,5 +1024,170 @@ TEST_F(OplogFetcherTest,
     ASSERT_EQUALS(0U, info.toApplyDocumentBytes);
 
     ASSERT_EQUALS(OpTime(), info.lastDocument);
+}
+
+class NewOplogFetcherTest : public executor::ThreadPoolExecutorTest {
+public:
+    void setUp() override;
+
+    // 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
+    const int defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
+
+    std::unique_ptr<NewOplogFetcher> makeOplogFetcher();
+    std::unique_ptr<NewOplogFetcher> makeOplogFetcherWithDifferentExecutor(
+        executor::TaskExecutor* executor, NewOplogFetcher::OnShutdownCallbackFn fn);
+
+    std::unique_ptr<DataReplicatorExternalStateMock> dataReplicatorExternalState;
+
+    NewOplogFetcher::Documents lastEnqueuedDocuments;
+    NewOplogFetcher::DocumentsInfo lastEnqueuedDocumentsInfo;
+    NewOplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn;
+
+    // The last OpTime fetched by the oplog fetcher.
+    OpTime lastFetched;
+};
+
+void NewOplogFetcherTest::setUp() {
+    executor::ThreadPoolExecutorTest::setUp();
+    launchExecutorThread();
+
+    lastFetched = {{123, 0}, 1};
+
+    dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
+    dataReplicatorExternalState->currentTerm = lastFetched.getTerm();
+    dataReplicatorExternalState->lastCommittedOpTime = {{9999, 0}, lastFetched.getTerm()};
+
+    enqueueDocumentsFn = [this](NewOplogFetcher::Documents::const_iterator begin,
+                                NewOplogFetcher::Documents::const_iterator end,
+                                const NewOplogFetcher::DocumentsInfo& info) -> Status {
+        lastEnqueuedDocuments = {begin, end};
+        lastEnqueuedDocumentsInfo = info;
+        return Status::OK();
+    };
+}
+
+std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcher() {
+    return makeOplogFetcherWithDifferentExecutor(&getExecutor(), [](Status) {});
+}
+
+std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcherWithDifferentExecutor(
+    executor::TaskExecutor* executor, NewOplogFetcher::OnShutdownCallbackFn fn) {
+    return std::make_unique<NewOplogFetcher>(
+        executor,
+        lastFetched,
+        source,
+        _createConfig(),
+        std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(1),
+        -1,
+        true,
+        dataReplicatorExternalState.get(),
+        enqueueDocumentsFn,
+        fn,
+        defaultBatchSize,
+        NewOplogFetcher::StartingPoint::kSkipFirstDoc);
+}
+
+TEST_F(NewOplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFromStarting) {
+    getExecutor().shutdown();
+
+    auto oplogFetcher = makeOplogFetcher();
+
+    // Last optime fetched should match values passed to constructor.
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+
+    ASSERT_FALSE(oplogFetcher->isActive());
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, oplogFetcher->startup());
+    ASSERT_FALSE(oplogFetcher->isActive());
+
+    // Last optime fetched should not change.
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToScheduleRunQuery) {
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldFailScheduleWorkRequest = []() { return true; };
+
+    // The onShutdownFn should not be called because the oplog fetcher should fail during startup.
+    auto oplogFetcher =
+        makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, [](Status) { MONGO_UNREACHABLE; });
+
+    // Last optime fetched should match values passed to constructor.
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+
+    ASSERT_FALSE(oplogFetcher->isActive());
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, oplogFetcher->startup());
+    ASSERT_FALSE(oplogFetcher->isActive());
+
+    // Last optime fetched should not change.
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+}
+
+TEST_F(NewOplogFetcherTest, ShuttingExecutorDownAfterStartupButBeforeRunQueryScheduled) {
+    ShutdownState shutdownState;
+
+    // Defer scheduling work so that the executor's shutdown happens before startup's work is
+    // scheduled.
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
+
+    auto oplogFetcher =
+        makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, std::ref(shutdownState));
+
+    ASSERT_FALSE(oplogFetcher->isActive());
+    ASSERT_OK(oplogFetcher->startup());
+    ASSERT_TRUE(oplogFetcher->isActive());
+
+    getExecutor().shutdown();
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQueryScheduled) {
+    ShutdownState shutdownState;
+
+    // Defer scheduling work so that the oplog fetcher's shutdown happens before startup's work is
+    // scheduled.
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
+
+    auto oplogFetcher =
+        makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, std::ref(shutdownState));
+
+    ASSERT_FALSE(oplogFetcher->isActive());
+    ASSERT_OK(oplogFetcher->startup());
+    ASSERT_TRUE(oplogFetcher->isActive());
+
+    oplogFetcher->shutdown();
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRunQueryScheduled) {
+    ShutdownState shutdownState;
+
+    auto oplogFetcher =
+        makeOplogFetcherWithDifferentExecutor(&getExecutor(), std::ref(shutdownState));
+
+    auto waitForCallbackScheduledFailPoint =
+        globalFailPointRegistry().find("hangAfterOplogFetcherCallbackScheduled");
+    auto timesEnteredFailPoint = waitForCallbackScheduledFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    ASSERT_FALSE(oplogFetcher->isActive());
+    ASSERT_OK(oplogFetcher->startup());
+    ASSERT_TRUE(oplogFetcher->isActive());
+
+    waitForCallbackScheduledFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    waitForCallbackScheduledFailPoint->setMode(FailPoint::off);
+
+    // Only call shutdown once we have confirmed that the callback is paused at the fail point.
+    oplogFetcher->shutdown();
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
 }
 }  // namespace

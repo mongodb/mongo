@@ -414,13 +414,7 @@ private:
     // =============== AbstractAsyncComponent overrides ================
 
     /**
-     * Initializes a DBClientConnection to the sync source and schedules the _runQuery function to
-     * run in a separate thread.
-     *
-     * Initializes a DBClientConnection to the sync source and uses its query function to schedule
-     * a `find` command on the source's oplog for entries with a timestamp greater than or equal to
-     * this node's last fetched. This will create a DBClientCursor which will be used until the
-     * cursor fails or OplogFetcher is shut down.
+     * Schedules the _runQuery function to run in a separate thread.
      */
     Status _doStartup_inlock() noexcept override;
 
@@ -434,10 +428,11 @@ private:
 
     // ============= End AbstractAsyncComponent overrides ==============
 
-    /*
+    /**
      * Creates a DBClientConnection and executes a query to retrieve oplog entries from this node's
-     * sync source. This will create a tailable, awaitData, exhaust cursor. For each batch returned
-     * by the upstream node, _onSuccessfulBatch will be called with the response.
+     * sync source. This will create a tailable, awaitData, exhaust cursor which will be used until
+     * the cursor fails or OplogFetcher is shut down. For each batch returned by the upstream node,
+     * _onSuccessfulBatch will be called with the response.
      *
      * In the case of any network or response errors, this method will close the cursor and restart
      * a new one. If OplogFetcherRestartDecision's shouldContinue function indicates it should not
@@ -445,7 +440,7 @@ private:
      */
     void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData);
 
-    /*
+    /**
      * Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
      * exhaust cursor. If it is not successful in creating a new cursor, it will retry based on the
      * OplogFetcherRestartDecision's shouldContinue function.
@@ -462,7 +457,7 @@ private:
      */
     BSONObj _makeFindQuery(OpTime lastOpTimeFetched, Milliseconds findMaxTime) const;
 
-    /*
+    /**
      * Gets the next batch from the exhaust cursor.
      *
      * If there was an error getting the next batch, checks _oplogFetcherRestartDecision's
@@ -479,7 +474,7 @@ private:
      */
     Status _onSuccessfulBatch(const Documents& documents);
 
-    /*
+    /**
      * Notifies caller that the oplog fetcher has completed processing operations from the remote
      * oplog using the "_onShutdownCallbackFn".
      */
