@@ -38,6 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
@@ -446,6 +447,15 @@ bool appendRawResponses(OperationContext* opCtx,
 
     const auto processError = [&](const ShardId& shardId, const Status& status) {
         invariant(!status.isOK());
+        // It is safe to pass `hasWriteConcernError` as false in the below check because operations
+        // run inside transactions do not wait for write concern, except for commit and abort.
+        if (TransactionRouter::get(opCtx) &&
+            isTransientTransactionError(
+                status.code(), false /*hasWriteConcernError*/, false /*isCommitOrAbort*/)) {
+            // Re-throw on transient transaction errors to make sure appropriate error labels are
+            // appended to the result.
+            uassertStatusOK(status);
+        }
         if (ignorableErrors.find(status.code()) != ignorableErrors.end()) {
             ignorableErrorsReceived.emplace_back(std::move(shardId), std::move(status));
             return;
