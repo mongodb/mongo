@@ -1212,6 +1212,10 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
             shardRegistry->clearEntries();
         }
     }
+
+    // Force the default read/write concern cache to reload on next access in case the defaults
+    // document was rolled back.
+    ReadWriteConcernDefaults::get(opCtx).invalidate();
 }
 
 }  // namespace mongo

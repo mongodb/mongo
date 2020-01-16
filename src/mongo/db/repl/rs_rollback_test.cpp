@@ -49,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
@@ -2899,6 +2900,47 @@ TEST(FixUpInfoTest, RemoveAllDocsToRefetchForWorks) {
     // Everything else.
     fui.removeAllDocsToRefetchFor(uuid1);
     ASSERT((fui.docsToRefetch == DocSet{})) << "remaining docs: " << fui.docsToRefetch.size();
+}
+
+TEST_F(RSRollbackTest, RollbackInvalidatesDefaultRWConcernCache) {
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+
+    // Put initial defaults in the cache.
+    {
+        RWConcernDefault origDefaults;
+        origDefaults.setEpoch(Timestamp(10, 20));
+        origDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
+        _lookupMock.setLookupCallReturnValue(std::move(origDefaults));
+    }
+    auto origCachedDefaults = rwcDefaults.getDefault(_opCtx.get());
+    ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getEpoch());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getSetTime());
+
+    // Change the mock's defaults, but don't invalidate the cache yet. The cache should still return
+    // the original defaults.
+    {
+        RWConcernDefault newDefaults;
+        newDefaults.setEpoch(Timestamp(50, 20));
+        newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(5678));
+        _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+        auto cachedDefaults = rwcDefaults.getDefault(_opCtx.get());
+        ASSERT_EQ(Timestamp(10, 20), *cachedDefaults.getEpoch());
+        ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *cachedDefaults.getSetTime());
+    }
+
+    // Rollback via refetch should invalidate the cache and getting the defaults should now return
+    // the latest value.
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
+    BSONObj doc = BSON("_id" << 0 << "a" << 1);
+    _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), coll->uuid(), doc);
+
+    auto newCachedDefaults = rwcDefaults.getDefault(_opCtx.get());
+    ASSERT_EQ(Timestamp(50, 20), *newCachedDefaults.getEpoch());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getSetTime());
 }
 
 }  // namespace
