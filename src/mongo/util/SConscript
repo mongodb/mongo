@@ -205,7 +205,7 @@ env.Library(
 env.Library(
     target='caching',
     source=[
-        'dist_cache.cpp',
+        'read_through_cache.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
