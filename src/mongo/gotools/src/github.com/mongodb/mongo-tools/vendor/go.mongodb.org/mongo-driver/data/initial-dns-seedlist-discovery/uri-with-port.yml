@@ -1,5 +1,0 @@
-uri: "mongodb+srv://test5.test.build.10gen.cc:8123/?replicaSet=repl0"
-seeds: []
-hosts: []
-error: true
-comment: Should fail because the mongodb+srv URI includes a port.

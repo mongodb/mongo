@@ -1,7 +1,0 @@
-#!/bin/sh
-
-. ../.env
-
-exec mongod $COMMONDOPTS \
-	--port 40002 \
-	--auth

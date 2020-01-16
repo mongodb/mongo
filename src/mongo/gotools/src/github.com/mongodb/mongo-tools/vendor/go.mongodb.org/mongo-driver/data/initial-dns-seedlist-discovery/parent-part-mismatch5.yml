@@ -1,5 +1,0 @@
-uri: "mongodb+srv://test19.test.build.10gen.cc/"
-seeds: []
-hosts: []
-error: true
-comment: Should fail because one of the returned host names' domain name parts "evil" mismatches "test".
