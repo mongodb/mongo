@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/client/dbclient_cursor.h"
 
 namespace mongo {
+
 // DBClientMockCursor supports only a small subset of DBClientCursor operations.
 // It supports only iteration, including use of DBClientCursorBatchIterator.  If a batchsize
 // is given, iteration is broken up into multiple batches at batchSize boundaries.
@@ -39,38 +42,29 @@ class DBClientMockCursor : public DBClientCursor {
 public:
     DBClientMockCursor(mongo::DBClientBase* client,
                        const BSONArray& mockCollection,
-                       unsigned long batchSize = 0)
-        : mongo::DBClientCursor(client, NamespaceString(), 0, 0, 0),
-          _collectionArray(mockCollection),
-          _iter(_collectionArray),
-          _batchSize(batchSize) {
-        if (_batchSize)
-            setBatchSize(_batchSize);
-        fillNextBatch();
-    }
+                       const bool provideResumeToken = false,
+                       unsigned long batchSize = 0);
 
     virtual ~DBClientMockCursor() {}
 
-    bool more() override {
-        if (_batchSize && batch.pos == _batchSize) {
-            fillNextBatch();
-        }
-        return batch.pos < batch.objs.size();
-    }
+    bool more() override;
+
+    // Override to return a mock resume token.
+    // The format of the token is simply {n: <idOfLastDocReturned>}.
+    boost::optional<BSONObj> getPostBatchResumeToken() const override;
 
 private:
-    void fillNextBatch() {
-        int leftInBatch = _batchSize;
-        batch.objs.clear();
-        while (_iter.more() && (!_batchSize || leftInBatch--)) {
-            batch.objs.emplace_back(_iter.next().Obj());
-        }
-        batch.pos = 0;
-    }
+    void _fillNextBatch();
+
     // The BSONObjIterator expects the underlying BSONObj to stay in scope while the
     // iterator is in use, so we store it here.
     BSONArray _collectionArray;
     BSONObjIterator _iter;
+
+    // A simple mock resume token that contains the id of the last document returned.
+    boost::optional<BSONObj> _postBatchResumeToken;
+    bool _provideResumeToken = false;
+
     unsigned long _batchSize;
 
     // non-copyable , non-assignable
