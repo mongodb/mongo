@@ -146,9 +146,11 @@ struct CommandHelpers {
                                            const BSONObj& request);
 
     /**
-     * Returns a copy of 'cmdObj' with a majority writeConcern appended.
+     * Returns a copy of 'cmdObj' with a majority writeConcern appended.  If the command object does
+     * not contain a writeConcern, 'defaultWC' will be used instead, if supplied.
      */
-    static BSONObj appendMajorityWriteConcern(const BSONObj& cmdObj);
+    static BSONObj appendMajorityWriteConcern(
+        const BSONObj& cmdObj, WriteConcernOptions defaultWC = WriteConcernOptions());
 
     /**
      * Rewrites cmdObj into a format safe to blindly forward to shards.

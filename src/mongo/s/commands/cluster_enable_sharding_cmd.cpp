@@ -114,7 +114,8 @@ public:
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(cmdObj, remoteCmdObj.obj())),
+                CommandHelpers::appendPassthroughFields(cmdObj, remoteCmdObj.obj()),
+                opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);

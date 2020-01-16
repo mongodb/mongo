@@ -125,7 +125,8 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 "admin",
-                CommandHelpers::appendMajorityWriteConcern(configCmd.toBSON({})),
+                CommandHelpers::appendMajorityWriteConcern(configCmd.toBSON({}),
+                                                           opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);

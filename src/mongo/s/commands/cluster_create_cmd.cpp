@@ -100,7 +100,8 @@ public:
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "admin",
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(cmdObj, configCreateCmd.toBSON({}))),
+                CommandHelpers::appendPassthroughFields(cmdObj, configCreateCmd.toBSON({})),
+                opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));

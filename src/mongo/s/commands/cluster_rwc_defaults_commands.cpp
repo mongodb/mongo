@@ -62,7 +62,8 @@ public:
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             NamespaceString::kAdminDb.toString(),
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                opCtx->getWriteConcern()),
             Shard::RetryPolicy::kNotIdempotent));
 
         uassertStatusOK(cmdResponse.commandStatus);

@@ -156,16 +156,16 @@ public:
         try {
             const auto routingInfo = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            shardResponses =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.db(),
-                                                           nss,
-                                                           routingInfo,
-                                                           countCmdObj,
-                                                           ReadPreferenceSetting::get(opCtx),
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           filter,
-                                                           collation);
+            shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                nss.db(),
+                nss,
+                routingInfo,
+                applyReadWriteConcern(opCtx, this, countCmdObj),
+                ReadPreferenceSetting::get(opCtx),
+                Shard::RetryPolicy::kIdempotent,
+                filter,
+                collation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
 

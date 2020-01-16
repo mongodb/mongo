@@ -896,6 +896,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "commands/server_status_core",
         "s/sharding_api_d",
+        "shared_request_handling",
     ],
 )
 

@@ -83,8 +83,10 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                cmdObj, BSON("_configsvrDropCollection" << nss.toString()))),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(
+                    cmdObj, BSON("_configsvrDropCollection" << nss.toString())),
+                opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);

@@ -34,9 +34,17 @@ checkLog = (function() {
         if (logMessages === null) {
             return false;
         }
-        for (let logMsg of logMessages) {
-            if (logMsg.includes(msg)) {
-                return true;
+        if (msg instanceof RegExp) {
+            for (let logMsg of logMessages) {
+                if (logMsg.search(msg) != -1) {
+                    return true;
+                }
+            }
+        } else {
+            for (let logMsg of logMessages) {
+                if (logMsg.includes(msg)) {
+                    return true;
+                }
             }
         }
         return false;
@@ -73,8 +81,14 @@ checkLog = (function() {
                     return false;
                 }
                 for (let i = 0; i < logMessages.length; i++) {
-                    if (logMessages[i].indexOf(msg) != -1) {
-                        count++;
+                    if (msg instanceof RegExp) {
+                        if (logMessages[i].search(msg) != -1) {
+                            count++;
+                        }
+                    } else {
+                        if (logMessages[i].indexOf(msg) != -1) {
+                            count++;
+                        }
                     }
                     if (!exact && count >= expectedCount) {
                         print("checkLog found at least " + expectedCount +
