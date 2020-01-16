@@ -221,15 +221,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status) {
                 uassertStatusOK(status);
             }
-
-            // TODO: This should not be needed once we get better targetting with SERVER-32723.
-            // Some commands are sent with allowImplicit: false to all shards and expect only some
-            // of them to succeed.
-            if (ignorableErrors.find(ErrorCodes::CannotImplicitlyCreateCollection) ==
-                    ignorableErrors.end() &&
-                ErrorCodes::CannotImplicitlyCreateCollection == status) {
-                uassertStatusOK(status);
-            }
         }
         responses.push_back(std::move(response));
     }

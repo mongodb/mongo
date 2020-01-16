@@ -247,8 +247,7 @@ error_codes:
     - {code: 225,name: TransactionTooOld,categories: [VoteAbortError]}
     - {code: 226,name: AtomicityFailure}
     - {code: 227,name: CannotImplicitlyCreateCollection,
-                  extra: CannotImplicitlyCreateCollectionInfo,
-                  categories: [NeedRetargettingError]}
+                  extra: CannotImplicitlyCreateCollectionInfo}
     - {code: 228,name: SessionTransferIncomplete}
     - {code: 229,name: MustDowngrade}
     - {code: 230,name: DNSHostNotFound}
