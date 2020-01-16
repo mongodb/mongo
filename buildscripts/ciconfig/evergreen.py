@@ -115,12 +115,20 @@ class Task(object):
     @property
     def generate_resmoke_tasks_command(self):
         """Return the 'generate resmoke tasks' command if found, or None."""
-        return self._find_func_command("generate resmoke tasks")
+        func = self._find_func_command("generate resmoke tasks")
+        return func if func is not None else self._find_func_command(
+            "generate randomized multiversion tasks")
+
+    @property
+    def generate_randomized_multiversion_command(self):
+        """Return the 'generate resmoke tasks' command if found, or None."""
+        return self._find_func_command("generate randomized multiversion tasks")
 
     @property
     def is_generate_resmoke_task(self):
         """Return True if 'generate resmoke tasks' command is found."""
-        return self.generate_resmoke_tasks_command is not None
+        return (self.generate_resmoke_tasks_command is not None
+                or self.generate_randomized_multiversion_command is not None)
 
     @property
     def run_tests_command(self):

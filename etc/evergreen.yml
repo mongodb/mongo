@@ -352,6 +352,7 @@ variables:
   - enterprise-rhel-62-64-bit-logv2
   - enterprise-rhel-62-64-bit-flow-control-off
   - enterprise-rhel-62-64-bit-majority-read-concern-off
+  - enterprise-rhel-62-64-bit-multiversion
   - enterprise-rhel-62-64-bit-multi-txn-oplog-entries
   - enterprise-rhel-62-64-bit-required-inmem
   - enterprise-rhel-62-64-bit-required-majority-read-concern-off
@@ -9693,7 +9694,7 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     large_distro_name: rhel62-large
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9918,6 +9919,38 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .updatefuzzer
+
+
+# This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
+# currently only run on our daily builders.
+- name: enterprise-rhel-62-64-bit-multiversion
+  display_name: "Enterprise RHEL 6.2 (implicit multiversion)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-multiversion
+    test_flags: >-
+      --excludeWithAnyTags=requires_fcv_44,multiversion_incompatible
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      MONGO_DISTMOD=rhel62
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    large_distro_name: rhel62-large
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: .multiversion_fuzzer
+  - name: .multiversion_passthrough
+  - name: .random_multiversion_replica_sets
 
 - name: enterprise-rhel-62-64-bit-flow-control-off
   display_name: "Enterprise RHEL 6.2 (flow control off)"
