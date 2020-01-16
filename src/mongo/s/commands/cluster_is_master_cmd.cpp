@@ -44,6 +44,9 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
+
 namespace {
 
 class CmdIsMaster : public BasicCommand {
@@ -77,6 +80,9 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+        waitInIsMaster.pauseWhileSet(opCtx);
+
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
         if (!seenIsMaster) {
