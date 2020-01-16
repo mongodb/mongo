@@ -728,14 +728,22 @@ int _main(int argc, char* argv[], char** envp) {
     setupSignalHandlers();
     setupSignals();
 
-    logger::globalLogManager()->getGlobalDomain()->clearAppenders();
-    logger::globalLogManager()->getGlobalDomain()->attachAppender(
-        std::make_unique<ShellConsoleAppender>(
-            std::make_unique<logger::MessageEventDetailsEncoder>()));
-
+    // Log to stdout for any early logging before we re-configure the logger
     auto& lv2Manager = logv2::LogManager::global();
     logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
-    lv2Config.makeDisabled();
+    if (logV2Enabled()) {
+        logger::globalLogManager()->getGlobalDomain()->clearAppenders();
+        logger::globalLogManager()->getGlobalDomain()->attachAppender(
+            std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
+                &lv2Manager.getGlobalDomain()));
+    } else {
+        logger::globalLogManager()->getGlobalDomain()->clearAppenders();
+        logger::globalLogManager()->getGlobalDomain()->attachAppender(
+            std::make_unique<ShellConsoleAppender>(
+                std::make_unique<logger::MessageEventDetailsEncoder>()));
+
+        lv2Config.makeDisabled();
+    }
     uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
@@ -787,6 +795,11 @@ int _main(int argc, char* argv[], char** envp) {
             boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));
 
         consoleSink->locked_backend()->auto_flush();
+
+        // Remove the initial config from above when setting this sink, otherwise we log everything
+        // twice.
+        lv2Config.makeDisabled();
+        uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 
         boost::log::core::get()->add_sink(std::move(consoleSink));
     }
