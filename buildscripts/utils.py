@@ -130,33 +130,6 @@ def which(executable):
     return executable
 
 
-def find_python(min_version=(3, 7)):
-    """Return path of python."""
-    try:
-        return sys.executable
-    except AttributeError:
-        # In case the version of Python is somehow missing sys.version_info or sys.executable.
-        pass
-
-    version = re.compile(r"[Pp]ython ([\d\.]+)", re.MULTILINE)
-    binaries = ("python37", "python3.7", "python36", "python3.6", "python35", "python3.5", "python")
-    for binary in binaries:
-        try:
-            out, err = subprocess.Popen([binary, "-V"], stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE).communicate()
-            for stream in (out, err):
-                match = version.search(stream)
-                if match:
-                    versiontuple = tuple(map(int, match.group(1).split(".")))
-                    if versiontuple >= min_version:
-                        return which(binary)
-        except Exception:  # pylint: disable=broad-except
-            pass
-
-    raise Exception(
-        "could not find suitable Python (version >= %s)" % ".".join(str(v) for v in min_version))
-
-
 def replace_with_repr(unicode_error):
     """Codec error handler replacement."""
     # Unicode is a pain, some strings cannot be unicode()'d

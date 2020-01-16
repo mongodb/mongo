@@ -94,7 +94,7 @@ def generate(env):
     global idlc
     idlc = idlc_mod
 
-    env["IDLC"] = sys.executable + " buildscripts/idl/idlc.py"
+    env["IDLC"] = "$PYTHON buildscripts/idl/idlc.py"
     env["IDLCFLAGS"] = ""
     base_dir = env.subst("$BUILD_ROOT/$VARIANT_DIR").replace("#", "")
     env["IDLCCOM"] = (

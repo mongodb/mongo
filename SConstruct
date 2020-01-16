@@ -1061,7 +1061,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                MODULE_INJECTORS=dict(),
                ARCHIVE_ADDITION_DIR_MAP={},
                ARCHIVE_ADDITIONS=[],
-               PYTHON=utils.find_python(),
+               PYTHON="$( {} $)".format(sys.executable),
                SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
                UNITTEST_ALIAS='unittests',
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
