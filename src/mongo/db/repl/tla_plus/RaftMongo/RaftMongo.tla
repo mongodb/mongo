@@ -6,24 +6,12 @@
 
 --------------------------------- MODULE RaftMongo ---------------------------------
 \* This is the formal specification for the Raft consensus algorithm in MongoDB.
+\*
+\* To run the model-checker, first edit the constants in MCRaftMongo.cfg if desired, then:
+\*     cd src/mongo/db/repl/tla_plus
+\*     ./model-check.sh RaftMongo
 
-\* INSTRUCTIONS FOR MODEL-CHECKING IN THE TLA+ TOOLBOX
-\* "What is the behavior spec?"
-\*     Temporal formula: Spec
-\* "What is the model?"
-\*     "Specify the value of declared constants"
-\*         MaxClientWriteSize = small number like 2 to limit state space
-\*         Servers = a set of your desired replica set size, e.g. {1, 2, 3}
-\* "What to check?"
-\*     Deadlock: checked
-\*     Invariants: NeverRollbackCommitted and NoTwoPrimariesInSameTerm
-\* "Additional Spec Options"
-\*     "State Constraint"
-\*         Add a state constraint to limit the state space like:
-\*             /\ GlobalCurrentTerm <= 3
-\*             /\ \forall i \in Server: Len(log[i]) <= 5
-
-EXTENDS Integers, FiniteSets, Sequences, TLC
+EXTENDS Integers, FiniteSets, Sequences
 
 \* The set of server IDs.
 CONSTANT Server
@@ -312,6 +300,12 @@ TwoPrimariesInSameTerm ==
 
 NoTwoPrimariesInSameTerm == ~TwoPrimariesInSameTerm
 
+\* NeverRollbackCommitted and NeverRollbackBeforeCommitPoint can be violated,
+\* although it's not ultimately a safety issue: SERVER-39626. The issue
+\* requires at least 5 servers, 3 terms, and oplogs of length 4+, which are
+\* larger limits than we can easily model-check. The properties
+\* are here if you want to experiment with them.
+
 RollbackCommitted(i) ==
     /\ [term |-> LastTerm(log[i]), index |-> Len(log[i])] \in committedEntries
     /\ \E j \in Server: CanRollbackOplog(i, j)
@@ -326,8 +320,6 @@ RollbackBeforeCommitPoint(i) ==
        \/ /\ LastTerm(log[i]) = commitPoint[i].term
           /\ Len(log[i]) <= commitPoint[i].index
 
-\* This is violated, although it's not ultimately a safety issue: SERVER-39626
-\* The property is here if you want to experiment with it.
 NeverRollbackBeforeCommitPoint == \A i \in Server: ~RollbackBeforeCommitPoint(i)
 
 \* Liveness check

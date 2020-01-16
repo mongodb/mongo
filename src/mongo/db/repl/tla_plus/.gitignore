@@ -1,1 +1,3 @@
-*.toolbox
+**/*.toolbox
+**/states/
+tla2tools.jar
