@@ -332,6 +332,8 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
                 !(_connectionHasPendingReplies && cursorId == 0));
 
         ns = cr.getNSS();  // Unlike OP_REPLY, find command can change the ns to use for getMores.
+        // Store the resume token, if we got one.
+        _postBatchResumeToken = cr.getPostBatchResumeToken();
         batch.objs = cr.releaseBatch();
         return;
     }

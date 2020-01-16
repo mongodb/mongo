@@ -132,6 +132,18 @@ private:
         AfterStageBehavior run() override;
     };
 
+    class CollectionClonerQueryStage : public CollectionClonerStage {
+    public:
+        CollectionClonerQueryStage(std::string name,
+                                   CollectionCloner* cloner,
+                                   ClonerRunFn stageFunc)
+            : CollectionClonerStage(name, cloner, stageFunc) {}
+
+        bool isTransientError(const Status& status) override {
+            return ErrorCodes::isRetriableError(status);
+        }
+    };
+
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
         return _sourceNss.db() + " db: { " + stage->getName() + ": UUID(\"" +
             _sourceDbAndUuid.uuid()->toString() + "\") coll: " + _sourceNss.coll() + " }";
@@ -186,6 +198,18 @@ private:
      */
     void insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd);
 
+    /**
+     * Sends a query command to the source. That query command with be parameterized based on
+     * wire version and clone progress.
+     */
+    void runQuery();
+
+    /**
+     * Attempts to clean up the cursor on the upstream node. This is called any time we
+     * receive a transient error during the query stage.
+     */
+    void killOldQueryCursor();
+
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
@@ -203,7 +227,7 @@ private:
     CollectionClonerStage _countStage;             // (R)
     CollectionClonerStage _listIndexesStage;       // (R)
     CollectionClonerStage _createCollectionStage;  // (R)
-    CollectionClonerStage _queryStage;             // (R)
+    CollectionClonerQueryStage _queryStage;        // (R)
 
     ProgressMeter _progressMeter;                       // (X) progress meter for this instance.
     std::vector<BSONObj> _indexSpecs;                   // (X) Except for _id_
@@ -217,6 +241,18 @@ private:
     // Putting _dbWorkTaskRunner last ensures anything the database work threads depend on,
     // like _documentsToInsert, is destroyed after those threads exit.
     TaskRunner _dbWorkTaskRunner;  // (R)
+
+    // Does the sync source support resumable queries? (wire version 4.4+)
+    bool _resumeSupported = false;  // (X)
+
+    // The resumeToken used to resume after network error.
+    boost::optional<BSONObj> _resumeToken;  // (X)
+
+    // The cursorId of the remote collection cursor.
+    long long _remoteCursorId = -1;  // (X)
+
+    // If true, it means we are starting a new query or resuming an interrupted one.
+    bool _firstBatchOfQueryRound = true;  // (X)
 };
 
 }  // namespace repl

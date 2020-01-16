@@ -374,3 +374,14 @@ env.CppIntegrationTest(
         'clientdriver_network',
     ],
 )
+
+env.Library(
+    target='dbclient_mockcursor',
+    source=[
+        'dbclient_mockcursor.cpp'
+    ],
+    LIBDEPS_PRIVATE=[
+        'clientdriver_minimal'
+    ],
+)
+

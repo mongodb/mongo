@@ -244,6 +244,13 @@ public:
         _lastKnownCommittedOpTime = lastCommittedOpTime;
     }
 
+    /**
+     * Returns the resume token for the latest batch, it set.
+     */
+    virtual boost::optional<BSONObj> getPostBatchResumeToken() const {
+        return _postBatchResumeToken;
+    }
+
 protected:
     struct Batch {
         // TODO remove constructors after c++17 toolchain upgrade
@@ -299,6 +306,7 @@ private:
     Milliseconds _awaitDataTimeout = Milliseconds{0};
     boost::optional<long long> _term;
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
+    boost::optional<BSONObj> _postBatchResumeToken;
 
     void dataReceived(const Message& reply) {
         bool retry;
@@ -339,6 +347,14 @@ public:
     // getNamespaceString() will return the NamespaceString returned by the 'find' command.
     const NamespaceString& getNamespaceString() {
         return _c.getNamespaceString();
+    }
+
+    const long long getCursorId() const {
+        return _c.getCursorId();
+    }
+
+    boost::optional<BSONObj> getPostBatchResumeToken() const {
+        return _c.getPostBatchResumeToken();
     }
 
 private:

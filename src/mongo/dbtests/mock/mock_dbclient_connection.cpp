@@ -112,8 +112,48 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
                                                      queryOptions,
                                                      batchSize));
 
+        BSONArray resultsInCursor;
+
+        // A simple mock implementation of a resumable query, where we skip the first 'n' fields
+        // where 'n' is given by the mock resume token.
+        auto nToSkip = 0;
+        auto queryBson = fromjson(query.toString());
+        if (queryBson.hasField("$_resumeAfter")) {
+            if (queryBson["$_resumeAfter"].Obj().hasField("n")) {
+                nToSkip = queryBson["$_resumeAfter"]["n"].numberInt();
+            }
+        }
+
+        bool provideResumeToken = false;
+        if (queryBson.hasField("$_requestResumeToken")) {
+            provideResumeToken = true;
+        }
+
+        // Resume query.
+        if (nToSkip != 0) {
+            BSONObjIterator iter(result);
+            BSONArrayBuilder builder;
+            auto numExamined = 0;
+
+            while (iter.more()) {
+                numExamined++;
+
+                if (numExamined < nToSkip + 1) {
+                    iter.next();
+                    continue;
+                }
+
+                builder.append(iter.next().Obj());
+            }
+            resultsInCursor = BSONArray(builder.obj());
+        } else {
+            // Yield all results instead (default).
+            resultsInCursor = BSONArray(result.copy());
+        }
+
         std::unique_ptr<mongo::DBClientCursor> cursor;
-        cursor.reset(new DBClientMockCursor(this, BSONArray(result.copy()), batchSize));
+        cursor.reset(new DBClientMockCursor(
+            this, BSONArray(resultsInCursor), provideResumeToken, batchSize));
         return cursor;
     } catch (const mongo::DBException&) {
         _isFailed = true;
