@@ -67,7 +67,6 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
@@ -554,20 +553,8 @@ void runCommand(OperationContext* opCtx,
                 const auto staleNs = [&] {
                     if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                         return staleInfo->getNss();
-                    } else if (auto implicitCreateInfo =
-                                   ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-                        // Requests that attempt to implicitly create a collection in a transaction
-                        // should always fail with OperationNotSupportedInTransaction - this
-                        // assertion is only meant to safeguard that assumption.
-                        uassert(50983,
-                                str::stream() << "Cannot handle exception in a transaction: "
-                                              << ex.toStatus(),
-                                !TransactionRouter::get(opCtx));
-
-                        return implicitCreateInfo->getNss();
-                    } else {
-                        throw;
                     }
+                    throw;
                 }();
 
                 // Send setShardVersion on this thread's versioned connections to shards (to support
@@ -1094,12 +1081,8 @@ void Strategy::explainFind(OperationContext* opCtx,
             const auto staleNs = [&] {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                     return staleInfo->getNss();
-                } else if (auto implicitCreateInfo =
-                               ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-                    return implicitCreateInfo->getNss();
-                } else {
-                    throw;
                 }
+                throw;
             }();
 
             // Send setShardVersion on this thread's versioned connections to shards (to support

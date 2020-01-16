@@ -118,9 +118,7 @@ size_t WriteOp::getNumTargeted() {
 }
 
 static bool isRetryErrCode(int errCode) {
-    return errCode == ErrorCodes::StaleShardVersion ||
-        errCode == ErrorCodes::CannotImplicitlyCreateCollection ||
-        errCode == ErrorCodes::StaleDbVersion;
+    return errCode == ErrorCodes::StaleShardVersion || errCode == ErrorCodes::StaleDbVersion;
 }
 
 static bool errorsAllSame(const vector<ChildWriteOp const*>& errOps) {
