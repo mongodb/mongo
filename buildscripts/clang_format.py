@@ -173,7 +173,19 @@ class ClangFormat(object):
                     CLANG_FORMAT_PROGNAME,
                 ]))
 
-            for ospath in os.environ["PATH"].split(os.pathsep):
+            directories_to_check = os.environ["PATH"].split(os.pathsep)
+
+            # If Windows, try to grab it from Program Files
+            # Check both native Program Files and WOW64 version
+            if sys.platform == "win32":
+                programfiles = [
+                    os.environ["ProgramFiles"],
+                    os.environ["ProgramFiles(x86)"],
+                ]
+
+                directories_to_check += [os.path.join(p, "LLVM\\bin\\") for p in programfiles]
+
+            for ospath in directories_to_check:
                 for program in programs:
                     self.path = os.path.join(ospath, program)
                     if os.path.exists(self.path) and self._validate_version():
