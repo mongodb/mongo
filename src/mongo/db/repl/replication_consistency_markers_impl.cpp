@@ -155,12 +155,15 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
                                        << MinValidDocument::kMinValidTermFieldName << time.getTerm()
                                        << MinValidDocument::kAppliedThroughFieldName << time));
 
-    // We clear the initial sync flag at the 'lastAppliedOpTime'. This is unnecessary, since there
-    // should not be any stable checkpoints being taken that this write could inadvertantly enter.
-    // This 'lastAppliedOpTime' will be the first stable timestamp candidate, so it will be in the
-    // first stable checkpoint taken after initial sync. This provides more clarity than providing
-    // no timestamp.
-    update.timestamp = time.getTimestamp();
+    // As we haven't yet updated our initialDataTimestamp from
+    // Timestamp::kAllowUnstableCheckpointsSentinel to lastAppliedTimestamp, we are only allowed to
+    // take unstable checkpoints. And, this "lastAppliedTimestamp" will be the first stable
+    // checkpoint taken after initial sync. So, no way this minValid update can be part of a stable
+    // checkpoint taken earlier than lastAppliedTimestamp. So, it's safe to make it as an
+    // non-timestamped write. Also, this has to be non-timestamped write because we may have readers
+    // at lastAppliedTimestamp, commiting the storage writes before or at such timestamps is
+    // illegal.
+    update.timestamp = Timestamp();
 
     _updateMinValidDocument(opCtx, update);
 

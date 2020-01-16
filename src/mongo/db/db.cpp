@@ -992,19 +992,37 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         repl::ReplicationStateTransitionLockGuard rstl(
             opCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
 
-        // Kill all operations. After this point, the opCtx will have been marked as killed and will
-        // not be usable other than to kill all transactions directly below.
+        // Kill all operations. And, makes all newly created opCtx to be immediately interrupted.
+        // After this point, the opCtx will have been marked as killed and will not be usable other
+        // than to kill all transactions directly below.
         serviceContext->setKillAllOperations();
 
         // Destroy all stashed transaction resources, in order to release locks.
         killSessionsLocalShutdownAllTransactions(opCtx);
 
         rstl.waitForLockUntil(Date_t::max());
-    }
 
-    // Shuts down the thread pool and waits for index builds to finish.
-    // Depends on setKillAllOperations() above to interrupt the index build operations.
-    IndexBuildsCoordinator::get(serviceContext)->shutdown();
+        // Release the rstl before waiting for the index build threads to join as index build
+        // reacquires rstl in uninterruptible lock guard to finish their cleanup process.
+        rstl.release();
+
+        // Shuts down the thread pool and waits for index builds to finish.
+        // Depends on setKillAllOperations() above to interrupt the index build operations.
+        IndexBuildsCoordinator::get(serviceContext)->shutdown();
+
+        // No new readers can come in after the releasing the RSTL, as previously before releasing
+        // the RSTL, we made sure that all new operations will be immediately interrupted by setting
+        // ServiceContext::_globalKill to true. Reacquires RSTL in mode X.
+        rstl.reacquire();
+
+        // We are expected to have no active readers while performing
+        // markAsCleanShutdownIfPossible() step. We guarantee that there are no active readers at
+        // this point due to:
+        // 1) Acquiring RSTL in mode X as all readers (except single phase hybrid index builds on
+        //    secondaries) are expected to hold RSTL in mode IX.
+        // 2) By waiting for all index build to finish.
+        repl::ReplicationCoordinator::get(serviceContext)->markAsCleanShutdownIfPossible(opCtx);
+    }
 
     ReplicaSetMonitor::shutdown();
 

@@ -134,6 +134,15 @@ public:
     virtual void shutdown(OperationContext* opCtx) = 0;
 
     /**
+     * Performs some bookkeeping to make sure that it's a clean shutdown (i.e. dataset is
+     * consistent with top of the oplog).
+     * This should be called after calling shutdown() and should make sure that that are no
+     * active readers while executing this method as this does perform timestamped storage
+     * writes at lastAppliedTimestamp.
+     */
+    virtual void markAsCleanShutdownIfPossible(OperationContext* opCtx) = 0;
+
+    /**
      * Returns a reference to the parsed command line arguments that are related to replication.
      */
     virtual const ReplSettings& getSettings() const = 0;

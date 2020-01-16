@@ -53,6 +53,8 @@ void ReplicationCoordinatorEmbedded::enterTerminalShutdown() {}
 
 void ReplicationCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
 
+void ReplicationCoordinatorEmbedded::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}
+
 const ReplSettings& ReplicationCoordinatorEmbedded::getSettings() const {
     static ReplSettings _settings;
     return _settings;

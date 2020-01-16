@@ -85,6 +85,10 @@ void ReplicationCoordinatorMock::shutdown(OperationContext*) {
     // TODO
 }
 
+void ReplicationCoordinatorMock::markAsCleanShutdownIfPossible(OperationContext*) {
+    // TODO
+}
+
 const ReplSettings& ReplicationCoordinatorMock::getSettings() const {
     return _settings;
 }
