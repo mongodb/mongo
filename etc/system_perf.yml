@@ -71,6 +71,7 @@ functions:
         genny: ${genny_rev}
         workloads: ${workloads_rev}
         wtdevelop: ${wtdevelop_rev}
+        mongo-tools: ${mongo-tools_rev}
 
   "compile mongodb":
     # We create a virtual environment with the Python dependencies for compiling the server
@@ -95,6 +96,8 @@ functions:
           set -o errexit
           set -o verbose
 
+          mkdir -p mongodb/bin
+
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe --abbrev=7)
 
@@ -118,28 +121,33 @@ functions:
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
+
     - command: shell.exec
       params:
-        working_dir: src/src/mongo/gotools/src/github.com/mongodb/mongo-tools
+        working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
         script: |
           set -o verbose
           set -o errexit
+
           # make sure newlines in the scripts are handled correctly by windows
           if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
           fi;
+
           # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
           . ./set_goenv.sh
           GOROOT="" set_goenv || exit
           go version
+
           build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
           if [ "${build_mongoreplay}" = "true" ]; then
               build_tools="$build_tools mongoreplay"
           fi
           for i in $build_tools; do
-              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
-              "../../../../../../mongo-tools/$i${exe|}" --version
+              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
+              "../../../../../mongodb/bin/$i${exe|}" --version
           done
+
     - command: shell.exec
       params:
         working_dir: src
@@ -147,14 +155,12 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
-          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
-          mkdir -p mongodb/bin
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/jstests/hooks
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
           mv mongocryptd mongodb/bin || /bin/true
-          mv src/mongo-tools/* mongodb/bin
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests"
@@ -901,6 +907,11 @@ modules:
   prefix: src/mongo/db/modules
   branch: master
 
+- name: mongo-tools
+  repo: git@github.com:mongodb/mongo-tools.git
+  prefix: mongo-tools/src/github.com/mongodb
+  branch: master
+
 #######################################
 #         Buildvariants               #
 #######################################
@@ -912,6 +923,7 @@ buildvariants:
   name: compile-amazon2
   display_name: Compile
   modules:
+    - mongo-tools
     - enterprise
     - genny
   batchtime: 1440 # 24 hours
@@ -937,6 +949,7 @@ buildvariants:
   name: wtdevelop-compile-amazon2
   display_name: WT Develop Compile
   modules:
+  - mongo-tools
   - wtdevelop
   - enterprise
   - genny # needed for genny_generate_all_tasks
@@ -947,6 +960,7 @@ buildvariants:
 - name: compile-rhel70
   display_name: Compile for Atlas-like
   modules:
+  - mongo-tools
   - enterprise
   batchtime: 1440 # 24 hours
   expansions:
