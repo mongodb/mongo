@@ -504,7 +504,7 @@ public:
         unittest::log() << "tid:" << ostr(stdx::this_thread::get_id()) << ", caught signal " << sig
                         << "!\n";
         char storage;
-        unittest::log() << "local var:" << (const void*)&storage << "\n";
+        unittest::log() << "local var:" << reinterpret_cast<uint64_t>(&storage) << "\n";
     }
 
     static void tryHandler(void (*handler)(int, siginfo_t*, void*)) {
@@ -872,7 +872,7 @@ TEST(StackTrace, BacktraceThroughLibc) {
     });
     unittest::log() << "caught [" << capture.arrSize << "]:";
     for (size_t i = 0; i < capture.arrSize; ++i) {
-        unittest::log() << "  [" << i << "] " << capture.arr[i];
+        unittest::log() << "  [" << i << "] " << reinterpret_cast<uint64_t>(capture.arr[i]);
     }
 }
 #endif  // mongo stacktrace backend

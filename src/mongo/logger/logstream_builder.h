@@ -162,14 +162,6 @@ public:
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(void* x) {
-        stream() << x;
-        return *this;
-    }
-    LogstreamBuilder& operator<<(const void* x) {
-        stream() << x;
-        return *this;
-    }
     LogstreamBuilder& operator<<(long long x) {
         stream() << x;
         return *this;

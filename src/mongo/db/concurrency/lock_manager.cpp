@@ -826,7 +826,7 @@ LockManager::Partition* LockManager::_getPartition(LockRequest* request) const {
 }
 
 void LockManager::dump() const {
-    log() << "Dumping LockManager @ " << static_cast<const void*>(this) << '\n';
+    log() << "Dumping LockManager @ " << reinterpret_cast<uint64_t>(this) << '\n';
 
     auto lockToClientMap = getLockToClientMap(getGlobalServiceContext());
     for (unsigned i = 0; i < _numLockBuckets; i++) {

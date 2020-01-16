@@ -147,7 +147,7 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
 
     _opToScopeMap[opId] = scope;
 
-    LOG(2) << "SMScope " << static_cast<const void*>(scope) << " registered for op " << opId;
+    LOG(2) << "SMScope " << reinterpret_cast<uint64_t>(scope) << " registered for op " << opId;
     Status status = opCtx->checkForInterruptNoAssert();
     if (!status.isOK()) {
         scope->kill();
@@ -157,7 +157,7 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
 void MozJSScriptEngine::unregisterOperation(unsigned int opId) {
     stdx::lock_guard<Latch> giLock(_globalInterruptLock);
 
-    LOG(2) << "ImplScope " << static_cast<const void*>(this) << " unregistered for op " << opId;
+    LOG(2) << "ImplScope " << reinterpret_cast<uint64_t>(this) << " unregistered for op " << opId;
 
     if (opId != 0) {
         // scope is currently associated with an operation id

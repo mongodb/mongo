@@ -111,7 +111,7 @@ ServiceContext::~ServiceContext() {
     stdx::lock_guard<Latch> lk(_mutex);
     for (const auto& client : _clients) {
         severe() << "Client " << client->desc() << " still exists while destroying ServiceContext@"
-                 << static_cast<void*>(this);
+                 << reinterpret_cast<uint64_t>(this);
     }
     invariant(_clients.empty());
 }
