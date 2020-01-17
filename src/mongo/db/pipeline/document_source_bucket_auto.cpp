@@ -109,13 +109,25 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
     return makeDocument(*(_bucketsIterator++));
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::optimize() {
+    _groupByExpression = _groupByExpression->optimize();
+    for (auto&& accumulatedField : _accumulatedFields) {
+        accumulatedField.expr.argument = accumulatedField.expr.argument->optimize();
+        accumulatedField.expr.initializer = accumulatedField.expr.initializer->optimize();
+    }
+    return this;
+}
+
 DepsTracker::State DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) const {
     // Add the 'groupBy' expression.
     _groupByExpression->addDependencies(deps);
 
     // Add the 'output' fields.
     for (auto&& accumulatedField : _accumulatedFields) {
-        accumulatedField.expression->addDependencies(deps);
+        // Anything the per-doc expression depends on, the whole stage depends on.
+        accumulatedField.expr.argument->addDependencies(deps);
+        // The initializer should be an ExpressionConstant, or something that optimizes to one.
+        // ExpressionConstant doesn't have dependencies.
     }
 
     // We know exactly which fields will be present in the output document. Future stages cannot
@@ -189,7 +201,8 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
     const size_t numAccumulators = _accumulatedFields.size();
     for (size_t k = 0; k < numAccumulators; k++) {
         bucket._accums[k]->process(
-            _accumulatedFields[k].expression->evaluate(entry.second, &pExpCtx->variables), false);
+            _accumulatedFields[k].expr.argument->evaluate(entry.second, &pExpCtx->variables),
+            false);
     }
 }
 
@@ -233,6 +246,16 @@ void DocumentSourceBucketAuto::populateBuckets() {
 
         // Initialize the current bucket.
         Bucket currentBucket(pExpCtx, currentValue.first, currentValue.first, _accumulatedFields);
+
+        // Evaluate each initializer against an empty document. Normally the
+        // initializer can refer to the group key, but in $bucketAuto there is no single
+        // group key per bucket.
+        Document emptyDoc;
+        for (size_t k = 0; k < _accumulatedFields.size(); ++k) {
+            Value initializerValue =
+                _accumulatedFields[k].expr.initializer->evaluate(emptyDoc, &pExpCtx->variables);
+            currentBucket._accums[k]->startNewGroup(initializerValue);
+        }
 
         // Add the first value into the current bucket.
         addDocumentToBucket(currentValue, currentBucket);
@@ -382,10 +405,11 @@ Value DocumentSourceBucketAuto::serialize(
 
     MutableDocument outputSpec(_accumulatedFields.size());
     for (auto&& accumulatedField : _accumulatedFields) {
-        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator();
+        intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
         outputSpec[accumulatedField.fieldName] =
-            Value{Document{{accum->getOpName(),
-                            accumulatedField.expression->serialize(static_cast<bool>(explain))}}};
+            Value(accum->serialize(accumulatedField.expr.initializer,
+                                   accumulatedField.expr.argument,
+                                   static_cast<bool>(explain)));
     }
     insides["output"] = outputSpec.freezeToValue();
 
@@ -405,9 +429,11 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
             numBuckets > 0);
     // If there is no output field specified, then add the default one.
     if (accumulationStatements.empty()) {
-        accumulationStatements.emplace_back("count",
-                                            ExpressionConstant::create(pExpCtx, Value(1)),
-                                            [pExpCtx] { return AccumulatorSum::create(pExpCtx); });
+        accumulationStatements.emplace_back(
+            "count",
+            AccumulationExpression(ExpressionConstant::create(pExpCtx, Value(BSONNULL)),
+                                   ExpressionConstant::create(pExpCtx, Value(1)),
+                                   [pExpCtx] { return AccumulatorSum::create(pExpCtx); }));
     }
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
@@ -486,8 +512,13 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                     argument.type() == BSONType::Object);
 
             for (auto&& outputField : argument.embeddedObject()) {
-                accumulationStatements.push_back(
-                    AccumulationStatement::parseAccumulationStatement(pExpCtx, outputField, vps));
+                auto stmt =
+                    AccumulationStatement::parseAccumulationStatement(pExpCtx, outputField, vps);
+                stmt.expr.initializer = stmt.expr.initializer->optimize();
+                uassert(4544714,
+                        "Can't refer to the group key in $bucketAuto",
+                        ExpressionConstant::isNullOrConstant(stmt.expr.initializer));
+                accumulationStatements.push_back(std::move(stmt));
             }
         } else if ("granularity" == argName) {
             uassert(40261,

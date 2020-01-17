@@ -46,9 +46,9 @@ using std::numeric_limits;
 using std::string;
 
 /**
- * Takes the name of an Accumulator as its template argument and a list of pairs of arguments and
- * expected results as its second argument, and asserts that for the given Accumulator the arguments
- * evaluate to the expected results.
+ * Takes the name of an AccumulatorState as its template argument and a list of pairs of arguments
+ * and expected results as its second argument, and asserts that for the given AccumulatorState the
+ * arguments evaluate to the expected results.
  */
 template <typename AccName>
 static void assertExpectedResults(

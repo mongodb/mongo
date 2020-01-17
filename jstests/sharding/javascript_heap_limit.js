@@ -49,7 +49,7 @@ const aggregateWithJSFunction = {
         {$project: {y: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}}
     ]
 };
-const aggregateWithJSAccumulator = {
+const aggregateWithInternalJsReduce = {
     aggregate: "coll",
     cursor: {},
     pipeline: [{
@@ -59,6 +59,24 @@ const aggregateWithJSAccumulator = {
                 $_internalJsReduce: {
                     data: {k: "$x", v: "$x"},
                     eval: allocateLargeString,
+                }
+            }
+        }
+    }]
+};
+const aggregateWithUserDefinedAccumulator = {
+    aggregate: "coll",
+    cursor: {},
+    pipeline: [{
+        $group: {
+            _id: "$x",
+            value: {
+                $accumulator: {
+                    init: allocateLargeString,
+                    accumulate: allocateLargeString,
+                    accumulateArgs: [{k: "$x", v: "$x"}],
+                    merge: allocateLargeString,
+                    lang: 'js',
                 }
             }
         }
@@ -82,14 +100,17 @@ function runCommonTests(db) {
     // All commands are expected to work with a sufficient JS heap size.
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: sufficentHeapSizeMB});
     assert.commandWorked(db.runCommand(aggregateWithJSFunction));
-    assert.commandWorked(db.runCommand(aggregateWithJSAccumulator));
+    assert.commandWorked(db.runCommand(aggregateWithInternalJsReduce));
+    assert.commandWorked(db.runCommand(aggregateWithUserDefinedAccumulator));
 
     // The aggregate command is expected to fail when the aggregation specific heap size limit is
     // too low.
     setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: sufficentHeapSizeMB});
     assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction),
                                  ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithJSAccumulator),
+    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce),
+                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator),
                                  ErrorCodes.JSInterpreterFailure);
 
     // All commands are expected to fail when the global heap size limit is too low, regardless
@@ -97,7 +118,9 @@ function runCommonTests(db) {
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: tooSmallHeapSizeMB});
     assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction),
                                  ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithJSAccumulator),
+    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce),
+                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator),
                                  ErrorCodes.JSInterpreterFailure);
 }
 
