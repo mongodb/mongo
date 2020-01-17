@@ -147,10 +147,11 @@ private:
      * Note that a PoolData can find itself orphaned from its GroupData during a reconfig.
      */
     struct GroupData {
-        explicit GroupData(const ReplicaSetChangeNotifier::State& state_) : state{state_} {}
+        // The members for this group
+        std::vector<HostAndPort> members;
 
-        // The ReplicaSet state for this set
-        ReplicaSetChangeNotifier::State state;
+        // The primary member for this group
+        HostAndPort primary;
 
         // Id for each pool in the set
         stdx::unordered_set<PoolId> poolIds;
