@@ -735,7 +735,7 @@ int _main(int argc, char* argv[], char** envp) {
         logger::globalLogManager()->getGlobalDomain()->clearAppenders();
         logger::globalLogManager()->getGlobalDomain()->attachAppender(
             std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &lv2Manager.getGlobalDomain()));
+                &lv2Manager.getGlobalDomain(), false));
     } else {
         logger::globalLogManager()->getGlobalDomain()->clearAppenders();
         logger::globalLogManager()->getGlobalDomain()->attachAppender(
@@ -779,11 +779,11 @@ int _main(int argc, char* argv[], char** envp) {
         logger::globalLogManager()->getGlobalDomain()->clearAppenders();
         logger::globalLogManager()->getGlobalDomain()->attachAppender(
             std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &(lv2Manager.getGlobalDomain())));
+                &(lv2Manager.getGlobalDomain()), false));
         logger::globalLogManager()
             ->getNamedDomain("plainShellOutput")
             ->attachAppender(std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &lv2Manager.getGlobalDomain(), logv2::LogTag::kPlainShell));
+                &lv2Manager.getGlobalDomain(), false, logv2::LogTag::kPlainShell));
 
         auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
         consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),

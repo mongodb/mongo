@@ -68,8 +68,10 @@ public:
     LogV2Appender(const LogV2Appender&) = delete;
     LogV2Appender& operator=(const LogV2Appender&) = delete;
 
-    explicit LogV2Appender(logv2::LogDomain* domain, logv2::LogTag extraTag = logv2::LogTag::kNone)
-        : _domain(domain), _tag(extraTag) {}
+    explicit LogV2Appender(logv2::LogDomain* domain,
+                           bool warnOnLargeMessages,
+                           logv2::LogTag extraTag = logv2::LogTag::kNone)
+        : _domain(domain), _tag(extraTag), _warnOnLargeMessages(warnOnLargeMessages) {}
 
     Status append(const Event& event) override {
 
@@ -80,7 +82,7 @@ public:
         }
         size_t maxSizeKB = MessageEventDetailsEncoder::getMaxLogSizeKB();
 
-        if (event.isTruncatable() && message.size() > maxSizeKB * 1024) {
+        if (_warnOnLargeMessages && event.isTruncatable() && message.size() > maxSizeKB * 1024) {
             logv2::detail::doLog(
                 0,
                 logv2::LogSeverity::cast(event.getSeverity().toInt()),
@@ -118,6 +120,7 @@ public:
 private:
     logv2::LogDomain* _domain;
     logv2::LogTag _tag;
+    bool _warnOnLargeMessages;
 };
 
 }  // namespace logger
