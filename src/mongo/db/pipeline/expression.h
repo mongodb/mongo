@@ -399,15 +399,15 @@ public:
  * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
  * use "REGISTER_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
  */
-template <typename Accumulator>
+template <typename AccumulatorState>
 class ExpressionFromAccumulator
-    : public ExpressionVariadic<ExpressionFromAccumulator<Accumulator>> {
+    : public ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>> {
 public:
     explicit ExpressionFromAccumulator(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ExpressionVariadic<ExpressionFromAccumulator<Accumulator>>(expCtx) {}
+        : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {}
 
     Value evaluate(const Document& root, Variables* variables) const final {
-        Accumulator accum(this->getExpressionContext());
+        AccumulatorState accum(this->getExpressionContext());
         const auto n = this->_children.size();
         // If a single array arg is given, loop through it passing each member to the accumulator.
         // If a single, non-array arg is given, pass it directly to the accumulator.
@@ -435,15 +435,15 @@ public:
         if (this->_children.size() == 1) {
             return false;
         }
-        return Accumulator(this->getExpressionContext()).isAssociative();
+        return AccumulatorState(this->getExpressionContext()).isAssociative();
     }
 
     bool isCommutative() const final {
-        return Accumulator(this->getExpressionContext()).isCommutative();
+        return AccumulatorState(this->getExpressionContext()).isCommutative();
     }
 
     const char* getOpName() const final {
-        return Accumulator(this->getExpressionContext()).getOpName();
+        return AccumulatorState(this->getExpressionContext()).getOpName();
     }
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
