@@ -579,11 +579,11 @@ std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getU
     return ret;
 }
 
-AuthorizationManagerImpl::AuthSchemaVersionDistCache::AuthSchemaVersionDistCache(
+AuthorizationManagerImpl::AuthSchemaVersionCache::AuthSchemaVersionCache(
     AuthzManagerExternalState* externalState)
-    : DistCache(1, _mutex), _externalState(externalState) {}
+    : ReadThroughCache(1, _mutex), _externalState(externalState) {}
 
-boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionDistCache::lookup(
+boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionCache::lookup(
     OperationContext* opCtx, const int& unusedKey) {
     invariant(unusedKey == 0);
 
@@ -593,16 +593,16 @@ boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionDistCache::looku
     return authzVersion;
 }
 
-AuthorizationManagerImpl::UserDistCacheImpl::UserDistCacheImpl(
-    AuthSchemaVersionDistCache* authSchemaVersionCache,
+AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
+    AuthSchemaVersionCache* authSchemaVersionCache,
     AuthzManagerExternalState* externalState,
     int cacheSize)
-    : UserDistCache(cacheSize, _mutex),
+    : UserCache(cacheSize, _mutex),
       _authSchemaVersionCache(authSchemaVersionCache),
       _externalState(externalState) {}
 
-boost::optional<User> AuthorizationManagerImpl::UserDistCacheImpl::lookup(
-    OperationContext* opCtx, const UserName& userName) {
+boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::lookup(OperationContext* opCtx,
+                                                                      const UserName& userName) {
     LOG(1) << "Getting user " << userName << " from disk";
 
     // Number of times to retry a user document that fetches due to transient AuthSchemaIncompatible
