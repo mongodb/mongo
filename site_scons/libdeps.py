@@ -108,6 +108,29 @@ def __get_sorted_direct_libdeps(node):
     return direct_sorted
 
 
+def __libdeps_visit(n, marked, tsorted, walking):
+    if n.target_node in marked:
+        return
+
+    if n.target_node in walking:
+        raise DependencyCycleError(n.target_node)
+
+    walking.add(n.target_node)
+
+    try:
+        for child in __get_sorted_direct_libdeps(n.target_node):
+            if child.dependency_type != dependency.Private:
+                __libdeps_visit(child, marked, tsorted, walking=walking)
+
+        marked.add(n.target_node)
+        tsorted.append(n.target_node)
+
+    except DependencyCycleError as e:
+        if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
+            e.cycle_nodes.insert(0, n.target_node)
+        raise
+
+
 def __get_libdeps(node):
     """Given a SCons Node, return its library dependencies, topologically sorted.
 
@@ -116,41 +139,17 @@ def __get_libdeps(node):
 
     cached_var_name = libdeps_env_var + "_cached"
 
-    if hasattr(node.attributes, cached_var_name):
-        return getattr(node.attributes, cached_var_name)
+    cache = getattr(node.attributes, cached_var_name, None)
+    if cache is not None:
+        return cache
 
     tsorted = []
     marked = set()
-
-    def visit(n):
-        if getattr(n.target_node.attributes, "libdeps_exploring", False):
-            raise DependencyCycleError(n.target_node)
-
-        n.target_node.attributes.libdeps_exploring = True
-        try:
-
-            if n.target_node in marked:
-                return
-
-            try:
-                for child in __get_sorted_direct_libdeps(n.target_node):
-                    if child.dependency_type != dependency.Private:
-                        visit(child)
-
-                marked.add(n.target_node)
-                tsorted.append(n.target_node)
-
-            except DependencyCycleError as e:
-                if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
-                    e.cycle_nodes.insert(0, n.target_node)
-                raise
-
-        finally:
-            n.target_node.attributes.libdeps_exploring = False
+    walking = set()
 
     for child in __get_sorted_direct_libdeps(node):
         if child.dependency_type != dependency.Interface:
-            visit(child)
+            __libdeps_visit(child, marked, tsorted, walking)
 
     tsorted.reverse()
     setattr(node.attributes, cached_var_name, tsorted)
@@ -164,26 +163,28 @@ def __get_syslibdeps(node):
     These are the depencencies listed with SYSLIBDEPS, and are linked using -l.
     """
     cached_var_name = syslibdeps_env_var + "_cached"
-    if not hasattr(node.attributes, cached_var_name):
-        syslibdeps = node.get_env().Flatten(node.get_env().get(syslibdeps_env_var, []))
-        for lib in __get_libdeps(node):
-            for syslib in node.get_env().Flatten(
-                lib.get_env().get(syslibdeps_env_var, [])
-            ):
-                if syslib:
-                    if type(syslib) is str and syslib.startswith(missing_syslibdep):
-                        print(
-                            (
-                                "Target '%s' depends on the availability of a "
-                                "system provided library for '%s', "
-                                "but no suitable library was found during configuration."
-                                % (str(node), syslib[len(missing_syslibdep) :])
-                            )
-                        )
-                        node.get_env().Exit(1)
-                    syslibdeps.append(syslib)
-        setattr(node.attributes, cached_var_name, syslibdeps)
-    return getattr(node.attributes, cached_var_name)
+    result = getattr(node.attributes, cached_var_name, None)
+    if result is not None:
+        return result
+
+    result = node.get_env().Flatten(node.get_env().get(syslibdeps_env_var, []))
+    for lib in __get_libdeps(node):
+        for syslib in lib.get_env().get(syslibdeps_env_var, []):
+            if not syslib:
+                continue
+
+            if type(syslib) is str and syslib.startswith(missing_syslibdep):
+                print(
+                    "Target '{}' depends on the availability of a "
+                    "system provided library for '{}', "
+                    "but no suitable library was found during configuration.".format(str(node), syslib[len(missing_syslibdep) :])
+                )
+                node.get_env().Exit(1)
+
+            result.append(syslib)
+
+    setattr(node.attributes, cached_var_name, result)
+    return result
 
 
 def __missing_syslib(name):
@@ -378,12 +379,12 @@ def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
     for lib in libs:
         if isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
             lib_target = str(lib)
+            lib_tags = lib.get_env().get("LIBDEPS_TAGS", [])
         else:
             lib_target = env.subst("$TARGET", target=lib)
+            lib_tags = env.File(lib).get_env().get("LIBDEPS_TAGS", [])
 
-        if "init-no-global-side-effects" in env.Entry(lib).get_env().get(
-            "LIBDEPS_TAGS", []
-        ):
+        if "init-no-global-side-effects" in lib_tags:
             result.append(lib_target)
         else:
             whole_archive_flag = "{}{}{}".format(
