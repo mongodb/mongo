@@ -234,7 +234,7 @@ ReadWriteConcernDefaults::ReadWriteConcernDefaults(FetchDefaultsFn fetchDefaults
 ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
 
 ReadWriteConcernDefaults::Cache::Cache(LookupFn lookupFn)
-    : DistCache(1, _mutex), _lookupFn(lookupFn) {}
+    : ReadThroughCache(1, _mutex), _lookupFn(lookupFn) {}
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::Cache::lookup(
     OperationContext* opCtx, const ReadWriteConcernDefaults::Type& key) {

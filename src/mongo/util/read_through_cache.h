@@ -41,11 +41,11 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Serves as a container of the non-templatised parts of the DistCache class below.
+ * Serves as a container of the non-templatised parts of the ReadThroughCache class below.
  */
-class DistCacheBase {
-    DistCacheBase(const DistCacheBase&) = delete;
-    DistCacheBase& operator=(const DistCacheBase&) = delete;
+class ReadThroughCacheBase {
+    ReadThroughCacheBase(const ReadThroughCacheBase&) = delete;
+    ReadThroughCacheBase& operator=(const ReadThroughCacheBase&) = delete;
 
 public:
     /**
@@ -54,14 +54,14 @@ public:
     OID getCacheGeneration() const;
 
 protected:
-    DistCacheBase(Mutex& mutex);
+    ReadThroughCacheBase(Mutex& mutex);
 
-    virtual ~DistCacheBase();
+    virtual ~ReadThroughCacheBase();
 
     /**
      * Type used to guard accesses and updates to the cache.
      *
-     * Guard object for synchronizing accesses to data cached in DistCache instances.
+     * Guard object for synchronizing accesses to data cached in ReadThroughCache instances.
      * This guard allows one thread to access the cache at a time, and provides an exception-safe
      * mechanism for a thread to release the cache mutex while performing network or disk operations
      * while allowing other readers to proceed.
@@ -92,9 +92,9 @@ protected:
 
     public:
         /**
-         * Constructs a cache guard, locking the mutex that synchronizes DistCache accesses.
+         * Constructs a cache guard, locking the mutex that synchronizes ReadThroughCache accesses.
          */
-        explicit CacheGuard(DistCacheBase* distCache)
+        explicit CacheGuard(ReadThroughCacheBase* distCache)
             : _distCache(distCache), _cacheLock(distCache->_cacheWriteMutex) {}
 
         /**
@@ -168,7 +168,7 @@ protected:
         }
 
     private:
-        DistCacheBase* const _distCache;
+        ReadThroughCacheBase* const _distCache;
 
         stdx::unique_lock<Latch> _cacheLock;
 
@@ -176,7 +176,7 @@ protected:
         OID _distCacheFetchGenerationAtFetchBegin;
     };
 
-    friend class DistCacheBase::CacheGuard;
+    friend class ReadThroughCacheBase::CacheGuard;
 
     /**
      * Updates _fetchGeneration to a new OID
@@ -213,7 +213,7 @@ protected:
  * Implements a generic read-through cache built on top of InvalidatingLRUCache.
  */
 template <typename Key, typename Value>
-class DistCache : public DistCacheBase {
+class ReadThroughCache : public ReadThroughCacheBase {
 public:
     using Cache = InvalidatingLRUCache<Key, Value>;
     using ValueHandle = typename Cache::ValueHandle;
@@ -307,13 +307,14 @@ public:
 
 protected:
     /**
-     * DistCache constructor, to be called by sub-classes.  Accepts the initial size of the cache,
-     * and a reference to a Mutex.  The Mutex is for the exclusive use of the DistCache, the
-     * sub-class should never actually use it (apart from passing it to this constructor).  Having
-     * the Mutex stored by the sub-class allows latch diagnostics to be correctly associated with
-     * the sub-class (not the generic DistCache class).
+     * ReadThroughCache constructor, to be called by sub-classes.  Accepts the initial size of the
+     * cache, and a reference to a Mutex.  The Mutex is for the exclusive use of the
+     * ReadThroughCache, the sub-class should never actually use it (apart from passing it to this
+     * constructor).  Having the Mutex stored by the sub-class allows latch diagnostics to be
+     * correctly associated with the sub-class (not the generic ReadThroughCache class).
      */
-    DistCache(int cacheSize, Mutex& mutex) : DistCacheBase(mutex), _cache(cacheSize) {}
+    ReadThroughCache(int cacheSize, Mutex& mutex)
+        : ReadThroughCacheBase(mutex), _cache(cacheSize) {}
 
 private:
     /**

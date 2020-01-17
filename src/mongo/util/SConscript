@@ -205,7 +205,7 @@ env.Library(
 env.Library(
     target='caching',
     source=[
-        'dist_cache.cpp',
+        'read_through_cache.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -566,7 +566,6 @@ icuEnv.CppUnitTest(
         'decimal_counter_test.cpp',
         'decorable_test.cpp',
         'diagnostic_info_test.cpp',
-        'dist_cache_test.cpp',
         'dns_name_test.cpp',
         'dns_query_test.cpp',
         'duration_test.cpp',
@@ -595,6 +594,7 @@ icuEnv.CppUnitTest(
         'procparser_test.cpp' if env.TargetOSIs('linux') else [],
         'producer_consumer_queue_test.cpp',
         'progress_meter_test.cpp',
+        'read_through_cache_test.cpp',
         'registry_list_test.cpp',
         'represent_as_test.cpp',
         'safe_num_test.cpp',
