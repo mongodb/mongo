@@ -3,7 +3,7 @@
  * and profiler. This test also verifies that for a sharded collection, the 'comment' fields gets
  * passed on from mongos to the respective shards.
  *
- * @tags: [requires_fcv_44]
+ * @tags: [requires_fcv_44, requires_text_logs]
  */
 (function() {
 "use strict";
