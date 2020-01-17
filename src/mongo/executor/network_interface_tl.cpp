@@ -44,6 +44,11 @@
 namespace mongo {
 namespace executor {
 
+namespace {
+const Status kNetworkInterfaceShutdownInProgress = {ErrorCodes::ShutdownInProgress,
+                                                    "NetworkInterface shutdown in progress"};
+}
+
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
                                        ConnectionPool::Options connPoolOpts,
                                        ServiceContext* svcCtx,
@@ -75,6 +80,17 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
         _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
     _pool = std::make_shared<ConnectionPool>(
         std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
+}
+
+NetworkInterfaceTL::~NetworkInterfaceTL() {
+    if (!inShutdown()) {
+        shutdown();
+    }
+
+    // Because we quick exit on shutdown, these invariants are usually checked only in ASAN builds
+    // and integration/unit tests.
+    invariant(_inProgress.empty());
+    invariant(_inProgressAlarms.empty());
 }
 
 std::string NetworkInterfaceTL::getDiagnosticString() {
@@ -134,10 +150,29 @@ void NetworkInterfaceTL::shutdown() {
 
     LOG(2) << "Shutting down network interface.";
 
+    // Cancel any remaining commands. Any attempt to register new commands will throw.
+    auto inProgress = [&] {
+        stdx::lock_guard lk(_inProgressMutex);
+        return std::exchange(_inProgress, {});
+    }();
+
+    for (auto& [_, weakCmdState] : inProgress) {
+        auto cmdState = weakCmdState.lock();
+        if (!cmdState) {
+            continue;
+        }
+
+        if (cmdState->done.swap(true)) {
+            continue;
+        }
+
+        cmdState->promise.setError(kNetworkInterfaceShutdownInProgress);
+    }
+
     // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
     _reactor->stop();
 
-    _cancelAllAlarms();
+    _shutdownAllAlarms();
 
     _ioThread.join();
 }
@@ -195,6 +230,11 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
 
     {
         stdx::lock_guard lk(interface->_inProgressMutex);
+        if (interface->inShutdown()) {
+            // If we're in shutdown, we can't add a new command.
+            uassertStatusOK(kNetworkInterfaceShutdownInProgress);
+        }
+
         interface->_inProgress.insert({cbHandle, state});
     }
 
@@ -213,9 +253,9 @@ NetworkInterfaceTL::CommandState::~CommandState() {
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         RemoteCommandRequestOnAny& request,
                                         RemoteCommandCompletionFn&& onFinish,
-                                        const BatonHandle& baton) {
+                                        const BatonHandle& baton) try {
     if (inShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
+        return kNetworkInterfaceShutdownInProgress;
     }
 
     LOG(3) << "startCommand: " << redact(request.toString());
@@ -362,6 +402,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 // This is only called from within a then() callback on a future, so throwing is equivalent to
@@ -506,7 +548,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
 
 Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
     if (inShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
+        return kNetworkInterfaceShutdownInProgress;
     }
 
     _reactor->schedule([action = std::move(action)](auto status) { action(status); });
@@ -517,7 +559,8 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
                                     Date_t when,
                                     unique_function<void(Status)> action) {
     if (inShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
+        // Pessimistically check if we're in shutdown and save some work
+        return kNetworkInterfaceShutdownInProgress;
     }
 
     if (when <= now()) {
@@ -531,19 +574,31 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
     auto alarmState =
         std::make_shared<AlarmState>(when, cbHandle, _reactor->makeTimer(), std::move(pf.promise));
 
+    auto weakAlarmState = std::weak_ptr<AlarmState>(alarmState);
+
     {
         stdx::lock_guard<Latch> lk(_inProgressMutex);
 
+        if (_inProgressAlarmsInShutdown) {
+            // Check that we've won any possible race with _shutdownAllAlarms();
+            return kNetworkInterfaceShutdownInProgress;
+        }
+
         // If a user has already scheduled an alarm with a handle, make sure they intentionally
         // override it by canceling and setting a new one.
-        auto alarmPair = std::make_pair(cbHandle, std::shared_ptr<AlarmState>(alarmState));
-        auto&& [_, wasInserted] = _inProgressAlarms.insert(std::move(alarmPair));
+        auto&& [_, wasInserted] = _inProgressAlarms.emplace(cbHandle, alarmState);
         invariant(wasInserted);
     }
 
     alarmState->timer->waitUntil(alarmState->when, nullptr)
-        .getAsync([this, state = std::move(alarmState)](Status status) mutable {
-            _answerAlarm(status, state);
+        .getAsync([this, weakAlarmState](Status status) mutable {
+            auto state = weakAlarmState.lock();
+            if (!state) {
+                LOG(4) << "AlarmState destroyed before timer callback finished";
+                return;
+            }
+
+            _answerAlarm(status, std::move(state));
         });
 
     return Status::OK();
@@ -564,17 +619,29 @@ void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandl
 
     lk.unlock();
 
+    if (alarmState->done.swap(true)) {
+        return;
+    }
+
     alarmState->timer->cancel();
     alarmState->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
 }
 
-void NetworkInterfaceTL::_cancelAllAlarms() {
+void NetworkInterfaceTL::_shutdownAllAlarms() {
     auto alarms = [&] {
         stdx::unique_lock<Latch> lk(_inProgressMutex);
+
+        // Prevent any more alarms from registering
+        _inProgressAlarmsInShutdown = true;
+
         return std::exchange(_inProgressAlarms, {});
     }();
 
     for (auto&& [cbHandle, state] : alarms) {
+        if (state->done.swap(true)) {
+            continue;
+        }
+
         state->timer->cancel();
         state->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
     }
@@ -584,7 +651,12 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
     // Since the lock is released before canceling the timer, this thread can win the race with
     // cancelAlarm(). Thus if status is CallbackCanceled, then this alarm is already removed from
     // _inProgressAlarms.
-    if (status == ErrorCodes::CallbackCanceled) {
+    if (ErrorCodes::isCancelationError(status.code())) {
+        return;
+    }
+
+    if (inShutdown()) {
+        // No alarms get processed in shutdown
         return;
     }
 
@@ -611,6 +683,10 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
         }
 
         _inProgressAlarms.erase(iter);
+    }
+
+    if (state->done.swap(true)) {
+        return;
     }
 
     // A not OK status here means the timer experienced a system error.

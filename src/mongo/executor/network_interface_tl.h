@@ -53,6 +53,7 @@ public:
                        ServiceContext* ctx,
                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
+    ~NetworkInterfaceTL();
 
     std::string getDiagnosticString() override;
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
@@ -130,10 +131,11 @@ private:
         Date_t when;
         std::unique_ptr<transport::ReactorTimer> timer;
 
+        AtomicWord<bool> done;
         Promise<void> promise;
     };
 
-    void _cancelAllAlarms();
+    void _shutdownAllAlarms();
     void _answerAlarm(Status status, std::shared_ptr<AlarmState> state);
 
     void _run();
@@ -170,6 +172,8 @@ private:
     Mutex _inProgressMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_inProgressMutex");
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandState>> _inProgress;
+
+    bool _inProgressAlarmsInShutdown = false;
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<AlarmState>>
         _inProgressAlarms;
 
