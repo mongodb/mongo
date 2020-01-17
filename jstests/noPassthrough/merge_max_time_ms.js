@@ -221,9 +221,11 @@ assert.commandWorked(st.shard0.getDB(kDBName).setProfilingLevel(2));
 assert.commandWorked(st.shard1.getDB(kDBName).setProfilingLevel(2));
 
 // // Run the test with 'destColl' unsharded.
-withEachMergeMode(
-    (mode) => runShardedTest(
-        mode.whenMatchedMode, mode.whenNotMatchedMode, st.s, st.shard0, mode + "_unshardedDest"));
+withEachMergeMode((mode) => runShardedTest(mode.whenMatchedMode,
+                                           mode.whenNotMatchedMode,
+                                           st.s,
+                                           st.shard0,
+                                           tojson(mode) + "_unshardedDest"));
 
 // Run the test with 'destColl' sharded. This means that writes will be sent to both
 // shards, and if either one hangs, the MaxTimeMS will expire.
@@ -239,14 +241,14 @@ withEachMergeMode((mode) => runShardedTest(mode.whenMatchedMode,
                                            mode.whenNotMatchedMode,
                                            st.s,
                                            st.shard0,
-                                           mode + "_shardedDest_" + st.shard0.name));
+                                           tojson(mode) + "_shardedDest_" + st.shard0.name));
 
 jsTestLog("Running test forcing shard " + st.shard1.name + " to hang");
 withEachMergeMode((mode) => runShardedTest(mode.whenMatchedMode,
                                            mode.whenNotMatchedMode,
                                            st.s,
                                            st.shard1,
-                                           mode + "_shardedDest_" + st.shard1.name));
+                                           tojson(mode) + "_shardedDest_" + st.shard1.name));
 
 st.stop();
 })();
