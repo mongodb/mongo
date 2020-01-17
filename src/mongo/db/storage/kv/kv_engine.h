@@ -227,7 +227,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
+    virtual StatusWith<StorageEngine::BackupInformation> beginNonBlockingBackup(
         OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");

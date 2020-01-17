@@ -512,10 +512,14 @@ stdx::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](String
     fassertFailed(40358);
 };
 
-StatusWith<std::vector<StorageEngine::BackupBlock>> getDataBlocksFromBackupCursor(
-    WT_CURSOR* cursor, std::string dbPath, const char* statusPrefix) {
+StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCursor(
+    WT_SESSION* session,
+    WT_CURSOR* cursor,
+    bool incrementalBackup,
+    std::string dbPath,
+    const char* statusPrefix) {
     int wtRet;
-    std::vector<StorageEngine::BackupBlock> blocks;
+    StorageEngine::BackupInformation backupInformation;
     const char* filename;
     const auto directoryPath = boost::filesystem::path(dbPath);
     const auto wiredTigerLogFilePrefix = "WiredTigerLog";
@@ -524,26 +528,57 @@ StatusWith<std::vector<StorageEngine::BackupBlock>> getDataBlocksFromBackupCurso
 
         std::string name(filename);
 
-        auto filePath = directoryPath;
+        boost::filesystem::path filePath = directoryPath;
+        boost::filesystem::path relativePath;
         if (name.find(wiredTigerLogFilePrefix) == 0) {
             // TODO SERVER-13455:replace `journal/` with the configurable journal path.
             filePath /= boost::filesystem::path("journal");
+            relativePath /= boost::filesystem::path("journal");
         }
         filePath /= name;
+        relativePath /= name;
 
-        boost::system::error_code errorCode;
-        const std::uint64_t filesize = boost::filesystem::file_size(filePath, errorCode);
-        uassert(31317,
-                "Failed to get a file's size. Filename: {} Error: {}"_format(filePath.string(),
-                                                                             errorCode.message()),
-                !errorCode);
-        blocks.push_back({filePath.string(), 0, filesize});
+        // TODO: SERVER-44410 Implement fileSize.
+        std::uint64_t fileSize = 0;
+        StorageEngine::BackupFile backupFile(fileSize);
+        backupInformation.insert({filePath.string(), backupFile});
+
+        if (!incrementalBackup) {
+            continue;
+        }
+
+        // For each file listed, open a duplicate backup cursor and get the blocks to copy.
+        std::stringstream ss;
+        ss << "incremental=(file=\"" << str::escape(relativePath.string()) << "\")";
+        const std::string config = ss.str();
+        WT_CURSOR* dupCursor;
+        wtRet = session->open_cursor(session, nullptr, cursor, config.c_str(), &dupCursor);
+        if (wtRet != 0) {
+            return wtRCToStatus(wtRet);
+        }
+
+        while ((wtRet = dupCursor->next(dupCursor)) == 0) {
+            uint64_t offset, size, type;
+            invariantWTOK(dupCursor->get_key(dupCursor, &offset, &size, &type));
+            LOG(2) << "Block to copy for incremental backup: filename: " << filePath.string()
+                   << ", offset: " << offset << ", size: " << size << ", type: " << type;
+            backupInformation.at(filePath.string()).blocksToCopy.push_back({offset, size});
+        }
+
+        if (wtRet != WT_NOTFOUND) {
+            return wtRCToStatus(wtRet);
+        }
+
+        wtRet = dupCursor->close(dupCursor);
+        if (wtRet != 0) {
+            return wtRCToStatus(wtRet);
+        }
     }
 
     if (wtRet != WT_NOTFOUND) {
         return wtRCToStatus(wtRet, statusPrefix);
     }
-    return blocks;
+    return backupInformation;
 }
 
 }  // namespace
@@ -1067,7 +1102,7 @@ Status WiredTigerKVEngine::disableIncrementalBackup(OperationContext* opCtx) {
     return Status::OK();
 }
 
-StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNonBlockingBackup(
+StatusWith<StorageEngine::BackupInformation> WiredTigerKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
@@ -1105,18 +1140,18 @@ StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNon
         return wtRCToStatus(wtRet);
     }
 
-    auto swBlocksToCopy =
-        getDataBlocksFromBackupCursor(cursor, _path, "Error opening backup cursor.");
+    auto swBackupInfo = getBackupInformationFromBackupCursor(
+        session, cursor, options.incrementalBackup, _path, "Error opening backup cursor.");
 
-    if (!swBlocksToCopy.isOK()) {
-        return swBlocksToCopy;
+    if (!swBackupInfo.isOK()) {
+        return swBackupInfo;
     }
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
     _backupCursor = cursor;
 
-    return swBlocksToCopy;
+    return swBackupInfo;
 }
 
 void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
@@ -1132,32 +1167,36 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
     invariant(_backupCursor);
 
-    WT_CURSOR* cursor = NULL;
+    // The "target=(\"log:\")" configuration string for the cursor will ensure that we only see the
+    // log files when iterating on the cursor.
+    WT_CURSOR* cursor = nullptr;
     WT_SESSION* session = _backupSession->getSession();
     int wtRet = session->open_cursor(session, NULL, _backupCursor, "target=(\"log:\")", &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
 
-    StatusWith<std::vector<StorageEngine::BackupBlock>> swBlocksToCopy =
-        getDataBlocksFromBackupCursor(cursor, _path, "Error extending backup cursor.");
+    StatusWith<StorageEngine::BackupInformation> swBackupInfo =
+        getBackupInformationFromBackupCursor(
+            session, cursor, /*incrementalBackup=*/false, _path, "Error extending backup cursor.");
 
     wtRet = cursor->close(cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
 
-    if (!swBlocksToCopy.isOK()) {
-        return swBlocksToCopy.getStatus();
+    if (!swBackupInfo.isOK()) {
+        return swBackupInfo.getStatus();
     }
 
-    // Journal files returned from the future backup cursor are not intended to have block level
-    // information. For now, this is being explicitly codified by transforming the result into a
-    // vector of filename strings. The lack of block/filesize information instructs the client to
-    // copy the whole file.
+    // Once all the backup cursors have been opened on a sharded cluster, we need to ensure that the
+    // data being copied from each shard is at the same point-in-time across the entire cluster to
+    // have a consistent view of the data. For shards that opened their backup cursor before the
+    // established point-in-time for backup, they will need to create a full copy of the additional
+    // journal files returned by this method to ensure a consistent backup of the data is taken.
     std::vector<std::string> filenames;
-    for (const auto& block : swBlocksToCopy.getValue()) {
-        filenames.push_back(std::move(block.filename));
+    for (const auto& entry : swBackupInfo.getValue()) {
+        filenames.push_back(entry.first);
     }
 
     return {filenames};
