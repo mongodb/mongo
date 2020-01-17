@@ -49,6 +49,8 @@ MockDBClientConnection::MockDBClientConnection()
       _sockCreationTime(mongo::curTimeMicros64()),
       _autoReconnect(false) {
     _setServerRPCProtocols(rpc::supports::kAll);
+    _callIter = _mockCallResponses.begin();
+    _recvIter = _mockRecvResponses.begin();
 }
 
 MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect)
@@ -56,7 +58,10 @@ MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
       _remoteServer(remoteServer),
       _isFailed(false),
       _sockCreationTime(mongo::curTimeMicros64()),
-      _autoReconnect(autoReconnect) {}
+      _autoReconnect(autoReconnect) {
+    _callIter = _mockCallResponses.begin();
+    _recvIter = _mockRecvResponses.begin();
+}
 
 MockDBClientConnection::~MockDBClientConnection() {}
 
