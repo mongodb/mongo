@@ -89,86 +89,39 @@ public:
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                 nss.isValid());
 
-        long long skip = 0;
-
-        if (cmdObj["skip"].isNumber()) {
-            skip = cmdObj["skip"].numberLong();
-            if (skip < 0) {
-                errmsg = "skip value is negative in count query";
-                return false;
-            }
-        } else if (cmdObj["skip"].ok()) {
-            errmsg = "skip value is not a valid number";
-            return false;
-        }
-
-        BSONObjBuilder countCmdBuilder;
-        countCmdBuilder.append("count", nss.coll());
-
-        BSONObj filter;
-        if (cmdObj["query"].isABSONObj()) {
-            countCmdBuilder.append("query", cmdObj["query"].Obj());
-            filter = cmdObj["query"].Obj();
-        }
-
-        BSONObj collation;
-        BSONElement collationElement;
-        auto status =
-            bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
-        if (status.isOK()) {
-            collation = collationElement.Obj();
-        } else if (status != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(status);
-        }
-
-        if (cmdObj["limit"].isNumber()) {
-            long long limit = cmdObj["limit"].numberLong();
+        std::vector<AsyncRequestsSender::Response> shardResponses;
+        try {
+            auto countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
 
             // We only need to factor in the skip value when sending to the shards if we
             // have a value for limit, otherwise, we apply it only once we have collected all
             // counts.
-            if (limit != 0 && cmdObj["skip"].isNumber()) {
-                if (limit > 0)
-                    limit += skip;
-                else
-                    limit -= skip;
+            if (countRequest.getLimit() && countRequest.getSkip()) {
+                const auto limit = countRequest.getLimit().get();
+                if (limit != 0) {
+                    countRequest.setLimit(limit + countRequest.getSkip().get());
+                }
             }
-
-            countCmdBuilder.append("limit", limit);
-        }
-
-        const std::initializer_list<StringData> passthroughFields = {
-            "$queryOptions",
-            "collation",
-            "hint",
-            "readConcern",
-            QueryRequest::cmdOptionMaxTimeMS,
-        };
-        for (auto name : passthroughFields) {
-            if (auto field = cmdObj[name]) {
-                countCmdBuilder.append(field);
-            }
-        }
-
-        auto countCmdObj = countCmdBuilder.done();
-
-        std::vector<AsyncRequestsSender::Response> shardResponses;
-        try {
+            countRequest.setSkip(boost::none);
             const auto routingInfo = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            const auto collation = countRequest.getCollation().get_value_or(BSONObj());
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.db(),
                 nss,
                 routingInfo,
-                applyReadWriteConcern(opCtx, this, countCmdObj),
+                applyReadWriteConcern(
+                    opCtx,
+                    this,
+                    countRequest.toBSON(
+                        CommandHelpers::filterCommandRequestForPassthrough(cmdObj))),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
-                filter,
+                countRequest.getQuery(),
                 collation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
-
             auto countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
