@@ -113,6 +113,10 @@ bool confirmCurrentOpContents(DBClientBase* conn,
         }
         sleepFor(intervalMS);
     }
+    auto currentOp = BSON("currentOp" << BSON("idleCursors" << true));
+    unittest::log()
+        << "confirmCurrentOpContents fails with curOpMatch: " << curOpMatch << " currentOp: "
+        << conn->runCommand(OpMsgRequest::fromDBAndBody("admin", currentOp))->getCommandReply();
     return false;
 }
 
