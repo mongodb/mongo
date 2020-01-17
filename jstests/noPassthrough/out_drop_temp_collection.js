@@ -1,8 +1,14 @@
 /**
  * Test that the temp collection created by $out is not dropped even if the database containing it
  * is dropped during the operation.
- * @tags: [assumes_unsharded_collection, do_not_wrap_aggregations_in_facets,
- * assumes_read_concern_unchanged]
+ *
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   do_not_wrap_aggregations_in_facets,
+ *   assumes_read_concern_unchanged,
+ *   requires_replication,
+ *   requires_sharding,
+ * ]
  */
 
 (function() {
