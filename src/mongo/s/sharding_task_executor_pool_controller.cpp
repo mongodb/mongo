@@ -99,10 +99,18 @@ Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(const std::s
 
 void ShardingTaskExecutorPoolController::_addGroup(WithLock,
                                                    const ReplicaSetChangeNotifier::State& state) {
-    auto groupData = std::make_shared<GroupData>(state);
+    auto groupData = std::make_shared<GroupData>();
+    groupData->primary = state.primary;
+
+    // Find each active member
+    for (auto& host : state.connStr.getServers()) {
+        if (!state.passives.count(host)) {
+            groupData->members.push_back(host);
+        }
+    }
 
     // Mark each host with this groupData
-    for (auto& host : state.connStr.getServers()) {
+    for (auto& host : groupData->members) {
         auto& groupAndId = _groupAndIds[host];
 
         invariant(!groupAndId.groupData);
@@ -127,7 +135,7 @@ void ShardingTaskExecutorPoolController::_removeGroup(WithLock, const std::strin
     }
 
     auto& groupData = it->second;
-    for (auto& host : groupData->state.connStr.getServers()) {
+    for (auto& host : groupData->members) {
         auto& groupAndId = getOrInvariant(_groupAndIds, host);
         groupAndId.groupData.reset();
         if (groupAndId.maybeId) {
@@ -221,13 +229,13 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
 
     // If the pool isn't in a groupData, we can return now
     auto groupData = poolData.groupData.lock();
-    if (!groupData || groupData->state.passives.count(poolData.host)) {
+    if (!groupData) {
         return {{poolData.host}, poolData.isAbleToShutdown};
     }
 
     switch (gParameters.matchingStrategy.load()) {
         case MatchingStrategy::kMatchPrimaryNode: {
-            if (groupData->state.primary == poolData.host) {
+            if (groupData->primary == poolData.host) {
                 groupData->target = poolData.target;
             }
         } break;
@@ -254,7 +262,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
         std::all_of(groupData->poolIds.begin(), groupData->poolIds.end(), [&](auto otherId) {
                               return getOrInvariant(_poolDatas, otherId).isAbleToShutdown;
                           });
-    return {groupData->state.connStr.getServers(), shouldShutdown};
+    return {groupData->members, shouldShutdown};
 }
 
 void ShardingTaskExecutorPoolController::removeHost(PoolId id) {
