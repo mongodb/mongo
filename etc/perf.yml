@@ -18,7 +18,7 @@ post:
       params:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
-            local_file: src/mongod.log
+            local_file: mongod.log
             remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/mongod-${build_id}.log
             bucket: mciuploads
             permissions: public-read
@@ -103,7 +103,7 @@ functions:
           set -e
           set -o verbose
           mkdir -p ./dbdata
-          ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
+          ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags} --logpath "${workdir}/mongod.log"
     - command: shell.exec
       params:
         working_dir: src
@@ -618,7 +618,6 @@ buildvariants:
       --fork
       --inMemoryEngineConfigString 'eviction=(threads_min=1),'
       --inMemorySizeGB 60
-      --logpath ./mongod.log
       --networkMessageCompressors noop
       --setParameter diagnosticDataCollectionEnabled=false
       --setParameter enableTestCommands=1
@@ -664,7 +663,6 @@ buildvariants:
       --fork
       --inMemoryEngineConfigString 'eviction=(threads_min=1),'
       --inMemorySizeGB 60
-      --logpath ./mongod.log
       --networkMessageCompressors noop
       --oplogSize 30000
       --replSet test
