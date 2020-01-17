@@ -65,8 +65,8 @@ AccumulationStatement::Parser& AccumulationStatement::getParser(StringData name)
     return it->second;
 }
 
-boost::intrusive_ptr<Accumulator> AccumulationStatement::makeAccumulator() const {
-    return _factory();
+boost::intrusive_ptr<AccumulatorState> AccumulationStatement::makeAccumulator() const {
+    return expr.factory();
 }
 
 AccumulationStatement AccumulationStatement::parseAccumulationStatement(
@@ -98,9 +98,10 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             specElem.type() != BSONType::Array);
 
     auto&& parser = AccumulationStatement::getParser(accName);
-    auto [expression, factory] = parser(expCtx, specElem, vps);
+    auto [initializer, argument, factory] = parser(expCtx, specElem, vps);
 
-    return AccumulationStatement(fieldName.toString(), expression, factory);
+    return AccumulationStatement(fieldName.toString(),
+                                 AccumulationExpression(initializer, argument, factory));
 }
 
 }  // namespace mongo

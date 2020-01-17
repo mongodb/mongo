@@ -93,7 +93,7 @@ void AccumulatorAvg::processInternal(const Value& input, bool merging) {
     _count++;
 }
 
-intrusive_ptr<Accumulator> AccumulatorAvg::create(
+intrusive_ptr<AccumulatorState> AccumulatorAvg::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorAvg(expCtx);
 }
@@ -123,8 +123,8 @@ Value AccumulatorAvg::getValue(bool toBeMerged) {
 }
 
 AccumulatorAvg::AccumulatorAvg(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Accumulator(expCtx), _isDecimal(false), _count(0) {
-    // This is a fixed size Accumulator so we never need to update this
+    : AccumulatorState(expCtx), _isDecimal(false), _count(0) {
+    // This is a fixed size AccumulatorState so we never need to update this
     _memUsageBytes = sizeof(*this);
 }
 

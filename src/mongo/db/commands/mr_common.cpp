@@ -124,15 +124,19 @@ auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string co
 }
 
 auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
-    auto accumulatorArgument =
-        ExpressionFieldPath::parse(expCtx, "$emits", expCtx->variablesParseState);
-    auto reduceFactory = [expCtx, funcSource = code]() {
+    auto initializer = ExpressionArray::create(expCtx, {});
+    auto argument = ExpressionFieldPath::parse(expCtx, "$emits", expCtx->variablesParseState);
+    auto reduceFactory = [expCtx, funcSource = std::move(code)]() {
         return AccumulatorInternalJsReduce::create(expCtx, funcSource);
     };
-    AccumulationStatement jsReduce("value", std::move(accumulatorArgument), reduceFactory);
-    auto groupExpr = ExpressionFieldPath::parse(expCtx, "$emits.k", expCtx->variablesParseState);
+    AccumulationStatement jsReduce("value",
+                                   AccumulationExpression(std::move(initializer),
+                                                          std::move(argument),
+                                                          std::move(reduceFactory)));
+    auto groupKeyExpression =
+        ExpressionFieldPath::parse(expCtx, "$emits.k", expCtx->variablesParseState);
     return DocumentSourceGroup::create(expCtx,
-                                       std::move(groupExpr),
+                                       std::move(groupKeyExpression),
                                        make_vector<AccumulationStatement>(std::move(jsReduce)),
                                        boost::none);
 }

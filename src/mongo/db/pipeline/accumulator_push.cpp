@@ -83,7 +83,7 @@ Value AccumulatorPush::getValue(bool toBeMerged) {
 
 AccumulatorPush::AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  boost::optional<int> maxMemoryUsageBytes)
-    : Accumulator(expCtx),
+    : AccumulatorState(expCtx),
       _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
     _memUsageBytes = sizeof(*this);
 }
@@ -93,7 +93,7 @@ void AccumulatorPush::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorPush::create(
+intrusive_ptr<AccumulatorState> AccumulatorPush::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorPush(expCtx, boost::none);
 }

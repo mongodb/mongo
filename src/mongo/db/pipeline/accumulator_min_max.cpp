@@ -71,7 +71,7 @@ Value AccumulatorMinMax::getValue(bool toBeMerged) {
 
 AccumulatorMinMax::AccumulatorMinMax(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      Sense sense)
-    : Accumulator(expCtx), _sense(sense) {
+    : AccumulatorState(expCtx), _sense(sense) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -80,12 +80,12 @@ void AccumulatorMinMax::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorMin::create(
+intrusive_ptr<AccumulatorState> AccumulatorMin::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorMin(expCtx);
 }
 
-intrusive_ptr<Accumulator> AccumulatorMax::create(
+intrusive_ptr<AccumulatorState> AccumulatorMax::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorMax(expCtx);
 }

@@ -37,10 +37,8 @@ namespace mongo {
 
 REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::parseInternalJsReduce);
 
-std::pair<boost::intrusive_ptr<Expression>, Accumulator::Factory>
-AccumulatorInternalJsReduce::parseInternalJsReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                                   BSONElement elem,
-                                                   VariablesParseState vps) {
+AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
+    boost::intrusive_ptr<ExpressionContext> expCtx, BSONElement elem, VariablesParseState vps) {
     uassert(31326,
             str::stream() << kAccumulatorName << " requires a document argument, but found "
                           << elem.type(),
@@ -48,13 +46,13 @@ AccumulatorInternalJsReduce::parseInternalJsReduce(boost::intrusive_ptr<Expressi
     BSONObj obj = elem.embeddedObject();
 
     std::string funcSource;
-    boost::intrusive_ptr<Expression> dataExpr;
+    boost::intrusive_ptr<Expression> argument;
 
     for (auto&& element : obj) {
         if (element.fieldNameStringData() == "eval") {
             funcSource = parseReduceFunction(element);
         } else if (element.fieldNameStringData() == "data") {
-            dataExpr = Expression::parseOperand(expCtx, element, vps);
+            argument = Expression::parseOperand(expCtx, element, vps);
         } else {
             uasserted(31243,
                       str::stream() << "Invalid argument specified to " << kAccumulatorName << ": "
@@ -68,13 +66,14 @@ AccumulatorInternalJsReduce::parseInternalJsReduce(boost::intrusive_ptr<Expressi
     uassert(31349,
             str::stream() << kAccumulatorName
                           << " requires 'data' argument, recieved input: " << obj.toString(false),
-            dataExpr);
+            argument);
 
     auto factory = [expCtx, funcSource = funcSource]() {
         return AccumulatorInternalJsReduce::create(expCtx, funcSource);
     };
 
-    return {std::move(dataExpr), std::move(factory)};
+    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
+    return {std::move(initializer), std::move(argument), std::move(factory)};
 }
 
 std::string AccumulatorInternalJsReduce::parseReduceFunction(BSONElement func) {
@@ -168,7 +167,7 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     }
 }
 
-boost::intrusive_ptr<Accumulator> AccumulatorInternalJsReduce::create(
+boost::intrusive_ptr<AccumulatorState> AccumulatorInternalJsReduce::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData funcSource) {
 
     return make_intrusive<AccumulatorInternalJsReduce>(expCtx, funcSource);
@@ -181,9 +180,233 @@ void AccumulatorInternalJsReduce::reset() {
 }
 
 // Returns this accumulator serialized as a Value along with the reduce function.
-Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> expression,
+Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> initializer,
+                                                boost::intrusive_ptr<Expression> argument,
                                                 bool explain) const {
-    return DOC(
-        getOpName() << DOC("data" << expression->serialize(explain) << "eval" << _funcSource));
+    return DOC(getOpName() << DOC("data" << argument->serialize(explain) << "eval" << _funcSource));
 }
+
+REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
+
+boost::intrusive_ptr<AccumulatorState> AccumulatorJs::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::string init,
+    std::string accumulate,
+    std::string merge,
+    std::string finalize) {
+    return new AccumulatorJs(
+        expCtx, std::move(init), std::move(accumulate), std::move(merge), std::move(finalize));
+}
+
+namespace {
+// Parses a constant expression of type String or Code.
+std::string parseFunction(StringData fieldName,
+                          boost::intrusive_ptr<ExpressionContext> expCtx,
+                          BSONElement elem,
+                          VariablesParseState vps) {
+    boost::intrusive_ptr<Expression> expr = Expression::parseOperand(expCtx, elem, vps);
+    expr = expr->optimize();
+    ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(expr.get());
+    uassert(4544701,
+            str::stream() << "$accumulator '" << fieldName << "' must be a constant expression",
+            ec);
+    Value v = ec->getValue();
+    uassert(4544702,
+            str::stream() << "$accumulator '" << fieldName << "' must be a String or Code",
+            v.getType() == BSONType::String || v.getType() == BSONType::Code);
+    return v.coerceToString();
+}
+}  // namespace
+
+
+Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
+                                  boost::intrusive_ptr<Expression> argument,
+                                  bool explain) const {
+    MutableDocument args;
+    args.addField("init", Value(_init));
+    args.addField("initArgs", Value(initializer->serialize(explain)));
+    args.addField("accumulate", Value(_accumulate));
+    args.addField("accumulateArgs", Value(argument->serialize(explain)));
+    args.addField("merge", Value(_merge));
+    args.addField("finalize", Value(_finalize));
+    args.addField("lang", Value("js"_sd));
+    return DOC(getOpName() << args.freeze());
+}
+
+AccumulationExpression AccumulatorJs::parse(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                            BSONElement elem,
+                                            VariablesParseState vps) {
+    /*
+     * {$accumulator: {
+     *   init: <code>,
+     *   accumulate: <code>,
+     *   merge: <code>,
+     *   finalize: <code>,
+     *
+     *   accumulateArgs: <expr>,  // evaluated once per document
+     *
+     *   initArgs: <expr>,  // evaluated once per group
+     *
+     *   lang: 'js',
+     * }}
+     */
+    uassert(4544703,
+            str::stream() << "$accumulator expects an object as an argument; found: "
+                          << typeName(elem.type()),
+            elem.type() == BSONType::Object);
+    BSONObj obj = elem.embeddedObject();
+
+    std::string init, accumulate, merge, finalize;
+    boost::intrusive_ptr<Expression> initArgs, accumulateArgs;
+
+    for (auto&& element : obj) {
+        auto name = element.fieldNameStringData();
+        if (name == "init") {
+            init = parseFunction("init", expCtx, element, vps);
+        } else if (name == "accumulate") {
+            accumulate = parseFunction("accumulate", expCtx, element, vps);
+        } else if (name == "merge") {
+            merge = parseFunction("merge", expCtx, element, vps);
+        } else if (name == "finalize") {
+            finalize = parseFunction("finalize", expCtx, element, vps);
+        } else if (name == "initArgs") {
+            initArgs = Expression::parseOperand(expCtx, element, vps);
+        } else if (name == "accumulateArgs") {
+            accumulateArgs = Expression::parseOperand(expCtx, element, vps);
+        } else if (name == "lang") {
+            uassert(4544704,
+                    str::stream() << "$accumulator lang must be a string; found: "
+                                  << element.type(),
+                    element.type() == BSONType::String);
+            uassert(4544705,
+                    "$accumulator only supports lang: 'js'",
+                    element.valueStringData() == "js");
+        } else {
+            // unexpected field
+            uassert(
+                4544706, str::stream() << "$accumulator got an unexpected field: " << name, false);
+        }
+    }
+    uassert(4544707, "$accumulator missing required argument 'init'", !init.empty());
+    uassert(4544708, "$accumulator missing required argument 'accumulate'", !accumulate.empty());
+    uassert(4544709, "$accumulator missing required argument 'merge'", !merge.empty());
+    if (finalize.empty()) {
+        // finalize is optional because many custom accumulators will return the final state
+        // unchanged.
+        finalize = "function(state) { return state; }";
+    }
+    if (!initArgs) {
+        // initArgs is optional because most custom accumulators don't need the state to depend on
+        // the group key.
+        initArgs = ExpressionConstant::create(expCtx, Value(BSONArray()));
+    }
+    // accumulateArgs is required because it's the only way to communicate a value from the input
+    // stream into the accumulator state.
+    uassert(4544710, "$accumulator missing required argument 'accumulateArgs'", accumulateArgs);
+
+    auto factory = [expCtx = expCtx,
+                    init = std::move(init),
+                    accumulate = std::move(accumulate),
+                    merge = std::move(merge),
+                    finalize = std::move(finalize)]() {
+        return new AccumulatorJs(expCtx, init, accumulate, merge, finalize);
+    };
+    return {std::move(initArgs), std::move(accumulateArgs), std::move(factory)};
+}
+
+Value AccumulatorJs::getValue(bool toBeMerged) {
+    // _state is initialized when we encounter the first document in each group. We never create
+    // empty groups: even in a {$group: {_id: 1, ...}}, we will return zero groups rather than one
+    // empty group.
+    invariant(_state);
+
+    // If toBeMerged then we return the current state, to be fed back in to accumulate / merge /
+    // finalize later. If not toBeMerged then we return the final value, by calling finalize.
+    if (toBeMerged) {
+        return *_state;
+    }
+
+    // Get the final value given the current accumulator state.
+
+    auto& expCtx = getExpressionContext();
+    auto jsExec = expCtx->getJsExecWithScope();
+    auto func = makeJsFunc(expCtx, _finalize);
+
+    return jsExec->callFunction(func, BSON_ARRAY(*_state), {});
+}
+
+void AccumulatorJs::startNewGroup(Value const& input) {
+    // Between groups the _state should be empty: we initialize it to be empty it in the
+    // constructor, and we clear it at the end of each group (in .reset()).
+    invariant(!_state);
+
+    auto& expCtx = getExpressionContext();
+    auto jsExec = expCtx->getJsExecWithScope();
+    auto func = makeJsFunc(expCtx, _init);
+
+    // input is a value produced by our AccumulationExpression::initializer.
+    uassert(4544711,
+            str::stream() << "$accumulator initArgs must evaluate to an array: "
+                          << input.toString(),
+            input.getType() == BSONType::Array);
+
+    size_t index = 0;
+    BSONArrayBuilder bob;
+    for (auto&& arg : input.getArray()) {
+        arg.addToBsonArray(&bob, index++);
+    }
+
+    _state = jsExec->callFunction(func, bob.arr(), {});
+
+    recomputeMemUsageBytes();
+}
+
+void AccumulatorJs::reset() {
+    _state = std::nullopt;
+    recomputeMemUsageBytes();
+}
+
+void AccumulatorJs::processInternal(const Value& input, bool merging) {
+    // _state should be nonempty because we populate it in startNewGroup.
+    invariant(_state);
+
+    auto& expCtx = getExpressionContext();
+    auto jsExec = expCtx->getJsExecWithScope();
+
+    if (merging) {
+        // input is an intermediate state from another instance of this kind of accumulator. Call
+        // the user's merge function.
+        auto func = makeJsFunc(expCtx, _merge);
+        _state = jsExec->callFunction(func, BSON_ARRAY(*_state << input), {});
+        recomputeMemUsageBytes();
+    } else {
+        // input is a value produced by our AccumulationExpression::argument. Call the user's
+        // accumulate function.
+        auto func = makeJsFunc(expCtx, _accumulate);
+        uassert(4544712,
+                str::stream() << "$accumulator accumulateArgs must evaluate to an array: "
+                              << input.toString(),
+                input.getType() == BSONType::Array);
+
+        size_t index = 0;
+        BSONArrayBuilder bob;
+        _state->addToBsonArray(&bob, index++);
+        for (auto&& arg : input.getArray()) {
+            arg.addToBsonArray(&bob, index++);
+        }
+
+        _state = jsExec->callFunction(func, bob.done(), {});
+        recomputeMemUsageBytes();
+    }
+}
+
+void AccumulatorJs::recomputeMemUsageBytes() {
+    auto stateSize = _state.value_or(Value{}).getApproximateSize();
+    uassert(4544713,
+            str::stream() << "$accumulator state exceeded max BSON size: " << stateSize,
+            stateSize <= BSONObjMaxUserSize);
+    _memUsageBytes = sizeof(*this) + stateSize + _init.capacity() + _accumulate.capacity() +
+        _merge.capacity() + _finalize.capacity();
+}
+
 }  // namespace mongo
