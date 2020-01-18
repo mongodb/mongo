@@ -156,79 +156,6 @@ void setOplogCollectionName(ServiceContext* service) {
     LocalOplogInfo::get(service)->setOplogCollectionName(service);
 }
 
-/**
- * Parse the given BSON array of BSON into a vector of BSON.
- */
-StatusWith<std::vector<BSONObj>> parseBSONSpecsIntoVector(const BSONElement& bsonArrayElem,
-                                                          const NamespaceString& nss) {
-    invariant(bsonArrayElem.type() == Array);
-    std::vector<BSONObj> vec;
-    for (auto& bsonElem : bsonArrayElem.Array()) {
-        if (bsonElem.type() != BSONType::Object) {
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << "The elements of '" << bsonArrayElem.fieldName()
-                                  << "' array must be objects, but found "
-                                  << typeName(bsonElem.type())};
-        }
-        vec.emplace_back(bsonElem.Obj().getOwned());
-    }
-    return vec;
-}
-
-Status startIndexBuild(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const UUID& collUUID,
-                       const UUID& indexBuildUUID,
-                       const BSONElement& indexesElem,
-                       OplogApplication::Mode mode) {
-    auto statusWithIndexes = parseBSONSpecsIntoVector(indexesElem, nss);
-    if (!statusWithIndexes.isOK()) {
-        return statusWithIndexes.getStatus();
-    }
-
-    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-    invariant(!indexBuildOptions.commitQuorum);
-    indexBuildOptions.replSetAndNotPrimaryAtStart = true;
-
-    // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of it.
-    return IndexBuildsCoordinator::get(opCtx)
-        ->startIndexBuild(opCtx,
-                          nss.db().toString(),
-                          collUUID,
-                          statusWithIndexes.getValue(),
-                          indexBuildUUID,
-                          /* This oplog entry is only replicated for two-phase index builds */
-                          IndexBuildProtocol::kTwoPhase,
-                          indexBuildOptions)
-        .getStatus();
-}
-
-Status commitIndexBuild(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const UUID& indexBuildUUID,
-                        const BSONElement& indexesElem,
-                        OplogApplication::Mode mode) {
-    auto statusWithIndexes = parseBSONSpecsIntoVector(indexesElem, nss);
-    if (!statusWithIndexes.isOK()) {
-        return statusWithIndexes.getStatus();
-    }
-    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoord->signalCommitAndWait(opCtx, indexBuildUUID);
-    return Status::OK();
-}
-
-Status abortIndexBuild(OperationContext* opCtx,
-                       const UUID& indexBuildUUID,
-                       const Status& cause,
-                       OplogApplication::Mode mode) {
-    // Wait until the index build finishes aborting.
-    IndexBuildsCoordinator::get(opCtx)->signalAbortAndWait(
-        opCtx,
-        indexBuildUUID,
-        str::stream() << "abortIndexBuild oplog entry encountered: " << cause);
-    return Status::OK();
-}
-
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
@@ -771,188 +698,59 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
        ErrorCodes::NamespaceNotFound}}},
     {"startIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          // {
-          //     "startIndexBuild" : "coll",
-          //     "indexBuildUUID" : <UUID>,
-          //     "indexes" : [
-          //         {
-          //             "key" : {
-          //                 "x" : 1
-          //             },
-          //             "name" : "x_1",
-          //             "v" : 2
-          //         },
-          //         {
-          //             "key" : {
-          //                 "k" : 1
-          //             },
-          //             "name" : "k_1",
-          //             "v" : 2
-          //         }
-          //     ]
-          // }
-
           if (OplogApplication::Mode::kApplyOpsCmd == mode) {
               return {ErrorCodes::CommandNotSupported,
                       "The startIndexBuild operation is not supported in applyOps mode"};
           }
 
-          const auto& ui = entry.getUuid();
-          const auto& cmd = entry.getObject();
-          const NamespaceString nss(extractNsFromUUIDorNs(opCtx, entry.getNss(), ui, cmd));
-
-          auto buildUUIDElem = cmd.getField("indexBuildUUID");
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'startIndexBuild' oplog entry, missing required field "
-                  "'indexBuildUUID'.",
-                  !buildUUIDElem.eoo());
-          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
-
-          auto indexesElem = cmd.getField("indexes");
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'startIndexBuild' oplog entry, missing required field 'indexes'.",
-                  !indexesElem.eoo());
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'startIndexBuild' oplog entry, field 'indexes' must be an array.",
-                  indexesElem.type() == Array);
-
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'startIndexBuild' oplog entry, missing required field 'uuid'.",
-                  ui);
-          auto collUUID = ui.get();
-
-          if (IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-              return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
+          if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
+              return Status::OK();
           }
 
+          auto swOplogEntry = IndexBuildOplogEntry::parse(entry);
+          if (!swOplogEntry.isOK()) {
+              return swOplogEntry.getStatus().withContext(
+                  "Error parsing 'startIndexBuild' oplog entry");
+          }
+
+          IndexBuildsCoordinator::get(opCtx)->applyStartIndexBuild(opCtx, swOplogEntry.getValue());
           return Status::OK();
       },
-      {ErrorCodes::NamespaceNotFound}}},
+      {ErrorCodes::IndexAlreadyExists,
+       ErrorCodes::IndexBuildAlreadyInProgress,
+       ErrorCodes::NamespaceNotFound}}},
     {"commitIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          // {
-          //     "commitIndexBuild" : "coll",
-          //     "indexBuildUUID" : <UUID>,
-          //     "indexes" : [
-          //         {
-          //             "key" : {
-          //                 "x" : 1
-          //             },
-          //             "name" : "x_1",
-          //             "v" : 2
-          //         },
-          //         {
-          //             "key" : {
-          //                 "k" : 1
-          //             },
-          //             "name" : "k_1",
-          //             "v" : 2
-          //         }
-          //     ]
-          // }
-
           if (OplogApplication::Mode::kApplyOpsCmd == mode) {
               return {ErrorCodes::CommandNotSupported,
                       "The commitIndexBuild operation is not supported in applyOps mode"};
           }
 
-          const auto& cmd = entry.getObject();
-          // Ensure the collection name is specified
-          BSONElement first = cmd.firstElement();
-          invariant(first.fieldNameStringData() == "commitIndexBuild");
-          uassert(ErrorCodes::InvalidNamespace,
-                  "commitIndexBuild value must be a string",
-                  first.type() == mongo::String);
-
-          // May throw NamespaceNotFound exception on a non-existent collection, especially if two
-          // phase index builds are not enabled.
-          const NamespaceString nss(
-              extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
-
-          auto buildUUIDElem = cmd.getField("indexBuildUUID");
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'commitIndexBuild' oplog entry, missing required field "
-                  "'indexBuildUUID'.",
-                  !buildUUIDElem.eoo());
-          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
-
-          auto indexesElem = cmd.getField("indexes");
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'commitIndexBuild' oplog entry, missing required field 'indexes'.",
-                  !indexesElem.eoo());
-          uassert(ErrorCodes::BadValue,
-                  "Error parsing 'commitIndexBuild' oplog entry, field 'indexes' must be an array.",
-                  indexesElem.type() == Array);
-
-          return commitIndexBuild(opCtx, nss, indexBuildUUID, indexesElem, mode);
+          auto swOplogEntry = IndexBuildOplogEntry::parse(entry);
+          if (!swOplogEntry.isOK()) {
+              return swOplogEntry.getStatus().withContext(
+                  "Error parsing 'commitIndexBuild' oplog entry");
+          }
+          IndexBuildsCoordinator::get(opCtx)->applyCommitIndexBuild(opCtx, swOplogEntry.getValue());
+          return Status::OK();
       },
-      {ErrorCodes::NamespaceNotFound, ErrorCodes::NoSuchKey}}},
+      {ErrorCodes::IndexAlreadyExists,
+       ErrorCodes::IndexBuildAlreadyInProgress,
+       ErrorCodes::NamespaceNotFound}}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-         // {
-         //     "abortIndexBuild" : "coll",
-         //     "indexBuildUUID" : <UUID>,
-         //     "indexes" : [
-         //         {
-         //             "key" : {
-         //                 "x" : 1
-         //             },
-         //             "name" : "x_1",
-         //             "v" : 2
-         //         },
-         //         {
-         //             "key" : {
-         //                 "k" : 1
-         //             },
-         //             "name" : "k_1",
-         //             "v" : 2
-         //         }
-         //     ]
-         // }
-
          if (OplogApplication::Mode::kApplyOpsCmd == mode) {
              return {ErrorCodes::CommandNotSupported,
                      "The abortIndexBuild operation is not supported in applyOps mode"};
          }
 
-         const auto& cmd = entry.getObject();
-         // Ensure that the first element is the 'abortIndexBuild' field.
-         BSONElement first = cmd.firstElement();
-         invariant(first.fieldNameStringData() == "abortIndexBuild");
-         uassert(ErrorCodes::InvalidNamespace,
-                 "abortIndexBuild value must be a string specifying the collection name",
-                 first.type() == mongo::String);
-
-         auto buildUUIDElem = cmd.getField("indexBuildUUID");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'abortIndexBuild' oplog entry, missing required field "
-                 "'indexBuildUUID'.",
-                 !buildUUIDElem.eoo());
-         UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
-
-         // We require the indexes field to ensure that rollback via refetch knows the appropriate
-         // indexes to rebuild.
-         auto indexesElem = cmd.getField("indexes");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'abortIndexBuild' oplog entry, missing required field 'indexes'.",
-                 !indexesElem.eoo());
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'abortIndexBuild' oplog entry, field 'indexes' must be an array of "
-                 "index names.",
-                 indexesElem.type() == Array);
-
-         // Get the reason this index build was aborted on the primary.
-         auto causeElem = cmd.getField("cause");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'abortIndexBuild' oplog entry, missing required field 'cause'.",
-                 !causeElem.eoo());
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'abortIndexBuild' oplog entry, field 'cause' must be an object.",
-                 causeElem.type() == Object);
-         auto causeStatusObj = causeElem.Obj();
-         auto cause = getStatusFromCommandResult(causeStatusObj);
-
-         return abortIndexBuild(opCtx, indexBuildUUID, cause, mode);
+         auto swOplogEntry = IndexBuildOplogEntry::parse(entry);
+         if (!swOplogEntry.isOK()) {
+             return swOplogEntry.getStatus().withContext(
+                 "Error parsing 'abortIndexBuild' oplog entry");
+         }
+         IndexBuildsCoordinator::get(opCtx)->applyAbortIndexBuild(opCtx, swOplogEntry.getValue());
+         return Status::OK();
      }}},
     {"collMod",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {

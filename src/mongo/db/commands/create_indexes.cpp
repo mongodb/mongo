@@ -77,6 +77,7 @@ MONGO_FAIL_POINT_DEFINE(createIndexesWriteConflict);
 // This failpoint causes createIndexes with an implicit collection creation to hang before the
 // collection is created.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCreateIndexesCollectionCreate);
+MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildAbortOnInterrupt);
 
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
@@ -491,8 +492,13 @@ BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
     const int numIndexesBefore = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
     auto filteredSpecs =
         IndexBuildsCoordinator::prepareSpecListForCreate(opCtx, collection, ns, specs);
-    IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-        opCtx, collection->uuid(), filteredSpecs, false);
+    // It's possible for 'filteredSpecs' to be empty if we receive a createIndexes request for the
+    // _id index and also create the collection implicitly. By this point, the _id index has already
+    // been created, and there is no more work to be done.
+    if (!filteredSpecs.empty()) {
+        IndexBuildsCoordinator::createIndexesOnEmptyCollection(
+            opCtx, collection->uuid(), filteredSpecs, false);
+    }
 
     const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
 
@@ -865,14 +871,32 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruptionEx) {
             log() << "Index build interrupted: " << buildUUID << ": " << interruptionEx;
 
-            // If this node is no longer a primary, the index build will continue to run in the
-            // background and will complete when this node receives a commitIndexBuild oplog entry
-            // from the new primary.
+            hangBeforeIndexBuildAbortOnInterrupt.pauseWhileSet();
 
-            if (indexBuildsCoord->supportsTwoPhaseIndexBuild() &&
-                ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
-                log() << "Index build continuing in background: " << buildUUID;
-                throw;
+            boost::optional<Lock::GlobalLock> globalLock;
+            if (IndexBuildProtocol::kTwoPhase == protocol) {
+                // If this node is no longer a primary, the index build will continue to run in the
+                // background and will complete when this node receives a commitIndexBuild oplog
+                // entry from the new primary.
+                if (ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
+                    log() << "Index build continuing in background: " << buildUUID;
+                    throw;
+                }
+
+                // If we are using two-phase index builds and are no longer primary after receiving
+                // an interrupt, we cannot replicate an abortIndexBuild oplog entry. Rely on the new
+                // primary to finish the index build. Acquire the global lock to check the
+                // replication state and to prevent any state transitions from happening while
+                // aborting the index build.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                globalLock.emplace(opCtx, MODE_IS);
+                if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
+                    uassertStatusOK(
+                        {ErrorCodes::NotMaster,
+                         str::stream()
+                             << "Unable to abort index build because we are no longer primary: "
+                             << buildUUID});
+                }
             }
 
             // It is unclear whether the interruption originated from the current opCtx instance
@@ -880,7 +904,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // independently of this command invocation. We'll defensively abort the index build
             // with the assumption that if the index build was already in the midst of tearing down,
             // this be a no-op.
-            indexBuildsCoord->abortIndexBuildByBuildUUID(
+            indexBuildsCoord->abortIndexBuildByBuildUUIDNoWait(
                 opCtx,
                 buildUUID,
                 str::stream() << "Index build interrupted: " << buildUUID << ": "
@@ -900,7 +924,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 throw;
             }
 
-            indexBuildsCoord->abortIndexBuildByBuildUUID(
+            indexBuildsCoord->abortIndexBuildByBuildUUIDNoWait(
                 opCtx,
                 buildUUID,
                 str::stream() << "Index build interrupted due to change in replication state: "

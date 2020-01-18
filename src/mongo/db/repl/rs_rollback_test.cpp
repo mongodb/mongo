@@ -132,8 +132,14 @@ OplogInterfaceMock::Operation makeAbortIndexBuildOplogEntry(Collection* collecti
                                                             UUID buildUUID,
                                                             BSONObj spec,
                                                             int time) {
-    auto entry = BSON("abortIndexBuild" << collection->ns().coll() << "indexBuildUUID" << buildUUID
-                                        << "indexes" << BSON_ARRAY(spec));
+    Status cause = {ErrorCodes::IndexBuildAborted, "test"};
+
+    BSONObjBuilder causeBuilder;
+    causeBuilder.appendBool("ok", 0);
+    cause.serializeErrorToBSON(&causeBuilder);
+    auto entry =
+        BSON("abortIndexBuild" << collection->ns().coll() << "indexBuildUUID" << buildUUID
+                               << "indexes" << BSON_ARRAY(spec) << "cause" << causeBuilder.done());
 
     return std::make_pair(BSON("ts" << Timestamp(Seconds(time), 0) << "op"
                                     << "c"
