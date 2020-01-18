@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/catalog/index_build_oplog_entry.h"
 #include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/collection_index_builds_tracker.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/database_index_builds_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/platform/mutex.h"
@@ -160,18 +162,23 @@ public:
         RepairData repair);
 
     /**
-     * Signals the index build identified by 'buildUUID' to commit, and waits for its thread to
-     * complete. Throws if there were any errors building the index.
+     * Apply a 'startIndexBuild' oplog entry. Returns when the index build thread has started and
+     * performed the initial ready:false write. Throws if there were any errors building the index.
      */
-    void signalCommitAndWait(OperationContext* opCtx, const UUID& buildUUID);
+    void applyStartIndexBuild(OperationContext* opCtx, const IndexBuildOplogEntry& entry);
 
     /**
-     * Signals the index build identified by 'buildUUID' to abort, and waits for its thread to
-     * complete.
+     * Apply a 'commitIndexBuild' oplog entry. If no index build is found, starts an index build
+     * with the provided information. In all cases, waits until the index build commits and the
+     * thread exits. Throws if there were any errors building the index.
      */
-    void signalAbortAndWait(OperationContext* opCtx,
-                            const UUID& buildUUID,
-                            const std::string& reason) noexcept;
+    void applyCommitIndexBuild(OperationContext* opCtx, const IndexBuildOplogEntry& entry);
+
+    /**
+     * Apply an 'abortIndexBuild' oplog entry. Waits until the index build aborts and the
+     * thread exits. Throws if there were any errors aborting the index.
+     */
+    void applyAbortIndexBuild(OperationContext* opCtx, const IndexBuildOplogEntry& entry);
 
     /**
      * Waits for all index builds to stop after they have been interrupted during shutdown.
@@ -227,11 +234,19 @@ public:
     void abortDatabaseIndexBuilds(StringData db, const std::string& reason);
 
     /**
-     * Aborts a given index build by index build UUID.
+     * Aborts an index build by index build UUID. Returns when the index build thread exits.
      */
     void abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                     const UUID& buildUUID,
                                     const std::string& reason);
+
+    /**
+     * Aborts an index build by index build UUID. Does not wait for the index build thread to
+     * exit. Returns true if an index build was aborted.
+     */
+    bool abortIndexBuildByBuildUUIDNoWait(OperationContext* opCtx,
+                                          const UUID& buildUUID,
+                                          const std::string& reason);
 
     /**
      * Invoked when the node enters the primary state.
@@ -602,7 +617,7 @@ protected:
         RepairData repair) noexcept;
 
     /**
-     * Looks up active index build by UUID.
+     * Looks up active index build by UUID. Returns NoSuchKey if the build does not exist.
      */
     StatusWith<std::shared_ptr<ReplIndexBuildState>> _getIndexBuild(const UUID& buildUUID) const;
 

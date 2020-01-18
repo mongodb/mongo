@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/index_build_oplog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -219,78 +220,6 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
 
     return Status::OK();
 }
-
-namespace {
-
-typedef struct {
-    UUID buildUUID;
-    std::vector<std::string> indexNames;
-    std::vector<BSONObj> indexSpecs;
-} IndexBuildOplogEntry;
-
-// Parses an oplog entry for "startIndexBuild", "commitIndexBuild", or "abortIndexBuild".
-StatusWith<IndexBuildOplogEntry> parseIndexBuildOplogObject(const BSONObj& obj) {
-    // Example object which takes the same form for all three oplog entries.
-    // {
-    //     < "startIndexBuild" | "commitIndexBuild" | "abortIndexBuild" > : "coll",
-    //     "indexBuildUUID" : <UUID>,
-    //     "indexes" : [
-    //         {
-    //             "key" : {
-    //                 "x" : 1
-    //             },
-    //             "name" : "x_1",
-    //             "v" : 2
-    //         },
-    //         {
-    //             "key" : {
-    //                 "k" : 1
-    //             },
-    //             "name" : "k_1",
-    //             "v" : 2
-    //         }
-    //     ]
-    // }
-    //
-    //
-    auto buildUUIDElem = obj.getField("indexBuildUUID");
-    if (buildUUIDElem.eoo()) {
-        return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexBuildUUID'"};
-    }
-    auto swBuildUUID = UUID::parse(buildUUIDElem);
-    if (!swBuildUUID.isOK()) {
-        return swBuildUUID.getStatus().withContext("Error parsing 'indexBuildUUID'");
-    }
-
-    auto indexesElem = obj.getField("indexes");
-    if (indexesElem.eoo()) {
-        return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexes'"};
-    }
-
-    if (indexesElem.type() != Array) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Field 'indexes' must be an array of index spec objects"};
-    }
-
-    std::vector<std::string> indexNames;
-    std::vector<BSONObj> indexSpecs;
-    for (auto& indexElem : indexesElem.Array()) {
-        if (!indexElem.isABSONObj()) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "Element of 'indexes' must be an object"};
-        }
-        std::string indexName;
-        auto status = bsonExtractStringField(indexElem.Obj(), "name", &indexName);
-        if (!status.isOK()) {
-            return status.withContext("Error extracting 'name' from index spec");
-        }
-        indexNames.push_back(indexName);
-        indexSpecs.push_back(indexElem.Obj().getOwned());
-    }
-    return IndexBuildOplogEntry{swBuildUUID.getValue(), indexNames, indexSpecs};
-}
-
-}  // namespace
 
 Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* opCtx,
                                                              const OplogInterface& localOplog,
@@ -507,15 +436,15 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 return Status::OK();
             }
             case OplogEntry::CommandType::kStartIndexBuild: {
-                auto swIndexBuildOplogObject = parseIndexBuildOplogObject(obj);
-                if (!swIndexBuildOplogObject.isOK()) {
+                auto swIndexBuildOplogEntry = IndexBuildOplogEntry::parse(oplogEntry);
+                if (!swIndexBuildOplogEntry.isOK()) {
                     return {ErrorCodes::UnrecoverableRollbackError,
                             str::stream()
                                 << "Error parsing 'startIndexBuild' oplog entry: "
-                                << swIndexBuildOplogObject.getStatus() << ": " << redact(obj)};
+                                << swIndexBuildOplogEntry.getStatus() << ": " << redact(obj)};
                 }
 
-                auto& indexBuildOplogObject = swIndexBuildOplogObject.getValue();
+                auto& indexBuildOplogEntry = swIndexBuildOplogEntry.getValue();
 
                 // If the index build has been committed or aborted, and the commit or abort
                 // oplog entry has also been rolled back, the index build will have been added
@@ -523,7 +452,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 // dropped. If the index has already been dropped by abort, then this is a
                 // no-op.
                 auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
-                auto buildUUID = indexBuildOplogObject.buildUUID;
+                auto buildUUID = indexBuildOplogEntry.buildUUID;
                 auto existingIt = buildsToRestart.find(buildUUID);
                 if (existingIt != buildsToRestart.end()) {
                     LOG(2) << "Index build that was previously marked to be restarted will now be "
@@ -533,7 +462,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                     // If the index build was committed or aborted, we must mark the index as
                     // needing to be dropped. Add each index to drop by name individually.
-                    for (auto& indexName : indexBuildOplogObject.indexNames) {
+                    for (auto& indexName : indexBuildOplogEntry.indexNames) {
                         fixUpInfo.indexesToDrop[*uuid].insert(indexName);
                     }
                     return Status::OK();
@@ -542,24 +471,24 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 // If the index build was not committed or aborted, the index build is
                 // unfinished in the catalog will need to be dropped before any other collection
                 // operations.
-                for (auto& indexName : indexBuildOplogObject.indexNames) {
+                for (auto& indexName : indexBuildOplogEntry.indexNames) {
                     fixUpInfo.unfinishedIndexesToDrop[*uuid].insert(indexName);
                 }
 
                 return Status::OK();
             }
             case OplogEntry::CommandType::kAbortIndexBuild: {
-                auto swIndexBuildOplogObject = parseIndexBuildOplogObject(obj);
-                if (!swIndexBuildOplogObject.isOK()) {
+                auto swIndexBuildOplogEntry = IndexBuildOplogEntry::parse(oplogEntry);
+                if (!swIndexBuildOplogEntry.isOK()) {
                     return {ErrorCodes::UnrecoverableRollbackError,
                             str::stream()
                                 << "Error parsing 'abortIndexBuild' oplog entry: "
-                                << swIndexBuildOplogObject.getStatus() << ": " << redact(obj)};
+                                << swIndexBuildOplogEntry.getStatus() << ": " << redact(obj)};
                 }
 
-                auto& indexBuildOplogObject = swIndexBuildOplogObject.getValue();
+                auto& indexBuildOplogEntry = swIndexBuildOplogEntry.getValue();
                 auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
-                auto buildUUID = indexBuildOplogObject.buildUUID;
+                auto buildUUID = indexBuildOplogEntry.buildUUID;
                 invariant(buildsToRestart.find(buildUUID) == buildsToRestart.end(),
                           str::stream()
                               << "Tried to restart an index build after rolling back an "
@@ -570,7 +499,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 LOG(2) << "Index build will be restarted after a rolled-back 'abortIndexBuild': "
                        << buildUUID;
                 IndexBuildDetails details{*uuid};
-                for (auto& spec : indexBuildOplogObject.indexSpecs) {
+                for (auto& spec : indexBuildOplogEntry.indexSpecs) {
                     invariant(spec.isOwned());
                     details.indexSpecs.emplace_back(spec);
                 }
@@ -578,21 +507,21 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 return Status::OK();
             }
             case OplogEntry::CommandType::kCommitIndexBuild: {
-                auto swIndexBuildOplogObject = parseIndexBuildOplogObject(obj);
-                if (!swIndexBuildOplogObject.isOK()) {
+                auto swIndexBuildOplogEntry = IndexBuildOplogEntry::parse(oplogEntry);
+                if (!swIndexBuildOplogEntry.isOK()) {
                     return {ErrorCodes::UnrecoverableRollbackError,
                             str::stream()
                                 << "Error parsing 'commitIndexBuild' oplog entry: "
-                                << swIndexBuildOplogObject.getStatus() << ": " << redact(obj)};
+                                << swIndexBuildOplogEntry.getStatus() << ": " << redact(obj)};
                 }
 
-                auto& indexBuildOplogObject = swIndexBuildOplogObject.getValue();
+                auto& indexBuildOplogEntry = swIndexBuildOplogEntry.getValue();
 
                 // If a dropIndexes oplog entry was already rolled-back, the index build needs to
                 // be restarted, but not committed. If the index is in the set to be created, then
                 // its drop was rolled-back and it should be removed.
                 auto& toCreate = fixUpInfo.indexesToCreate[*uuid];
-                for (auto& indexName : indexBuildOplogObject.indexNames) {
+                for (auto& indexName : indexBuildOplogEntry.indexNames) {
                     auto existing = toCreate.find(indexName);
                     if (existing != toCreate.end()) {
                         toCreate.erase(existing);
@@ -601,7 +530,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 // Add the index build to be restarted.
                 auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
-                auto buildUUID = indexBuildOplogObject.buildUUID;
+                auto buildUUID = indexBuildOplogEntry.buildUUID;
                 invariant(buildsToRestart.find(buildUUID) == buildsToRestart.end(),
                           str::stream()
                               << "Tried to restart an index build after rolling back a "
@@ -613,7 +542,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                        << buildUUID;
 
                 IndexBuildDetails details{*uuid};
-                for (auto& spec : indexBuildOplogObject.indexSpecs) {
+                for (auto& spec : indexBuildOplogEntry.indexSpecs) {
                     invariant(spec.isOwned());
                     details.indexSpecs.emplace_back(spec);
                 }

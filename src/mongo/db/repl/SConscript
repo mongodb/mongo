@@ -47,6 +47,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/db_raii',
@@ -404,6 +405,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/query_exec',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
     ],
 )
 

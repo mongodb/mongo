@@ -124,6 +124,19 @@ env.Library(
 )
 
 env.Library(
+    target='index_build_oplog_entry',
+    source=[
+        "index_build_oplog_entry.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/db/repl/oplog_entry",
+        "$BUILD_DIR/mongo/rpc/command_status",
+    ],
+)
+
+env.Library(
     target='index_key_validate',
     source=[
         "index_key_validate.cpp",
