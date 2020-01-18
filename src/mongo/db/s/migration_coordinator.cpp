@@ -45,8 +45,6 @@ MONGO_FAIL_POINT_DEFINE(disableWritingPendingRangeDeletionEntries);
 namespace migrationutil {
 
 MigrationCoordinator::MigrationCoordinator(UUID migrationId,
-                                           LogicalSessionId lsid,
-                                           TxnNumber txnNumber,
                                            ShardId donorShard,
                                            ShardId recipientShard,
                                            NamespaceString collectionNamespace,
@@ -54,8 +52,6 @@ MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            ChunkRange range,
                                            ChunkVersion preMigrationChunkVersion)
     : _migrationInfo(migrationId,
-                     std::move(lsid),
-                     txnNumber,
                      std::move(collectionNamespace),
                      collectionUuid,
                      std::move(donorShard),
@@ -120,11 +116,8 @@ void MigrationCoordinator::_commitMigrationOnDonorAndRecipient(OperationContext*
     migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
 
     LOG(0) << _logPrefix() << "Deleting range deletion task on recipient";
-    migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
-                                                      _migrationInfo.getRecipientShardId(),
-                                                      _migrationInfo.getId(),
-                                                      _migrationInfo.getLsid(),
-                                                      _migrationInfo.getTxnNumber());
+    migrationutil::deleteRangeDeletionTaskOnRecipient(
+        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 
     LOG(0) << _logPrefix() << "Marking range deletion task on donor as ready for processing";
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
@@ -138,11 +131,8 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 
     LOG(0) << _logPrefix() << "Marking range deletion task on recipient as ready for processing";
-    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
-                                                           _migrationInfo.getRecipientShardId(),
-                                                           _migrationInfo.getId(),
-                                                           _migrationInfo.getLsid(),
-                                                           _migrationInfo.getTxnNumber());
+    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(
+        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 }
 
 void MigrationCoordinator::_forgetMigration(OperationContext* opCtx) {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/persistent_task_store.h"
@@ -146,9 +145,7 @@ void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
  */
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
-                                        const UUID& migrationId,
-                                        const LogicalSessionId& lsid,
-                                        const TxnNumber txnNumber);
+                                        const UUID& migrationId);
 
 /**
  * Removes the 'pending' flag from the range deletion task document with the specified id from
@@ -165,9 +162,7 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
  */
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
-                                             const UUID& migrationId,
-                                             const LogicalSessionId& lsid,
-                                             const TxnNumber txnNumber);
+                                             const UUID& migrationId);
 
 /**
  * Deletes the migration coordinator document with the specified id from

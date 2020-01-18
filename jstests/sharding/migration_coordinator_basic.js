@@ -40,8 +40,6 @@ function getCollectionUuidAndEpoch(ns) {
 
 function assertHasMigrationCoordinatorDoc({conn, ns, uuid, epoch}) {
     const query = {
-        lsid: {$exists: 1},
-        txnNumber: {$exists: 1},
         nss: ns,
         collectionUuid: uuid,
         donorShardId: st.shard0.shardName,

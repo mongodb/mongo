@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -48,8 +47,6 @@ public:
     enum class Decision { kAborted, kCommitted };
 
     MigrationCoordinator(UUID migrationId,
-                         LogicalSessionId lsid,
-                         TxnNumber txnNumber,
                          ShardId donorShard,
                          ShardId recipientShard,
                          NamespaceString collectionNamespace,
@@ -67,10 +64,10 @@ public:
      * Initializes persistent state required to ensure that orphaned ranges are properly handled,
      * even after failover, by doing the following:
      *
-     * 1) Inserts a document into the local config.migrationCoordinators with the lsid, txnNumber,
-     * and recipientId and waits for majority writeConcern.
-     * 2) Inserts a document into the local config.rangeDeletions with the collectionUUID, range to
-     * delete, and "pending: true" and waits for majority writeConcern.
+     * 1) Inserts a document into the local config.migrationCoordinators with the recipientId and
+     * waits for majority writeConcern. 2) Inserts a document into the local config.rangeDeletions
+     * with the collectionUUID, range to delete, and "pending: true" and waits for majority
+     * writeConcern.
      */
     void startMigration(OperationContext* opCtx, bool waitForDelete);
 

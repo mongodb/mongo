@@ -285,15 +285,8 @@ Status MigrationSourceManager::startClone() {
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
 
         if (_useFCV44Protocol) {
-            // TODO (SERVER-xxx): Allow re-using the same session (though different transaction
-            // number) across migrations.
-            auto lsid = makeLogicalSessionId(_opCtx);
-            auto txnNumber = TxnNumber{0};
-
             _coordinator = std::make_unique<migrationutil::MigrationCoordinator>(
                 migrationId,
-                lsid,
-                txnNumber,
                 _args.getFromShardId(),
                 _args.getToShardId(),
                 getNss(),
