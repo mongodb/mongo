@@ -77,7 +77,8 @@ TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
     unionWithOne.setSource(mock.get());
     unionWithTwo.setSource(&unionWithOne);
 
-    auto results = DocumentComparator().makeUnorderedDocumentSet();
+    auto comparator = DocumentComparator();
+    auto results = comparator.makeUnorderedDocumentSet();
     for (auto& doc [[maybe_unused]] : docs) {
         auto next = unionWithTwo.getNext();
         ASSERT_TRUE(next.isAdvanced());
