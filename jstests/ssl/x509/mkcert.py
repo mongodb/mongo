@@ -26,6 +26,9 @@ CONFIGFILE = 'jstests/ssl/x509/certs.yml'
 
 CONFIG = Dict[str, Any]
 
+MUST_STAPLE_KEY = b'1.3.6.1.5.5.7.1.24'
+MUST_STAPLE_VALUE = str('DER:30:03:02:01:05').encode('utf-8')
+
 def glbl(key, default=None):
     """Fetch a key from the global dict."""
     return CONFIG.get('global', {}).get(key, default)
@@ -184,6 +187,21 @@ def set_ocsp_extension(x509, exts, cert):
         return
     exts.append(OpenSSL.crypto.X509Extension(b'authorityInfoAccess', False, ocsp.encode('utf-8'), subject=x509))
 
+def set_no_check_extension(x509, exts, cert):
+    """Set the OCSP No Check extension"""
+    noCheck = cert.get('extensions', {}).get('noCheck')
+    if not noCheck:
+        return
+    # "The OCSP No Check extension is a string extension but its value is ignored." https://www.openssl.org/docs/man1.1.1/man5/x509v3_config.html
+    exts.append(OpenSSL.crypto.X509Extension(b'noCheck', False, "this-value-ignored".encode('utf8'), subject=x509))
+
+def set_tls_feature_extension(x509, exts, cert):
+    """Set the OCSP Must Staple extension"""
+    mustStaple = cert.get('extensions', {}).get('mustStaple')
+    if not mustStaple:
+        return
+    exts.append(OpenSSL.crypto.X509Extension(MUST_STAPLE_KEY, False, MUST_STAPLE_VALUE, subject=x509))
+
 def set_san_extension(x509, exts, cert):
     """Set the Subject Alternate Name extension."""
     san = cert.get('extensions', {}).get('subjectAltName')
@@ -286,6 +304,14 @@ def set_mongo_roles_extension(exts, cert):
 
     exts.append(OpenSSL.crypto.X509Extension(b'1.3.6.1.4.1.34601.2.1.1', False, value))
 
+def set_crl_distribution_point_extension(exts, cert):
+    """Specify URI(s) for CRL distribution point(s)."""
+    uris = cert.get('extensions', {}).get('crlDistributionPoints')
+    if not uris:
+        return
+
+    exts.append(OpenSSL.crypto.X509Extension(b'crlDistributionPoints', False, (','.join(uris)).encode('utf-8')))
+
 def set_extensions(x509, cert):
     """Setup X509 extensions."""
     exts = []
@@ -299,6 +325,9 @@ def set_extensions(x509, cert):
     enable_subject_key_identifier_extension(x509, exts, cert)
     enable_authority_key_identifier_extension(x509, exts, cert)
     set_ocsp_extension(x509, exts, cert)
+    set_no_check_extension(x509, exts, cert)
+    set_tls_feature_extension(x509, exts, cert)
+    set_crl_distribution_point_extension(exts, cert)
     set_san_extension(x509, exts, cert)
     set_mongo_roles_extension(exts, cert)
 
