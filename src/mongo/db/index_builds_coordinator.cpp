@@ -272,7 +272,10 @@ void forEachIndexBuild(
         std::string indexNamesStr;
         str::joinStringDelim(replState->indexNames, &indexNamesStr, ',');
         log() << logPrefix << replState->buildUUID << ": collection: " << replState->collectionUUID
-              << "; indexes: " << replState->indexNames.size() << " [" << indexNamesStr << "]";
+              << "; indexes: " << replState->indexNames.size() << " [" << indexNamesStr
+              << "]; method: "
+              << (IndexBuildProtocol::kTwoPhase == replState->protocol ? "two phase"
+                                                                       : "single phase");
 
         onIndexBuild(replState);
     }
