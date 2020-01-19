@@ -694,6 +694,16 @@ bool containsUniqueIndexes(const std::vector<BSONObj>& specs) {
 }
 }  // namespace
 
+std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* opCtx) {
+    auto indexBuilds = _getIndexBuilds();
+    // We use forEachIndexBuild() to log basic details on the current index builds and don't intend
+    // to modify any of the index builds, hence the no-op.
+    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {};
+    forEachIndexBuild(indexBuilds, "index build still running: "_sd, onIndexBuild);
+
+    return indexBuilds.size();
+}
+
 void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     log() << "IndexBuildsCoordinator::onStepUp - this node is stepping up to primary";
 
