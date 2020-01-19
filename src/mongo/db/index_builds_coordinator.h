@@ -247,6 +247,13 @@ public:
     bool abortIndexBuildByBuildUUIDNoWait(OperationContext* opCtx,
                                           const UUID& buildUUID,
                                           const std::string& reason);
+    /**
+     * Returns number of index builds in process.
+     *
+     * Invoked when the node is processing a shutdown command, an admin command that is
+     * used to shut down the server gracefully.
+     */
+    std::size_t getActiveIndexBuildCount(OperationContext* opCtx);
 
     /**
      * Invoked when the node enters the primary state.

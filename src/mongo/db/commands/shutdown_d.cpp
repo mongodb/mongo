@@ -34,7 +34,9 @@
 #include <string>
 
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -59,6 +61,13 @@ public:
         long long timeoutSecs = 10;
         if (cmdObj.hasField("timeoutSecs")) {
             timeoutSecs = cmdObj["timeoutSecs"].numberLong();
+        }
+
+        if (!force) {
+            auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+            auto numIndexBuilds = indexBuildsCoord->getActiveIndexBuildCount(opCtx);
+            log() << "Index builds in progress while processing shutdown command: "
+                  << numIndexBuilds;
         }
 
         try {
