@@ -77,8 +77,7 @@ public:
         managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
         auto authzManager = std::make_unique<AuthorizationManagerImpl>(
-            std::move(localManagerState),
-            AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
+            getServiceContext(), std::move(localManagerState));
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getServiceContext(), std::move(authzManager));
         Client::releaseCurrent();

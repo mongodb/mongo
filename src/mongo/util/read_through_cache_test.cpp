@@ -33,6 +33,7 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/read_through_cache.h"
 
 namespace mongo {
@@ -44,13 +45,27 @@ struct CachedValue {
 
 class Cache : public ReadThroughCache<std::string, CachedValue> {
 public:
-    Cache(size_t size, LookupFn lookupFn)
-        : ReadThroughCache(size, _mutex), _lookupFn(std::move(lookupFn)) {}
+    Cache(ServiceContext* service, size_t size, LookupFn lookupFn)
+        : ReadThroughCache(_mutex, service, _threadPool, size), _lookupFn(std::move(lookupFn)) {}
 
 private:
     boost::optional<CachedValue> lookup(OperationContext* opCtx, const std::string& key) override {
         return _lookupFn(opCtx, key);
     }
+
+    ThreadPool _threadPool{[] {
+        ThreadPool::Options options;
+        options.poolName = "ReadThroughCacheTest";
+        options.minThreads = 0;
+        options.maxThreads = 1;
+
+        // Ensure all threads have a client
+        options.onCreateThread = [](const std::string& threadName) {
+            Client::initThread(threadName.c_str());
+        };
+
+        return options;
+    }()};
 
     Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::Cache");
 
@@ -65,7 +80,7 @@ protected:
 
 TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
     int countLookups = 0;
-    Cache cache(1, [&](OperationContext*, const std::string& key) {
+    Cache cache(getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
         ASSERT_EQ("TestKey", key);
         countLookups++;
 
@@ -87,7 +102,7 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
 
 TEST_F(ReadThroughCacheTest, CacheSizeZero) {
     int countLookups = 0;
-    Cache cache(0, [&](OperationContext*, const std::string& key) {
+    Cache cache(getServiceContext(), 0, [&](OperationContext*, const std::string& key) {
         ASSERT_EQ("TestKey", key);
         countLookups++;
 

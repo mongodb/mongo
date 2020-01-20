@@ -207,8 +207,9 @@ env.Library(
     source=[
         'read_through_cache.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 
@@ -609,6 +610,7 @@ icuEnv.CppUnitTest(
         'caching',
         'clock_source_mock',
         'clock_sources',
+        'concurrency/thread_pool',
         'diagnostic_info',
         'dns_query',
         'fail_point',

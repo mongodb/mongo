@@ -208,13 +208,28 @@ void ReadWriteConcernDefaults::create(ServiceContext* service, FetchDefaultsFn f
 }
 
 ReadWriteConcernDefaults::ReadWriteConcernDefaults(FetchDefaultsFn fetchDefaultsFn)
-    : _defaults([fetchDefaultsFn = std::move(fetchDefaultsFn)](
+    : _threadPool([] {
+          ThreadPool::Options options;
+          options.poolName = "ReadWriteConcernDefaults";
+          options.minThreads = 0;
+          options.maxThreads = 1;
+
+          // Ensure all threads have a client
+          options.onCreateThread = [](const std::string& threadName) {
+              Client::initThread(threadName.c_str());
+          };
+
+          return options;
+      }()),
+      _defaults(_threadPool,
+                [fetchDefaultsFn = std::move(fetchDefaultsFn)](
                     OperationContext* opCtx, const Type&) { return fetchDefaultsFn(opCtx); }) {}
 
 ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
 
-ReadWriteConcernDefaults::Cache::Cache(LookupFn lookupFn)
-    : ReadThroughCache(1, _mutex), _lookupFn(lookupFn) {}
+ReadWriteConcernDefaults::Cache::Cache(ThreadPoolInterface& threadPool, LookupFn lookupFn)
+    : ReadThroughCache(_mutex, getGlobalServiceContext(), threadPool, 1 /* cacheSize */),
+      _lookupFn(std::move(lookupFn)) {}
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::Cache::lookup(
     OperationContext* opCtx, const ReadWriteConcernDefaults::Type& key) {

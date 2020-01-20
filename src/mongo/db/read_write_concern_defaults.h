@@ -37,6 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/read_through_cache.h"
 
@@ -161,7 +162,7 @@ private:
         Cache& operator=(const Cache&) = delete;
 
     public:
-        Cache(LookupFn lookupFn);
+        Cache(ThreadPoolInterface& threadPool, LookupFn lookupFn);
         virtual ~Cache() = default;
 
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx, const Type& key) override;
@@ -171,6 +172,9 @@ private:
 
         LookupFn _lookupFn;
     };
+
+    // Thread pool on which to perform loading of the cached RWC defaults
+    ThreadPool _threadPool;
 
     Cache _defaults;
 };

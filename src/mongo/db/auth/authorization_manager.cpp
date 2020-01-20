@@ -71,9 +71,9 @@ const int AuthorizationManager::schemaVersion26Upgrade;
 const int AuthorizationManager::schemaVersion26Final;
 const int AuthorizationManager::schemaVersion28SCRAM;
 
-std::unique_ptr<AuthorizationManager> AuthorizationManager::create() {
+std::unique_ptr<AuthorizationManager> AuthorizationManager::create(ServiceContext* serviceContext) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthorizationManager::create);
-    return w();
+    return w(serviceContext);
 }
 
 }  // namespace mongo

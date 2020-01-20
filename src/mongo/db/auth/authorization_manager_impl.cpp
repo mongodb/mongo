@@ -285,8 +285,10 @@ Status initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) {
     return Status::OK();
 }
 
-std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl() {
-    return std::make_unique<AuthorizationManagerImpl>();
+std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(
+    ServiceContext* serviceContext) {
+    return std::make_unique<AuthorizationManagerImpl>(serviceContext,
+                                                      AuthzManagerExternalState::create());
 }
 
 auto authorizationManagerCreateRegistration =
@@ -310,17 +312,35 @@ Status AuthorizationManagerPinnedUsersServerParameter::setFromString(const std::
     return authorizationManagerPinnedUsers.setFromString(str);
 }
 
-AuthorizationManagerImpl::AuthorizationManagerImpl()
-    : AuthorizationManagerImpl(AuthzManagerExternalState::create(),
-                               InstallMockForTestingOrAuthImpl{}) {}
-
 AuthorizationManagerImpl::AuthorizationManagerImpl(
-    std::unique_ptr<AuthzManagerExternalState> externalState, InstallMockForTestingOrAuthImpl)
+    ServiceContext* service, std::unique_ptr<AuthzManagerExternalState> externalState)
     : _externalState(std::move(externalState)),
-      _authSchemaVersionCache(_externalState.get()),
-      _userCache(&_authSchemaVersionCache, _externalState.get(), authorizationManagerCacheSize) {}
+      _threadPool([] {
+          ThreadPool::Options options;
+          options.poolName = "AuthorizationManager";
+          options.minThreads = 0;
+          options.maxThreads = ThreadPool::Options::kUnlimited;
 
-AuthorizationManagerImpl::~AuthorizationManagerImpl() {}
+          // Ensure all threads have a client
+          options.onCreateThread = [](const std::string& threadName) {
+              Client::initThread(threadName.c_str());
+          };
+
+          return options;
+      }()),
+      _authSchemaVersionCache(service, _threadPool, _externalState.get()),
+      _userCache(service,
+                 _threadPool,
+                 authorizationManagerCacheSize,
+                 &_authSchemaVersionCache,
+                 _externalState.get()) {
+    _threadPool.startup();
+}
+
+AuthorizationManagerImpl::~AuthorizationManagerImpl() {
+    _threadPool.shutdown();
+    _threadPool.join();
+}
 
 std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession() {
     return std::make_unique<AuthorizationSessionImpl>(
@@ -593,8 +613,11 @@ std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getU
 }
 
 AuthorizationManagerImpl::AuthSchemaVersionCache::AuthSchemaVersionCache(
+    ServiceContext* service,
+    ThreadPoolInterface& threadPool,
     AuthzManagerExternalState* externalState)
-    : ReadThroughCache(1, _mutex), _externalState(externalState) {}
+    : ReadThroughCache(_mutex, service, threadPool, 1 /* cacheSize */),
+      _externalState(externalState) {}
 
 boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionCache::lookup(
     OperationContext* opCtx, const int& unusedKey) {
@@ -607,10 +630,12 @@ boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionCache::lookup(
 }
 
 AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
+    ServiceContext* service,
+    ThreadPoolInterface& threadPool,
+    int cacheSize,
     AuthSchemaVersionCache* authSchemaVersionCache,
-    AuthzManagerExternalState* externalState,
-    int cacheSize)
-    : UserCache(cacheSize, _mutex),
+    AuthzManagerExternalState* externalState)
+    : UserCache(_mutex, service, threadPool, cacheSize),
       _authSchemaVersionCache(authSchemaVersionCache),
       _externalState(externalState) {}
 

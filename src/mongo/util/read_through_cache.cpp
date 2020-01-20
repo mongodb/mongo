@@ -31,15 +31,28 @@
 
 #include "mongo/util/read_through_cache.h"
 
+#include "mongo/db/client.h"
+
 namespace mongo {
 
-ReadThroughCacheBase::ReadThroughCacheBase(Mutex& mutex) : _cacheWriteMutex(mutex) {}
+ReadThroughCacheBase::ReadThroughCacheBase(Mutex& mutex,
+                                           ServiceContext* service,
+                                           ThreadPoolInterface& threadPool)
+    : _serviceContext(service), _threadPool(threadPool), _cacheWriteMutex(mutex) {}
 
 ReadThroughCacheBase::~ReadThroughCacheBase() = default;
 
 OID ReadThroughCacheBase::getCacheGeneration() const {
     stdx::lock_guard<Latch> lk(_cacheWriteMutex);
     return _fetchGeneration;
+}
+
+void ReadThroughCacheBase::_asyncWork(WorkWithOpContext work) {
+    _threadPool.schedule([this, work = std::move(work)](Status status) {
+        ThreadClient tc(_serviceContext);
+        auto opCtxHolder = tc->makeOperationContext();
+        work(opCtxHolder.get());
+    });
 }
 
 void ReadThroughCacheBase::_updateCacheGeneration(const CacheGuard&) {

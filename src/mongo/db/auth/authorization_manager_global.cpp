@@ -44,7 +44,7 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
     {"OIDGeneration", "EndStartupOptionStorage"},
     [](ServiceContext* service) {
-        auto authzManager = AuthorizationManager::create();
+        auto authzManager = AuthorizationManager::create(service);
         authzManager->setAuthEnabled(serverGlobalParams.authState ==
                                      ServerGlobalParams::AuthState::kEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);

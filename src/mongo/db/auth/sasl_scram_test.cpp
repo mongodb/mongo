@@ -191,8 +191,7 @@ protected:
             std::make_unique<AuthzManagerExternalStateMock>();
         authzManagerExternalState = uniqueAuthzManagerExternalStateMock.get();
         auto newManager = std::make_unique<AuthorizationManagerImpl>(
-            std::move(uniqueAuthzManagerExternalStateMock),
-            AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
+            serviceContext.get(), std::move(uniqueAuthzManagerExternalStateMock));
         authzSession = std::make_unique<AuthorizationSessionImpl>(
             std::make_unique<AuthzSessionExternalStateMock>(newManager.get()),
             AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});

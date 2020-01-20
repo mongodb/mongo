@@ -80,7 +80,7 @@ public:
     static AuthorizationManager* get(ServiceContext& service);
     static void set(ServiceContext* service, std::unique_ptr<AuthorizationManager> authzManager);
 
-    static std::unique_ptr<AuthorizationManager> create();
+    static std::unique_ptr<AuthorizationManager> create(ServiceContext* serviceContext);
 
     AuthorizationManager() = default;
 

@@ -34,6 +34,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -42,16 +43,14 @@ namespace mongo {
  */
 class AuthorizationManagerImpl : public AuthorizationManager {
 public:
-    ~AuthorizationManagerImpl() override;
-
-    AuthorizationManagerImpl();
-
     struct InstallMockForTestingOrAuthImpl {
         explicit InstallMockForTestingOrAuthImpl() = default;
     };
 
-    AuthorizationManagerImpl(std::unique_ptr<AuthzManagerExternalState> externalState,
-                             InstallMockForTestingOrAuthImpl);
+    AuthorizationManagerImpl(ServiceContext* service,
+                             std::unique_ptr<AuthzManagerExternalState> externalState);
+    ~AuthorizationManagerImpl();
+
 
     std::unique_ptr<AuthorizationSession> makeAuthorizationSession() override;
 
@@ -137,24 +136,20 @@ private:
 
     std::unique_ptr<AuthzManagerExternalState> _externalState;
 
-    /**
-     * True if AuthSchema startup checks should be applied in this AuthorizationManager.
-     *
-     * Changes to its value are not synchronized, so it should only be set at initalization-time.
-     */
+    // True if AuthSchema startup checks should be applied in this AuthorizationManager. Changes to
+    // its value are not synchronized, so it should only be set once, at initalization time.
     bool _startupAuthSchemaValidation{true};
 
-    /**
-     * True if access control enforcement is enabled in this AuthorizationManager.
-     *
-     * Changes to its value are not synchronized, so it should only be set at initalization-time.
-     */
+    // True if access control enforcement is enabled in this AuthorizationManager. Changes to its
+    // value are not synchronized, so it should only be set once, at initalization time.
     bool _authEnabled{false};
 
-    /**
-     * A cache of whether there are any users set up for the cluster.
-     */
+    // A cache of whether there are any users set up for the cluster.
     AtomicWord<bool> _privilegeDocsExist{false};
+
+    // Thread pool on which to perform the blocking activities that load the user credentials from
+    // storage
+    ThreadPool _threadPool;
 
     /**
      * Cache which contains at most a single entry (which has key 0), whose value is the version of
@@ -162,7 +157,9 @@ private:
      */
     class AuthSchemaVersionCache : public ReadThroughCache<int, int> {
     public:
-        AuthSchemaVersionCache(AuthzManagerExternalState* externalState);
+        AuthSchemaVersionCache(ServiceContext* service,
+                               ThreadPoolInterface& threadPool,
+                               AuthzManagerExternalState* externalState);
 
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if
@@ -181,9 +178,11 @@ private:
      */
     class UserCacheImpl : public UserCache {
     public:
-        UserCacheImpl(AuthSchemaVersionCache* authSchemaVersionCache,
-                      AuthzManagerExternalState* externalState,
-                      int cacheSize);
+        UserCacheImpl(ServiceContext* service,
+                      ThreadPoolInterface& threadPool,
+                      int cacheSize,
+                      AuthSchemaVersionCache* authSchemaVersionCache,
+                      AuthzManagerExternalState* externalState);
 
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if

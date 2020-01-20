@@ -382,6 +382,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/caching',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'logical_clock',
     ],
 )

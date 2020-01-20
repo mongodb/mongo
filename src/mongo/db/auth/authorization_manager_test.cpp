@@ -85,8 +85,7 @@ public:
         auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
         auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            std::move(localExternalState),
-            AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
+            getServiceContext(), std::move(localExternalState));
         authzManager = localAuthzManager.get();
         externalState->setAuthorizationManager(authzManager);
         authzManager->setAuthEnabled(true);
@@ -256,24 +255,6 @@ private:
         }
         return status;
     }
-};
-
-class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::mongo::unittest::Test {
-public:
-    virtual void setUp() {
-        auto localExternalState =
-            std::make_unique<AuthzManagerExternalStateMockWithExplicitUserPrivileges>();
-        externalState = localExternalState.get();
-        externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        authzManager = std::make_unique<AuthorizationManagerImpl>(
-            std::move(localExternalState),
-            AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
-        externalState->setAuthorizationManager(authzManager.get());
-        authzManager->setAuthEnabled(true);
-    }
-
-    std::unique_ptr<AuthorizationManager> authzManager;
-    AuthzManagerExternalStateMockWithExplicitUserPrivileges* externalState;
 };
 
 // Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.

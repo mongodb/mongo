@@ -35,6 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/invalidating_lru_cache.h"
 
 namespace mongo {
@@ -53,7 +55,7 @@ public:
     OID getCacheGeneration() const;
 
 protected:
-    ReadThroughCacheBase(Mutex& mutex);
+    ReadThroughCacheBase(Mutex& mutex, ServiceContext* service, ThreadPoolInterface& threadPool);
 
     virtual ~ReadThroughCacheBase();
 
@@ -178,9 +180,27 @@ protected:
     friend class ReadThroughCacheBase::CacheGuard;
 
     /**
+     * Creates a client and an operation context and executes the specified 'work' under that
+     * environment.
+     */
+    using WorkWithOpContext = unique_function<void(OperationContext*)>;
+    void _asyncWork(WorkWithOpContext work);
+
+    /**
      * Updates _fetchGeneration to a new OID
      */
     void _updateCacheGeneration(const CacheGuard&);
+
+    /**
+     * Service context under which this cache has been instantiated (used for access to service-wide
+     * functionality, such as client/operation context creation)
+     */
+    ServiceContext* const _serviceContext;
+
+    /**
+     * Thread pool, to be used for invoking the blocking loader work.
+     */
+    ThreadPoolInterface& _threadPool;
 
     /**
      * Protects _fetchGeneration and _isFetchPhaseBusy.  Manipulated via CacheGuard.
@@ -329,8 +349,7 @@ public:
 
             if (guard.isSameCacheGeneration())
                 return ValueHandle(_cache.insertOrAssignAndGet(
-                    key,
-                    {std::move(*value), opCtx->getServiceContext()->getFastClockSource()->now()}));
+                    key, {std::move(*value), _serviceContext->getFastClockSource()->now()}));
 
             // If the cache generation changed while this thread was in fetch mode, the data
             // associated with the value may now be invalid, so we will throw out the fetched value
@@ -379,14 +398,17 @@ public:
 
 protected:
     /**
-     * ReadThroughCache constructor, to be called by sub-classes.  Accepts the initial size of the
-     * cache, and a reference to a Mutex.  The Mutex is for the exclusive use of the
+     * ReadThroughCache constructor, to be called by sub-classes. The 'cacheSize' parameter
+     * represents the maximum size of the cache and 'mutex' is for the exclusive use of the
      * ReadThroughCache, the sub-class should never actually use it (apart from passing it to this
-     * constructor).  Having the Mutex stored by the sub-class allows latch diagnostics to be
+     * constructor). Having the Mutex stored by the sub-class allows latch diagnostics to be
      * correctly associated with the sub-class (not the generic ReadThroughCache class).
      */
-    ReadThroughCache(int cacheSize, Mutex& mutex)
-        : ReadThroughCacheBase(mutex), _cache(cacheSize) {}
+    ReadThroughCache(Mutex& mutex,
+                     ServiceContext* service,
+                     ThreadPoolInterface& threadPool,
+                     int cacheSize)
+        : ReadThroughCacheBase(mutex, service, threadPool), _cache(cacheSize) {}
 
 private:
     /**

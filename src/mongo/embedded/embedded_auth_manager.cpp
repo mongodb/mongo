@@ -149,7 +149,7 @@ private:
 
 namespace {
 
-std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl() {
+std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(ServiceContext*) {
     return std::make_unique<embedded::AuthorizationManager>();
 }
 
