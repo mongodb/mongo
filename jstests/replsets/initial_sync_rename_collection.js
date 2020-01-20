@@ -1,5 +1,5 @@
 /**
- * Test that CollectionCloner completes without error when a collection is dropped during cloning.
+ * Test that CollectionCloner completes without error when a collection is renamed during cloning.
  * @tags: [requires_fcv_44]
  */
 
@@ -7,31 +7,39 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/libs/two_phase_drops.js');
 load("jstests/libs/uuid_util.js");
+load('jstests/replsets/libs/two_phase_drops.js');
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
-const testName = "initial_sync_drop_collection";
+const testName = "initial_sync_rename_collection";
 const dbName = testName;
-var replTest = new ReplSetTest(
+const replTest = new ReplSetTest(
     {name: testName, nodes: [{}, {rsConfig: {priority: 0}}], settings: {chainingAllowed: false}});
 replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var primaryDB = primary.getDB(dbName);
-var secondary = replTest.getSecondary();
-var secondaryDB = secondary.getDB(dbName);
 const collName = "testcoll";
-var primaryColl = primaryDB[collName];
-var secondaryColl = secondaryDB[collName];
-var nss = primaryColl.getFullName();
+const primary = replTest.getPrimary();
+const primaryDB = primary.getDB(dbName);
+const primaryColl = primaryDB[collName];
+const pRenameColl = primaryDB["r_" + collName];
+
+// Used for cross-DB renames.
+const secondDbName = testName + "_cross";
+const primarySecondDB = primary.getDB(secondDbName);
+const pCrossDBRenameColl = primarySecondDB[collName + "_cross"];
+
+const nss = primaryColl.getFullName();
+const rnss = pRenameColl.getFullName();
+let secondary = replTest.getSecondary();
+let secondaryDB = secondary.getDB(dbName);
+let secondaryColl = secondaryDB[collName];
 
 // This function adds data to the collection, restarts the secondary node with the given
 // parameters and setting the given failpoint, waits for the failpoint to be hit,
-// drops the collection, then disables the failpoint.  It then optionally waits for the
+// renames the collection, then disables the failpoint.  It then optionally waits for the
 // expectedLog message and waits for the secondary to complete initial sync, then ensures
-// the collection on the secondary is empty.
+// the collection on the secondary has been properly cloned.
 function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
     jsTestLog("Writing data to collection.");
     assert.commandWorked(primaryColl.insert([{_id: 1}, {_id: 2}]));
@@ -62,26 +70,26 @@ function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
     replTest.waitForState(secondary, ReplSetTest.State.STARTUP_2);
 }
 
-function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
+function finishTest({failPoint, expectedLog, createNew, renameAcrossDBs}) {
     // Get the uuid for use in checking the log line.
     const uuid = extractUUIDFromObject(getUUIDFromListCollections(primaryDB, collName));
+    const target = (renameAcrossDBs ? pCrossDBRenameColl : pRenameColl);
 
-    jsTestLog("Dropping collection on primary: " + primaryColl.getFullName());
-    assert(primaryColl.drop());
-
-    if (waitForDrop) {
-        jsTestLog("Waiting for drop to commit on primary");
-        TwoPhaseDropCollectionTest.waitForDropToComplete(primaryDB, collName);
-    }
+    jsTestLog("Renaming collection on primary: " + target.getFullName());
+    assert.commandWorked(primary.adminCommand({
+        renameCollection: primaryColl.getFullName(),
+        to: target.getFullName(),
+        dropTarget: false
+    }));
 
     // Only set for test cases that use 'system.drop' namespaces when dropping collections.
-    // In those tests the variable 'rnss' represents such a namespace. Used for expectedLog.
-    // See test cases 3 and 4 below.
-    let rnss;
+    // In those tests the variable 'dropPendingNss' represents such a namespace. Used for
+    // expectedLog. See test cases 6 and 8 below.
+    let dropPendingNss;
     const dropPendingColl =
         TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(primaryDB, collName);
     if (dropPendingColl) {
-        rnss = dbName + "." + dropPendingColl["name"];
+        dropPendingNss = dbName + "." + dropPendingColl["name"];
     }
 
     if (createNew) {
@@ -110,28 +118,56 @@ function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
         assert.eq(0, secondaryColl.find().itcount());
     }
     replTest.checkReplicatedDataHashes();
+
+    // Drop the renamed collection so we can start fresh the next time around.
+    assert(target.drop());
 }
 
-function runDropTest(params) {
+function runRenameTest(params) {
     setupTest(params);
     finishTest(params);
 }
 
-jsTestLog("[1] Testing dropping between listIndexes and find.");
-runDropTest({
+jsTestLog("[1] Testing rename between listIndexes and find.");
+runRenameTest({
     failPoint: "hangBeforeClonerStage",
     extraFailPointData: {cloner: "CollectionCloner", stage: "query"}
 });
 
+jsTestLog("[2] Testing cross-DB rename between listIndexes and find.");
+runRenameTest({
+    failPoint: "hangBeforeClonerStage",
+    extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
+    renameAcrossDBs: true
+});
+
 jsTestLog(
-    "[2] Testing dropping between listIndexes and find, with new same-name collection created.");
-runDropTest({
+    "[3] Testing rename between listIndexes and find, with new same-name collection created.");
+runRenameTest({
     failPoint: "hangBeforeClonerStage",
     extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
     createNew: true
 });
 
-let expectedLogFor3and4 =
+jsTestLog(
+    "[4] Testing cross-DB rename between listIndexes and find, with new same-name collection created.");
+runRenameTest({
+    failPoint: "hangBeforeClonerStage",
+    extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
+    createNew: true,
+    renameAcrossDBs: true
+});
+
+jsTestLog("[5] Testing rename between getMores.");
+runRenameTest({
+    failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
+    secondaryStartupParams: {collectionClonerBatchSize: 1},
+    expectedLog:
+        "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`"
+});
+
+// A cross-DB rename will appear as a drop in the context of the source DB.
+let expectedLogFor6and8 =
     "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`";
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
@@ -139,49 +175,32 @@ let expectedLogFor3and4 =
 // the cloner queries collection by UUID, it will observe the first drop phase as a rename.
 // We still want to check that initial sync succeeds in such a case.
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
-    expectedLogFor3and4 =
-        "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`";
+    expectedLogFor6and8 =
+        "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${dropPendingNss}'. UUID ${uuid}`";
 }
 
-jsTestLog("[3] Testing drop-pending between getMore calls.");
-runDropTest({
+jsTestLog("[6] Testing cross-DB rename between getMores.");
+runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
-    expectedLog: expectedLogFor3and4
+    renameAcrossDBs: true,
+    expectedLog: expectedLogFor6and8
 });
 
-jsTestLog("[4] Testing drop-pending with new same-name collection created, between getMore calls.");
-runDropTest({
+jsTestLog("[7] Testing rename with new same-name collection created, between getMores.");
+runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
-    expectedLog: expectedLogFor3and4,
-    createNew: true
-});
-
-// Add another node to the set, so when we drop the collection it can commit.  This other
-// secondary will be finished with initial sync when the drop happens.
-var secondary2 = replTest.add({rsConfig: {priority: 0}});
-replTest.reInitiate();
-replTest.waitForState(secondary2, ReplSetTest.State.SECONDARY);
-
-jsTestLog("[5] Testing committed drop between getMore calls.");
-runDropTest({
-    failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
-    secondaryStartupParams: {collectionClonerBatchSize: 1},
-    waitForDrop: true,
     expectedLog:
-        "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`"
+        "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`"
 });
 
-jsTestLog(
-    "[6] Testing committed drop with new same-name collection created, between getMore calls.");
-runDropTest({
+jsTestLog("[8] Testing cross-DB rename with new same-name collection created, between getMores.");
+runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
-    waitForDrop: true,
-    expectedLog:
-        "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`",
-    createNew: true
+    renameAcrossDBs: true,
+    expectedLog: expectedLogFor6and8
 });
 
 replTest.stopSet();

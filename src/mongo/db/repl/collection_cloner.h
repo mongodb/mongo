@@ -140,7 +140,21 @@ private:
             : CollectionClonerStage(name, cloner, stageFunc) {}
 
         bool isTransientError(const Status& status) override {
+            if (isCursorError(status)) {
+                // We have already lost this cursor so do not try to kill it.
+                getCloner()->forgetOldQueryCursor();
+                return true;
+            }
             return ErrorCodes::isRetriableError(status);
+        }
+
+        static bool isCursorError(const Status& status) {
+            // Our cursor was killed due to changes on the remote collection.
+            if ((status == ErrorCodes::CursorNotFound) || (status == ErrorCodes::OperationFailed) ||
+                (status == ErrorCodes::QueryPlanKilled)) {
+                return true;
+            }
+            return false;
         }
     };
 
@@ -210,6 +224,18 @@ private:
      */
     void killOldQueryCursor();
 
+    /**
+     * Clears the stored id of the remote cursor so that we do not attempt to kill it.
+     * We call this when we know it has already been killed by the sync source itself.
+     */
+    void forgetOldQueryCursor();
+
+    /**
+     * Used to terminate the clone when we encounter a fatal error during a non-resumable query.
+     * Throws.
+     */
+    void abortNonResumableClone(const Status& status);
+
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
@@ -253,6 +279,11 @@ private:
 
     // If true, it means we are starting a new query or resuming an interrupted one.
     bool _firstBatchOfQueryRound = true;  // (X)
+
+    // Only set during non-resumable (4.2) queries.
+    // Signifies that there were changes to the collection on the sync source that resulted in
+    // our remote cursor getting killed.
+    bool _lostNonResumableCursor = false;  // (X)
 };
 
 }  // namespace repl
