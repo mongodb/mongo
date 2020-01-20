@@ -37,23 +37,16 @@ IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1');
 // Stop the primary using the shutdown command without {force: true}.
 try {
     assert.commandFailedWithCode(primary.adminCommand({shutdown: 1, force: false}),
-                                 ErrorCodes.ExceededTimeLimit);
+                                 ErrorCodes.ConflictingOperationInProgress);
 } finally {
     IndexBuildTest.resumeIndexBuilds(primary);
 }
 
 IndexBuildTest.waitForIndexBuildToStop(testDB);
 
-const exitCode = createIdx({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+createIdx();
 
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Two phased index build would resume after stepped down primary node is re-elected.
-    IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
-} else {
-    // Single-phased ndex build would be aborted by step down triggered by the shutdown command.
-    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
-}
+IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
 // This runs the shutdown command without {force: true} with additional handling for expected
 // network errors when the command succeeds.

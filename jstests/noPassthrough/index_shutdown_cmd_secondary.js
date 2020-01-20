@@ -40,7 +40,8 @@ IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), 'a
 
 // Stop the secondary using the shutdown command without {force: true}.
 try {
-    // assert.commandWorked(secondary.adminCommand({shutdown: 1, force: false}));
+    assert.commandFailedWithCode(secondary.adminCommand({shutdown: 1, force: false}),
+                                 ErrorCodes.ConflictingOperationInProgress);
 } finally {
     IndexBuildTest.resumeIndexBuilds(secondary);
 }
