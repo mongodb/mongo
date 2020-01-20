@@ -127,7 +127,7 @@ function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
 function waitForMoveChunkStep(shardConnection, stepNumber) {
     var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
-    assert.between(migrateStepNames.copiedIndexes,
+    assert.between(migrateStepNames.deletedPriorDataInRange,
                    stepNumber,
                    migrateStepNames.done,
                    "incorrect stepNumber",
@@ -158,8 +158,8 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
 }
 
 var migrateStepNames = {
-    copiedIndexes: 1,
-    deletedPriorDataInRange: 2,
+    deletedPriorDataInRange: 1,
+    copiedIndexes: 2,
     cloned: 3,
     catchup: 4,  // About to enter steady state.
     steady: 5,
@@ -191,7 +191,7 @@ function proceedToMigrateStep(shardConnection, stepNumber) {
 }
 
 function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
-    assert.between(migrateStepNames.copiedIndexes,
+    assert.between(migrateStepNames.deletedPriorDataInRange,
                    stepNumber,
                    migrateStepNames.done,
                    "incorrect stepNumber",
@@ -208,7 +208,7 @@ function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
 function waitForMigrateStep(shardConnection, stepNumber) {
     var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
-    assert.between(migrateStepNames.copiedIndexes,
+    assert.between(migrateStepNames.deletedPriorDataInRange,
                    stepNumber,
                    migrateStepNames.done,
                    "incorrect stepNumber",

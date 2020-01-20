@@ -232,8 +232,8 @@ ExecutorFuture<int> deleteBatchAndWaitForReplication(
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto* const collection = autoColl.getCollection();
 
-        // Ensure the collection has not been dropped or dropped and recreated.
-        uassert(ErrorCodes::RangeDeletionAbandonedDueToCollectionDrop,
+        // Ensure the collection exists and has not been dropped or dropped and recreated.
+        uassert(ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
                 "Collection has been dropped since enqueuing this range "
                 "deletion task. No need to delete documents.",
                 !collectionUuidHasChanged(nss, collection, collectionUuid));
@@ -278,7 +278,8 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
             // Continue iterating until there are no more documents to delete, retrying on
             // any error that doesn't indicate that this node is stepping down.
             return (swNumDeleted.isOK() && swNumDeleted.getValue() == 0) ||
-                swNumDeleted.getStatus() == ErrorCodes::RangeDeletionAbandonedDueToCollectionDrop ||
+                swNumDeleted.getStatus() ==
+                ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
                 ErrorCodes::isShutdownError(swNumDeleted.getStatus()) ||
                 ErrorCodes::isNotMasterError(swNumDeleted.getStatus());
         })
@@ -373,7 +374,9 @@ SharedSemiFuture<void> removeDocumentsInRange(
                        << redact(range.toString()) << causedBy(redact(s));
             }
 
-            if (s.isOK() || s.code() == ErrorCodes::RangeDeletionAbandonedDueToCollectionDrop) {
+            if (s.isOK() ||
+                s.code() ==
+                    ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
                 removePersistentRangeDeletionTask(nss, collectionUuid, range);
 
                 LOG(1) << "Completed removal of persistent range deletion task for " << nss.ns()

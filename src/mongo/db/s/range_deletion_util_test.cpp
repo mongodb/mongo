@@ -297,8 +297,9 @@ TEST_F(RangeDeleterTest,
                                Milliseconds(0) /* delayBetweenBatches */);
 
 
-    ASSERT_THROWS_CODE(
-        cleanupComplete.get(), DBException, ErrorCodes::RangeDeletionAbandonedDueToCollectionDrop);
+    ASSERT_THROWS_CODE(cleanupComplete.get(),
+                       DBException,
+                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
     ASSERT_EQUALS(dbclient.count(kNss, BSONObj()), numDocsToInsert);
 }
 
@@ -316,8 +317,9 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotE
                                Milliseconds(0) /* delayBetweenBatches */);
 
 
-    ASSERT_THROWS_CODE(
-        cleanupComplete.get(), DBException, ErrorCodes::RangeDeletionAbandonedDueToCollectionDrop);
+    ASSERT_THROWS_CODE(cleanupComplete.get(),
+                       DBException,
+                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
 }
 
 
@@ -631,8 +633,9 @@ TEST_F(RangeDeleterTest,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
                                Milliseconds(0) /* delayBetweenBatches */);
 
-    ASSERT_THROWS_CODE(
-        cleanupComplete.get(), DBException, ErrorCodes::RangeDeletionAbandonedDueToCollectionDrop);
+    ASSERT_THROWS_CODE(cleanupComplete.get(),
+                       DBException,
+                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
 
     // Document should have been deleted.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 0);

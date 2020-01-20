@@ -658,8 +658,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             log() << "Waiting for cleanup of " << getNss().ns() << " range "
                   << redact(range.toString());
 
-            auto deleteStatus =
-                CollectionShardingRuntime::waitForClean(_opCtx, getNss(), _collectionEpoch, range);
+            auto deleteStatus = CollectionShardingRuntime::waitForClean(
+                _opCtx, getNss(), _collectionUuid.get(), range);
 
             if (!deleteStatus.isOK()) {
                 return {ErrorCodes::OrphanedRangeCleanUpFailed,

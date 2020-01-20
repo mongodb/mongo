@@ -59,6 +59,13 @@ namespace repl {
 class OpTime;
 }
 
+struct CollectionOptionsAndIndexes {
+    UUID uuid;
+    std::vector<BSONObj> indexSpecs;
+    BSONObj idIndexSpec;
+    BSONObj options;
+};
+
 /**
  * Drives the receiving side of the MongoD migration process. One instance exists per shard.
  */
@@ -129,11 +136,19 @@ public:
     Status startCommit(const MigrationSessionId& sessionId);
 
     /**
-     * Creates the collection nss on the shard and clones the indexes and options from fromShardId.
+     * Gets the collection uuid, options and indexes from fromShardId.
      */
-    static void cloneCollectionIndexesAndOptions(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const ShardId& fromShardId);
+    static CollectionOptionsAndIndexes getCollectionIndexesAndOptions(OperationContext* opCtx,
+                                                                      const NamespaceString& nss,
+                                                                      const ShardId& fromShardId);
+
+    /**
+     * Creates the collection on the shard and clones the indexes and options.
+     */
+    static void cloneCollectionIndexesAndOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const CollectionOptionsAndIndexes& collectionOptionsAndIndexes);
 
 private:
     /**

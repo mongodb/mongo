@@ -74,12 +74,12 @@ public:
                                                  const NamespaceString& nss);
 
     /**
-     * Tracks deletion of any documents within the range, returning when deletion is complete.
-     * Throws if the collection is dropped while it sleeps.
+     * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
+     * 'orphanRange' to be processed, even if the collection does not exist in the storage catalog.
      */
     static Status waitForClean(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               OID const& epoch,
+                               const UUID& collectionUuid,
                                ChunkRange orphanRange);
 
     ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx, bool isCollection) override;
