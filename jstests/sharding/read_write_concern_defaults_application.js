@@ -147,9 +147,6 @@ let testCases = {
         command: {aggregate: coll, pipeline: [{$match: {x: 1}}, {$out: "out"}], cursor: {}},
         checkReadConcern: true,
         checkWriteConcern: true,
-        // TODO SERVER-45549: Remove the following line once RWC defaults are correctly being
-        // applied on mongos.
-        target: "replset",
     },
     appendOplogNote: {
         command: {appendOplogNote: 1, data: {foo: 1}},
