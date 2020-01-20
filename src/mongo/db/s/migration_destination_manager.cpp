@@ -531,9 +531,8 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     return Status::OK();
 }
 
-void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationContext* opCtx,
-                                                                   const NamespaceString& nss,
-                                                                   const ShardId& fromShardId) {
+CollectionOptionsAndIndexes MigrationDestinationManager::getCollectionIndexesAndOptions(
+    OperationContext* opCtx, const NamespaceString& nss, const ShardId& fromShardId) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
 
@@ -542,73 +541,80 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
     std::vector<BSONObj> donorIndexSpecs;
     BSONObj donorIdIndexSpec;
     BSONObj donorOptions;
-    {
-        // 0. Get the collection indexes and options from the donor shard.
 
-        // Do not hold any locks while issuing remote calls.
-        invariant(!opCtx->lockState()->isLocked());
+    // Get the collection indexes and options from the donor shard.
 
-        // Get indexes by calling listIndexes against the donor.
-        auto indexes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            nss.db().toString(),
-            BSON("listIndexes" << nss.coll().toString()),
-            Milliseconds(-1)));
+    // Do not hold any locks while issuing remote calls.
+    invariant(!opCtx->lockState()->isLocked());
 
-        for (auto&& spec : indexes.docs) {
-            donorIndexSpecs.push_back(spec);
-            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
-                if (indexNameElem.type() == BSONType::String &&
-                    indexNameElem.valueStringData() == "_id_"_sd) {
-                    donorIdIndexSpec = spec;
-                }
+    // Get indexes by calling listIndexes against the donor.
+    auto indexes = uassertStatusOK(
+        fromShard->runExhaustiveCursorCommand(opCtx,
+                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                              nss.db().toString(),
+                                              BSON("listIndexes" << nss.coll().toString()),
+                                              Milliseconds(-1)));
+
+    for (auto&& spec : indexes.docs) {
+        donorIndexSpecs.push_back(spec);
+        if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
+            if (indexNameElem.type() == BSONType::String &&
+                indexNameElem.valueStringData() == "_id_"_sd) {
+                donorIdIndexSpec = spec;
             }
         }
-
-        // Get collection options by calling listCollections against the donor.
-        auto infosRes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            nss.db().toString(),
-            BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())),
-            Milliseconds(-1)));
-
-        auto infos = infosRes.docs;
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "expected listCollections against the primary shard for "
-                              << nss.toString() << " to return 1 entry, but got " << infos.size()
-                              << " entries",
-                infos.size() == 1);
-
-
-        BSONObj entry = infos.front();
-
-        // The entire options include both the settable options under the 'options' field in the
-        // listCollections response, and the UUID under the 'info' field.
-        BSONObjBuilder donorOptionsBob;
-
-        if (entry["options"].isABSONObj()) {
-            donorOptionsBob.appendElements(entry["options"].Obj());
-        }
-
-        BSONObj info;
-        if (entry["info"].isABSONObj()) {
-            info = entry["info"].Obj();
-        }
-
-        uassert(ErrorCodes::InvalidUUID,
-                str::stream() << "The donor shard did not return a UUID for collection " << nss.ns()
-                              << " as part of its listCollections response: " << entry
-                              << ", but this node expects to see a UUID.",
-                !info["uuid"].eoo());
-
-        donorOptionsBob.append(info["uuid"]);
-
-        donorOptions = donorOptionsBob.obj();
     }
 
-    // 1. If this shard doesn't own any chunks for the collection to be cloned and the collection
+    // Get collection options by calling listCollections against the donor.
+    auto infosRes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
+        opCtx,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        nss.db().toString(),
+        BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())),
+        Milliseconds(-1)));
+
+    auto infos = infosRes.docs;
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "expected listCollections against the primary shard for "
+                          << nss.toString() << " to return 1 entry, but got " << infos.size()
+                          << " entries",
+            infos.size() == 1);
+
+
+    BSONObj entry = infos.front();
+
+    // The entire options include both the settable options under the 'options' field in the
+    // listCollections response, and the UUID under the 'info' field.
+    BSONObjBuilder donorOptionsBob;
+
+    if (entry["options"].isABSONObj()) {
+        donorOptionsBob.appendElements(entry["options"].Obj());
+    }
+
+    BSONObj info;
+    if (entry["info"].isABSONObj()) {
+        info = entry["info"].Obj();
+    }
+
+    uassert(ErrorCodes::InvalidUUID,
+            str::stream() << "The donor shard did not return a UUID for collection " << nss.ns()
+                          << " as part of its listCollections response: " << entry
+                          << ", but this node expects to see a UUID.",
+            !info["uuid"].eoo());
+
+    auto donorUUID = info["uuid"].uuid();
+
+    donorOptionsBob.append(info["uuid"]);
+    donorOptions = donorOptionsBob.obj();
+
+    return {donorUUID, donorIndexSpecs, donorIdIndexSpec, donorOptions};
+}
+
+void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
+    // 0. If this shard doesn't own any chunks for the collection to be cloned and the collection
     // exists locally, we drop its indexes to guarantee that no stale indexes carry over.
     bool dropNonDonorIndexes = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -636,7 +642,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         auto indexes = client.getIndexSpecs(nss);
         for (auto&& recipientIndex : indexes) {
             bool dropIndex = true;
-            for (auto&& donorIndex : donorIndexSpecs) {
+            for (auto&& donorIndex : collectionOptionsAndIndexes.indexSpecs) {
                 if (recipientIndex.woCompare(donorIndex) == 0) {
                     dropIndex = false;
                     break;
@@ -658,7 +664,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
     }
 
     {
-        // 2. Create the collection (if it doesn't already exist) and create any indexes we are
+        // 1. Create the collection (if it doesn't already exist) and create any indexes we are
         // missing (auto-heal indexes).
 
         // Checks that the collection's UUID matches the donor's.
@@ -668,28 +674,24 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                                   << " because the node is not primary",
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
-            boost::optional<UUID> donorUUID;
-            if (!donorOptions["uuid"].eoo()) {
-                donorUUID.emplace(UUID::parse(donorOptions));
-            }
-
             uassert(ErrorCodes::InvalidUUID,
                     str::stream()
                         << "Cannot create collection " << nss.ns()
                         << " because we already have an identically named collection with UUID "
                         << collection->uuid() << ", which differs from the donor's UUID "
-                        << (donorUUID ? donorUUID->toString() : "(none)")
+                        << collectionOptionsAndIndexes.uuid
                         << ". Manually drop the collection on this shard if it contains data from "
                            "a previous incarnation of "
                         << nss.ns(),
-                    collection->uuid() == donorUUID);
+                    collection->uuid() == collectionOptionsAndIndexes.uuid);
         };
 
         // Gets the missing indexes and checks if the collection is empty (auto-healing is
         // possible).
         auto checkEmptyOrGetMissingIndexesFromDonor = [&](Collection* collection) {
             auto indexCatalog = collection->getIndexCatalog();
-            auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(opCtx, donorIndexSpecs);
+            auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
+                opCtx, collectionOptionsAndIndexes.indexSpecs);
             if (!indexSpecs.empty()) {
                 // Only allow indexes to be copied if the collection does not have any documents.
                 uassert(ErrorCodes::CannotCreateCollection,
@@ -727,11 +729,15 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
             // We do not have a collection by this name. Create the collection with the donor's
             // options.
             WriteUnitOfWork wuow(opCtx);
-            CollectionOptions collectionOptions = uassertStatusOK(CollectionOptions::parse(
-                donorOptions, CollectionOptions::ParseKind::parseForStorage));
+            CollectionOptions collectionOptions = uassertStatusOK(
+                CollectionOptions::parse(collectionOptionsAndIndexes.options,
+                                         CollectionOptions::ParseKind::parseForStorage));
             const bool createDefaultIndexes = true;
-            uassertStatusOK(db->userCreateNS(
-                opCtx, nss, collectionOptions, createDefaultIndexes, donorIdIndexSpec));
+            uassertStatusOK(db->userCreateNS(opCtx,
+                                             nss,
+                                             collectionOptions,
+                                             createDefaultIndexes,
+                                             collectionOptionsAndIndexes.idIndexSpec));
             wuow.commit();
             collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         }
@@ -796,20 +802,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
 
     invariant(initialState == READY);
 
-    {
-        cloneCollectionIndexesAndOptions(opCtx, _nss, _fromShard);
-
-        timing.done(1);
-        migrateThreadHangAtStep1.pauseWhileSet();
-    }
+    auto donorCollectionOptionsAndIndexes = getCollectionIndexesAndOptions(opCtx, _nss, _fromShard);
 
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard));
-
-    const UUID collectionUuid = [&] {
-        AutoGetCollection autoGetCollection(opCtx, _nss, MODE_IS);
-        return autoGetCollection.getCollection()->uuid();
-    }();
 
     {
         const ChunkRange range(_min, _max);
@@ -817,12 +813,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         // 2. Ensure any data which might have been left orphaned in the range being moved has been
         // deleted.
         if (_useFCV44Protocol) {
-            while (migrationutil::checkForConflictingDeletions(opCtx, range, collectionUuid)) {
+            while (migrationutil::checkForConflictingDeletions(
+                opCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
                 LOG(0) << "Migration paused because range overlaps with a "
                           "range that is scheduled for deletion: collection: "
                        << _nss.ns() << " range: " << redact(range.toString());
 
-                auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
+                auto status = CollectionShardingRuntime::waitForClean(
+                    opCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
 
                 if (!status.isOK()) {
                     _setStateFail(redact(status.reason()));
@@ -832,8 +830,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                 opCtx->sleepFor(Milliseconds(1000));
             }
 
-            RangeDeletionTask recipientDeletionTask(
-                _migrationId, _nss, collectionUuid, _fromShard, range, CleanWhenEnum::kNow);
+            RangeDeletionTask recipientDeletionTask(_migrationId,
+                                                    _nss,
+                                                    donorCollectionOptionsAndIndexes.uuid,
+                                                    _fromShard,
+                                                    range,
+                                                    CleanWhenEnum::kNow);
             recipientDeletionTask.setPending(true);
 
             migrationutil::persistRangeDeletionTaskLocally(opCtx, recipientDeletionTask);
@@ -842,19 +844,33 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
             // being moved, and wait for completion
 
             auto cleanupCompleteFuture = _notePending(opCtx, range);
-            // Wait for the range deletion to report back
-            if (!cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
-                _setStateFail(redact(cleanupCompleteFuture.getNoThrow(opCtx).reason()));
+            auto cleanupStatus = cleanupCompleteFuture.getNoThrow(opCtx);
+            // Wait for the range deletion to report back. Swallow
+            // RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the
+            // collection could either never exist or get dropped directly from the shard after the
+            // range deletion task got scheduled.
+            if (!cleanupStatus.isOK() &&
+                cleanupStatus !=
+                    ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
+                _setStateFail(redact(cleanupStatus.reason()));
                 return;
             }
 
             // Wait for any other, overlapping queued deletions to drain
-            auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, range);
-            if (!status.isOK()) {
-                _setStateFail(redact(status.reason()));
+            cleanupStatus = CollectionShardingRuntime::waitForClean(
+                opCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+            if (!cleanupStatus.isOK()) {
+                _setStateFail(redact(cleanupStatus.reason()));
                 return;
             }
         }
+
+        timing.done(1);
+        migrateThreadHangAtStep1.pauseWhileSet();
+    }
+
+    {
+        cloneCollectionIndexesAndOptions(opCtx, _nss, donorCollectionOptionsAndIndexes);
 
         timing.done(2);
         migrateThreadHangAtStep2.pauseWhileSet();

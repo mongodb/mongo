@@ -52,8 +52,11 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             auto primaryShardId = ShardId(request().getPrimaryShard().toString());
+            auto collectionOptionsAndIndexes =
+                MigrationDestinationManager::getCollectionIndexesAndOptions(
+                    opCtx, ns(), primaryShardId);
             MigrationDestinationManager::cloneCollectionIndexesAndOptions(
-                opCtx, ns(), primaryShardId);
+                opCtx, ns(), collectionOptionsAndIndexes);
 
             // At the time this command is invoked, the config server primary has already written
             // the collection's routing metadata, so sync from the config server

@@ -248,7 +248,7 @@ SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const&
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                const NamespaceString& nss,
-                                               OID const& epoch,
+                                               const UUID& collectionUuid,
                                                ChunkRange orphanRange) {
     while (true) {
         boost::optional<SharedSemiFuture<void>> stillScheduled;
@@ -258,13 +258,13 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             auto* const self = CollectionShardingRuntime::get(opCtx, nss);
             stdx::lock_guard lk(self->_metadataManagerLock);
 
-            // If the metadata was reset, the collection does not exist, or the collection was
-            // dropped and recreated since the metadata manager was created, return an error.
-            if (!self->_metadataManager || !autoColl.getCollection() ||
-                autoColl.getCollection()->uuid() != self->_metadataManager->getCollectionUuid()) {
+            // If the metadata was reset, or the collection was dropped and recreated since the
+            // metadata manager was created, return an error.
+            if (!self->_metadataManager ||
+                (collectionUuid != self->_metadataManager->getCollectionUuid())) {
                 return {ErrorCodes::ConflictingOperationInProgress,
-                        "Collection being migrated was dropped or otherwise had its metadata "
-                        "reset"};
+                        "Collection being migrated was dropped and created or otherwise had its "
+                        "metadata reset"};
             }
 
             stillScheduled = self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
@@ -278,7 +278,12 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
         log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
 
         Status result = stillScheduled->getNoThrow(opCtx);
-        if (!result.isOK()) {
+
+        // Swallow RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the
+        // collection could either never exist or get dropped directly from the shard after
+        // the range deletion task got scheduled.
+        if (!result.isOK() &&
+            result != ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
             return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
                                                     << " range " << orphanRange.toString());
         }
