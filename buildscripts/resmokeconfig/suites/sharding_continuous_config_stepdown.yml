@@ -204,6 +204,8 @@ selector:
   - jstests/sharding/read_write_concern_defaults_commands_api.js
   - jstests/sharding/read_write_concern_defaults_propagation.js
 
+  # On stepdown there is not gurantee that changelog entries have been inserted [SERVER-45655]
+  - jstests/sharding/refine_collection_shard_key_changelog.js
   # This is expected to fail if the config server steps down during moveChunk.
   - jstests/sharding/index_operations_abort_concurrent_outgoing_migrations.js
   # Runs commands on mongos which target the primary configsvr, and then checks the outcome using

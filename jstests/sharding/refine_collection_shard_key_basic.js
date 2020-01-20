@@ -55,19 +55,6 @@ function validateConfigCollections(keyDoc, oldEpoch) {
     assert.neq(oldEpoch, collArr[0].lastmodEpoch);
 }
 
-function validateConfigChangelog(count) {
-    // We allow for more than one entry in the changelog for the 'start' message, because a config
-    // server stepdown can cause the command to be retried and the changelog entry to be rewritten.
-    assert.gte(count,
-               mongos.getCollection(kConfigChangelog)
-                   .find({what: 'refineCollectionShardKey.start', ns: kNsName})
-                   .itcount());
-    assert.lte(count,
-               mongos.getCollection(kConfigChangelog)
-                   .find({what: 'refineCollectionShardKey.end', ns: kNsName})
-                   .itcount());
-}
-
 function validateConfigCollectionsUnique(unique) {
     const collArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
     assert.eq(1, collArr.length);
@@ -413,7 +400,6 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
-validateConfigChangelog(1);
 
 // Should work because an index with missing or incomplete shard key entries exists for new shard
 // key {_id: 1, aKey: 1} and these entries are treated as null values.
@@ -486,7 +472,6 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
-validateConfigChangelog(5);
 
 // Should work because a 'useful' index exists for new shard key {a: 1, b.c: 1}. NOTE: We are
 // explicitly verifying that refineCollectionShardKey works with a dotted field.
@@ -497,7 +482,6 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
 validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
-validateConfigChangelog(6);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
