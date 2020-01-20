@@ -272,6 +272,8 @@ MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
+    globalFailPointRegistry().find("logForTLAPlusSpecs")->setMode(FailPoint::alwaysOn);
+
     initWireSpec();
     auto serviceContext = getGlobalServiceContext();
 

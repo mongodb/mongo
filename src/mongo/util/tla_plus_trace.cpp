@@ -41,12 +41,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(logForTLAPlusSpecs);
 
 std::function<bool(const BSONObj& data)> enabledForSpec(TLAPlusSpecEnum spec) {
-    return [spec](const BSONObj& data) {
-        auto array = data["specs"_sd].Array();
-        return std::find_if(array.begin(), array.end(), [&spec](BSONElement elem) {
-                   return elem.String() == TLAPlusSpec_serializer(spec);
-               }) != array.end();
-    };
+    return [](const BSONObj& data) { return true; };
 }
 
 void logTlaPlusTraceEvent(const TlaPlusTraceEvent& event) {
