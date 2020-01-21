@@ -354,13 +354,13 @@ class OCSPResponseBuilder(object):
 
             issuer = self._certificate_issuer if self._certificate_issuer else responder_certificate
 
-            produced_at = datetime.now(timezone.utc)
+            produced_at = datetime.now(timezone.utc).replace(microsecond=0)
 
             if self._this_update is None:
                 self._this_update = produced_at
 
             if self._next_update is None:
-                self._next_update = self._this_update + timedelta(days=7)
+                self._next_update = (self._this_update + timedelta(days=7)).replace(microsecond=0)
 
             response = {
                     'cert_id': {
@@ -594,7 +594,8 @@ class OCSPResponder:
         builder.certificate_issuer = self._issuer_cert
 
         # Set next update date
-        builder.next_update = datetime.now(timezone.utc) + timedelta(days=self._next_update_days)
+        now = datetime.now(timezone.utc)
+        builder.next_update = (now + timedelta(days=self._next_update_days)).replace(microsecond=0)
 
         return builder.build(self._responder_key, self._responder_cert)
 
