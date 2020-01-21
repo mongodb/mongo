@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,23 +26,20 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/executor/remote_command_request.h"
+
 namespace mongo {
-/**
- * Set parameter used to control whether or not the mongos attempts to precache the routing table on
- * startup.
- */
-
-extern bool gLoadRoutingTableOnStartup;
 
 /**
- * Set parameters used to control whether or not the mongos attempts to warm up the connection
- * pool on start up and for how long it should try.
+ * Constructs and returns hedge options based on the ReadPreferenceSetting on the 'opCtx'
+ * (assumes that it is not null), the hedging server parameters, and maxTimeMS in 'cmdObj'.
+ * If no hedging should be performed, returns boost::none.
  */
-
-extern bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup;
-extern int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS;
+boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeOptions(
+    OperationContext* opCtx, const BSONObj& cmdObj);
 
 }  // namespace mongo

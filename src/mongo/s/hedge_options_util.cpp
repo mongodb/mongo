@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,13 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/s/warmup_server_parameters.h"
+#include "mongo/s/hedge_options_util.h"
 
+#include "mongo/client/read_preference.h"
+#include "mongo/db/query/query_request.h"
+#include "mongo/s/mongos_server_parameters_gen.h"
 
 namespace mongo {
 
-bool gLoadRoutingTableOnStartup = true;
-bool gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup = true;
-int gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS = 2000;
+boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeOptions(
+    OperationContext* opCtx, const BSONObj& cmdObj) {
+    const auto hedgingMode = ReadPreferenceSetting::get(opCtx).hedgingMode;
+
+    if (hedgingMode && hedgingMode->getEnabled()) {
+        boost::optional<int> maxTimeMS;
+        if (auto cmdOptionMaxTimeMSField = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
+            maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
+        }
+
+        // Check if the operation is worth hedging.
+        if (maxTimeMS && maxTimeMS > gMaxTimeMSThresholdForHedging) {
+            return boost::none;
+        }
+
+        // Compute the delay.
+        auto delay = Milliseconds{0};
+        bool shouldDelayHedging = hedgingMode->getDelay();
+
+        if (shouldDelayHedging) {
+            delay = maxTimeMS ? Milliseconds{gHedgingDelayPercentage * maxTimeMS.get() / 100}
+                              : Milliseconds{gDefaultHedgingDelayMS};
+        }
+
+        return executor::RemoteCommandRequestOnAny::HedgeOptions{1, delay};
+    }
+
+    return boost::none;
+}
 
 }  // namespace mongo

@@ -59,8 +59,13 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                                                    const BSONObj& theCmdObj,
                                                    const BSONObj& metadataObj,
                                                    OperationContext* opCtx,
-                                                   Milliseconds timeoutMillis)
-    : id(requestId), dbname(theDbName), metadata(metadataObj), opCtx(opCtx) {
+                                                   Milliseconds timeoutMillis,
+                                                   boost::optional<HedgeOptions> hedgeOptions)
+    : id(requestId),
+      dbname(theDbName),
+      metadata(metadataObj),
+      opCtx(opCtx),
+      hedgeOptions(hedgeOptions) {
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.
     //
@@ -91,8 +96,10 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
                                                       const BSONObj& theCmdObj,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
-                                                      Milliseconds timeoutMillis)
-    : RemoteCommandRequestBase(requestId, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis),
+                                                      Milliseconds timeoutMillis,
+                                                      boost::optional<HedgeOptions> hedgeOptions)
+    : RemoteCommandRequestBase(
+          requestId, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis, hedgeOptions),
       target(theTarget) {
     if constexpr (std::is_same_v<T, std::vector<HostAndPort>>) {
         invariant(!theTarget.empty());
@@ -100,19 +107,32 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
 }
 
 template <typename T>
-RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
+RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
+                                                      const T& theTarget,
                                                       const std::string& theDbName,
                                                       const BSONObj& theCmdObj,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
                                                       Milliseconds timeoutMillis)
+    : RemoteCommandRequestImpl(
+          requestId, theTarget, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis, {}) {}
+
+template <typename T>
+RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
+                                                      const std::string& theDbName,
+                                                      const BSONObj& theCmdObj,
+                                                      const BSONObj& metadataObj,
+                                                      OperationContext* opCtx,
+                                                      Milliseconds timeoutMillis,
+                                                      boost::optional<HedgeOptions> hedgeOptions)
     : RemoteCommandRequestImpl(requestIdCounter.addAndFetch(1),
                                theTarget,
                                theDbName,
                                theCmdObj,
                                metadataObj,
                                opCtx,
-                               timeoutMillis) {}
+                               timeoutMillis,
+                               hedgeOptions) {}
 
 template <typename T>
 std::string RemoteCommandRequestImpl<T>::toString() const {
@@ -127,6 +147,11 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
 
     if (expirationDate != kNoExpirationDate) {
         out << " expDate:" << expirationDate.toString();
+    }
+
+    if (hedgeOptions) {
+        out << " hedgeOptions.count: " << hedgeOptions->count;
+        out << " hedgeOptions.delay: " << hedgeOptions->delay;
     }
 
     out << " cmd:" << cmdObj.toString();

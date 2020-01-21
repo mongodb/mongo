@@ -58,6 +58,8 @@ checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
 assert.commandWorked(
     testDB.runCommand({query: {find: collName}, $readPreference: {mode: "nearest", hedge: {}}}));
+// TODO (SERVER-45432): increment expectedHedgingMetrics.numTotalOperations and
+// expectedHedgingMetrics.numTotalHedgedOperations.
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
 st.stop();

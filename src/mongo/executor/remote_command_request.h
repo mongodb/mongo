@@ -43,6 +43,11 @@ namespace mongo {
 namespace executor {
 
 struct RemoteCommandRequestBase {
+    struct HedgeOptions {
+        size_t count;
+        Milliseconds delay;
+    };
+
     // Indicates that there is no timeout for the request to complete
     static constexpr Milliseconds kNoTimeout{-1};
 
@@ -58,7 +63,8 @@ struct RemoteCommandRequestBase {
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
-                             Milliseconds timeoutMillis);
+                             Milliseconds timeoutMillis,
+                             boost::optional<HedgeOptions> hedgeOptions);
 
     // Internal id of this request. Not interpreted and used for tracing purposes only.
     RequestId id;
@@ -75,6 +81,8 @@ struct RemoteCommandRequestBase {
     // metadata is propagated. It is allowed to be null if used on NetworkInterfaces without
     // metadata attachment (i.e., replication).
     OperationContext* opCtx{nullptr};
+
+    boost::optional<HedgeOptions> hedgeOptions;
 
     Milliseconds timeout = kNoTimeout;
 
@@ -112,6 +120,15 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
+                             Milliseconds timeoutMillis,
+                             boost::optional<HedgeOptions> hedgeOptions);
+
+    RemoteCommandRequestImpl(RequestId requestId,
+                             const Target& theTarget,
+                             const std::string& theDbName,
+                             const BSONObj& theCmdObj,
+                             const BSONObj& metadataObj,
+                             OperationContext* opCtx,
                              Milliseconds timeoutMillis);
 
     RemoteCommandRequestImpl(const Target& theTarget,
@@ -119,7 +136,26 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
-                             Milliseconds timeoutMillis = kNoTimeout);
+                             Milliseconds timeoutMillis,
+                             boost::optional<HedgeOptions> hedgeOptions);
+
+    RemoteCommandRequestImpl(const Target& theTarget,
+                             const std::string& theDbName,
+                             const BSONObj& theCmdObj,
+                             const BSONObj& metadataObj,
+                             OperationContext* opCtx,
+                             Milliseconds timeoutMillis = kNoTimeout)
+        : RemoteCommandRequestImpl(
+              theTarget, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis, boost::none) {}
+
+    RemoteCommandRequestImpl(const Target& theTarget,
+                             const std::string& theDbName,
+                             const BSONObj& theCmdObj,
+                             const BSONObj& metadataObj,
+                             OperationContext* opCtx,
+                             boost::optional<HedgeOptions> hedgeOptions)
+        : RemoteCommandRequestImpl(
+              theTarget, theDbName, theCmdObj, metadataObj, opCtx, kNoTimeout, hedgeOptions) {}
 
     RemoteCommandRequestImpl(const Target& theTarget,
                              const std::string& theDbName,

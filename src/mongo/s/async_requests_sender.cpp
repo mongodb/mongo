@@ -41,6 +41,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/hedge_options_util.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -181,8 +182,13 @@ SemiFuture<std::vector<HostAndPort>> AsyncRequestsSender::RemoteData::resolveSha
 
 auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndPort>&& hostAndPorts)
     -> SemiFuture<RemoteCommandOnAnyCallbackArgs> {
-    executor::RemoteCommandRequestOnAny request(
-        std::move(hostAndPorts), _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx);
+    auto hedgeOptions = extractHedgeOptions(_ars->_opCtx, _cmdObj);
+    executor::RemoteCommandRequestOnAny request(std::move(hostAndPorts),
+                                                _ars->_db,
+                                                _cmdObj,
+                                                _ars->_metadataObj,
+                                                _ars->_opCtx,
+                                                hedgeOptions);
 
     // We have to make a promise future pair because the TaskExecutor doesn't currently support a
     // future returning variant of scheduleRemoteCommand
