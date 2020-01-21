@@ -1107,6 +1107,14 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
     return advancedOpTime;
 }
 
+void TopologyCoordinator::updateLastCommittedInPrevConfig() {
+    _lastCommittedInPrevConfig = _lastCommittedOpTimeAndWallTime.opTime;
+}
+
+OpTime TopologyCoordinator::getLastCommittedInPrevConfig() {
+    return _lastCommittedInPrevConfig;
+}
+
 MemberData* TopologyCoordinator::_findMemberDataByMemberId(const int memberId) {
     const int memberIndex = _getMemberIndex(memberId);
     if (memberIndex >= 0)

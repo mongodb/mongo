@@ -509,6 +509,16 @@ public:
                                    long long* configVersion);
 
     /**
+     * Sets the latest optime committed in the previous config to the current lastCommitted optime.
+     */
+    void updateLastCommittedInPrevConfig();
+
+    /**
+     * Returns the latest optime committed in the previous config.
+     */
+    OpTime getLastCommittedInPrevConfig();
+
+    /**
      * Sets lastVote to be for ourself in this term.
      */
     void voteForMyselfV1();
@@ -957,6 +967,9 @@ private:
     // OpTime representing our transition to PRIMARY and the start of our term.
     // _lastCommittedOpTime cannot be set to an earlier OpTime.
     OpTime _firstOpTimeOfMyTerm;
+
+    // Latest committed optime in the previous config.
+    OpTime _lastCommittedInPrevConfig;
 
     // The number of calls we have had to enter maintenance mode
     int _maintenanceModeCalls;

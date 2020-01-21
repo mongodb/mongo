@@ -2862,6 +2862,12 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     const ReplSetConfig oldConfig = _rsConfig;
     const PostMemberStateUpdateAction action = _setCurrentRSConfig(lk, opCtx, newConfig, myIndex);
 
+    // Record the latest committed optime in the current config atomically with the new config
+    // taking effect. Once we have acquired the replication mutex above, we are ensured that no new
+    // writes will be committed in the previous config, since any other system operation must
+    // acquire the mutex to advance the commit point.
+    _topCoord->updateLastCommittedInPrevConfig();
+
     // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
     _dropAllSnapshots_inlock();

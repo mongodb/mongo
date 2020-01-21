@@ -2510,6 +2510,39 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {
     ASSERT_FALSE(response2.getVoteGranted());
 }
 
+TEST_F(TopoCoordTest, UpdateLastCommittedInPrevConfigSetsToLastCommittedOpTime) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"))),
+                 0);
+
+    // Make sure the lastCommittedInPrevConfig is set to be the current committed optime.
+    const OpTime commitPoint1 = OpTime({10, 0}, 1);
+    makeSelfPrimary(Timestamp(1, 0));
+    topoCoordSetMyLastAppliedOpTime(commitPoint1, Date_t(), false);
+    topoCoordSetMyLastDurableOpTime(commitPoint1, Date_t(), false);
+    topoCoordAdvanceLastCommittedOpTime(commitPoint1);
+    getTopoCoord().updateLastCommittedInPrevConfig();
+    ASSERT_EQ(commitPoint1, getTopoCoord().getLastCommittedInPrevConfig());
+
+    // Should not change.
+    getTopoCoord().updateLastCommittedInPrevConfig();
+    ASSERT_EQ(commitPoint1, getTopoCoord().getLastCommittedInPrevConfig());
+
+    // Update commit point again.
+    const OpTime commitPoint2 = OpTime({11, 0}, 1);
+    topoCoordSetMyLastAppliedOpTime(commitPoint2, Date_t(), false);
+    topoCoordSetMyLastDurableOpTime(commitPoint2, Date_t(), false);
+    topoCoordAdvanceLastCommittedOpTime(commitPoint2);
+    getTopoCoord().updateLastCommittedInPrevConfig();
+    ASSERT_EQ(commitPoint2, getTopoCoord().getLastCommittedInPrevConfig());
+}
+
+
 TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatTerm) {
     updateConfig(BSON("_id"
                       << "rs0"
