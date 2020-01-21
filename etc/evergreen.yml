@@ -10830,6 +10830,8 @@ buildvariants:
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
+    multiversion_platform: ubuntu1604
+    multiversion_edition: enterprise
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
