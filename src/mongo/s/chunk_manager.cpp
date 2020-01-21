@@ -86,14 +86,18 @@ std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardK
         for (BSONElement elt : shardKey) {
             uassert(ErrorCodes::ShardKeyNotFound,
                     str::stream() << "Cannot target single shard due to collation of key "
-                                  << elt.fieldNameStringData(),
+                                  << elt.fieldNameStringData()
+                                  << " for namespace "
+                                  << getns(),
                     !CollationIndexKey::isCollatableType(elt.type()));
         }
     }
 
     const auto it = _chunkMap.upper_bound(shardKey);
     uassert(ErrorCodes::ShardKeyNotFound,
-            str::stream() << "Cannot target single shard using key " << shardKey,
+            str::stream() << "Cannot target single shard using key " << shardKey
+                          << " for namespace "
+                          << getns(),
             it != _chunkMap.end() && it->second->containsKey(shardKey));
 
     return it->second;
