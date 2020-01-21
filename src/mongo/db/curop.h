@@ -245,6 +245,9 @@ public:
     // Records the WC that was waited on during the operation. (The WC in opCtx can't be used
     // because it's only set while the Command itself executes.)
     boost::optional<WriteConcernOptions> writeConcern;
+
+    // Whether this is an oplog getMore operation for replication oplog fetching.
+    bool isReplOplogFetching{false};
 };
 
 /**

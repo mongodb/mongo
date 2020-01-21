@@ -662,10 +662,14 @@ public:
             curOp->debug().cursorid = _request.cursorid;
 
             // Validate term before acquiring locks, if provided.
-            if (_request.term) {
+            if (_request.term && _request.nss == NamespaceString::kRsOplogNamespace) {
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 // Note: updateTerm returns ok if term stayed the same.
                 uassertStatusOK(replCoord->updateTerm(opCtx, *_request.term));
+                // If the term field is present in an oplog request, it means this is an oplog
+                // getMore for replication oplog fetching because the term field is only allowed for
+                // internal clients (see checkAuthForGetMore).
+                curOp->debug().isReplOplogFetching = true;
             }
 
             auto cursorManager = CursorManager::get(opCtx);

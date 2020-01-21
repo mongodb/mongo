@@ -55,6 +55,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
+#include <mongo/db/stats/timer_stats.h>
 
 namespace mongo {
 
@@ -75,6 +76,10 @@ const std::vector<const char*> kDollarQueryModifiers = {
     "$snapshot",
     "$maxTimeMS",
 };
+
+TimerStats oplogGetMoreStats;
+ServerStatusMetricField<TimerStats> displayBatchesReceived("repl.network.oplogGetMoresProcessed",
+                                                           &oplogGetMoreStats);
 
 }  // namespace
 
@@ -430,6 +435,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     // Obtain the total execution time of this operation.
     _end = curTimeMicros64();
     _debug.executionTimeMicros = durationCount<Microseconds>(elapsedTimeExcludingPauses());
+
+    if (_debug.isReplOplogFetching) {
+        oplogGetMoreStats.recordMillis(_debug.executionTimeMicros / 1000);
+    }
 
     const bool shouldSample =
         client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
