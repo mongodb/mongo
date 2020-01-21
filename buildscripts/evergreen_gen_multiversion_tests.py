@@ -50,7 +50,7 @@ REPL_MIXED_VERSION_CONFIGS = ["new-old-new", "new-new-old", "old-new-new"]
 SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
 
 BURN_IN_TASK = "burn_in_tests_multiversion"
-BURN_IN_CONFIG_KEY = "use_in_multiversion_burn_in_tests"
+MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
 PASSTHROUGH_TAG = "multiversion_passthrough"
 EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible"
 
@@ -120,6 +120,33 @@ def get_last_stable_yaml(last_stable_commit_hash, suite_name):
 
     backports_required_last_stable = generate_resmoke.read_yaml(temp_dir, last_stable_file)
     return backports_required_last_stable[suite_name]
+
+
+def get_exclude_files(suite_name, task_path_suffix):
+    """Generate the list of files to exclude based on the BACKPORTS_REQUIRED_FILE."""
+    backports_required_latest = generate_resmoke.read_yaml(ETC_DIR, BACKPORTS_REQUIRED_FILE)
+    if suite_name not in backports_required_latest:
+        LOGGER.info(f"Generating exclude files not supported for '{suite_name}''.")
+        return set()
+
+    latest_suite_yaml = backports_required_latest[suite_name]
+
+    if not latest_suite_yaml:
+        LOGGER.info(f"No tests need to be excluded from suite '{suite_name}'.")
+        return set()
+
+    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-stable
+    # binary we are running tests against. We do this by using the commit hash from the last-stable
+    # mongo shell executable.
+    last_stable_commit_hash = get_backports_required_last_stable_hash(task_path_suffix)
+
+    # Get the yaml contents under the 'suite_name' key from the last-stable commit.
+    last_stable_suite_yaml = get_last_stable_yaml(last_stable_commit_hash, suite_name)
+    if last_stable_suite_yaml is None:
+        return set(elem["test_file"] for elem in latest_suite_yaml)
+    else:
+        return set(
+            elem["test_file"] for elem in latest_suite_yaml if elem not in last_stable_suite_yaml)
 
 
 class EvergreenConfigGenerator(object):
@@ -342,30 +369,7 @@ def generate_exclude_yaml(suite, task_path_suffix, is_generated_suite):
 
     suite_name = generate_resmoke.remove_gen_suffix(suite)
 
-    # Get the backports_required_for_multiversion_tests.yml on the current version branch.
-    backports_required_latest = generate_resmoke.read_yaml(ETC_DIR, BACKPORTS_REQUIRED_FILE)
-    if suite_name not in backports_required_latest:
-        LOGGER.info(f"Generating exclude files not supported for '{suite_name}''.")
-        return
-
-    latest_suite_yaml = backports_required_latest[suite_name]
-
-    if not latest_suite_yaml:
-        LOGGER.info(f"No tests need to be excluded from suite '{suite_name}'.")
-        return
-
-    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-stable
-    # binary we are running tests against. We do this by using the commit hash from the last-stable
-    # mongo shell executable.
-    last_stable_commit_hash = get_backports_required_last_stable_hash(task_path_suffix)
-
-    # Get the yaml contents under the 'suite_name' key from the last-stable commit.
-    last_stable_suite_yaml = get_last_stable_yaml(last_stable_commit_hash, suite_name)
-    if last_stable_suite_yaml is None:
-        files_to_exclude = set(elem["test_file"] for elem in latest_suite_yaml)
-    else:
-        files_to_exclude = set(
-            elem["test_file"] for elem in latest_suite_yaml if elem not in last_stable_suite_yaml)
+    files_to_exclude = get_exclude_files(suite_name, task_path_suffix)
 
     if not files_to_exclude:
         LOGGER.info(f"No tests need to be excluded from suite '{suite_name}'.")
@@ -389,7 +393,16 @@ def generate_exclude_yaml(suite, task_path_suffix, is_generated_suite):
         for file_name in os.listdir(CONFIG_DIR):
             suites_dir = CONFIG_DIR
             # Update the 'exclude_files' for each of the appropriate generated suites.
-            if file_name.endswith('.yml'):
+            if file_name.endswith('misc.yml'):
+                # New tests will be run as part of misc.yml. We want to make sure to properly
+                # exclude these tests if they have been blacklisted.
+                suite_config = generate_resmoke.read_yaml(CONFIG_DIR, file_name)
+                exclude_files = suite_config["selector"]["exclude_files"]
+                add_to_excludes = [test for test in files_to_exclude if test not in exclude_files]
+                exclude_files += add_to_excludes
+                suite_yaml_dict[file_name] = generate_resmoke.generate_resmoke_suite_config(
+                    suite_config, file_name, excludes=list(exclude_files))
+            elif file_name.endswith('.yml'):
                 suite_config = generate_resmoke.read_yaml(CONFIG_DIR, file_name)
                 selected_files = suite_config["selector"]["roots"]
                 # Only exclude the files that we want to exclude in the first place and have been

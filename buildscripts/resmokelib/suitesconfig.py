@@ -19,15 +19,16 @@ def get_named_suites():
     return names
 
 
-def get_named_suites_with_root_level_key_and_value(root_level_key, value):
-    """Return the suites that contain the given root_level_key with value equal to 'value'."""
+def get_named_suites_with_root_level_key(root_level_key):
+    """Return the suites that contain the given root_level_key and their values."""
     all_suite_names = get_named_suites()
     suites_to_return = []
 
     for suite in all_suite_names:
         suite_config = _get_suite_config(suite)
-        if root_level_key in suite_config.keys() and suite_config[root_level_key] == value:
-            suites_to_return.append(suite)
+        if root_level_key in suite_config.keys() and suite_config[root_level_key]:
+            suites_to_return.append(
+                {"origin": suite, "multiversion_name": suite_config[root_level_key]})
     return suites_to_return
 
 

@@ -4491,6 +4491,7 @@ tasks:
   - func: "set up virtualenv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
+  - func: "do multiversion setup"
   - command: shell.exec
     type: test
     params:
@@ -7553,6 +7554,7 @@ tasks:
   - func: "upload pip requirements"
   - func: "get buildnumber"
   - func: "set up credentials"
+  - func: "do multiversion setup"
   - func: "run tests"
     vars:
       resmoke_args: --suites=buildscripts_test
@@ -10791,6 +10793,8 @@ buildvariants:
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
     scons_cache_scope: shared
     scons_cache_mode: all
+    multiversion_platform: ubuntu1604
+    multiversion_edition: enterprise
   tasks:
   - name: compile_all_run_unittests_TG
     distros:

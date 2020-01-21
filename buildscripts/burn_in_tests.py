@@ -35,7 +35,7 @@ import buildscripts.evergreen_generate_resmoke_tasks as gen_resmoke
 from buildscripts.patch_builds.change_data import find_changed_files
 import buildscripts.resmokelib.parser
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites, \
-    get_named_suites_with_root_level_key_and_value
+    get_named_suites_with_root_level_key
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
     EvergreenProjectConfig, VariantTask
@@ -72,9 +72,10 @@ SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
 BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"
 
-MULTIVERSION_CONFIG_KEY = gen_multiversion.BURN_IN_CONFIG_KEY
+MULTIVERSION_CONFIG_KEY = gen_multiversion.MULTIVERSION_CONFIG_KEY
 MULTIVERSION_TAG = gen_multiversion.PASSTHROUGH_TAG
 BURN_IN_MULTIVERSION_TASK = gen_multiversion.BURN_IN_TASK
+TASK_PATH_SUFFIX = "/data/multiversion"
 
 
 class RepeatConfig(object):
@@ -615,38 +616,44 @@ def create_multiversion_generate_tasks_config(evg_config: Configuration, tests_b
     dt = DisplayTaskDefinition(BURN_IN_MULTIVERSION_TASK)
 
     if tests_by_task:
-        multiversion_suites = get_named_suites_with_root_level_key_and_value(
-            MULTIVERSION_CONFIG_KEY, True)
+        # Get the multiversion suites that will run in as part of burn_in_multiversion.
+        multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
         for suite in multiversion_suites:
             idx = 0
-            if suite not in tests_by_task.keys():
+            if suite["origin"] not in tests_by_task.keys():
                 # Only generate burn in multiversion tasks for suites that would run the detected
                 # changed tests.
                 continue
-            LOGGER.debug("Generating multiversion suite", suite=suite)
+            LOGGER.debug("Generating multiversion suite", suite=suite["multiversion_name"])
 
             # We hardcode the number of fallback sub suites and the target resmoke time here
             # since burn_in_tests cares about individual tests and not entire suites. The config
             # options here are purely used to generate the proper multiversion suites to run
             # tests against.
             config_options = {
-                "suite": suite,
+                "suite": suite["origin"],
                 "fallback_num_sub_suites": 1,
                 "project": generate_config.project,
                 "build_variant": generate_config.build_variant,
                 "task_id": generate_config.task_id,
-                "task_name": suite,
+                "task_name": suite["multiversion_name"],
                 "target_resmoke_time": 60,
             }
             config_options.update(gen_resmoke.DEFAULT_CONFIG_VALUES)
 
             config_generator = gen_multiversion.EvergreenConfigGenerator(
                 evg_api, evg_config, gen_resmoke.ConfigOptions(config_options))
-            test_list = tests_by_task[suite]["tests"]
+            test_list = tests_by_task[suite["origin"]]["tests"]
             for test in test_list:
-                # Generate the multiversion tasks for each test.
-                config_generator.generate_evg_tasks(test, idx)
-                idx += 1
+                # Exclude files that should be blacklisted from multiversion testing.
+                files_to_exclude = gen_multiversion.get_exclude_files(suite["multiversion_name"],
+                                                                      TASK_PATH_SUFFIX)
+                LOGGER.debug("Files to exclude", files_to_exclude=files_to_exclude, test=test,
+                             suite=suite["multiversion_name"])
+                if test not in files_to_exclude:
+                    # Generate the multiversion tasks for each test.
+                    config_generator.generate_evg_tasks(test, idx)
+                    idx += 1
             dt.execution_tasks(config_generator.task_names)
             evg_config.variant(generate_config.build_variant).tasks(config_generator.task_specs)
 
@@ -815,10 +822,9 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
             LOGGER.debug("Multiversion tasks by tag", tasks=multiversion_tasks,
                          tag=MULTIVERSION_TAG)
             # We expect the number of suites with MULTIVERSION_TAG to be the same as in
-            # multiversion_suites. Multiversion passthrough suites must include BURN_IN_CONFIG_KEY
-            # as a root level key and must be set to true.
-            multiversion_suites = get_named_suites_with_root_level_key_and_value(
-                MULTIVERSION_CONFIG_KEY, True)
+            # multiversion_suites. Multiversion passthrough suites must include
+            # MULTIVERSION_CONFIG_KEY as a root level key and must be set to true.
+            multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
             assert len(multiversion_tasks) == len(multiversion_suites)
         json_config = create_generate_tasks_file(tests_by_task, generate_config, repeat_config,
                                                  evg_api)
