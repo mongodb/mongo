@@ -91,6 +91,12 @@ public:
         _rootReplacementExpression = expr;
     }
 
+    /**
+     * Returns the exhaustive set of all paths that will be preserved by this projection, or
+     * boost::none if the exhaustive set cannot be determined.
+     */
+    virtual boost::optional<std::set<FieldRef>> extractExhaustivePaths() const = 0;
+
 protected:
     ProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        ProjectionPolicies policies)

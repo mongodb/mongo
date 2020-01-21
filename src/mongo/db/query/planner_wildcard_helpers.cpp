@@ -356,12 +356,14 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     invariant(wildcardIndex.multikeyPaths.empty());
 
     // Obtain the projection executor from the parent wildcard IndexEntry.
-    auto projExec = wildcardIndex.wildcardProjection;
-    invariant(projExec);
+    auto* wildcardProjection = wildcardIndex.wildcardProjection;
+    invariant(wildcardProjection);
 
     const auto projectedFields =
-        projection_executor_utils::applyProjectionToFields(projExec, fields);
-    const auto& includedPaths = projection_executor_utils::extractExhaustivePaths(projExec);
+        projection_executor_utils::applyProjectionToFields(wildcardProjection->exec(), fields);
+
+    std::set<FieldRef> includedPaths =
+        wildcardProjection->exhaustivePaths().value_or(std::set<FieldRef>{});
     out->reserve(out->size() + projectedFields.size());
     for (auto&& fieldName : projectedFields) {
         // Convert string 'fieldName' into a FieldRef, to better facilitate the subsequent checks.

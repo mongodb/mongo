@@ -119,7 +119,7 @@ void PlanCacheIndexabilityState::processWildcardIndex(const CoreIndexInfo& cii) 
     invariant(cii.type == IndexType::INDEX_WILDCARD);
 
     _wildcardIndexDiscriminators.emplace_back(
-        cii.wildcardProjection, cii.identifier.catalogName, cii.filterExpr, cii.collator);
+        cii.wildcardProjection->exec(), cii.identifier.catalogName, cii.filterExpr, cii.collator);
 }
 
 void PlanCacheIndexabilityState::processIndexCollation(const std::string& indexName,

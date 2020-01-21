@@ -54,20 +54,6 @@ stdx::unordered_set<std::string> applyProjectionToFields(
     return out;
 }
 
-std::set<FieldRef> extractExhaustivePaths(const projection_executor::ProjectionExecutor* executor) {
-    std::set<FieldRef> exhaustivePaths;
-
-    if (executor->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
-        DepsTracker depsTracker;
-        executor->addDependencies(&depsTracker);
-        for (auto&& field : depsTracker.fields) {
-            exhaustivePaths.insert(FieldRef{field});
-        }
-    }
-
-    return exhaustivePaths;
-}
-
 namespace {
 /**
  * Holds various parameters required to apply a $slice projection. Populated from the arguments

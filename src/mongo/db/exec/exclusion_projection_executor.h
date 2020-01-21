@@ -136,6 +136,10 @@ public:
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
     }
 
+    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const {
+        return boost::none;
+    }
+
 private:
     // The ExclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<ExclusionNode> _root;

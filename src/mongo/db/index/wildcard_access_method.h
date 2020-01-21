@@ -71,10 +71,10 @@ public:
                                    const MultikeyPaths& multikeyPaths) const final;
 
     /**
-     * Returns a pointer to the ProjectionExecutor owned by the underlying WildcardKeyGenerator.
+     * Returns a pointer to the WildcardProjection owned by the underlying WildcardKeyGenerator.
      */
-    projection_executor::ProjectionExecutor* getProjectionExecutor() const {
-        return _keyGen.getProjectionExecutor();
+    const WildcardProjection* getWildcardProjection() const {
+        return _keyGen.getWildcardProjection();
     }
 
     /**

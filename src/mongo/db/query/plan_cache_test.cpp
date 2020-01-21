@@ -243,9 +243,9 @@ void assertEquivalent(const char* queryStr,
 // The latter simulates the ProjectionExecutor which, during normal operation, is owned and
 // maintained by the $** index's IndexAccessMethod, and is required because the plan cache will
 // obtain unowned pointers to it.
-std::pair<IndexEntry, std::unique_ptr<projection_executor::ProjectionExecutor>> makeWildcardEntry(
-    BSONObj keyPattern) {
-    auto projExec = WildcardKeyGenerator::createProjectionExecutor(keyPattern, {});
+std::pair<IndexEntry, std::unique_ptr<WildcardProjection>> makeWildcardEntry(BSONObj keyPattern) {
+    auto wcProj = std::make_unique<WildcardProjection>(
+        WildcardKeyGenerator::createProjectionExecutor(keyPattern, {}));
     return {IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                        false,  // multikey
@@ -257,22 +257,23 @@ std::pair<IndexEntry, std::unique_ptr<projection_executor::ProjectionExecutor>> 
                        nullptr,
                        BSONObj(),
                        nullptr,
-                       projExec.get()),
-            std::move(projExec)};
+                       wcProj.get()),
+            std::move(wcProj)};
 }
 
 // A version of the above for CoreIndexInfo, used for plan cache update tests.
-std::pair<CoreIndexInfo, std::unique_ptr<projection_executor::ProjectionExecutor>>
-makeWildcardUpdate(BSONObj keyPattern) {
-    auto projExec = WildcardKeyGenerator::createProjectionExecutor(keyPattern, {});
+std::pair<CoreIndexInfo, std::unique_ptr<WildcardProjection>> makeWildcardUpdate(
+    BSONObj keyPattern) {
+    auto wcProj = std::make_unique<WildcardProjection>(
+        WildcardKeyGenerator::createProjectionExecutor(keyPattern, {}));
     return {CoreIndexInfo(keyPattern,
                           IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                           false,                                // sparse
                           IndexEntry::Identifier{"indexName"},  // name
                           nullptr,                              // filterExpr
                           nullptr,                              // collation
-                          projExec.get()),                      // wildcard
-            std::move(projExec)};
+                          wcProj.get()),                        // wildcard
+            std::move(wcProj)};
 }
 
 //

@@ -166,18 +166,19 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 
     const bool isMultikey = desc->isMultikey();
 
-    projection_executor::ProjectionExecutor* projExec = nullptr;
+    const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExecutor();
+        wildcardProjection =
+            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
         if (isMultikey) {
             MultikeyMetadataAccessStats mkAccessStats;
 
             if (canonicalQuery) {
                 stdx::unordered_set<std::string> fields;
                 QueryPlannerIXSelect::getFields(canonicalQuery->root(), &fields);
-                const auto projectedFields =
-                    projection_executor_utils::applyProjectionToFields(projExec, fields);
+                const auto projectedFields = projection_executor_utils::applyProjectionToFields(
+                    wildcardProjection->exec(), fields);
 
                 multikeyPathSet =
                     accessMethod->getMultikeyPathSet(opCtx, projectedFields, &mkAccessStats);
@@ -207,7 +208,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             ice.getFilterExpression(),
             desc->infoObj(),
             ice.getCollator(),
-            projExec};
+            wildcardProjection};
 }
 
 /**
@@ -1409,7 +1410,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
             auto* proj = static_cast<const WildcardAccessMethod*>(ice->accessMethod())
-                             ->getProjectionExecutor();
+                             ->getWildcardProjection()
+                             ->exec();
             if (projection_executor_utils::applyProjectionToOneField(proj,
                                                                      parsedDistinct.getKey())) {
                 plannerParams.indices.push_back(

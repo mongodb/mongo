@@ -1057,10 +1057,11 @@ auto makeIndexEntry(BSONObj keyPattern,
                     MultikeyPaths multiKeyPaths,
                     std::set<FieldRef> multiKeyPathSet = {},
                     BSONObj infoObj = BSONObj()) {
-    auto projExec = (keyPattern.firstElement().fieldNameStringData().endsWith("$**"_sd)
-                         ? WildcardKeyGenerator::createProjectionExecutor(
-                               keyPattern, infoObj.getObjectField("wildcardProjection"))
-                         : nullptr);
+
+    auto wcProj = keyPattern.firstElement().fieldNameStringData().endsWith("$**"_sd)
+        ? std::make_unique<WildcardProjection>(WildcardKeyGenerator::createProjectionExecutor(
+              keyPattern, infoObj.getObjectField("wildcardProjection")))
+        : std::unique_ptr<WildcardProjection>(nullptr);
 
     auto multiKey = !multiKeyPathSet.empty() ||
         std::any_of(multiKeyPaths.cbegin(), multiKeyPaths.cend(), [](const auto& entry) {
@@ -1077,8 +1078,8 @@ auto makeIndexEntry(BSONObj keyPattern,
                                      nullptr,
                                      {},
                                      nullptr,
-                                     projExec.get()),
-                          std::move(projExec));
+                                     wcProj.get()),
+                          std::move(wcProj));
 }
 
 TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseMultiKeyIndex) {

@@ -211,11 +211,11 @@ TEST(ProjectionExecutorTests, InclusionFieldPathsWithImplicitIdInclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
     std::set<FieldRef> expectedPaths = toFieldRefs({"_id", "a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
-    ASSERT(exhaustivePaths == expectedPaths);
+    ASSERT(*exhaustivePaths == expectedPaths);
 }
 
 TEST(ProjectionExecutorTests, InclusionFieldPathsWithExplicitIdInclusion) {
@@ -224,11 +224,11 @@ TEST(ProjectionExecutorTests, InclusionFieldPathsWithExplicitIdInclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
     std::set<FieldRef> expectedPaths = toFieldRefs({"_id", "a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
-    ASSERT(exhaustivePaths == expectedPaths);
+    ASSERT(*exhaustivePaths == expectedPaths);
 }
 
 TEST(ProjectionExecutorTests, InclusionFieldPathsWithExplicitIdInclusionIdOnly) {
@@ -237,11 +237,11 @@ TEST(ProjectionExecutorTests, InclusionFieldPathsWithExplicitIdInclusionIdOnly) 
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
     std::set<FieldRef> expectedPaths = toFieldRefs({"_id"});
 
     // Verify that the exhaustive set of paths is as expected.
-    ASSERT(exhaustivePaths == expectedPaths);
+    ASSERT(*exhaustivePaths == expectedPaths);
 }
 
 TEST(ProjectionExecutorTests, InclusionFieldPathsWithImplicitIdExclusion) {
@@ -250,11 +250,11 @@ TEST(ProjectionExecutorTests, InclusionFieldPathsWithImplicitIdExclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
     std::set<FieldRef> expectedPaths = toFieldRefs({"a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
-    ASSERT(exhaustivePaths == expectedPaths);
+    ASSERT(*exhaustivePaths == expectedPaths);
 }
 
 TEST(ProjectionExecutorTests, InclusionFieldPathsWithExplicitIdExclusion) {
@@ -263,11 +263,11 @@ TEST(ProjectionExecutorTests, InclusionFieldPathsWithExplicitIdExclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
     std::set<FieldRef> expectedPaths = toFieldRefs({"a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
-    ASSERT(exhaustivePaths == expectedPaths);
+    ASSERT(*exhaustivePaths == expectedPaths);
 }
 
 TEST(ProjectionExecutorTests, ExclusionFieldPathsWithImplicitIdInclusion) {
@@ -276,10 +276,10 @@ TEST(ProjectionExecutorTests, ExclusionFieldPathsWithImplicitIdInclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
 
-    // Verify that the exhaustive set is empty, despite the implicit inclusion of _id.
-    ASSERT(exhaustivePaths.empty());
+    // Verify that the exhaustive set is not available, despite the implicit inclusion of _id.
+    ASSERT(!exhaustivePaths);
 }
 
 TEST(ProjectionExecutorTests, ExclusionFieldPathsWithExplicitIdInclusion) {
@@ -288,10 +288,10 @@ TEST(ProjectionExecutorTests, ExclusionFieldPathsWithExplicitIdInclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
 
-    // Verify that the exhaustive set is empty, despite the explicit inclusion of _id.
-    ASSERT(exhaustivePaths.empty());
+    // Verify that the exhaustive set is not available, despite the explicit inclusion of _id.
+    ASSERT(!exhaustivePaths);
 }
 
 TEST(ProjectionExecutorTests, ExclusionFieldPathsWithImplicitIdExclusion) {
@@ -300,10 +300,10 @@ TEST(ProjectionExecutorTests, ExclusionFieldPathsWithImplicitIdExclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
 
     // Verify that the exhaustive set is empty.
-    ASSERT(exhaustivePaths.empty());
+    ASSERT(!exhaustivePaths);
 }
 
 TEST(ProjectionExecutorTests, ExclusionFieldPathsWithExplicitIdExclusion) {
@@ -312,10 +312,10 @@ TEST(ProjectionExecutorTests, ExclusionFieldPathsWithExplicitIdExclusion) {
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
 
     // Verify that the exhaustive set is empty.
-    ASSERT(exhaustivePaths.empty());
+    ASSERT(!exhaustivePaths);
 }
 
 TEST(ProjectionExecutorTests, ExclusionFieldPathsWithExplicitIdExclusionIdOnly) {
@@ -324,10 +324,10 @@ TEST(ProjectionExecutorTests, ExclusionFieldPathsWithExplicitIdExclusionIdOnly) 
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
-    auto exhaustivePaths = projection_executor_utils::extractExhaustivePaths(parsedProject.get());
+    auto exhaustivePaths = parsedProject->extractExhaustivePaths();
 
     // Verify that the exhaustive set is empty.
-    ASSERT(exhaustivePaths.empty());
+    ASSERT(!exhaustivePaths);
 }
 
 }  // namespace

@@ -50,13 +50,6 @@ stdx::unordered_set<std::string> applyProjectionToFields(
     const stdx::unordered_set<std::string>& fields);
 
 /**
- * Returns the exhaustive set of all paths that will be preserved by this projection, or an
- * empty set if the exhaustive set cannot be determined. An inclusion will always produce an
- * exhaustive set; an exclusion will always produce an empty set.
- */
-std::set<FieldRef> extractExhaustivePaths(const projection_executor::ProjectionExecutor* executor);
-
-/**
  * Applies a positional projection on the first array found in the 'path' on a projection
  * 'preImage' document. The applied projection is merged with a projection 'postImage' document.
  * The 'matchExpr' specifies a condition to locate the first matching element in the array and must

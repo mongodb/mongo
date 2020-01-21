@@ -117,6 +117,10 @@ public:
      */
     Document applyProjection(const Document& inputDoc) const final;
 
+    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const {
+        return boost::none;
+    }
+
 private:
     /**
      * Attempts to parse 'objSpec' as an expression like {$add: [...]}. Adds a computed field to

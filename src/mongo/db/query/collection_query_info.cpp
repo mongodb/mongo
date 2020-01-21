@@ -61,9 +61,9 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
     auto accessMethod = ice.accessMethod();
     invariant(accessMethod);
 
-    projection_executor::ProjectionExecutor* projExec = nullptr;
+    const WildcardProjection* projExec = nullptr;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
-        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExecutor();
+        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
 
     return {desc->keyPattern(),
             desc->getIndexType(),
@@ -100,17 +100,18 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx) {
         if (descriptor->getAccessMethodName() == IndexNames::WILDCARD) {
             // Obtain the projection used by the $** index's key generator.
             const auto* pathProj =
-                static_cast<const WildcardAccessMethod*>(iam)->getProjectionExecutor();
+                static_cast<const WildcardAccessMethod*>(iam)->getWildcardProjection();
             // If the projection is an exclusion, then we must check the new document's keys on all
             // updates, since we do not exhaustively know the set of paths to be indexed.
-            if (pathProj->getType() ==
+            if (pathProj->exec()->getType() ==
                 TransformerInterface::TransformerType::kExclusionProjection) {
                 _indexedPaths.allPathsIndexed();
             } else {
                 // If a subtree was specified in the keyPattern, or if an inclusion projection is
                 // present, then we need only index the path(s) preserved by the projection.
-                for (const auto& path :
-                     projection_executor_utils::extractExhaustivePaths(pathProj)) {
+                const auto& exhaustivePaths = pathProj->exhaustivePaths();
+                invariant(exhaustivePaths);
+                for (const auto& path : *exhaustivePaths) {
                     _indexedPaths.addPath(path);
                 }
             }

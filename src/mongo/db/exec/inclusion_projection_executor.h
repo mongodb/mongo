@@ -225,6 +225,21 @@ public:
         return _root->applyToDocument(inputDoc);
     }
 
+    /**
+     * Returns the exhaustive set of all paths that will be preserved by this projection, or
+     * boost::none if the exhaustive set cannot be determined.
+     */
+    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const override {
+        std::set<FieldRef> exhaustivePaths;
+        DepsTracker depsTracker;
+        addDependencies(&depsTracker);
+        for (auto&& field : depsTracker.fields) {
+            exhaustivePaths.insert(FieldRef{field});
+        }
+
+        return exhaustivePaths;
+    }
+
 private:
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;

@@ -65,8 +65,8 @@ void popPathComponent(BSONElement elem, bool enclosingObjIsArray, FieldRef* path
 
 constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 
-std::unique_ptr<projection_executor::ProjectionExecutor>
-WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern, BSONObj pathProjection) {
+WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
+                                                                  BSONObj pathProjection) {
     // We should never have a key pattern that contains more than a single element.
     invariant(keyPattern.nFields() == 1);
 
@@ -91,8 +91,8 @@ WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern, BSONObj pathP
     auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr);
     auto policies = ProjectionPolicies::wildcardIndexSpecProjectionPolicies();
     auto projection = projection_ast::parse(expCtx, projSpec, policies);
-    return projection_executor::buildProjectionExecutor(
-        expCtx, &projection, policies, projection_executor::kDefaultBuilderParams);
+    return WildcardProjection{projection_executor::buildProjectionExecutor(
+        expCtx, &projection, policies, projection_executor::kDefaultBuilderParams)};
 }
 
 WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
@@ -100,7 +100,7 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
                                            const CollatorInterface* collator,
                                            KeyString::Version keyStringVersion,
                                            Ordering ordering)
-    : _projExec(createProjectionExecutor(keyPattern, pathProjection)),
+    : _proj(createProjectionExecutor(keyPattern, pathProjection)),
       _collator(collator),
       _keyPattern(keyPattern),
       _keyStringVersion(keyStringVersion),
@@ -111,7 +111,7 @@ void WildcardKeyGenerator::generateKeys(BSONObj inputDoc,
                                         KeyStringSet* multikeyPaths,
                                         boost::optional<RecordId> id) const {
     FieldRef rootPath;
-    _traverseWildcard(_projExec->applyTransformation(Document{inputDoc}).toBson(),
+    _traverseWildcard(_proj.exec()->applyTransformation(Document{inputDoc}).toBson(),
                       false,
                       &rootPath,
                       keys,

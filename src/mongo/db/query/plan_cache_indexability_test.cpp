@@ -58,7 +58,8 @@ std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj,
 // maintained by the $** index's IndexAccessMethod, and is required because the plan cache will
 // obtain unowned pointers to it.
 auto makeWildcardEntry(BSONObj keyPattern, const MatchExpression* filterExpr = nullptr) {
-    auto projExec = WildcardKeyGenerator::createProjectionExecutor(keyPattern, {});
+    auto projExec = std::make_unique<WildcardProjection>(
+        WildcardKeyGenerator::createProjectionExecutor(keyPattern, {}));
     return std::make_pair(IndexEntry(keyPattern,
                                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                                      false,  // multikey
