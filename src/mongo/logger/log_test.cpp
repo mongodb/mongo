@@ -45,6 +45,8 @@
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/logger/rotatable_file_appender.h"
 #include "mongo/logger/rotatable_file_writer.h"
+#include "mongo/logv2/plain_formatter.h"
+#include "mongo/logv2/text_formatter.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -56,8 +58,8 @@ using namespace mongo::logger;
 namespace mongo {
 namespace {
 
-typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
-typedef LogTest<MessageEventUnadornedEncoder> LogTestUnadornedEncoder;
+typedef LogTest<MessageEventDetailsEncoder, logv2::TextFormatter> LogTestDetailsEncoder;
+typedef LogTest<MessageEventUnadornedEncoder, logv2::PlainFormatter> LogTestUnadornedEncoder;
 
 TEST_F(LogTestUnadornedEncoder, logContext) {
     logContext("WHA!");
@@ -124,8 +126,8 @@ public:
 TEST_F(LogTestUnadornedEncoder, LogstreamBuilderReentrance) {
     log() << "Logging A() -- " << A() << " -- done!" << std::endl;
     ASSERT_EQUALS(2U, _logLines.size());
-    ASSERT_EQUALS(std::string("Golly!\n"), _logLines[0]);
-    ASSERT_EQUALS(std::string("Logging A() -- Golly! -- done!\n"), _logLines[1]);
+    ASSERT(StringData(_logLines[0]).startsWith("Golly!"));
+    ASSERT(StringData(_logLines[1]).startsWith("Logging A() -- Golly! -- done!"));
 }
 
 //
@@ -155,14 +157,14 @@ TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
     LOG(2) << "This is logged";
     LOG(3) << "This is not logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
+    ASSERT(StringData(_logLines[0]).startsWith("This is logged"));
 
     // MONGO_LOG_COMPONENT
     _logLines.clear();
     MONGO_LOG_COMPONENT(2, componentA) << "This is logged";
     MONGO_LOG_COMPONENT(3, componentA) << "This is not logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
+    ASSERT(StringData(_logLines[0]).startsWith("This is logged"));
 }
 
 //

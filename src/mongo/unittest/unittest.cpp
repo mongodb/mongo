@@ -33,6 +33,7 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <boost/log/core.hpp>
 #include <fmt/format.h>
 #include <fmt/printf.h>
 #include <functional>
@@ -48,6 +49,12 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
+#include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/log_capture_backend.h"
+#include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -187,13 +194,30 @@ struct UnitTestEnvironment {
 
 }  // namespace
 
-Test::Test() : _isCapturingLogMessages(false) {}
-
-Test::~Test() {
-    if (_isCapturingLogMessages) {
-        stopCapturingLogMessages();
+class Test::CaptureLogs {
+public:
+    ~CaptureLogs() {
+        if (_isCapturingLogMessages) {
+            stopCapturingLogMessages();
+        }
     }
-}
+    void startCapturingLogMessages();
+    void stopCapturingLogMessages();
+    const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
+    int64_t countTextFormatLogLinesContaining(const std::string& needle);
+    void printCapturedTextFormatLogLines() const;
+
+private:
+    bool _isCapturingLogMessages{false};
+    std::vector<std::string> _capturedLogMessages;
+    logger::MessageLogDomain::AppenderHandle _captureAppenderHandle;
+    std::unique_ptr<logger::MessageLogDomain::EventAppender> _captureAppender;
+    boost::shared_ptr<boost::log::sinks::synchronous_sink<logv2::LogCaptureBackend>> _captureSink;
+};
+
+Test::Test() : _captureLogs(std::make_unique<CaptureLogs>()) {}
+
+Test::~Test() {}
 
 void Test::run() {
     UnitTestEnvironment environment(this);
@@ -246,36 +270,75 @@ private:
 };
 }  // namespace
 
-void Test::startCapturingLogMessages() {
+void Test::CaptureLogs::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
     _capturedLogMessages.clear();
-    if (!_captureAppender) {
-        _captureAppender = std::make_unique<StringVectorAppender>(&_capturedLogMessages);
+
+    if (logV2Enabled()) {
+        if (!_captureSink) {
+            _captureSink = logv2::LogCaptureBackend::create(_capturedLogMessages);
+            _captureSink->set_filter(
+                logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
+            _captureSink->set_formatter(logv2::PlainFormatter());
+        }
+        boost::log::core::get()->add_sink(_captureSink);
+    } else {
+        if (!_captureAppender) {
+            _captureAppender = std::make_unique<StringVectorAppender>(&_capturedLogMessages);
+        }
+        checked_cast<StringVectorAppender*>(_captureAppender.get())->enable();
+        _captureAppenderHandle =
+            logger::globalLogDomain()->attachAppender(std::move(_captureAppender));
     }
-    checked_cast<StringVectorAppender*>(_captureAppender.get())->enable();
-    _captureAppenderHandle = logger::globalLogDomain()->attachAppender(std::move(_captureAppender));
+
     _isCapturingLogMessages = true;
 }
 
-void Test::stopCapturingLogMessages() {
+void Test::CaptureLogs::stopCapturingLogMessages() {
     invariant(_isCapturingLogMessages);
-    invariant(!_captureAppender);
-    _captureAppender = logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
-    checked_cast<StringVectorAppender*>(_captureAppender.get())->disable();
+    if (logV2Enabled()) {
+        boost::log::core::get()->remove_sink(_captureSink);
+    } else {
+        invariant(!_captureAppender);
+        _captureAppender = logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
+        checked_cast<StringVectorAppender*>(_captureAppender.get())->disable();
+    }
+
     _isCapturingLogMessages = false;
 }
-void Test::printCapturedLogLines() const {
+
+const std::vector<std::string>& Test::CaptureLogs::getCapturedTextFormatLogMessages() const {
+    return _capturedLogMessages;
+}
+
+void Test::CaptureLogs::printCapturedTextFormatLogLines() const {
     log() << "****************************** Captured Lines (start) *****************************";
-    for (const auto& line : getCapturedLogMessages()) {
+    for (const auto& line : getCapturedTextFormatLogMessages()) {
         log() << line;
     }
     log() << "****************************** Captured Lines (end) ******************************";
 }
 
-int64_t Test::countLogLinesContaining(const std::string& needle) {
-    const auto& msgs = getCapturedLogMessages();
+int64_t Test::CaptureLogs::countTextFormatLogLinesContaining(const std::string& needle) {
+    const auto& msgs = getCapturedTextFormatLogMessages();
     return std::count_if(
         msgs.begin(), msgs.end(), [&](const std::string& s) { return stringContains(s, needle); });
+}
+
+void Test::startCapturingLogMessages() {
+    _captureLogs->startCapturingLogMessages();
+}
+void Test::stopCapturingLogMessages() {
+    _captureLogs->stopCapturingLogMessages();
+}
+const std::vector<std::string>& Test::getCapturedTextFormatLogMessages() const {
+    return _captureLogs->getCapturedTextFormatLogMessages();
+}
+int64_t Test::countTextFormatLogLinesContaining(const std::string& needle) {
+    return _captureLogs->countTextFormatLogLinesContaining(needle);
+}
+void Test::printCapturedTextFormatLogLines() const {
+    _captureLogs->printCapturedTextFormatLogLines();
 }
 
 Suite::Suite(ConstructorEnable, std::string name) : _name(std::move(name)) {}

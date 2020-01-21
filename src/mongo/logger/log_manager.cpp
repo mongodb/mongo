@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/logger/log_manager.h"
 
 #include "mongo/logger/console_appender.h"
+#include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace logger {
@@ -63,9 +68,15 @@ void LogManager::detachDefaultConsoleAppender() {
 
 void LogManager::reattachDefaultConsoleAppender() {
     invariant(!_defaultAppender);
-    _defaultAppender =
-        _globalDomain.attachAppender(std::make_unique<ConsoleAppender<MessageEventEphemeral>>(
-            std::make_unique<MessageEventDetailsEncoder>()));
+    if (logV2Enabled()) {
+        _defaultAppender = _globalDomain.attachAppender(
+            std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
+                &logv2::LogManager::global().getGlobalDomain(), false));
+    } else {
+        _defaultAppender =
+            _globalDomain.attachAppender(std::make_unique<ConsoleAppender<MessageEventEphemeral>>(
+                std::make_unique<MessageEventDetailsEncoder>()));
+    }
 }
 
 bool LogManager::isDefaultConsoleAppenderAttached() const {

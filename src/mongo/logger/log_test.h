@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/log/core.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -37,7 +38,13 @@
 #include "mongo/logger/appender.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_log_domain.h"
+#include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/log_capture_backend.h"
+#include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log_global_settings.h"
 
@@ -47,19 +54,37 @@ namespace logger {
 // Used for testing logging framework only.
 // TODO(schwerin): Have logger write to a different log from the global log, so that tests can
 // redirect their global log output for examination.
-template <typename MessageEventEncoder>
+template <typename MessageEventEncoder, typename LOGV2Formatter>
 class LogTest : public unittest::Test {
     friend class LogTestAppender;
 
 public:
     LogTest() : _severityOld(getMinimumLogSeverity()) {
         globalLogDomain()->clearAppenders();
-        _appenderHandle =
-            globalLogDomain()->attachAppender(std::make_unique<LogTestAppender>(this));
+        if (logV2Enabled()) {
+            _appenderHandle = globalLogDomain()->attachAppender(
+                std::make_unique<LogV2Appender<MessageEventEphemeral>>(
+                    &logv2::LogManager::global().getGlobalDomain(), true));
+
+            if (!_captureSink) {
+                _captureSink = logv2::LogCaptureBackend::create(_logLines);
+                _captureSink->set_filter(logv2::ComponentSettingsFilter(
+                    logv2::LogManager::global().getGlobalDomain(),
+                    logv2::LogManager::global().getGlobalSettings()));
+                _captureSink->set_formatter(LOGV2Formatter());
+            }
+            boost::log::core::get()->add_sink(_captureSink);
+        } else {
+            _appenderHandle =
+                globalLogDomain()->attachAppender(std::make_unique<LogTestAppender>(this));
+        }
     }
 
     virtual ~LogTest() {
         globalLogDomain()->detachAppender(_appenderHandle);
+        if (logV2Enabled()) {
+            boost::log::core::get()->remove_sink(_captureSink);
+        }
         setMinimumLoggedSeverity(_severityOld);
     }
 
@@ -86,6 +111,7 @@ private:
     };
 
     MessageLogDomain::AppenderHandle _appenderHandle;
+    boost::shared_ptr<boost::log::sinks::synchronous_sink<logv2::LogCaptureBackend>> _captureSink;
 };
 
 }  // namespace logger

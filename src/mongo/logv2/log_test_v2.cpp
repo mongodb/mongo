@@ -47,6 +47,7 @@
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_capture_backend.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/logv2/ramlog_sink.h"
@@ -162,32 +163,11 @@ BSONObj toBSON(const TypeWithNonMemberFormatting&) {
     return builder.obj();
 }
 
-class LogTestBackend
-    : public boost::log::sinks::
-          basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
-public:
-    LogTestBackend(std::vector<std::string>& lines) : _logLines(lines) {}
-
-    static boost::shared_ptr<boost::log::sinks::synchronous_sink<LogTestBackend>> create(
-        std::vector<std::string>& lines) {
-        auto backend = boost::make_shared<LogTestBackend>(lines);
-        return boost::make_shared<boost::log::sinks::synchronous_sink<LogTestBackend>>(
-            std::move(backend));
-    }
-
-    void consume(boost::log::record_view const& rec, string_type const& formatted_string) {
-        _logLines.push_back(formatted_string);
-    }
-
-private:
-    std::vector<std::string>& _logLines;
-};
-
 class LogDuringInitTester {
 public:
     LogDuringInitTester() {
         std::vector<std::string> lines;
-        auto sink = LogTestBackend::create(lines);
+        auto sink = LogCaptureBackend::create(lines);
         sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
         sink->set_formatter(PlainFormatter());
@@ -204,7 +184,7 @@ LogDuringInitTester logDuringInit;
 
 TEST_F(LogTestV2, Basic) {
     std::vector<std::string> lines;
-    auto sink = LogTestBackend::create(lines);
+    auto sink = LogCaptureBackend::create(lines);
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());
@@ -263,21 +243,21 @@ TEST_F(LogTestV2, Types) {
     using namespace constants;
 
     std::vector<std::string> text;
-    auto text_sink = LogTestBackend::create(text);
+    auto text_sink = LogCaptureBackend::create(text);
     text_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     text_sink->set_formatter(PlainFormatter());
     attach(text_sink);
 
     std::vector<std::string> json;
-    auto json_sink = LogTestBackend::create(json);
+    auto json_sink = LogCaptureBackend::create(json);
     json_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     json_sink->set_formatter(JSONFormatter());
     attach(json_sink);
 
     std::vector<std::string> bson;
-    auto bson_sink = LogTestBackend::create(bson);
+    auto bson_sink = LogCaptureBackend::create(bson);
     bson_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     bson_sink->set_formatter(BSONFormatter());
@@ -602,7 +582,7 @@ TEST_F(LogTestV2, Types) {
 
 TEST_F(LogTestV2, TextFormat) {
     std::vector<std::string> lines;
-    auto sink = LogTestBackend::create(lines);
+    auto sink = LogCaptureBackend::create(lines);
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
     sink->set_formatter(TextFormatter());
@@ -640,14 +620,14 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     using namespace constants;
 
     std::vector<std::string> lines;
-    auto sink = LogTestBackend::create(lines);
+    auto sink = LogCaptureBackend::create(lines);
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
     sink->set_formatter(JSONFormatter());
     attach(sink);
 
     std::vector<std::string> linesBson;
-    auto sinkBson = LogTestBackend::create(linesBson);
+    auto sinkBson = LogCaptureBackend::create(linesBson);
     sinkBson->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
     sinkBson->set_formatter(BSONFormatter());
@@ -815,21 +795,21 @@ TEST_F(LogTestV2, Containers) {
     using namespace constants;
 
     std::vector<std::string> text;
-    auto text_sink = LogTestBackend::create(text);
+    auto text_sink = LogCaptureBackend::create(text);
     text_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     text_sink->set_formatter(PlainFormatter());
     attach(text_sink);
 
     std::vector<std::string> json;
-    auto json_sink = LogTestBackend::create(json);
+    auto json_sink = LogCaptureBackend::create(json);
     json_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     json_sink->set_formatter(JSONFormatter());
     attach(json_sink);
 
     std::vector<std::string> bson;
-    auto bson_sink = LogTestBackend::create(bson);
+    auto bson_sink = LogCaptureBackend::create(bson);
     bson_sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     bson_sink->set_formatter(BSONFormatter());
@@ -1014,7 +994,7 @@ TEST_F(LogTestV2, Containers) {
 
 TEST_F(LogTestV2, Unicode) {
     std::vector<std::string> lines;
-    auto sink = LogTestBackend::create(lines);
+    auto sink = LogCaptureBackend::create(lines);
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
     sink->set_formatter(JSONFormatter());
@@ -1085,21 +1065,21 @@ TEST_F(LogTestV2, Unicode) {
 
 TEST_F(LogTestV2, Threads) {
     std::vector<std::string> linesPlain;
-    auto plainSink = LogTestBackend::create(linesPlain);
+    auto plainSink = LogCaptureBackend::create(linesPlain);
     plainSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                   LogManager::global().getGlobalSettings()));
     plainSink->set_formatter(PlainFormatter());
     attach(plainSink);
 
     std::vector<std::string> linesText;
-    auto textSink = LogTestBackend::create(linesText);
+    auto textSink = LogCaptureBackend::create(linesText);
     textSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
     textSink->set_formatter(TextFormatter());
     attach(textSink);
 
     std::vector<std::string> linesJson;
-    auto jsonSink = LogTestBackend::create(linesJson);
+    auto jsonSink = LogCaptureBackend::create(linesJson);
     jsonSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
     jsonSink->set_formatter(JSONFormatter());
@@ -1148,7 +1128,7 @@ TEST_F(LogTestV2, Ramlog) {
     attach(sink);
 
     std::vector<std::string> lines;
-    auto testSink = LogTestBackend::create(lines);
+    auto testSink = LogCaptureBackend::create(lines);
     testSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
     testSink->set_formatter(PlainFormatter());
@@ -1169,7 +1149,7 @@ TEST_F(LogTestV2, Ramlog) {
 
 TEST_F(LogTestV2, MultipleDomains) {
     std::vector<std::string> global_lines;
-    auto sink = LogTestBackend::create(global_lines);
+    auto sink = LogCaptureBackend::create(global_lines);
     sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                              LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());
@@ -1188,7 +1168,7 @@ TEST_F(LogTestV2, MultipleDomains) {
 
     LogDomain other_domain(std::make_unique<OtherDomainImpl>());
     std::vector<std::string> other_lines;
-    auto other_sink = LogTestBackend::create(other_lines);
+    auto other_sink = LogCaptureBackend::create(other_lines);
     other_sink->set_filter(
         ComponentSettingsFilter(other_domain, LogManager::global().getGlobalSettings()));
     other_sink->set_formatter(PlainFormatter());

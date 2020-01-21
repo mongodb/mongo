@@ -1323,7 +1323,8 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(1, countLogLinesContaining("No stored oplog entries to apply for recovery."));
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery."));
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(0, 0), 1));
 }

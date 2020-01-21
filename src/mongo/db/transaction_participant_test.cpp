@@ -3292,7 +3292,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     std::string expectedTransactionInfo = "transaction " +
         txnParticipant.getTransactionInfoForLogForTest(
             opCtx(), &lockerInfo->stats, true, readConcernArgs);
-    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expectedTransactionInfo));
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
@@ -3329,7 +3329,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
     std::string expectedTransactionInfo = "transaction " +
         txnParticipant.getTransactionInfoForLogForTest(
             opCtx(), &lockerInfo->stats, true, readConcernArgs);
-    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expectedTransactionInfo));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
@@ -3372,7 +3372,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
                                    metricValue,
                                    false);
 
-    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expectedTransactionInfo));
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
@@ -3419,7 +3419,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
                                    false,
                                    prepareOpTime);
 
-    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expectedTransactionInfo));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
@@ -3465,7 +3465,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
                                    metricValue,
                                    false);
 
-    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expectedTransactionInfo));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
@@ -3504,7 +3504,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     stopCapturingLogMessages();
 
     std::string expectedTransactionInfo = "transaction parameters";
-    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expectedTransactionInfo));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityInfo) {
@@ -3525,7 +3525,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityInfo) {
     stopCapturingLogMessages();
 
     // Test that the transaction is not logged.
-    ASSERT_EQUALS(0, countLogLinesContaining("transaction parameters"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("transaction parameters"));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
@@ -3549,7 +3549,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
     setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Info());
 
     // Test that the transaction is still logged.
-    ASSERT_EQUALS(1, countLogLinesContaining("transaction parameters"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("transaction parameters"));
 }
 
 TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {

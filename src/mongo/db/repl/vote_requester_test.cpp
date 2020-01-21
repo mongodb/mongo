@@ -95,7 +95,7 @@ public:
 
 protected:
     int64_t countLogLinesContaining(const std::string& needle) {
-        const auto& msgs = getCapturedLogMessages();
+        const auto& msgs = getCapturedTextFormatLogMessages();
         return std::count_if(
             msgs.begin(), msgs.end(), [&](const auto& s) { return stringContains(s, needle); });
     }

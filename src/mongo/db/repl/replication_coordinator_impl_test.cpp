@@ -192,7 +192,7 @@ TEST_F(ReplCoordTest, NodeEntersRemovedStateWhenStartingUpWithALocalConfigWhichL
                                                         << "node2:54321"))),
                        HostAndPort("node3", 12345));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("NodeNotFound"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("NodeNotFound"));
     ASSERT_EQUALS(MemberState::RS_REMOVED, getReplCoord()->getMemberState().s);
 }
 
@@ -207,7 +207,7 @@ TEST_F(ReplCoordTest,
                                                      << "node1:12345"))),
                        HostAndPort("node1", 12345));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("reports set name of notMySet,"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("reports set name of notMySet,"));
     ASSERT_EQUALS(MemberState::RS_REMOVED, getReplCoord()->getMemberState().s);
 }
 
@@ -215,7 +215,7 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     startCapturingLogMessages();
     start();
     stopCapturingLogMessages();
-    ASSERT_EQUALS(3, countLogLinesContaining("Did not find local "));
+    ASSERT_EQUALS(3, countTextFormatLogLinesContaining("Did not find local "));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
@@ -3534,7 +3534,8 @@ TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {
         getReplCoord()->shutdown(opCtx.get());
     }
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("shutdown() called before startup() finished"));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining("shutdown() called before startup() finished"));
 }
 
 TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {
@@ -5671,15 +5672,15 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     // Setting mode to secondary should schedule the election timeout.
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_EQ(1, countLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(0, countLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(0, countLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(0, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(0, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
     // Scheduling again should produce the "rescheduled", not the "scheduled", message .
     replCoord->cancelAndRescheduleElectionTimeout();
-    ASSERT_EQ(1, countLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(1, countLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(1, countLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
     auto net = getNet();
     net->enterNetwork();
@@ -5703,9 +5704,9 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     net->exitNetwork();
 
     // The election should have scheduled (not rescheduled) another timeout.
-    ASSERT_EQ(2, countLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(1, countLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(1, countLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
     setMinimumLoggedSeverity(logger::LogComponent::kReplicationElection,
                              logger::LogSeverity::Debug(4));
@@ -5716,9 +5717,9 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     replCoord->cancelAndRescheduleElectionTimeout();
 
     // We should not see this reschedule because it should be at log level 5.
-    ASSERT_EQ(2, countLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(1, countLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(1, countLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
     net->enterNetwork();
     until = electionTimeoutWhen + Milliseconds(1001);
@@ -5729,9 +5730,9 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     stopCapturingLogMessages();
     // We should see this reschedule at level 4 because it has been over 1 sec since we logged
     // at level 4.
-    ASSERT_EQ(2, countLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(2, countLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(2, countLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 }
 
 TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeWhenOpTimeChanges) {

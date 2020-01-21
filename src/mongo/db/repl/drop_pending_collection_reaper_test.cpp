@@ -238,7 +238,8 @@ TEST_F(DropPendingCollectionReaperTest, DropCollectionsOlderThanLogsDropCollecti
     reaper.dropCollectionsOlderThan(opCtx.get(), optime);
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(1LL, countLogLinesContaining("Failed to remove drop-pending collection"));
+    ASSERT_EQUALS(1LL,
+                  countTextFormatLogLinesContaining("Failed to remove drop-pending collection"));
 }
 
 TEST_F(DropPendingCollectionReaperTest,

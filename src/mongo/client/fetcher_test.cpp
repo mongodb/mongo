@@ -837,7 +837,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
     // killCursors command request will be canceled by executor on shutdown.
     tearDown();
     ASSERT_EQUALS(1,
-                  countLogLinesContaining(
+                  countTextFormatLogLinesContaining(
                       "killCursors command task failed: CallbackCanceled: Callback canceled"));
 }
 
@@ -910,7 +910,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         getNet()->runReadyNetworkOperations();
     }
 
-    ASSERT_EQUALS(1, countLogLinesContaining("killCursors command failed: UnknownError"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("killCursors command failed: UnknownError"));
 }
 
 /**
@@ -979,8 +979,8 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
 
     // Fetcher should attempt (unsuccessfully) to schedule a killCursors command.
     ASSERT_EQUALS(1,
-                  countLogLinesContaining("failed to schedule killCursors command: "
-                                          "ShutdownInProgress: Shutdown in progress"));
+                  countTextFormatLogLinesContaining("failed to schedule killCursors command: "
+                                                    "ShutdownInProgress: Shutdown in progress"));
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
 }

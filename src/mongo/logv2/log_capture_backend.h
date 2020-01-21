@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,42 +29,32 @@
 
 #pragma once
 
-#include "mongo/logv2/log_domain.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/logv2/log_domain_internal.h"
-#include "mongo/logv2/log_manager.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/sinks.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/make_shared.hpp>
+#include <string>
+#include <vector>
 
-namespace mongo {
-namespace logv2 {
-
-class LogTestV2 : public unittest::Test {
-
+namespace mongo::logv2 {
+class LogCaptureBackend
+    : public boost::log::sinks::
+          basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
 public:
-    LogTestV2() {
-        LogDomainGlobal::ConfigurationOptions config;
-        config.makeDisabled();
+    LogCaptureBackend(std::vector<std::string>& lines) : _logLines(lines) {}
 
-        ASSERT_OK(LogManager::global().getGlobalDomainInternal().configure(config));
+    static boost::shared_ptr<boost::log::sinks::synchronous_sink<LogCaptureBackend>> create(
+        std::vector<std::string>& lines) {
+        return boost::make_shared<boost::log::sinks::synchronous_sink<LogCaptureBackend>>(
+            boost::make_shared<LogCaptureBackend>(lines));
     }
 
-    ~LogTestV2() override {
-        for (auto&& sink : _attachedSinks) {
-            boost::log::core::get()->remove_sink(sink);
-        }
-
-        ASSERT_OK(LogManager::global().getGlobalDomainInternal().configure({}));
+    void consume(boost::log::record_view const& rec, string_type const& formatted_string) {
+        _logLines.push_back(formatted_string);
     }
-
-    void attach(boost::shared_ptr<boost::log::sinks::sink> sink) {
-        boost::log::core::get()->add_sink(std::move(sink));
-        _attachedSinks.push_back(sink);
-    }
-
 
 private:
-    std::vector<boost::shared_ptr<boost::log::sinks::sink>> _attachedSinks;
+    std::vector<std::string>& _logLines;
 };
-
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

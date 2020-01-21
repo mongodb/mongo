@@ -41,6 +41,7 @@
 #include "mongo/logger/encoder.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/logv2/text_formatter.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -49,7 +50,7 @@ using namespace mongo::logger;
 namespace mongo {
 namespace {
 
-typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
+typedef LogTest<MessageEventDetailsEncoder, logv2::TextFormatter> LogTestDetailsEncoder;
 
 // Constants for log component test cases.
 const LogComponent componentA = LogComponent::kCommand;

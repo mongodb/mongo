@@ -605,8 +605,9 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     // respond to reconfig's quorum check so that we can join that thread and exit cleanly
     net->exitNetwork();
     stopCapturingLogMessages();
-    ASSERT_EQUALS(
-        1, countLogLinesContaining("because already in the midst of a configuration process"));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "because already in the midst of a configuration process"));
     shutdown(opCtx.get());
     reconfigThread.join();
     setMinimumLoggedSeverity(logger::LogSeverity::Log());

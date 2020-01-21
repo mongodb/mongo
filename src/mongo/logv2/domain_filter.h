@@ -57,5 +57,14 @@ private:
     const LogDomain::Internal* _domain;
 };
 
+class AllLogsFilter : public DomainFilter<AllLogsFilter> {
+public:
+    using DomainFilter::DomainFilter;
+
+    bool filter(boost::log::attribute_value_set const& attrs) const {
+        return true;
+    }
+};
+
 }  // namespace logv2
 }  // namespace mongo
