@@ -112,7 +112,8 @@ TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
             std::list<boost::intrusive_ptr<DocumentSource>>{unionWithOne}, getExpCtx())));
     unionWithTwo.setSource(mock.get());
 
-    auto results = DocumentComparator().makeUnorderedDocumentSet();
+    auto comparator = DocumentComparator();
+    auto results = comparator.makeUnorderedDocumentSet();
     for (auto& doc [[maybe_unused]] : docs) {
         auto next = unionWithTwo.getNext();
         ASSERT_TRUE(next.isAdvanced());
@@ -150,7 +151,8 @@ TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
     unionWithOne.setSource(mock.get());
     unionWithTwo.setSource(&unionWithOne);
 
-    auto results = DocumentComparator().makeUnorderedDocumentSet();
+    auto comparator = DocumentComparator();
+    auto results = comparator.makeUnorderedDocumentSet();
     for (auto& doc [[maybe_unused]] : outputDocs) {
         auto next = unionWithTwo.getNext();
         ASSERT_TRUE(next.isAdvanced());
