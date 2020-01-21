@@ -38,20 +38,6 @@ extern int __wt_optind;
 extern char *__wt_optarg;
 
 /*
- * signal_timer --
- *     Alarm signal handler, report the signal and drop core.
- */
-static void signal_timer(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
-static void
-signal_timer(int signo)
-{
-    fprintf(stderr, "format alarm timed out\n");
-    fprintf(stderr, "format caught signal %d, aborting the process\n", signo);
-    fflush(stderr);
-    __wt_abort(NULL);
-}
-
-/*
  * signal_handler --
  *     Generic signal handler, report the signal and exit.
  */
@@ -59,15 +45,77 @@ static void signal_handler(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 signal_handler(int signo)
 {
-    fprintf(stderr, "format caught signal %d, exiting\n", signo);
+    fprintf(stderr, "format caught signal %d, exiting without error\n", signo);
     fflush(stderr);
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
+
+/*
+ * signal_timer --
+ *     Alarm signal handler.
+ */
+static void signal_timer(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void
+signal_timer(int signo)
+{
+    /*
+     * Direct I/O configurations can result in really long run times depending on how the test
+     * machine is configured. If a direct I/O run timed out, don't bother dropping core.
+     */
+    if (g.c_direct_io) {
+        fprintf(stderr, "format direct I/O configuration timed out\n");
+        fprintf(stderr, "format caught signal %d, exiting with error\n", signo);
+        fflush(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    /* Note, format.sh checks for this message, so be cautious in changing the format. */
+    fprintf(stderr, "format alarm timed out\n");
+    fprintf(stderr, "format caught signal %d, exiting with error\n", signo);
+    fprintf(stderr, "format attempting to create a core dump\n");
+    fflush(stderr);
+    __wt_abort(NULL);
+    /* NOTREACHED */
+}
+
+/*
+ * set_alarm --
+ *     Set a timer.
+ */
+void
+set_alarm(u_int seconds)
+{
+#ifdef HAVE_TIMER_CREATE
+    struct itimerspec timer_val;
+    timer_t timer_id;
+
+    testutil_check(timer_create(CLOCK_REALTIME, NULL, &timer_id));
+    memset(&timer_val, 0, sizeof(timer_val));
+    timer_val.it_value.tv_sec = seconds;
+    timer_val.it_value.tv_nsec = 0;
+    testutil_check(timer_settime(timer_id, 0, &timer_val, NULL));
+#endif
+    (void)seconds;
+}
+
+/*
+ * TIMED_MAJOR_OP --
+ *	Set a timer and perform a major operation (for example, verify or salvage).
+ */
+#define TIMED_MAJOR_OP(call)                   \
+    do {                                       \
+        if (g.c_major_timeout != 0)            \
+            set_alarm(g.c_major_timeout * 60); \
+        call;                                  \
+        if (g.c_major_timeout != 0)            \
+            set_alarm(0);                      \
+    } while (0)
 
 int
 main(int argc, char *argv[])
 {
-    time_t start;
+    uint64_t now, start;
+    u_int ops_seconds;
     int ch, onerun, reps;
     const char *config, *home;
 
@@ -79,7 +127,7 @@ main(int argc, char *argv[])
 
 /*
  * Windows and Linux support different sets of signals, be conservative about installing handlers.
- * If we time out, we want a core dump, otherwise, just exit.
+ * If we time out unexpectedly, we want a core dump, otherwise, just exit.
  */
 #ifdef SIGALRM
     (void)signal(SIGALRM, signal_timer);
@@ -194,51 +242,51 @@ main(int argc, char *argv[])
     testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
     testutil_check(pthread_rwlock_init(&g.ts_lock, NULL));
 
+    /*
+     * Calculate how long each operations loop should run. Take any timer value and convert it to
+     * seconds, then allocate 15 seconds to do initialization, verification, rebalance and/or
+     * salvage tasks after the operations loop finishes. This is not intended to be exact in any
+     * way, just enough to get us into an acceptable range of run times. The reason for this is
+     * because we want to consume the legitimate run-time, but we also need to do the end-of-run
+     * checking in all cases, even if we run out of time, otherwise it won't get done. So, in
+     * summary pick a reasonable time and then don't check for timer expiration once the main
+     * operations loop completes.
+     */
+    ops_seconds = g.c_timer == 0 ? 0 : ((g.c_timer * 60) - 15) / FORMAT_OPERATION_REPS;
+
     printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
     fflush(stdout);
     while (++g.run_cnt <= g.c_runs || g.c_runs == 0) {
-        startup(); /* Start a run */
+        __wt_seconds(NULL, &start);
 
+        startup();           /* Start a run */
         config_setup();      /* Run configuration */
         config_print(false); /* Dump run configuration */
         key_init();          /* Setup keys/values */
         val_init();
 
-        start = time(NULL);
         track("starting up", 0ULL, NULL);
 
         wts_open(g.home, true, &g.wts_conn);
         wts_init();
 
-        wts_load();                     /* Load initial records */
-        wts_verify("post-bulk verify"); /* Verify */
+        /* Load and verify initial records */
+        TIMED_MAJOR_OP(wts_load());
+        TIMED_MAJOR_OP(wts_verify("post-bulk verify"));
+        TIMED_MAJOR_OP(wts_read_scan());
+
+        /* Operations. */
+        for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps)
+            wts_ops(ops_seconds, reps == FORMAT_OPERATION_REPS);
+
+        /* Copy out the run's statistics. */
+        TIMED_MAJOR_OP(wts_stats());
 
         /*
-         * If we're not doing any operations, scan the bulk-load, copy the statistics and we're
-         * done. Otherwise, loop reading and operations, with a verify after each set.
+         * Verify the objects. Verify closes the underlying handle and discards the statistics, read
+         * them first.
          */
-        if (g.c_timer == 0 && g.c_ops == 0) {
-            wts_read_scan(); /* Read scan */
-            wts_stats();     /* Statistics */
-        } else
-            for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps) {
-                wts_read_scan(); /* Read scan */
-
-                /* Operations */
-                wts_ops(reps == FORMAT_OPERATION_REPS);
-
-                /*
-                 * Copy out the run's statistics after the last set of operations.
-                 *
-                 * XXX Verify closes the underlying handle and discards the statistics, read them
-                 * first.
-                 */
-                if (reps == FORMAT_OPERATION_REPS)
-                    wts_stats();
-
-                /* Verify */
-                wts_verify("post-ops verify");
-            }
+        TIMED_MAJOR_OP(wts_verify("post-ops verify"));
 
         track("shutting down", 0ULL, NULL);
         wts_close();
@@ -246,21 +294,20 @@ main(int argc, char *argv[])
         /*
          * Rebalance testing.
          */
-        wts_rebalance();
+        TIMED_MAJOR_OP(wts_rebalance());
 
         /*
          * Salvage testing.
          */
-        wts_salvage();
+        TIMED_MAJOR_OP(wts_salvage());
 
         /* Overwrite the progress line with a completion line. */
         if (!g.c_quiet)
             printf("\r%78s\r", " ");
-        printf("%4" PRIu32 ": %s, %s (%.0f seconds)\n", g.run_cnt, g.c_data_source, g.c_file_type,
-          difftime(time(NULL), start));
+        __wt_seconds(NULL, &now);
+        printf("%4" PRIu32 ": %s, %s (%" PRIu64 " seconds)\n", g.run_cnt, g.c_data_source,
+          g.c_file_type, now - start);
         fflush(stdout);
-
-        val_teardown(); /* Teardown keys/values */
     }
 
     /* Flush/close any logging information. */

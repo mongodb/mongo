@@ -2328,9 +2328,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: unit-test
-  - name: format-stress-ppc-zseries-test
-  - name: format-stress-smoke-test
-  - name: format-wtperf-test
 
 - name: ubuntu1804-zseries
   display_name: Ubuntu 18.04 zSeries

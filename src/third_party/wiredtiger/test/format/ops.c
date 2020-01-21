@@ -61,25 +61,6 @@ modify_repl_init(void)
 }
 
 /*
- * set_alarm --
- *     Set a timer.
- */
-static void
-set_alarm(void)
-{
-#ifdef HAVE_TIMER_CREATE
-    struct itimerspec timer_val;
-    timer_t timer_id;
-
-    testutil_check(timer_create(CLOCK_REALTIME, NULL, &timer_id));
-    memset(&timer_val, 0, sizeof(timer_val));
-    timer_val.it_value.tv_sec = 60 * 2;
-    timer_val.it_value.tv_nsec = 0;
-    testutil_check(timer_settime(timer_id, 0, &timer_val, NULL));
-#endif
-}
-
-/*
  * set_core_off --
  *     Turn off core dumps.
  */
@@ -103,7 +84,10 @@ random_failure(void)
 {
     static char *core = NULL;
 
-    /* Let our caller know. */
+    /*
+     * Let our caller know. Note, format.sh checks for this message, so be cautious in changing the
+     * format.
+     */
     printf("%s: aborting to test recovery\n", progname);
     fflush(stdout);
 
@@ -121,7 +105,7 @@ TINFO **tinfo_list;
  *     Perform a number of operations in a set of threads.
  */
 void
-wts_ops(bool lastrun)
+wts_ops(u_int ops_seconds, bool lastrun)
 {
     TINFO *tinfo, total;
     WT_CONNECTION *conn;
@@ -160,10 +144,10 @@ wts_ops(bool lastrun)
             g.c_ops = g.c_threads;
         thread_ops = g.c_ops / g.c_threads;
     }
-    if (g.c_timer == 0)
+    if (ops_seconds == 0)
         fourths = quit_fourths = -1;
     else {
-        fourths = ((int64_t)g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
+        fourths = ops_seconds * 4;
         quit_fourths = fourths + 15 * 4 * 60;
     }
 
@@ -267,18 +251,15 @@ wts_ops(bool lastrun)
         if (fourths != -1)
             --fourths;
         if (quit_fourths != -1 && --quit_fourths == 0) {
+            fprintf(stderr, "%s\n", "format run more than 15 minutes past the maximum time");
             fprintf(stderr, "%s\n",
-              "format run more than 15 minutes past the maximum "
-              "time");
-            fprintf(stderr, "%s\n",
-              "format run dumping cache and transaction state, "
-              "then aborting the process");
+              "format run dumping cache and transaction state, then aborting the process");
 
             /*
-             * If the library is deadlocked, we might just join the mess, set a timer to limit our
-             * exposure.
+             * If the library is deadlocked, we might just join the mess, set a two-minute timer to
+             * limit our exposure.
              */
-            set_alarm();
+            set_alarm(120);
 
             (void)conn->debug_info(conn, "txn");
             (void)conn->debug_info(conn, "cache");

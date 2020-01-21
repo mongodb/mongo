@@ -30,7 +30,6 @@
 import os
 import shutil
 import wiredtiger, wttest
-from wttest import unittest
 
 # test_shared_cache01.py
 #    Checkpoint tests
@@ -192,7 +191,6 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
             'requires a percentage value for eviction checkpoint target/')
 
     # Test verbose output
-    @unittest.skip("Verbose output handling")
     def test_shared_cache_verbose(self):
         nops = 1000
         self.openConnections(
@@ -202,6 +200,7 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
             sess.create(self.uri, "key_format=S,value_format=S")
             self.add_records(sess, 0, nops)
         self.closeConnections()
+        self.captureout.checkAdditionalPattern(self, " *Created cache pool pool")
 
     # Test opening a connection outside of the shared cache
     def test_shared_cache_mixed(self):

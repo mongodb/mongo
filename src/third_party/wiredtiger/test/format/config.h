@@ -160,9 +160,7 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"internal_page_max", "maximum size of Btree internal nodes", 0x0, 9, 17, 27, &g.c_intl_page_max,
     NULL},
 
-  {"isolation",
-    "isolation level "
-    "(random | read-uncommitted | read-committed | snapshot)",
+  {"isolation", "isolation level (random | read-uncommitted | read-committed | snapshot)",
     C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_isolation},
 
   {"key_gap", "gap between instantiated keys on a Btree page", 0x0, 0, 20, 20, &g.c_key_gap, NULL},
@@ -192,6 +190,9 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
 
   {"lsm_worker_threads", "the number of LSM worker threads", 0x0, 3, 4, 20, &g.c_lsm_worker_threads,
     NULL},
+
+  {"major_timeout", "timeout for long-running operations (minutes)", C_IGNORE, 0, 0, 1000,
+    &g.c_major_timeout, NULL},
 
   {"memory_page_max", "maximum size of in-memory pages", 0x0, 1, 10, 128, &g.c_memory_page_max,
     NULL},

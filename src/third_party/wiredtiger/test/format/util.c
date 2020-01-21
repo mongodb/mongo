@@ -162,6 +162,11 @@ val_init(void)
 {
     size_t i;
 
+    /* Discard any previous value initialization. */
+    free(val_base);
+    val_base = NULL;
+    val_dup_data_len = val_len = 0;
+
     /*
      * Set initial buffer contents to recognizable text.
      *
@@ -174,14 +179,6 @@ val_init(void)
         val_base[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
     val_dup_data_len = value_len(NULL, (uint64_t)mmrand(NULL, 1, 20), g.c_value_min, g.c_value_max);
-}
-
-void
-val_teardown(void)
-{
-    free(val_base);
-    val_base = NULL;
-    val_dup_data_len = val_len = 0;
 }
 
 void
@@ -425,32 +422,20 @@ path_setup(const char *home)
 }
 
 /*
- * rng --
- *     Return a random number.
+ * rng_slow --
+ *     Return a random number, doing the real work.
  */
 uint32_t
-rng(WT_RAND_STATE *rnd)
+rng_slow(WT_RAND_STATE *rnd)
 {
     u_long ulv;
     uint32_t v;
     char *endptr, buf[64];
 
     /*
-     * Threaded operations have their own RNG information, otherwise we use the default.
-     */
-    if (rnd == NULL)
-        rnd = &g.rnd;
-
-    /*
      * We can reproduce a single-threaded run based on the random numbers used in the initial run,
      * plus the configuration files.
-     *
-     * Check g.replay and g.rand_log_stop: multithreaded runs log/replay until they get to the
-     * operations phase, then turn off log/replay, threaded operation order can't be replayed.
      */
-    if (g.rand_log_stop)
-        return (__wt_random(rnd));
-
     if (g.replay) {
         if (fgets(buf, sizeof(buf), g.randfp) == NULL) {
             if (feof(g.randfp)) {

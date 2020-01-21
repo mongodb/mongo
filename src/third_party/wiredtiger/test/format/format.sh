@@ -17,8 +17,8 @@ onintr()
 trap 'onintr' 2
 
 usage() {
-	echo "usage: $0 [-aFSv] [-c config] "
-	echo "    [-b format-binary] [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
+	echo "usage: $0 [-aFSv] [-b format-binary] [-c config] "
+	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
 	echo
 	echo "    -a           abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
@@ -146,7 +146,7 @@ verbose "$name: run starting at $(date)"
 	echo "$name: directory \"$home\" not found"
 	exit 1
 }
-home=$(cd $home && echo $PWD)
+home=$(cd $home > /dev/null || exit 1 && echo $PWD)
 
 # Config is possibly relative to our current directory and we're about to change directories.
 # Get an absolute path for config if it's local.

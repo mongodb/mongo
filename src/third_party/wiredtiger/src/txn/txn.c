@@ -1589,22 +1589,24 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const cha
 
 /*
  * __wt_txn_is_blocking --
- *     Return if this transaction is likely blocking eviction because of a pinned transaction ID,
- *     called by eviction to determine if a worker thread should be released from eviction.
+ *     Return an error if this transaction is likely blocking eviction because of a pinned
+ *     transaction ID, called by eviction to determine if a worker thread should be released from
+ *     eviction.
  */
 int
 __wt_txn_is_blocking(WT_SESSION_IMPL *session)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_TXN *txn;
-    uint64_t txn_oldest;
+    WT_TXN_STATE *txn_state;
+    uint64_t global_oldest;
 
-    conn = S2C(session);
     txn = &session->txn;
+    txn_state = WT_SESSION_TXN_STATE(session);
+    global_oldest = S2C(session)->txn_global.oldest_id;
 
     /* We can't roll back prepared transactions. */
     if (F_ISSET(txn, WT_TXN_PREPARE))
-        return (false);
+        return (0);
 
     /*
      * MongoDB can't (yet) handle rolling back read only transactions. For this reason, don't check
@@ -1612,14 +1614,12 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
      * to confirm our caller is prepared for rollback).
      */
     if (txn->mod_count == 0 && !__wt_op_timer_fired(session))
-        return (false);
+        return (0);
 
-    /* Check the oldest transaction ID of either the current transaction ID or the snapshot. */
-    txn_oldest = txn->id;
-    if (F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) && txn->snap_min != WT_TXN_NONE &&
-      (txn_oldest == WT_TXN_NONE || WT_TXNID_LT(txn->snap_min, txn_oldest)))
-        txn_oldest = txn->snap_min;
-    return (txn_oldest == conn->txn_global.oldest_id ?
+    /*
+     * Check if either the transaction's ID or its pinned ID is equal to the oldest transaction ID.
+     */
+    return (txn_state->id == global_oldest || txn_state->pinned_id == global_oldest ?
         __wt_txn_rollback_required(
           session, "oldest pinned transaction ID rolled back for eviction") :
         0);
