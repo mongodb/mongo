@@ -392,6 +392,17 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
     if (!_initialSyncState->stopTimestamp.isNull()) {
         bob->append("initialSyncOplogEnd", _initialSyncState->stopTimestamp);
     }
+    if (_sharedData) {
+        stdx::lock_guard<InitialSyncSharedData> sdLock(*_sharedData);
+        auto unreachableSince = _sharedData->getSyncSourceUnreachableSince(sdLock);
+        if (unreachableSince != Date_t()) {
+            bob->append("syncSourceUnreachableSince", unreachableSince);
+            bob->append("currentOutageDurationMillis",
+                        durationCount<Milliseconds>(_sharedData->getCurrentOutageDuration(sdLock)));
+        }
+        bob->append("totalTimeUnreachableMillis",
+                    durationCount<Milliseconds>(_sharedData->getTotalTimeUnreachable(sdLock)));
+    }
 }
 
 BSONObj InitialSyncer::_getInitialSyncProgress_inlock() const {
@@ -1464,8 +1475,24 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     log() << "Initial Sync Attempt Statistics: " << redact(_getInitialSyncProgress_inlock());
 
     auto runTime = _initialSyncState ? _initialSyncState->timer.millis() : 0;
+    int rollBackId = -1;
+    int operationsRetried = 0;
+    int totalTimeUnreachableMillis = 0;
+    if (_sharedData) {
+        stdx::lock_guard<InitialSyncSharedData> sdLock(*_sharedData);
+        rollBackId = _sharedData->getRollBackId();
+        operationsRetried = _sharedData->getTotalRetries(sdLock);
+        totalTimeUnreachableMillis =
+            durationCount<Milliseconds>(_sharedData->getTotalTimeUnreachable(sdLock));
+    }
+
     _stats.initialSyncAttemptInfos.emplace_back(
-        InitialSyncer::InitialSyncAttemptInfo{runTime, result.getStatus(), _syncSource});
+        InitialSyncer::InitialSyncAttemptInfo{runTime,
+                                              result.getStatus(),
+                                              _syncSource,
+                                              rollBackId,
+                                              operationsRetried,
+                                              totalTimeUnreachableMillis});
 
     if (MONGO_unlikely(failAndHangInitialSync.shouldFail())) {
         log() << "failAndHangInitialSync fail point enabled.";
@@ -1883,6 +1910,11 @@ void InitialSyncer::InitialSyncAttemptInfo::append(BSONObjBuilder* builder) cons
     builder->appendNumber("durationMillis", durationMillis);
     builder->append("status", status.toString());
     builder->append("syncSource", syncSource.toString());
+    if (rollBackId >= 0) {
+        builder->append("rollBackId", rollBackId);
+    }
+    builder->append("operationsRetried", operationsRetried);
+    builder->append("totalTimeUnreachableMillis", totalTimeUnreachableMillis);
 }
 
 bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(

@@ -4597,7 +4597,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         log() << "Progress after first failed response: " << progress;
-        ASSERT_EQUALS(progress.nFields(), 7) << progress;
+        ASSERT_EQUALS(progress.nFields(), 8) << progress;
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
@@ -4605,6 +4605,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
+        ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
 
         // Inject the listDatabases failure.
         _mockServer->setCommandReply(
@@ -4652,18 +4653,19 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         log() << "Progress after failure: " << progress;
-        ASSERT_EQUALS(progress.nFields(), 7) << progress;
+        ASSERT_EQUALS(progress.nFields(), 8) << progress;
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
+        ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
 
         BSONObj attempts = progress["initialSyncAttempts"].Obj();
         ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
         BSONObj attempt0 = attempts["0"].Obj();
-        ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
+        ASSERT_EQUALS(attempt0.nFields(), 6) << attempt0;
         const std::string expectedlistDatabaseFailure =
             "FailedToParse: error cloning databases :: caused by :: Command 'listDatabases' "
             "failed.";
@@ -4674,6 +4676,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
         ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
             << attempt0;
+        ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
+        ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 0) << attempt0;
+        ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 0) << attempt0;
 
         // Set up the successful cloner run.
         // listDatabases: a
@@ -4753,12 +4758,13 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto progress = initialSyncer->getInitialSyncProgress();
     log() << "Progress after all but last successful response: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 8) << progress;
+    ASSERT_EQUALS(progress.nFields(), 9) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
     ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
     auto databasesProgress = progress.getObjectField("databases");
@@ -4779,7 +4785,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     auto attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1) << progress;
     auto attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
+    ASSERT_EQUALS(attempt0.nFields(), 6) << attempt0;
     const std::string expectedlistDatabaseFailure =
         "FailedToParse: error cloning databases :: caused by :: Command 'listDatabases' failed.";
     ASSERT_EQUALS(std::string(attempt0.getStringField("status"))
@@ -4789,6 +4795,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 0) << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 0) << attempt0;
 
     // Play last successful response.
     {
@@ -4816,7 +4825,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = initialSyncer->getInitialSyncProgress();
     log() << "Progress at end: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 10) << progress;
+    ASSERT_EQUALS(progress.nFields(), 11) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
@@ -4824,6 +4833,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncElapsedMillis"].type(), NumberInt) << progress;
+    ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
     ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
 
@@ -4831,7 +4841,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempts.nFields(), 2) << attempts;
 
     attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
+    ASSERT_EQUALS(attempt0.nFields(), 6) << attempt0;
     ASSERT_EQUALS(std::string(attempt0.getStringField("status"))
                       .substr(0, expectedlistDatabaseFailure.length()),
                   expectedlistDatabaseFailure)
@@ -4839,13 +4849,148 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 0) << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 0) << attempt0;
 
     BSONObj attempt1 = attempts["1"].Obj();
-    ASSERT_EQUALS(attempt1.nFields(), 3) << attempt1;
+    ASSERT_EQUALS(attempt1.nFields(), 6) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("status"), std::string("OK")) << attempt1;
     ASSERT_EQUALS(attempt1["durationMillis"].type(), NumberInt) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt1;
+    ASSERT_EQUALS(attempt1.getIntField("rollBackId"), 1) << attempt1;
+    ASSERT_EQUALS(attempt1.getIntField("operationsRetried"), 0) << attempt1;
+    ASSERT_EQUALS(attempt1.getIntField("totalTimeUnreachableMillis"), 0) << attempt1;
+}
+
+TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgressForNetworkError) {
+    // Skip reconstructing prepared transactions at the end of initial sync because
+    // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
+    // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
+    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+
+    // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
+    // initial sync is complete.
+    FailPointEnableBlock skipClearInitialSyncState("skipClearInitialSyncState");
+
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Oplog entry associated with the defaultBeginFetchingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
+        net->runReadyNetworkOperations();
+
+        // Oplog entry associated with the beginApplyingTimestamp.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        {
+            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
+            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
+                                                 kListDatabasesFailPointData);
+            // Feature Compatibility Version.
+            processSuccessfulFCVFetcherResponseLastStable();
+
+            // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and
+            // move on to the AllDatabaseCloner's request.
+            auto noi = net->getNextReadyRequest();
+            request = assertRemoteCommandNameEquals("find", noi->getRequest());
+            ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
+            net->blackHole(noi);
+        }
+
+        // Oplog entry associated with the stopTimestamp.
+        request = assertRemoteCommandNameEquals(
+            "find",
+            net->scheduleErrorResponse(Status(ErrorCodes::HostUnreachable,
+                                              "Oplog entry fetcher associated with the "
+                                              "stopTimestamp failed with network error")));
+        ASSERT_TRUE(request.cmdObj.hasField("sort"));
+        ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
+        net->runReadyNetworkOperations();
+        auto outageStart = net->now();
+
+        auto progress = initialSyncer->getInitialSyncProgress();
+        log() << "Progress after first network error: " << progress;
+        ASSERT_EQUALS(progress.getField("syncSourceUnreachableSince").date(), outageStart)
+            << progress;
+        ASSERT_EQUALS(progress.getIntField("currentOutageDurationMillis"), 0) << progress;
+        ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
+
+        // Advance the clock but not enough to terminate.
+        net->advanceTime(net->now() + Seconds(1));
+
+        // Retry fetch of oplog entry associated with the stopTimestamp.
+        request = assertRemoteCommandNameEquals(
+            "find",
+            net->scheduleErrorResponse(Status(ErrorCodes::HostUnreachable,
+                                              "Oplog entry fetcher associated with the "
+                                              "stopTimestamp failed with network error")));
+        ASSERT_TRUE(request.cmdObj.hasField("sort"));
+        ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
+        net->runReadyNetworkOperations();
+
+        progress = initialSyncer->getInitialSyncProgress();
+        log() << "Progress after failed retry: " << progress;
+        ASSERT_EQUALS(progress.getField("syncSourceUnreachableSince").date(), outageStart)
+            << progress;
+        ASSERT_EQUALS(progress.getIntField("currentOutageDurationMillis"), 1000) << progress;
+        ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 1000) << progress;
+
+        // Advance the clock but not enough to terminate.
+        net->advanceTime(net->now() + Seconds(1));
+
+        // Second retry succeeds.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        net->runReadyNetworkOperations();
+
+        progress = initialSyncer->getInitialSyncProgress();
+        log() << "Progress after successful retry: " << progress;
+        ASSERT(progress.getField("syncSourceUnreachableSince").eoo());
+        ASSERT(progress.getField("currentOutageDurationMillis").eoo()) << progress;
+        ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 2000) << progress;
+
+        // Last rollback checker replSetGetRBID command.
+        assertRemoteCommandNameEquals(
+            "replSetGetRBID", net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1)));
+        net->runReadyNetworkOperations();
+
+        // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
+        // setting the completion status.
+        // We call runReadyNetworkOperations() again to deliver the cancellation status to
+        // _oplogFetcherCallback().
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_OK(_lastApplied.getStatus());
+
+    auto progress = initialSyncer->getInitialSyncProgress();
+    log() << "Progress at end: " << progress;
+    ASSERT(progress.getField("syncSourceUnreachableSince").eoo());
+    ASSERT(progress.getField("currentOutageDurationMillis").eoo()) << progress;
+    ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 2000) << progress;
+    BSONObj attempts = progress["initialSyncAttempts"].Obj();
+    ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
+    BSONObj attempt0 = attempts["0"].Obj();
+    ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 2000) << attempt0;
+    ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 2) << attempt0;
 }
 
 TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExceedBsonLimit) {

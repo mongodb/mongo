@@ -115,6 +115,14 @@ public:
     }
 
     /**
+     * Returns the time the current outage (if any) began.  Returns Date_t() if no outage in
+     * progress.
+     */
+    Date_t getSyncSourceUnreachableSince(WithLock lk) {
+        return _syncSourceUnreachableSince;
+    }
+
+    /**
      * shouldRetryOperation() is the interface for retries.  For each retryable operation, declare a
      * RetryableOperation which is passed to this method.  When the operation succeeds, destroy the
      * RetryableOperation (outside the lock) or assign boost::none to it.

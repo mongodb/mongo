@@ -156,6 +156,9 @@ public:
         int durationMillis;
         Status status;
         HostAndPort syncSource;
+        int rollBackId;
+        int operationsRetried;
+        int totalTimeUnreachableMillis;
 
         std::string toString() const;
         BSONObj toBSON() const;
