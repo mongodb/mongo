@@ -45,6 +45,8 @@ using namespace mongo;
 
 using projection_ast::Projection;
 
+const NamespaceString kTestNss = NamespaceString("db.projection_test");
+
 /**
  * Helper for creating projections.
  */
@@ -55,7 +57,7 @@ projection_ast::Projection createProjection(const BSONObj& query,
     auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), collator));
+        new ExpressionContext(opCtx.get(), collator, kTestNss));
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT_OK(statusWithMatcher.getStatus());
@@ -85,7 +87,7 @@ void assertInvalidProjection(const char* queryStr, const char* projStr) {
     auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), collator));
+        new ExpressionContext(opCtx.get(), collator, kTestNss));
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT_OK(statusWithMatcher.getStatus());
@@ -206,7 +208,7 @@ TEST(QueryProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression)
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), nullptr));
+        new ExpressionContext(opCtx.get(), nullptr, kTestNss));
 
     unique_ptr<MatchExpression> queryMatchExpr(new AlwaysFalseMatchExpression());
     ASSERT_EQ(nullptr, queryMatchExpr->path().rawData());

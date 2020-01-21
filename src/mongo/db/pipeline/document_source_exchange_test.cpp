@@ -83,6 +83,8 @@ struct ThreadInfo {
 };
 }  // namespace
 
+const NamespaceString kTestNss = NamespaceString("test.docSourceExchange"_sd);
+
 class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     std::unique_ptr<executor::TaskExecutor> _executor;
@@ -148,7 +150,8 @@ protected:
             threads.emplace_back(ThreadInfo{
                 std::move(client),
                 std::move(opCtxOwned),
-                new DocumentSourceExchange(new ExpressionContext(opCtx, nullptr), ex, idx, nullptr),
+                new DocumentSourceExchange(
+                    new ExpressionContext(opCtx, nullptr, kTestNss), ex, idx, nullptr),
             });
         }
         return threads;
@@ -526,12 +529,12 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
         auto yielder = std::make_unique<MutexYielder>(&artificalGlobalMutex);
         auto yielderRaw = yielder.get();
 
-        threads.push_back(
-            ThreadInfo{std::move(client),
-                       std::move(opCtxOwned),
-                       new DocumentSourceExchange(
-                           new ExpressionContext(opCtx, nullptr), ex, idx, std::move(yielder)),
-                       yielderRaw});
+        threads.push_back(ThreadInfo{
+            std::move(client),
+            std::move(opCtxOwned),
+            new DocumentSourceExchange(
+                new ExpressionContext(opCtx, nullptr, kTestNss), ex, idx, std::move(yielder)),
+            yielderRaw});
     }
 
     std::vector<executor::TaskExecutor::CallbackHandle> handles;

@@ -57,6 +57,7 @@ using namespace mongo;
 
 using std::string;
 
+
 bool filterMatches(const BSONObj& testFilter,
                    const BSONObj& testCollation,
                    const QuerySolutionNode* trueFilterNode) {
@@ -619,7 +620,8 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         // Create an empty/dummy expression context without access to the operation context and
         // collator. This should be sufficient to parse a projection.
-        auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr);
+        auto expCtx =
+            make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString("test.dummy"));
         auto projection =
             projection_ast::parse(expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
         auto specProjObj = projection_ast::astToDebugBSON(projection.root());

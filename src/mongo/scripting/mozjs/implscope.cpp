@@ -33,6 +33,7 @@
 
 #include "mongo/scripting/mozjs/implscope.h"
 
+#include <iostream>
 #include <memory>
 
 #include <js/CharacterEncoding.h>

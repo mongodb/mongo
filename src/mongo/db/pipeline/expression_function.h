@@ -50,8 +50,22 @@ public:
         boost::intrusive_ptr<Expression> passedArgs,
         std::string funcSourceString,
         std::string lang) {
+        return new ExpressionFunction{expCtx,
+                                      passedArgs,
+                                      false /* don't assign first argument to 'this' */,
+                                      std::move(funcSourceString),
+                                      std::move(lang)};
+    }
+
+    // This method is intended for use when you want to bind obj to an argument for desugaring
+    // $where.
+    static boost::intrusive_ptr<ExpressionFunction> createForWhere(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::intrusive_ptr<Expression> passedArgs,
+        std::string funcSourceString,
+        std::string lang) {
         return new ExpressionFunction{
-            expCtx, passedArgs, std::move(funcSourceString), std::move(lang)};
+            expCtx, passedArgs, true, std::move(funcSourceString), std::move(lang)};
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -68,11 +82,13 @@ public:
 private:
     ExpressionFunction(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        boost::intrusive_ptr<Expression> passedArgs,
+                       bool assignFirstArgToThis,
                        std::string funcSourceString,
                        std::string lang);
     void _doAddDependencies(DepsTracker* deps) const final override;
 
     const boost::intrusive_ptr<Expression>& _passedArgs;
+    bool _assignFirstArgToThis;
     std::string _funcSource;
     std::string _lang;
 };

@@ -43,6 +43,8 @@ namespace mongo {
 
 namespace {
 
+const NamespaceString kTestNss = NamespaceString("db.dummy");
+
 class QueryStageEnsureSortedTest : public unittest::Test {
 public:
     /**
@@ -80,7 +82,7 @@ public:
 
         // Create a mock ExpressionContext.
         boost::intrusive_ptr<ExpressionContext> pExpCtx(
-            new ExpressionContext(opCtx.get(), collator));
+            new ExpressionContext(opCtx.get(), collator, kTestNss));
         pExpCtx->setCollator(collator);
 
         // Initialization.
@@ -121,7 +123,8 @@ TEST_F(QueryStageEnsureSortedTest, EnsureSortedEmptyWorkingSet) {
     auto opCtx = _serviceContext.makeOperationContext();
 
     // Create a mock ExpressionContext.
-    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(opCtx.get(), nullptr));
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(
+        new ExpressionContext(opCtx.get(), nullptr, kTestNss));
 
     WorkingSet ws;
     auto queuedDataStage = std::make_unique<QueuedDataStage>(opCtx.get(), &ws);

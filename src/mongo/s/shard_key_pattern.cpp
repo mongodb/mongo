@@ -377,8 +377,9 @@ BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj d
 }
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
                                                               const BSONObj& basicQuery) const {
-    auto qr = std::make_unique<QueryRequest>(NamespaceString(""));
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(basicQuery);
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;

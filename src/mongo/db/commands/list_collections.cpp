@@ -260,7 +260,8 @@ public:
             }
             // The collator is null because collection objects are compared using binary comparison.
             const CollatorInterface* collator = nullptr;
-            boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+            boost::intrusive_ptr<ExpressionContext> expCtx(
+                new ExpressionContext(opCtx, collator, NamespaceString(StringData(dbname))));
             StatusWithMatchExpression statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
             uassertStatusOK(statusWithMatcher.getStatus());

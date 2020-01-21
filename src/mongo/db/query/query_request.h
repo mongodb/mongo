@@ -165,7 +165,6 @@ public:
     static const std::string kAllowDiskUseField;
 
     const NamespaceString& nss() const {
-        invariant(!_nss.isEmpty());
         return _nss;
     }
 

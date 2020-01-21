@@ -472,7 +472,7 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
             [&](const BSONObj& data) {
                 auto opCtx = cc().makeOperationContext();
                 boost::intrusive_ptr<ExpressionContext> expCtx(
-                    new ExpressionContext(opCtx.get(), nullptr));
+                    new ExpressionContext(opCtx.get(), nullptr, _getNamespace()));
                 Matcher m(data["document"].Obj(), expCtx);
                 return !queryResponse.documents.empty() &&
                     m.matches(queryResponse.documents.front()["o"].Obj());
@@ -1079,7 +1079,7 @@ Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
             [&](const BSONObj& data) {
                 auto opCtx = cc().makeOperationContext();
                 boost::intrusive_ptr<ExpressionContext> expCtx(
-                    new ExpressionContext(opCtx.get(), nullptr));
+                    new ExpressionContext(opCtx.get(), nullptr, _nss));
                 Matcher m(data["document"].Obj(), expCtx);
                 return !documents.empty() && m.matches(documents.front()["o"].Obj());
             });

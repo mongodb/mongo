@@ -81,9 +81,12 @@ BSONObj getCollation(const BSONObj& cmdObj) {
     return BSONObj();
 }
 
-BSONObj getShardKey(OperationContext* opCtx, const ChunkManager& chunkMgr, const BSONObj& query) {
+BSONObj getShardKey(OperationContext* opCtx,
+                    const ChunkManager& chunkMgr,
+                    const NamespaceString& nss,
+                    const BSONObj& query) {
     BSONObj shardKey =
-        uassertStatusOK(chunkMgr.getShardKeyPattern().extractShardKeyFromQuery(opCtx, query));
+        uassertStatusOK(chunkMgr.getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, query));
     uassert(ErrorCodes::ShardKeyNotFound,
             "Query for sharded findAndModify must contain the shard key",
             !shardKey.isEmpty());
@@ -188,7 +191,7 @@ public:
 
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj collation = getCollation(cmdObj);
-            const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, query);
+            const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, nss, query);
             const auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
             shard = uassertStatusOK(
@@ -264,7 +267,7 @@ public:
 
         const BSONObj query = cmdObjForShard.getObjectField("query");
         const BSONObj collation = getCollation(cmdObjForShard);
-        const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, query);
+        const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, nss, query);
         auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
         _runCommand(opCtx,

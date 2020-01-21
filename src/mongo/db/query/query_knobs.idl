@@ -338,5 +338,13 @@ server_parameters:
     cpp_vartype: AtomicWord<int>
     default:
       expr: 100
+
+  internalQueryJavaScriptFnTimeoutMillis:
+    description: "Limits the maximum allowed time a user-defined javascript function can run in a query."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryJavaScriptFnTimeoutMillis"
+    cpp_vartype: AtomicWord<int>
+    default:
+      expr: 60 * 1000
     validator:
         gt: 0

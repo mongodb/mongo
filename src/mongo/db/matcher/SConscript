@@ -80,7 +80,6 @@ env.Library(
     source=[
         'extensions_callback_real.cpp',
         'expression_text.cpp',
-        'expression_where.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

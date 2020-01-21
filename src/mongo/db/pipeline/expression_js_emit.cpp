@@ -89,7 +89,6 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
     uassert(
         31223, str::stream() << kExpressionName << " requires 'this' to be specified", thisField);
     boost::intrusive_ptr<Expression> thisRef = parseOperand(expCtx, thisField, vps);
-
     return new ExpressionInternalJsEmit(expCtx, std::move(thisRef), std::move(funcSourceString));
 }
 

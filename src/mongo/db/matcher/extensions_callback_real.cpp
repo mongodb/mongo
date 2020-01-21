@@ -31,9 +31,12 @@
 
 #include "mongo/db/matcher/extensions_callback_real.h"
 
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_function.h"
+#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
@@ -52,15 +55,29 @@ StatusWithMatchExpression ExtensionsCallbackReal::parseText(BSONElement text) co
     return {std::move(exp)};
 }
 
-StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(BSONElement where) const {
+StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONElement where) const {
+
     auto whereParams = extractWhereMatchExpressionParams(where);
     if (!whereParams.isOK()) {
         return whereParams.getStatus();
     }
 
-    auto exp = std::make_unique<WhereMatchExpression>(
-        _opCtx, std::move(whereParams.getValue()), _nss->db());
-    return {std::move(exp)};
-}
+    uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", expCtx->ns.db().size() != 0);
 
+    auto code = whereParams.getValue().code;
+
+    // Desugar $where to $expr. The $where function is invoked through an $_internalJs expression by
+    // passing the document as $$CURRENT.
+    auto fnExpression = ExpressionFunction::createForWhere(
+        expCtx,
+        ExpressionArray::create(
+            expCtx,
+            make_vector<boost::intrusive_ptr<Expression>>(
+                ExpressionFieldPath::parse(expCtx, "$$CURRENT", expCtx->variablesParseState))),
+        code,
+        ExpressionFunction::kJavaScript);
+
+    return {std::make_unique<ExprMatchExpression>(fnExpression, expCtx)};
+}
 }  // namespace mongo

@@ -396,7 +396,8 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
         return canUseValidatorInThisContext;
     }
 
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, _collator.get()));
+    boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx, _collator.get(), ns()));
 
     // The MatchExpression and contained ExpressionContext created as part of the validator are
     // owned by the Collection and will outlive the OperationContext they were created under.

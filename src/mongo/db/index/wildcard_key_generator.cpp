@@ -86,9 +86,10 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
                          : pathProjection.isEmpty() ? kDefaultProjection : pathProjection);
 
     // Construct a dummy ExpressionContext for ProjectionExecutor. It's OK to set the
-    // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' here; since we
-    // ban computed fields from the projection, the ExpressionContext will never be used.
-    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr);
+    // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' and the namespace
+    // string to '' here; since we ban computed fields from the projection, the ExpressionContext
+    // will never be used.
+    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString());
     auto policies = ProjectionPolicies::wildcardIndexSpecProjectionPolicies();
     auto projection = projection_ast::parse(expCtx, projSpec, policies);
     return WildcardProjection{projection_executor::buildProjectionExecutor(

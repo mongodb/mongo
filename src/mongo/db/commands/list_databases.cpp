@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -123,7 +124,8 @@ public:
             // The collator is null because database metadata objects are compared using simple
             // binary comparison.
             const CollatorInterface* collator = nullptr;
-            boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+            boost::intrusive_ptr<ExpressionContext> expCtx(
+                new ExpressionContext(opCtx, collator, NamespaceString(dbname)));
             auto matcher =
                 uassertStatusOK(MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
             filter = std::move(matcher);

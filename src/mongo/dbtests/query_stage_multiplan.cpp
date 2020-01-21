@@ -155,7 +155,8 @@ unique_ptr<PlanStage> getIxScanPlan(OperationContext* opCtx,
 unique_ptr<MatchExpression> makeMatchExpressionFromFilter(OperationContext* opCtx,
                                                           BSONObj filterObj) {
     const CollatorInterface* collator = nullptr;
-    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx, collator, nss));
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj, expCtx);
     ASSERT_OK(statusWithMatcher.getStatus());
     unique_ptr<MatchExpression> filter = std::move(statusWithMatcher.getValue());

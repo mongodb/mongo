@@ -94,5 +94,4 @@ private:
     const boost::intrusive_ptr<Expression>& _thisRef;
     std::string _funcSource;
 };
-
 }  // namespace mongo

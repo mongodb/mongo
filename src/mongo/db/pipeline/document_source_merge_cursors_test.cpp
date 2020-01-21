@@ -79,8 +79,7 @@ class DocumentSourceMergeCursorsTest : public ShardingTestFixture {
 public:
     DocumentSourceMergeCursorsTest() {
         TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
-        _expCtx = new ExpressionContext(operationContext(), nullptr);
-        _expCtx->ns = kTestNss;
+        _expCtx = new ExpressionContext(operationContext(), nullptr, kTestNss);
     }
 
     void setUp() override {

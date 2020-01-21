@@ -85,7 +85,7 @@ public:
 
         const CollatorInterface* collator = nullptr;
         const boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(&_opCtx, collator));
+            new ExpressionContext(&_opCtx, collator, NamespaceString(ns())));
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, expCtx);
         verify(statusWithMatcher.isOK());

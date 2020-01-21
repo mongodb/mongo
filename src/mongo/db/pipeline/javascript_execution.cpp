@@ -28,7 +28,9 @@
  */
 
 #include "mongo/platform/basic.h"
+#include <iostream>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 
 namespace mongo {
@@ -54,6 +56,21 @@ JsExecution* JsExecution::get(OperationContext* opCtx,
         }
     }
     return exec.get();
+}
+
+Value JsExecution::doCallFunction(ScriptingFunction func,
+                                  const BSONObj& params,
+                                  const BSONObj& thisObj,
+                                  bool noReturnVal) {
+
+    int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, noReturnVal);
+
+    uassert(
+        31439, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);
+
+    BSONObjBuilder returnValue;
+    _scope->append(returnValue, "", "__returnValue");
+    return Value(returnValue.done().firstElement());
 }
 
 }  // namespace mongo

@@ -42,6 +42,11 @@ selector:
   - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
   - jstests/concurrency/fsm_workloads/map_reduce_with_chunk_migrations.js
 
+  # Disabled due to thread local scope used in desugaring $where doesn't handle
+  # maxTimeMS timeouts correctly.
+  # TODO SERVER-46098: Remove when MaxTimeMs handling has been fixed for find with $where.
+  - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
+
   # Disabled due to MongoDB restrictions and/or workload restrictions
 
   # These workloads sometimes trigger 'Could not lock auth data update lock'

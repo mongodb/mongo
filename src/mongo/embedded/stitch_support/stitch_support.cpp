@@ -39,6 +39,7 @@
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/projection.h"
@@ -60,6 +61,8 @@
 namespace mongo {
 
 using StitchSupportStatusImpl = StatusForAPI<stitch_support_v1_error>;
+
+const NamespaceString kDummyNamespaceStr = NamespaceString("");
 
 /**
  * C interfaces that use enterCXX() must provide a translateException() function that converts any
@@ -171,7 +174,8 @@ struct stitch_support_v1_matcher {
           opCtx(this->client->makeOperationContext()),
           matcher(filterBSON.getOwned(),
                   new mongo::ExpressionContext(opCtx.get(),
-                                               collator ? collator->collator.get() : nullptr)){};
+                                               collator ? collator->collator.get() : nullptr,
+                                               mongo::kDummyNamespaceStr)){};
 
     mongo::ServiceContext::UniqueClient client;
     mongo::ServiceContext::UniqueOperationContext opCtx;
@@ -186,7 +190,7 @@ struct stitch_support_v1_projection {
         : client(std::move(client)), opCtx(this->client->makeOperationContext()), matcher(matcher) {
 
         auto expCtx = mongo::make_intrusive<mongo::ExpressionContext>(
-            opCtx.get(), collator ? collator->collator.get() : nullptr);
+            opCtx.get(), collator ? collator->collator.get() : nullptr, mongo::kDummyNamespaceStr);
         const auto policies = mongo::ProjectionPolicies::findProjectionPolicies();
         auto proj =
             mongo::projection_ast::parse(expCtx,
@@ -228,14 +232,18 @@ struct stitch_support_v1_update {
           updateExpr(updateExpr.getOwned()),
           arrayFilters(arrayFilters.getOwned()),
           matcher(matcher),
-          updateDriver(new mongo::ExpressionContext(
-              opCtx.get(), collator ? collator->collator.get() : nullptr)) {
+          updateDriver(new mongo::ExpressionContext(opCtx.get(),
+                                                    collator ? collator->collator.get() : nullptr,
+                                                    mongo::kDummyNamespaceStr)) {
         std::vector<mongo::BSONObj> arrayFilterVector;
         for (auto&& filter : this->arrayFilters) {
             arrayFilterVector.push_back(filter.embeddedObject());
         }
-        this->parsedFilters = uassertStatusOK(mongo::ParsedUpdate::parseArrayFilters(
-            arrayFilterVector, this->opCtx.get(), collator ? collator->collator.get() : nullptr));
+        this->parsedFilters = uassertStatusOK(
+            mongo::ParsedUpdate::parseArrayFilters(arrayFilterVector,
+                                                   this->opCtx.get(),
+                                                   collator ? collator->collator.get() : nullptr,
+                                                   mongo::kDummyNamespaceStr));
 
         updateDriver.parse(this->updateExpr, parsedFilters);
 

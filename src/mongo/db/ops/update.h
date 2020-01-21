@@ -31,6 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 
@@ -56,6 +57,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
  *   returns: { x : 2 }
  */
 BSONObj applyUpdateOperators(OperationContext* opCtx,
+                             const NamespaceString& ns,
                              const BSONObj& from,
                              const BSONObj& operators);
 }  // namespace mongo

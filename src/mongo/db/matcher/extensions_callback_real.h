@@ -60,7 +60,8 @@ public:
     /**
      * Returns a WhereMatchExpression, or an error Status if parsing fails.
      */
-    StatusWithMatchExpression parseWhere(BSONElement where) const final;
+    StatusWithMatchExpression parseWhere(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         BSONElement where) const final;
 
 private:
     OperationContext* const _opCtx;

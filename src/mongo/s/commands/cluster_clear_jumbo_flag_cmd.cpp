@@ -94,8 +94,9 @@ public:
             boost::optional<Chunk> chunk;
 
             if (request().getFind()) {
-                BSONObj shardKey = uassertStatusOK(
-                    cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, *request().getFind()));
+                BSONObj shardKey =
+                    uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(
+                        opCtx, ns(), *request().getFind()));
                 uassert(51260,
                         str::stream()
                             << "no shard key found in chunk query " << *request().getFind(),

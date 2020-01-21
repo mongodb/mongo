@@ -66,7 +66,8 @@ public:
     static StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
     parseArrayFilters(const std::vector<BSONObj>& rawArrayFiltersIn,
                       OperationContext* opCtx,
-                      CollatorInterface* collator);
+                      CollatorInterface* collator,
+                      const NamespaceString& nss);
 
     /**
      * Constructs a parsed update.

@@ -383,10 +383,12 @@ StatusWith<BSONObj> validateIndexSpec(
             // specified or may inherit the default collation from the collection. It's legal to
             // parse with the wrong collation, since the collation can be set on a MatchExpression
             // after the fact. Here, we don't bother checking the collation after the fact, since
-            // this invocation of the parser is just for validity checking.
+            // this invocation of the parser is just for validity checking. It's also legal to parse
+            // with an empty namespace string, because we are only doing validity checking and not
+            // resolving the expression against a given namespace.
             auto simpleCollator = nullptr;
             boost::intrusive_ptr<ExpressionContext> expCtx(
-                new ExpressionContext(opCtx, simpleCollator));
+                new ExpressionContext(opCtx, simpleCollator, NamespaceString()));
 
             // Special match expression features (e.g. $jsonSchema, $expr, ...) are not allowed in a
             // partialFilterExpression on index creation.

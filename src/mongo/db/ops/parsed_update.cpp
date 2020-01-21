@@ -45,7 +45,8 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
-      _driver(new ExpressionContext(opCtx, nullptr, _request->getRuntimeConstants())),
+      _driver(new ExpressionContext(
+          opCtx, nullptr, _request->getNamespaceString(), _request->getRuntimeConstants())),
       _canonicalQuery(),
       _extensionsCallback(extensionsCallback) {}
 
@@ -83,8 +84,8 @@ Status ParsedUpdate::parseRequest() {
         _collator = std::move(collator.getValue());
     }
 
-    auto statusWithArrayFilters =
-        parseArrayFilters(_request->getArrayFilters(), _opCtx, _collator.get());
+    auto statusWithArrayFilters = parseArrayFilters(
+        _request->getArrayFilters(), _opCtx, _collator.get(), _request->getNamespaceString());
     if (!statusWithArrayFilters.isOK()) {
         return statusWithArrayFilters.getStatus();
     }
@@ -177,10 +178,11 @@ void ParsedUpdate::parseUpdate() {
 StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
 ParsedUpdate::parseArrayFilters(const std::vector<BSONObj>& rawArrayFiltersIn,
                                 OperationContext* opCtx,
-                                CollatorInterface* collator) {
+                                CollatorInterface* collator,
+                                const NamespaceString& nss) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFiltersOut;
     for (auto rawArrayFilter : rawArrayFiltersIn) {
-        boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+        boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator, nss));
         auto parsedArrayFilter =
             MatchExpressionParser::parse(rawArrayFilter,
                                          std::move(expCtx),

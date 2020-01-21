@@ -104,7 +104,8 @@ public:
         auto sortPattern = fromjson(patternStr);
 
         // Create an ExpressionContext for the SortKeyGeneratorStage.
-        auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), collator);
+        auto expCtx =
+            make_intrusive<ExpressionContext>(getOpCtx(), collator, NamespaceString("foo"));
 
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
             expCtx, std::move(queuedDataStage), &ws, sortPattern);
@@ -168,7 +169,7 @@ TEST_F(SortStageDefaultTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
     // Create an ExpressionContext for the SortKeyGeneratorStage.
-    auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), nullptr);
+    auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), nullptr, NamespaceString("foo"));
 
     // QueuedDataStage will be owned by SortStageDefault.
     auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);

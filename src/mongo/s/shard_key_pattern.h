@@ -211,6 +211,7 @@ public:
      *                                                 a : { $eq : { b : ... } }
      */
     StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
                                                  const BSONObj& basicQuery) const;
     BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
 

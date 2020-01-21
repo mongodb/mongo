@@ -47,7 +47,8 @@ StatusWithMatchExpression ExtensionsCallbackNoop::parseText(BSONElement text) co
     return {std::move(expr)};
 }
 
-StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(BSONElement where) const {
+StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONElement where) const {
     auto whereParams = extractWhereMatchExpressionParams(where);
     if (!whereParams.isOK()) {
         return whereParams.getStatus();

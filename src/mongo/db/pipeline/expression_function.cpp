@@ -38,18 +38,25 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
 
 ExpressionFunction::ExpressionFunction(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        boost::intrusive_ptr<Expression> passedArgs,
+                                       bool assignFirstArgToThis,
                                        std::string funcSource,
                                        std::string lang)
     : Expression(expCtx, {std::move(passedArgs)}),
       _passedArgs(_children[0]),
+      _assignFirstArgToThis(assignFirstArgToThis),
       _funcSource(std::move(funcSource)),
       _lang(std::move(lang)) {}
 
 Value ExpressionFunction::serialize(bool explain) const {
-    return Value(Document{{kExpressionName,
-                           Document{{"body", _funcSource},
-                                    {"args", _passedArgs->serialize(explain)},
-                                    {"lang", _lang}}}});
+    MutableDocument d;
+    d["body"] = Value(_funcSource);
+    d["args"] = Value(_passedArgs->serialize(explain));
+    d["lang"] = Value(_lang);
+    // This field will only be seralized when desugaring $where in $expr + $_internalJs
+    if (_assignFirstArgToThis) {
+        d["_internalSetObjToThis"] = Value(_assignFirstArgToThis);
+    }
+    return Value(Document{{kExpressionName, d.freezeToValue()}});
 }
 
 void ExpressionFunction::_doAddDependencies(mongo::DepsTracker* deps) const {
@@ -84,17 +91,25 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(
     uassert(31263, "The args field must be specified.", argsField);
     boost::intrusive_ptr<Expression> argsExpr = parseOperand(expCtx, argsField, vps);
 
+    // This element will be present when desugaring $where, only.
+    BSONElement assignFirstArgToThis = expr["_internalSetObjToThis"];
+
     BSONElement langField = expr["lang"];
     uassert(31418, "The lang field must be specified.", langField);
     uassert(31419,
             "Currently the only supported language specifier is 'js'.",
             langField.type() == BSONType::String && langField.str() == kJavaScript);
 
-    return new ExpressionFunction(expCtx, argsExpr, bodyValue.coerceToString(), langField.str());
+    return new ExpressionFunction(expCtx,
+                                  argsExpr,
+                                  assignFirstArgToThis.trueValue(),
+                                  bodyValue.coerceToString(),
+                                  langField.str());
 }
 
 Value ExpressionFunction::evaluate(const Document& root, Variables* variables) const {
     auto jsExec = getExpressionContext()->getJsExecWithScope();
+    auto scope = jsExec->getScope();
 
     ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
     uassert(31265, "The body function did not evaluate", func);
@@ -102,8 +117,25 @@ Value ExpressionFunction::evaluate(const Document& root, Variables* variables) c
     auto argValue = _passedArgs->evaluate(root, variables);
     uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::Array);
 
-    int argNum = 0;
+    // This logic exists to desugar $where into $expr + $function. In this case set the global obj
+    // to this, to handle cases where the $where function references the current document through
+    // obj.
     BSONObjBuilder bob;
+    if (_assignFirstArgToThis) {
+        // For defense-in-depth, The $where case will pass a field path expr carrying $$CURRENT as
+        // the only element of the array.
+        auto args = argValue.getArray();
+        uassert(31422,
+                "field path $$CURRENT must be the only element in args",
+                argValue.getArrayLength() == 1);
+
+        BSONObj thisBSON = args[0].getDocument().toBson();
+        scope->setObject("obj", thisBSON);
+
+        return jsExec->callFunction(func, bob.done(), thisBSON);
+    }
+
+    int argNum = 0;
     for (const auto& arg : argValue.getArray()) {
         arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
     }

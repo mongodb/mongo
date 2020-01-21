@@ -286,7 +286,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // passthrough, we only need a bare minimum expression context anyway.
         invariant(targeter.policy ==
                   cluster_aggregation_planner::AggregationTargeter::kPassthrough);
-        expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr);
+        expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, namespaces.executionNss);
     }
 
     if (request.getExplain()) {

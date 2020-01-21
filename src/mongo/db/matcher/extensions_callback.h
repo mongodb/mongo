@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
@@ -45,7 +46,8 @@ public:
 
     virtual StatusWithMatchExpression parseText(BSONElement text) const = 0;
 
-    virtual StatusWithMatchExpression parseWhere(BSONElement where) const = 0;
+    virtual StatusWithMatchExpression parseWhere(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONElement where) const = 0;
 
     /**
      * Returns true if extensions (e.g. $text and $where) are allowed but are converted into no-ops.

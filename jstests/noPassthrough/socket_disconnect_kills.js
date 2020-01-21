@@ -129,6 +129,9 @@ function runCommand(cmd) {
 function runTests(client) {
     let admin = client.getDB("admin");
 
+    // set timeout for js function execution to 100 ms to speed up tests that run inf loop.
+    assert.commandWorked(client.getDB(testName).adminCommand(
+        {setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
     assert.commandWorked(client.getDB(testName).test.insert({x: 1}));
     assert.commandWorked(client.getDB(testName).test.insert({x: 2}));
     assert.commandWorked(client.getDB(testName).test.insert({x: 3}));

@@ -54,6 +54,8 @@ public:
     virtual ~CollectionBase() {}
 };
 
+const NamespaceString kTestNss = NamespaceString("db.dummy");
+
 template <typename M>
 class Basic {
 public:
@@ -229,7 +231,7 @@ public:
 
         const CollatorInterface* collator = nullptr;
         const boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtxPtr.get(), collator));
+            new ExpressionContext(opCtxPtr.get(), collator, kTestNss));
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
             expCtx,

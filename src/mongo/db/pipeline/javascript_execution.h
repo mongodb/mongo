@@ -33,7 +33,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -65,6 +67,8 @@ public:
         _scopeVars = scopeVars.getOwned();
         _scope->init(&_scopeVars);
         _scope->registerOperation(Client::getCurrent()->getOperationContext());
+
+        _fnCallTimeoutMillis = internalQueryJavaScriptFnTimeoutMillis.load();
     }
 
     ~JsExecution() {
@@ -80,7 +84,7 @@ public:
     void callFunctionWithoutReturn(ScriptingFunction func,
                                    const BSONObj& params,
                                    const BSONObj& thisObj) {
-        _scope->invoke(func, &params, &thisObj, 0, true);
+        doCallFunction(func, params, thisObj, true);
     }
 
     /**
@@ -90,10 +94,7 @@ public:
      * Returns the value returned by the function.
      */
     Value callFunction(ScriptingFunction func, const BSONObj& params, const BSONObj& thisObj) {
-        _scope->invoke(func, &params, &thisObj, 0, false);
-        BSONObjBuilder returnValue;
-        _scope->append(returnValue, "", "__returnValue");
-        return Value(returnValue.done().firstElement());
+        return doCallFunction(func, params, thisObj, false);
     }
 
     /**
@@ -115,5 +116,11 @@ private:
     BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
     bool _emitCreated = false;
+    int _fnCallTimeoutMillis;
+
+    Value doCallFunction(ScriptingFunction func,
+                         const BSONObj& params,
+                         const BSONObj& thisObj,
+                         bool noReturnVal);
 };
 }  // namespace mongo

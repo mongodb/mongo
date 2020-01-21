@@ -201,7 +201,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             const CollatorInterface* collator = nullptr;
-            UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
+            UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
             Collection* collection = ctx.getCollection();
             ASSERT(collection);
 
@@ -272,7 +272,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             const CollatorInterface* collator = nullptr;
-            UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
+            UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
             Collection* coll =
                 CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
             ASSERT(coll);
@@ -387,7 +387,7 @@ public:
         ASSERT(coll);
         UpdateRequest request(nss);
         const CollatorInterface* collator = nullptr;
-        UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
+        UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();
@@ -479,7 +479,7 @@ public:
         ASSERT(coll);
         UpdateRequest request(nss);
         const CollatorInterface* collator = nullptr;
-        UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
+        UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();

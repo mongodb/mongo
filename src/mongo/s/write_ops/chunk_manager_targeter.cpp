@@ -115,6 +115,7 @@ StatusWith<UpdateType> getUpdateExprType(const write_ops::UpdateOpEntry& updateD
  */
 StatusWith<BSONObj> getUpdateExprForTargeting(OperationContext* opCtx,
                                               const ShardKeyPattern& shardKeyPattern,
+                                              const NamespaceString& nss,
                                               const UpdateType updateType,
                                               const write_ops::UpdateOpEntry& updateDoc) {
     // We should never see an invalid update type here.
@@ -144,7 +145,8 @@ StatusWith<BSONObj> getUpdateExprForTargeting(OperationContext* opCtx,
     // We are missing _id, so attempt to extract it from an exact match in the update's query spec.
     // This will guarantee that we can target a single shard, but it is not necessarily fatal if no
     // exact _id can be found.
-    const auto idFromQuery = kVirtualIdShardKey.extractShardKeyFromQuery(opCtx, updateDoc.getQ());
+    const auto idFromQuery =
+        kVirtualIdShardKey.extractShardKeyFromQuery(opCtx, nss, updateDoc.getQ());
     if (!idFromQuery.isOK()) {
         return idFromQuery;
     } else if (auto idElt = idFromQuery.getValue()[kIdFieldName]) {
@@ -447,8 +449,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     const auto& shardKeyPattern = _routingInfo->cm()->getShardKeyPattern();
     const auto collation = write_ops::collationOf(updateDoc);
 
-    const auto updateExpr =
-        getUpdateExprForTargeting(opCtx, shardKeyPattern, updateType.getValue(), updateDoc);
+    const auto updateExpr = getUpdateExprForTargeting(
+        opCtx, shardKeyPattern, getNS(), updateType.getValue(), updateDoc);
     const bool isUpsert = updateDoc.getUpsert();
     const auto query = updateDoc.getQ();
     if (!updateExpr.isOK()) {
@@ -477,7 +479,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     // to target based on the replacement doc, it could result in an insertion even if a document
     // matching the query exists on another shard.
     if (isUpsert) {
-        return targetByShardKey(shardKeyPattern.extractShardKeyFromQuery(opCtx, query),
+        return targetByShardKey(shardKeyPattern.extractShardKeyFromQuery(opCtx, getNS(), query),
                                 "Failed to target upsert by query");
     }
 
@@ -531,8 +533,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
 
         // Get the shard key
         StatusWith<BSONObj> status =
-            _routingInfo->cm()->getShardKeyPattern().extractShardKeyFromQuery(opCtx,
-                                                                              deleteDoc.getQ());
+            _routingInfo->cm()->getShardKeyPattern().extractShardKeyFromQuery(
+                opCtx, getNS(), deleteDoc.getQ());
 
         // Bad query
         if (!status.isOK())

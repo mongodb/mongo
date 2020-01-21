@@ -51,7 +51,7 @@ public:
         TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
         // Must instantiate ExpressionContext _after_ setting the TZ database on the service
         // context.
-        _expCtx = new ExpressionContext(_opCtx.get(), nullptr);
+        _expCtx = new ExpressionContext(_opCtx.get(), nullptr, nss);
         _expCtx->ns = std::move(nss);
         unittest::TempDir tempDir("AggregationContextFixture");
         _expCtx->tempDir = tempDir.path();

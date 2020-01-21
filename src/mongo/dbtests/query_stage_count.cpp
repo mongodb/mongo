@@ -53,6 +53,7 @@ using std::vector;
 
 const int kDocuments = 100;
 const int kInterjections = kDocuments;
+const NamespaceString kTestNss = NamespaceString("db.dummy");
 
 class CountStageTest {
 public:
@@ -147,7 +148,7 @@ public:
 
         const CollatorInterface* collator = nullptr;
         const boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(&_opCtx, collator));
+            new ExpressionContext(&_opCtx, collator, kTestNss));
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(request.getQuery(), expCtx);
         ASSERT(statusWithMatcher.isOK());

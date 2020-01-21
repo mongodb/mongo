@@ -46,7 +46,6 @@
 namespace {
 
 using namespace mongo;
-
 /**
  * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
  */
@@ -720,7 +719,7 @@ auto createMatchExprAndProjection(const BSONObj& query, const BSONObj& projObj) 
     auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), collator));
+        new ExpressionContext(opCtx.get(), collator, NamespaceString("test.dummy")));
     StatusWithMatchExpression queryMatchExpr =
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT(queryMatchExpr.isOK());

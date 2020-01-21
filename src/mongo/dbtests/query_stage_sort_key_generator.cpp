@@ -55,6 +55,8 @@ Value extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* w
     return wsm->metadata().getSortKey();
 }
 
+const NamespaceString kTestNss = NamespaceString("db.dummy");
+
 /**
  * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key
  * from 'doc', a JSON string representation of a user document. Does so using the SORT_KEY_GENERATOR
@@ -66,7 +68,8 @@ Value extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* w
 Value extractSortKey(const char* sortSpec, const char* doc, const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(opCtx.get(), collator));
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(
+        new ExpressionContext(opCtx.get(), collator, kTestNss));
 
     WorkingSet workingSet;
 
@@ -95,7 +98,8 @@ Value extractSortKeyCovered(const char* sortSpec,
                             const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(opCtx.get(), collator));
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(
+        new ExpressionContext(opCtx.get(), collator, kTestNss));
 
     WorkingSet workingSet;
 

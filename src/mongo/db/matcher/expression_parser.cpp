@@ -338,8 +338,12 @@ StatusWithMatchExpression parseWhere(StringData name,
     if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kJavascript) == 0u) {
         return {Status(ErrorCodes::BadValue, "$where is not allowed in this context")};
     }
+    if (currentLevel == DocumentParseLevel::kUserSubDocument) {
+        return {
+            Status(ErrorCodes::BadValue, "$where can only be applied to the top-level document")};
+    }
 
-    return extensionsCallback->parseWhere(elem);
+    return extensionsCallback->parseWhere(expCtx, elem);
 }
 
 StatusWithMatchExpression parseText(StringData name,

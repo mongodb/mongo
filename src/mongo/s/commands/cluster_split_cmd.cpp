@@ -193,8 +193,8 @@ public:
 
         if (!find.isEmpty()) {
             // find
-            BSONObj shardKey =
-                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, find));
+            BSONObj shardKey = uassertStatusOK(
+                cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, find));
             if (shardKey.isEmpty()) {
                 errmsg = str::stream() << "no shard key found in chunk query " << find;
                 return false;

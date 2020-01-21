@@ -194,6 +194,7 @@ Status handleOplogInsert(RoleGraph* roleGraph, const BSONObj& insertedObj) {
  */
 Status handleOplogUpdate(OperationContext* opCtx,
                          RoleGraph* roleGraph,
+                         const NamespaceString& nss,
                          const BSONObj& updatePattern,
                          const BSONObj& queryPattern) {
     RoleName roleToUpdate;
@@ -201,7 +202,7 @@ Status handleOplogUpdate(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr));
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr, nss));
     UpdateDriver driver(std::move(expCtx));
     driver.setFromOplogApplication(true);
 
@@ -391,7 +392,7 @@ Status RoleGraph::handleLogOp(OperationContext* opCtx,
                 return Status(ErrorCodes::InternalError,
                               "Missing query pattern in update oplog entry.");
             }
-            return handleOplogUpdate(opCtx, this, o, *o2);
+            return handleOplogUpdate(opCtx, this, ns, o, *o2);
         case 'd':
             return handleOplogDelete(this, o);
         case 'n':

@@ -128,8 +128,10 @@ ExpressionContext::ExpressionContext(
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const CollatorInterface* collator,
+                                     const NamespaceString& nss,
                                      const boost::optional<RuntimeConstants>& runtimeConstants)
-    : opCtx(opCtx),
+    : ns(nss),
+      opCtx(opCtx),
       mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
       timeZoneDatabase(opCtx && opCtx->getServiceContext()
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())

@@ -98,7 +98,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         const BSONObj& filter = _descriptor->partialFilterExpression();
 
         boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, _collator.get()));
+            new ExpressionContext(opCtx, _collator.get(), ns()));
 
         // Parsing the partial filter expression is not expected to fail here since the
         // expression would have been successfully parsed upstream during index creation.

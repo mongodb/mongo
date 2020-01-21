@@ -109,10 +109,11 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
 }
 
 BSONObj applyUpdateOperators(OperationContext* opCtx,
+                             const NamespaceString& nss,
                              const BSONObj& from,
                              const BSONObj& operators) {
     const CollatorInterface* collator = nullptr;
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator, nss));
     UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     driver.parse(operators, arrayFilters);

@@ -61,6 +61,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/util/log.h"
 
@@ -171,7 +172,7 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
         std::unique_ptr<PlanStage> userRoot{
-            parseQuery(opCtx, collection, planObj, ws.get(), &exprs)};
+            parseQuery(opCtx, collection, planObj, ws.get(), nss, &exprs)};
         uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), nullptr != userRoot);
 
         // Add a fetch at the top for the user so we can get obj back for sure.
@@ -208,6 +209,7 @@ public:
                           Collection* collection,
                           BSONObj obj,
                           WorkingSet* workingSet,
+                          const NamespaceString& nss,
                           std::vector<std::unique_ptr<MatchExpression>>* exprs) {
         BSONElement firstElt = obj.firstElement();
         if (!firstElt.isABSONObj()) {
@@ -232,7 +234,7 @@ public:
             if (filterTag == e.fieldName()) {
                 const CollatorInterface* collator = nullptr;
                 const boost::intrusive_ptr<ExpressionContext> expCtx(
-                    new ExpressionContext(opCtx, collator));
+                    new ExpressionContext(opCtx, collator, nss));
                 auto statusWithMatcher =
                     MatchExpressionParser::parse(argObj,
                                                  expCtx,
@@ -308,7 +310,7 @@ public:
                 uassert(16922, "node of AND isn't an obj?: " + e.toString(), e.isABSONObj());
 
                 std::unique_ptr<PlanStage> subNode{
-                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, nss, exprs)};
                 uassert(16923,
                         "Can't parse sub-node of AND: " + e.Obj().toString(),
                         nullptr != subNode);
@@ -332,7 +334,7 @@ public:
                 uassert(16925, "node of AND isn't an obj?: " + e.toString(), e.isABSONObj());
 
                 std::unique_ptr<PlanStage> subNode{
-                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, nss, exprs)};
                 uassert(16926,
                         "Can't parse sub-node of AND: " + e.Obj().toString(),
                         nullptr != subNode);
@@ -356,7 +358,7 @@ public:
                     return nullptr;
                 }
                 std::unique_ptr<PlanStage> subNode{
-                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, nss, exprs)};
                 uassert(
                     16936, "Can't parse sub-node of OR: " + e.Obj().toString(), nullptr != subNode);
                 orStage->addChild(std::move(subNode));
@@ -367,7 +369,7 @@ public:
             uassert(
                 16929, "Node argument must be provided to fetch", nodeArgs["node"].isABSONObj());
             std::unique_ptr<PlanStage> subNode{
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs)};
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, nss, exprs)};
             uassert(28731,
                     "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
@@ -380,7 +382,7 @@ public:
                 16930, "Node argument must be provided to limit", nodeArgs["node"].isABSONObj());
             uassert(16931, "Num argument must be provided to limit", nodeArgs["num"].isNumber());
             std::unique_ptr<PlanStage> subNode{
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs)};
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, nss, exprs)};
             uassert(28732,
                     "Can't parse sub-node of LIMIT: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
@@ -393,7 +395,7 @@ public:
             uassert(16932, "Node argument must be provided to skip", nodeArgs["node"].isABSONObj());
             uassert(16933, "Num argument must be provided to skip", nodeArgs["num"].isNumber());
             std::unique_ptr<PlanStage> subNode{
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs)};
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, nss, exprs)};
             uassert(28733,
                     "Can't parse sub-node of SKIP: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
@@ -432,7 +434,7 @@ public:
                 uassert(16973, "node of mergeSort isn't an obj?: " + e.toString(), e.isABSONObj());
 
                 std::unique_ptr<PlanStage> subNode{
-                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, nss, exprs)};
                 uassert(16974,
                         "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
                         nullptr != subNode);
@@ -481,7 +483,7 @@ public:
                     "isMulti argument must be provided to delete",
                     nodeArgs["isMulti"].type() == Bool);
             PlanStage* subNode =
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, nss, exprs);
             uassert(28734,
                     "Can't parse sub-node of DELETE: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);

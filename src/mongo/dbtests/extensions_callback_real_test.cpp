@@ -240,72 +240,23 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
 //
 // $where parsing tests.
 //
+const NamespaceString kTestNss = NamespaceString("db.dummy");
 
-TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeHaveSameBSONRepresentation) {
-    const char code[] = "function(){ return a; }";
+TEST_F(ExtensionsCallbackRealTest, WhereExpressionDesugarsToExprAndInternalJs) {
+    auto query1 = fromjson("{$where: 'function() { return this.x == 10; }'}");
+    boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(&_opCtx, nullptr, kTestNss));
 
-    BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
     auto expr1 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
-    BSONObjBuilder builder1;
-    expr1->serialize(&builder1);
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(expCtx, query1.firstElement()));
 
-    BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr2 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
-    BSONObjBuilder builder2;
-    expr2->serialize(&builder2);
+    BSONObjBuilder gotMatch;
+    expr1->serialize(&gotMatch);
 
-    ASSERT_BSONOBJ_EQ(builder1.obj(), builder2.obj());
-}
-
-TEST_F(ExtensionsCallbackRealTest,
-       WhereExpressionsWithDifferentScopesHaveDifferentBSONRepresentations) {
-    const char code[] = "function(){ return a; }";
-
-    BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
-    BSONObjBuilder builder1;
-    expr1->serialize(&builder1);
-
-    BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << false)));
-    auto expr2 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
-    BSONObjBuilder builder2;
-    expr2->serialize(&builder2);
-
-    ASSERT_BSONOBJ_NE(builder1.obj(), builder2.obj());
-}
-
-TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeAreEquivalent) {
-    const char code[] = "function(){ return a; }";
-
-    BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
-
-    BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr2 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
-
-    ASSERT(expr1->equivalent(expr2.get()));
-    ASSERT(expr2->equivalent(expr1.get()));
-}
-
-TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithDifferentScopesAreNotEquivalent) {
-    const char code[] = "function(){ return a; }";
-
-    BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
-
-    BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << false)));
-    auto expr2 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
-
-    ASSERT_FALSE(expr1->equivalent(expr2.get()));
-    ASSERT_FALSE(expr2->equivalent(expr1.get()));
+    auto expectedMatch = fromjson(
+        "{$expr: {$function: {'body': 'function() { return this.x == 10; }', 'args': "
+        "['$$CURRENT'], 'lang': 'js', '_internalSetObjToThis': true}}}");
+    ASSERT_BSONOBJ_EQ(gotMatch.obj(), expectedMatch);
 }
 
 }  // namespace
