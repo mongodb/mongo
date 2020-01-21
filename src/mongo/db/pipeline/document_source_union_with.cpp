@@ -125,8 +125,10 @@ DocumentSource::GetModPathsReturn DocumentSourceUnionWith::getModifiedPaths() co
 }
 
 void DocumentSourceUnionWith::doDispose() {
-    _pipeline->dispose(pExpCtx->opCtx);
-    _pipeline.reset();
+    if (_pipeline) {
+        _pipeline->dispose(pExpCtx->opCtx);
+        _pipeline.reset();
+    }
 }
 
 void DocumentSourceUnionWith::serializeToArray(

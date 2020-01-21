@@ -16,6 +16,7 @@ selector:
   - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
   - jstests/aggregation/expressions/internal_js_emit_with_scope.js
   exclude_with_any_tags:
+  - assumes_against_mongod_not_mongos
   - requires_profiling
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding

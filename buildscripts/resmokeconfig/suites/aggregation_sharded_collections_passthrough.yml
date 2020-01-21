@@ -28,6 +28,7 @@ selector:
   - jstests/aggregation/sources/graphLookup/variables.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
+  - assumes_against_mongod_not_mongos
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
