@@ -311,9 +311,11 @@ env.CppUnitTest(
         'replica_set_monitor_scan_test.cpp',
         'replica_set_monitor_test_concurrent.cpp',
         'replica_set_monitor_test_fixture.cpp',
+        'server_ping_monitor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/client/sdam/sdam',
+        '$BUILD_DIR/mongo/client/sdam/sdam_test',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/write_concern_options',

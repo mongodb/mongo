@@ -42,8 +42,10 @@ env.Library(
     target='sdam_test',
     source=[
         'server_description_builder.cpp',
+        'topology_listener_mock.cpp',
     ],
     LIBDEPS=[
+        'sdam',
         '$BUILD_DIR/mongo/base',
     ],
 )

@@ -30,44 +30,39 @@
 #pragma once
 
 #include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::sdam {
 
-/**
- * An interface for handling topology related events.
- */
-class TopologyListener {
+class TopologyListenerMock : public TopologyListener {
 public:
-    virtual ~TopologyListener() {}
+    TopologyListenerMock() = default;
+    virtual ~TopologyListenerMock() = default;
+    void onServerPingFailedEvent(const ServerAddress& hostAndPort, const Status& status) override;
+    void onServerPingSucceededEvent(IsMasterRTT durationMS,
+                                    const ServerAddress& hostAndPort) override;
 
     /**
-     * Called when a TopologyDescriptionChangedEvent is published - The TopologyDescription changed
-     * and the new TopologyDescription does not match the old.
+     * Acquires _mutex before calling _hasPingResponse_inlock().
      */
-    virtual void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                                   TopologyDescriptionPtr previousDescription,
-                                                   TopologyDescriptionPtr newDescription){};
+    bool hasPingResponse(const ServerAddress& hostAndPort);
 
     /**
-     * Called when a ServerHeartBeatSucceededEvent is published - A heartbeat sent to the server at
-     * hostAndPort succeeded. durationMS is the execution time of the event, including the time it
-     * took to send the message and recieve the reply from the server.
+     * Should only be called while holding the _mutex. Returns true if _serverPingRTTs contains an
+     * element corresponding to hostAndPort.
      */
-    virtual void onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
-                                                 const ServerAddress& hostAndPort){};
-
-    /*
-     * Called when a ServerPingFailedEvent is published - A monitoring ping to the server at
-     * hostAndPort was not successful.
-     */
-    virtual void onServerPingFailedEvent(const ServerAddress& hostAndPort, const Status& status){};
+    bool _hasPingResponse_inlock(const ServerAddress& hostAndPort);
 
     /**
-     * Called when a ServerPingSucceededEvent is published - A monitoring ping to the server at
-     * hostAndPort was successful. durationMS is the measured RTT (Round Trip Time).
+     * Returns the response for the most recent onServerPing event. MUST be called after a ping has
+     * been sent and proccessed in order to remove it from the map and make room for the next.
      */
-    virtual void onServerPingSucceededEvent(IsMasterRTT durationMS,
-                                            const ServerAddress& hostAndPort){};
+    StatusWith<IsMasterRTT> getPingResponse(const ServerAddress& hostAndPort);
+
+private:
+    Mutex _mutex;
+    stdx::unordered_map<ServerAddress, StatusWith<IsMasterRTT>> _serverPingRTTs;
 };
+
 }  // namespace mongo::sdam

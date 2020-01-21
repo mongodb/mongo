@@ -48,6 +48,11 @@ public:
                                      std::shared_ptr<executor::TaskExecutor> executor);
 
     /**
+     * Starts the pinging loop.
+     */
+    void init();
+
+    /**
      * Signals that the SingleServerPingMonitor has been dropped and should cancel any outstanding
      * pings scheduled to execute in the future. Contract: Once drop() is completed, the
      * SingleServerPingMonitor will stop broadcasting results to the listener.
@@ -55,6 +60,33 @@ public:
     void drop();
 
 private:
+    Date_t now() const {
+        return _executor ? _executor->now() : Date_t::now();
+    }
+
+    /**
+     * Wraps the callback and schedules it to run at some time.
+     *
+     * The callback wrapper does the following:
+     * * Returns before running cb if isDropped is true.
+     * * Returns before running cb if the handle was canceled.
+     * * Locks before running cb and unlocks after.
+     */
+    template <typename Callback>
+    auto _scheduleWorkAt(Date_t when, Callback&& cb) const;
+
+    /**
+     * Schedules the next ping request at _nextPingStartDate.
+     */
+    void _scheduleServerPing();
+
+    /**
+     * Sends a ping to the server and processes the response. If the ping was successful, broadcasts
+     * the RTT (Round Trip Time) and schedules the next ping. Otherwise, broadcasts the error status
+     * and returns.
+     */
+    void _doServerPing();
+
     sdam::ServerAddress _hostAndPort;
 
     /**
@@ -67,15 +99,35 @@ private:
      */
     Seconds _pingFrequency;
 
-
     std::shared_ptr<executor::TaskExecutor> _executor;
+
+    /**
+     * The time at which the next ping should be scheduled. Pings should be sent uniformly across
+     * time at _pingFrequency.
+     */
+    Date_t _nextPingStartDate{};
+
+    /**
+     * Must be held to access any of the member variables below.
+     */
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("SingleServerPingMonitor::mutex");
+
+    /**
+     * Enables a scheduled or outgoing ping to be cancelled upon drop().
+     */
+    executor::TaskExecutor::CallbackHandle _pingHandle;
+
+    /**
+     * Indicates if the server has been dropped and should no longer be monitored.
+     */
+    bool _isDropped = false;
 };
 
 
 /**
  * Monitors the RTT (Round Trip Time) for a set of servers.
  */
-class ServerPingMonitor {
+class ServerPingMonitor : public sdam::TopologyListener {
     ServerPingMonitor(const ServerPingMonitor&) = delete;
     ServerPingMonitor& operator=(const ServerPingMonitor&) = delete;
 
@@ -91,36 +143,40 @@ public:
     ~ServerPingMonitor();
 
     /**
+     * Drops all SingleServerMonitors and shuts down the task executor.
+     */
+    void shutdown();
+
+    /**
      * The first isMaster exchange for a server succeeded. Creates a new
      * SingleServerPingMonitor to monitor the new replica set member.
      */
-    void onServerHandshakeCompleteEvent(sdam::ServerAddress address, OID topologyId);
+    void onServerHandshakeCompleteEvent(const sdam::ServerAddress& address, OID topologyId);
 
     /**
      * The connection to the server was closed. Removes the server from the ServerPingMonitorList.
      */
-    void onServerClosedEvent(sdam::ServerAddress address, OID topologyId);
+    void onServerClosedEvent(const sdam::ServerAddress& address, OID topologyId);
 
 private:
     /**
-     * Sets up and starts up the _executor. Creates a new executor if one wasn't provided.
+     * Sets up and starts up the _executor if it did not already exist.
      */
-    void _setupTaskExecutor(boost::optional<std::shared_ptr<executor::TaskExecutor>> executor);
-
+    void _setupTaskExecutor_inlock();
     /**
      * Listens for when new RTT (Round Trip Time) values are published.
      */
     sdam::TopologyListener* _rttListener;
 
     /**
-     * Executor for performing server monitoring pings for all of the replica set members.
-     */
-    std::shared_ptr<executor::TaskExecutor> _executor;
-
-    /**
      * The interval at which ping requests should be sent to measure the RTT (Round Trip Time).
      */
     Seconds _pingFrequency;
+
+    /**
+     * Executor for performing server monitoring pings for all of the replica set members.
+     */
+    std::shared_ptr<executor::TaskExecutor> _executor;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerPingMonitor::mutex");
 
@@ -129,8 +185,10 @@ private:
      * Note: SingleServerPingMonitor's drop() should always be called before removing it from the
      * _serverPingMonitorMap.
      */
-    stdx::unordered_map<sdam::ServerAddress, std::unique_ptr<SingleServerPingMonitor>>
+    stdx::unordered_map<sdam::ServerAddress, std::shared_ptr<SingleServerPingMonitor>>
         _serverPingMonitorMap;
+
+    bool _isShutdown{false};
 };
 
 }  // namespace mongo
