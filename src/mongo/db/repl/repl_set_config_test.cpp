@@ -366,6 +366,18 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+
+    // If we provide an explicit term field, then we should not fail initialize since we overwrite
+    // the invalid term. This tests the case where a reconfig command passes in an invalid term.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term"
+                                     << "1"
+                                     << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"))),
+                                1 /* explicit term */));
+    ASSERT_OK(config.validate());
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadMembers) {
@@ -1672,6 +1684,7 @@ TEST(ReplSetConfig, ReplSetId) {
                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                    << "localhost:12345"
                                                                    << "priority" << 1))),
+                                     boost::none,
                                      defaultReplicaSetId));
     ASSERT_OK(configLocal.validate());
     ASSERT_TRUE(configLocal.hasReplicaSetId());

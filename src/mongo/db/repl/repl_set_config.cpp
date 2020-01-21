@@ -96,15 +96,20 @@ const std::string kCatchUpTakeoverDelayFieldName = "catchUpTakeoverDelayMillis";
 
 }  // namespace
 
-Status ReplSetConfig::initialize(const BSONObj& cfg, OID defaultReplicaSetId) {
-    return _initialize(cfg, false, defaultReplicaSetId);
+Status ReplSetConfig::initialize(const BSONObj& cfg,
+                                 boost::optional<long long> forceTerm,
+                                 OID defaultReplicaSetId) {
+    return _initialize(cfg, false, forceTerm, defaultReplicaSetId);
 }
 
 Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg) {
-    return _initialize(cfg, true, OID());
+    return _initialize(cfg, true, OpTime::kInitialTerm, OID());
 }
 
-Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defaultReplicaSetId) {
+Status ReplSetConfig::_initialize(const BSONObj& cfg,
+                                  bool forInitiate,
+                                  boost::optional<long long> forceTerm,
+                                  OID defaultReplicaSetId) {
     _isInitialized = false;
     _members.clear();
 
@@ -132,17 +137,19 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defa
         return status;
 
     //
-    // Parse term. Default to -1 if none is given. Initial configs always have the initial term.
+    // Set term
     //
-    if (forInitiate) {
-        _term = OpTime::kInitialTerm;
+    if (forceTerm != boost::none) {
+        // Set term to the value explicitly passed in.
+        _term = forceTerm.get();
     } else {
+        // Parse term if an explicit term was not passed in. If we cannot find a term to parse,
+        // default to -1.
         status = bsonExtractIntegerFieldWithDefault(
             cfg, kTermFieldName, OpTime::kUninitializedTerm, &_term);
         if (!status.isOK())
             return status;
     }
-
 
     //
     // Parse members

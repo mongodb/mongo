@@ -79,12 +79,17 @@ public:
     /**
      * Initializes this ReplSetConfig from the contents of "cfg".
      * Sets _replicaSetId to "defaultReplicaSetId" if a replica set ID is not specified in "cfg".
+     * If forceTerm is not boost::none, sets _term to the given term. Otherwise, parses term from
+     * config BSON.
      */
-    Status initialize(const BSONObj& cfg, OID defaultReplicaSetId = OID());
+    Status initialize(const BSONObj& cfg,
+                      boost::optional<long long> forceTerm = boost::none,
+                      OID defaultReplicaSetId = OID());
 
     /**
      * Same as the generic initialize() above except will default "configsvr" setting to the value
      * of serverGlobalParams.configsvr.
+     * Sets _term to kInitialTerm.
      */
     Status initializeForInitiate(const BSONObj& cfg);
 
@@ -419,8 +424,13 @@ private:
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if forInitiate is false and 'cfg' does not
      * contain an ID.
+     * Sets _term to kInitialTerm for initiate.
+     * Sets _term to forceTerm if it is not boost::none. Otherwise, parses term from 'cfg'.
      */
-    Status _initialize(const BSONObj& cfg, bool forInitiate, OID defaultReplicaSetId);
+    Status _initialize(const BSONObj& cfg,
+                       bool forInitiate,
+                       boost::optional<long long> forceTerm,
+                       OID defaultReplicaSetId);
 
     bool _isInitialized = false;
     long long _version = 1;

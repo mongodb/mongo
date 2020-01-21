@@ -2752,7 +2752,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     BSONObj oldConfigObj = oldConfig.toBSON();
     audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);
 
-    Status status = newConfig.initialize(newConfigObj, oldConfig.getReplicaSetId());
+    // When initializing a new config through the replSetReconfig command, ignore the term
+    // field passed in through its args. Instead, use this node's term.
+    Status status =
+        newConfig.initialize(newConfigObj, _topCoord->getTerm(), oldConfig.getReplicaSetId());
     if (!status.isOK()) {
         error() << "replSetReconfig got " << status << " while parsing " << newConfigObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());

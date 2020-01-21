@@ -49,12 +49,12 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
-    ASSERT_OK(config.initializeForInitiate(BSON("_id"
-                                                << "rs0"
-                                                << "version" << 2 << "term" << OpTime::kInitialTerm
-                                                << "protocolVersion" << 1 << "members"
-                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                         << "h1")))));
+    ASSERT_OK(
+        config.initializeForInitiate(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")))));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
