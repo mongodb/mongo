@@ -797,6 +797,12 @@ public:
     virtual long long getTerm() const = 0;
 
     /**
+     * Returns the TopologyVersion. It is possible to return a stale value. This is safe because
+     * we expect the 'processId' field to never change and 'counter' should always be increasing.
+     */
+    virtual TopologyVersion getTopologyVersion() const = 0;
+
+    /**
      * Attempts to update the current term for the V1 election protocol. If the term changes and
      * this node is primary, relinquishes primary.
      * Returns a Status OK if the term was *not* updated (meaning, it is safe to proceed with

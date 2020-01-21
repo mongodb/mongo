@@ -464,6 +464,10 @@ void ReplicationCoordinatorNoOp::updateAndLogStateTransitionMetrics(
     MONGO_UNREACHABLE;
 }
 
+TopologyVersion ReplicationCoordinatorNoOp::getTopologyVersion() const {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMasterResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,

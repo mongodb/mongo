@@ -256,6 +256,8 @@ public:
         const size_t numOpsKilled,
         const size_t numOpsRunning) const final;
 
+    TopologyVersion getTopologyVersion() const final;
+
     std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,

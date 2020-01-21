@@ -750,6 +750,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
         'commands/server_status_core',
+        'repl/replica_set_messages',
     ],
 )
 

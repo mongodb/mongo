@@ -555,6 +555,10 @@ void ReplicationCoordinatorMock::updateAndLogStateTransitionMetrics(
     return;
 }
 
+TopologyVersion ReplicationCoordinatorMock::getTopologyVersion() const {
+    return TopologyVersion(repl::instanceId, 0);
+}
+
 std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMasterResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,

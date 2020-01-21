@@ -104,6 +104,7 @@ MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
+MONGO_FAIL_POINT_DEFINE(failWithErrorCodeInRunCommand);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not master error resulted in network disconnection.
@@ -430,6 +431,38 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
     operationTime.appendAsOperationTime(commandBodyFieldsBob);
 }
 
+void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
+                                         BSONObjBuilder* commandBodyFieldsBob,
+                                         const OperationSessionInfoFromClient& sessionOptions,
+                                         const std::string& commandName,
+                                         boost::optional<ErrorCodes::Error> code,
+                                         boost::optional<ErrorCodes::Error> wcCode,
+                                         bool isInternalClient) {
+    auto errorLabels =
+        getErrorLabels(opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
+    commandBodyFieldsBob->appendElements(errorLabels);
+
+    auto isStateChangeError = false;
+    if (code) {
+        isStateChangeError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*code) ||
+            ErrorCodes::isA<ErrorCategory::ShutdownError>(*code);
+    }
+
+    if (!isStateChangeError && wcCode) {
+        isStateChangeError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode) ||
+            ErrorCodes::isA<ErrorCategory::ShutdownError>(*wcCode);
+    }
+
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+        !isStateChangeError) {
+        return;
+    }
+    const auto topologyVersion = replCoord->getTopologyVersion();
+    BSONObjBuilder topologyVersionBuilder(commandBodyFieldsBob->subobjStart("topologyVersion"));
+    topologyVersion.serialize(&topologyVersionBuilder);
+}
+
 namespace {
 void _abortUnpreparedOrStashPreparedTransaction(
     OperationContext* opCtx, TransactionParticipant::Participant* txnParticipant) {
@@ -667,7 +700,18 @@ bool runCommandImpl(OperationContext* opCtx,
         };
 
         try {
-            if (shouldCheckOutSession) {
+            if (MONGO_unlikely(failWithErrorCodeInRunCommand.shouldFail())) {
+                auto scoped = failWithErrorCodeInRunCommand.scoped();
+                const auto errorCode = scoped.getData()["errorCode"].numberInt();
+                log() << "failWithErrorCodeInRunCommand enabled - failing command with error "
+                         "code: "
+                      << errorCode;
+                BSONObjBuilder errorBuilder;
+                errorBuilder.append("ok", 0.0);
+                errorBuilder.append("code", errorCode);
+                errorBuilder.append("errmsg", "failWithErrorCodeInRunCommand enabled.");
+                replyBuilder->setCommandReply(errorBuilder.obj());
+            } else if (shouldCheckOutSession) {
                 invokeWithSessionCheckedOut(opCtx, invocation, sessionOptions, replyBuilder);
             } else {
                 invocation->run(opCtx, replyBuilder);
@@ -731,9 +775,10 @@ bool runCommandImpl(OperationContext* opCtx,
     behaviors.attachCurOpErrInfo(opCtx, replyBuilder->getBodyBuilder().asTempObj());
 
     {
-        boost::optional<ErrorCodes::Error> wcCode;
         boost::optional<ErrorCodes::Error> code;
-        auto response = replyBuilder->getBodyBuilder().asTempObj();
+        boost::optional<ErrorCodes::Error> wcCode;
+        auto body = replyBuilder->getBodyBuilder();
+        auto response = body.asTempObj();
         auto codeField = response["code"];
         if (!ok && codeField.isNumber()) {
             code = ErrorCodes::Error(codeField.numberInt());
@@ -743,15 +788,13 @@ bool runCommandImpl(OperationContext* opCtx,
         }
         auto isInternalClient = opCtx->getClient()->session() &&
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-        auto errorLabels = getErrorLabels(
-            opCtx, sessionOptions, command->getName(), code, wcCode, isInternalClient);
-        replyBuilder->getBodyBuilder().appendElements(errorLabels);
+        appendErrorLabelsAndTopologyVersion(
+            opCtx, &body, sessionOptions, command->getName(), code, wcCode, isInternalClient);
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
     behaviors.appendReplyMetadata(opCtx, request, &commandBodyBob);
     appendClusterAndOperationTime(opCtx, &commandBodyBob, &commandBodyBob, startOperationTime);
-
     return ok;
 }
 
@@ -1049,9 +1092,13 @@ void execCommandDatabase(OperationContext* opCtx,
         }
         auto isInternalClient = opCtx->getClient()->session() &&
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-        auto errorLabels = getErrorLabels(
-            opCtx, sessionOptions, command->getName(), e.code(), wcCode, isInternalClient);
-        extraFieldsBuilder.appendElements(errorLabels);
+        appendErrorLabelsAndTopologyVersion(opCtx,
+                                            &extraFieldsBuilder,
+                                            sessionOptions,
+                                            command->getName(),
+                                            e.code(),
+                                            wcCode,
+                                            isInternalClient);
 
         BSONObjBuilder metadataBob;
         behaviors.appendReplyMetadata(opCtx, request, &metadataBob);

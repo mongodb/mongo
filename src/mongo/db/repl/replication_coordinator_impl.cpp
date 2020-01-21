@@ -63,6 +63,7 @@
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -2992,6 +2993,7 @@ void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
 void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(OperationContext* opCtx,
                                                                WithLock lock) {
     _topCoord->incrementTopologyVersion();
+    _cachedTopologyVersionCounter.store(_topCoord->getTopologyVersion().getCounter());
     // Create an isMaster response for each horizon the server is knowledgeable about.
     for (auto iter = _horizonToPromiseMap.begin(); iter != _horizonToPromiseMap.end(); iter++) {
         auto response = _makeIsMasterResponse(iter->first, lock);
@@ -4116,6 +4118,10 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
 long long ReplicationCoordinatorImpl::getTerm() const {
     // Note: no mutex acquisition here, as we are reading an Atomic variable.
     return _termShadow.load();
+}
+
+TopologyVersion ReplicationCoordinatorImpl::getTopologyVersion() const {
+    return TopologyVersion(repl::instanceId, _cachedTopologyVersionCounter.load());
 }
 
 EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(

@@ -339,6 +339,8 @@ public:
         const size_t numOpsKilled,
         const size_t numOpsRunning) const override;
 
+    virtual TopologyVersion getTopologyVersion() const override;
+
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
@@ -1570,6 +1572,9 @@ private:
 
     // If we're in terminal shutdown.  If true, we'll refuse to vote in elections.
     bool _inTerminalShutdown = false;  // (M)
+
+    // The cached value of the 'counter' field in the server's TopologyVersion.
+    AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)
 };
 
 }  // namespace repl

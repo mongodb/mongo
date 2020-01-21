@@ -319,6 +319,8 @@ public:
 
     virtual void setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites);
 
+    virtual TopologyVersion getTopologyVersion() const;
+
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
