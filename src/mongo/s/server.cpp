@@ -579,6 +579,13 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             ->getBalancerConfiguration()
             ->refreshAndCheck(opCtx)
             .transitional_ignore();
+
+        try {
+            ReadWriteConcernDefaults::get(serviceContext).refreshIfNecessary(opCtx);
+        } catch (const DBException& ex) {
+            warning() << "Failed to load read and write concern defaults at startup"
+                      << causedBy(redact(ex.toStatus()));
+        }
     }
 
     startMongoSFTDC();

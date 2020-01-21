@@ -525,6 +525,17 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
+    try {
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+            replSettings.usingReplSets()) {
+            ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
+                .refreshIfNecessary(startupOpCtx.get());
+        }
+    } catch (const DBException& ex) {
+        warning() << "Failed to load read and write concern defaults at startup"
+                  << causedBy(redact(ex.toStatus()));
+    }
+
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
     BackupCursorHooks::initialize(serviceContext, storageEngine);

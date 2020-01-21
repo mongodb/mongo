@@ -32,11 +32,18 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(failRWCDefaultsLookup);
+
 BSONObj getPersistedDefaultRWConcernDocument(OperationContext* opCtx) {
+    uassert(51762,
+            "Failing read/write concern persisted defaults lookup because of fail point",
+            !MONGO_unlikely(failRWCDefaultsLookup.shouldFail()));
+
     DBDirectClient client(opCtx);
     return client.findOne(NamespaceString::kConfigSettingsNamespace.toString(),
                           QUERY("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
