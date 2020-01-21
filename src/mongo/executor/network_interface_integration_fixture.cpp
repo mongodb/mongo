@@ -50,6 +50,9 @@ namespace executor {
 void NetworkInterfaceIntegrationFixture::createNet(
     std::unique_ptr<NetworkConnectionHook> connectHook) {
     ConnectionPool::Options options;
+
+    options.minConnections = 0u;
+
 #ifdef _WIN32
     // Connections won't queue on widnows, so attempting to open too many connections
     // concurrently will result in refused connections and test failure.

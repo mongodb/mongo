@@ -47,6 +47,8 @@ namespace mongo {
 namespace executor {
 
 class NetworkInterfaceTL : public NetworkInterface {
+    static constexpr int kDiagnosticLogLevel = 4;
+
 public:
     NetworkInterfaceTL(std::string instanceName,
                        ConnectionPool::Options connPoolOpts,
@@ -86,7 +88,7 @@ public:
     void dropConnections(const HostAndPort& hostAndPort) override;
 
 private:
-    struct CommandState {
+    struct CommandState final : public std::enable_shared_from_this<CommandState> {
         CommandState(NetworkInterfaceTL* interface_,
                      RemoteCommandRequestOnAny request_,
                      const TaskExecutor::CallbackHandle& cbHandle_,
@@ -100,6 +102,41 @@ private:
                          const TaskExecutor::CallbackHandle& cbHandle,
                          Promise<RemoteCommandOnAnyResponse> promise);
 
+        /**
+         * Return the client object bound to the current command or nullptr if there isn't one.
+         *
+         * This is only useful on the networking thread (i.e. the reactor).
+         */
+        AsyncDBClient* client();
+
+        /**
+         * Set a timer to fulfill the promise with a timeout error.
+         */
+        void setTimer();
+
+        /**
+         * Cancel the current client operation or do nothing if there is no client.
+         *
+         * This must be called from the networking thread (i.e. the reactor).
+         */
+        void cancel();
+
+        /**
+         * Return the current connection to the pool and unset it locally.
+         *
+         * This must be called from the networking thread (i.e. the reactor).
+         */
+        void returnConnection(Status status);
+
+        /**
+         * Fulfill the promise for the Command.
+         *
+         * This will throw/invariant if called multiple times. In an ideal world, this would do the
+         * swap on CommandState::done for you and return early if it was already true. It does not
+         * do so currently.
+         */
+        void tryFinish(Status status);
+
         NetworkInterfaceTL* interface;
 
         RemoteCommandRequestOnAny requestOnAny;
@@ -108,9 +145,11 @@ private:
         Date_t deadline = RemoteCommandRequest::kNoExpirationDate;
         Date_t start;
 
+        BatonHandle baton;
+        std::unique_ptr<transport::ReactorTimer> timer;
+
         StrongWeakFinishLine finishLine;
         ConnectionPool::ConnectionHandle conn;
-        std::unique_ptr<transport::ReactorTimer> timer;
 
         AtomicWord<bool> done;
         Promise<RemoteCommandOnAnyResponse> promise;
@@ -137,13 +176,19 @@ private:
     void _answerAlarm(Status status, std::shared_ptr<AlarmState> state);
 
     void _run();
-    void _onAcquireConn(std::shared_ptr<CommandState> state,
-                        ConnectionPool::ConnectionHandle conn,
-                        const BatonHandle& baton);
+
+    /**
+     * Structure a future chain based upon a CommandState that has received a good connection
+     *
+     * This command starts on the reactor to launch the command and its future chain must end on the
+     * reactor to return the connection. The internal future chain essentially starts with sending
+     * the RemoteCommandRequest and ends with receiving the RemoteCommandResponse.
+     */
+    void _onAcquireConn(std::shared_ptr<CommandState> state) noexcept;
 
     std::string _instanceName;
-    ServiceContext* _svcCtx;
-    transport::TransportLayer* _tl;
+    ServiceContext* _svcCtx = nullptr;
+    transport::TransportLayer* _tl = nullptr;
     // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup
     std::unique_ptr<transport::TransportLayer> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
@@ -153,7 +198,9 @@ private:
     ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::shared_ptr<ConnectionPool> _pool;
-    Counters _counters;
+
+    class SynchronizedCounters;
+    std::shared_ptr<SynchronizedCounters> _counters;
 
     std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
 

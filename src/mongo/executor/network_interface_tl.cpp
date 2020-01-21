@@ -36,6 +36,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/connection_pool_tl.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
@@ -44,6 +45,51 @@
 namespace mongo {
 namespace executor {
 
+/**
+ * SynchronizedCounters is synchronized bucket of event counts for commands
+ */
+class NetworkInterfaceTL::SynchronizedCounters {
+public:
+    auto get() const {
+        stdx::lock_guard lk(_mutex);
+        return _data;
+    }
+
+
+    void recordResult(const Status& status) {
+        stdx::lock_guard lk(_mutex);
+        if (status.isOK()) {
+            // Increment the count of commands that received a valid response
+            ++_data.succeeded;
+        } else if (ErrorCodes::isExceededTimeLimitError(status)) {
+            // Increment the count of commands that experienced a local timeout
+            // Note that these commands do not count as "failed".
+            ++_data.timedOut;
+        } else if (ErrorCodes::isCancelationError(status)) {
+            // Increment the count of commands that were canceled locally
+            ++_data.canceled;
+        } else if (ErrorCodes::isShutdownError(status)) {
+            // Increment the count of commands that received an unrecoverable response
+            ++_data.failedRemotely;
+        } else {
+            // Increment the count of commands that experienced a network failure
+            ++_data.failed;
+        }
+    }
+
+    /**
+     * Increment the count of commands sent over the network
+     */
+    void recordSent() {
+        ++_data.sent;
+    }
+
+private:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
+                                            "NetworkInterfaceTL::SynchronizedCounters::_mutex");
+    Counters _data;
+};
+
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
                                        ConnectionPool::Options connPoolOpts,
                                        ServiceContext* svcCtx,
@@ -51,9 +97,6 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
                                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook)
     : _instanceName(std::move(instanceName)),
       _svcCtx(svcCtx),
-      _tl(nullptr),
-      _ownedTransportLayer(nullptr),
-      _reactor(nullptr),
       _connPoolOpts(std::move(connPoolOpts)),
       _onConnectHook(std::move(onConnectHook)),
       _metadataHook(std::move(metadataHook)),
@@ -75,6 +118,10 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
         _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
     _pool = std::make_shared<ConnectionPool>(
         std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
+
+    if (getTestCommandsEnabled()) {
+        _counters = std::make_unique<SynchronizedCounters>();
+    }
 }
 
 std::string NetworkInterfaceTL::getDiagnosticString() {
@@ -91,9 +138,8 @@ void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const
 }
 
 NetworkInterface::Counters NetworkInterfaceTL::getCounters() const {
-    invariant(getTestCommandsEnabled());
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _counters;
+    invariant(_counters);
+    return _counters->get();
 }
 
 std::string NetworkInterfaceTL::getHostName() {
@@ -201,13 +247,107 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
     return state;
 }
 
-NetworkInterfaceTL::CommandState::~CommandState() {
-    invariant(interface);
+AsyncDBClient* NetworkInterfaceTL::CommandState::client() {
+    if (!conn) {
+        return nullptr;
+    }
+
+    return checked_cast<connection_pool_tl::TLConnection*>(conn.get())->client();
+}
+
+void NetworkInterfaceTL::CommandState::setTimer() {
+    if (deadline == RemoteCommandRequest::kNoExpirationDate) {
+        return;
+    }
+
+    const auto nowVal = interface->now();
+    if (nowVal >= deadline) {
+        auto connDuration = nowVal - start;
+        uasserted(ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                  str::stream() << "Remote command timed out while waiting to get a "
+                                   "connection from the pool, took "
+                                << connDuration << ", timeout was set to " << requestOnAny.timeout);
+    }
+
+    // TODO reform with SERVER-41459
+    timer = interface->_reactor->makeTimer();
+    timer->waitUntil(deadline, baton).getAsync([this, anchor = shared_from_this()](Status status) {
+        if (!status.isOK()) {
+            return;
+        }
+
+        if (done.swap(true)) {
+            return;
+        }
+
+        const std::string message = str::stream() << "Request " << requestOnAny.id << " timed out"
+                                                  << ", deadline was " << deadline.toString()
+                                                  << ", op was " << redact(requestOnAny.toString());
+
+        LOG(2) << message;
+        promise.setError(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, message));
+    });
+}
+
+void NetworkInterfaceTL::CommandState::returnConnection(Status status) {
+    // Settle the connection object on the reactor
+    invariant(conn);
+    invariant(interface->_reactor->onReactorThread());
+
+    auto connToReturn = std::exchange(conn, {});
+
+    if (!status.isOK()) {
+        connToReturn->indicateFailure(std::move(status));
+        return;
+    }
+
+    connToReturn->indicateUsed();
+    connToReturn->indicateSuccess();
+}
+
+void NetworkInterfaceTL::CommandState::tryFinish(Status status) {
+    if (timer) {
+        // The command has resolved one way or another,
+        timer->cancel(baton);
+    }
+
+    if (!status.isOK() && !finishLine.arriveStrongly()) {
+        // If we failed, then get the client to finish up.
+        // Note: CommandState::returnConnection() and CommandState::cancel() run on the reactor
+        // thread only. One goes first and then the other, so there isn't a risk of canceling
+        // the next command to run on the connection.
+        if (interface->_reactor->onReactorThread()) {
+            cancel();
+        } else {
+            ExecutorFuture<void>(interface->_reactor)
+                .getAsync([this, anchor = shared_from_this()](Status status) {
+                    invariant(status.isOK());
+                    cancel();
+                });
+        }
+    }
+
+    if (interface->_counters) {
+        // Increment our counters for the integration test
+        interface->_counters->recordResult(status);
+    }
 
     {
+        // We've finished, we're not in progress anymore
         stdx::lock_guard lk(interface->_inProgressMutex);
         interface->_inProgress.erase(cbHandle);
     }
+}
+
+void NetworkInterfaceTL::CommandState::cancel() {
+    if (auto clientPtr = client()) {
+        // If we have a client, cancel it
+        clientPtr->cancel(baton);
+    }
+}
+
+NetworkInterfaceTL::CommandState::~CommandState() {
+    invariant(!conn);
 }
 
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
@@ -218,7 +358,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
-    LOG(3) << "startCommand: " << redact(request.toString());
+    LOG(kDiagnosticLogLevel) << "startCommand: " << redact(request.toString());
 
     if (_metadataHook) {
         BSONObjBuilder newMetadata(std::move(request.metadata));
@@ -238,6 +378,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->start + cmdState->requestOnAny.timeout;
     }
+    cmdState->baton = baton;
 
     /**
      * It is important that onFinish() runs out of line. That said, we can't thenRunOn() arbitrarily
@@ -262,11 +403,14 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
      */
 
     // When our command finishes, run onFinish
-    std::move(pf.future)
-        .onError([requestId = cmdState->requestOnAny.id](
-                     auto error) -> StatusWith<RemoteCommandOnAnyResponse> {
-            LOG(2) << "Failed to get connection from pool for request " << requestId << ": "
-                   << redact(error);
+    std::move(pf.future).getAsync([this, cmdState, onFinish = std::move(onFinish)](
+                                      StatusWith<RemoteCommandOnAnyResponse> response) {
+        cmdState->tryFinish(response.getStatus());
+
+        auto duration = now() - cmdState->start;
+        if (!response.isOK()) {
+            auto error = response.getStatus();
+            LOG(2) << "Request " << cmdState->requestOnAny.id << " failed: " << redact(error);
 
             // The TransportLayer has, for historical reasons returned SocketException
             // for network errors, but sharding assumes HostUnreachable on network
@@ -274,20 +418,15 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
             if (error == ErrorCodes::SocketException) {
                 error = Status(ErrorCodes::HostUnreachable, error.reason());
             }
-            return error;
-        })
-        .getAsync([this, cmdState, onFinish = std::move(onFinish)](
-                      StatusWith<RemoteCommandOnAnyResponse> response) {
-            auto duration = now() - cmdState->start;
-            if (!response.isOK()) {
-                onFinish(RemoteCommandOnAnyResponse(boost::none, response.getStatus(), duration));
-            } else {
-                const auto& rs = response.getValue();
-                LOG(2) << "Request " << cmdState->requestOnAny.id << " finished with response: "
-                       << redact(rs.isOK() ? rs.data.toString() : rs.status.toString());
-                onFinish(rs);
-            }
-        });
+
+            onFinish(RemoteCommandOnAnyResponse(boost::none, error, duration));
+        } else {
+            const auto& rs = response.getValue();
+            LOG(2) << "Request " << cmdState->requestOnAny.id << " finished with response: "
+                   << redact(rs.isOK() ? rs.data.toString() : rs.status.toString());
+            onFinish(rs);
+        }
+    });
 
     if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
         log() << "Discarding command due to failpoint before acquireConn";
@@ -295,8 +434,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     // Attempt to use a connection and update our accounting
-    auto resolver = [this, baton, cmdState](StatusWith<ConnectionPool::ConnectionHandle> swConn,
-                                            size_t idx) -> Status {
+    auto resolver = [this, cmdState](StatusWith<ConnectionPool::ConnectionHandle> swConn,
+                                     size_t idx) -> Status {
         // Our connection wasn't any good
         if (!swConn.isOK()) {
             if (cmdState->finishLine.arriveWeakly()) {
@@ -313,17 +452,11 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
         // We have a connection and the command hasn't already been attempted
         cmdState->request.emplace(cmdState->requestOnAny, idx);
+        cmdState->conn = std::move(swConn.getValue());
 
-        if (MONGO_unlikely(networkInterfaceDiscardCommandsAfterAcquireConn.shouldFail())) {
-            log() << "Discarding command due to failpoint after acquireConn";
-            return Status::OK();
-        }
+        networkInterfaceDiscardCommandsAfterAcquireConn.pauseWhileSet();
 
-        try {
-            _onAcquireConn(cmdState, std::move(swConn.getValue()), baton);
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
+        _onAcquireConn(cmdState);
 
         return Status::OK();
     };
@@ -364,112 +497,78 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     return Status::OK();
 }
 
-// This is only called from within a then() callback on a future, so throwing is equivalent to
-// returning a ready Future with a not-OK status.
-void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
-                                        ConnectionPool::ConnectionHandle conn,
-                                        const BatonHandle& baton) {
+void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state) noexcept {
+    auto clientFuture = makeReadyFutureWith([this, state] {
+        // Do everything we need to in the initial scope and then use the client to run the command
+        // to the network
 
-    if (state->done.load()) {
-        conn->indicateSuccess();
-        uasserted(ErrorCodes::CallbackCanceled, "Command was canceled");
-    }
-
-    state->conn = std::move(conn);
-    auto tlconn = checked_cast<connection_pool_tl::TLConnection*>(state->conn.get());
-    auto client = tlconn->client();
-
-    if (state->deadline != RemoteCommandRequest::kNoExpirationDate) {
-        auto nowVal = now();
-        if (nowVal >= state->deadline) {
-            auto connDuration = nowVal - state->start;
-            uasserted(ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                      str::stream() << "Remote command timed out while waiting to get a "
-                                       "connection from the pool, took "
-                                    << connDuration << ", timeout was set to "
-                                    << state->requestOnAny.timeout);
+        if (state->done.load()) {
+            uasserted(ErrorCodes::CallbackCanceled, "Command was canceled");
         }
 
-        // TODO reform with SERVER-41459
-        state->timer = _reactor->makeTimer();
-        state->timer->waitUntil(state->deadline, baton)
-            .getAsync([this, client, state, baton](Status status) {
-                if (status == ErrorCodes::CallbackCanceled) {
-                    invariant(state->done.load());
-                    return;
+        state->setTimer();
+
+        if (_counters) {
+            _counters->recordSent();
+        }
+
+        return state->client()->runCommandRequest(*state->request, state->baton);
+    });
+
+    auto metadataCallback = [this, state](RemoteCommandResponse response) {
+        // This callback will package up an RCR into a RCoaR and run the metadata hook. We hold it
+        // separate because it needs to run on both paths after thenRunOn().
+        if (state->done.load()) {
+            uasserted(ErrorCodes::CallbackCanceled, "Callback was canceled");
+        }
+
+        const auto& target = state->conn->getHostAndPort();
+
+        if (_metadataHook && response.status.isOK()) {
+            uassertStatusOK(
+                _metadataHook->readReplyMetadata(nullptr, target.toString(), response.data));
+        }
+
+        return RemoteCommandOnAnyResponse(target, std::move(response));
+    };
+
+    if (state->baton) {
+        // If we have a baton then use it for the promise and then switch to the reactor to return
+        // our connection.
+        std::move(clientFuture)
+            .thenRunOn(state->baton)
+            .then(std::move(metadataCallback))
+            .onCompletion([this, state](StatusWith<RemoteCommandOnAnyResponse> swr) {
+                auto status = swr.getStatus();
+                if (state->done.swap(true)) {
+                    return status;
                 }
 
+                state->promise.setFromStatusWith(std::move(swr));
+                return status;
+            })
+            .thenRunOn(_reactor)
+            .getAsync([this, state](Status status) { state->returnConnection(status); });
+    } else {
+        // If we do not have a baton, then we can fulfill the promise and return our connection in
+        // the same callback
+        std::move(clientFuture)
+            .thenRunOn(_reactor)
+            .then(std::move(metadataCallback))
+            .getAsync([this, state](StatusWith<RemoteCommandOnAnyResponse> swr) {
+                auto status = swr.getStatus();
+                ON_BLOCK_EXIT([&] { state->returnConnection(status); });
                 if (state->done.swap(true)) {
                     return;
                 }
 
-                if (getTestCommandsEnabled()) {
-                    stdx::lock_guard<Latch> lk(_mutex);
-                    _counters.timedOut++;
-                }
-
-                const std::string message = str::stream()
-                    << "Request " << state->requestOnAny.id << " timed out"
-                    << ", deadline was " << state->deadline.toString() << ", op was "
-                    << redact(state->requestOnAny.toString());
-
-                LOG(2) << message;
-                state->promise.setError(
-                    Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, message));
-
-                client->cancel(baton);
+                state->promise.setFromStatusWith(std::move(swr));
             });
     }
-
-    client->runCommandRequest(*state->request, baton)
-        .thenRunOn(baton ? ExecutorPtr(baton) : ExecutorPtr(_reactor))
-        .then([this, state](RemoteCommandResponse response) {
-            if (state->done.load()) {
-                uasserted(ErrorCodes::CallbackCanceled, "Callback was canceled");
-            }
-
-            const auto& target = state->conn->getHostAndPort();
-
-            if (_metadataHook && response.status.isOK()) {
-                response.status =
-                    _metadataHook->readReplyMetadata(nullptr, target.toString(), response.data);
-            }
-
-            return RemoteCommandOnAnyResponse(target, std::move(response));
-        })
-        .getAsync([this, state, baton](StatusWith<RemoteCommandOnAnyResponse> swr) {
-            if (!swr.isOK()) {
-                state->conn->indicateFailure(swr.getStatus());
-            } else if (!swr.getValue().isOK()) {
-                state->conn->indicateFailure(swr.getValue().status);
-            } else {
-                state->conn->indicateUsed();
-                state->conn->indicateSuccess();
-            }
-
-            if (state->done.swap(true)) {
-                return;
-            }
-
-            if (getTestCommandsEnabled()) {
-                stdx::lock_guard<Latch> lk(_mutex);
-                if (swr.isOK() && swr.getValue().status.isOK()) {
-                    _counters.succeeded++;
-                } else {
-                    _counters.failed++;
-                }
-            }
-
-            if (state->timer) {
-                state->timer->cancel(baton);
-            }
-
-            state->promise.setFromStatusWith(std::move(swr));
-        });
 }
 
 void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                       const BatonHandle& baton) {
+                                       const BatonHandle&) {
     stdx::unique_lock<Latch> lk(_inProgressMutex);
     auto it = _inProgress.find(cbHandle);
     if (it == _inProgress.end()) {
@@ -487,20 +586,12 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
         return;
     }
 
-    if (getTestCommandsEnabled()) {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _counters.canceled++;
-    }
-
+    // Satisfy the promise locally
     LOG(2) << "Canceling operation; original request was: "
            << redact(state->requestOnAny.toString());
     state->promise.setError({ErrorCodes::CallbackCanceled,
                              str::stream() << "Command canceled; original request was: "
                                            << redact(state->requestOnAny.toString())});
-    if (state->conn) {
-        auto client = checked_cast<connection_pool_tl::TLConnection*>(state->conn.get());
-        client->client()->cancel(baton);
-    }
 }
 
 Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {

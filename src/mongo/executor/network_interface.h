@@ -121,9 +121,11 @@ public:
     virtual std::string getHostName() = 0;
 
     struct Counters {
+        uint64_t sent = 0;
         uint64_t canceled = 0;
         uint64_t timedOut = 0;
         uint64_t failed = 0;
+        uint64_t failedRemotely = 0;
         uint64_t succeeded = 0;
     };
     /*
@@ -172,6 +174,9 @@ public:
     /**
      * Requests cancelation of the network activity associated with "cbHandle" if it has not yet
      * completed.
+     *
+     * Note that the work involved in onFinish may run locally as a result of invoking this
+     * function. Do not hold locks while calling cancelCommand(...).
      */
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                const BatonHandle& baton = nullptr) = 0;

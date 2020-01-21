@@ -245,10 +245,6 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
         .then([start, clkSource, this](rpc::UniqueReply response) {
             auto duration = duration_cast<Milliseconds>(clkSource->now() - start);
             return executor::RemoteCommandResponse(*response, duration);
-        })
-        .onError([start, clkSource](Status status) {
-            auto duration = duration_cast<Milliseconds>(clkSource->now() - start);
-            return executor::RemoteCommandResponse(status, duration);
         });
 }
 
