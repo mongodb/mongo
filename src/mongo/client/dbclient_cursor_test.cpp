@@ -486,6 +486,43 @@ TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
     ASSERT_TRUE(msg.body.getBoolField("readOnce")) << msg.body;
 }
 
+// "Resume fields" refers to $_requestResumeToken and $_resumeAfter.
+TEST_F(DBClientCursorTest, DBClientCursorPassesResumeFields) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss("test", "coll");
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          QUERY("query" << BSONObj() << "$_requestResumeToken" << true
+                                        << "$_resumeAfter" << BSON("$recordId" << 5LL))
+                              .obj,
+                          0,
+                          0,
+                          nullptr,
+                          /*QueryOption*/ 0,
+                          0);
+    cursor.setBatchSize(0);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {});
+
+    conn.setCallResponse(findResponseMsg);
+    ASSERT(cursor.init());
+
+    // Verify that the 'find' request was sent with $_requestResumeToken and $_resumeAfter.
+    auto m = conn.getLastSentMessage();
+    ASSERT(!m.empty());
+    auto msg = OpMsg::parse(m);
+    ASSERT_EQ(OpMsg::flags(m), OpMsg::kChecksumPresent);
+    ASSERT_EQ(msg.body.getStringField("find"), nss.coll());
+    ASSERT_EQ(msg.body["batchSize"].number(), 0);
+    ASSERT_TRUE(msg.body.getBoolField("$_requestResumeToken")) << msg.body;
+    ASSERT_TRUE(msg.body.hasField("$_resumeAfter")) << msg.body;
+    ASSERT_TRUE(msg.body.getObjectField("$_resumeAfter").hasField("$recordId")) << msg.body;
+    ASSERT_EQ(msg.body.getObjectField("$_resumeAfter")["$recordId"].numberLong(), 5LL) << msg.body;
+}
+
 TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     // This tests DBClientCursor in tailable mode. Cases to test are:
     // 1. Initial find command has {tailable: true} set.

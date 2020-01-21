@@ -207,6 +207,7 @@ void CollectionCloner::runQuery() {
             query = QUERY("query" << BSONObj() << "$readOnce" << true << "$_requestResumeToken"
                                   << true);
         }
+        query.hint(BSON("$natural" << 1));
     }
 
     // We reset this every time we retry or resume a query.

@@ -131,6 +131,14 @@ Message DBClientCursor::_assembleInit() {
                 // Legacy queries don't handle readOnce.
                 qr.getValue()->setReadOnce(true);
             }
+            if (query.getBoolField("$_requestResumeToken")) {
+                // Legacy queries don't handle requestResumeToken.
+                qr.getValue()->setRequestResumeToken(true);
+            }
+            if (query.hasField("$_resumeAfter")) {
+                // Legacy queries don't handle resumeAfter.
+                qr.getValue()->setResumeAfter(query.getObjectField("$_resumeAfter"));
+            }
             if (auto replTerm = query[QueryRequest::kTermField]) {
                 // Legacy queries don't handle term.
                 qr.getValue()->setReplicationTerm(replTerm.numberLong());
