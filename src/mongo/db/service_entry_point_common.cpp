@@ -68,6 +68,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -480,6 +481,11 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
                 // Check the session back in and wait for ongoing prepared transaction to complete.
                 MongoDOperationContextSession::checkIn(opCtx);
                 prepareCompleted.wait(opCtx);
+                // Wait for the prepared commit or abort oplog entry to be visible in the oplog.
+                // This will prevent a new transaction from missing the transaction table update for
+                // the previous prepared commit or abort due to an oplog hole.
+                auto storageInterface = repl::StorageInterface::get(opCtx);
+                storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
                 MongoDOperationContextSession::checkOut(opCtx);
             }
         }
