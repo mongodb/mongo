@@ -110,7 +110,8 @@ assert(newPrimaryElectionCandidateMetrics.electionTimeoutMillis,
 assert.eq(newPrimaryElectionCandidateMetrics.electionTimeoutMillis, expectedElectionTimeoutMillis);
 // Since the previous primary's ID is 0, we directly assert that 0 is stored in the
 // priorPrimaryMemberId field.
-assert.eq(newPrimaryElectionCandidateMetrics.priorPrimaryMemberId, 0);
+// TODO (SERVER-45274): Re-enable this assertion.
+// assert.eq(newPrimaryElectionCandidateMetrics.priorPrimaryMemberId, 0);
 
 let newPrimaryElectionParticipantMetrics = newPrimaryReplSetGetStatus.electionParticipantMetrics;
 
@@ -186,7 +187,8 @@ assert.eq(originalPrimaryElectionCandidateMetrics.numVotesNeeded, 2);
 assert.eq(originalPrimaryElectionCandidateMetrics.priorityAtElection, 1);
 assert.eq(originalPrimaryElectionCandidateMetrics.electionTimeoutMillis,
           expectedElectionTimeoutMillis);
-assert.eq(originalPrimaryElectionCandidateMetrics.priorPrimaryMemberId, 1);
+// TODO (SERVER-45274): Re-enable this assertion.
+// assert.eq(originalPrimaryElectionCandidateMetrics.priorPrimaryMemberId, 1);
 
 newPrimaryReplSetGetStatus = assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
 jsTestLog("New primary status (2): " + tojson(newPrimaryReplSetGetStatus));
