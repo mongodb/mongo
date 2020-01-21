@@ -9955,6 +9955,7 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel62-large
+    resmoke_jobs_factor: 0.25
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
