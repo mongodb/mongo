@@ -69,6 +69,14 @@ public:
     using OldestActiveTransactionTimestampCallback =
         std::function<OldestActiveTransactionTimestampResult(Timestamp stableTimestamp)>;
 
+    struct BackupOptions {
+        bool disableIncrementalBackup = false;
+        bool incrementalBackup = false;
+        int blockSizeMB = 16;
+        boost::optional<std::string> thisBackupName;
+        boost::optional<std::string> srcBackupName;
+    };
+
     struct BackupBlock {
         std::string filename;
         std::uint64_t offset;
@@ -314,6 +322,9 @@ public:
      * storage engine will take a backup called 'thisBackupName' which will contain the changes made
      * to data files since the backup named 'srcBackupName'.
      *
+     * The storage engine must use an upper bound limit of 'blockSizeMB' when returning changed
+     * file blocks.
+     *
      * The first full backup meant for incremental and future incremental backups must pass
      * 'incrementalBackup' as true.
      * 'thisBackupName' must exist only if 'incrementalBackup' is true.
@@ -321,10 +332,7 @@ public:
      * when 'incrementalBackup' is true.
      */
     virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
-        OperationContext* opCtx,
-        bool incrementalBackup,
-        boost::optional<std::string> thisBackupName,
-        boost::optional<std::string> srcBackupName) = 0;
+        OperationContext* opCtx, const BackupOptions& options) = 0;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
 

@@ -91,10 +91,7 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
     StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
-        OperationContext* opCtx,
-        bool incrementalBackup,
-        boost::optional<std::string> thisBackupName,
-        boost::optional<std::string> srcBackupName) final {
+        OperationContext* opCtx, const StorageEngine::BackupOptions& options) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }

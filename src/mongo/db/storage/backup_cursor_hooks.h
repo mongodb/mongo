@@ -39,13 +39,6 @@ class OperationContext;
 class ServiceContext;
 class StorageEngine;
 
-struct BackupOptions {
-    bool disableIncrementalBackup = false;
-    bool incrementalBackup = false;
-    boost::optional<std::string> thisBackupName;
-    boost::optional<std::string> srcBackupName;
-};
-
 class BackupCursorHooks {
 public:
     using InitializerFunction = std::function<std::unique_ptr<BackupCursorHooks>(StorageEngine*)>;
@@ -69,7 +62,7 @@ public:
     virtual void fsyncUnlock(OperationContext* opCtx);
 
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                               const BackupOptions& options);
+                                               const StorageEngine::BackupOptions& options);
 
     virtual void closeBackupCursor(OperationContext* opCtx, const UUID& backupId);
 

@@ -571,8 +571,8 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-BackupCursorState MongoInterfaceStandalone::openBackupCursor(OperationContext* opCtx,
-                                                             const BackupOptions& options) {
+BackupCursorState MongoInterfaceStandalone::openBackupCursor(
+    OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         return backupCursorHooks->openBackupCursor(opCtx, options);
