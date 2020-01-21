@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/waitable.h"
 
 namespace mongo {
@@ -50,8 +51,8 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     // The rest of this function only runs during testing, when the clock source is virtualized and
     // does not track the system clock.
 
-    auto currentTime = now();
-    if (deadline <= currentTime) {
+    auto testNow = now();
+    if (deadline <= testNow) {
         return stdx::cv_status::timeout;
     }
 
@@ -84,7 +85,14 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     // This is a wait_until because theoretically setAlarm could run out of line before this cv
     // joins the wait list. Then it could completely miss the notification and block until a lucky
     // renotify or spurious wakeup.
-    Waitable::wait_until(waitable, this, cv, bla, currentTime + kMaxTimeoutForArtificialClocks);
+    auto systemClockSource = SystemClockSource::get();
+    invariant(this != systemClockSource);
+
+    Waitable::wait_until(waitable,
+                         systemClockSource,
+                         cv,
+                         bla,
+                         systemClockSource->now() + kMaxTimeoutForArtificialClocks);
 
     stdx::lock_guard infoLk(alarmInfo->mutex);
     alarmInfo->cv = nullptr;
