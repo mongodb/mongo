@@ -352,7 +352,7 @@ public:
      * The following methods forward to the BackupCursorHooks decorating the ServiceContext.
      */
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                               const BackupOptions& options) = 0;
+                                               const StorageEngine::BackupOptions& options) = 0;
 
     virtual void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) = 0;
 

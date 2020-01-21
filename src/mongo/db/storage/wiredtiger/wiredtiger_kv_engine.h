@@ -177,10 +177,7 @@ public:
     Status disableIncrementalBackup(OperationContext* opCtx) override;
 
     StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
-        OperationContext* opCtx,
-        bool incrementalBackup,
-        boost::optional<std::string> thisBackupName,
-        boost::optional<std::string> srcBackupName) override;
+        OperationContext* opCtx, const StorageEngine::BackupOptions& options) override;
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
 

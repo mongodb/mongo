@@ -183,7 +183,7 @@ public:
     }
 
     BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                       const BackupOptions& options) final {
+                                       const StorageEngine::BackupOptions& options) final {
         return BackupCursorState{UUID::gen(), boost::none, {}};
     }
 

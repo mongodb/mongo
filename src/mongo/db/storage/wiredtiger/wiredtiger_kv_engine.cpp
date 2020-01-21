@@ -1068,20 +1068,18 @@ Status WiredTigerKVEngine::disableIncrementalBackup(OperationContext* opCtx) {
 }
 
 StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNonBlockingBackup(
-    OperationContext* opCtx,
-    bool incrementalBackup,
-    boost::optional<std::string> thisBackupName,
-    boost::optional<std::string> srcBackupName) {
+    OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
     std::stringstream ss;
-    if (incrementalBackup) {
-        invariant(thisBackupName);
+    if (options.incrementalBackup) {
+        invariant(options.thisBackupName);
         ss << "incremental=(enabled=true,force_stop=false,";
-        ss << "this_id=" << std::quoted(str::escape(*thisBackupName)) << ",";
+        ss << "granularity=" << options.blockSizeMB << "MB,";
+        ss << "this_id=" << std::quoted(str::escape(*options.thisBackupName)) << ",";
 
-        if (srcBackupName) {
-            ss << "src_id=" << std::quoted(str::escape(*srcBackupName)) << ",";
+        if (options.srcBackupName) {
+            ss << "src_id=" << std::quoted(str::escape(*options.srcBackupName)) << ",";
         }
 
         ss << ")";

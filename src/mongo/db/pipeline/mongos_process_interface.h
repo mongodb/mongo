@@ -191,7 +191,7 @@ public:
      * a mongos.
      */
     BackupCursorState openBackupCursor(OperationContext* opCtx,
-                                       const BackupOptions& options) final {
+                                       const StorageEngine::BackupOptions& options) final {
         MONGO_UNREACHABLE;
     }
 

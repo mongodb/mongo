@@ -271,10 +271,7 @@ void DevNullKVEngine::setCachePressureForTest(int pressure) {
 }
 
 StatusWith<std::vector<StorageEngine::BackupBlock>> DevNullKVEngine::beginNonBlockingBackup(
-    OperationContext* opCtx,
-    bool incrementalBackup,
-    boost::optional<std::string> thisBackupName,
-    boost::optional<std::string> srcBackupName) {
+    OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
     std::vector<StorageEngine::BackupBlock> blocksToCopy = {{"filename.wt", 0, 0}};
     return blocksToCopy;
 }

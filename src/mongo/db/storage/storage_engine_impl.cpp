@@ -652,11 +652,8 @@ Status StorageEngineImpl::disableIncrementalBackup(OperationContext* opCtx) {
 }
 
 StatusWith<std::vector<StorageEngine::BackupBlock>> StorageEngineImpl::beginNonBlockingBackup(
-    OperationContext* opCtx,
-    bool incrementalBackup,
-    boost::optional<std::string> thisBackupName,
-    boost::optional<std::string> srcBackupName) {
-    return _engine->beginNonBlockingBackup(opCtx, incrementalBackup, thisBackupName, srcBackupName);
+    OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
+    return _engine->beginNonBlockingBackup(opCtx, options);
 }
 
 void StorageEngineImpl::endNonBlockingBackup(OperationContext* opCtx) {
