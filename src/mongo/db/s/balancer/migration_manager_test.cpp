@@ -32,6 +32,8 @@
 #include <memory>
 
 #include "mongo/db/commands.h"
+#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/s/balancer/migration_manager.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -50,6 +52,10 @@ protected:
         _migrationManager = std::make_unique<MigrationManager>(getServiceContext());
         _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
         _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
+
+        // Necessary because the migration manager may take a dist lock, which calls serverStatus
+        // and will attempt to return the latest read write concern defaults.
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
     }
 
     void tearDown() override {
@@ -95,6 +101,7 @@ protected:
     }
 
     std::unique_ptr<MigrationManager> _migrationManager;
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {

@@ -164,7 +164,9 @@ public:
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
             if (request().getInMemory() && *request().getInMemory()) {
-                return rwcDefaults.getDefault(opCtx);
+                auto rwc = rwcDefaults.getDefault(opCtx);
+                rwc.setInMemory(true);
+                return rwc;
             }
 
             // Force a refresh to find the most recent defaults, then return them.

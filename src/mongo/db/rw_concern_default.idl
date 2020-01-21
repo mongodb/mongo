@@ -60,3 +60,7 @@ structs:
                 description: "The wallclock time when this node updated its understanding of the default read or write concern"
                 type: date
                 optional: true
+            inMemory:
+                description: "Whether these defaults were from the inMemory cache"
+                type: bool
+                optional: true

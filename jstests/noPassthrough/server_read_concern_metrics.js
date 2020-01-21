@@ -61,13 +61,19 @@ session.startTransaction();
 assert.eq(sessionColl.find().itcount(), 1);
 assert.commandWorked(session.abortTransaction_forTesting());
 
+function getServerStatus(conn) {
+    // Don't return defaultRWConcern because it may trigger a refresh of the read write concern
+    // defaults, which unexpectedly increases the opReadConcernCounters.
+    return assert.commandWorked(conn.adminCommand({serverStatus: 1, defaultRWConcern: false}));
+}
+
 // Get initial serverStatus.
-let serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+let serverStatus = getServerStatus(testDB);
 verifyServerStatusFields(serverStatus);
 
 // Run a find with no readConcern.
 assert.eq(testColl.find().itcount(), 1);
-let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+let newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -86,7 +92,7 @@ serverStatus = newStatus;
 // Run a find with a readConcern with no level.
 assert.commandWorked(
     testDB.runCommand({find: collName, readConcern: {afterClusterTime: Timestamp(1, 1)}}));
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -105,7 +111,7 @@ serverStatus = newStatus;
 // Run a legacy query.
 primary.forceReadMode("legacy");
 assert.eq(testColl.find().itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -124,7 +130,7 @@ serverStatus = newStatus;
 
 // Run a find with a readConcern level available.
 assert.eq(testColl.find().readConcern("available").itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 1);
@@ -142,7 +148,7 @@ serverStatus = newStatus;
 
 // Run a find with a readConcern level linearizable.
 assert.eq(testColl.find().readConcern("linearizable").itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -160,7 +166,7 @@ serverStatus = newStatus;
 
 // Run a find with a readConcern level local.
 assert.eq(testColl.find().readConcern("local").itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -178,7 +184,7 @@ serverStatus = newStatus;
 
 // Run a find with a readConcern level majority.
 assert.eq(testColl.find().readConcern("majority").itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -197,7 +203,7 @@ serverStatus = newStatus;
 // Run a find in a transaction with readConcern level snapshot.
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.eq(sessionColl.find().itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -217,7 +223,7 @@ serverStatus = newStatus;
 // Run a find in a transaction with no specified readConcern level.
 session.startTransaction();
 assert.eq(sessionColl.find().itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -237,7 +243,7 @@ serverStatus = newStatus;
 // Run a find in a transaction with readConcern level local.
 session.startTransaction({readConcern: {level: "local"}});
 assert.eq(sessionColl.find().itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -257,7 +263,7 @@ serverStatus = newStatus;
 // Run a find in a transaction with readConcern level majority.
 session.startTransaction({readConcern: {level: "majority"}});
 assert.eq(sessionColl.find().itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -276,7 +282,7 @@ serverStatus = newStatus;
 // Run a second find in the same transaction. It will inherit the readConcern from the
 // transaction.
 assert.eq(sessionColl.find().itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -297,7 +303,7 @@ serverStatus = newStatus;
 // in the 'opCounters' serverStatus section, and we only track the readConcern of queries
 // tracked in 'opCounters.query'.
 assert.eq(testColl.aggregate([]).itcount(), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -317,7 +323,7 @@ serverStatus = newStatus;
 // a 'command' in the 'opCounters' serverStatus section, and we only track the readConcern of
 // queries tracked in 'opCounters.query'.
 assert.eq(testColl.count({_id: 0}), 1);
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
@@ -336,9 +342,9 @@ serverStatus = newStatus;
 // getMore does not count toward readConcern metrics. getMore inherits the readConcern of the
 // originating command. It is not counted in 'opCounters.query'.
 let res = assert.commandWorked(testDB.runCommand({find: collName, batchSize: 0}));
-serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+serverStatus = getServerStatus(testDB);
 assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
-newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+newStatus = getServerStatus(testDB);
 verifyServerStatusFields(newStatus);
 verifyServerStatusChange(
     serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);

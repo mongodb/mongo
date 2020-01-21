@@ -89,6 +89,12 @@ var ReadWriteConcernDefaultsPropagation = (function() {
 
                 // Check if they all match the recently-set values.
                 for (var connDefault of checkConnsDefaults) {
+                    if (inMemory) {
+                        assert.eq(true, connDefault.inMemory, tojson(connDefault));
+                    } else {
+                        assert.eq(undefined, connDefault.inMemory, tojson(connDefault));
+                    }
+
                     for (var field of kSetFields) {
                         if (!friendlyEqual(connDefault[field], newDefaultsRes[field])) {
                             return false;

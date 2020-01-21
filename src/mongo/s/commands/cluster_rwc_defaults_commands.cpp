@@ -121,7 +121,10 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             if (request().getInMemory() && *request().getInMemory()) {
-                return ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                auto rwc =
+                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                rwc.setInMemory(true);
+                return rwc;
             }
 
             GetDefaultRWConcern configsvrRequest;
