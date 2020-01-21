@@ -837,7 +837,8 @@ void MigrationSourceManager::_cleanup() {
     }
 
     if (_useFCV44Protocol) {
-        if (_state < kCommittingOnConfig) {
+        if (_state >= kCloning && _state < kCommittingOnConfig) {
+            invariant(_coordinator);
             _coordinator->setMigrationDecision(
                 migrationutil::MigrationCoordinator::Decision::kAborted);
         }
