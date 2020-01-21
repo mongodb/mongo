@@ -49,7 +49,7 @@ public:
      */
     static Message mockFindResponse(NamespaceString nss,
                                     long long cursorId,
-                                    std::vector<BSONObj> firstBatch,
+                                    const std::vector<BSONObj>& firstBatch,
                                     const BSONObj& metadata) {
         auto cursorRes = CursorResponse(nss, cursorId, firstBatch);
         BSONObjBuilder bob(cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse));
@@ -62,7 +62,7 @@ public:
      */
     static Message mockGetMoreResponse(NamespaceString nss,
                                        long long cursorId,
-                                       std::vector<BSONObj> batch,
+                                       const std::vector<BSONObj>& batch,
                                        const BSONObj& metadata,
                                        bool moreToCome = false) {
         auto cursorRes = CursorResponse(nss, cursorId, batch);

@@ -410,6 +410,22 @@ public:
      */
     Milliseconds getAwaitDataTimeout_forTest() const;
 
+    /**
+     * Type of function to create a database client connection. Used for testing only.
+     */
+    using CreateClientFn = std::function<std::unique_ptr<DBClientConnection>()>;
+
+    /**
+     * Overrides how the OplogFetcher creates the client. Used for testing only.
+     */
+    void setCreateClientFn_forTest(const CreateClientFn& createClientFn);
+
+    /**
+     * Get a raw pointer to the client connection. It is the caller's responsibility to not reuse
+     * this pointer beyond the lifetime of the underlying client. Used for testing only.
+     */
+    DBClientConnection* getDBClientConnection_forTest() const;
+
 private:
     // =============== AbstractAsyncComponent overrides ================
 
@@ -532,6 +548,9 @@ private:
     // connection failure. When the OplogFetcher is shut down, the connection will be interrupted
     // via its shutdownAndDisallowReconnect function.
     std::unique_ptr<DBClientConnection> _conn;
+
+    // Used to create the DBClientConnection for the oplog fetcher.
+    CreateClientFn _createClientFn;
 
     // The tailable, awaitData, exhaust cursor used to fetch oplog entries from the sync source.
     // When an error is encountered, depending on the result of OplogFetcherRestartDecision's

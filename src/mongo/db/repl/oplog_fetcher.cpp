@@ -601,13 +601,14 @@ NewOplogFetcher::NewOplogFetcher(
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(lastFetched),
       _metadataObj(makeMetadataObject()),
+      _createClientFn(
+          [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
       _requireFresherSyncSource(requireFresherSyncSource),
       _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
       _awaitDataTimeout(calculateAwaitDataTimeout(config)),
       _batchSize(batchSize),
       _startingPoint(startingPoint) {
-
     invariant(config.isInitialized());
     invariant(!_lastFetched.isNull());
     invariant(onShutdownCallbackFn);
@@ -649,6 +650,16 @@ BSONObj NewOplogFetcher::getFindQuery_forTest(bool initialFind) const {
 
 Milliseconds NewOplogFetcher::getAwaitDataTimeout_forTest() const {
     return _awaitDataTimeout;
+}
+
+void NewOplogFetcher::setCreateClientFn_forTest(const CreateClientFn& createClientFn) {
+    stdx::lock_guard lock(_mutex);
+    _createClientFn = createClientFn;
+}
+
+DBClientConnection* NewOplogFetcher::getDBClientConnection_forTest() const {
+    stdx::lock_guard lock(_mutex);
+    return _conn.get();
 }
 
 OpTime NewOplogFetcher::_getLastOpTimeFetched() const {
