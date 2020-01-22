@@ -8,6 +8,7 @@ env.Library(
     target='sharding_client',
     source=[
         'shard_remote.cpp',
+        'hedging_metrics.cpp',
         'num_hosts_targeted_metrics.cpp',
          env.Idlc('shard_remote.idl')[0],
     ],
