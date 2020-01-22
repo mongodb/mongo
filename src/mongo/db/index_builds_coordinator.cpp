@@ -744,6 +744,12 @@ IndexBuilds IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
 
     auto indexBuilds = _getIndexBuilds();
     auto onIndexBuild = [this, &buildsAborted](std::shared_ptr<ReplIndexBuildState> replState) {
+        if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
+            log() << "IndexBuildsCoordinator::onRollback - not aborting single phase index build: "
+                  << replState->buildUUID;
+            return;
+        }
+
         const std::string reason = "rollback";
         _indexBuildsManager.abortIndexBuild(replState->buildUUID, reason);
 
