@@ -246,6 +246,10 @@ public:
         return _socketTimeout.value_or(Milliseconds{0}).count() / 1000.0;
     }
 
+    void setHandshakeValidationHook(const HandshakeValidationHook& hook) {
+        _hook = hook;
+    }
+
     bool lazySupported() const override {
         return true;
     }

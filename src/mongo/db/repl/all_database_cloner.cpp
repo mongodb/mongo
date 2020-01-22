@@ -51,9 +51,43 @@ BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
     return {&_connectStage, &_listDatabasesStage};
 }
 
+Status AllDatabaseCloner::ensurePrimaryOrSecondary(
+    const executor::RemoteCommandResponse& isMasterReply) {
+    if (!isMasterReply.isOK()) {
+        log() << "Cannot reconnect because isMaster command failed.";
+        return isMasterReply.status;
+    }
+    if (isMasterReply.data["ismaster"].trueValue() || isMasterReply.data["secondary"].trueValue())
+        return Status::OK();
+    // Nodes in a set always have a version; removed nodes never do.
+    if (!isMasterReply.data["setVersion"]) {
+        Status status(ErrorCodes::NotMasterOrSecondary,
+                      str::stream() << "Sync source " << getSource()
+                                    << " has been removed from the replication configuration.");
+        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        // Setting the status in the shared data will cancel the initial sync.
+        getSharedData()->setInitialSyncStatusIfOK(lk, status);
+        return status;
+    }
+    auto source = isMasterReply.data.getStringField("me");
+    return Status(ErrorCodes::NotMasterOrSecondary,
+                  str::stream() << "Cannot connect because sync source " << source
+                                << " is neither primary nor secondary.");
+}
+
 BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
     auto* client = getClient();
-    uassertStatusOK(client->connect(getSource(), StringData()));
+    // If the client already has the address (from a previous attempt), we must allow it to
+    // handle the reconnect itself. This is necessary to get correct backoff behavior.
+    if (client->getServerHostAndPort() != getSource()) {
+        client->setHandshakeValidationHook(
+            [this](const executor::RemoteCommandResponse& isMasterReply) {
+                return ensurePrimaryOrSecondary(isMasterReply);
+            });
+        uassertStatusOK(client->connect(getSource(), StringData()));
+    } else {
+        client->checkConnection();
+    }
     uassertStatusOK(replAuthenticate(client).withContext(
         str::stream() << "Failed to authenticate to " << getSource()));
     return kContinueNormally;
