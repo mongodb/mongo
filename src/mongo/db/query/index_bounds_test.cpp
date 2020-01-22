@@ -174,6 +174,14 @@ TEST(IndexBoundsTest, OILReverseClone) {
                              Interval(BSON("" << 20 << "" << 7), false, true)};
     ASSERT(reverseList == listClone);
     ASSERT(listClone.computeDirection() == Interval::Direction::kDirectionDescending);
+
+    OrderedIntervalList descendingPoints("foo");
+    descendingPoints.intervals.push_back(Interval(BSON("" << 7 << "" << 7), true, true));
+    descendingPoints.intervals.push_back(Interval(BSON("" << 5 << "" << 5), true, true));
+    ASSERT(descendingPoints.computeDirection() == Interval::Direction::kDirectionDescending);
+
+    OrderedIntervalList ascendingPoints = descendingPoints.reverseClone();
+    ASSERT(ascendingPoints.computeDirection() == Interval::Direction::kDirectionAscending);
 }
 
 //

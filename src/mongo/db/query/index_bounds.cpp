@@ -226,14 +226,19 @@ OrderedIntervalList OrderedIntervalList::reverseClone() const {
 }
 
 Interval::Direction OrderedIntervalList::computeDirection() const {
-    for (auto&& iv : intervals) {
-        const auto dir = iv.getDirection();
-        if (dir != Interval::Direction::kDirectionNone) {
-            return dir;
-        }
-    }
+    if (intervals.empty())
+        return Interval::Direction::kDirectionNone;
 
-    return Interval::Direction::kDirectionNone;
+    // Because the interval list is ordered, we only need to compare the two endpoints of the
+    // overall list. If the endpoints are ascending or descending, then each interval already
+    // respects that order. And if the endpoints are equal, then all the intervals must be squeezed
+    // into a single point.
+    bool compareFieldNames = false;
+    int res = intervals.front().start.woCompare(intervals.back().end, compareFieldNames);
+    if (res == 0)
+        return Interval::Direction::kDirectionNone;
+    return res < 0 ? Interval::Direction::kDirectionAscending
+                   : Interval::Direction::kDirectionDescending;
 }
 
 // static
