@@ -1,6 +1,6 @@
 /*
  * This test makes sure 'find' and 'getMore' commands fail correctly during rollback.
- * @tags: [requires_majority_read_concern, requires_fcv_44]
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
 "use strict";

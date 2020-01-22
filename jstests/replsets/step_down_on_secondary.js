@@ -9,7 +9,7 @@
  * 3) Oplog applier is blocked trying to apply a 'commitTransaction' oplog entry. The commit is
  *    attempting to acquire the RSTL lock in MODE_IX but is blocked behind the step down thread.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
 
