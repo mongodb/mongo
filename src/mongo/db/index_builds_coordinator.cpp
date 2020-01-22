@@ -966,24 +966,14 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
 
-    // If two phase index builds are enabled, the index build will be coordinated using
-    // startIndexBuild and commitIndexBuild oplog entries.
     auto indexCatalog = collection->getIndexCatalog();
-    if (supportsTwoPhaseIndexBuild()) {
-        // All indexes will be added to the mdb catalog using the commitIndexBuild timestamp.
-        auto buildUUID = UUID::gen();
-        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
-        opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
-        for (const auto& spec : specs) {
-            uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
-        }
-    } else {
-        for (const auto& spec : specs) {
-            // Each index will be added to the mdb catalog using the preceding createIndexes
-            // timestamp.
-            opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
-            uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
-        }
+    // Always run single phase index build for empty collection. And, will be coordinated using
+    // createIndexes oplog entry.
+    for (const auto& spec : specs) {
+        // Each index will be added to the mdb catalog using the preceding createIndexes
+        // timestamp.
+        opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
+        uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
     }
 }
 
@@ -1193,16 +1183,10 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
             // commitIndexBuild oplog entries, this optimization will fail to accurately timestamp
             // the catalog update when it uses the timestamp from the startIndexBuild, rather than
             // the commitIndexBuild, oplog entry.
-            auto opObserver = opCtx->getServiceContext()->getOpObserver();
-            auto fromMigrate = false;
-            auto indexCatalog = collection->getIndexCatalog();
             writeConflictRetry(
                 opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss.ns(), [&] {
                     WriteUnitOfWork wuow(opCtx);
-                    for (const auto& spec : filteredSpecs) {
-                        opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
-                        uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, spec));
-                    }
+                    createIndexesOnEmptyCollection(opCtx, collection->uuid(), filteredSpecs, false);
                     wuow.commit();
                 });
         } catch (DBException& ex) {

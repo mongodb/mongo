@@ -2288,29 +2288,16 @@ public:
 
         NamespaceString tmpName;
         Timestamp indexCommitTs;
-        if (IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-            const auto commitIndexBuildDocument = queryOplog(
-                BSON("ns" << renamedNss.db() + ".$cmd"
-                          << "o.commitIndexBuild" << BSON("$exists" << true) << "o.indexes.0.name"
-                          << "a_1"
-                          << "o.indexes.1.name"
-                          << "b_1"));
-
-            const auto tmpCollName =
-                commitIndexBuildDocument.getObjectField("o").getStringField("commitIndexBuild");
-            tmpName = NamespaceString(renamedNss.db(), tmpCollName);
-            indexCommitTs = commitIndexBuildDocument["ts"].timestamp();
-        } else {
-            const auto createIndexesDocument =
-                queryOplog(BSON("ns" << renamedNss.db() + ".$cmd"
-                                     << "o.createIndexes" << BSON("$exists" << true) << "o.name"
-                                     << "b_1"));
-            const auto tmpCollName =
-                createIndexesDocument.getObjectField("o").getStringField("createIndexes");
-            tmpName = NamespaceString(renamedNss.db(), tmpCollName);
-            indexCommitTs = createIndexesDocument["ts"].timestamp();
-        }
-
+        // Empty temporary collections generate createIndexes oplog entry even if the node
+        // supports 2 phase index build.
+        const auto createIndexesDocument =
+            queryOplog(BSON("ns" << renamedNss.db() + ".$cmd"
+                                 << "o.createIndexes" << BSON("$exists" << true) << "o.name"
+                                 << "b_1"));
+        const auto tmpCollName =
+            createIndexesDocument.getObjectField("o").getStringField("createIndexes");
+        tmpName = NamespaceString(renamedNss.db(), tmpCollName);
+        indexCommitTs = createIndexesDocument["ts"].timestamp();
         const Timestamp indexCreateInitTs = queryOplog(BSON("op"
                                                             << "c"
                                                             << "o.create" << tmpName.coll()))["ts"]
@@ -2851,32 +2838,17 @@ public:
         Timestamp indexStartTs;
         Timestamp indexCreateTs;
         Timestamp indexCompleteTs;
-        if (IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-            indexStartTs = repl::OplogEntry(queryOplog(BSON("op"
-                                                            << "c"
-                                                            << "ns" << nss.getCommandNS().ns()
-                                                            << "o.startIndexBuild" << nss.coll()
-                                                            << "o.indexes.0.name"
-                                                            << "user_1_db_1")))
-                               .getTimestamp();
-            indexCompleteTs = repl::OplogEntry(queryOplog(BSON("op"
-                                                               << "c"
-                                                               << "ns" << nss.getCommandNS().ns()
-                                                               << "o.commitIndexBuild" << nss.coll()
-                                                               << "o.indexes.0.name"
-                                                               << "user_1_db_1")))
-                                  .getTimestamp();
-        } else {
-            indexStartTs = op.getTimestamp();
-            indexCreateTs =
-                repl::OplogEntry(queryOplog(BSON("op"
-                                                 << "c"
-                                                 << "ns" << nss.getCommandNS().ns()
-                                                 << "o.createIndexes" << nss.coll() << "o.name"
-                                                 << "user_1_db_1")))
-                    .getTimestamp();
-            indexCompleteTs = indexCreateTs;
-        }
+        // Empty collections generate createIndexes oplog entry even if the node
+        // supports 2 phase index build.
+        indexStartTs = op.getTimestamp();
+        indexCreateTs =
+            repl::OplogEntry(queryOplog(BSON("op"
+                                             << "c"
+                                             << "ns" << nss.getCommandNS().ns() << "o.createIndexes"
+                                             << nss.coll() << "o.name"
+                                             << "user_1_db_1")))
+                .getTimestamp();
+        indexCompleteTs = indexCreateTs;
 
         assertNamespaceInIdents(nss, pastTs, false);
         assertNamespaceInIdents(nss, presentTs, false);

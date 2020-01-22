@@ -1072,11 +1072,9 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
     bool forApplyOps = false;
     std::vector<std::string> expectedOplogEntries;
-    if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
-    } else {
-        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
-    }
+    // Empty collections generate createIndexes oplog entry even if the node
+    // supports 2 phase index build.
+    expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
                                                     _targetNssDifferentDb,
@@ -1088,11 +1086,9 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntries) {
     bool forApplyOps = true;
     std::vector<std::string> expectedOplogEntries;
-    if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
-    } else {
-        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
-    }
+    // Empty collections generate createIndexes oplog entry even if the node
+    // supports 2 phase index build.
+    expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
                                                     _targetNssDifferentDb,
@@ -1105,11 +1101,9 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarge
     _createCollection(_opCtx.get(), _targetNssDifferentDb);
     bool forApplyOps = false;
     std::vector<std::string> expectedOplogEntries;
-    if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
-    } else {
-        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
-    }
+    // Empty collections generate createIndexes oplog entry even if the node
+    // supports 2 phase index build.
+    expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
                                                     _targetNssDifferentDb,
@@ -1122,11 +1116,9 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntri
     _createCollection(_opCtx.get(), _targetNssDifferentDb);
     bool forApplyOps = true;
     std::vector<std::string> expectedOplogEntries;
-    if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries = {"create", "startIndex", "commitIndex", "inserts", "rename", "drop"};
-    } else {
-        expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
-    }
+    // Empty collections generate createIndexes oplog entry even if the node
+    // supports 2 phase index build.
+    expectedOplogEntries = {"create", "index", "inserts", "rename", "drop"};
     _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
                                                     _sourceNss,
                                                     _targetNssDifferentDb,
@@ -1168,11 +1160,9 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollect
                        AssertionException,
                        ErrorCodes::OperationFailed);
     std::vector<std::string> expectedOplogEntries;
-    if (_supportsTwoPhaseIndexBuild) {
-        expectedOplogEntries = {"create", "startIndex", "commitIndex", "drop"};
-    } else {
-        expectedOplogEntries = {"create", "index", "drop"};
-    }
+    // Empty Collections generate createIndexes oplog entry even if the node
+    // supports 2 phase index build.
+    expectedOplogEntries = {"create", "index", "drop"};
     _checkOplogEntries(_opObserver->oplogEntries, expectedOplogEntries);
 }
 
