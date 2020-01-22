@@ -32,7 +32,6 @@ NINJA_RULES = "__NINJA_CUSTOM_RULES"
 NINJA_POOLS = "__NINJA_CUSTOM_POOLS"
 NINJA_CUSTOM_HANDLERS = "__NINJA_CUSTOM_HANDLERS"
 NINJA_BUILD = "NINJA_BUILD"
-NINJA_OUTPUTS = "__NINJA_OUTPUTS"
 NINJA_WHEREIS_MEMO = {}
 NINJA_STAT_MEMO = {}
 MEMO_LOCK = Lock()
@@ -76,9 +75,6 @@ def _lib_symlink_action_function(_env, node):
         return None
 
     outputs = [link.get_dir().rel_path(linktgt) for link, linktgt in symlinks]
-    if getattr(node.attributes, NINJA_OUTPUTS, None) is None:
-        setattr(node.attributes, NINJA_OUTPUTS, outputs)
-
     inputs = [link.get_path() for link, _ in symlinks]
 
     return {
@@ -117,28 +113,36 @@ def alias_to_ninja_build(node):
 
 def get_dependencies(node):
     """Return a list of dependencies for node."""
-    # TODO: test if this is faster as a try except
-    deps = getattr(node.attributes, "NINJA_DEPS", None)
-    if deps is None:
-        deps = [get_path(src_file(child)) for child in node.children()]
-        setattr(node.attributes, "NINJA_DEPS", deps)
-    return deps
+    return [
+        get_path(src_file(child))
+        for child in node.children()
+    ]
+
+
+def get_inputs(node):
+    """Collect the Ninja inputs for node."""
+    executor = node.get_executor()
+    if executor is not None:
+        inputs = executor.get_all_sources()
+    else:
+        inputs = node.sources
+
+    inputs = [get_path(src_file(o)) for o in inputs]
+    return inputs
 
 
 def get_outputs(node):
     """Collect the Ninja outputs for node."""
-    outputs = getattr(node.attributes, NINJA_OUTPUTS, None)
-    if outputs is None:
-        executor = node.get_executor()
-        if executor is not None:
-            outputs = executor.get_all_targets()
+    executor = node.get_executor()
+    if executor is not None:
+        outputs = executor.get_all_targets()
+    else:
+        if hasattr(node, "target_peers"):
+            outputs = node.target_peers
         else:
-            if hasattr(node, "target_peers"):
-                outputs = node.target_peers
-            else:
-                outputs = [node]
-        outputs = [get_path(o) for o in outputs]
-        setattr(node.attributes, NINJA_OUTPUTS, outputs)
+            outputs = [node]
+
+    outputs = [get_path(o) for o in outputs]
     return outputs
 
 
@@ -250,7 +254,6 @@ class SConsToNinjaTranslator:
             return results[0]
 
         all_outputs = list({output for build in results for output in build["outputs"]})
-        setattr(node.attributes, NINJA_OUTPUTS, all_outputs)
         # If we have no outputs we're done
         if not all_outputs:
             return None
@@ -856,6 +859,7 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
 
     ninja_build = {
         "outputs": outputs,
+        "inputs": get_inputs(node),
         "implicit": implicit,
         "rule": rule,
         "variables": {"cmd": command_env + cmd},
