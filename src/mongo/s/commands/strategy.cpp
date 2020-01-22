@@ -849,6 +849,8 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
             }
         }();
 
+        opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
+
         // Execute.
         std::string db = request.getDatabase().toString();
         try {
