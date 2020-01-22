@@ -596,17 +596,17 @@ private:
         const stdx::lock_guard<Latch>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
-     * Check if a status is one which means there's a network error and we should retry the current
-     * operation, and records whether an operation is currently being retried.  Note this can only
-     * handle one operation at a time (i.e. it should not be used in both parts of the "split"
-     * section of Initial Sync)
+     * Check if a status is one which means there's a retriable error and we should retry the
+     * current operation, and records whether an operation is currently being retried.  Note this
+     * can only handle one operation at a time (i.e. it should not be used in both parts of the
+     * "split" section of Initial Sync)
      */
-    bool _shouldRetryNetworkError(WithLock lk, Status status);
+    bool _shouldRetryError(WithLock lk, Status status);
 
     /**
-     * Indicates we are no longer handling a network error.
+     * Indicates we are no longer handling a retriable error.
      */
-    void _clearNetworkError(WithLock lk);
+    void _clearRetriableError(WithLock lk);
 
     /**
      * Checks the given status (or embedded status inside the callback args) and current data

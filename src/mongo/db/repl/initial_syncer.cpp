@@ -299,7 +299,7 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
     _shutdownComponent_inlock(_oplogFetcher);
     if (_sharedData) {
         // We actually hold the required lock, but the lock object itself is not passed through.
-        _clearNetworkError(WithLock::withoutLock());
+        _clearRetriableError(WithLock::withoutLock());
         stdx::lock_guard<InitialSyncSharedData> lock(*_sharedData);
         _sharedData->setInitialSyncStatusIfOK(
             lock, Status{ErrorCodes::CallbackCanceled, "Initial sync attempt canceled"});
@@ -1192,7 +1192,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         stdx::lock_guard<Latch> lock(_mutex);
         auto status = _checkForShutdownAndConvertStatus_inlock(
             result.getStatus(), "error fetching last oplog entry for stop timestamp");
-        if (_shouldRetryNetworkError(lock, status)) {
+        if (_shouldRetryError(lock, status)) {
             auto scheduleStatus = _exec->scheduleWork(
                 [this, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
                     // It is not valid to schedule the retry from within this callback,
@@ -1417,7 +1417,7 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
     stdx::lock_guard<Latch> lock(_mutex);
     auto status = _checkForShutdownAndConvertStatus_inlock(result.getStatus(),
                                                            "error while getting last rollback ID");
-    if (_shouldRetryNetworkError(lock, status)) {
+    if (_shouldRetryError(lock, status)) {
         LOG(1) << "Retrying rollback checker because of network error " << status;
         _scheduleRollbackCheckerCheckForRollback_inlock(lock, onCompletionGuard);
         return;
@@ -1712,18 +1712,18 @@ void InitialSyncer::_scheduleRollbackCheckerCheckForRollback_inlock(
     return;
 }
 
-bool InitialSyncer::_shouldRetryNetworkError(WithLock lk, Status status) {
-    if (ErrorCodes::isNetworkError(status)) {
+bool InitialSyncer::_shouldRetryError(WithLock lk, Status status) {
+    if (ErrorCodes::isRetriableError(status)) {
         stdx::lock_guard<InitialSyncSharedData> sharedDataLock(*_sharedData);
         return _sharedData->shouldRetryOperation(sharedDataLock, &_retryingOperation);
     }
-    // The status was OK or some error other than a network error, so clear the network error
+    // The status was OK or some error other than a retriable error, so clear the retriable error
     // state and indicate that we should not retry.
-    _clearNetworkError(lk);
+    _clearRetriableError(lk);
     return false;
 }
 
-void InitialSyncer::_clearNetworkError(WithLock lk) {
+void InitialSyncer::_clearRetriableError(WithLock lk) {
     _retryingOperation = boost::none;
 }
 
@@ -1919,7 +1919,7 @@ void InitialSyncer::InitialSyncAttemptInfo::append(BSONObjBuilder* builder) cons
 
 bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(
     AbstractOplogFetcher* fetcher, Status status) {
-    if (ErrorCodes::isNetworkError(status)) {
+    if (ErrorCodes::isRetriableError(status)) {
         stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
         return _sharedData->shouldRetryOperation(lk, &_retryingOperation);
     }

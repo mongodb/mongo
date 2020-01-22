@@ -167,7 +167,7 @@ Status BaseCloner::checkRollBackIdIsUnchanged() {
     try {
         getClient()->simpleCommand("admin", &info, "replSetGetRBID");
     } catch (DBException& e) {
-        if (ErrorCodes::isNetworkError(e)) {
+        if (ErrorCodes::isRetriableError(e)) {
             auto status = e.toStatus().withContext(
                 ": failed while attempting to retrieve rollBackId after re-connect");
             LOG(1) << status;
