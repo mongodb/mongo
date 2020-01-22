@@ -560,16 +560,6 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: jasper_smoke
-  priority: 5
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "jasper_smoke"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
 - name: genny_canaries
   priority: 5
   commands:
@@ -1022,7 +1012,6 @@ buildvariants:
     - name: snapshot_reads
     - name: linkbench
     - name: tpcc
-    - name: jasper_smoke
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
@@ -1048,7 +1037,6 @@ buildvariants:
     - name: industry_benchmarks
     - name: ycsb_60GB
     - name: crud_workloads
-    - name: jasper_smoke
     - name: genny_canaries
     - name: cursor_manager
     - name: mixed_workloads
@@ -1207,7 +1195,6 @@ buildvariants:
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
-    - name: jasper_smoke
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -1286,7 +1273,6 @@ buildvariants:
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
     - name: crud_workloads_majority
-    - name: jasper_smoke
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -1447,7 +1433,6 @@ buildvariants:
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
     - name: crud_workloads_majority
-    - name: jasper_smoke
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
