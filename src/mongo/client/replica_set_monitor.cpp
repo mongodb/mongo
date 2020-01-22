@@ -547,6 +547,7 @@ void Refresher::scheduleNetworkRequests() {
                                  });
 
         if (ErrorCodes::isShutdownError(swHandle.getStatus().code())) {
+            _scan->markHostsToScanAsTried();
             break;
         }
 
@@ -1453,5 +1454,17 @@ void ScanState::retryAllTriedHosts(PseudoRandom& rand) {
                         std::inserter(hostsToScan, hostsToScan.end()));
     std::shuffle(hostsToScan.begin(), hostsToScan.end(), rand.urbg());
     triedHosts = waitingFor;
+}
+
+void ScanState::markHostsToScanAsTried() noexcept {
+    while (!hostsToScan.empty()) {
+        auto host = hostsToScan.front();
+        hostsToScan.pop_front();
+        /**
+         * Mark the popped host as tried to avoid deleting hosts in multiple points.
+         * This emulates the final effect of Refresher::getNextStep() on the set.
+         */
+        triedHosts.insert(host);
+    }
 }
 }  // namespace mongo

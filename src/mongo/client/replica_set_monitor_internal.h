@@ -307,6 +307,11 @@ public:
      */
     void retryAllTriedHosts(PseudoRandom& rand);
 
+    /**
+     * A safe way to clear interrupted scans
+     */
+    void markHostsToScanAsTried() noexcept;
+
     // This is only for logging and should not affect behavior otherwise.
     Timer timer;
 
