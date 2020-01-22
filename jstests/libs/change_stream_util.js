@@ -53,6 +53,33 @@ function assertInvalidateOp({cursor, opType}) {
     }
 }
 
+/**
+ * Helper to check whether a change stream event matches the given expected event. Ignores the
+ * resume token and clusterTime unless they are explicitly listed in the expectedEvent.
+ */
+function assertChangeStreamEventEq(actualEvent, expectedEvent) {
+    const testEvent = Object.assign({}, actualEvent);
+    if (!expectedEvent.hasOwnProperty("_id")) {
+        delete testEvent._id;  // Remove the resume token, if present.
+    }
+    if (!expectedEvent.hasOwnProperty("clusterTime")) {
+        delete testEvent.clusterTime;  // Remove the cluster time, if present.
+    }
+
+    // The change stream transaction passthrough causes operations to have txnNumber and lsid
+    // values that the test doesn't expect, which can cause comparisons to fail.
+    if (!expectedEvent.hasOwnProperty("txnNumber")) {
+        delete testEvent.txnNumber;  // Remove the txnNumber, if present.
+    }
+    if (!expectedEvent.hasOwnProperty("lsid")) {
+        delete testEvent.lsid;  // Remove the lsid, if present.
+    }
+    assert.docEq(testEvent,
+                 expectedEvent,
+                 "Change did not match expected change. Expected change: " + tojson(expectedEvent) +
+                     ", Actual change: " + tojson(testEvent));
+}
+
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
 
