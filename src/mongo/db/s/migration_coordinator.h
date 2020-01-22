@@ -39,8 +39,6 @@ namespace migrationutil {
 /**
  * Manages the migration commit/abort process, including updates to config.rangeDeletions on the
  * donor and the recipient, and updates to the routing table on the config server.
- *
- * TODO (SERVER-44716): Implement commit/abort/recovery logic on the config server.
  */
 class MigrationCoordinator {
 public:
