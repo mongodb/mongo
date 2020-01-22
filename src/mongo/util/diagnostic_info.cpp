@@ -174,7 +174,8 @@ struct DiagnosticInfoHandle {
 };
 const auto getDiagnosticInfoHandle = Client::declareDecoration<DiagnosticInfoHandle>();
 
-MONGO_INITIALIZER(LockListener)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeLockListeners"))
+(InitializerContext* context) {
     class LockListener : public Mutex::LockListener {
         void onContendedLock(const Identity& id) override {
             if (auto client = Client::getCurrent()) {

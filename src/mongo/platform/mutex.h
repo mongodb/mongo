@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <memory>
 #include <type_traits>
+#include <vector>
+
+#include "boost/optional.hpp"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -256,10 +260,17 @@ public:
      */
     static void addLockListener(LockListener* listener);
 
+    /**
+     * This function finalizes the list of LockListener subclasses and prevents more from being
+     * added.
+     */
+    static void finalizeLockListeners();
+
 private:
     static auto& _getListenerState() noexcept {
         struct State {
-            RegistryList<LockListener*> list;
+            AtomicWord<bool> isFinalized{false};
+            std::vector<LockListener*> listeners;
         };
 
         static State state;

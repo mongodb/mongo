@@ -89,7 +89,8 @@ public:
 };
 
 // Register our LockListener with the Mutex class
-MONGO_INITIALIZER(LatchAnalysis)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(LatchAnalysis, (/* NO PREREQS */), ("FinalizeLockListeners"))
+(InitializerContext* context) {
 
     // Intentionally leaked, people use Latches in detached threads
     static auto& listener = *new LockListener;
