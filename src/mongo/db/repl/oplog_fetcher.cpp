@@ -37,6 +37,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -77,6 +78,10 @@ const Milliseconds maximumAwaitDataTimeoutMS(30 * 1000);
  * Calculates await data timeout based on the current replica set configuration.
  */
 Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
+    if (MONGO_unlikely(setSmallOplogGetMoreMaxTimeMS.shouldFail())) {
+        return Milliseconds(50);
+    }
+
     // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
     // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
     // We never wait longer than 30 seconds.
@@ -638,9 +643,25 @@ OpTime NewOplogFetcher::getLastOpTimeFetched_forTest() const {
     return _getLastOpTimeFetched();
 }
 
+BSONObj NewOplogFetcher::getFindQuery_forTest(bool initialFind) const {
+    return _makeFindQuery(initialFind);
+}
+
+Milliseconds NewOplogFetcher::getAwaitDataTimeout_forTest() const {
+    return _awaitDataTimeout;
+}
+
 OpTime NewOplogFetcher::_getLastOpTimeFetched() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _lastFetched;
+}
+
+Milliseconds NewOplogFetcher::_getInitialFindMaxTime() const {
+    return Milliseconds(oplogInitialFindMaxSeconds.load() * 1000);
+}
+
+Milliseconds NewOplogFetcher::_getRetriedFindMaxTime() const {
+    return Milliseconds(oplogRetriedFindMaxSeconds.load() * 1000);
 }
 
 void NewOplogFetcher::_finishCallback(Status status) {
@@ -688,6 +709,29 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
             return;
         }
     }
+}
+
+BSONObj NewOplogFetcher::_makeFindQuery(bool initialFind) const {
+    BSONObjBuilder queryBob;
+
+    auto lastOpTimeFetched = _getLastOpTimeFetched();
+    queryBob.append("query", BSON("ts" << BSON("$gte" << lastOpTimeFetched.getTimestamp())));
+
+    auto findMaxTime = initialFind ? _getInitialFindMaxTime() : _getRetriedFindMaxTime();
+    queryBob.append("maxTimeMS", durationCount<Milliseconds>(findMaxTime));
+
+    auto lastCommittedWithCurrentTerm =
+        _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
+    auto term = lastCommittedWithCurrentTerm.value;
+    if (term != OpTime::kUninitializedTerm) {
+        queryBob.append("term", term);
+    }
+
+    // This ensures that the sync source waits for all earlier oplog writes to be visible.
+    // Since Timestamp(0, 0) isn't allowed, Timestamp(0, 1) is the minimal we can use.
+    queryBob.append("readConcern", BSON("afterClusterTime" << Timestamp(0, 1)));
+
+    return queryBob.obj();
 }
 
 bool NewOplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(NewOplogFetcher* fetcher,

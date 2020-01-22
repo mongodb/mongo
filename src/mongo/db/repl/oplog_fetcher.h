@@ -398,7 +398,7 @@ public:
     /**
      * Returns the `find` query run on the sync source's oplog.
      */
-    BSONObj getFindQuery_forTest() const;
+    BSONObj getFindQuery_forTest(bool initialFind) const;
 
     /**
      * Returns the OpTime of the last oplog entry fetched and processed.
@@ -453,9 +453,10 @@ private:
 
     /**
      * This function will create the `find` query to issue to the sync source. It is provided with
-     * the last OpTime fetched so that it can begin from the middle of the oplog.
+     * whether this is the initial attempt to create the `find` query to determine what the find
+     * timeout should be.
      */
-    BSONObj _makeFindQuery(OpTime lastOpTimeFetched, Milliseconds findMaxTime) const;
+    BSONObj _makeFindQuery(bool initialFind) const;
 
     /**
      * Gets the next batch from the exhaust cursor.

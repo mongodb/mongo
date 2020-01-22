@@ -1190,4 +1190,48 @@ TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRu
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
 }
+
+TEST_F(NewOplogFetcherTest,
+       FindQueryContainsTermIfGetCurrentTermAndLastCommittedOpTimeReturnsValidTerm) {
+    // Test that the correct maxTimeMS is set if this is the initial 'find' query.
+    auto queryObj = makeOplogFetcher()->getFindQuery_forTest(true);
+    ASSERT_EQUALS(60000, queryObj.getIntField("maxTimeMS"));
+
+    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["query"].type());
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
+                      queryObj["query"].Obj());
+    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
+    ASSERT_BSONOBJ_EQ(BSON("afterClusterTime" << Timestamp(0, 1)), queryObj["readConcern"].Obj());
+    ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, queryObj["term"].numberLong());
+}
+
+TEST_F(NewOplogFetcherTest,
+       FindQueryDoesNotContainTermIfGetCurrentTermAndLastCommittedOpTimeReturnsUninitializedTerm) {
+    dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
+
+    // Test that the correct maxTimeMS is set if we are retrying the 'find' query.
+    auto queryObj = makeOplogFetcher()->getFindQuery_forTest(false);
+    ASSERT_EQUALS(2000, queryObj.getIntField("maxTimeMS"));
+
+    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["query"].type());
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
+                      queryObj["query"].Obj());
+    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
+    ASSERT_BSONOBJ_EQ(BSON("afterClusterTime" << Timestamp(0, 1)), queryObj["readConcern"].Obj());
+    ASSERT_FALSE(queryObj.hasField("term"));
+}
+
+TEST_F(NewOplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeout) {
+    auto config = _createConfig();
+    auto timeout = makeOplogFetcher()->getAwaitDataTimeout_forTest();
+    ASSERT_EQUALS(config.getElectionTimeoutPeriod() / 2, timeout);
+}
+
+TEST_F(NewOplogFetcherTest, AwaitDataTimeoutSmallerWhenFailPointSet) {
+    auto failPoint = globalFailPointRegistry().find("setSmallOplogGetMoreMaxTimeMS");
+    failPoint->setMode(FailPoint::alwaysOn);
+    auto timeout = makeOplogFetcher()->getAwaitDataTimeout_forTest();
+    ASSERT_EQUALS(Milliseconds(50), timeout);
+    failPoint->setMode(FailPoint::off);
+}
 }  // namespace

@@ -892,6 +892,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/timer_stats',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
     ],
