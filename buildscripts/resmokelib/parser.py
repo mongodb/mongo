@@ -47,6 +47,11 @@ def _make_parser():  # pylint: disable=too-many-statements
                       help="Directory to search for MongoDB binaries")
 
     parser.add_option(
+        "--alwaysUseLogFiles", dest="always_use_log_files", action="store_true",
+        help=("Logs server output to a file located in the db path and prevents the"
+              " cleaning of dbpaths after testing. Note that conflicting options"
+              " passed in from test files may cause an error."))
+    parser.add_option(
         "--archiveFile", dest="archive_file", metavar="ARCHIVE_FILE",
         help=("Sets the archive file name for the Evergreen task running the tests."
               " The archive file is JSON format containing a list of tests that were"
@@ -585,6 +590,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             user_config = dict(config_parser["resmoke"])
             config.update(user_config)
 
+    _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.ARCHIVE_FILE = config.pop("archive_file")
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
     _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")

@@ -156,7 +156,7 @@ def mongod_program(  # pylint: disable=too-many-branches
         shortcut_opts["wiredTigerCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
 
     # These options are just flags, so they should not take a value.
-    opts_without_vals = ("nojournal", )
+    opts_without_vals = ("nojournal", "logappend")
 
     # Have the --nojournal command line argument to resmoke.py unset the journal option.
     if shortcut_opts["nojournal"] and "journal" in kwargs:

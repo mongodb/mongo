@@ -33,13 +33,19 @@ class MongoDFixture(interface.Fixture):
         self.mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE, mongod_executable)
 
         self.mongod_options = utils.default_if_none(mongod_options, {}).copy()
-        self.preserve_dbpath = preserve_dbpath
 
         # The dbpath in mongod_options takes precedence over other settings to make it easier for
         # users to specify a dbpath containing data to test against.
         if "dbpath" not in self.mongod_options:
             self.mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, config.FIXTURE_SUBDIR)
         self._dbpath = self.mongod_options["dbpath"]
+
+        if config.ALWAYS_USE_LOG_FILES:
+            self.mongod_options["logpath"] = self._dbpath + "/mongod.log"
+            self.mongod_options["logappend"] = ""
+            self.preserve_dbpath = True
+        else:
+            self.preserve_dbpath = preserve_dbpath
 
         self.mongod = None
         self.port = None

@@ -624,8 +624,21 @@ var _removeSetParameterIfBeforeVersion = function(opts, parameterName, requiredV
  *     oplogSize
  *   }
  */
-MongoRunner.mongodOptions = function(opts) {
+MongoRunner.mongodOptions = function(opts = {}) {
     opts = MongoRunner.mongoOptions(opts);
+
+    if (jsTestOptions().alwaysUseLogFiles) {
+        if (opts.cleanData || opts.startClean || opts.noCleanData === false ||
+            opts.useLogFiles === false) {
+            throw new Error("Always using log files, but received conflicting option.");
+        }
+
+        opts.cleanData = false;
+        opts.startClean = false;
+        opts.noCleanData = true;
+        opts.useLogFiles = true;
+        opts.logappend = "";
+    }
 
     opts.dbpath = MongoRunner.toRealDir(opts.dbpath || "$dataDir/mongod-$port", opts.pathOpts);
 
@@ -707,6 +720,15 @@ MongoRunner.mongosOptions = function(opts) {
     // Normalize configdb option to be host string if currently a host
     if (opts.configdb && opts.configdb.getDB) {
         opts.configdb = opts.configdb.host;
+    }
+
+    if (jsTestOptions().alwaysUseLogFiles) {
+        if (opts.useLogFiles === false) {
+            throw new Error("Always using log files, but received conflicting option.");
+        }
+
+        opts.useLogFiles = true;
+        opts.logappend = "";
     }
 
     opts.pathOpts = Object.merge(opts.pathOpts, {configdb: opts.configdb.replace(/:|\/|,/g, "-")});

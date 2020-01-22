@@ -45,6 +45,7 @@ DEFAULT_GENNY_EXECUTABLE = os.path.normpath("genny/build/src/driver/genny")
 
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
+    "always_use_log_files": False,
     "archive_file": None,
     "archive_limit_mb": 5000,
     "archive_limit_tests": 10,
@@ -218,6 +219,9 @@ SuiteOptions.ALL_INHERITED = SuiteOptions(  # type: ignore
 ##
 # Variables that are set by the user at the command line or with --options.
 ##
+
+# Log to files located in the db path and don't clean dbpaths after tests.
+ALWAYS_USE_LOG_FILES = False
 
 # The name of the archive JSON file used to associate S3 archives to an Evergreen task.
 ARCHIVE_FILE = None

@@ -340,8 +340,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                                 + ShardedClusterFixture._LAST_STABLE_BIN_VERSION
         mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else last_stable_executable
 
-        return _MongoSFixture(mongos_logger, self.job_num, mongos_executable=mongos_executable,
-                              mongos_options=mongos_options)
+        return _MongoSFixture(mongos_logger, self.job_num, dbpath_prefix=self._dbpath_prefix,
+                              mongos_executable=mongos_executable, mongos_options=mongos_options)
 
     def _add_shard(self, client, shard):
         """
@@ -360,7 +360,8 @@ class _MongoSFixture(interface.Fixture):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
-    def __init__(self, logger, job_num, mongos_executable=None, mongos_options=None):
+    # pylint: disable=too-many-arguments
+    def __init__(self, logger, job_num, dbpath_prefix, mongos_executable=None, mongos_options=None):
         """Initialize _MongoSFixture."""
 
         interface.Fixture.__init__(self, logger, job_num)
@@ -372,12 +373,18 @@ class _MongoSFixture(interface.Fixture):
 
         self.mongos = None
         self.port = None
+        self._dbpath_prefix = dbpath_prefix
 
     def setup(self):
         """Set up the sharded cluster."""
         if "port" not in self.mongos_options:
             self.mongos_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongos_options["port"]
+
+        if config.ALWAYS_USE_LOG_FILES:
+            self.mongos_options["logpath"] = self._dbpath_prefix + "/mongos-{port}.log".format(
+                port=self.port)
+            self.mongos_options["logappend"] = ""
 
         mongos = core.programs.mongos_program(self.logger, executable=self.mongos_executable,
                                               **self.mongos_options)

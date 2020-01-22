@@ -349,6 +349,10 @@ jsTestOptions = function() {
             // Set a specific random seed to be used when useRandomBinVersionsWithinReplicaSet is
             // true.
             seed: TestData.seed || undefined,
+            // Override the logging options for mongod and mongos so they always log to a file
+            // in dbpath; additionally, prevent the dbpath from being cleared after a node
+            // is shut down.
+            alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
         });
     }
     return _jsTestOptions;

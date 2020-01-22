@@ -386,9 +386,17 @@ var ShardingTest = function(params) {
         }
     };
 
-    this.stop = function(opts) {
+    this.stop = function(opts = {}) {
         this.checkUUIDsConsistentAcrossCluster();
         this.checkIndexesConsistentAcrossCluster();
+
+        if (jsTestOptions().alwaysUseLogFiles) {
+            if (opts.noCleanData === false) {
+                throw new Error("Always using log files, but received conflicting option.");
+            }
+
+            opts.noCleanData = true;
+        }
 
         this.stopAllMongos(opts);
 
@@ -412,7 +420,7 @@ var ShardingTest = function(params) {
             }
         }
 
-        if (!opts || !opts.noCleanData) {
+        if (!opts.noCleanData) {
             print("ShardingTest stop deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
                 resetDbpath(MongoRunner.dataPath + _alldbpaths[i]);

@@ -2932,7 +2932,14 @@ var ReplSetTest = function(opts) {
      * @param {boolean} forRestart will not cleanup data directory
      * @param {Object} opts @see MongoRunner.stopMongod
      */
-    this.stopSet = function(signal, forRestart, opts) {
+    this.stopSet = function(signal, forRestart, opts = {}) {
+        if (jsTestOptions().alwaysUseLogFiles) {
+            if (opts.noCleanData === false) {
+                throw new Error("Always using log files, but received conflicting option.");
+            }
+
+            opts.noCleanData = true;
+        }
         // Check to make sure data is the same on all nodes.
         const skipChecks = jsTest.options().skipCheckDBHashes || (opts && opts.skipCheckDBHashes);
         if (!skipChecks) {
@@ -2984,7 +2991,7 @@ var ReplSetTest = function(opts) {
         let startTime = new Date();  // Measure the execution time of shutting down nodes.
 
         // Optionally validate collections on all nodes.
-        if (opts && opts.skipValidation) {
+        if (opts.skipValidation) {
             print("ReplSetTest stopSet skipping validation before stopping nodes.");
         } else {
             print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
@@ -3016,7 +3023,7 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        if ((!opts || !opts.noCleanData) && _alldbpaths) {
+        if ((!opts.noCleanData) && _alldbpaths) {
             print("ReplSetTest stopSet deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
                 print("ReplSetTest stopSet deleting dbpath: " + _alldbpaths[i]);
