@@ -9,7 +9,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/rslib.js');
-const basename = 'initial_sync_rename_collection';
+const basename = 'initial_sync_rename_collection_before_cloning';
 
 jsTestLog('Bring up a replica set');
 const rst = new ReplSetTest({name: basename, nodes: 1});
