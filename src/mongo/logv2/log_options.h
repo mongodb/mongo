@@ -38,7 +38,12 @@ namespace logv2 {
 
 class LogOptions {
 public:
-    LogOptions() {}
+    static LogOptions ensureValidComponent(LogOptions options, LogComponent component) {
+        if (options._component == LogComponent::kAutomaticDetermination) {
+            options._component = component;
+        }
+        return options;
+    }
 
     LogOptions(LogComponent component) : _component(component) {}
 
@@ -64,11 +69,7 @@ public:
 private:
     LogDomain* _domain = &LogManager::global().getGlobalDomain();
     LogTag _tags;
-#ifdef MONGO_LOGV2_DEFAULT_COMPONENT
-    LogComponent _component = MongoLogV2DefaultComponent_component;
-#else
-    LogComponent _component = LogComponent::kDefault;
-#endif  // MONGO_LOGV2_DEFAULT_COMPONENT
+    LogComponent _component = LogComponent::kAutomaticDetermination;
 };
 
 }  // namespace logv2

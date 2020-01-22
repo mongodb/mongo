@@ -36,6 +36,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_tag.h"
 
 namespace mongo {

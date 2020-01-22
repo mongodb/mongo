@@ -47,6 +47,7 @@ void doLogImpl(int32_t id,
                LogOptions const& options,
                StringData message,
                TypeErasedAttributeStorage const& attrs) {
+    dassert(options.component() != LogComponent::kNumLogComponents);
     auto& source = options.domain().internal().source();
     auto record = source.open_record(id, severity, options.component(), options.tags());
     if (record) {

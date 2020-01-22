@@ -48,97 +48,130 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/logger/log_version_util.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/errno_util.h"
 
-// Provide log component in global scope so that MONGO_LOG will always have a valid component.
-// Global log component will be kDefault unless overridden by MONGO_LOGV2_DEFAULT_COMPONENT.
-#if !defined(MONGO_LOGV2_DEFAULT_COMPONENT)
 #if defined(MONGO_LOG_DEFAULT_COMPONENT)
-#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT)
-#endif
+#include "mongo/logger/log_version_util.h"
 #endif
 
+namespace {
 #if defined(MONGO_LOGV2_DEFAULT_COMPONENT)
 const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
     MONGO_LOGV2_DEFAULT_COMPONENT;
+
+// Provide log component in global scope so that MONGO_LOG will always have a valid component.
+// Global log component will be kDefault unless overridden by MONGO_LOGV2_DEFAULT_COMPONENT.
+#elif defined(MONGO_LOG_DEFAULT_COMPONENT)
+const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
+    ::mongo::logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT);
 #else
 #error \
     "mongo/logv2/log.h requires MONGO_LOGV2_DEFAULT_COMPONENT to be defined. " \
        "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOGV2_DEFAULT_COMPONENT
-
-// include log_detail.h and log_options.h after MONGO_LOGV2_DEFAULT_COMPONENT gets set
-#include "mongo/logv2/log_detail.h"
-#include "mongo/logv2/log_options.h"
+}  // namespace
 
 namespace mongo {
 
 #define LOGV2_IMPL(ID, SEVERITY, OPTIONS, MESSAGE, ...) \
     logv2::detail::doLog(ID, SEVERITY, OPTIONS, FMT_STRING(MESSAGE), ##__VA_ARGS__)
 
-#define LOGV2(ID, MESSAGE, ...)                    \
-    LOGV2_IMPL(ID,                                 \
-               ::mongo::logv2::LogSeverity::Log(), \
-               ::mongo::logv2::LogOptions{},       \
-               MESSAGE,                            \
+#define LOGV2(ID, MESSAGE, ...)                                                  \
+    LOGV2_IMPL(ID,                                                               \
+               ::mongo::logv2::LogSeverity::Log(),                               \
+               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+               MESSAGE,                                                          \
                ##__VA_ARGS__)
 
-#define LOGV2_OPTIONS(ID, OPTIONS, MESSAGE, ...) \
-    LOGV2_IMPL(ID, ::mongo::logv2::LogSeverity::Log(), OPTIONS, MESSAGE, ##__VA_ARGS__)
-
-#define LOGV2_INFO(ID, MESSAGE, ...)                \
-    LOGV2_IMPL(ID,                                  \
-               ::mongo::logv2::LogSeverity::Info(), \
-               ::mongo::logv2::LogOptions{},        \
-               MESSAGE,                             \
+#define LOGV2_OPTIONS(ID, OPTIONS, MESSAGE, ...)                   \
+    LOGV2_IMPL(ID,                                                 \
+               ::mongo::logv2::LogSeverity::Log(),                 \
+               ::mongo::logv2::LogOptions::ensureValidComponent(   \
+                   OPTIONS, MongoLogV2DefaultComponent_component), \
+               MESSAGE,                                            \
                ##__VA_ARGS__)
 
-#define LOGV2_INFO_OPTIONS(ID, OPTIONS, MESSAGE, ...) \
-    LOGV2_IMPL(ID, ::mongo::logv2::LogSeverity::Info(), OPTIONS, MESSAGE, ##__VA_ARGS__)
-
-#define LOGV2_WARNING(ID, MESSAGE, ...)                \
-    LOGV2_IMPL(ID,                                     \
-               ::mongo::logv2::LogSeverity::Warning(), \
-               ::mongo::logv2::LogOptions{},           \
-               MESSAGE,                                \
+#define LOGV2_INFO(ID, MESSAGE, ...)                                             \
+    LOGV2_IMPL(ID,                                                               \
+               ::mongo::logv2::LogSeverity::Info(),                              \
+               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+               MESSAGE,                                                          \
                ##__VA_ARGS__)
 
-#define LOGV2_WARNING_OPTIONS(ID, OPTIONS, MESSAGE, ...) \
-    LOGV2_IMPL(ID, ::mongo::logv2::LogSeverity::Warning(), OPTIONS, MESSAGE, ##__VA_ARGS__)
-
-#define LOGV2_ERROR(ID, MESSAGE, ...)                \
-    LOGV2_IMPL(ID,                                   \
-               ::mongo::logv2::LogSeverity::Error(), \
-               ::mongo::logv2::LogOptions{},         \
-               MESSAGE,                              \
+#define LOGV2_INFO_OPTIONS(ID, OPTIONS, MESSAGE, ...)              \
+    LOGV2_IMPL(ID,                                                 \
+               ::mongo::logv2::LogSeverity::Info(),                \
+               ::mongo::logv2::LogOptions::ensureValidComponent(   \
+                   OPTIONS, MongoLogV2DefaultComponent_component), \
+               MESSAGE,                                            \
                ##__VA_ARGS__)
 
-#define LOGV2_ERROR_OPTIONS(ID, OPTIONS, MESSAGE, ...) \
-    LOGV2_IMPL(ID, ::mongo::logv2::LogSeverity::Error(), OPTIONS, MESSAGE, ##__VA_ARGS__)
-
-#define LOGV2_FATAL(ID, MESSAGE, ...)                 \
-    LOGV2_IMPL(ID,                                    \
-               ::mongo::logv2::LogSeverity::Severe(), \
-               ::mongo::logv2::LogOptions{},          \
-               MESSAGE,                               \
+#define LOGV2_WARNING(ID, MESSAGE, ...)                                          \
+    LOGV2_IMPL(ID,                                                               \
+               ::mongo::logv2::LogSeverity::Warning(),                           \
+               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+               MESSAGE,                                                          \
                ##__VA_ARGS__)
 
-#define LOGV2_FATAL_OPTIONS(ID, OPTIONS, MESSAGE, ...) \
-    LOGV2_IMPL(ID, ::mongo::logv2::LogSeverity::Severe(), OPTIONS, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_WARNING_OPTIONS(ID, OPTIONS, MESSAGE, ...)           \
+    LOGV2_IMPL(ID,                                                 \
+               ::mongo::logv2::LogSeverity::Warning(),             \
+               ::mongo::logv2::LogOptions::ensureValidComponent(   \
+                   OPTIONS, MongoLogV2DefaultComponent_component), \
+               MESSAGE,                                            \
+               ##__VA_ARGS__)
 
-#define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, MESSAGE, ...)                    \
-    do {                                                                          \
-        auto severityMacroLocal_ = ::mongo::logv2::LogSeverity::Debug(DLEVEL);    \
-        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(   \
-                MongoLogV2DefaultComponent_component, severityMacroLocal_)) {     \
-            LOGV2_IMPL(ID, severityMacroLocal_, OPTIONS, MESSAGE, ##__VA_ARGS__); \
-        }                                                                         \
+#define LOGV2_ERROR(ID, MESSAGE, ...)                                            \
+    LOGV2_IMPL(ID,                                                               \
+               ::mongo::logv2::LogSeverity::Error(),                             \
+               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+               MESSAGE,                                                          \
+               ##__VA_ARGS__)
+
+#define LOGV2_ERROR_OPTIONS(ID, OPTIONS, MESSAGE, ...)             \
+    LOGV2_IMPL(ID,                                                 \
+               ::mongo::logv2::LogSeverity::Error(),               \
+               ::mongo::logv2::LogOptions::ensureValidComponent(   \
+                   OPTIONS, MongoLogV2DefaultComponent_component), \
+               MESSAGE,                                            \
+               ##__VA_ARGS__)
+
+#define LOGV2_FATAL(ID, MESSAGE, ...)                                            \
+    LOGV2_IMPL(ID,                                                               \
+               ::mongo::logv2::LogSeverity::Severe(),                            \
+               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+               MESSAGE,                                                          \
+               ##__VA_ARGS__)
+
+#define LOGV2_FATAL_OPTIONS(ID, OPTIONS, MESSAGE, ...)             \
+    LOGV2_IMPL(ID,                                                 \
+               ::mongo::logv2::LogSeverity::Severe(),              \
+               ::mongo::logv2::LogOptions::ensureValidComponent(   \
+                   OPTIONS, MongoLogV2DefaultComponent_component), \
+               MESSAGE,                                            \
+               ##__VA_ARGS__)
+
+#define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, MESSAGE, ...)                               \
+    do {                                                                                     \
+        auto severityMacroLocal_ = ::mongo::logv2::LogSeverity::Debug(DLEVEL);               \
+        auto optionsMacroLocal_ = ::mongo::logv2::LogOptions::ensureValidComponent(          \
+            OPTIONS, MongoLogV2DefaultComponent_component);                                  \
+        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(              \
+                optionsMacroLocal_.component(), severityMacroLocal_)) {                      \
+            LOGV2_IMPL(ID, severityMacroLocal_, optionsMacroLocal_, MESSAGE, ##__VA_ARGS__); \
+        }                                                                                    \
     } while (false)
 
-#define LOGV2_DEBUG(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, ::mongo::logv2::LogOptions{}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_DEBUG(ID, DLEVEL, MESSAGE, ...)                                             \
+    LOGV2_DEBUG_OPTIONS(ID,                                                               \
+                        DLEVEL,                                                           \
+                        ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+                        MESSAGE,                                                          \
+                        ##__VA_ARGS__)
 
 }  // namespace mongo
 

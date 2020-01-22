@@ -150,6 +150,9 @@ StringData LogComponent::toStringData() const {
             return "tlaPlusTrace"_sd;
         case kNumLogComponents:
             return "total"_sd;
+        case kAutomaticDetermination:
+            // We should not reach this
+            break;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
     MONGO_UNREACHABLE;
@@ -240,6 +243,9 @@ StringData LogComponent::getNameForLog() const {
             return "TLA_PLUS"_sd;
         case kNumLogComponents:
             return "TOTAL"_sd;
+        case kAutomaticDetermination:
+            // We should not reach this
+            break;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
     MONGO_UNREACHABLE;
