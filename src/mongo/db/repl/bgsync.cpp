@@ -147,6 +147,9 @@ MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeStart);
 // Failpoint to override the time to sleep before retrying sync source selection.
 MONGO_FAIL_POINT_DEFINE(forceBgSyncSyncSourceRetryWaitMS);
 
+// Failpoint which causes rollback to hang after completing.
+MONGO_FAIL_POINT_DEFINE(bgSyncHangAfterRunRollback);
+
 BackgroundSync::BackgroundSync(
     ReplicationCoordinator* replicationCoordinator,
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
@@ -515,6 +518,13 @@ void BackgroundSync::_produce() {
         auto storageInterface = StorageInterface::get(opCtx.get());
         _runRollback(
             opCtx.get(), fetcherReturnStatus, source, syncSourceResp.rbid, storageInterface);
+
+        if (bgSyncHangAfterRunRollback.shouldFail()) {
+            log() << "bgSyncHangAfterRunRollback failpoint is set.";
+            while (MONGO_unlikely(bgSyncHangAfterRunRollback.shouldFail()) && !inShutdown()) {
+                mongo::sleepmillis(100);
+            }
+        }
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
         warning() << "Fetcher got invalid BSON while querying oplog. Blacklisting sync source "
