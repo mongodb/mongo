@@ -90,6 +90,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -865,7 +866,16 @@ void WiredTigerKVEngine::cleanShutdown() {
         closeConfig += "use_timestamp=false,";
     }
 
-    invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
+    const Timestamp stableTimestamp = getStableTimestamp();
+    const Timestamp initialDataTimestamp = getInitialDataTimestamp();
+    if (stableTimestamp >= initialDataTimestamp) {
+        invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
+    } else {
+        log() << "Skipping checkpoint during clean shutdown because stableTimestamp ("
+              << stableTimestamp << ") is less than the initialDataTimestamp ("
+              << initialDataTimestamp << ")";
+        quickExit(EXIT_SUCCESS);
+    }
     _conn = nullptr;
 }
 
