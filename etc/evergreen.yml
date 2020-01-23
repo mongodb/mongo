@@ -10211,6 +10211,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - rhel70
 
 - &enterprise-rhel-80-64-bit-template
   name: enterprise-rhel-80-64-bit
@@ -10464,6 +10466,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - rhel70
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -10583,7 +10587,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - rhel70-small
+    - rhel70
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -10639,7 +10643,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - rhel70-small
+    - rhel70
 
 - name: enterprise-rhel-67-s390x
   display_name: Enterprise RHEL 6.7 s390x
