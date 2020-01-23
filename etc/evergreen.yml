@@ -9280,7 +9280,7 @@ buildvariants:
     push_path: windows
     push_bucket: downloads.10gen.com
     push_name: windows
-    push_arch: x86-enterprise
+    push_arch: x86_64-enterprise
   tasks:
   - name: compile_TG
     requires:
@@ -9437,7 +9437,7 @@ buildvariants:
     push_path: windows
     push_bucket: downloads.mongodb.org
     push_name: windows
-    push_arch: x64
+    push_arch: x86_64
     multiversion_platform: windows_x86_64-2008plus-ssl
     multiversion_platform_42_or_later: windows_x86_64-2012plus
     msi_target: msi
