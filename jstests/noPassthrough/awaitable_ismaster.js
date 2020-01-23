@@ -62,7 +62,7 @@ function runTest(db) {
         },
         maxAwaitTimeMS: 0
     }),
-                                 [31382, 51761]);
+                                 [31382, 51761, 51764]);
 
     // Check that passing a topologyVersion not of type object fails.
     assert.commandFailedWithCode(
@@ -147,6 +147,11 @@ function runTest(db) {
     }),
                                  [31373, 51759]);
 }
+
+const conn = MongoRunner.runMongod({});
+assert.neq(null, conn, "mongod was unable to start up");
+runTest(conn.getDB("admin"));
+MongoRunner.stopMongod(conn);
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();

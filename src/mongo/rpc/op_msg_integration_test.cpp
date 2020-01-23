@@ -528,11 +528,6 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
     uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
     DBClientBase* conn = fixtureConn.get();
 
-    // TODO SERVER-44813: Run this test on standalone.
-    if (!fixtureConn->isReplicaSetMember() && !fixtureConn->isMongos()) {
-        return;
-    }
-
     if (fixtureConn->isReplicaSetMember()) {
         // Connect directly to the primary.
         conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
@@ -595,11 +590,6 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
         unittest::getFixtureConnectionString().connect("integration_test", errMsg));
     uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
     DBClientBase* conn = fixtureConn.get();
-
-    // TODO SERVER-44813: Run this test on standalone.
-    if (!fixtureConn->isReplicaSetMember() && !fixtureConn->isMongos()) {
-        return;
-    }
 
     if (fixtureConn->isReplicaSetMember()) {
         // Connect directly to the primary.
@@ -666,11 +656,6 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
         unittest::getFixtureConnectionString().connect("integration_test", errMsg));
     uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
     DBClientBase* conn = fixtureConn.get();
-
-    // TODO SERVER-44813: Run this test on standalone.
-    if (!fixtureConn->isReplicaSetMember() && !fixtureConn->isMongos()) {
-        return;
-    }
 
     if (fixtureConn->isReplicaSetMember()) {
         // Connect directly to the primary.
