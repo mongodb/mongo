@@ -555,11 +555,16 @@ std::unique_ptr<CommandInvocation> BasicCommand::parse(OperationContext* opCtx,
     return stdx::make_unique<Invocation>(opCtx, request, this);
 }
 
-Command::Command(StringData name, StringData oldName)
+Command::Command(StringData name, std::vector<StringData> aliases)
     : _name(name.toString()),
+      _aliases(std::move(aliases)),
       _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
       _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
-    globalCommandRegistry()->registerCommand(this, name, oldName);
+    globalCommandRegistry()->registerCommand(this, _name, _aliases);
+}
+
+bool Command::hasAlias(const StringData& alias) const {
+    return globalCommandRegistry()->findCommand(alias) == this;
 }
 
 Status BasicCommand::explain(OperationContext* opCtx,
@@ -610,8 +615,12 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
 //////////////////////////////////////////////////////////////
 // CommandRegistry
 
-void CommandRegistry::registerCommand(Command* command, StringData name, StringData oldName) {
-    for (StringData key : {name, oldName}) {
+void CommandRegistry::registerCommand(Command* command,
+                                      StringData name,
+                                      std::vector<StringData> aliases) {
+    aliases.push_back(name);
+
+    for (auto key : aliases) {
         if (key.empty()) {
             continue;
         }

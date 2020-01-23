@@ -259,9 +259,15 @@ public:
      * Constructs a new command and causes it to be registered with the global commands list. It is
      * not safe to construct commands other than when the server is starting up.
      *
-     * @param oldName an optional old, deprecated name for the command
+     * @param oldName an old, deprecated name for the command
      */
-    Command(StringData name, StringData oldName = StringData());
+    Command(StringData name, StringData oldName)
+        : Command(name, std::vector<StringData>({oldName})) {}
+
+    /**
+     * @param aliases the optional list of aliases (e.g., old names) for the command
+     */
+    Command(StringData name, std::vector<StringData> aliases = {});
 
     // Do not remove or relocate the definition of this "key function".
     // See https://gcc.gnu.org/wiki/VerboseDiagnostics#missing_vtable
@@ -330,7 +336,7 @@ public:
 
     /**
      * Return true if the command requires auth.
-    */
+     */
     virtual bool requiresAuth() const {
         return true;
     }
@@ -409,9 +415,17 @@ public:
                                      rpc::ReplyBuilderInterface* replyBuilder,
                                      const Command& command);
 
+    /**
+     * Checks if the command is also known by the provided alias.
+     */
+    bool hasAlias(const StringData& alias) const;
+
 private:
     // The full name of the command
     const std::string _name;
+
+    // The list of aliases for the command
+    const std::vector<StringData> _aliases;
 
     // Counters for how many times this command has been executed and failed
     mutable Counter64 _commandsExecuted;
@@ -851,7 +865,7 @@ public:
         return _commands;
     }
 
-    void registerCommand(Command* command, StringData name, StringData oldName);
+    void registerCommand(Command* command, StringData name, std::vector<StringData> aliases);
 
     Command* findCommand(StringData name) const;
 

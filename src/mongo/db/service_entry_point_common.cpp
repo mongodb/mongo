@@ -131,7 +131,10 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},
                                                  {"update", 1}};
 
-bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName, Client* client) {
+bool shouldActivateFailCommandFailPoint(const BSONObj& data,
+                                        const CommandInvocation* invocation,
+                                        Client* client) {
+    auto cmdName = invocation->definition()->getName();
     if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
@@ -569,8 +572,7 @@ bool runCommandImpl(OperationContext* opCtx,
 
         auto waitForWriteConcern = [&](auto&& bb) {
             MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-                return shouldActivateFailCommandFailPoint(
-                           data, request.getCommandName(), opCtx->getClient()) &&
+                return shouldActivateFailCommandFailPoint(data, invocation, opCtx->getClient()) &&
                     data.hasField("writeConcernError");
             }) {
                 bb.append(data.getData()["writeConcernError"]);
@@ -635,12 +637,13 @@ bool runCommandImpl(OperationContext* opCtx,
 /**
  * Maybe uassert according to the 'failCommand' fail point.
  */
-void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
+void evaluateFailCommandFailPoint(OperationContext* opCtx, const CommandInvocation* invocation) {
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient()) &&
+        return shouldActivateFailCommandFailPoint(data, invocation, opCtx->getClient()) &&
             (data.hasField("closeConnection") || data.hasField("errorCode"));
     }) {
         bool closeConnection;
+        auto commandName = invocation->definition()->getName();
         if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
             closeConnection) {
             opCtx->getClient()->session()->end();
@@ -697,7 +700,7 @@ void execCommandDatabase(OperationContext* opCtx,
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
 
-        evaluateFailCommandFailPoint(opCtx, command->getName());
+        evaluateFailCommandFailPoint(opCtx, invocation.get());
 
         const auto dbname = request.getDatabase().toString();
         uassert(
