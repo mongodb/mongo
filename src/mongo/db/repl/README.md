@@ -1318,11 +1318,11 @@ initiated by the `ReplicationCoordinator` and done in the
 When a node begins initial sync, it goes into the `STARTUP2` state. `STARTUP` is reserved for the
 time before the node has loaded its local configuration of the replica set.
 
-At a high level, there are two phases to initial sync: the data clone phase and the oplog
-application phase. During the data clone phase, the node will copy all of another node's data. After
-that phase is completed, it will start the oplog application phase where it will apply all the oplog
-entries that were written since it started copying data. Finally, it will reconstruct any
-transactions in the prepared state.
+At a high level, there are two phases to initial sync: the [**data clone phase**](#data-clone-phase)
+and the [**oplog application phase**](#oplog-application-phase). During the data clone phase, the
+node will copy all of another node's data. After that phase is completed, it will start the oplog
+application phase where it will apply all the oplog entries that were written since it started
+copying data. Finally, it will reconstruct any transactions in the prepared state.
 
 Before the data clone phase begins, the node will do the following:
 
@@ -1353,23 +1353,42 @@ Before the data clone phase begins, the node will do the following:
 
 ## Data clone phase
 
-The new node then begins to clone data from its sync source. The `InitialSyncer` constructs a
-[`DatabasesCloner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/databases_cloner.h)
-that's used to clone all of the databases on the upstream node. The `DatabasesCloner` asks the sync
-source for a list of its databases and then for each one it creates a
-[`DatabaseCloner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/database_cloner.h)
+The new node then begins to clone data from its sync source. The `InitialSyncer` constructs an
+[`AllDatabaseCloner`](https://github.com/mongodb/mongo/blob/r4.3.2/src/mongo/db/repl/all_database_cloner.h)
+that's used to clone all of the databases on the upstream node. The `AllDatabaseCloner` asks the
+sync source for a list of its databases and then for each one it creates and runs a
+[`DatabaseCloner`](https://github.com/mongodb/mongo/blob/r4.3.2/src/mongo/db/repl/database_cloner.h)
 to clone that database. Each `DatabaseCloner` asks the sync source for a list of its collections and
-for each one creates a
-[`CollectionCloner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/collection_cloner.h)
+for each one creates and runs a
+[`CollectionCloner`](https://github.com/mongodb/mongo/blob/r4.3.2/src/mongo/db/repl/collection_cloner.h)
 to clone that collection. The `CollectionCloner` calls `listIndexes` on the sync source and creates
 a
-[`CollectionBulkLoader`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/collection_bulk_loader.h)
+[`CollectionBulkLoader`](https://github.com/mongodb/mongo/blob/r4.3.2/src/mongo/db/repl/collection_bulk_loader.h)
 to create all of the indexes in parallel with the data cloning. The `CollectionCloner` then uses an
 **exhaust cursor** to run a `find` request on the sync source for each collection, inserting the
 fetched documents each time, until it fetches all of the documents. Instead of explicitly needing to
 run a `getMore` on an open cursor to get the next batch, exhaust cursors make it so that if the
 `find` does not exhaust the cursor, the sync source will keep sending batches until there are none
 left.
+
+The cloners are resilient to transient errors.  If a cloner encounters an error marked with the
+`RetriableError` label in
+[`error_codes.yml`](https://github.com/mongodb/mongo/blob/r4.3.2/src/mongo/base/error_codes.yml), it
+will retry whatever network operation it was attempting.  It will continue attempting to retry for a
+length of time set by the server parameter `initialSyncTransientErrorRetryPeriodSeconds`, after
+which it will consider the failure permanent.  A permanent failure means it will choose a new sync
+source and retry all of initial sync, up to a number of times set by the server parameter
+`numInitialSyncAttempts`.  One notable exception, where we do not retry the entire operation, is for
+the actual querying of the collection data.  For querying, we use a feature called **resume
+tokens**.  We set a flag on the query: `$_requestResumeToken`.  This causes each batch we receive
+from the sync source to contain an opaque token which indicates our current position in the
+collection.  After storing a batch of data, we store the most recent resume token in a member
+variable of the `CollectionCloner`.  Then, when retrying we provide this resume token in the query,
+allowing us to avoid having to re-fetch the parts of the collection we have already stored.
+
+The `initialSyncTransientErrorRetryPeriodSeconds` is also used to control retries for the oplog
+fetcher and all network operations in initial sync which take place after the data cloning has
+started.
 
 ## Oplog application phase
 
