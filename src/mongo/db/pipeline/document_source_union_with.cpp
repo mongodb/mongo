@@ -32,9 +32,9 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(unionWith,
-                         DocumentSourceUnionWith::LiteParsed::parse,
-                         DocumentSourceUnionWith::createFromBson);
+REGISTER_TEST_DOCUMENT_SOURCE(unionWith,
+                              DocumentSourceUnionWith::LiteParsed::parse,
+                              DocumentSourceUnionWith::createFromBson);
 
 std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::LiteParsed::parse(
     const AggregationRequest& request, const BSONElement& spec) {
