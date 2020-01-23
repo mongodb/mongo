@@ -459,10 +459,10 @@ MONGO_FAIL_POINT_DEFINE(failCommand);
 MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
 
 bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
-                                                        StringData cmdName,
-                                                        Client* client,
-                                                        const NamespaceString& nss) {
-    if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
+                                                        const CommandInvocation* invocation,
+                                                        Client* client) {
+    const Command* cmd = invocation->definition();
+    if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
     if (data.hasField("threadName") &&
@@ -490,12 +490,13 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;
     }
 
-    if (data.hasField("namespace") && nss != NamespaceString(data.getStringField("namespace"))) {
+    if (data.hasField("namespace") &&
+        invocation->ns() != NamespaceString(data.getStringField("namespace"))) {
         return false;
     }
 
     for (auto&& failCommand : data.getObjectField("failCommands")) {
-        if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
+        if (failCommand.type() == String && cmd->hasAlias(failCommand.valueStringData())) {
             return true;
         }
     }
@@ -504,10 +505,10 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 }
 
 void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
-                                                  StringData commandName,
-                                                  const NamespaceString& nss) {
+                                                  const CommandInvocation* invocation) {
     bool closeConnection, hasErrorCode, blockConnection, hasBlockTimeMS;
     long long errorCode, blockTimeMS;
+    const Command* cmd = invocation->definition();
 
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
         closeConnection = data.hasField("closeConnection") &&
@@ -520,18 +521,18 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
         hasBlockTimeMS = data.hasField("blockTimeMS") &&
             bsonExtractIntegerField(data, "blockTimeMS", &blockTimeMS).isOK();
 
-        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient(), nss) &&
+        return shouldActivateFailCommandFailPoint(data, invocation, opCtx->getClient()) &&
             (closeConnection || blockConnection || hasErrorCode);
     }) {
         if (closeConnection) {
             opCtx->getClient()->session()->end();
-            log() << "Failing command '" << commandName
+            log() << "Failing command '" << cmd->getName()
                   << "' via 'failCommand' failpoint. Action: closing connection.";
             uasserted(50985, "Failing command due to 'failCommand' failpoint");
         }
 
         if (hasErrorCode) {
-            log() << "Failing command '" << commandName
+            log() << "Failing command '" << cmd->getName()
                   << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
                   << ".";
             uasserted(ErrorCodes::Error(errorCode),
@@ -692,11 +693,16 @@ std::unique_ptr<CommandInvocation> BasicCommand::parse(OperationContext* opCtx,
     return stdx::make_unique<Invocation>(opCtx, request, this);
 }
 
-Command::Command(StringData name, StringData oldName)
+Command::Command(StringData name, std::vector<StringData> aliases)
     : _name(name.toString()),
+      _aliases(std::move(aliases)),
       _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
       _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
-    globalCommandRegistry()->registerCommand(this, name, oldName);
+    globalCommandRegistry()->registerCommand(this, _name, _aliases);
+}
+
+bool Command::hasAlias(const StringData& alias) const {
+    return globalCommandRegistry()->findCommand(alias) == this;
 }
 
 Status BasicCommand::explain(OperationContext* opCtx,
@@ -746,8 +752,12 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
 //////////////////////////////////////////////////////////////
 // CommandRegistry
 
-void CommandRegistry::registerCommand(Command* command, StringData name, StringData oldName) {
-    for (StringData key : {name, oldName}) {
+void CommandRegistry::registerCommand(Command* command,
+                                      StringData name,
+                                      std::vector<StringData> aliases) {
+    aliases.push_back(name);
+
+    for (auto key : aliases) {
         if (key.empty()) {
             continue;
         }

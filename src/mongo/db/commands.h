@@ -221,16 +221,14 @@ struct CommandHelpers {
      * Checks if the command passed in is in the list of failCommands defined in the fail point.
      */
     static bool shouldActivateFailCommandFailPoint(const BSONObj& data,
-                                                   StringData cmdName,
-                                                   Client* client,
-                                                   const NamespaceString& nss);
+                                                   const CommandInvocation* invocation,
+                                                   Client* client);
 
     /**
      * Possibly uasserts according to the "failCommand" fail point.
      */
     static void evaluateFailCommandFailPoint(OperationContext* opCtx,
-                                             StringData commandName,
-                                             const NamespaceString& nss);
+                                             const CommandInvocation* invocation);
 
     /**
      * Handles marking kill on client disconnect.
@@ -251,9 +249,15 @@ public:
      * Constructs a new command and causes it to be registered with the global commands list. It is
      * not safe to construct commands other than when the server is starting up.
      *
-     * @param oldName an optional old, deprecated name for the command
+     * @param oldName an old, deprecated name for the command
      */
-    Command(StringData name, StringData oldName = StringData());
+    Command(StringData name, StringData oldName)
+        : Command(name, std::vector<StringData>({oldName})) {}
+
+    /**
+     * @param aliases the optional list of aliases (e.g., old names) for the command
+     */
+    Command(StringData name, std::vector<StringData> aliases = {});
 
     Command(const Command&) = delete;
     Command& operator=(const Command&) = delete;
@@ -416,9 +420,17 @@ public:
         return true;
     }
 
+    /**
+     * Checks if the command is also known by the provided alias.
+     */
+    bool hasAlias(const StringData& alias) const;
+
 private:
     // The full name of the command
     const std::string _name;
+
+    // The list of aliases for the command
+    const std::vector<StringData> _aliases;
 
     // Counters for how many times this command has been executed and failed
     mutable Counter64 _commandsExecuted;
@@ -844,7 +856,7 @@ public:
         return _commands;
     }
 
-    void registerCommand(Command* command, StringData name, StringData oldName);
+    void registerCommand(Command* command, StringData name, std::vector<StringData> aliases);
 
     Command* findCommand(StringData name) const;
 

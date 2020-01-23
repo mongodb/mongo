@@ -69,6 +69,24 @@ assert.commandWorked(adminDB.runCommand({
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
+// Test failpoint for command aliases
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        errorCode: ErrorCodes.BadValue,
+        failCommands: ["dropIndexes"],
+        threadName: threadName,
+    }
+}));
+assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'collection', index: '*'}),
+                             ErrorCodes.BadValue);
+assert.commandWorked(testDB.runCommand({buildInfo: 1}));
+assert.commandFailedWithCode(testDB.runCommand({deleteIndexes: 'collection', index: '*'}),
+                             ErrorCodes.BadValue);
+assert.commandWorked(testDB.runCommand({buildinfo: 1}));
+assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
+
 // Test failing with a particular error code.
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
