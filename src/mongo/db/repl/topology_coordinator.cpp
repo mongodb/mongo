@@ -2748,41 +2748,60 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         return;
     }
 
+    // If either config term is -1, ignore the config term entirely and compare config versions.
+    bool compareConfigTerms = args.getConfigTerm() != -1 && _rsConfig.getConfigTerm() != -1;
+
     if (args.getTerm() < _term) {
         response->setVoteGranted(false);
-        response->setReason(str::stream() << "candidate's term (" << args.getTerm()
-                                          << ") is lower than mine (" << _term << ")");
-    } else if (args.getConfigVersion() != _rsConfig.getConfigVersion()) {
+        response->setReason(str::stream() << "candidate's term ({}) is lower than mine ({})"_format(
+                                args.getTerm(), _term));
+    } else if (compareConfigTerms && args.getConfigTerm() < _rsConfig.getConfigTerm()) {
         response->setVoteGranted(false);
         response->setReason(str::stream()
-                            << "candidate's config version (" << args.getConfigVersion()
-                            << ") differs from mine (" << _rsConfig.getConfigVersion() << ")");
+                            << "candidate's term in config(term, version): ({}, {}) is lower "
+                               "than mine ({}, {})"_format(args.getConfigTerm(),
+                                                           args.getConfigVersion(),
+                                                           _rsConfig.getConfigTerm(),
+                                                           _rsConfig.getConfigVersion()));
+    } else if ((!compareConfigTerms || args.getConfigTerm() == _rsConfig.getConfigTerm()) &&
+               args.getConfigVersion() < _rsConfig.getConfigVersion()) {
+        // If the terms should not be compared or if the terms are equal, fall back to version
+        // comparison.
+        response->setVoteGranted(false);
+        response->setReason(str::stream()
+                            << "ignoring term of -1 for comparison, candidate's version in "
+                               "config(term, version): ({}, {}) is lower than mine ({}, {})"_format(
+                                   args.getConfigTerm(),
+                                   args.getConfigVersion(),
+                                   _rsConfig.getConfigTerm(),
+                                   _rsConfig.getConfigVersion()));
     } else if (args.getSetName() != _rsConfig.getReplSetName()) {
         response->setVoteGranted(false);
         response->setReason(str::stream()
-                            << "candidate's set name (" << args.getSetName()
-                            << ") differs from mine (" << _rsConfig.getReplSetName() << ")");
+                            << "candidate's set name ({}) differs from mine ({})"_format(
+                                   args.getSetName(), _rsConfig.getReplSetName()));
     } else if (args.getLastDurableOpTime() < getMyLastAppliedOpTime()) {
         response->setVoteGranted(false);
-        response
-            ->setReason(str::stream()
-                        << "candidate's data is staler than mine. candidate's last applied OpTime: "
-                        << args.getLastDurableOpTime().toString()
-                        << ", my last applied OpTime: " << getMyLastAppliedOpTime().toString());
+        response->setReason(str::stream()
+                            << "candidate's data is staler than mine. candidate's last applied "
+                               "OpTime: {}, my last applied OpTime: {}"_format(
+                                   args.getLastDurableOpTime().toString(),
+                                   getMyLastAppliedOpTime().toString()));
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);
-        response->setReason(str::stream()
-                            << "already voted for another candidate ("
-                            << _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort()
-                            << ") this term (" << _lastVote.getTerm() << ")");
+        response->setReason(
+            str::stream() << "already voted for another candidate ({}) this "
+                             "term ({})"_format(_rsConfig.getMemberAt(_lastVote.getCandidateIndex())
+                                                    .getHostAndPort(),
+                                                _lastVote.getTerm()));
     } else {
         int betterPrimary = _findHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex());
         if (_selfConfig().isArbiter() && betterPrimary >= 0) {
             response->setVoteGranted(false);
-            response->setReason(str::stream()
-                                << "can see a healthy primary ("
-                                << _rsConfig.getMemberAt(betterPrimary).getHostAndPort()
-                                << ") of equal or greater priority");
+            response
+                ->setReason(str::stream()
+                            << "can see a healthy primary ({}) of equal or greater priority"_format(
+                                   _rsConfig.getMemberAt(betterPrimary).getHostAndPort()));
         } else {
             if (!args.isADryRun()) {
                 _lastVote.setTerm(args.getTerm());

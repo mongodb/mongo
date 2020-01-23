@@ -87,6 +87,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("term", _term);
     requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
+    requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
 
     _lastDurableOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
 
