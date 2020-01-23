@@ -171,6 +171,18 @@ void Client::setCurrent(ServiceContext::UniqueClient client) {
     currentClient = std::move(client);
 }
 
+/**
+ * User connections are listed active so long as they are associated with an opCtx.
+ * Non-user connections are listed active if they have an opCtx and not waiting on a condvar.
+ */
+bool Client::hasAnyActiveCurrentOp() const {
+    if (!_opCtx)
+        return false;
+    if (isFromUserConnection() || !_opCtx->isWaitingForConditionOrInterrupt())
+        return true;
+    return false;
+}
+
 ThreadClient::ThreadClient(ServiceContext* serviceContext)
     : ThreadClient(getThreadName(), serviceContext, nullptr) {}
 

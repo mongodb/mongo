@@ -80,7 +80,8 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
         }
 
         // Ignore inactive connections unless 'idleConnections' is true.
-        if (!client->getOperationContext() && connMode == CurrentOpConnectionsMode::kExcludeIdle) {
+        if (connMode == CurrentOpConnectionsMode::kExcludeIdle &&
+            !client->hasAnyActiveCurrentOp()) {
             continue;
         }
 

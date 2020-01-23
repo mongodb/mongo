@@ -121,11 +121,12 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
                      failpointData.numTimesShouldBeHit);
 
     jsTest.log("Going to find coordinator opCtx ids");
-    let coordinatorOps =
-        coordinator.getDB("admin")
-            .aggregate(
-                [{$currentOp: {'allUsers': true}}, {$match: {desc: "TransactionCoordinator"}}])
-            .toArray();
+    let coordinatorOps = coordinator.getDB("admin")
+                             .aggregate([
+                                 {$currentOp: {'allUsers': true, 'idleConnections': true}},
+                                 {$match: {desc: "TransactionCoordinator"}}
+                             ])
+                             .toArray();
 
     // Use "greater than or equal to" since, for failpoints that pause the coordinator while
     // it's sending prepare or sending the decision, there might be one additional thread that's

@@ -129,6 +129,24 @@ protected:
 class Interruptible : public InterruptibleBase {
 private:
     /**
+     * Helper class to properly set _isWaiting for Interruptible instances.
+     * Every call sequence that waits on a condition/interrupt must hold an instance of WaitContext.
+     */
+    class WaitContext {
+    public:
+        WaitContext(Interruptible* interruptible) : _interruptible(interruptible) {
+            _interruptible->_isWaiting.store(true);
+        }
+
+        ~WaitContext() {
+            _interruptible->_isWaiting.store(false);
+        }
+
+    private:
+        Interruptible* const _interruptible;
+    };
+
+    /**
      * A deadline guard provides a subsidiary deadline to the parent.
      */
     class DeadlineGuard {
@@ -206,6 +224,17 @@ private:
 
 public:
     class WaitListener;
+
+    Interruptible() : _isWaiting(false) {}
+
+    /**
+     * Returns true if currently waiting for a condition/interrupt.
+     * This function relies on instances of WaitContext to properly set _isWaiting.
+     * Note that _isWaiting remains true until waitForConditionOrInterruptUntil() returns.
+     */
+    bool isWaitingForConditionOrInterrupt() const {
+        return _isWaiting.loadRelaxed();
+    }
 
     /**
      * Enum to convey why an Interruptible woke up
@@ -320,6 +349,7 @@ public:
                                           LockT& m,
                                           Date_t finalDeadline,
                                           PredicateT pred) {
+        WaitContext waitContext(this);
         auto latchName = getLatchName(m);
 
         auto waitUntil = [&](Date_t deadline, WakeSpeed speed) -> boost::optional<WakeReason> {
@@ -447,6 +477,9 @@ protected:
         static State state;
         return state;
     }
+
+private:
+    AtomicWord<bool> _isWaiting;
 };
 
 /**

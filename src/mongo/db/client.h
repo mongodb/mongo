@@ -239,6 +239,12 @@ public:
      */
     std::unique_ptr<Locker> swapLockState(std::unique_ptr<Locker> locker);
 
+    /**
+     * Checks if there is an active currentOp associated with this client.
+     * The definition of active varies between User and System connections.
+     * Note that the caller must hold the client lock.
+     */
+    bool hasAnyActiveCurrentOp() const;
 
 private:
     friend class ServiceContext;

@@ -19,7 +19,7 @@ class IndexBuildTest {
      * Accepts optional filter that can be used to customize the db.currentOp() query.
      */
     static getIndexBuildOpId(database, collectionName, indexName, filter) {
-        let pipeline = [{$currentOp: {allUsers: true}}];
+        let pipeline = [{$currentOp: {allUsers: true, idleConnections: true}}];
         if (filter) {
             pipeline.push({$match: filter});
         }
@@ -101,7 +101,7 @@ class IndexBuildTest {
      * An optional 'onOperationFn' callback accepts an operation to perform any additional checks.
      */
     static assertIndexBuildCurrentOpContents(database, opId, onOperationFn) {
-        const inprog = database.currentOp({opid: opId}).inprog;
+        const inprog = database.currentOp({opid: opId, "$all": true}).inprog;
         assert.eq(1,
                   inprog.length,
                   'unable to find opid ' + opId +

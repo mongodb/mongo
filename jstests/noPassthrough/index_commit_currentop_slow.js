@@ -48,6 +48,7 @@ assert.soon(function() {
     const filter = {
         'command.commitIndexBuild': {$exists: true},
         'waitingForLatch.captureName': 'FutureResolution',
+        '$all': true,
     };
     const result = assert.commandWorked(secondaryDB.currentOp(filter));
     assert.lte(

@@ -36,7 +36,8 @@ function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
     }
 
     jsTest.log(`Running curOp operation after '${failPoint.failPointName}' failpoint.`);
-    let result = adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
+    let result =
+        adminDB.aggregate([{$currentOp: {'idleConnections': true}}, {$match: filter}]).toArray();
 
     jsTest.log(`${result.length} matching curOp entries after '${failPoint.failPointName}':\n${
         tojson(result)}`);
@@ -49,7 +50,6 @@ function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
 
 function makeWorkerFilterWithAction(session, action, txnNumber) {
     return {
-        active: true,
         'twoPhaseCommitCoordinator.lsid.id': session.getSessionId().id,
         'twoPhaseCommitCoordinator.txnNumber': NumberLong(txnNumber),
         'twoPhaseCommitCoordinator.action': action,

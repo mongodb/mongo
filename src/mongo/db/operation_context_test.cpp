@@ -978,6 +978,38 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
         ErrorCodes::MaxTimeMSExpired);
 }
 
+TEST(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto optCtx = client->makeOperationContext();
+
+    // Case (1) must return false (immediately after initialization)
+    ASSERT_FALSE(optCtx->isWaitingForConditionOrInterrupt());
+
+    // Case (2) must return true while waiting for the condition
+
+    unittest::Barrier barrier(2);
+
+    stdx::thread worker([&] {
+        auto mutex = MONGO_MAKE_LATCH();
+        stdx::condition_variable cv;
+        stdx::unique_lock<Latch> lk(mutex);
+        Date_t deadline = Date_t::now() + Milliseconds(300);
+        optCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [&, i = 0]() mutable {
+            if (i++ == 0) {
+                barrier.countDownAndWait();
+            }
+            return false;
+        });
+    });
+
+    barrier.countDownAndWait();
+    ASSERT_TRUE(optCtx->isWaitingForConditionOrInterrupt());
+
+    worker.join();
+    ASSERT_FALSE(optCtx->isWaitingForConditionOrInterrupt());
+}
+
 }  // namespace
 
 }  // namespace mongo

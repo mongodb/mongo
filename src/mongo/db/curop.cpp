@@ -261,7 +261,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     }
 
     // Fill out the rest of the BSONObj with opCtx specific details.
-    infoBuilder->appendBool("active", static_cast<bool>(clientOpCtx));
+    infoBuilder->appendBool("active", client->hasAnyActiveCurrentOp());
     infoBuilder->append("currentOpTime",
                         opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
 
