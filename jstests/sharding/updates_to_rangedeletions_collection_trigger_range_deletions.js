@@ -140,10 +140,9 @@ let testColl = testDB.foo;
     // Update deletion task
     deletionsColl.update(deletionTask, {$unset: {pending: ""}});
 
-    // Verify that UUID mismatch is logged.
+    // Verify that the deletion task gets deleted after being processed.
     assert.soon(function() {
-        return rawMongoProgramOutput().match(
-            'Collection UUID doesn\'t match the one marked for deletion:');
+        return deletionsColl.find().itcount() === 0;
     });
 
     // Verify counts on shards are correct.

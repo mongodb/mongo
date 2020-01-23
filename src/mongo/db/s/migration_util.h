@@ -43,6 +43,8 @@ class ShardId;
 
 namespace migrationutil {
 
+constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
+
 /**
  * Creates a report document with the provided parameters:
  *
@@ -77,10 +79,16 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
                                   const UUID& uuid);
 
 /**
- * Submits a RangeDeletionTask to the CollectionRangeDeleter.
- * Returns false if the submission failed and is not retryable.
+ * Asynchronously attempts to submit the RangeDeletionTask for processing.
+ *
+ * Note that if the current filtering metadata's UUID does not match the task's UUID, the filtering
+ * metadata will be refreshed once. If the UUID's still don't match, the task will be deleted from
+ * disk. If the UUID's do match, the task will be submitted for processing.
+ *
+ * The returned future will contain whether the task was submitted for processing.
  */
-bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& deletionTask);
+ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* oppCtx,
+                                             const RangeDeletionTask& deletionTask);
 
 /**
  * Queries the rangeDeletions collection for ranges that are ready to be deleted and submits them to
@@ -130,7 +138,10 @@ void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId);
  * Deletes the range deletion task document with the specified id from config.rangeDeletions and
  * waits for majority write concern.
  */
-void deleteRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& deletionTaskId);
+void deleteRangeDeletionTaskLocally(
+    OperationContext* opCtx,
+    const UUID& deletionTaskId,
+    const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern);
 
 /**
  * Deletes all range deletion task documents with the specified collection UUID from

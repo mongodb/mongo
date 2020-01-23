@@ -28,13 +28,16 @@ let deletionTask = {
     collectionUuid: UUID(),
     donorShardId: "unused",
     range: {min: {x: 50}, max: {x: MaxKey}},
-    whenToClean: "now"
+    whenToClean: "now",
+    // Mark the range as pending, otherwise the task will be processed immediately on being
+    // inserted (and deleted after it's proessed) rather than being deleted on setFCV downgrade.
+    pending: true
 };
 
 let deletionsColl = st.shard0.getCollection(rangeDeletionNs);
 
 // Write range to deletion collection
-deletionsColl.insert(deletionTask);
+assert.commandWorked(deletionsColl.insert(deletionTask));
 
 // Verify deletion count.
 assert.eq(deletionsColl.find().itcount(), 1);

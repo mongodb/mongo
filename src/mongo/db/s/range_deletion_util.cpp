@@ -51,6 +51,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -210,7 +211,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
 template <typename Callable>
 auto withTemporaryOperationContext(Callable&& callable) {
-    ThreadClient tc("Collection-Range-Deleter", getGlobalServiceContext());
+    ThreadClient tc(migrationutil::kRangeDeletionThreadName, getGlobalServiceContext());
     {
         stdx::lock_guard<Client> lk(*tc.get());
         tc->setSystemOperationKillable(lk);

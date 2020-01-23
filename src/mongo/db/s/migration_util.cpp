@@ -119,45 +119,79 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
     return store.count(opCtx, overlappingRangeQuery(range, uuid)) > 0;
 }
 
-bool submitRangeDeletionTask(OperationContext* opCtx, const RangeDeletionTask& deletionTask) {
-    const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
-        ? CollectionShardingRuntime::kNow
-        : CollectionShardingRuntime::kDelayed;
+ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
+                                             const RangeDeletionTask& deletionTask) {
+    const auto serviceContext = opCtx->getServiceContext();
+    // TODO (SERVER-45577): Use the Grid's fixed executor once the refresh is done asynchronously.
+    // An arbitrary executor is being used temporarily because unit tests have only one thread in
+    // the fixed executor, and that thread is needed to respond to the refresh.
+    return ExecutorFuture<void>(
+               Grid::get(serviceContext)->getExecutorPool()->getArbitraryExecutor())
+        .then([=] {
+            ThreadClient tc(kRangeDeletionThreadName, serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillable(lk);
+            }
+            auto uniqueOpCtx = tc->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
 
-    AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
+            boost::optional<AutoGetCollection> autoColl;
+            autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
 
-    if (!autoColl.getCollection()) {
-        LOG(0) << "Namespace not found: " << deletionTask.getNss();
-        return false;
-    }
+            auto css = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
+            if (!css->getCurrentMetadataIfKnown() ||
+                !css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid())) {
+                // If the collection's filtering metadata is not known or its UUID does not match
+                // the UUID of the deletion task, force a filtering metadata refresh once, because
+                // this node may have just stepped up and therefore may have a stale cache.
+                LOG(0) << "Filtering metadata for namespace in deletion task "
+                       << deletionTask.toBSON()
+                       << (css->getCurrentMetadataIfKnown()
+                               ? "has UUID that does not match UUID of the deletion task"
+                               : "is not known")
+                       << ", forcing a refresh of " << deletionTask.getNss();
 
-    if (autoColl.getCollection()->uuid() != deletionTask.getCollectionUuid()) {
-        LOG(0) << "Collection UUID doesn't match the one marked for deletion: "
-               << autoColl.getCollection()->uuid() << " != " << deletionTask.getCollectionUuid();
+                // TODO (SERVER-45577): Add an asynchronous version of
+                // forceShardFilteringMetadataRefresh to avoid blocking on the network in the
+                // thread pool.
+                autoColl.reset();
+                forceShardFilteringMetadataRefresh(opCtx, deletionTask.getNss(), true);
+            }
 
-        return false;
-    }
+            autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
+            if (!css->getCurrentMetadataIfKnown() ||
+                !css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid())) {
+                LOG(0) << "Even after forced refresh, filtering metadata for namespace in deletion "
+                          "task "
+                       << deletionTask.toBSON()
+                       << (css->getCurrentMetadataIfKnown()
+                               ? "has UUID that does not match UUID of the deletion task"
+                               : "is not known")
+                       << ", deleting the task.";
 
-    LOG(0) << "Scheduling range " << deletionTask.getRange() << " in namespace "
-           << deletionTask.getNss() << " for deletion.";
+                autoColl.reset();
+                deleteRangeDeletionTaskLocally(
+                    opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
+                return false;
+            }
 
-    auto css = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
+            LOG(0) << "Submitting range deletion task " << deletionTask.toBSON();
 
-    // TODO (SERVER-44554): This is needed for now because of the invariant that throws on cleanup
-    // if the metadata is not set.
-    if (!css->getCurrentMetadataIfKnown()) {
-        LOG(0) << "Current metadata is not available";
-        return false;
-    }
+            const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
+                ? CollectionShardingRuntime::kNow
+                : CollectionShardingRuntime::kDelayed;
 
-    auto cleanupCompleteFuture = css->cleanUpRange(deletionTask.getRange(), whenToClean);
+            auto cleanupCompleteFuture = css->cleanUpRange(deletionTask.getRange(), whenToClean);
 
-    if (cleanupCompleteFuture.isReady() && !cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
-        LOG(0) << "Failed to resubmit range for deletion: "
-               << causedBy(cleanupCompleteFuture.getNoThrow(opCtx));
-    }
-
-    return true;
+            if (cleanupCompleteFuture.isReady() &&
+                !cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
+                LOG(0) << "Failed to submit range deletion task " << deletionTask.toBSON()
+                       << causedBy(cleanupCompleteFuture.getNoThrow(opCtx));
+                return false;
+            }
+            return true;
+        });
 }
 
 void submitPendingDeletions(OperationContext* opCtx) {
@@ -167,19 +201,9 @@ void submitPendingDeletions(OperationContext* opCtx) {
 
     std::vector<RangeDeletionTask> invalidRanges;
     store.forEach(opCtx, query, [&opCtx, &invalidRanges](const RangeDeletionTask& deletionTask) {
-        forceShardFilteringMetadataRefresh(opCtx, deletionTask.getNss(), true);
-
-        auto taskValid = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
-
-        if (!taskValid)
-            invalidRanges.push_back(deletionTask);
-
+        migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
         return true;
     });
-
-    for (const auto& range : invalidRanges) {
-        store.remove(opCtx, Query(range.toBSON()));
-    }
 }
 
 void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
@@ -352,9 +376,11 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     sendToRecipient(opCtx, recipientId, deleteOp);
 }
 
-void deleteRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& deletionTaskId) {
+void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
+                                    const UUID& deletionTaskId,
+                                    const WriteConcernOptions& writeConcern) {
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
-    store.remove(opCtx, QUERY(RangeDeletionTask::kIdFieldName << deletionTaskId));
+    store.remove(opCtx, QUERY(RangeDeletionTask::kIdFieldName << deletionTaskId), writeConcern);
 }
 
 void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
