@@ -1254,19 +1254,11 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     const size_t oplogOperationBytes = p().transactionOperationBytes;
     clearOperationsInMemory(opCtx);
 
-    try {
-        // Once committing we cannot throw an exception.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        _commitStorageTransaction(opCtx);
-        _finishCommitTransaction(opCtx, operationCount, oplogOperationBytes);
-    } catch (...) {
-        // It is illegal for committing a transaction to fail for any reason, other than an
-        // invalid command, so we crash instead.
-        severe() << "Caught exception during commit of unprepared transaction "
-                 << opCtx->getTxnNumber() << " on " << _sessionId().toBSON() << ": "
-                 << exceptionToStatus();
-        std::terminate();
-    }
+    // _commitStorageTransaction can throw, but it is safe for the exception to be bubbled up to
+    // the caller, since the transaction can still be safely aborted at this point.
+    _commitStorageTransaction(opCtx);
+
+    _finishCommitTransaction(opCtx, operationCount, oplogOperationBytes);
 
     if (needsNoopWrite) {
         performNoopWrite(
@@ -1395,7 +1387,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     }
 }
 
-void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx) try {
+void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx) {
     invariant(opCtx->getWriteUnitOfWork());
     invariant(opCtx->lockState()->isRSTLLocked());
     opCtx->getWriteUnitOfWork()->commit();
@@ -1408,16 +1400,10 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     opCtx->lockState()->unsetMaxLockTimeout();
-} catch (...) {
-    // It is illegal for committing a storage-transaction to fail so we crash instead.
-    severe() << "Caught exception during commit of storage-transaction " << opCtx->getTxnNumber()
-             << " on " << _sessionId().toBSON() << ": " << exceptionToStatus();
-    std::terminate();
 }
 
-void TransactionParticipant::Participant::_finishCommitTransaction(OperationContext* opCtx,
-                                                                   size_t operationCount,
-                                                                   size_t oplogOperationBytes) {
+void TransactionParticipant::Participant::_finishCommitTransaction(
+    OperationContext* opCtx, size_t operationCount, size_t oplogOperationBytes) noexcept {
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         stdx::lock_guard<Client> lk(*opCtx->getClient());

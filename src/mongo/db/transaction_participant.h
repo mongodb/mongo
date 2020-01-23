@@ -648,7 +648,7 @@ public:
         // has been updated.
         void _finishCommitTransaction(OperationContext* opCtx,
                                       size_t operationCount,
-                                      size_t oplogOperationBytes);
+                                      size_t oplogOperationBytes) noexcept;
 
         // Commits the storage-transaction on the OperationContext.
         //

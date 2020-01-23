@@ -925,90 +925,92 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     invariant(!stmts.empty());
     invariant(stmts.size() <= oplogSlots.size());
 
+    // Storage transaction commit is the last place inside a transaction that can throw an
+    // exception. In order to safely allow exceptions to be thrown at that point, this function must
+    // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
+    // exception.
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
     const auto txnParticipant = TransactionParticipant::get(opCtx);
     OpTimeBundle prevWriteOpTime;
     auto numEntriesWritten = 0;
-    writeConflictRetry(
-        opCtx, "logOplogEntriesForTransaction", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            // Writes to the oplog only require a Global intent lock. Guaranteed by
-            // OplogSlotReserver.
-            invariant(opCtx->lockState()->isWriteLocked());
 
-            WriteUnitOfWork wuow(opCtx);
+    // Writes to the oplog only require a Global intent lock. Guaranteed by
+    // OplogSlotReserver.
+    invariant(opCtx->lockState()->isWriteLocked());
 
-            prevWriteOpTime.writeOpTime = txnParticipant.getLastWriteOpTime();
-            auto currOplogSlot = oplogSlots.begin();
+    prevWriteOpTime.writeOpTime = txnParticipant.getLastWriteOpTime();
+    auto currOplogSlot = oplogSlots.begin();
 
-            // At the beginning of each loop iteration below, 'stmtsIter' will always point to the
-            // first statement of the sequence of remaining, unpacked transaction statements. If all
-            // statements have been packed, it should point to stmts.end(), which is the loop's
-            // termination condition.
-            auto stmtsIter = stmts.begin();
-            while (stmtsIter != stmts.end()) {
+    // At the beginning of each loop iteration below, 'stmtsIter' will always point to the
+    // first statement of the sequence of remaining, unpacked transaction statements. If all
+    // statements have been packed, it should point to stmts.end(), which is the loop's
+    // termination condition.
+    auto stmtsIter = stmts.begin();
+    while (stmtsIter != stmts.end()) {
 
-                BSONObjBuilder applyOpsBuilder;
-                auto nextStmt =
-                    packTransactionStatementsForApplyOps(&applyOpsBuilder, stmtsIter, stmts.end());
+        BSONObjBuilder applyOpsBuilder;
+        auto nextStmt =
+            packTransactionStatementsForApplyOps(&applyOpsBuilder, stmtsIter, stmts.end());
 
-                // If we packed the last op, then the next oplog entry we log should be the implicit
-                // commit or implicit prepare, i.e. we omit the 'partialTxn' field.
-                auto firstOp = stmtsIter == stmts.begin();
-                auto lastOp = nextStmt == stmts.end();
+        // If we packed the last op, then the next oplog entry we log should be the implicit
+        // commit or implicit prepare, i.e. we omit the 'partialTxn' field.
+        auto firstOp = stmtsIter == stmts.begin();
+        auto lastOp = nextStmt == stmts.end();
 
-                auto implicitCommit = lastOp && !prepare;
-                auto implicitPrepare = lastOp && prepare;
-                auto isPartialTxn = !lastOp;
-                // A 'prepare' oplog entry should never include a 'partialTxn' field.
-                invariant(!(isPartialTxn && implicitPrepare));
-                if (implicitPrepare) {
-                    applyOpsBuilder.append("prepare", true);
-                }
-                if (isPartialTxn) {
-                    applyOpsBuilder.append("partialTxn", true);
-                }
+        auto implicitCommit = lastOp && !prepare;
+        auto implicitPrepare = lastOp && prepare;
+        auto isPartialTxn = !lastOp;
+        // A 'prepare' oplog entry should never include a 'partialTxn' field.
+        invariant(!(isPartialTxn && implicitPrepare));
+        if (implicitPrepare) {
+            applyOpsBuilder.append("prepare", true);
+        }
+        if (isPartialTxn) {
+            applyOpsBuilder.append("partialTxn", true);
+        }
 
-                // The 'count' field gives the total number of individual operations in the
-                // transaction, and is included on a non-initial implicit commit or prepare entry.
-                if (lastOp && !firstOp) {
-                    applyOpsBuilder.append("count", static_cast<long long>(stmts.size()));
-                }
+        // The 'count' field gives the total number of individual operations in the
+        // transaction, and is included on a non-initial implicit commit or prepare entry.
+        if (lastOp && !firstOp) {
+            applyOpsBuilder.append("count", static_cast<long long>(stmts.size()));
+        }
 
-                // For both prepared and unprepared transactions, update the transactions table on
-                // the first and last op.
-                auto updateTxnTable = firstOp || lastOp;
+        // For both prepared and unprepared transactions, update the transactions table on
+        // the first and last op.
+        auto updateTxnTable = firstOp || lastOp;
 
-                // Use the next reserved oplog slot. In the special case of writing the implicit
-                // 'prepare' oplog entry, we use the last reserved oplog slot, since callers of this
-                // function will expect that timestamp to be used as the 'prepare' timestamp. This
-                // may mean we skipped over some reserved slots, but there's no harm in that.
-                auto oplogSlot = implicitPrepare ? oplogSlots.back() : *currOplogSlot++;
+        // Use the next reserved oplog slot. In the special case of writing the implicit
+        // 'prepare' oplog entry, we use the last reserved oplog slot, since callers of this
+        // function will expect that timestamp to be used as the 'prepare' timestamp. This
+        // may mean we skipped over some reserved slots, but there's no harm in that.
+        auto oplogSlot = implicitPrepare ? oplogSlots.back() : *currOplogSlot++;
 
-                // The first optime of the transaction is always the first oplog slot, except in the
-                // case of a single prepare oplog entry.
-                auto firstOpTimeOfTxn =
-                    (implicitPrepare && firstOp) ? oplogSlots.back() : oplogSlots.front();
+        // The first optime of the transaction is always the first oplog slot, except in the
+        // case of a single prepare oplog entry.
+        auto firstOpTimeOfTxn =
+            (implicitPrepare && firstOp) ? oplogSlots.back() : oplogSlots.front();
 
-                // We always write the startOpTime field, which is the first optime of the
-                // transaction, except when transitioning to 'committed' state, in which it should
-                // no longer be set.
-                auto startOpTime = boost::make_optional(!implicitCommit, firstOpTimeOfTxn);
+        // We always write the startOpTime field, which is the first optime of the
+        // transaction, except when transitioning to 'committed' state, in which it should
+        // no longer be set.
+        auto startOpTime = boost::make_optional(!implicitCommit, firstOpTimeOfTxn);
 
-                MutableOplogEntry oplogEntry;
-                oplogEntry.setOpTime(oplogSlot);
-                oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime.writeOpTime);
-                oplogEntry.setObject(applyOpsBuilder.done());
-                auto txnState = isPartialTxn ? DurableTxnStateEnum::kInProgress
-                                             : (implicitPrepare ? DurableTxnStateEnum::kPrepared
-                                                                : DurableTxnStateEnum::kCommitted);
-                prevWriteOpTime = logApplyOpsForTransaction(
-                    opCtx, &oplogEntry, txnState, startOpTime, updateTxnTable);
+        MutableOplogEntry oplogEntry;
+        oplogEntry.setOpTime(oplogSlot);
+        oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime.writeOpTime);
+        oplogEntry.setObject(applyOpsBuilder.done());
+        auto txnState = isPartialTxn
+            ? DurableTxnStateEnum::kInProgress
+            : (implicitPrepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted);
+        prevWriteOpTime =
+            logApplyOpsForTransaction(opCtx, &oplogEntry, txnState, startOpTime, updateTxnTable);
 
-                // Advance the iterator to the beginning of the remaining unpacked statements.
-                stmtsIter = nextStmt;
-                numEntriesWritten++;
-            }
-            wuow.commit();
-        });
+        // Advance the iterator to the beginning of the remaining unpacked statements.
+        stmtsIter = nextStmt;
+        numEntriesWritten++;
+    }
+
     return numEntriesWritten;
 }
 
