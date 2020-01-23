@@ -268,9 +268,15 @@ public:
      * Constructs a new command and causes it to be registered with the global commands list. It is
      * not safe to construct commands other than when the server is starting up.
      *
-     * @param oldName an optional old, deprecated name for the command
+     * @param oldName an old, deprecated name for the command
      */
-    Command(StringData name, StringData oldName = StringData());
+    Command(StringData name, StringData oldName)
+        : Command(name, std::vector<StringData>({oldName})) {}
+
+    /**
+     * @param aliases the optional list of aliases (e.g., old names) for the command
+     */
+    Command(StringData name, std::vector<StringData> aliases = {});
 
     // NOTE: Do not remove this declaration, or relocate it in this class. We
     // are using this method to control where the vtable is emitted.
@@ -371,6 +377,11 @@ public:
 
     // Counter for unknown commands
     static Counter64 unknownCommands;
+
+    /**
+     * Checks if the command is also known by the provided alias.
+     */
+    bool hasAlias(const StringData& alias) const;
 
     /**
      * Runs a command directly and returns the result. Does not do any other work normally handled
@@ -550,6 +561,9 @@ private:
 
     // The full name of the command
     const std::string _name;
+
+    // The list of aliases for the command
+    const std::vector<StringData> _aliases;
 
     // Pointers to hold the metrics tree references
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;

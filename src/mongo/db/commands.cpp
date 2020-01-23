@@ -186,7 +186,7 @@ ResourcePattern Command::parseResourcePattern(const std::string& dbname,
     return ResourcePattern::forExactNamespace(NamespaceString(ns));
 }
 
-Command::Command(StringData name, StringData oldName)
+Command::Command(StringData name, std::vector<StringData> aliases)
     : _name(name.toString()),
       _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
       _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
@@ -201,8 +201,12 @@ Command::Command(StringData name, StringData oldName)
     c = this;
     (*_commandsByBestName)[name] = this;
 
-    if (!oldName.empty())
-        (*_commands)[oldName.toString()] = this;
+    for (auto key : aliases) {
+        if (key.empty()) {
+            continue;
+        }
+        (*_commands)[key.toString()] = this;
+    }
 }
 
 void Command::help(stringstream& help) const {
@@ -386,6 +390,10 @@ void Command::generateHelpResponse(OperationContext* opCtx,
 
     replyBuilder->setCommandReply(helpBuilder.obj());
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+}
+
+bool Command::hasAlias(const StringData& alias) const {
+    return findCommand(alias) == this;
 }
 
 namespace {
