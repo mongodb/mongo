@@ -281,7 +281,7 @@ variables:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
@@ -8481,7 +8481,6 @@ buildvariants:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
-    use_scons_cache: true
     test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
@@ -9347,6 +9346,22 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2017-compile
+  # Do not add more tasks to this list.
+
+- <<: *enterprise-windows-nopush-template
+  name: enterprise-windows-compile-all-vs2019-canary
+  display_name: "~ Enterprise Windows compile_all VS2019 Canary"
+  batchtime: 1440 # 1 day
+  run_on:
+  - windows-64-vs2019-nonprod
+  expansions:
+    <<: *enterprise-windows-nopush-expansions-template
+    task_compile_flags_extra: >-
+      MSVC_VERSION=14.2
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - windows-64-vs2019-nonprod
   # Do not add more tasks to this list.
 
 - name: enterprise-windows-async
