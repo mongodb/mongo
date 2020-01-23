@@ -48,6 +48,7 @@ namespace {
 const char kModeFieldName[] = "mode";
 const char kTagsFieldName[] = "tags";
 const char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
+const char kHedgeFieldName[] = "hedge";
 
 const char kPrimaryOnly[] = "primary";
 const char kPrimaryPreferred[] = "primaryPreferred";
@@ -132,10 +133,12 @@ TagSet TagSet::primaryOnly() {
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref,
                                              TagSet tags,
-                                             Seconds maxStalenessSeconds)
+                                             Seconds maxStalenessSeconds,
+                                             boost::optional<HedgingMode> hedgingMode)
     : pref(std::move(pref)),
       tags(std::move(tags)),
-      maxStalenessSeconds(std::move(maxStalenessSeconds)) {}
+      maxStalenessSeconds(std::move(maxStalenessSeconds)),
+      hedgingMode(std::move(hedgingMode)) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds)
     : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessSeconds) {}
@@ -159,6 +162,22 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
         return swReadPrefMode.getStatus();
     }
     mode = std::move(swReadPrefMode.getValue());
+
+    boost::optional<HedgingMode> hedgingMode;
+    if (auto hedgingModeEl = readPrefObj[kHedgeFieldName]) {
+        hedgingMode = HedgingMode::parse(IDLParserErrorContext(kHedgeFieldName),
+                                         hedgingModeEl.embeddedObject());
+        if (hedgingMode->getEnabled() && mode == ReadPreference::PrimaryOnly) {
+            return {
+                ErrorCodes::InvalidOptions,
+                str::stream() << "cannot enable hedging for $readPreference mode \"primaryOnly\""};
+        }
+
+        if (!hedgingMode->getEnabled() && hedgingMode->getDelay()) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "cannot enable staggered reads without enabling hedging"};
+        }
+    }
 
     TagSet tags;
     BSONElement tagsElem;
@@ -222,7 +241,7 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
                                     << " can not be set for the primary mode");
     }
 
-    return ReadPreferenceSetting(mode, tags, Seconds(maxStalenessSecondsValue));
+    return ReadPreferenceSetting(mode, tags, Seconds(maxStalenessSecondsValue), hedgingMode);
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {
@@ -249,6 +268,9 @@ void ReadPreferenceSetting::toInnerBSON(BSONObjBuilder* bob) const {
     }
     if (maxStalenessSeconds.count() > 0) {
         bob->append(kMaxStalenessSecondsFieldName, maxStalenessSeconds.count());
+    }
+    if (hedgingMode) {
+        bob->append(kHedgeFieldName, hedgingMode.get().toBSON());
     }
 }
 

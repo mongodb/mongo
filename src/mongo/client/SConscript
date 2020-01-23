@@ -32,6 +32,7 @@ env.Library(
     ],
     source=[
         'read_preference.cpp',
+        env.Idlc('hedging_mode.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
@@ -384,4 +385,3 @@ env.Library(
         'clientdriver_minimal'
     ],
 )
-

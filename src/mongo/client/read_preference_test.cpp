@@ -39,10 +39,14 @@ using namespace mongo;
 
 static const Seconds kMinMaxStaleness = ReadPreferenceSetting::kMinimalMaxStalenessValue;
 
-void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
+ReadPreferenceSetting parse(const BSONObj& rpsObj) {
     const auto swRps = ReadPreferenceSetting::fromInnerBSON(rpsObj);
     ASSERT_OK(swRps.getStatus());
-    const auto rps = swRps.getValue();
+    return std::move(swRps.getValue());
+}
+
+void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
+    const auto rps = parse(rpsObj);
     ASSERT_TRUE(rps.equals(expected));
 }
 
@@ -86,6 +90,84 @@ TEST(ReadPreferenceSetting, ParseValid) {
                                      TagSet(BSON_ARRAY(BSON("dc"
                                                             << "ny"))),
                                      kMinMaxStaleness));
+
+    checkParse(BSON("mode"
+                    << "nearest"
+                    << "tags"
+                    << BSON_ARRAY(BSON("dc"
+                                       << "ny"))
+                    << "maxStalenessSeconds" << kMinMaxStaleness.count() << "hedge" << BSONObj()),
+               ReadPreferenceSetting(ReadPreference::Nearest,
+                                     TagSet(BSON_ARRAY(BSON("dc"
+                                                            << "ny"))),
+                                     kMinMaxStaleness,
+                                     HedgingMode()));
+}
+
+TEST(ReadPreferenceSetting, ParseHedgingMode) {
+    // No hedging mode.
+    auto rpsObj = BSON("mode"
+                       << "primary");
+    auto rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
+    ASSERT_FALSE(rps.hedgingMode.has_value());
+
+    // Default hedging mode.
+    rpsObj = BSON("mode"
+                  << "primaryPreferred"
+                  << "hedge" << BSONObj());
+    rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::PrimaryPreferred);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_TRUE(rps.hedgingMode->getEnabled());
+    ASSERT_TRUE(rps.hedgingMode->getDelay());
+
+    rpsObj = BSON("mode"
+                  << "secondary"
+                  << "hedge" << BSON("enabled" << true));
+    rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::SecondaryOnly);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_TRUE(rps.hedgingMode->getEnabled());
+    ASSERT_TRUE(rps.hedgingMode->getDelay());
+
+    rpsObj = BSON("mode"
+                  << "secondaryPreferred"
+                  << "hedge" << BSON("delay" << false));
+    rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::SecondaryPreferred);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_TRUE(rps.hedgingMode->getEnabled());
+    ASSERT_FALSE(rps.hedgingMode->getDelay());
+
+    // Input hedging mode.
+    rpsObj = BSON("mode"
+                  << "nearest"
+                  << "hedge" << BSON("enabled" << true << "delay" << false));
+    rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_TRUE(rps.hedgingMode->getEnabled());
+    ASSERT_FALSE(rps.hedgingMode->getDelay());
+
+    rpsObj = BSON("mode"
+                  << "nearest"
+                  << "hedge" << BSON("enabled" << false << "delay" << false));
+    rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_FALSE(rps.hedgingMode->getEnabled());
+    ASSERT_FALSE(rps.hedgingMode->getDelay());
+
+    rpsObj = BSON("mode"
+                  << "primary"
+                  << "hedge" << BSON("enabled" << false << "delay" << false));
+    rps = parse(rpsObj);
+
+    ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_FALSE(rps.hedgingMode->getEnabled());
+    ASSERT_FALSE(rps.hedgingMode->getDelay());
 }
 
 void checkParseFails(const BSONObj& rpsObj) {
@@ -110,15 +192,22 @@ TEST(ReadPreferenceSetting, NonEquality) {
                                          << "ca")
                                     << BSON("foo"
                                             << "bar")));
-    auto rps = ReadPreferenceSetting(ReadPreference::Nearest, tagSet, kMinMaxStaleness);
+    auto hedgingMode = HedgingMode();
+    hedgingMode.setDelay(false);
+    auto rps =
+        ReadPreferenceSetting(ReadPreference::Nearest, tagSet, kMinMaxStaleness, hedgingMode);
 
-    auto unexpected1 =
-        ReadPreferenceSetting(ReadPreference::Nearest, TagSet::primaryOnly(), kMinMaxStaleness);
+    auto unexpected1 = ReadPreferenceSetting(
+        ReadPreference::Nearest, TagSet::primaryOnly(), kMinMaxStaleness, hedgingMode);
     ASSERT_FALSE(rps.equals(unexpected1));
 
     auto unexpected2 = ReadPreferenceSetting(
-        ReadPreference::Nearest, tagSet, Seconds(kMinMaxStaleness.count() + 1));
+        ReadPreference::Nearest, tagSet, Seconds(kMinMaxStaleness.count() + 1), hedgingMode);
     ASSERT_FALSE(rps.equals(unexpected2));
+
+    auto unexpected3 =
+        ReadPreferenceSetting(ReadPreference::Nearest, tagSet, kMinMaxStaleness, HedgingMode());
+    ASSERT_FALSE(rps.equals(unexpected3));
 }
 
 TEST(ReadPreferenceSetting, ParseInvalid) {
@@ -170,6 +259,18 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
                          << "secondary"
                          << "maxStalenessSeconds" << Seconds::max().count()));
 
+    // Hedging is not supported for read preference mode "primary".
+    checkParseFailsWithError(BSON("mode"
+                                  << "primary"
+                                  << "hedge" << BSONObj()),
+                             ErrorCodes::InvalidOptions);
+
+    // Cannot enable staggering without enabling hedging.
+    checkParseFailsWithError(BSON("mode"
+                                  << "primaryPreferred"
+                                  << "hedge" << BSON("enabled" << false << "delay" << true)),
+                             ErrorCodes::InvalidOptions);
+
     checkParseContainerFailsWithError(BSON("$query" << BSON("pang"
                                                             << "pong")
                                                     << "$readPreference" << 2),
@@ -204,6 +305,16 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                                            << BSON("foo"
                                                                    << "bar"))),
                                          kMinMaxStaleness));
+
+    auto hedgingMode = HedgingMode();
+    hedgingMode.setDelay(false);
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
+                                         TagSet(BSON_ARRAY(BSON("dc"
+                                                                << "ca")
+                                                           << BSON("foo"
+                                                                   << "bar"))),
+                                         kMinMaxStaleness,
+                                         hedgingMode));
 }
 
 }  // namespace

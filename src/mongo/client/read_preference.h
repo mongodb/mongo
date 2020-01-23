@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/hedging_mode_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -137,15 +138,27 @@ struct ReadPreferenceSetting {
      *     object's copy of tag will have the iterator in the initial
      *     position).
      */
-    ReadPreferenceSetting(ReadPreference pref, TagSet tags, Seconds maxStalenessSeconds);
+    ReadPreferenceSetting(ReadPreference pref,
+                          TagSet tags,
+                          Seconds maxStalenessSeconds,
+                          boost::optional<HedgingMode> hedgingMode = boost::none);
     ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
     ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {}
 
     inline bool equals(const ReadPreferenceSetting& other) const {
+        auto hedgingModeEquals = [](const boost::optional<HedgingMode>& hedgingModeA,
+                                    const boost::optional<HedgingMode>& hedgingModeB) -> bool {
+            if (hedgingModeA && hedgingModeB) {
+                return hedgingModeA->toBSON().woCompare(hedgingModeB->toBSON()) == 0;
+            }
+            return !hedgingModeA && !hedgingModeB;
+        };
+
         return (pref == other.pref) && (tags == other.tags) &&
-            (maxStalenessSeconds == other.maxStalenessSeconds) && (minOpTime == other.minOpTime);
+            (maxStalenessSeconds == other.maxStalenessSeconds) &&
+            hedgingModeEquals(hedgingMode, other.hedgingMode) && (minOpTime == other.minOpTime);
     }
 
     /**
@@ -179,11 +192,12 @@ struct ReadPreferenceSetting {
 
     /**
      * Parses a ReadPreferenceSetting from a BSON document of the form:
-     * { mode: <mode>, tags: <array of tags>, maxStalenessSeconds: Number }. The 'mode' element must
-     * be a string equal to either "primary", "primaryPreferred", "secondary", "secondaryPreferred",
-     * or "nearest". Although the tags array is intended to be an array of unique BSON documents, no
-     * further validation is performed on it other than checking that it is an array, and that it is
-     * empty if 'mode' is 'primary'.
+     * { mode: <mode>, tags: <array of tags>, maxStalenessSeconds: Number, hedge: <hedgingMode>}.
+     * The 'mode' element must be a string equal to either "primary", "primaryPreferred",
+     * "secondary", "secondaryPreferred", or "nearest". Although the tags array is intended to be an
+     * array of unique BSON documents, no further validation is performed on it other than checking
+     * that it is an array, and that it is empty if 'mode' is 'primary'. The 'hedge' element
+     * consists of the optional field "enabled" (default true) and "delay" (default true).
      */
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONObj& readPrefSettingObj);
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONElement& readPrefSettingObj);
@@ -208,6 +222,7 @@ struct ReadPreferenceSetting {
     ReadPreference pref;
     TagSet tags;
     Seconds maxStalenessSeconds{};
+    boost::optional<HedgingMode> hedgingMode;
     repl::OpTime minOpTime{};
 };
 
