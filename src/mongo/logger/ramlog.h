@@ -114,7 +114,7 @@ private:
 
     enum {
         N = 1024,  // number of lines
-        C = 1024   // max size of line
+        C = 2048   // max size of line
     };
 
     const char* getLine_inlock(unsigned lineNumber) const;
