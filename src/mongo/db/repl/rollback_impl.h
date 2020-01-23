@@ -342,13 +342,6 @@ private:
     Status _checkAgainstTimeLimit(RollBackLocalOperations::RollbackCommonPoint commonPoint);
 
     /**
-     * Finds the timestamp of the record after the common point to put into the oplog truncate
-     * after point.
-     */
-    Timestamp _findTruncateTimestamp(
-        OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) const;
-
-    /**
      * Kills all user operations currently being performed. Since this node is a secondary, these
      * operations are all reads.
      */

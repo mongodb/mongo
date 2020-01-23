@@ -576,7 +576,7 @@ TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncate
     auto coll = _initializeCollection(_opCtx.get(), UUID::gen(), nss);
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
-    ASSERT_EQUALS(_truncatePoint, Timestamp(3, 3));
+    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
 }
 
 TEST_F(RollbackImplTest, RollbackImplResetsOptimesFromOplogAfterRollback) {
@@ -839,7 +839,7 @@ TEST_F(RollbackImplTest,
     truncateAfterPoint =
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
     ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
-    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
+    ASSERT_EQUALS(_truncatePoint, Timestamp(1, 1));
     ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid), 1);
 }
 
@@ -863,7 +863,7 @@ TEST_F(RollbackImplTest, RollbackSucceedsAndTruncatesOplog) {
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
     ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
     _assertDocsInOplog(_opCtx.get(), {1});
-    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
+    ASSERT_EQUALS(_truncatePoint, Timestamp(1, 1));
 }
 
 DEATH_TEST_F(RollbackImplTest,

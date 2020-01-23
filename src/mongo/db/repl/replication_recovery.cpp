@@ -410,7 +410,9 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
                                                           OpTime topOfOplog) {
     invariant(!stableTimestamp.isNull());
     invariant(!topOfOplog.isNull());
+
     const auto truncateAfterPoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
+
     log() << "Recovering from stable timestamp: " << stableTimestamp
           << " (top of oplog: " << topOfOplog << ", appliedThrough: " << appliedThrough
           << ", TruncateAfter: " << truncateAfterPoint << ")";
@@ -568,8 +570,7 @@ StatusWith<OpTime> ReplicationRecoveryImpl::_getTopOfOplog(OperationContext* opC
 }
 
 void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
-                                               Timestamp truncateTimestamp,
-                                               bool inclusive) {
+                                               Timestamp truncateTimestamp) {
     Timer timer;
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
@@ -583,8 +584,15 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                    str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
     }
 
-    // Scan through oplog in reverse, from latest entry to first, to find the truncateTimestamp.
-    RecordId oldestIDToDelete;  // Non-null if there is something to delete.
+    // Truncate the oplog after (non-inclusive of) the truncateTimestamp. Scan through the oplog in
+    // reverse, from latest entry to first, to find an entry lte truncateTimestamp. Once such an
+    // entry is found, we will truncate inclusive of the previous entry found that is greater than
+    // the truncate point. If only one entry is found lte to the truncateTimestamp, then nothing is
+    // truncated: nothing was found greater than the truncateTimestamp. Note that the
+    // truncateTimestamp does not have to be an exact match to an oplog entry: any entries after
+    // that time will be truncated.
+    RecordId previousRecordId;
+    Timestamp topOfOplog;
     auto oplogRs = oplogCollection->getRecordStore();
     auto oplogReverseCursor = oplogRs->getCursor(opCtx, /*forward=*/false);
     size_t count = 0;
@@ -595,25 +603,32 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
 
         const auto tsElem = entry["ts"];
         if (count == 1) {
-            if (tsElem.eoo())
+            if (tsElem.eoo()) {
                 LOG(2) << "Oplog tail entry: " << redact(entry);
-            else
+            } else {
                 LOG(2) << "Oplog tail entry ts field: " << tsElem;
+                topOfOplog = tsElem.timestamp();
+            }
         }
 
-        if (tsElem.timestamp() < truncateTimestamp) {
+        if (tsElem.timestamp() <= truncateTimestamp) {
             // If count == 1, that means that we have nothing to delete because everything in the
-            // oplog is < truncateTimestamp.
+            // oplog is <= truncateTimestamp.
             if (count != 1) {
-                invariant(!oldestIDToDelete.isNull());
-                oplogCollection->cappedTruncateAfter(opCtx, oldestIDToDelete, inclusive);
+                log() << "Truncating oplog from [" << Timestamp(previousRecordId.repr()) << " to "
+                      << topOfOplog << "]. Truncate after point is " << truncateTimestamp;
+                invariant(!previousRecordId.isNull());
+                oplogCollection->cappedTruncateAfter(opCtx, previousRecordId, /*inclusive*/ true);
+            } else {
+                log() << "There is no oplog after " << truncateTimestamp
+                      << " to truncate. The top of the oplog is " << topOfOplog;
             }
             log() << "Replication recovery oplog truncation finished in: " << timer.millis()
                   << "ms";
             return;
         }
 
-        oldestIDToDelete = id;
+        previousRecordId = id;
     }
 
     severe() << "Reached end of oplog looking for oplog entry before " << truncateTimestamp.toBSON()
@@ -630,10 +645,6 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
         return;
     }
 
-    // We want to delete oplog inclusive of the 'oplogTruncateAfterPoint', but not inclusive of the
-    // stable timestamp if we end up using that value instead.
-    bool inclusive = true;
-
     if (stableTimestamp && !stableTimestamp->isNull() && truncatePoint <= stableTimestamp) {
         AutoGetCollectionForRead oplog(opCtx, NamespaceString::kRsOplogNamespace);
         invariant(oplog.getCollection());
@@ -642,17 +653,15 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
               << ") is equal to or earlier than the stable timestamp (" << stableTimestamp.get()
               << "), so truncating after the stable timestamp instead";
 
-        inclusive = false;
         truncatePoint = stableTimestamp.get();
     }
 
-    log() << "Removing unapplied oplog entries starting at: " << truncatePoint.toBSON() << ", "
-          << (inclusive ? "inclusive" : "not inclusive");
-    _truncateOplogTo(opCtx, truncatePoint, inclusive);
+    log() << "Removing unapplied oplog entries starting after: " << truncatePoint.toBSON();
+    _truncateOplogTo(opCtx, truncatePoint);
 
     // Clear the oplogTruncateAfterPoint now that we have removed any holes that might exist in the
     // oplog -- and so that we do not truncate future entries erroneously.
-    _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, {});
+    _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
     opCtx->recoveryUnit()->waitUntilDurable(opCtx);
 }
 

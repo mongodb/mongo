@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/op_observer_impl.h"
@@ -64,6 +66,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 using repl::MutableOplogEntry;

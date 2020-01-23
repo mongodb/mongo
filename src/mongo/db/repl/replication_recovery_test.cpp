@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -53,6 +55,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace {
@@ -467,7 +470,7 @@ TEST_F(ReplicationRecoveryTest, RecoveryTruncatesOplogAtOplogTruncateAfterPoint)
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
-    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(3, 3));
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
 
@@ -731,7 +734,7 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehi
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
-    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(3, 3));
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
 
@@ -748,7 +751,7 @@ void ReplicationRecoveryTest::testRecoveryAppliesDocumentsWithNoAppliedThroughAf
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
-    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(3, 3));
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
 
     auto startingTS = Timestamp(1, 1);

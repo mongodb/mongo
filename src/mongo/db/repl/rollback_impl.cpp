@@ -502,11 +502,12 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
           << " update operations and " << _observerInfo.rollbackCommandCounts[kDeleteCmdName]
           << " delete operations.";
 
-    // During replication recovery, we truncate all oplog entries with timestamps greater than
-    // or equal to the oplog truncate after point. As a result, we must find the oplog entry
-    // after the common point so we do not truncate the common point itself. If we entered
-    // rollback, we are guaranteed to have at least one oplog entry after the common point.
-    Timestamp truncatePoint = _findTruncateTimestamp(opCtx, commonPoint);
+    // During replication recovery, we truncate all oplog entries with timestamps greater than the
+    // oplog truncate after point. If we entered rollback, we are guaranteed to have at least one
+    // oplog entry after the common point.
+    log() << "Marking to truncate all oplog entries with timestamps greater than "
+          << commonPoint.getOpTime().getTimestamp();
+    Timestamp truncatePoint = commonPoint.getOpTime().getTimestamp();
 
     // Persist the truncate point to the 'oplogTruncateAfterPoint' document. We save this value so
     // that the replication recovery logic knows where to truncate the oplog. We save this value
@@ -1003,34 +1004,6 @@ Status RollbackImpl::_checkAgainstTimeLimit(
     }
 
     return Status::OK();
-}
-
-Timestamp RollbackImpl::_findTruncateTimestamp(
-    OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) const {
-
-    AutoGetCollectionForRead oplog(opCtx, NamespaceString::kRsOplogNamespace);
-    invariant(oplog.getCollection());
-    auto oplogCursor = oplog.getCollection()->getCursor(opCtx, /*forward=*/true);
-
-    auto commonPointRecord = oplogCursor->seekExact(commonPoint.getRecordId());
-    auto commonPointOpTime = commonPoint.getOpTime();
-    // Check that we've found the right document for the common point.
-    invariant(commonPointRecord);
-    auto commonPointTime = OpTime::parseFromOplogEntry(commonPointRecord->data.releaseToBson());
-    invariant(commonPointTime.getStatus());
-    invariant(commonPointTime.getValue() == commonPointOpTime,
-              str::stream() << "Common point: " << commonPointOpTime.toString()
-                            << ", record found: " << commonPointTime.getValue().toString());
-
-    // Get the next document, which will be the first document to truncate.
-    auto truncatePointRecord = oplogCursor->next();
-    invariant(truncatePointRecord);
-    auto truncatePointTime = OpTime::parseFromOplogEntry(truncatePointRecord->data.releaseToBson());
-    invariant(truncatePointTime.getStatus());
-
-    log() << "Marking to truncate all oplog entries with timestamps greater than or equal to "
-          << truncatePointTime.getValue();
-    return truncatePointTime.getValue().getTimestamp();
 }
 
 boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx,

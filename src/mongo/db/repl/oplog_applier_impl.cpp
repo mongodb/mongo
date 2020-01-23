@@ -624,7 +624,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
         // Write batch of ops into oplog.
         if (!getOptions().skipWritesToOplog) {
-            _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
+            _consistencyMarkers->setOplogTruncateAfterPoint(
+                opCtx, _replCoord->getMyLastAppliedOpTime().getTimestamp());
             scheduleWritesToOplog(opCtx, _storageInterface, _writerPool, ops);
         }
 

@@ -10,7 +10,7 @@ var testDB = db.getSiblingDB("profile_findandmodify");
 assert.commandWorked(testDB.dropDatabase());
 var coll = testDB.getCollection("test");
 
-testDB.setProfilingLevel(2);
+assert.commandWorked(testDB.setProfilingLevel(2));
 
 //
 // Update as findAndModify.
