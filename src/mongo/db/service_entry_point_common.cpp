@@ -687,10 +687,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 },
                 [&](const BSONObj& data) {
                     return CommandHelpers::shouldActivateFailCommandFailPoint(
-                               data,
-                               request.getCommandName(),
-                               opCtx->getClient(),
-                               invocation->ns()) &&
+                               data, invocation, opCtx->getClient()) &&
                         data.hasField("writeConcernError");
                 });
             if (reallyWait) {
@@ -845,7 +842,7 @@ void execCommandDatabase(OperationContext* opCtx,
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
 
-        CommandHelpers::evaluateFailCommandFailPoint(opCtx, command->getName(), invocation->ns());
+        CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
 
         const auto dbname = request.getDatabase().toString();
         uassert(

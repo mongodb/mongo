@@ -283,7 +283,7 @@ void execCommandClient(OperationContext* opCtx,
             },
             [&](const BSONObj& data) {
                 return CommandHelpers::shouldActivateFailCommandFailPoint(
-                           data, request.getCommandName(), opCtx->getClient(), invocation->ns()) &&
+                           data, invocation, opCtx->getClient()) &&
                     data.hasField("writeConcernError");
             });
     }
@@ -397,7 +397,7 @@ void runCommand(OperationContext* opCtx,
     try {
         rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
 
-        CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName, invocation->ns());
+        CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
         bool startTransaction = false;
         if (osi.getAutocommit()) {
             routerSession.emplace(opCtx);
