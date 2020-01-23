@@ -301,7 +301,7 @@ class TestCalculateExecTimeout(unittest.TestCase):
 
         exec_timeout = under_test._calculate_exec_timeout(repeat_config, avg_test_runtime)
 
-        self.assertEqual(1531, exec_timeout)
+        self.assertEqual(1771, exec_timeout)
 
     def test_average_timeout_greater_than_execution_time(self):
         repeat_config = under_test.RepeatConfig(repeat_tests_secs=600, repeat_tests_min=2)
@@ -323,7 +323,7 @@ class TestGenerateTimeouts(unittest.TestCase):
 
         timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
 
-        self.assertEqual(timeout_info.exec_timeout, 1531)
+        self.assertEqual(timeout_info.exec_timeout, 1771)
         self.assertEqual(timeout_info.timeout, 1366)
 
     def test__generate_timeouts_no_results(self):
