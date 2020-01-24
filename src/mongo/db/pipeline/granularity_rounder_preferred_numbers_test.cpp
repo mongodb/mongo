@@ -573,5 +573,19 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNegativeNumber)
         ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), AssertionException, 40268);
     }
 }
+
+TEST(GranularityRounderPreferredNumbersTest, Infinity) {
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "E192");
+
+    Value inf = Value(std::numeric_limits<double>::infinity());
+    ASSERT_TRUE(std::isinf(rounder->roundUp(inf).coerceToDouble()));
+    ASSERT_TRUE(std::isinf(rounder->roundDown(inf).coerceToDouble()));
+
+    Value decimalInf = Value(Decimal128::kPositiveInfinity);
+    testEquals(rounder->roundUp(decimalInf), decimalInf);
+    testEquals(rounder->roundDown(decimalInf), decimalInf);
+}
+
 }  // namespace
 }  // namespace mongo

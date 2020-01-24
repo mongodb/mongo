@@ -166,7 +166,7 @@ void uassertNonNegativeNumber(Value value) {
 Value GranularityRounderPreferredNumbers::roundUp(Value value) {
     uassertNonNegativeNumber(value);
 
-    if (value.coerceToDouble() == 0.0) {
+    if (value.coerceToDouble() == 0.0 || std::isinf(value.coerceToDouble())) {
         return value;
     }
 
@@ -251,7 +251,7 @@ Value GranularityRounderPreferredNumbers::roundUp(Value value) {
 Value GranularityRounderPreferredNumbers::roundDown(Value value) {
     uassertNonNegativeNumber(value);
 
-    if (value.coerceToDouble() == 0.0) {
+    if (value.coerceToDouble() == 0.0 || std::isinf(value.coerceToDouble())) {
         return value;
     }
 
