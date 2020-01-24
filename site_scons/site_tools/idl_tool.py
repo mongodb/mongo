@@ -37,8 +37,20 @@ def idlc_emitter(target, source, env):
         )
 
     base_file_name, _ = SCons.Util.splitext(str(target[0]))
-    target_source = base_file_name + "_gen.cpp"
-    target_header = base_file_name + "_gen.h"
+    target_source = env.File(base_file_name + "_gen.cpp")
+    target_header = env.File(base_file_name + "_gen.h")
+
+    # When generating ninja we need to inform each IDL build the
+    # string it should search for to find implicit dependencies.
+    if env.get("GENERATING_NINJA", False):
+        setattr(target_source.attributes, "NINJA_EXTRA_VARS", {"msvc_deps_prefix": "import file:"})
+        setattr(target_header.attributes, "NINJA_EXTRA_VARS", {"msvc_deps_prefix": "import file:"})
+
+        # IDL can generate too-long commands on Windows and does not
+        # need environment variables, so disable them by pre-setting
+        # NINJA_ENV_ENV to an empty string.
+        setattr(target_source.attributes, "NINJA_ENV_ENV", "")
+        setattr(target_header.attributes, "NINJA_ENV_ENV", "")
 
     env.Alias("generated-sources", [target_source, target_header])
 
@@ -49,6 +61,13 @@ IDLCAction = SCons.Action.Action("$IDLCCOM", "$IDLCCOMSTR")
 
 
 def idl_scanner(node, env, path):
+
+    # When generating ninja we only need to add the IDL_GLOBAL_DEPS
+    # because the implicit dependencies will be picked up using the
+    # deps=msvc method.
+    if env.get("GENERATING_NINJA", False):
+        return IDL_GLOBAL_DEPS
+
     nodes_deps_list = getattr(node.attributes, "IDL_NODE_DEPS", None)
     if nodes_deps_list is not None:
         return nodes_deps_list
@@ -95,12 +114,13 @@ def generate(env):
     idlc = idlc_mod
 
     env["IDLC"] = "$PYTHON buildscripts/idl/idlc.py"
-    env["IDLCFLAGS"] = ""
-    base_dir = env.subst("$BUILD_ROOT/$VARIANT_DIR").replace("#", "")
-    env["IDLCCOM"] = (
-        "$IDLC --include src --base_dir %s --target_arch $TARGET_ARCH --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES "
-        % (base_dir)
-    )
+    base_dir = env.Dir("$BUILD_ROOT/$VARIANT_DIR").path
+    env["IDLCFLAGS"] = [
+        "--include", "src",
+        "--base_dir", base_dir,
+        "--target_arch", "$TARGET_ARCH",
+    ]
+    env["IDLCCOM"] = "$IDLC $IDLCFLAGS --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES"
     env["IDLCSUFFIX"] = ".idl"
 
     IDL_GLOBAL_DEPS = env.Glob("#buildscripts/idl/*.py") + env.Glob(

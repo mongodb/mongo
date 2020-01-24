@@ -68,11 +68,19 @@ def _add_scanner(builder):
 
     def new_scanner(node, env, path):
         old_results = old_scanner(node, env, path)
+
+        # Ninja uses only timestamps for implicit dependencies so will
+        # always rebuild a program whose archive has been updated even
+        # if has the same content signature.
+        if env.get("GENERATING_NINJA", False):
+            return old_results
+
         new_results = []
         for base in old_results:
             new_results.append(base)
             if getattr(env.Entry(base).attributes, "thin_archive", None):
                 new_results.extend(base.children())
+
         return new_results
 
     builder.target_scanner = SCons.Scanner.Scanner(

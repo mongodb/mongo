@@ -3817,6 +3817,20 @@ if get_option('ninja') == 'true':
     env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", skip)
     env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", skip)
 
+
+    # idlc.py has the ability to print it's implicit dependencies
+    # while generating, Ninja can consume these prints using the
+    # deps=msvc method.
+    env.AppendUnique(IDLCFLAGS= "--write-dependencies-inline")
+    env.NinjaRule(
+        rule="IDLC",
+        command="cmd /c $cmd" if env.TargetOSIs("windows") else "$cmd",
+        description="Generating $out",
+        deps="msvc",
+    )
+    env.NinjaRuleMapping("$IDLCCOM", "IDLC")
+    env.NinjaRuleMapping(env["IDLCCOM"], "IDLC")
+
     # We can create empty files for FAKELIB in Ninja because it
     # does not care about content signatures. We have to
     # write_uuid_to_file for FAKELIB in SCons because SCons does.
