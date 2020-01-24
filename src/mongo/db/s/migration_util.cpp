@@ -46,6 +46,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -54,6 +55,8 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -419,5 +422,179 @@ void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UU
                  QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
                  {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
+
+void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                     const ChunkRange& range,
+                                     const ChunkVersion& preMigrationChunkVersion) {
+    ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
+    ensureChunkVersionIsGreaterThanRequest.setDbName(NamespaceString::kAdminDb);
+    ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
+    ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
+    ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
+    const auto ensureChunkVersionIsGreaterThanRequestBSON =
+        ensureChunkVersionIsGreaterThanRequest.toBSON({});
+
+    for (int attempts = 1;; attempts++) {
+        const auto ensureChunkVersionIsGreaterThanResponse =
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                ensureChunkVersionIsGreaterThanRequestBSON,
+                Shard::RetryPolicy::kIdempotent);
+        const auto ensureChunkVersionIsGreaterThanStatus =
+            Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
+        if (ensureChunkVersionIsGreaterThanStatus.isOK()) {
+            break;
+        }
+
+        // If the server is already doing a clean shutdown, join the shutdown.
+        if (globalInShutdownDeprecated()) {
+            shutdown(waitForShutdown());
+        }
+        opCtx->checkForInterrupt();
+
+        LOG(0) << "_configsvrEnsureChunkVersionIsGreaterThan failed after " << attempts
+               << " attempts " << causedBy(ensureChunkVersionIsGreaterThanStatus)
+               << " . Will try again.";
+    }
+}
+
+void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
+    for (int attempts = 1;; attempts++) {
+        try {
+            forceShardFilteringMetadataRefresh(opCtx, nss, true);
+            break;
+        } catch (const DBException& ex) {
+            // If the server is already doing a clean shutdown, join the shutdown.
+            if (globalInShutdownDeprecated()) {
+                shutdown(waitForShutdown());
+            }
+            opCtx->checkForInterrupt();
+
+            LOG(0) << "Failed to refresh metadata for " << nss.ns() << " after " << attempts
+                   << " attempts " << causedBy(redact(ex.toStatus()))
+                   << ". Will try to refresh again.";
+        }
+    }
+}
+
+void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
+    LOG(0) << "Starting migration coordinator stepup recovery thread.";
+
+    auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
+    ExecutorFuture<void>(executor).getAsync([serviceContext](const Status& status) {
+        try {
+            ThreadClient tc("MigrationCoordinatorStepupRecovery", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillable(lk);
+            }
+
+            auto uniqueOpCtx = tc->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
+
+            // Wait for the latest OpTime to be majority committed to ensure any decision that is
+            // read is on the true branch of history.
+            // Note (Esha): I don't think this is strictly required for correctness, but it is
+            // is difficult to reason about, and being pessimistic by waiting for the decision to be
+            // majority committed does not cost much, since stepup should be rare. It *is* required
+            // that this node ensure a decision that it itself recovers is majority committed. For
+            // example, it is possible that this node is a stale primary, and the true primary has
+            // already sent a *commit* decision and re-received a chunk containing the minKey of
+            // this migration. In this case, this node would see that the minKey is still owned and
+            // assume the migration *aborted*. If this node communicated the abort decision to the
+            // recipient, the recipient (if it had not heard the decision yet) would delete data
+            // that the recipient actually owns. (The recipient does not currently wait to hear the
+            // range deletion decision for the first migration before being able to donate (any
+            // part of) the chunk again.)
+            auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+            replClientInfo.setLastOpToSystemLastOpTime(opCtx);
+            const auto lastOpTime = replClientInfo.getLastOp();
+            LOG(0) << "Waiting for OpTime " << lastOpTime << " to become majority committed";
+            WriteConcernResult unusedWCResult;
+            uassertStatusOK(
+                waitForWriteConcern(opCtx,
+                                    lastOpTime,
+                                    WriteConcernOptions{WriteConcernOptions::kMajority,
+                                                        WriteConcernOptions::SyncMode::UNSET,
+                                                        WriteConcernOptions::kNoTimeout},
+                                    &unusedWCResult));
+
+            PersistentTaskStore<MigrationCoordinatorDocument> store(
+                opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+            Query query;
+            store.forEach(opCtx, query, [&opCtx](const MigrationCoordinatorDocument& doc) {
+                LOG(0) << "Recovering migration " << doc.toBSON();
+
+                // Create a MigrationCoordinator to complete the coordination.
+                MigrationCoordinator coordinator(doc.getId(),
+                                                 doc.getDonorShardId(),
+                                                 doc.getRecipientShardId(),
+                                                 doc.getNss(),
+                                                 doc.getCollectionUuid(),
+                                                 doc.getRange(),
+                                                 doc.getPreMigrationChunkVersion());
+
+                if (doc.getDecision()) {
+                    // The decision is already known.
+                    coordinator.setMigrationDecision(
+                        (*doc.getDecision()) == DecisionEnum::kCommitted
+                            ? MigrationCoordinator::Decision::kCommitted
+                            : MigrationCoordinator::Decision::kAborted);
+                    coordinator.completeMigration(opCtx);
+                    return true;
+                }
+
+                // The decision is not known. Recover the decision from the config server.
+
+                ensureChunkVersionIsGreaterThan(
+                    opCtx, doc.getRange(), doc.getPreMigrationChunkVersion());
+
+                refreshFilteringMetadataUntilSuccess(opCtx, doc.getNss());
+
+                auto refreshedMetadata = [&] {
+                    AutoGetCollection autoColl(opCtx, doc.getNss(), MODE_IS);
+                    auto* const css = CollectionShardingRuntime::get(opCtx, doc.getNss());
+                    return css->getCurrentMetadataIfKnown();
+                }();
+
+                if (!refreshedMetadata || !(*refreshedMetadata)->isSharded() ||
+                    !(*refreshedMetadata)->uuidMatches(doc.getCollectionUuid())) {
+                    LOG(0) << "Even after forced refresh, filtering metadata for namespace in "
+                              "migration coordinator doc "
+                           << doc.toBSON()
+                           << (!refreshedMetadata || !(*refreshedMetadata)->isSharded()
+                                   ? "is not known"
+                                   : "has UUID that does not match the collection UUID in the "
+                                     "coordinator doc")
+                           << ". Deleting the range deletion tasks on the donor and recipient as "
+                              "well as the migration coordinator document on this node.";
+
+                    // TODO (SERVER-45707): Test that range deletion tasks are eventually
+                    // deleted even if the collection is dropped before migration coordination
+                    // is resumed.
+                    deleteRangeDeletionTaskOnRecipient(
+                        opCtx, doc.getRecipientShardId(), doc.getId());
+                    deleteRangeDeletionTaskLocally(opCtx, doc.getId());
+                    coordinator.forgetMigration(opCtx);
+                    return true;
+                }
+
+                if ((*refreshedMetadata)->keyBelongsToMe(doc.getRange().getMin())) {
+                    coordinator.setMigrationDecision(MigrationCoordinator::Decision::kAborted);
+                } else {
+                    coordinator.setMigrationDecision(MigrationCoordinator::Decision::kCommitted);
+                }
+                coordinator.completeMigration(opCtx);
+                return true;
+            });
+        } catch (const DBException& ex) {
+            LOG(0) << "Failed to resume coordinating migrations on stepup "
+                   << causedBy(ex.toStatus());
+        }
+    });
+}
+
 }  // namespace migrationutil
 }  // namespace mongo

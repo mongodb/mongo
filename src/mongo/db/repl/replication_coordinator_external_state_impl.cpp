@@ -819,7 +819,11 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
 
+        // Note, these must be done after the configOpTime is recovered via
+        // ShardingStateRecovery::recover above, because they may trigger filtering metadata
+        // refreshes which should use the recovered configOpTime.
         migrationutil::resubmitRangeDeletionsOnStepUp(_service);
+        migrationutil::resumeMigrationCoordinationsOnStepUp(_service);
 
     } else {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {

@@ -180,5 +180,26 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
  * config.migrationCoordinators without waiting for majority writeConcern.
  */
 void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId);
+
+/**
+ * Sends _configsvrEnsureChunkVersionIsGreaterThan for the range and preMigrationChunkVersion until
+ * hearing success or the node steps down or shuts down.
+ */
+void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                     const ChunkRange& range,
+                                     const ChunkVersion& preMigrationChunkVersion);
+
+/**
+ * Forces a filtering metadata refresh of the namespace until the refresh succeeds or the node
+ * steps down or shuts down.
+ */
+void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
+ * migration coordination to completion.
+ */
+void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext);
+
 }  // namespace migrationutil
 }  // namespace mongo

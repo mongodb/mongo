@@ -38,6 +38,14 @@ imports:
     - "mongo/s/chunk_range.idl"
     - "mongo/s/chunk_version.idl"
 
+enums:
+    Decision:
+        description: "Whether the migration committed or aborted."
+        type: string
+        values:
+            kCommitted: "committed"
+            kAborted: "aborted"
+
 structs:
     migrationCoordinatorDocument:
         description: "Represents an in-progress migration on the migration donor."
@@ -67,6 +75,6 @@ structs:
                 type: ChunkVersion
                 description: "The version, at the start of the migration, of the chunk being moved."
             decision:
-                type: string
-                description: "Whether the migration committed or aborted."
+                type: Decision
+                description: "Enumeration that defines whether the migration committed or aborted."
                 optional: true

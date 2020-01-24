@@ -22,6 +22,7 @@ selector:
   - jstests/sharding/out_fails_to_replace_sharded_collection.js
   - jstests/sharding/merge_from_stale_mongos.js
   - jstests/sharding/migration_coordinator_basic.js
+  - jstests/sharding/migration_coordinator_failover.js
   - jstests/sharding/count1.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js

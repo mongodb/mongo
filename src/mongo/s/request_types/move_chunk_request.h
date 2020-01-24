@@ -103,6 +103,10 @@ public:
         return _toShardId;
     }
 
+    const ChunkRange& getRange() const {
+        return _range;
+    }
+
     const BSONObj& getMinKey() const {
         return _range.getMin();
     }

@@ -82,6 +82,11 @@ public:
      */
     void completeMigration(OperationContext* opCtx);
 
+    /**
+     * Deletes the persistent state for this migration from config.migrationCoordinators.
+     */
+    void forgetMigration(OperationContext* opCtx);
+
 private:
     /**
      * Deletes the range deletion task from the recipient node and marks the range deletion task on
@@ -94,11 +99,6 @@ private:
      * recipient node as ready to be processed.
      */
     void _abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
-
-    /**
-     * Deletes the persistent state for this migration from config.migrationCoordinators.
-     */
-    void _forgetMigration(OperationContext* opCtx);
 
     // The decision of the migration commit against the config server.
     boost::optional<Decision> _decision;

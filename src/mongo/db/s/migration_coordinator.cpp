@@ -42,6 +42,15 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(disableWritingPendingRangeDeletionEntries);
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeMakingCommitDecisionDurable);
+MONGO_FAIL_POINT_DEFINE(hangBeforeMakingAbortDecisionDurable);
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeSendingCommitDecision);
+MONGO_FAIL_POINT_DEFINE(hangBeforeSendingAbortDecision);
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeForgettingMigrationAfterCommitDecision);
+MONGO_FAIL_POINT_DEFINE(hangBeforeForgettingMigrationAfterAbortDecision);
+
 namespace migrationutil {
 
 MigrationCoordinator::MigrationCoordinator(UUID migrationId,
@@ -103,17 +112,23 @@ void MigrationCoordinator::completeMigration(OperationContext* opCtx) {
     switch (*_decision) {
         case Decision::kAborted:
             _abortMigrationOnDonorAndRecipient(opCtx);
+            hangBeforeForgettingMigrationAfterAbortDecision.pauseWhileSet();
             break;
         case Decision::kCommitted:
             _commitMigrationOnDonorAndRecipient(opCtx);
+            hangBeforeForgettingMigrationAfterCommitDecision.pauseWhileSet();
             break;
     }
-    _forgetMigration(opCtx);
+    forgetMigration(opCtx);
 }
 
 void MigrationCoordinator::_commitMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+    hangBeforeMakingCommitDecisionDurable.pauseWhileSet();
+
     LOG(0) << _logPrefix() << "Making commit decision durable";
     migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
+
+    hangBeforeSendingCommitDecision.pauseWhileSet();
 
     LOG(0) << _logPrefix() << "Deleting range deletion task on recipient";
     migrationutil::deleteRangeDeletionTaskOnRecipient(
@@ -124,8 +139,12 @@ void MigrationCoordinator::_commitMigrationOnDonorAndRecipient(OperationContext*
 }
 
 void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+    hangBeforeMakingAbortDecisionDurable.pauseWhileSet();
+
     LOG(0) << _logPrefix() << "Making abort decision durable";
     migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
+
+    hangBeforeSendingAbortDecision.pauseWhileSet();
 
     LOG(0) << _logPrefix() << "Deleting range deletion task on donor";
     migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
@@ -135,7 +154,7 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 }
 
-void MigrationCoordinator::_forgetMigration(OperationContext* opCtx) {
+void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
     LOG(0) << _logPrefix() << "Deleting migration coordinator document";
     migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
 }

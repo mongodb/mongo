@@ -60,7 +60,6 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
-#include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
@@ -469,48 +468,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     if (!migrationCommitStatus.isOK()) {
         if (_useFCV44Protocol) {
-            // Send _configsvrEnsureShardVersionIsGreaterThan until hearing success to ensure
-            // that if the migration commit has not occurred yet, it will never occur. This
-            // makes it safe for the shard to refresh to find out if the migration commit
-            // succeeded.
-
-            ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
-            ensureChunkVersionIsGreaterThanRequest.setDbName(NamespaceString::kAdminDb);
-            ensureChunkVersionIsGreaterThanRequest.setMinKey(_args.getMinKey());
-            ensureChunkVersionIsGreaterThanRequest.setMaxKey(_args.getMaxKey());
-            ensureChunkVersionIsGreaterThanRequest.setVersion(_chunkVersion);
-            const auto ensureChunkVersionIsGreaterThanRequestBSON =
-                ensureChunkVersionIsGreaterThanRequest.toBSON({});
-
-            for (int attempts = 1;; attempts++) {
-                const auto ensureChunkVersionIsGreaterThanResponse =
-                    Grid::get(_opCtx)
-                        ->shardRegistry()
-                        ->getConfigShard()
-                        ->runCommandWithFixedRetryAttempts(
-                            _opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            "admin",
-                            ensureChunkVersionIsGreaterThanRequestBSON,
-                            Shard::RetryPolicy::kIdempotent);
-                const auto ensureChunkVersionIsGreaterThanStatus =
-                    Shard::CommandResponse::getEffectiveStatus(
-                        ensureChunkVersionIsGreaterThanResponse);
-                if (ensureChunkVersionIsGreaterThanStatus.isOK()) {
-                    break;
-                }
-
-                // If the server is already doing a clean shutdown, join the shutdown. This
-                // prevents the cleanup logic from running if the node is shutting down.
-                if (globalInShutdownDeprecated()) {
-                    shutdown(waitForShutdown());
-                }
-                _opCtx->checkForInterrupt();
-
-                LOG(0) << "_configsvrEnsureChunkVersionIsGreaterThan failed after " << attempts
-                       << " attempts " << causedBy(ensureChunkVersionIsGreaterThanStatus)
-                       << " . Will try again.";
-            }
+            migrationutil::ensureChunkVersionIsGreaterThan(_opCtx, _args.getRange(), _chunkVersion);
         } else {
             // This is the FCV 4.2 and below protocol.
 
@@ -571,23 +529,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     }
 
     // Incrementally refresh the metadata before leaving the critical section.
-    for (int attempts = 1;; attempts++) {
-        try {
-            forceShardFilteringMetadataRefresh(_opCtx, getNss(), true);
-            break;
-        } catch (const DBException& ex) {
-            // If the server is already doing a clean shutdown, join the shutdown. This prevents the
-            // cleanup logic from running if the node is shutting down.
-            if (globalInShutdownDeprecated()) {
-                shutdown(waitForShutdown());
-            }
-            _opCtx->checkForInterrupt();
-
-            log() << "Failed to refresh metadata after " << attempts << " attempts, after a "
-                  << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
-                  << causedBy(redact(ex.toStatus())) << ". Will try to refresh again.";
-        }
-    }
+    migrationutil::refreshFilteringMetadataUntilSuccess(_opCtx, getNss());
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
 
