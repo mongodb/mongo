@@ -122,6 +122,32 @@ validateFindCmdOutputAndPlan({
     stagesNotExpected: ["SORT_MERGE", "SORT", "FETCH"]
 });
 
+// Verify that the sort can use index when there is no filter and the sort order is a non-hashed
+// prefix of the index pattern.
+validateFindCmdOutputAndPlan({
+    filter: {},
+    project: {_id: 0, a: 1, b: 1},
+    sort: {a: 1, b: -1},
+    expectedOutput: [
+        {a: 0, b: 4}, {a: 0, b: 3}, {a: 0, b: 2}, {a: 0, b: 1}, {a: 0, b: 0},
+        {a: 1, b: 4}, {a: 1, b: 3}, {a: 1, b: 2}, {a: 1, b: 1}, {a: 1, b: 0},
+        {a: 2, b: 4}, {a: 2, b: 3}, {a: 2, b: 2}, {a: 2, b: 1}, {a: 2, b: 0},
+        {a: 3, b: 4}, {a: 3, b: 3}, {a: 3, b: 2}, {a: 3, b: 1}, {a: 3, b: 0},
+        {a: 4, b: 4}, {a: 4, b: 3}, {a: 4, b: 2}, {a: 4, b: 1}, {a: 4, b: 0},
+    ],
+    expectedStages: ["IXSCAN"],
+    stagesNotExpected: ["SORT_MERGE", "SORT", "FETCH"]
+});
+
+// Verify that the sort cannot use index when there is no filter and the sort order uses a hashed
+// field from the index.
+validateFindCmdOutputAndPlan({
+    filter: {},
+    project: {_id: 0, a: 1, b: 1},
+    sort: {a: 1, b: -1, c: 1},
+    expectedStages: ["SORT", "COLLSCAN"],
+});
+
 // Verify that a list of exact match predicates on range field (prefix) and sort with an immediate
 // range field can use 'SORT_MERGE'. The entire operation will not require a FETCH.
 validateFindCmdOutputAndPlan({
