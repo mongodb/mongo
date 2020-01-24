@@ -478,6 +478,35 @@ TEST_F(StitchSupportTest, TestReplacementStyleUpdatePreservesId) {
     ASSERT_EQ("{ \"_id\" : 123, \"b\" : 789 }", checkUpdate("{b: 789}", "{_id: 123, a: 456}"));
 }
 
+TEST_F(StitchSupportTest, TestReplacementZeroTimestamp) {
+    auto result =
+        mongo::fromjson(checkUpdate("{b: Timestamp(0, 0)}", "{_id: 123, a: 456}").c_str());
+    auto elemB = result["b"];
+    ASSERT_TRUE(elemB.ok());
+    ASSERT_EQUALS(elemB.type(), mongo::BSONType::bsonTimestamp);
+    auto ts = elemB.timestamp();
+    ASSERT_NOT_EQUALS(0U, ts.getSecs());
+    ASSERT_NOT_EQUALS(0U, ts.getInc());
+}
+
+TEST_F(StitchSupportTest, TestUpdateCurrentDateTimestamp) {
+    auto result = mongo::fromjson(
+        checkUpdate("{$currentDate: {b: {$type: 'timestamp'}}}", "{_id: 123, a: 456}").c_str());
+    auto elemB = result["b"];
+    ASSERT_TRUE(elemB.ok());
+    ASSERT_EQUALS(elemB.type(), mongo::BSONType::bsonTimestamp);
+    auto ts = elemB.timestamp();
+    ASSERT_NOT_EQUALS(0U, ts.getSecs());
+    ASSERT_NOT_EQUALS(0U, ts.getInc());
+}
+
+TEST_F(StitchSupportTest, TestUpdatePipelineClusterTime) {
+    auto result = mongo::fromjson(
+        checkUpdate("[{$set: {b: '$$CLUSTER_TIME'}}]", "{_id: 123, a: 456}").c_str());
+    auto elemB = result["b"];
+    ASSERT_FALSE(elemB.ok());
+}
+
 TEST_F(StitchSupportTest, TestUpdateArrayElement) {
     ASSERT_EQ("{ \"a\" : [ 2, 2 ] }", checkUpdate("{$set: {'a.0': 2}}", "{a: [1, 2]}"));
     ASSERT_EQ("[a.0]", getModifiedPaths());
