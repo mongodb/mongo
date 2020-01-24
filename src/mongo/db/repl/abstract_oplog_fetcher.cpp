@@ -152,7 +152,12 @@ void AbstractOplogFetcher::_makeAndScheduleFetcherCallback(
 Status AbstractOplogFetcher::_doStartup_inlock() noexcept {
     return _scheduleWorkAndSaveHandle_inlock(
         [this](const executor::TaskExecutor::CallbackArgs& args) {
-            hangBeforeStartingOplogFetcher.pauseWhileSet();
+            // Tests use this failpoint to prevent the oplog fetcher from starting.  If those
+            // tests fail and the oplog fetcher is canceled, we want to continue so we see
+            // a test failure quickly instead of a test timeout eventually.
+            while (hangBeforeStartingOplogFetcher.shouldFail() && !args.myHandle.isCanceled()) {
+                sleepmillis(100);
+            }
             _makeAndScheduleFetcherCallback(args);
         },
         &_makeAndScheduleFetcherHandle,
