@@ -1688,6 +1688,9 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
               txnDurationAfterStart);
     sleepmillis(10);
     session.commitTransaction(opCtx());
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
+
     unsigned long long txnDurationAfterCommit =
         session.getSingleTransactionStats()->getDuration(curTimeMicros64());
 
@@ -1722,6 +1725,9 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
               txnDurationAfterStart);
     sleepmillis(10);
     session.abortArbitraryTransaction();
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
+
     unsigned long long txnDurationAfterAbort =
         session.getSingleTransactionStats()->getDuration(curTimeMicros64());
 
@@ -2123,6 +2129,8 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
 
     // The transaction is inactive again, so time inactive should have increased.
     ASSERT_GT(session.getSingleTransactionStats()->getTimeInactiveMicros(curTimeMicros64()),
