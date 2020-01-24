@@ -27,6 +27,7 @@ selector:
 
   # TODO(SERVER-45368) re-enable once collection creation is permitted in cross-shard transactions.
   - jstests/core/txns/create_collection.js
+  - jstests/core/txns/create_collection_parallel.js
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos

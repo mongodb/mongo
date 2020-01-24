@@ -634,9 +634,13 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     // collection create always correct even when other operations are present in the same storage
     // transaction, we reserve an opTime before the collection creation, then pass it to the
     // opObserver.  Reserving the optime automatically sets the storage timestamp.
+    // In order to ensure isolation of multi-document transactions, createCollection should only
+    // reserve oplog slots here if it is run outside of a multi-document transaction. Multi-
+    // document transactions reserve the appropriate oplog slots at commit time.
     OplogSlot createOplogSlot;
     Timestamp createTime;
-    if (canAcceptWrites && supportsDocLocking() && !coordinator->isOplogDisabledFor(opCtx, nss)) {
+    if (canAcceptWrites && supportsDocLocking() && !coordinator->isOplogDisabledFor(opCtx, nss) &&
+        !opCtx->inMultiDocumentTransaction()) {
         createOplogSlot = repl::getNextOpTime(opCtx);
         createTime = createOplogSlot.getTimestamp();
     } else {
