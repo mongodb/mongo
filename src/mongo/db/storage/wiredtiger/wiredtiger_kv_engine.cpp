@@ -538,8 +538,13 @@ StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCurso
         filePath /= name;
         relativePath /= name;
 
-        // TODO: SERVER-44410 Implement fileSize.
-        std::uint64_t fileSize = 0;
+        boost::system::error_code errorCode;
+        const std::uint64_t fileSize = boost::filesystem::file_size(filePath, errorCode);
+        uassert(31403,
+                "Failed to get a file's size. Filename: {} Error: {}"_format(filePath.string(),
+                                                                             errorCode.message()),
+                !errorCode);
+
         StorageEngine::BackupFile backupFile(fileSize);
         backupInformation.insert({filePath.string(), backupFile});
 
