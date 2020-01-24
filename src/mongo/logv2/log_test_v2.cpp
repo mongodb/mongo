@@ -573,11 +573,15 @@ TEST_F(LogTestV2, Types) {
     ASSERT_EQUALS(mongo::fromjson(json.back())
                       .getField(kAttributesFieldName)
                       .Obj()
-                      .getField("name")
+                      .getField("name" + ms.mongoUnitSuffix())
+                      .Int(),
+                  ms.count());
+    ASSERT_EQUALS(BSONObj(bson.back().data())
+                      .getField(kAttributesFieldName)
                       .Obj()
-                      .woCompare(ms.toBSON()),
-                  0);
-    ASSERT(lastBSONElement().Obj().woCompare(ms.toBSON()) == 0);
+                      .getField("name" + ms.mongoUnitSuffix())
+                      .Long(),
+                  ms.count());
 }
 
 TEST_F(LogTestV2, TextFormat) {
@@ -990,6 +994,31 @@ TEST_F(LogTestV2, Containers) {
     };
     validateMapOfOptionalVectors(mongo::fromjson(json.back()));
     validateMapOfOptionalVectors(BSONObj(bson.back().data()));
+
+    std::vector<Nanoseconds> nanos = {Nanoseconds(10), Nanoseconds(100)};
+    LOGV2(20081, "{}", "name"_attr = nanos);
+    auto validateDurationVector = [&nanos](const BSONObj& obj) {
+        std::vector<BSONElement> jsonVector =
+            obj.getField(kAttributesFieldName).Obj().getField("name").Array();
+        ASSERT_EQUALS(nanos.size(), jsonVector.size());
+        for (std::size_t i = 0; i < nanos.size(); ++i)
+            ASSERT(jsonVector[i].Obj().woCompare(nanos[i].toBSON()) == 0);
+    };
+    validateDurationVector(mongo::fromjson(json.back()));
+    validateDurationVector(BSONObj(bson.back().data()));
+
+    std::map<std::string, Microseconds> mapOfMicros = {{"first", Microseconds(20)},
+                                                       {"second", Microseconds(40)}};
+    LOGV2(20082, "{}", "name"_attr = mapOfMicros);
+    auto validateMapOfMicros = [&mapOfMicros](const BSONObj& obj) {
+        BSONObj mappedValues = obj.getField(kAttributesFieldName).Obj().getField("name").Obj();
+        auto in = mapOfMicros.begin();
+        for (; in != mapOfMicros.end(); ++in) {
+            ASSERT(mappedValues.getField(in->first).Obj().woCompare(in->second.toBSON()) == 0);
+        }
+    };
+    validateMapOfMicros(mongo::fromjson(json.back()));
+    validateMapOfMicros(BSONObj(bson.back().data()));
 }
 
 TEST_F(LogTestV2, Unicode) {

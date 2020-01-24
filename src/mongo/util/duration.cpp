@@ -38,9 +38,7 @@ namespace mongo {
 template <typename Period>
 BSONObj Duration<Period>::toBSON() const {
     BSONObjBuilder builder;
-    builder.append("units", unit_short());
-    builder.append("value", count());
-    builder.done();
+    builder.append("duration" + mongoUnitSuffix(), count());
     return builder.obj();
 }
 

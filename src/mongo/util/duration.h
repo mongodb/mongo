@@ -146,6 +146,24 @@ public:
         }
         return StringData{};
     }
+    static constexpr StringData mongoUnitSuffix() {
+        if constexpr (std::is_same_v<Duration, Nanoseconds>) {
+            return "Nanos"_sd;
+        } else if constexpr (std::is_same_v<Duration, Microseconds>) {
+            return "Micros"_sd;
+        } else if constexpr (std::is_same_v<Duration, Milliseconds>) {
+            return "Millis"_sd;
+        } else if constexpr (std::is_same_v<Duration, Seconds>) {
+            return "Seconds"_sd;
+        } else if constexpr (std::is_same_v<Duration, Minutes>) {
+            return "Minutes"_sd;
+        } else if constexpr (std::is_same_v<Duration, Hours>) {
+            return "Hours"_sd;
+        } else if constexpr (std::is_same_v<Duration, Days>) {
+            return "Days"_sd;
+        }
+        return StringData{};
+    }
     MONGO_STATIC_ASSERT_MSG(Period::num > 0, "Duration::period's numerator must be positive");
     MONGO_STATIC_ASSERT_MSG(Period::den > 0, "Duration::period's denominator must be positive");
 

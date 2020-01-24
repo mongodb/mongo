@@ -32,7 +32,7 @@ Libfmt supports named replacement fields within the message string, this is not 
 
 The message string must be a compile time constant. This is to be able to add compile time verification of log statements in the future.
 
-#### Examples
+##### Examples
 
 ```
 LOGV2(1000, "Logging event, no replacement fields is OK");
@@ -54,7 +54,7 @@ To override the default component, a separate logging API can be used that takes
 
 `LogOptions` can be constructed with a `LogComponent` to avoid verbosity in the log statement.
 
-#### Examples
+##### Examples
 
 ```
 LOGV2_OPTIONS(1003, {LogComponent::kCommand}, "Log event to specified component");
@@ -82,7 +82,7 @@ Debug-level logging is slightly different where an additional parameter (as inte
 
 `LOGV2_DEBUG_OPTIONS(ID, debug-level, options, message-string, attr0, ..., attrN);`
 
-#### Examples
+##### Examples
 
 ```
 // Index specifier in replacement field
@@ -99,7 +99,7 @@ Tags are added to a log statement with the options API similarly to how non-defa
 
 Multiple tags can be attached to a log statement using the bitwise or operator `|`.
 
-#### Examples
+##### Examples
 
 ```
 LOGV2_WARNING_OPTIONS(1005, {LogTag::kStartupWarnings}, "XFS filesystem is recommended with WiredTiger");
@@ -122,6 +122,8 @@ Many basic types have built in support:
   * std::string
   * StringData
   * const char*
+* Duration types
+  * Special formatting, see below
 * BSON types
   * BSONObj
   * BSONArray
@@ -165,7 +167,7 @@ Enums will only try to bind a `toString(const T& val)` non-member function. If o
 
 *NOTE: No `operator<<` overload is used even if available*
 
-#### Examples
+##### Examples
 
 ```
 class UserDefinedType {
@@ -209,7 +211,7 @@ seqLog indicates that it is a sequential range where the iterators point to logg
 mapLog indicates that it is a range coming from an associative container where the iterators point to a key-value pair.
 
 
-#### Examples
+##### Examples
 
 ```
 std::array<int, 20> arrayOfInts = ...;
@@ -223,6 +225,31 @@ StringMap<BSONObj> bsonMap = ...;
 LOGV2(1013, "log map directly: {}", "values"_attr = bsonMap);
 LOGV2(1014, "log map iterator range: {}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
 ``` 
+
+### Duration types
+
+Duration types have special formatting to match existing practices in the server code base. Their resulting format depends on the context they are logged.
+
+When durations are formatted as JSON or BSON a unit suffix is added to the attribute name when building the field name. The value will be count of the duration as a number.
+
+When logging containers with durations there is no attribute per duration instance that can have the suffix added. In this case durations are instead formatted as a BSON object.
+
+##### Examples
+
+`"duration"_attr = Milliseconds(10)`
+
+Text | JSON/BSON
+---- | ---------
+`10 ms` | `"durationMillis": 10`
+
+```
+std::vector<Nanoseconds> nanos = {Nanoseconds(200), Nanoseconds(400)};
+"samples"_attr = nanos
+```
+
+Text | JSON/BSON
+---- | ---------
+`(200 ns, 400 ns)` | `"samples": [{"durationNanos": 200}, {"durationNanos": 400}]`
 
 # Output formats
 

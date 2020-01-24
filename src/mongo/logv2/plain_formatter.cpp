@@ -70,6 +70,12 @@ struct TextValueExtractor {
         operator()(name, _storage.back());
     }
 
+    template <typename Period>
+    void operator()(StringData name, const Duration<Period>& val) {
+        _storage.push_back(val.toString());
+        args.push_back(fmt::internal::make_arg<fmt::format_context>(_storage.back()));
+    }
+
     template <typename T>
     void operator()(StringData name, const T& val) {
         args.push_back(fmt::internal::make_arg<fmt::format_context>(val));

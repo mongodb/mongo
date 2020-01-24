@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/duration.h"
 
 #include <functional>
 
@@ -66,7 +67,6 @@ template <typename It>
 auto mapLog(It begin, It end);
 
 namespace detail {
-namespace {
 
 // Helper traits to figure out capabilities on custom types
 template <class T>
@@ -74,6 +74,12 @@ struct IsOptional : std::false_type {};
 
 template <class T>
 struct IsOptional<boost::optional<T>> : std::true_type {};
+
+template <class T>
+struct IsDuration : std::false_type {};
+
+template <class T>
+struct IsDuration<Duration<T>> : std::true_type {};
 
 template <class T, typename = void>
 struct IsContainer : std::false_type {};
@@ -154,8 +160,6 @@ struct HasNonMemberToBSON : std::false_type {};
 template <class T>
 struct HasNonMemberToBSON<T, std::void_t<decltype(toBSON(std::declval<T>()))>> : std::true_type {};
 
-}  // namespace
-
 // Mapping functions on how to map a logged value to how it is stored in variant (reused by
 // container support)
 inline bool mapValue(bool value) {
@@ -220,6 +224,11 @@ inline CustomAttributeValue mapValue(boost::none_t val) {
     return custom;
 }
 
+template <typename T, std::enable_if_t<IsDuration<T>::value, int> = 0>
+auto mapValue(T val) {
+    return val;
+}
+
 template <typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 auto mapValue(T val) {
     if constexpr (HasNonMemberToString<T>::value) {
@@ -247,10 +256,11 @@ CustomAttributeValue mapValue(const T& val) {
     return custom;
 }
 
-template <typename T,
-          std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T> &&
-                               !std::is_enum_v<T> && !IsContainer<T>::value,
-                           int> = 0>
+template <
+    typename T,
+    std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T> && !std::is_enum_v<T> &&
+                         !IsDuration<T>::value && !IsContainer<T>::value,
+                     int> = 0>
 CustomAttributeValue mapValue(const T& val) {
     static_assert(HasToString<T>::value || HasStringSerialize<T>::value ||
                       HasNonMemberToString<T>::value,
@@ -315,6 +325,8 @@ public:
                     } else {
                         builder.append(val.toString());
                     }
+                } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
+                    builder.append(val.toBSON());
                 } else {
                     builder.append(val);
                 }
@@ -349,6 +361,9 @@ public:
                     } else {
                         fmt::format_to(buffer, "{}", val.toString());
                     }
+
+                } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
+                    fmt::format_to(buffer, "{}", val.toString());
                 } else {
                     fmt::format_to(buffer, "{}", val);
                 }
@@ -404,6 +419,8 @@ public:
                     } else {
                         builder->append(key, val.toString());
                     }
+                } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
+                    builder->append(key, val.toBSON());
                 } else {
                     builder->append(key, val);
                 }
@@ -438,6 +455,8 @@ public:
                     } else {
                         fmt::format_to(buffer, "{}: {}", key, val.toString());
                     }
+                } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
+                    fmt::format_to(buffer, "{}: {}", key, val.toString());
                 } else {
                     fmt::format_to(buffer, "{}: {}", key, val);
                 }
@@ -491,6 +510,13 @@ public:
                   bool,
                   double,
                   StringData,
+                  Nanoseconds,
+                  Microseconds,
+                  Milliseconds,
+                  Seconds,
+                  Minutes,
+                  Hours,
+                  Days,
                   const BSONObj*,
                   const BSONArray*,
                   CustomAttributeValue>

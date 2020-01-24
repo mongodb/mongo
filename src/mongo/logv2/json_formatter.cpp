@@ -102,6 +102,13 @@ struct JSONValueExtractor {
         storeQuoted(name, value);
     }
 
+    template <typename Period>
+    void operator()(StringData name, const Duration<Period>& value) {
+        fmt::format_to(
+            _buffer, R"({}"{}{}":{})", _separator, name, value.mongoUnitSuffix(), value.count());
+        _separator = ","_sd;
+    }
+
     template <typename T>
     void operator()(StringData name, const T& value) {
         storeUnquotedValue(name, value);

@@ -98,6 +98,11 @@ struct BSONValueExtractor {
         _builder.append(name, static_cast<long long>(val));
     }
 
+    template <typename Period>
+    void operator()(StringData name, const Duration<Period>& value) {
+        _builder.append(name.toString() + value.mongoUnitSuffix(), value.count());
+    }
+
     template <typename T>
     void operator()(StringData name, const T& value) {
         _builder.append(name, value);
