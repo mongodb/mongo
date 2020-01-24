@@ -42,6 +42,7 @@ from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
 from buildscripts.util.teststats import TestStats
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.patch_builds.task_generation import resmoke_commands, TimeoutInfo, TaskList
+
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -53,6 +54,7 @@ EXTERNAL_LOGGERS = {
 }
 
 AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
+AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = ".evergreen.yml"
 DEFAULT_PROJECT = "mongodb-mongo-master"
@@ -491,7 +493,8 @@ def _calculate_exec_timeout(repeat_config: RepeatConfig, avg_test_runtime: float
 
     test_execution_time_over_limit = avg_test_runtime - (repeat_tests_secs % avg_test_runtime)
     test_execution_time_over_limit = max(MIN_AVG_TEST_OVERFLOW_SEC, test_execution_time_over_limit)
-    return ceil(repeat_tests_secs + (test_execution_time_over_limit * AVG_TEST_TIME_MULTIPLIER))
+    return ceil(repeat_tests_secs + (test_execution_time_over_limit * AVG_TEST_TIME_MULTIPLIER) +
+                AVG_TEST_SETUP_SEC)
 
 
 def _generate_timeouts(repeat_config: RepeatConfig, test: str,
