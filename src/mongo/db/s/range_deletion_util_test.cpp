@@ -101,6 +101,7 @@ public:
 
         std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
 
+        Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
         CollectionShardingRuntime::get(operationContext(), kNss)
             ->setFilteringMetadata(operationContext(),
                                    CollectionMetadata(cm, ShardId("dummyShardId")));
