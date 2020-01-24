@@ -99,7 +99,7 @@ public:
 
     virtual Status disableIncrementalBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
+    virtual StatusWith<BackupInformation> beginNonBlockingBackup(
         OperationContext* opCtx, const BackupOptions& options) override;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override;
