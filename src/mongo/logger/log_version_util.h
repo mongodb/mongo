@@ -48,6 +48,9 @@ inline logger::LogComponent logComponentV2toV1(logv2::LogComponent component) {
 inline logv2::LogSeverity logSeverityV1toV2(logger::LogSeverity severity) {
     return logv2::LogSeverity::cast(severity.toInt());
 }
+inline logv2::LogSeverity logSeverityV1toV2(int severity) {
+    return logv2::LogSeverity::cast(severity);
+}
 inline logger::LogSeverity logSeverityV2toV1(logv2::LogSeverity severity) {
     return logger::LogSeverity::cast(severity.toInt());
 }

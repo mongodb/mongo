@@ -63,7 +63,7 @@ public:
     void setInterval(Seconds interval) {
         {
             stdx::lock_guard<Latch> twiddle(_mutex);
-            MONGO_LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
+            LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
             _interval = interval;
         }
         _condition.notify_all();
@@ -94,15 +94,15 @@ public:
 
             Date_t now = Date_t::now();
             Date_t expiry = _last + _interval;
-            MONGO_LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
+            LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
 
             if (now >= expiry) {
                 _last = now;
-                MONGO_LOG(5) << "wait: done";
+                LOG(5) << "wait: done";
                 return true;
             }
 
-            MONGO_LOG(5) << "wait: blocking";
+            LOG(5) << "wait: blocking";
             MONGO_IDLE_THREAD_BLOCK;
             _condition.wait_until(lock, expiry.toSystemTimePoint());
         }

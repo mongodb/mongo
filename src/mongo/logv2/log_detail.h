@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/attribute_storage.h"

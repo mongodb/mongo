@@ -46,6 +46,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/logger/log_version_util.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_severity.h"
@@ -53,6 +54,12 @@
 
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOGV2_DEFAULT_COMPONENT.
+#if !defined(MONGO_LOGV2_DEFAULT_COMPONENT)
+#if defined(MONGO_LOG_DEFAULT_COMPONENT)
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT)
+#endif
+#endif
+
 #if defined(MONGO_LOGV2_DEFAULT_COMPONENT)
 const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
     MONGO_LOGV2_DEFAULT_COMPONENT;
@@ -121,13 +128,13 @@ namespace mongo {
 #define LOGV2_FATAL_OPTIONS(ID, OPTIONS, MESSAGE, ...) \
     LOGV2_IMPL(ID, ::mongo::logv2::LogSeverity::Severe(), OPTIONS, MESSAGE, ##__VA_ARGS__)
 
-#define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, MESSAGE, ...)                  \
-    do {                                                                        \
-        auto severity = ::mongo::logv2::LogSeverity::Debug(DLEVEL);             \
-        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog( \
-                MongoLogV2DefaultComponent_component, severity)) {              \
-            LOGV2_IMPL(ID, severity, OPTIONS, MESSAGE, ##__VA_ARGS__);          \
-        }                                                                       \
+#define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, MESSAGE, ...)                    \
+    do {                                                                          \
+        auto severityMacroLocal_ = ::mongo::logv2::LogSeverity::Debug(DLEVEL);    \
+        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(   \
+                MongoLogV2DefaultComponent_component, severityMacroLocal_)) {     \
+            LOGV2_IMPL(ID, severityMacroLocal_, OPTIONS, MESSAGE, ##__VA_ARGS__); \
+        }                                                                         \
     } while (false)
 
 #define LOGV2_DEBUG(ID, DLEVEL, MESSAGE, ...) \
