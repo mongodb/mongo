@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/downgraded_unique_indexes.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/stdx/functional.h"
@@ -310,6 +311,41 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
         fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
+    }
+}
+
+/**
+ * Upgrades the metadata for every unique index.
+ */
+void upgradeAllUniqueIndexes(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
+
+    auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto dbNames = storageEngine->listDatabases();
+    for (auto dbName : dbNames) {
+        auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
+        for (auto nss : colls) {
+            auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+
+            std::vector<std::string> indexNames;
+            DurableCatalog::get(opCtx)->getAllUniqueIndexes(opCtx, nss, &indexNames);
+            for (auto indexName : indexNames) {
+                const IndexDescriptor* desc =
+                    collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+                invariant(desc);
+
+                WriteUnitOfWork wuow(opCtx);
+                log() << "Upgrading unique index metadata for '" << indexName << "' on collection "
+                      << nss;
+
+                // Update index metadata in storage engine.
+                DurableCatalog::get(opCtx)->updateIndexMetadata(opCtx, nss, desc);
+
+                // Refresh the in-memory instance of the index.
+                collection->getIndexCatalog()->refreshEntry(opCtx, desc);
+                wuow.commit();
+            }
+        }
     }
 }
 
@@ -591,6 +627,16 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         severe() << "Please run with --repair to restore the document.";
         fassertFailedNoTrace(40652);
     }
+
+    // If we are in FCV 4.2 and have not upgraded all unique indexes, they must be upgraded before
+    // startup. See SERVER-45374.
+    if (hasDowngradedUniqueIndexes() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+        log() << "In FCV 4.2 and detected unique indexes that are not fully-upgraded";
+        upgradeAllUniqueIndexes(opCtx);
+    }
+
 
     LOG(1) << "done repairDatabases";
     return nonLocalDatabases;

@@ -27,6 +27,16 @@ env.Library(
     )
 
 env.Library(
+    target='downgraded_unique_indexes',
+    source=[
+        'downgraded_unique_indexes.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ],
+    )
+
+env.Library(
     target='index_entry_comparison',
     source=[
         'index_entry_comparison.cpp',

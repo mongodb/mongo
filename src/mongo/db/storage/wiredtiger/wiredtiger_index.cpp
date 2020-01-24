@@ -43,6 +43,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/downgraded_unique_indexes.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -165,6 +166,9 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
             ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
             : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
     } else {
+        if (desc.unique() && !desc.isIdIndex()) {
+            setHasDowngradedUniqueIndexes();
+        }
         keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
             ? kDataFormatV2KeyStringV1IndexVersionV2
             : kDataFormatV1KeyStringV0IndexVersionV1;
