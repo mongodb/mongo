@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Bypass compile and fetch binaries."""
 
-import argparse
+from collections import namedtuple
 import json
 import logging
 import os
-import re
 import sys
 import tarfile
 from tempfile import TemporaryDirectory
@@ -13,13 +12,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-# pylint: disable=ungrouped-imports
-try:
-    from urllib.parse import urlparse
-except ImportError:
-    from urllib.parse import urlparse  # type: ignore
-# pylint: enable=ungrouped-imports
+import click
 
+from evergreen.api import RetryingEvergreenApi
 from git.repo import Repo
 import requests
 import structlog
@@ -37,11 +32,13 @@ from buildscripts.ciconfig.evergreen import parse_evergreen_file
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
 
+EVG_CONFIG_FILE = ".evergreen.yml"
+
 _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
 
 # If changes are only from files in the bypass_files list or the bypass_directories list, then
-# bypass compile, unless they are also found in the requires_compile_directories lists. All
-# other file changes lead to compile.
+# bypass compile, unless they are also found in the BYPASS_EXTRA_CHECKS_REQUIRED lists. All other
+# file changes lead to compile.
 BYPASS_WHITELIST = {
     "files": {
         "etc/evergreen.yml",
@@ -85,6 +82,20 @@ EXPANSIONS_TO_CHECK = {
     "compile_flags",
 }  # yapf: disable
 
+# SERVER-21492 related issue where without running scons the jstests/libs/key1
+# and key2 files are not chmod to 0600. Need to change permissions since we bypass SCons.
+ARTIFACTS_NEEDING_PERMISSIONS = {
+    os.path.join("jstests", "libs", "key1"): 0o600,
+    os.path.join("jstests", "libs", "key2"): 0o600,
+    os.path.join("jstests", "libs", "keyForRollover"): 0o600,
+}
+
+TargetBuild = namedtuple("TargetBuild", [
+    "project",
+    "revision",
+    "build_variant",
+])
+
 
 def executable_name(pathname):
     """Return the executable name."""
@@ -112,19 +123,6 @@ def requests_get_json(url):
     except ValueError:
         LOGGER.warning("Invalid JSON object returned with response", response=response.text)
         raise
-
-
-def read_evg_config():
-    """Attempt to parse the Evergreen configuration from its home location.
-
-    Return None if the configuration file wasn't found.
-    """
-    evg_file = os.path.expanduser("~/.evergreen.yml")
-    if os.path.isfile(evg_file):
-        with open(evg_file, "r") as fstream:
-            return yaml.safe_load(fstream)
-
-    return None
 
 
 def write_out_bypass_compile_expansions(patch_file, **expansions):
@@ -155,17 +153,15 @@ def _create_bypass_path(prefix, build_id, name):
     return archive_name(f"{prefix}/{name}-{build_id}")
 
 
-def generate_bypass_expansions(project, build_variant, revision, build_id):
+def generate_bypass_expansions(target, build_id):
     """
     Create a dictionary of the generate bypass expansions.
 
-    :param project: Evergreen project.
-    :param build_variant: Build variant being run in.
-    :param revision: Revision to use in expansions.
+    :param target: Build being targeted.
     :param build_id: Build id to use in expansions.
     :returns: Dictionary of expansions to update.
     """
-    prefix = f"{project}/{build_variant}/{revision}"
+    prefix = f"{target.project}/{target.build_variant}/{target.revision}"
 
     return {
         # With compile bypass we need to update the URL to point to the correct name of the base
@@ -251,16 +247,17 @@ def _file_in_group(filename, group):
     return False
 
 
-def should_bypass_compile(args):
+def should_bypass_compile(patch_file, build_variant):
     """
     Determine whether the compile stage should be bypassed based on the modified patch files.
 
     We use lists of files and directories to more precisely control which modified patch files will
     lead to compile bypass.
-    :param args: Command line arguments.
+    :param patch_file: A list of all files modified in patch build.
+    :param build_variant: Build variant where compile is running.
     :returns: True if compile should be bypassed.
     """
-    with open(args.patchFile, "r") as pch:
+    with open(patch_file, "r") as pch:
         for filename in pch:
             filename = filename.rstrip()
             # Skip directories that show up in 'git diff HEAD --name-only'.
@@ -277,172 +274,192 @@ def should_bypass_compile(args):
                 return False
 
             if filename in BYPASS_EXTRA_CHECKS_REQUIRED:
-                if not _check_file_for_bypass(filename, args.buildVariant):
+                if not _check_file_for_bypass(filename, build_variant):
                     log.warning("Compile bypass disabled due to extra checks for file.")
                     return False
 
     return True
 
 
-def parse_args():
-    """Parse the program arguments."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--project", required=True,
-                        help="The Evergreen project. e.g mongodb-mongo-master")
-
-    parser.add_argument("--buildVariant", required=True,
-                        help="The build variant. e.g enterprise-rhel-62-64-bit")
-
-    parser.add_argument("--revision", required=True, help="The base commit hash.")
-
-    parser.add_argument("--patchFile", required=True,
-                        help="A list of all files modified in patch build.")
-
-    parser.add_argument("--outFile", required=True,
-                        help="The YAML file to write out the macro expansions.")
-
-    parser.add_argument("--jsonArtifact", required=True,
-                        help="The JSON file to write out the metadata of files to attach to task.")
-
-    return parser.parse_args()
-
-
-def main():  # pylint: disable=too-many-locals,too-many-statements
-    """Execute Main entry.
-
-    From the /rest/v1/projects/{project}/revisions/{revision} endpoint find an existing build id
-    to generate the compile task id to use for retrieving artifacts when bypassing compile.
-
-    We retrieve the URLs to the artifacts from the task info endpoint at
-    /rest/v1/tasks/{build_id}. We only download the artifacts.tgz and extract certain files
-    in order to retain any modified patch files.
-
-    If for any reason bypass compile is false, we do not write out the macro expansion. Only if we
-    determine to bypass compile do we write out the macro expansions.
+def find_build_for_previous_compile_task(evg_api, target):
     """
-    args = parse_args()
+    Find build_id of the base revision.
+
+    :param evg_api: Evergreen.py object.
+    :param target: Build being targeted.
+    :return: build_id of the base revision.
+    """
+    project_prefix = target.project.replace("-", "_")
+    version_of_base_revision = "{}_{}".format(project_prefix, target.revision)
+    version = evg_api.version_by_id(version_of_base_revision)
+    build_id = version.build_by_variant(target.build_variant).id
+    return build_id
+
+
+def find_previous_compile_task(evg_api, build_id, revision):
+    """
+    Find compile task that should be used for skip compile..
+
+    :param evg_api: Evergreen.py object.
+    :param build_id: Build id of the desired compile task.
+    :param revision: The base revision being run against.
+    :return: Evergreen.py object containing data about the desired compile task.
+    """
+    index = build_id.find(revision)
+    compile_task_id = "{}compile_{}".format(build_id[:index], build_id[index:])
+    task = evg_api.task_by_id(compile_task_id)
+    return task
+
+
+def fetch_artifacts(evg_api, build_id, revision):
+    """
+    Fetch artifacts from a given revision.
+
+    :param evg_api: Evergreen.py object.
+    :param build_id: Build id of the desired artifacts.
+    :param revision: The revision being fetched from.
+    :return: Artifacts from the revision.
+    """
+    task = find_previous_compile_task(evg_api, build_id, revision)
+    if task is None or not task.is_success():
+        LOGGER.warning(
+            "Could not retrieve artifacts because the compile task for base commit"
+            " was not available. Default compile bypass to false.", task_id=task.task_id)
+        raise ValueError("No artifacts were found for the current task")
+    LOGGER.info("Fetching pre-existing artifacts from compile task", task_id=task.task_id)
+    artifacts = []
+    for artifact in task.artifacts:
+        filename = os.path.basename(artifact.url)
+        if filename.startswith(build_id):
+            LOGGER.info("Retrieving archive", filename=filename)
+            # This is the artifacts.tgz as referenced in evergreen.yml.
+            try:
+                urllib.request.urlretrieve(artifact.url, filename)
+            except urllib.error.ContentTooShortError:
+                LOGGER.warning(
+                    "The artifact could not be completely downloaded. Default"
+                    " compile bypass to false.", filename=filename)
+                raise ValueError("No artifacts were found for the current task")
+            # Need to extract certain files from the pre-existing artifacts.tgz.
+            extract_files = [
+                executable_name("mongobridge"),
+                executable_name("mongotmock"),
+                executable_name("wt"),
+            ]
+            with tarfile.open(filename, "r:gz") as tar:
+                # The repo/ directory contains files needed by the package task. May
+                # need to add other files that would otherwise be generated by SCons
+                # if we did not bypass compile.
+                subdir = [
+                    tarinfo for tarinfo in tar.getmembers()
+                    if tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
+                ]
+                LOGGER.info("Extracting the files...", filename=filename,
+                            files="\n".join(tarinfo.name for tarinfo in subdir))
+                tar.extractall(members=subdir)
+        elif filename.startswith("mongo-src"):
+            LOGGER.info("Retrieving mongo source", filename=filename)
+            # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
+            try:
+                urllib.request.urlretrieve(artifact.url, filename)
+            except urllib.error.ContentTooShortError:
+                LOGGER.warn(
+                    "The artifact could not be completely downloaded. Default"
+                    " compile bypass to false.", filename=filename)
+                raise ValueError("No artifacts were found for the current task")
+            extension = os.path.splitext(filename)[1]
+            distsrc_filename = "distsrc{}".format(extension)
+            LOGGER.info("Renaming", filename=filename, rename=distsrc_filename)
+            os.rename(filename, distsrc_filename)
+        else:
+            LOGGER.info("Linking base artifact to this patch build", filename=filename)
+            # For other artifacts we just add their URLs to the JSON file to upload.
+            files = {
+                "name": artifact.name,
+                "link": artifact.url,
+                "visibility": "private",
+            }
+            # Check the link exists, else raise an exception. Compile bypass is disabled.
+            requests.head(artifact.url).raise_for_status()
+            artifacts.append(files)
+    return artifacts
+
+
+def update_artifact_permissions(permission_dict):
+    """
+    Update the given files with the specified permissions.
+
+    :param permission_dict: Keys of dict should be files to update, values should be permissions.
+    """
+    for path, perm in permission_dict.items():
+        os.chmod(path, perm)
+
+
+def gather_artifacts_and_update_expansions(build_id, target, json_artifact_file, expansions_file,
+                                           evg_api):
+    """
+    Fetch the artifacts for this build and save them to be used by other tasks.
+
+    :param build_id: build_id of build with artifacts.
+    :param target: Target build being bypassed.
+    :param json_artifact_file: File to write json artifacts to.
+    :param expansions_file: Files to write expansions to.
+    :param evg_api: Evergreen Api.
+    """
+    artifacts = fetch_artifacts(evg_api, build_id, target.revision)
+    update_artifact_permissions(ARTIFACTS_NEEDING_PERMISSIONS)
+    write_out_artifacts(json_artifact_file, artifacts)
+
+    LOGGER.info("Creating expansions files", target=target, build_id=build_id)
+
+    expansions = generate_bypass_expansions(target, build_id)
+    write_out_bypass_compile_expansions(expansions_file, **expansions)
+
+
+@click.command()
+@click.option("--project", required=True, help="The evergreen project.")
+@click.option("--build-variant", required=True,
+              help="The build variant whose artifacts we want to use.")
+@click.option("--revision", required=True, help="Base revision of the build.")
+@click.option("--patch-file", required=True, help="A list of all files modified in patch build.")
+@click.option("--out-file", required=True, help="File to write expansions to.")
+@click.option("--json-artifact", required=True,
+              help="The JSON file to write out the metadata of files to attach to task.")
+def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements
+        project, build_variant, revision, patch_file, out_file, json_artifact):
+    """
+    Create a file with expansions that can be used to bypass compile.
+
+    If for any reason bypass compile is false, we do not write out the expansion. Only if we
+    determine to bypass compile do we write out the expansions.
+    \f
+
+    :param project: The evergreen project.
+    :param build_variant: The build variant whose artifacts we want to use.
+    :param revision: Base revision of the build.
+    :param patch_file: A list of all files modified in patch build.
+    :param out_file: File to write expansions to.
+    :param json_artifact: The JSON file to write out the metadata of files to attach to task.
+    """
     logging.basicConfig(
         format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
         level=logging.DEBUG,
         stream=sys.stdout,
     )
 
+    target = TargetBuild(project=project, build_variant=build_variant, revision=revision)
+
     # Determine if we should bypass compile based on modified patch files.
-    if should_bypass_compile(args):
-        evg_config = read_evg_config()
-        if evg_config is None:
-            LOGGER.warning(
-                "Could not find ~/.evergreen.yml config file. Default compile bypass to false.")
-            return
-
-        api_server = "{url.scheme}://{url.netloc}".format(
-            url=urlparse(evg_config.get("api_server_host")))
-        revision_url = "{}/rest/v1/projects/{}/revisions/{}".format(api_server, args.project,
-                                                                    args.revision)
-        revisions = requests_get_json(revision_url)
-
-        prefix = "{}_{}_{}_".format(args.project, args.buildVariant, args.revision)
-        # The "project" and "buildVariant" passed in may contain "-", but the "builds" listed from
-        # Evergreen only contain "_". Replace the hyphens before searching for the build.
-        prefix = prefix.replace("-", "_")
-        build_id_pattern = re.compile(prefix)
-        build_id = None
-        for build_id in revisions["builds"]:
-            # Find a suitable build_id
-            match = build_id_pattern.search(build_id)
-            if match:
-                break
-        else:
+    if should_bypass_compile(patch_file, build_variant):
+        evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
+        build_id = find_build_for_previous_compile_task(evg_api, target)
+        if not build_id:
             LOGGER.warning("Could not find build id. Default compile bypass to false.",
-                           revision=args.revision, project=args.project)
+                           revision=revision, project=project)
             return
 
-        # Generate the compile task id.
-        index = build_id.find(args.revision)
-        compile_task_id = "{}compile_{}".format(build_id[:index], build_id[index:])
-        task_url = "{}/rest/v1/tasks/{}".format(api_server, compile_task_id)
-        # Get info on compile task of base commit.
-        task = requests_get_json(task_url)
-        if task is None or task["status"] != "success":
-            LOGGER.warning(
-                "Could not retrieve artifacts because the compile task for base commit"
-                " was not available. Default compile bypass to false.", task_id=compile_task_id)
-            return
-
-        # Get the compile task artifacts from REST API
-        LOGGER.info("Fetching pre-existing artifacts from compile task", task_id=compile_task_id)
-        artifacts = []
-        for artifact in task["files"]:
-            filename = os.path.basename(artifact["url"])
-            if filename.startswith(build_id):
-                LOGGER.info("Retrieving archive", filename=filename)
-                # This is the artifacts.tgz as referenced in evergreen.yml.
-                try:
-                    urllib.request.urlretrieve(artifact["url"], filename)
-                except urllib.error.ContentTooShortError:
-                    LOGGER.warning(
-                        "The artifact could not be completely downloaded. Default"
-                        " compile bypass to false.", filename=filename)
-                    return
-
-                # Need to extract certain files from the pre-existing artifacts.tgz.
-                extract_files = [
-                    executable_name("mongobridge"),
-                    executable_name("mongotmock"),
-                    executable_name("wt"),
-                ]
-                with tarfile.open(filename, "r:gz") as tar:
-                    # The repo/ directory contains files needed by the package task. May
-                    # need to add other files that would otherwise be generated by SCons
-                    # if we did not bypass compile.
-                    subdir = [
-                        tarinfo for tarinfo in tar.getmembers()
-                        if tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
-                    ]
-                    LOGGER.info("Extracting the files...", filename=filename,
-                                files="\n".join(tarinfo.name for tarinfo in subdir))
-                    tar.extractall(members=subdir)
-            elif filename.startswith("mongo-src"):
-                LOGGER.info("Retrieving mongo source", filename=filename)
-                # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
-                try:
-                    urllib.request.urlretrieve(artifact["url"], filename)
-                except urllib.error.ContentTooShortError:
-                    LOGGER.warn(
-                        "The artifact could not be completely downloaded. Default"
-                        " compile bypass to false.", filename=filename)
-                    return
-                extension = os.path.splitext(filename)[1]
-                distsrc_filename = "distsrc{}".format(extension)
-                LOGGER.info("Renaming", filename=filename, rename=distsrc_filename)
-                os.rename(filename, distsrc_filename)
-            else:
-                LOGGER.info("Linking base artifact to this patch build", filename=filename)
-                # For other artifacts we just add their URLs to the JSON file to upload.
-                files = {
-                    "name": artifact["name"],
-                    "link": artifact["url"],
-                    "visibility": "private",
-                }
-                # Check the link exists, else raise an exception. Compile bypass is disabled.
-                requests.head(artifact["url"]).raise_for_status()
-                artifacts.append(files)
-
-        # SERVER-21492 related issue where without running scons the jstests/libs/key1
-        # and key2 files are not chmod to 0600. Need to change permissions here since we
-        # bypass SCons.
-        os.chmod("jstests/libs/key1", 0o600)
-        os.chmod("jstests/libs/key2", 0o600)
-        os.chmod("jstests/libs/keyForRollover", 0o600)
-
-        # This is the artifacts.json file.
-        write_out_artifacts(args.jsonArtifact, artifacts)
-
-        # Need to apply these expansions for bypassing SCons.
-        expansions = generate_bypass_expansions(args.project, args.buildVariant, args.revision,
-                                                build_id)
-        write_out_bypass_compile_expansions(args.outFile, **expansions)
+        gather_artifacts_and_update_expansions(build_id, target, json_artifact, out_file, evg_api)
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pylint: disable=no-value-for-parameter
