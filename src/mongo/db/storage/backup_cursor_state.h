@@ -41,7 +41,7 @@ namespace mongo {
 struct BackupCursorState {
     UUID backupId;
     boost::optional<Document> preamble;
-    StorageEngine::BackupInformation backupInformation;
+    std::vector<StorageEngine::BackupBlock> blocksToCopy;
 };
 
 struct BackupCursorExtendState {

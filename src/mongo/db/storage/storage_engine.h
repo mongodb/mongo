@@ -78,25 +78,10 @@ public:
     };
 
     struct BackupBlock {
-        std::uint64_t offset = 0;
-        std::uint64_t length = 0;
+        std::string filename;
+        std::uint64_t offset;
+        std::uint64_t length;
     };
-
-    /**
-     * Contains the size of the file to be backed up. This allows the backup application to safely
-     * truncate the file for incremental backups. Files that have had changes since the last
-     * incremental backup will have their changed file blocks listed.
-     */
-    struct BackupFile {
-        BackupFile() = delete;
-        explicit BackupFile(std::uint64_t fileSize) : fileSize(fileSize){};
-
-        std::uint64_t fileSize;
-        std::vector<BackupBlock> blocksToCopy;
-    };
-
-    // Map of filenames to backup file information.
-    using BackupInformation = stdx::unordered_map<std::string, BackupFile>;
 
     /**
      * The interface for creating new instances of storage engines.
@@ -346,7 +331,7 @@ public:
      * 'srcBackupName' must not exist when 'incrementalBackup' is false but may or may not exist
      * when 'incrementalBackup' is true.
      */
-    virtual StatusWith<StorageEngine::BackupInformation> beginNonBlockingBackup(
+    virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
         OperationContext* opCtx, const BackupOptions& options) = 0;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
