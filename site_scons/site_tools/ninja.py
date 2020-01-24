@@ -612,7 +612,24 @@ class NinjaState:
             # listed in self.rules so verify that we got a result
             # before trying to check if it has a deps key.
             if rule is not None and rule.get("deps"):
-                build["outputs"] = build["outputs"][0:1]
+
+                # Anything using deps in Ninja can only have a single
+                # output, but we may have a build which actually
+                # produces multiple outputs which other targets can
+                # depend on. Here we slice up the outputs so we have a
+                # single output which we will use for the "real"
+                # builder and multiple phony targets that match the
+                # file names of the remaining outputs. This way any
+                # build can depend on any output from any build.
+                first_output, remaining_outputs = build["outputs"][0], build["outputs"][1:]
+                if remaining_outputs:
+                    ninja.build(
+                        outputs=remaining_outputs,
+                        rule="phony",
+                        implicit=first_output,
+                    )
+
+                build["outputs"] = first_output
 
             ninja.build(**build)
 
