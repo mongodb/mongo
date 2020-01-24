@@ -21,6 +21,8 @@ import shutil
 
 from threading import Lock
 from glob import glob
+from os.path import join as joinpath
+from os.path import splitext
 
 import SCons
 from SCons.Action import _string_from_cmd_list, get_default_ENV
@@ -43,17 +45,6 @@ COMMAND_TYPES = (
     SCons.Action.CommandAction,
     SCons.Action.CommandGeneratorAction,
 )
-
-
-# TODO: make this configurable or improve generated source detection
-def is_generated_source(output):
-    """
-    Determine if output indicates this is a generated header file.
-    """
-    for generated in output:
-        if generated.endswith(".h") or generated.endswith(".hpp"):
-            return True
-    return False
 
 
 def _install_action_function(_env, node):
@@ -349,6 +340,7 @@ class NinjaState:
         self.writer_class = writer_class
         self.__generated = False
         self.translator = SConsToNinjaTranslator(env)
+        self.generated_suffixes = env.get("NINJA_GENERATED_SOURCE_SUFFIXES", [])
 
         # List of generated builds that will be written at a later stage
         self.builds = list()
@@ -515,6 +507,20 @@ class NinjaState:
 
                 self.builds.append(build)
 
+    def is_generated_source(self, output):
+        """Check if output ends with a known generated suffix."""
+        _, suffix = splitext(output)
+        return suffix in self.generated_suffixes
+        
+    def has_generated_sources(self, output):
+        """
+        Determine if output indicates this is a generated header file.
+        """
+        for generated in output:
+            if self.is_generated_source(generated):
+                return True
+        return False
+
     # pylint: disable=too-many-branches,too-many-locals
     def generate(self, ninja_file, fallback_default_target=None):
         """
@@ -543,14 +549,14 @@ class NinjaState:
             output
             # First find builds which have header files in their outputs.
             for build in self.builds
-            if is_generated_source(build["outputs"])
+            if self.has_generated_sources(build["outputs"])
             for output in build["outputs"]
             # Collect only the header files from the builds with them
             # in their output. We do this because is_generated_source
             # returns True if it finds a header in any of the outputs,
             # here we need to filter so we only have the headers and
             # not the other outputs.
-            if output.endswith(".h") or output.endswith(".hpp")
+            if self.is_generated_source(output)
         }
 
         if generated_source_files:
@@ -577,8 +583,9 @@ class NinjaState:
             # generated sources or else we will create a dependency
             # cycle.
             if (
-                not build["rule"] == "INSTALL"
-                and not is_generated_source(build["outputs"])
+                generated_source_files
+                and not build["rule"] == "INSTALL"
+                and set(build["outputs"]).isdisjoint(generated_source_files)
                 and set(implicit).isdisjoint(generated_source_files)
             ):
 
@@ -821,7 +828,8 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
             cmd = cmd[0:-2].strip()
 
     outputs = get_outputs(node)
-    command_env = getattr(node.attributes, "NINJA_ENV_ENV", None)
+    command_env = ""
+    windows = env["PLATFORM"] == "win32"
 
     # If win32 and rule == CMD_W_DEPS then we don't want to calculate
     # an environment for this command. It's a compile command and
@@ -832,38 +840,38 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
     #
     # On POSIX we can still set environment variables even for compile
     # commands so we do so.
-    if command_env is None and not (
-        env["PLATFORM"] == "win32" and rule == "CMD_W_DEPS"
-    ):
+    if not (windows and rule == "CMD_W_DEPS"):
+
+        # Scan the ENV looking for any keys which do not exist in
+        # os.environ or differ from it. We assume if it's a new or
+        # differing key from the process environment then it's
+        # important to pass down to commands in the Ninja file.
         ENV = get_default_ENV(sub_env)
-        command_env = ""
+        scons_specified_env = {
+            key: value
+            for key, value in ENV.items()
+            if key not in os.environ or os.environ.get(key, None) != value
+        }
 
-        # This is taken wholesale from SCons/Action.py
-        #
-        # Ensure that the ENV values are all strings:
-        for key, value in ENV.items():
-            if not is_String(value):
-                if is_List(value):
-                    # If the value is a list, then we assume it is a
-                    # path list, because that's a pretty common list-like
-                    # value to stick in an environment variable:
-                    value = flatten_sequence(value)
-                    value = os.pathsep.join(map(str, value))
-                else:
-                    # If it isn't a string or a list, then we just coerce
-                    # it to a string, which is the proper way to handle
-                    # Dir and File instances and will produce something
-                    # reasonable for just about everything else:
-                    value = str(value)
+        for key, value in scons_specified_env.items():
+            # Ensure that the ENV values are all strings:
+            if is_List(value):
+                # If the value is a list, then we assume it is a
+                # path list, because that's a pretty common list-like
+                # value to stick in an environment variable:
+                value = flatten_sequence(value)
+                value = joinpath(map(str, value))
+            else:
+                # If it isn't a string or a list, then we just coerce
+                # it to a string, which is the proper way to handle
+                # Dir and File instances and will produce something
+                # reasonable for just about everything else:
+                value = str(value)
 
-            if env["PLATFORM"] == "win32":
+            if windows:
                 command_env += "set '{}={}' && ".format(key, value)
             else:
                 command_env += "{}={} ".format(key, value)
-
-        setattr(node.attributes, "NINJA_ENV_ENV", command_env)
-    elif command_env is None:
-        command_env = ""
 
     variables = {"cmd": command_env + cmd}
     extra_vars = getattr(node.attributes, "NINJA_EXTRA_VARS", {})
@@ -956,7 +964,7 @@ def ninja_print(_cmd, target, _source, env):
     if target:
         for tgt in target:
             if (
-                tgt.builder is not None
+                tgt.has_builder()
                 # Use 'is False' because not would still trigger on
                 # None's which we don't want to regenerate
                 and getattr(tgt.attributes, NINJA_BUILD, False) is False
@@ -1232,6 +1240,11 @@ def generate(env):
 
     # Make SCons node walk faster by preventing unnecessary work
     env.Decider("timestamp-match")
+
+    # Used to determine if a build generates a source file. Ninja
+    # requires that all generated sources are added as order_only
+    # dependencies to any builds that *might* use them.
+    env["NINJA_GENERATED_SOURCE_SUFFIXES"] = [".h", ".hpp"]
 
     # This is the point of no return, anything after this comment
     # makes changes to SCons that are irreversible and incompatible

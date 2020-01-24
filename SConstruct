@@ -860,13 +860,13 @@ env_vars.Add('NINJA_SUFFIX',
 files. Useful for when compiling multiple build ninja files for
 different configurations, for instance:
 
-    scons --sanitize=asan --ninja NINJA_SUFFIX=asan new.build.ninja
-    scons --sanitize=tsan --ninja NINJA_SUFFIX=tsan new.build.ninja
+    scons --sanitize=asan --ninja NINJA_SUFFIX=asan build.ninja
+    scons --sanitize=tsan --ninja NINJA_SUFFIX=tsan build.ninja
 
 Will generate the files (respectively):
 
-    new.build.ninja.asan
-    new.build.ninja.tsan
+    build.ninja.asan
+    build.ninja.tsan
 """)
 
 env_vars.Add('__NINJA_NO',
@@ -3771,7 +3771,7 @@ if get_option('ninja') == 'true':
 
     if get_option("install-mode") == "hygienic":
         ninja_build = env.Ninja(
-            target="new.build.ninja",
+            target="build.ninja",
             source=[
                 env.Alias("install-all-meta"),
                 env.Alias("test-execution-aliases"),
@@ -3779,49 +3779,22 @@ if get_option('ninja') == 'true':
         )
     else:
         ninja_build = env.Ninja(
-            target="new.build.ninja",
+            target="build.ninja",
             source=[
                 env.Alias("all"),
                 env.Alias("test-execution-aliases"),
             ],
         )
 
-    from glob import glob
-    sconscripts = [env.File(g) for g in glob("**/SConscript", recursive=True)]
-    sconscripts += [env.File("#SConstruct")]
-    env.Depends(ninja_build, sconscripts)
-
-
-    def skip(env, node):
-        """
-        Write an empty test text file.
-        
-        Instead of calling SCONS to generate a *test.txt that most
-        users aren't using (and the current generator skips) we
-        simply teach Ninja how to make an empty file on the given
-        platform so as not to break dependency trees.
-        """
-        cmd = "touch {}".format(str(node))
-        if env["PLATFORM"] == "win32":
-            cmd = "copy NUL {}".format(str(node))
-        return {
-            "outputs": [str(node)],
-            "rule": "CMD",
-            "variables": {
-                "cmd": cmd,
-            }
-        }
-
-    env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", skip)
-    env.NinjaRegisterFunctionHandler("libfuzzer_test_list_builder_action", skip)
-    env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", skip)
-    env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", skip)
+    env.Alias("generate-ninja", ninja_build)
 
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
     # deps=msvc method.
-    env.AppendUnique(IDLCFLAGS= "--write-dependencies-inline")
+    env.AppendUnique(IDLCFLAGS=[
+        "--write-dependencies-inline",
+    ])
     env.NinjaRule(
         rule="IDLC",
         command="cmd /c $cmd" if env.TargetOSIs("windows") else "$cmd",

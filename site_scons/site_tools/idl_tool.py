@@ -46,12 +46,6 @@ def idlc_emitter(target, source, env):
         setattr(target_source.attributes, "NINJA_EXTRA_VARS", {"msvc_deps_prefix": "import file:"})
         setattr(target_header.attributes, "NINJA_EXTRA_VARS", {"msvc_deps_prefix": "import file:"})
 
-        # IDL can generate too-long commands on Windows and does not
-        # need environment variables, so disable them by pre-setting
-        # NINJA_ENV_ENV to an empty string.
-        setattr(target_source.attributes, "NINJA_ENV_ENV", "")
-        setattr(target_header.attributes, "NINJA_ENV_ENV", "")
-
     env.Alias("generated-sources", [target_source, target_header])
 
     return [target_source, target_header], source
