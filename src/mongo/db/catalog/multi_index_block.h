@@ -128,7 +128,7 @@ public:
      *
      * Does not need to be called inside of a WriteUnitOfWork (but can be due to nesting).
      *
-     * Requires holding an exclusive database lock.
+     * Requires holding an intent lock on the collection.
      */
     using OnInitFn = std::function<Status(std::vector<BSONObj>& specs)>;
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
@@ -227,7 +227,7 @@ public:
      * `onCreateEach` will be called after each index has been marked as "ready".
      * `onCommit` will be called after all indexes have been marked "ready".
      *
-     * Requires holding an exclusive database lock.
+     * Requires holding an exclusive lock on the collection.
      */
     using OnCommitFn = std::function<void()>;
     using OnCreateEachFn = std::function<void(const BSONObj& spec)>;

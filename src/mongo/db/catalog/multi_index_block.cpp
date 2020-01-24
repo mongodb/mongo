@@ -203,6 +203,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                                                        Collection* collection,
                                                        const std::vector<BSONObj>& indexSpecs,
                                                        OnInitFn onInit) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX),
+              str::stream() << "Collection " << collection->ns() << " with UUID "
+                            << collection->uuid() << " is holding the incorrect lock");
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -742,6 +745,10 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                Collection* collection,
                                OnCreateEachFn onCreateEach,
                                OnCommitFn onCommit) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
+              str::stream() << "Collection " << collection->ns() << " with UUID "
+                            << collection->uuid() << " is holding the incorrect lock");
+
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
         invariant(_collectionUUID.get() == collection->uuid());
