@@ -52,26 +52,11 @@ configs:
     short_name: "test"
     arg_vartype: Switch
     source: [ cli, ini ]
-#
-# Javascript Options
-# As a general rule, js enable/disable options are ignored for mongos.
-# However, we define and hide these options so that if someone
-# were to use these args in a set of options meant for both
-# mongos and mongod runs, the mongos won't fail on an unknown argument.
-#
-# These options have no affect on how the mongos runs.
-# Setting either or both to *any* value will provoke a warning message
-# and nothing more.
-#
+  "noscripting":
+    description: "Disable scripting engine"
+    arg_vartype: Switch
+    source: [ cli, ini ]
   "security.javascriptEnabled":
-    section: "General options"
     description: "Enable javascript execution"
     arg_vartype: Bool
     source: [ yaml ]
-    hidden: true
-  "noscripting":
-    description: "disable scripting engine"
-    short_name: "noscripting"
-    arg_vartype: Switch
-    source: [ cli, ini ]
-    hidden: true

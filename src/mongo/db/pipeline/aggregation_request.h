@@ -65,6 +65,7 @@ public:
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
     static constexpr StringData kUse44SortKeys = "use44SortKeys"_sd;
     static constexpr StringData kUseNewUpsert = "useNewUpsert"_sd;
+    static constexpr StringData kIsMapReduceCommand = "isMapReduceCommand"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -226,6 +227,10 @@ public:
         return _useNewUpsert;
     }
 
+    bool getIsMapReduceCommand() const {
+        return _isMapReduceCommand;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -298,6 +303,10 @@ public:
         _useNewUpsert = useNewUpsert;
     }
 
+    void setIsMapReduceCommand(bool isMapReduce) {
+        _isMapReduceCommand = isMapReduce;
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -355,5 +364,8 @@ private:
     // Indicates whether the aggregation may use the new 'upsertSupplied' mechanism when running
     // $merge stages. All 4.4 mongoS and some versions of 4.2 set this flag.
     bool _useNewUpsert = false;
+
+    // True when an aggregation was invoked by the MapReduce command.
+    bool _isMapReduceCommand = false;
 };
 }  // namespace mongo

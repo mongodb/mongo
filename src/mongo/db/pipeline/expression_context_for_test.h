@@ -58,6 +58,7 @@ public:
                             false,        // needsMerge,
                             false,        // allowDiskUse,
                             false,        // bypassDocumentValidation,
+                            false,        // isMapReduce
                             nss,
                             RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator

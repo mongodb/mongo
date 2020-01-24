@@ -88,7 +88,7 @@ class MozJSImplScope final : public Scope {
     MozJSImplScope& operator=(const MozJSImplScope&) = delete;
 
 public:
-    explicit MozJSImplScope(MozJSScriptEngine* engine);
+    explicit MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB);
     ~MozJSImplScope();
 
     void init(const BSONObj* data) override;
@@ -377,7 +377,7 @@ private:
      */
     struct MozRuntime {
     public:
-        MozRuntime(const MozJSScriptEngine* engine);
+        MozRuntime(const MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB);
 
         std::thread _thread;  // NOLINT
         std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;

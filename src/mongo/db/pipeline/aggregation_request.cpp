@@ -222,6 +222,13 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                                       << typeName(elem.type())};
             }
             request.setUseNewUpsert(elem.boolean());
+        } else if (fieldName == kIsMapReduceCommand) {
+            if (elem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kIsMapReduceCommand << " must be a boolean, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setIsMapReduceCommand(elem.boolean());
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -261,7 +268,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     }
 
     return request;
-}
+}  // namespace mongo
 
 NamespaceString AggregationRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
     auto firstElement = cmdObj.firstElement();
@@ -322,6 +329,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
         {kUse44SortKeys, _use44SortKeys ? Value(true) : Value()},
         {kUseNewUpsert, _useNewUpsert ? Value(true) : Value()},
+        {kIsMapReduceCommand, _isMapReduceCommand ? Value(true) : Value()},
     };
 }
 }  // namespace mongo

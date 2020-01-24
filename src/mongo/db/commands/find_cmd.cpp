@@ -107,6 +107,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           false,  // needsMerge
                                           queryRequest.allowDiskUse(),
                                           false,  // bypassDocumentValidation
+                                          false,  // isMapReduceCommand
                                           queryRequest.nss(),
                                           queryRequest.getRuntimeConstants(),
                                           std::move(collator),

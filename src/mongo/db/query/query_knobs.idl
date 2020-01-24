@@ -330,3 +330,13 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
         gt: 0
+
+  internalQueryJavaScriptHeapSizeLimitMB:
+    description: "Limits the JavaScript heap size used in aggregation. Will defer to the global 'jsHeapLimitMB' limit if the global limit is smaller."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryJavaScriptHeapSizeLimitMB"
+    cpp_vartype: AtomicWord<int>
+    default:
+      expr: 100
+    validator:
+        gt: 0

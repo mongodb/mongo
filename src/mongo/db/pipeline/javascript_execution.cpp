@@ -37,12 +37,21 @@ namespace {
 const auto getExec = OperationContext::declareDecoration<std::unique_ptr<JsExecution>>();
 }  // namespace
 
-JsExecution* JsExecution::get(OperationContext* opCtx, const BSONObj& scope, StringData database) {
+JsExecution* JsExecution::get(OperationContext* opCtx,
+                              const BSONObj& scope,
+                              StringData database,
+                              bool inMongos,
+                              boost::optional<int> jsHeapLimitMB) {
     auto& exec = getExec(opCtx);
     if (!exec) {
-        exec = std::make_unique<JsExecution>(scope);
+        exec = std::make_unique<JsExecution>(scope, jsHeapLimitMB);
         exec->getScope()->setLocalDB(database);
-        exec->getScope()->loadStored(opCtx, true);
+
+        // TODO SERVER-45457: Remove this check and the "inMongos" argument to this method once we
+        // are no longer loading system.js for $function use outside of mapReduce and $where.
+        if (!inMongos) {
+            exec->getScope()->loadStored(opCtx, true);
+        }
     }
     return exec.get();
 }

@@ -90,6 +90,21 @@ Status canonicalizeMongosOptions(moe::Environment* params) {
         return ret;
     }
 
+    // "security.javascriptEnabled" comes from the config file, so override it if "noscripting"
+    // is set since that comes from the command line.
+    if (params->count("noscripting")) {
+        auto status = params->set("security.javascriptEnabled",
+                                  moe::Value(!(*params)["noscripting"].as<bool>()));
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = params->remove("noscripting");
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     return Status::OK();
 }
 
@@ -106,9 +121,8 @@ Status storeMongosOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("noscripting") || params.count("security.javascriptEnabled")) {
-        warning() << "The Javascript enabled/disabled options are not supported for mongos. "
-                     "(\"noscripting\" and/or \"security.javascriptEnabled\" are set.)";
+    if (params.count("security.javascriptEnabled")) {
+        mongosGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
     }
 
     if (!params.count("sharding.configDB")) {

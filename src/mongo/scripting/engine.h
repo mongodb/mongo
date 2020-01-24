@@ -217,8 +217,12 @@ public:
         return createScope();
     }
 
-    virtual Scope* newScopeForCurrentThread() {
-        return createScopeForCurrentThread();
+    virtual Scope* newScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) {
+        return createScopeForCurrentThread(jsHeapLimitMB);
+    }
+
+    Scope* newScopeForCurrentThread() {
+        return newScopeForCurrentThread(boost::none);
     }
 
     virtual void runTest() = 0;
@@ -273,7 +277,7 @@ public:
 
 protected:
     virtual Scope* createScope() = 0;
-    virtual Scope* createScopeForCurrentThread() = 0;
+    virtual Scope* createScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) = 0;
     void (*_scopeInitCallback)(Scope&);
 
 private:

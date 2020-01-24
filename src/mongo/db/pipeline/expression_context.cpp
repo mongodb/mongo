@@ -57,6 +57,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         request.needsMerge(),
                         request.shouldAllowDiskUse(),
                         request.shouldBypassDocumentValidation(),
+                        request.getIsMapReduceCommand(),
                         request.getNamespaceString(),
                         request.getRuntimeConstants(),
                         std::move(collator),
@@ -67,6 +68,12 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     // has the 'useNewUpsert' flag set, can use the new upsertSupplied mechanism for $merge.
     // TODO SERVER-44884: Remove this flag after we branch for 4.5.
     useNewUpsert = request.getUseNewUpsert() || !request.isFromMongos();
+
+    if (request.getIsMapReduceCommand()) {
+        // mapReduce command JavaScript invocation is only subject to the server global
+        // 'jsHeapLimitMB' limit.
+        jsHeapLimitMB = boost::none;
+    }
 }
 
 ExpressionContext::ExpressionContext(
@@ -76,6 +83,7 @@ ExpressionContext::ExpressionContext(
     bool needsMerge,
     bool allowDiskUse,
     bool bypassDocumentValidation,
+    bool isMapReduce,
     const NamespaceString& ns,
     const boost::optional<RuntimeConstants>& runtimeConstants,
     std::unique_ptr<CollatorInterface> collator,
@@ -101,10 +109,15 @@ ExpressionContext::ExpressionContext(
       _valueComparator(_unownedCollator),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
-    if (runtimeConstants)
+    if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
-    else
+    } else {
         variables.setDefaultRuntimeConstants(opCtx);
+    }
+
+    if (!isMapReduce) {
+        jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
+    }
 
     // Any request which did not originate from a mongoS can use the new upsertSupplied mechanism.
     // This is used to set 'useNewUpsert' when constructing a MR context on mongoS or mongoD. The MR
@@ -128,6 +141,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
     }
+
+    jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
 }
 
 void ExpressionContext::checkForInterrupt() {
@@ -191,6 +206,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     needsMerge,
                                                     allowDiskUse,
                                                     bypassDocumentValidation,
+                                                    false,  // isMapReduce
                                                     ns,
                                                     boost::none,  // runtimeConstants
                                                     std::move(collator),
@@ -203,6 +219,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->subPipelineDepth = subPipelineDepth;
     expCtx->tempDir = tempDir;
     expCtx->useNewUpsert = useNewUpsert;
+    expCtx->jsHeapLimitMB = jsHeapLimitMB;
 
     // ExpressionContext is used both universally in Agg and in Find within a $expr. In the case
     // that this context is for use in $expr, the collator will be unowned and we will pass nullptr

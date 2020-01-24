@@ -49,6 +49,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/intrusive_counter.h"
@@ -120,6 +121,7 @@ public:
                       bool needsMerge,
                       bool allowDiskUse,
                       bool bypassDocumentValidation,
+                      bool isMapReduceCommand,
                       const NamespaceString& ns,
                       const boost::optional<RuntimeConstants>& runtimeConstants,
                       std::unique_ptr<CollatorInterface> collator,
@@ -245,7 +247,8 @@ public:
                 getGlobalScriptEngine());
         RuntimeConstants runtimeConstants = getRuntimeConstants();
         const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
-        return JsExecution::get(opCtx, scope.get_value_or(BSONObj()), ns.db());
+        return JsExecution::get(
+            opCtx, scope.get_value_or(BSONObj()), ns.db(), inMongos, jsHeapLimitMB);
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
@@ -266,6 +269,11 @@ public:
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.
 
     OperationContext* opCtx;
+
+    // When set restricts the global JavaScript heap size limit for any Scope returned by
+    // getJsExecWithScope(). This limit is ignored if larger than the global limit dictated by the
+    // 'jsHeapLimitMB' server parameter.
+    boost::optional<int> jsHeapLimitMB;
 
     // An interface for accessing information or performing operations that have different
     // implementations on mongod and mongos, or that only make sense on one of the two.

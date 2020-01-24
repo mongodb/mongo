@@ -51,13 +51,17 @@ public:
      * and reading the return value. This will load all stored procedures from database unless
      * 'disableLoadStored' is set on the global ScriptEngine.
      */
-    static JsExecution* get(OperationContext* opCtx, const BSONObj& scope, StringData database);
+    static JsExecution* get(OperationContext* opCtx,
+                            const BSONObj& scope,
+                            StringData database,
+                            bool inMongos,
+                            boost::optional<int> jsHeapLimitMB);
 
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.
      */
-    explicit JsExecution(const BSONObj& scopeVars)
-        : _scope(getGlobalScriptEngine()->newScopeForCurrentThread()) {
+    explicit JsExecution(const BSONObj& scopeVars, boost::optional<int> jsHeapLimitMB = boost::none)
+        : _scope(getGlobalScriptEngine()->newScopeForCurrentThread(jsHeapLimitMB)) {
         _scopeVars = scopeVars.getOwned();
         _scope->init(&_scopeVars);
         _scope->registerOperation(Client::getCurrent()->getOperationContext());

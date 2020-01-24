@@ -261,14 +261,18 @@ void MozJSImplScope::ASANHandles::removePointer(void* ptr) {}
 #endif
 
 
-MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
+MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
+                                       boost::optional<int> jsHeapLimitMB) {
     /**
      * The maximum amount of memory to be given out per thread to mozilla. We
      * manage this by trapping all calls to malloc, free, etc. and keeping track of
-     * counts in some thread locals
+     * counts in some thread locals. If 'jsHeapLimitMB' is specified then we use this instead of the
+     * engine limit, given it does not exceed the engine limit.
      */
+    const auto engineJsHeapLimit = engine->getJSHeapLimitMB();
+    const auto jsHeapLimit =
+        jsHeapLimitMB ? std::min(*jsHeapLimitMB, engineJsHeapLimit) : engineJsHeapLimit;
 
-    const auto jsHeapLimit = engine->getJSHeapLimitMB();
     if (jsHeapLimit != 0 && jsHeapLimit < 10) {
         warning() << "JavaScript may not be able to initialize with a heap limit less than 10MB.";
     }
@@ -360,9 +364,9 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
     }
 }
 
-MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
+MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB)
     : _engine(engine),
-      _mr(engine),
+      _mr(engine, jsHeapLimitMB),
       _context(_mr._context.get()),
       _globalProto(_context),
       _global(_globalProto.getProto()),

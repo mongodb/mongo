@@ -89,6 +89,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         false,  // needsmerge
         true,   // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
+        true,  // isMapReduceCommand
         parsedMr.getNamespace(),
         runtimeConstants,
         std::move(resolvedCollator),

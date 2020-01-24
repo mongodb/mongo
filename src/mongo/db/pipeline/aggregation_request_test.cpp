@@ -61,7 +61,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
         "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
         "$queryOptions: {$readPreference: 'nearest'}, exchange: {policy: "
-        "'roundrobin', consumers:NumberInt(2)}}");
+        "'roundrobin', consumers:NumberInt(2)}, isMapReduceCommand: true}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
@@ -81,6 +81,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
                       BSON("$readPreference"
                            << "nearest"));
     ASSERT_TRUE(request.getExchangeSpec().is_initialized());
+    ASSERT_TRUE(request.getIsMapReduceCommand());
 }
 
 TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
@@ -159,6 +160,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setMaxTimeMS(0u);
     request.setUnwrappedReadPref(BSONObj());
     request.setReadConcern(BSONObj());
+    request.setIsMapReduceCommand(false);
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -187,6 +189,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     const auto readConcernObj = BSON("level"
                                      << "linearizable");
     request.setReadConcern(readConcernObj);
+    request.setIsMapReduceCommand(true);
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -201,7 +204,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kHintName, hintObj},
                  {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
                  {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
-                 {QueryRequest::cmdOptionMaxTimeMS, 10}};
+                 {QueryRequest::cmdOptionMaxTimeMS, 10},
+                 {AggregationRequest::kIsMapReduceCommand, true}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -367,6 +371,13 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, allowDiskUse: 1}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonBoolIsMapReduceCommand) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, isMapReduceCommand: 1}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

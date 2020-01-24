@@ -93,6 +93,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         false,  // needsmerge
         true,   // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
+        true,  // isMapReduceCommand
         nss,
         runtimeConstants,
         std::move(resolvedCollator),
@@ -114,6 +115,7 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
     translatedCmd[AggregationRequest::kFromMongosName] = Value(true);
     translatedCmd[AggregationRequest::kRuntimeConstants] =
         Value(pipeline->getContext()->getRuntimeConstants().toBSON());
+    translatedCmd[AggregationRequest::kIsMapReduceCommand] = Value(true);
 
     if (shouldBypassDocumentValidationForCommand(originalCmd)) {
         translatedCmd[bypassDocumentValidationCommandOption()] = Value(true);

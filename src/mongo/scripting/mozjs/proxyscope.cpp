@@ -345,7 +345,8 @@ void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
     // This will leave _status set for the first noop runOnImplThread(), which
     // captures the startup exception that way
     try {
-        scope.reset(new MozJSImplScope(proxy->_engine));
+        scope.reset(new MozJSImplScope(proxy->_engine,
+                                       boost::none /* Don't override global jsHeapLimitMB */));
         proxy->_implScope = scope.get();
     } catch (...) {
         proxy->_status = exceptionToStatus();

@@ -49,6 +49,7 @@
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/initialize_server_security_state.h"
@@ -93,6 +94,8 @@
 #include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/version_mongos.h"
+#include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/admin_access.h"
@@ -592,6 +595,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 
     startMongoSFTDC();
+
+    if (mongosGlobalParams.scriptingEnabled) {
+        ScriptEngine::setup();
+    }
 
     Status status = AuthorizationManager::get(serviceContext)->initialize(opCtx);
     if (!status.isOK()) {

@@ -543,6 +543,7 @@ mongos = env.Program(
         'db/commands/server_status_core',
         'db/commands/server_status_servers',
         'db/curop',
+        'db/dbdirectclient',
         'db/ftdc/ftdc_mongos',
         'db/initialize_server_security_state',
         'db/logical_session_cache',
