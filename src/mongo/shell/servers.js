@@ -103,6 +103,10 @@ function pathJoin(...parts) {
     return parts.join(separator);
 }
 
+// Internal state to determine if the hang analyzer should be enabled or not.
+// Accessible via global setter/getter defined below.
+let _hangAnalyzerEnabled = true;
+
 /**
  * Run `./buildscripts/hang_analyzer.py`.
  *
@@ -118,6 +122,12 @@ function runHangAnalyzer(pids) {
         print("Skipping runHangAnalyzer: no TestData (not running from resmoke)");
         return;
     }
+
+    if (!_hangAnalyzerEnabled) {
+        print('Skipping runHangAnalyzer: manually disabled');
+        return;
+    }
+
     if (typeof pids === 'undefined') {
         pids = getPids();
     }
@@ -130,10 +140,18 @@ function runHangAnalyzer(pids) {
     pids = pids.map(p => p + 0).join(',');
     print(`Running hang_analyzer.py for pids [${pids}]`);
     const scriptPath = pathJoin('.', 'buildscripts', 'hang_analyzer.py');
-    runProgram('python', scriptPath, '-c', '-d', pids);
+    return runProgram('python', scriptPath, '-c', '-d', pids);
 }
 
 MongoRunner.runHangAnalyzer = runHangAnalyzer;
+
+MongoRunner.runHangAnalyzer.enable = function() {
+    _hangAnalyzerEnabled = true;
+};
+
+MongoRunner.runHangAnalyzer.disable = function() {
+    _hangAnalyzerEnabled = false;
+};
 })();
 
 /**
