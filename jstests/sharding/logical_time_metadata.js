@@ -36,8 +36,8 @@
     // this.
     var appliedTime = res.optimes.appliedOpTime.ts;
     var logicalTimeMetadata = res.$clusterTime;
-    assert.lte(0,
-               timestampCmp(appliedTime, logicalTimeMetadata.clusterTime),
+    assert.lte(timestampCmp(appliedTime, logicalTimeMetadata.clusterTime),
+               0,
                'appliedTime: ' + tojson(appliedTime) + ' not less than or equal to clusterTime: ' +
                    tojson(logicalTimeMetadata.clusterTime));
 
