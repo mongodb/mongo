@@ -31,6 +31,8 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -80,6 +82,28 @@ public:
 
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixture::tearDown();
+    }
+
+    void setFilteringMetadataWithUUID(const UUID& uuid) {
+        const OID epoch = OID::gen();
+
+        auto rt = RoutingTableHistory::makeNew(
+            kNss,
+            uuid,
+            kShardKeyPattern,
+            nullptr,
+            false,
+            epoch,
+            {ChunkType{kNss,
+                       ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
+                       ChunkVersion(1, 0, epoch),
+                       ShardId("dummyShardId")}});
+
+        std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
+
+        CollectionShardingRuntime::get(operationContext(), kNss)
+            ->setFilteringMetadata(operationContext(),
+                                   CollectionMetadata(cm, ShardId("dummyShardId")));
     }
 
     UUID uuid() const {
@@ -421,9 +445,9 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
+    setFilteringMetadataWithUUID(uuid());
     PersistentTaskStore<RangeDeletionTask> store(operationContext(),
                                                  NamespaceString::kRangeDeletionNamespace);
-
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
     store.add(operationContext(), t);
@@ -459,9 +483,9 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
+    setFilteringMetadataWithUUID(uuid());
     PersistentTaskStore<RangeDeletionTask> store(operationContext(),
                                                  NamespaceString::kRangeDeletionNamespace);
-
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
     store.add(operationContext(), t);
@@ -576,6 +600,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
+    setFilteringMetadataWithUUID(uuid());
     PersistentTaskStore<RangeDeletionTask> store(operationContext(),
                                                  NamespaceString::kRangeDeletionNamespace);
 
@@ -613,6 +638,7 @@ TEST_F(RangeDeleterTest,
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
+    setFilteringMetadataWithUUID(fakeUuid);
     PersistentTaskStore<RangeDeletionTask> store(operationContext(),
                                                  NamespaceString::kRangeDeletionNamespace);
 
@@ -650,6 +676,7 @@ TEST_F(RangeDeleterTest,
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
+    setFilteringMetadataWithUUID(uuid());
     PersistentTaskStore<RangeDeletionTask> store(operationContext(),
                                                  NamespaceString::kRangeDeletionNamespace);
 

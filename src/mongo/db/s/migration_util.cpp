@@ -151,8 +151,8 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
                 LOG(0) << "Filtering metadata for namespace in deletion task "
                        << deletionTask.toBSON()
                        << (css->getCurrentMetadataIfKnown()
-                               ? "has UUID that does not match UUID of the deletion task"
-                               : "is not known")
+                               ? " has UUID that does not match UUID of the deletion task"
+                               : " is not known")
                        << ", forcing a refresh of " << deletionTask.getNss();
 
                 // TODO (SERVER-45577): Add an asynchronous version of
