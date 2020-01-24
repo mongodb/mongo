@@ -189,6 +189,10 @@ functions:
           test_control: ${test}
           production: true
           overrides:
+            infrastructure_provisioning:
+              tfvars:
+                # This is currently only used by initialsync-logkeeper. It is empty and not used for other tests.
+                mongod_seeded_ebs_snapshot_id: ${snapshotId}
             workload_setup:
               local_repos:
                 workloads: ../src/workloads/workloads
@@ -530,6 +534,17 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: initialsync-logkeeper
+  priority: 5
+  exec_timeout_secs: 216000 # 2.5 days
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "initialsync-logkeeper"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: change_streams_throughput
   priority: 5
   commands:
@@ -745,6 +760,29 @@ buildvariants:
         variant: compile-rhel70
   tasks:
     - name: initialsync
+
+
+- name: linux-replSet-initialsync-logkeeper
+  display_name: Linux ReplSet Initial Sync LogKeeper
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: initialsync-logkeeper
+    cluster: initialsync-logkeeper
+    # EBS logkeeper snapshot with FCV set to 4.0
+    snapshotId: snap-044cc4cf3f616ef5d
+    platform: linux
+    # TODO(TIG-1506): enabled authentication on initialsync variants
+    authentication: disabled
+    storageEngine: wiredTiger
+    project_dir: *project_dir
+  run_on:
+      - "rhel70-perf-initialsync-logkeeper"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
+  tasks:
+    - name: initialsync-logkeeper
 
 #######################################
 #         MMAP Buildvariants         #
