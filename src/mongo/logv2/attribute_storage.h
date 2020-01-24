@@ -35,6 +35,7 @@
 #include "mongo/stdx/variant.h"
 #include "mongo/util/duration.h"
 
+#include <boost/container/small_vector.hpp>
 #include <functional>
 
 namespace mongo {
@@ -549,16 +550,53 @@ AttributeStorage<Args...> makeAttributeStorage(const Args&... args) {
 
 }  // namespace detail
 
+class DynamicAttributes {
+public:
+    // Do not allow rvalue references and temporary objects to avoid lifetime problem issues
+    template <typename T,
+              std::enable_if_t<std::is_arithmetic_v<T> || std::is_pointer_v<T> || std::is_enum_v<T>,
+                               int> = 0>
+    void add(StringData name, T value) {
+        _attributes.emplace_back(name, value);
+    }
+
+    template <typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
+    void add(StringData name, const T& value) {
+        _attributes.emplace_back(name, value);
+    }
+
+    template <typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
+    void add(StringData name, T&& value) = delete;
+
+    void add(StringData name, StringData value) {
+        _attributes.emplace_back(name, value);
+    }
+
+    // Does not have the protections of add() above. Be careful about lifetime of value!
+    template <typename T>
+    void addUnsafe(StringData name, const T& value) {
+        _attributes.emplace_back(name, value);
+    }
+
+private:
+    // This class is meant to be wrapped by TypeErasedAttributeStorage below that provides public
+    // accessors. Let it access all our internals.
+    friend class mongo::logv2::TypeErasedAttributeStorage;
+
+    boost::container::small_vector<detail::NamedAttribute, constants::kNumStaticAttrs> _attributes;
+};
+
 // Wrapper around internal pointer of AttributeStorage so it does not need any template parameters
 class TypeErasedAttributeStorage {
 public:
     TypeErasedAttributeStorage() : _size(0) {}
 
     template <typename... Args>
-    TypeErasedAttributeStorage(const detail::AttributeStorage<Args...>& store) {
-        _data = store._data;
-        _size = store.kNumArgs;
-    }
+    TypeErasedAttributeStorage(const detail::AttributeStorage<Args...>& store)
+        : _data(store._data), _size(store.kNumArgs) {}
+
+    TypeErasedAttributeStorage(const DynamicAttributes& attrs)
+        : _data(attrs._attributes.data()), _size(attrs._attributes.size()) {}
 
     bool empty() const {
         return _size == 0;

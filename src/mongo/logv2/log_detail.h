@@ -57,8 +57,18 @@ void doLog(int32_t id,
            const fmt::internal::named_arg<Args, char>&... args) {
     auto attributes = makeAttributeStorage(args...);
 
-    auto msg = static_cast<fmt::string_view>(message);
+    fmt::string_view msg{message};
     doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), attributes);
+}
+
+template <typename S>
+void doLog(int32_t id,
+           LogSeverity const& severity,
+           LogOptions const& options,
+           S const& message,
+           const DynamicAttributes& dynamicAttrs) {
+    fmt::string_view msg{message};
+    doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), dynamicAttrs);
 }
 
 }  // namespace detail

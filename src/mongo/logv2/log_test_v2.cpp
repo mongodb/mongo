@@ -793,6 +793,37 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     };
     validateNonMemberToBSON(mongo::fromjson(lines.back()));
     validateNonMemberToBSON(BSONObj(linesBson.back().data()));
+
+    DynamicAttributes attrs;
+    attrs.add("string data"_sd, "a string data"_sd);
+    attrs.add("cstr"_sd, "a c string");
+    attrs.add("int"_sd, 5);
+    attrs.add("float"_sd, 3.0f);
+    attrs.add("bool"_sd, true);
+    attrs.add("enum"_sd, UnscopedEntryWithToString);
+    attrs.add("custom"_sd, t6);
+    attrs.addUnsafe("unsafe but ok"_sd, 1);
+    BSONObj bsonObj;
+    attrs.add("bson"_sd, bsonObj);
+    LOGV2(20083, "message", attrs);
+    auto validateDynamic = [](const BSONObj& obj) {
+        const BSONObj& attrObj = obj.getField(kAttributesFieldName).Obj();
+        for (StringData f : {"cstr"_sd,
+                             "int"_sd,
+                             "float"_sd,
+                             "bool"_sd,
+                             "enum"_sd,
+                             "custom"_sd,
+                             "bson"_sd,
+                             "unsafe but ok"_sd}) {
+            ASSERT(attrObj.hasField(f));
+        }
+
+        // Check that one of them actually has the value too.
+        ASSERT_EQUALS(attrObj.getField("int").Int(), 5);
+    };
+    validateDynamic(mongo::fromjson(lines.back()));
+    validateDynamic(BSONObj(linesBson.back().data()));
 }
 
 TEST_F(LogTestV2, Containers) {

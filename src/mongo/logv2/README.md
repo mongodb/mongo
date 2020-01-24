@@ -105,6 +105,27 @@ Multiple tags can be attached to a log statement using the bitwise or operator `
 LOGV2_WARNING_OPTIONS(1005, {LogTag::kStartupWarnings}, "XFS filesystem is recommended with WiredTiger");
 ```
 
+### Dynamic attributes
+
+Sometimes there is a need to add attributes depending on runtime conditionals. To support this there is the `DynamicAttributes` class that has an `add` method to add named attributes one by one. This class is meant to be used when you have this specific requirement and is not the general logging API.
+
+When finished, it is logged using the regular logging API but the `DynamicAttributes` instance is passed as the first attribute parameter. Mixing `_attr` literals with the `DynamicAttributes` is not supported.
+
+When using the `DynamicAttributes` you need to be careful about parameter lifetimes. The `DynamicAttributes` binds attributes *by reference* and the reference must be valid when passing the `DynamicAttributes` to the log statement.
+
+##### Examples
+
+```
+DynamicAttributes attrs;
+attrs.add("str"_sd, "StringData value"_sd);
+if (condition) {
+    // getExtraInfo() returns a reference that is valid until the LOGV2 call below.
+    // Be careful of functions returning by value
+    attrs.add("extra"_sd, getExtraInfo());
+}
+LOGV2(1030, "dynamic attributes", attrs);
+```
+
 # Type Support
 
 ### Built-in 
