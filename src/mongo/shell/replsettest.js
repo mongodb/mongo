@@ -1248,7 +1248,8 @@ var ReplSetTest = function(opts) {
 
         // Wait for initial sync to complete on all nodes. Use a faster polling interval so we can
         // detect initial sync completion more quickly.
-        this.awaitSecondaryNodes(self.kDefaultTimeoutMS, self._slaves, 25 /* retryIntervalMS */);
+        this.awaitSecondaryNodes(
+            self.kDefaultTimeoutMS, null /* slaves */, 25 /* retryIntervalMS */);
         print("ReplSetTest initiate reconfig and awaitSecondaryNodes took " +
               (new Date() - reconfigStart) + "ms for " + this.nodes.length + " nodes in set '" +
               this.name + "'");

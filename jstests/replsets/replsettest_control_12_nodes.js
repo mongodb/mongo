@@ -9,6 +9,9 @@
  * We use 12 replica set nodes because we consider that to be a reasonable scalability limit for
  * ReplSetTest. We expect the large majority of tests will never use more than this number of nodes,
  * and so we're not particularly worried about scaling beyond that point.
+ *
+ * @tags: [resource_intensive]
+ *
  */
 (function() {
 // There are a limited number of voting nodes allowed in a replica set. We use as many voting nodes
