@@ -141,6 +141,28 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNumber) {
     ASSERT_EQUALS(123, options.wTimeout);
 }
 
+TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
+    const double nan = std::nan("1");
+    auto sw = WriteConcernOptions::parse(BSON("wtimeout" << nan));
+    ASSERT_OK(sw.getStatus());
+    WriteConcernOptions options = sw.getValue();
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
+    ASSERT_EQUALS("", options.wMode);
+    ASSERT_EQUALS(1, options.wNumNodes);
+    ASSERT_EQUALS(0, options.wTimeout);
+}
+
+TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
+    // Set wtimeout to a double with value larger than INT_MAX.
+    auto sw = WriteConcernOptions::parse(BSON("wtimeout" << 2999999999.0));
+    ASSERT_OK(sw.getStatus());
+    WriteConcernOptions options = sw.getValue();
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
+    ASSERT_EQUALS("", options.wMode);
+    ASSERT_EQUALS(1, options.wNumNodes);
+    ASSERT_LESS_THAN(options.wTimeout, 0);
+}
+
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnUnknownField) {
     auto status = WriteConcernOptions::parse(BSON("x" << 123)).getStatus();
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);

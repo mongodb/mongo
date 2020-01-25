@@ -122,7 +122,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
             wEl = e;
             writeConcern.usedDefault = false;
         } else if (fieldName == kWTimeoutFieldName) {
-            wTimeout = e.numberInt();
+            wTimeout = e.safeNumberLong();
             writeConcern.usedDefault = false;
         } else if (fieldName == kWElectionIdFieldName) {
             // Ignore.
