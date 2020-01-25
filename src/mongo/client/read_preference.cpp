@@ -179,6 +179,10 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
         }
     }
 
+    if (!hedgingMode && mode == ReadPreference::Nearest) {
+        hedgingMode = HedgingMode();
+    }
+
     TagSet tags;
     BSONElement tagsElem;
     auto tagExtractStatus =

@@ -112,6 +112,15 @@ TEST(ReadPreferenceSetting, ParseHedgingMode) {
     ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
     ASSERT_FALSE(rps.hedgingMode.has_value());
 
+    // Implicit opt-in for readPreference mode "nearest".
+    rpsObj = BSON("mode"
+                  << "nearest");
+    rps = parse(rpsObj);
+    ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
+    ASSERT_TRUE(rps.hedgingMode.has_value());
+    ASSERT_TRUE(rps.hedgingMode->getEnabled());
+    ASSERT_TRUE(rps.hedgingMode->getDelay());
+
     // Default hedging mode.
     rpsObj = BSON("mode"
                   << "primaryPreferred"
@@ -284,7 +293,7 @@ void checkRoundtrip(const ReadPreferenceSetting& rps) {
 }
 
 TEST(ReadPreferenceSetting, Roundtrip) {
-    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
                                          TagSet(BSON_ARRAY(BSON("dc"
                                                                 << "ca")
                                                            << BSON("foo"
@@ -299,7 +308,7 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                                                 << "rack"
                                                                 << "bar")))));
 
-    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
                                          TagSet(BSON_ARRAY(BSON("dc"
                                                                 << "ca")
                                                            << BSON("foo"
