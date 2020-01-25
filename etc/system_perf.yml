@@ -1361,7 +1361,6 @@ buildvariants:
     setup: replica-2node
     cluster: replica
     platform: linux
-    # TODO(TIG-1506): enabled authentication on initialsync variants
     authentication: disabled
     storageEngine: wiredTiger
     project_dir: *project_dir
@@ -1389,7 +1388,6 @@ buildvariants:
     # EBS logkeeper snapshot with FCV set to 4.4
     snapshotId: snap-0b0b8b2ad16e8f14e
     platform: linux
-    # TODO(TIG-1506): enabled authentication on initialsync variants
     authentication: disabled
     storageEngine: wiredTiger
     project_dir: *project_dir
