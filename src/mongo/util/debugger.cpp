@@ -127,7 +127,11 @@ void execCallback(int) {
 
 void execCallback(int) {
     launchDebugger([](char* pidToDebug) {
+#ifdef __linux__
+        execlp("lldb-server", "lldb-server", "g", "--attach", pidToDebug, "*:12345", nullptr);
+#else
         execlp("debugserver", "debugserver", "*:12345", "--attach", pidToDebug, nullptr);
+#endif
     });
 }
 
