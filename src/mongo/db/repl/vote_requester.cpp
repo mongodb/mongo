@@ -87,6 +87,12 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("term", _term);
     requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
+    // Only append the config term field to the VoteRequester if we are in FCV 4.4
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
+    }
 
     _lastDurableOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
 
