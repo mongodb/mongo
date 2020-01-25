@@ -1545,7 +1545,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             // X lock while a prepared transaction held a Collection IX lock, and a step down was
             // waiting to acquire the RSTL in mode X.
             // TODO(SERVER-44045): Revisit this logic for the non-two phase index build case.
-            if (!supportsTwoPhaseIndexBuild()) {
+            if (IndexBuildProtocol::kTwoPhase != replState->protocol) {
                 const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
                 invariant(unlocked);
             }
