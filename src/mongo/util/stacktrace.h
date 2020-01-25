@@ -36,6 +36,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe
@@ -45,7 +46,7 @@
  *    - markAsStackTraceProcessingThread
  *    - printAllThreadStacks
  */
-#if defined(__linux__) && defined(MONGO_USE_LIBUNWIND)
+#if defined(__linux__) && defined(MONGO_CONFIG_USE_LIBUNWIND)
 #define MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS
 #endif
 

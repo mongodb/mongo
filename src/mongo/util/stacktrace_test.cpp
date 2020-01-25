@@ -848,7 +848,7 @@ TEST_F(PrintAllThreadStacksTest, Go_200_Threads) {
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
-#if defined(MONGO_USE_LIBUNWIND) || defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+#if defined(MONGO_CONFIG_USE_LIBUNWIND) || defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 /**
  * Try to backtrace from a stack containing a libc function. To do this
  * we need a libc function that makes a user-provided callback, like qsort.

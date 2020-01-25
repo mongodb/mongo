@@ -47,7 +47,7 @@
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/stacktrace.h"
 
-#if defined(MONGO_USE_LIBUNWIND)
+#if defined(MONGO_CONFIG_USE_LIBUNWIND)
 #include <libunwind.h>
 #endif
 
@@ -101,7 +101,7 @@ void BM_Print(benchmark::State& state) {
 }
 BENCHMARK(BM_Print)->Range(1, 100);
 
-#if defined(MONGO_USE_LIBUNWIND)
+#if defined(MONGO_CONFIG_USE_LIBUNWIND)
 void BM_CursorSteps(benchmark::State& state) {
     size_t items = 0;
     RecursionParam param;
@@ -134,7 +134,7 @@ void BM_CursorSteps(benchmark::State& state) {
     state.SetItemsProcessed(items);
 }
 BENCHMARK(BM_CursorSteps)->Range(1, 100);
-#endif  // MONGO_USE_LIBUNWIND
+#endif  // MONGO_CONFIG_USE_LIBUNWIND
 
 
 }  // namespace
