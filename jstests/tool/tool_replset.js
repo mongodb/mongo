@@ -10,6 +10,7 @@
  * 8. Import the collection.
  */
 
+// @tags: [requires_persistence]
 (function() {
 "use strict";
 
