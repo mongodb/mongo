@@ -393,6 +393,7 @@ env.Library(
         env.Idlc('document_source_merge.idl')[0],
         env.Idlc('document_source_merge_modes.idl')[0],
         env.Idlc('document_source_replace_root.idl')[0],
+        env.Idlc('document_source_union_with.idl')[0],
         env.Idlc('exchange_spec.idl')[0],
         env.Idlc('value.idl')[0],
         'document_source_merge_spec.cpp',

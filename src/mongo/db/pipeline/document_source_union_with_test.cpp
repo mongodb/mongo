@@ -232,7 +232,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                                                                    .firstElement(),
                                                                getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       40413);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll"
@@ -243,7 +243,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                 .firstElement(),
             getExpCtx()),
         AssertionException,
-        ErrorCodes::FailedToParse);
+        40413);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll"
@@ -254,7 +254,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                 .firstElement(),
             getExpCtx()),
         AssertionException,
-        ErrorCodes::FailedToParse);
+        40415);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll"
@@ -265,6 +265,35 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
             getExpCtx()),
         AssertionException,
         16436);
+    ASSERT_THROWS_CODE(
+        DocumentSourceUnionWith::createFromBson(
+            BSON("$unionWith" << BSON("coll" << BSON("not"
+                                                     << "string")
+                                             << "pipeline"
+                                             << BSON_ARRAY(BSON("$addFields" << BSON("a" << 3)))))
+                .firstElement(),
+            getExpCtx()),
+        AssertionException,
+        ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        DocumentSourceUnionWith::createFromBson(BSON("$unionWith" << BSON("coll"
+                                                                          << "foo"
+                                                                          << "pipeline"
+                                                                          << "string"))
+                                                    .firstElement(),
+                                                getExpCtx()),
+        AssertionException,
+        10065);
+    ASSERT_THROWS_CODE(
+        DocumentSourceUnionWith::createFromBson(BSON("$unionWith" << BSON("coll"
+                                                                          << "foo"
+                                                                          << "pipeline"
+                                                                          << BSON("not"
+                                                                                  << "string")))
+                                                    .firstElement(),
+                                                getExpCtx()),
+        AssertionException,
+        40422);
 }
 
 TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {

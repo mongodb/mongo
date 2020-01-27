@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/document_source_union_with_gen.h"
 
 namespace mongo {
 
@@ -50,16 +51,14 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
     if (spec.type() == BSONType::String) {
         unionNss = NamespaceString(request.getNamespaceString().db(), spec.valueStringData());
     } else {
-        unionNss =
-            NamespaceString(request.getNamespaceString().db(), spec["coll"].valueStringData());
+        auto unionWithSpec =
+            UnionWithSpec::parse(IDLParserErrorContext(kStageName), spec.embeddedObject());
+        unionNss = NamespaceString(request.getNamespaceString().db(), unionWithSpec.getColl());
 
         // Recursively lite parse the nested pipeline, if one exists.
-        if (auto pipelineElem = spec["pipeline"]) {
-            auto pipeline =
-                uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
-            AggregationRequest foreignAggReq(unionNss, std::move(pipeline));
+        if (unionWithSpec.getPipeline()) {
+            AggregationRequest foreignAggReq(unionNss, std::move(*unionWithSpec.getPipeline()));
             liteParsedPipeline = LiteParsedPipeline(foreignAggReq);
-
             foreignNssSet.merge(liteParsedPipeline->getInvolvedNamespaces());
         }
     }
@@ -83,30 +82,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
     if (elem.type() == BSONType::String) {
         unionNss = NamespaceString(expCtx->ns.db().toString(), elem.valueStringData());
     } else {
-        bool sawColl = false;
-        bool sawPipeline = false;
-        for (auto&& arg : elem.embeddedObject()) {
-            auto fieldName = arg.fieldNameStringData();
-            if (fieldName == "coll") {
-                if (sawColl)
-                    uasserted(ErrorCodes::FailedToParse,
-                              str::stream() << "Redundant 'coll' argument given to $unionWith");
-                unionNss = NamespaceString(expCtx->ns.db().toString(), arg.valueStringData());
-                sawColl = true;
-            } else if (fieldName == "pipeline") {
-                if (sawPipeline)
-                    uasserted(ErrorCodes::FailedToParse,
-                              str::stream() << "Redundant 'pipeline' argument given to $unionWith");
-                pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(arg));
-                sawPipeline = true;
-            } else
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "Unknown argument given to $unionWith stage: " << fieldName);
-        }
-        if (!sawColl)
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "No 'coll' argument given to $unionWith");
+        auto unionWithSpec =
+            UnionWithSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+        unionNss = NamespaceString(expCtx->ns.db().toString(), unionWithSpec.getColl());
+        pipeline = unionWithSpec.getPipeline().value_or(std::vector<BSONObj>{});
     }
     return make_intrusive<DocumentSourceUnionWith>(
         expCtx,
