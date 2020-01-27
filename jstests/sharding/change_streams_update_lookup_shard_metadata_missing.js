@@ -1,8 +1,7 @@
 /**
- * Tests that an updateLookup change stream throws ChangeStreamFatalError when it encounters an
- * oplog entry whose documentKey omits the shard key.
- * TODO SERVER-44598: the oplog entry will no longer omit the shard key when SERVER-44598 is fixed,
- * and so this test will no longer be relevant.
+ * Tests that an updateLookup change stream doesn't throw ChangeStreamFatalError after
+ * fixing SERVER-44598
+ *
  * @tags: [uses_change_streams]
  */
 (function() {
@@ -39,12 +38,26 @@
 
     const resumeToken = csCursor.next()._id;
 
+    // get any secondary
+    const newPrimary = st.rs0.getSecondary();
+    let shards = st.s.getDB('config').shards.find().toArray();
+
     // Step up one of the Secondaries, which will not have any sharding metadata loaded.
-    shard0.stepUpNoAwaitReplication(shard0.getSecondary());
+    st.rs0.stepUpNoAwaitReplication(newPrimary);
+
+    // make sure the mongos refreshes it's connections to the shard
+    let primary = {};
+    do {
+        let connPoolStats = st.s0.adminCommand({connPoolStats: 1});
+        primary = connPoolStats.replicaSets[shards[0]._id].hosts.find((host) => {
+            return host.ismaster;
+        }) ||
+            {};
+    } while (newPrimary.host !== primary.addr);
 
     // Do a {multi:true} update. This will scatter to all shards and update the document on shard0.
-    // Because no metadata is loaded, this will write the update into the oplog with a documentKey
-    // containing only the _id field.
+    // Because no metadata is loaded, the shard will return a StaleShardVersion and fetch it,
+    // the operation will be retried
     assert.soonNoExcept(() => assert.commandWorked(
                             mongosColl.update({_id: 0}, {$set: {updated: true}}, false, true)));
 
@@ -54,12 +67,11 @@
         cursor: {}
     }));
 
-    // Begin pulling from the stream. We should hit a ChangeStreamFatalError when the updateLookup
-    // attempts to read the update entry that is missing the shard key value of the document.
-    assert.soonNoExcept(
-        () => assert.commandFailedWithCode(
-            mongosColl.runCommand({getMore: cmdRes.cursor.id, collection: mongosColl.getName()}),
-            ErrorCodes.ChangeStreamFatalError));
+    assert.soon(() => csCursor.hasNext());
+
+    const updateObj = csCursor.next();
+
+    assert.eq(true, updateObj.updateDescription.updatedFields.updated);
 
     st.stop();
 })();
