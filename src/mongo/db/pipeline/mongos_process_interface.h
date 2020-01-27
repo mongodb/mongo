@@ -32,10 +32,6 @@
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
-#include "mongo/s/query/owned_remote_cursor.h"
 
 namespace mongo {
 

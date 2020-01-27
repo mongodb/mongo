@@ -39,10 +39,10 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -134,12 +134,12 @@ TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineDoesNotEndWithOut) {
     setupNShards(2);
     auto mergePipe =
         unittest::assertGet(Pipeline::create({DocumentSourceLimit::create(expCtx(), 1)}, expCtx()));
-    ASSERT_FALSE(cluster_aggregation_planner::checkIfEligibleForExchange(operationContext(),
-                                                                         mergePipe.get()));
+    ASSERT_FALSE(
+        sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
     mergePipe = unittest::assertGet(
         Pipeline::create({DocumentSourceMatch::create(BSONObj(), expCtx())}, expCtx()));
-    ASSERT_FALSE(cluster_aggregation_planner::checkIfEligibleForExchange(operationContext(),
-                                                                         mergePipe.get()));
+    ASSERT_FALSE(
+        sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
 }
 
 TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineEndsWithOut) {
@@ -152,8 +152,8 @@ TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineEndsWithOut) {
 
     auto mergePipe = unittest::assertGet(
         Pipeline::create({DocumentSourceOut::create(kTestOutNss, expCtx())}, expCtx()));
-    ASSERT_FALSE(cluster_aggregation_planner::checkIfEligibleForExchange(operationContext(),
-                                                                         mergePipe.get()));
+    ASSERT_FALSE(
+        sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
 }
 
 TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputDatabaseDoesNotExist) {
@@ -170,10 +170,10 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputDataba
                          expCtx()));
 
     auto future = launchAsync([&] {
-        ASSERT_THROWS_CODE(cluster_aggregation_planner::checkIfEligibleForExchange(
-                               operationContext(), mergePipe.get()),
-                           AssertionException,
-                           ErrorCodes::NamespaceNotFound);
+        ASSERT_THROWS_CODE(
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()),
+            AssertionException,
+            ErrorCodes::NamespaceNotFound);
     });
 
     // Mock out a response as if the database doesn't exist.
@@ -200,8 +200,8 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollec
                          expCtx()));
 
     auto future = launchAsync([&] {
-        ASSERT_FALSE(cluster_aggregation_planner::checkIfEligibleForExchange(operationContext(),
-                                                                             mergePipe.get()));
+        ASSERT_FALSE(
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
     });
 
     expectGetDatabase(kTestOutNss);
@@ -230,8 +230,8 @@ TEST_F(ClusterExchangeTest, LimitFollowedByMergeStageIsNotEligibleForExchange) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        ASSERT_FALSE(cluster_aggregation_planner::checkIfEligibleForExchange(operationContext(),
-                                                                             mergePipe.get()));
+        ASSERT_FALSE(
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get()));
     });
 
     future.default_timed_get();
@@ -255,8 +255,8 @@ TEST_F(ClusterExchangeTest, GroupFollowedByMergeIsEligbleForExchange) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
@@ -292,8 +292,8 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
@@ -332,8 +332,8 @@ TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
@@ -377,8 +377,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("x" << 1));
@@ -422,8 +422,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(),
@@ -469,8 +469,8 @@ TEST_F(ClusterExchangeTest, ProjectThroughDottedFieldDoesNotPreserveShardKey) {
         expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         // Because '_id' is populated from '$_id.country', we cannot prove that '_id' is a simple
         // rename. We cannot prove that '_id' is not an array, and thus the $project could do more
         // than a rename.
@@ -505,8 +505,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
@@ -570,8 +570,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
@@ -653,8 +653,8 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
                          expCtx()));
 
     auto future = launchAsync([&] {
-        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
-            operationContext(), mergePipe.get());
+        auto exchangeSpec =
+            sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1 << "_id" << 1));

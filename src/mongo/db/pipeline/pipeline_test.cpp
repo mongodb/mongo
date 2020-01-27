@@ -55,12 +55,12 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 
@@ -1892,7 +1892,7 @@ public:
         mergePipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         mergePipe->optimizePipeline();
 
-        auto splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(mergePipe));
+        auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(mergePipe));
 
         ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(
                             ExplainOptions::Verbosity::kQueryPlanner)),
@@ -1991,7 +1991,7 @@ namespace propagateDocLimitToShards {
  * stage in the merge pipeline creates an upper bound on how many documents are necessary from any
  * of the shards, we can add a $limit to the shard pipeline to prevent it from sending more
  * documents than necessary. See the comment for propagateDocLimitToShard in
- * cluster_aggregation_planner.cpp and the explanation in SERVER-36881.
+ * sharded_agg_helpers.cpp and the explanation in SERVER-36881.
  */
 class MatchWithSkipAndLimit : public Base {
     string inputPipeJson() {
@@ -2524,7 +2524,7 @@ DEATH_TEST_F(PipelineMustRunOnMongoSTest,
     // $_internalSplitPipeline.
     ASSERT_FALSE(pipeline->requiredToRunOnMongos());
 
-    auto splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
+    auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(pipeline));
     ASSERT(splitPipeline.shardsPipeline);
     ASSERT(splitPipeline.mergePipeline);
 
@@ -2565,7 +2565,7 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
     // $_internalSplitPipeline.
     ASSERT_FALSE(pipeline->requiredToRunOnMongos());
 
-    auto splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
+    auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(pipeline));
 
     // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
     ASSERT_THROWS_CODE(splitPipeline.mergePipeline->requiredToRunOnMongos(),

@@ -255,7 +255,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 return {request.getCollation(), boost::none};
             }
 
-            return sharded_agg_helpers::getCollationAndUUID(
+            return cluster_aggregation_planner::getCollationAndUUID(
                 routingInfo, namespaces.executionNss, request.getCollation());
         }();
 
@@ -271,7 +271,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return pipeline;
     };
 
-    auto targeter = sharded_agg_helpers::AggregationTargeter::make(
+    auto targeter = cluster_aggregation_planner::AggregationTargeter::make(
         opCtx,
         namespaces.executionNss,
         pipelineBuilder,
@@ -284,7 +284,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
         // 'pipelineBuilder' function, so we never get an expression context. Because this is a
         // passthrough, we only need a bare minimum expression context anyway.
-        invariant(targeter.policy == sharded_agg_helpers::AggregationTargeter::kPassthrough);
+        invariant(targeter.policy ==
+                  cluster_aggregation_planner::AggregationTargeter::kPassthrough);
         expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr);
     }
 
@@ -294,10 +295,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     auto status = [&]() {
         switch (targeter.policy) {
-            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough: {
                 // A pipeline with $changeStream should never be allowed to passthrough.
                 invariant(!hasChangeStream);
-                return sharded_agg_helpers::runPipelineOnPrimaryShard(
+                return cluster_aggregation_planner::runPipelineOnPrimaryShard(
                     expCtx,
                     namespaces,
                     targeter.routingInfo->db(),
@@ -307,7 +308,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     result);
             }
 
-            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kMongosRequired: {
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
+                kMongosRequired: {
                 // If this is an explain write the explain output and return.
                 auto expCtx = targeter.pipeline->getContext();
                 if (expCtx->explain) {
@@ -318,15 +320,16 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     return Status::OK();
                 }
 
-                return sharded_agg_helpers::runPipelineOnMongoS(namespaces,
-                                                                request.getBatchSize(),
-                                                                std::move(targeter.pipeline),
-                                                                result,
-                                                                privileges);
+                return cluster_aggregation_planner::runPipelineOnMongoS(
+                    namespaces,
+                    request.getBatchSize(),
+                    std::move(targeter.pipeline),
+                    result,
+                    privileges);
             }
 
-            case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kAnyShard: {
-                return sharded_agg_helpers::dispatchPipelineAndMerge(
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
+                return cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
                     std::move(targeter),
                     request.serializeToCommandObj(),

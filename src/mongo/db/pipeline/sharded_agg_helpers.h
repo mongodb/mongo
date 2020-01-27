@@ -32,13 +32,43 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/query/cluster_aggregate.h"
-#include "mongo/s/query/cluster_aggregation_planner.h"
+#include "mongo/s/query/owned_remote_cursor.h"
 
 namespace mongo {
 class CachedCollectionRoutingInfo;
 
 namespace sharded_agg_helpers {
+
+/**
+ * Represents the two halves of a pipeline that will execute in a sharded cluster. 'shardsPipeline'
+ * will execute in parallel on each shard, and 'mergePipeline' will execute on the merge host -
+ * either one of the shards or a mongos.
+ */
+struct SplitPipeline {
+    SplitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline,
+                  std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline,
+                  boost::optional<BSONObj> shardCursorsSortSpec)
+        : shardsPipeline(std::move(shardsPipeline)),
+          mergePipeline(std::move(mergePipeline)),
+          shardCursorsSortSpec(std::move(shardCursorsSortSpec)) {}
+
+    std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
+
+    // If set, the cursors from the shards are expected to be sorted according to this spec, and to
+    // have populated a "$sortKey" metadata field which can be used to compare the results.
+    boost::optional<BSONObj> shardCursorsSortSpec;
+};
+
+struct ShardedExchangePolicy {
+    // The exchange specification that will be sent to shards as part of the aggregate command.
+    // It will be used by producers to determine how to distribute documents to consumers.
+    ExchangeSpec exchangeSpec;
+
+    // Shards that will run the consumer part of the exchange.
+    std::vector<ShardId> consumerShards;
+};
+
 struct DispatchShardPipelineResults {
     // True if this pipeline was split, and the second half of the pipeline needs to be run on
     // the primary shard for the database.
@@ -53,7 +83,7 @@ struct DispatchShardPipelineResults {
 
     // The split version of the pipeline if more than one shard was targeted, otherwise
     // boost::none.
-    boost::optional<cluster_aggregation_planner::SplitPipeline> splitPipeline;
+    boost::optional<SplitPipeline> splitPipeline;
 
     // If the pipeline targeted a single shard, this is the pipeline to run on that shard.
     std::unique_ptr<Pipeline, PipelineDeleter> pipelineForSingleShard;
@@ -65,81 +95,62 @@ struct DispatchShardPipelineResults {
     size_t numProducers;
 
     // The exchange specification if the query can run with the exchange otherwise boost::none.
-    boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec;
+    boost::optional<ShardedExchangePolicy> exchangeSpec;
 };
 
 /**
- * This structure contains information for targeting an aggregation pipeline in a sharded cluster.
+ * If the merging pipeline is eligible for an $exchange merge optimization, returns the information
+ * required to set that up.
  */
-struct AggregationTargeter {
-    /**
-     * Populates and returns targeting info for an aggregation pipeline on the given namespace
-     * 'executionNss'.
-     */
-    static AggregationTargeter make(
-        OperationContext* opCtx,
-        const NamespaceString& executionNss,
-        const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
-        boost::optional<CachedCollectionRoutingInfo> routingInfo,
-        stdx::unordered_set<NamespaceString> involvedNamespaces,
-        bool hasChangeStream,
-        bool allowedToPassthrough);
-
-    enum TargetingPolicy {
-        kPassthrough,
-        kMongosRequired,
-        kAnyShard,
-    } policy;
-
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
-    boost::optional<CachedCollectionRoutingInfo> routingInfo;
-};
-
-Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 const ClusterAggregate::Namespaces& namespaces,
-                                 const CachedDatabaseInfo& dbInfo,
-                                 boost::optional<ExplainOptions::Verbosity> explain,
-                                 Document serializedCommand,
-                                 const PrivilegeVector& privileges,
-                                 BSONObjBuilder* out);
+boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationContext* opCtx,
+                                                                  const Pipeline* mergePipeline);
 
 /**
- * Runs a pipeline on mongoS, having first validated that it is eligible to do so. This can be a
- * pipeline which is split for merging, or an intact pipeline which must run entirely on mongoS.
+ * Split the current Pipeline into a Pipeline for each shard, and a Pipeline that combines the
+ * results within a merging process. This call also performs optimizations with the aim of reducing
+ * computing time and network traffic when a pipeline has been split into two pieces.
+ *
+ * The 'mergePipeline' returned as part of the SplitPipeline here is not ready to execute until the
+ * 'shardsPipeline' has been sent to the shards and cursors have been established. Once cursors have
+ * been established, the merge pipeline can be made executable by calling 'addMergeCursorsSource()'
  */
-Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
-                           long long batchSize,
-                           std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                           BSONObjBuilder* result,
-                           const PrivilegeVector& privileges);
+SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
 
 /**
- * Dispatches the pipeline in 'targeter' to the shards that are involved, and merges the results if
- * necessary on either mongos or a randomly designated shard.
+ * Targets shards for the pipeline and returns a struct with the remote cursors or results, and
+ * the pipeline that will need to be executed to merge the results from the remotes. If a stale
+ * shard version is encountered, refreshes the routing table and tries again.
  */
-Status dispatchPipelineAndMerge(OperationContext* opCtx,
-                                sharded_agg_helpers::AggregationTargeter targeter,
-                                Document serializedCommand,
-                                long long batchSize,
-                                const ClusterAggregate::Namespaces& namespaces,
-                                const PrivilegeVector& privileges,
-                                BSONObjBuilder* result,
-                                bool hasChangeStream);
+DispatchShardPipelineResults dispatchShardPipeline(
+    Document serializedCommand,
+    bool hasChangeStream,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+
+BSONObj createPassthroughCommandForShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Document serializedCommand,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    const boost::optional<RuntimeConstants>& constants,
+    Pipeline* pipeline,
+    BSONObj collationObj);
+
+BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       Document serializedCommand,
+                                       const SplitPipeline& splitPipeline,
+                                       const boost::optional<ShardedExchangePolicy> exchangeSpec,
+                                       bool needsMerge);
 
 /**
- *  Returns the "collation" and "uuid" for the collection given by "nss" with the following
- *  semantics:
- *  - The "collation" parameter will be set to the default collation for the collection or the
- *    simple collation if there is no default. If the collection does not exist or if the aggregate
- *    is on the collectionless namespace, this will be set to an empty object.
- *  - The "uuid" is retrieved from the chunk manager for sharded collections or the listCollections
- *    output for unsharded collections. The UUID will remain unset if the aggregate is on the
- *    collectionless namespace.
+ * Creates a new DocumentSourceMergeCursors from the provided 'remoteCursors' and adds it to the
+ * front of 'mergePipeline'.
  */
-std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
-    const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
-    const NamespaceString& nss,
-    const BSONObj& collation);
+void addMergeCursorsSource(Pipeline* mergePipeline,
+                           BSONObj cmdSentToShards,
+                           std::vector<OwnedRemoteCursor> ownedCursors,
+                           const std::vector<ShardId>& targetedShards,
+                           boost::optional<BSONObj> shardCursorsSortSpec,
+                           std::shared_ptr<executor::TaskExecutor> executor,
+                           bool hasChangeStream);
 
 /**
  * For a sharded collection, establishes remote cursors on each shard that may have results, and
@@ -149,6 +160,7 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
  */
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline);
+
 
 /**
  * Returns the proper routing table to use for targeting shards: either a historical routing table
@@ -160,5 +172,16 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
  */
 StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
                                                                   const NamespaceString& execNss);
+
+/**
+ * Returns true if an aggregation over 'nss' must run on all shards.
+ */
+bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream);
+
+/**
+ * Retrieves the desired retry policy based on whether the default writeConcern is set on 'opCtx'.
+ */
+Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
+
 }  // namespace sharded_agg_helpers
 }  // namespace mongo
