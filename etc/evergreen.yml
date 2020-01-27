@@ -8771,6 +8771,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel70
 
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
@@ -9074,6 +9076,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel70
 
 - name: rhel80
   display_name: SSL RHEL 8.0
@@ -9281,7 +9285,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: push
     distros:
-    - rhel70-small
+    - rhel70
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -9389,7 +9393,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: push
     distros:
-    - rhel70-small
+    - rhel70
 
 - name: enterprise-rhel-67-s390x
   display_name: Enterprise RHEL 6.7 s390x
