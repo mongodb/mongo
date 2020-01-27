@@ -4,6 +4,7 @@
  * index is correctly upgraded before startup is complete. See SERVER-45374.
  *
  * @tags: [
+ *   requires_persistence,
  *   requires_replication,
  * ]
  */
