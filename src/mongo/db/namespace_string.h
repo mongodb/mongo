@@ -212,6 +212,9 @@ public:
     bool isSystem() const {
         return coll().startsWith("system.");
     }
+    bool isNormalCollection() const {
+        return !isSystem() && !(isLocal() && coll().startsWith("replset."));
+    }
     bool isAdminDB() const {
         return db() == kAdminDb;
     }

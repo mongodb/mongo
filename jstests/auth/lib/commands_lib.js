@@ -3491,15 +3491,8 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: "local",
-                roles: {
-                    "clusterAdmin": 1,
-                    "clusterMonitor": 1,
-                    "readLocal": 1,
-                    "readWriteLocal": 1,
-                    "backup": 1,
-                    "root": 1,
-                    "__system": 1
-                },
+                roles:
+                    {"clusterAdmin": 1, "clusterMonitor": 1, "backup": 1, "root": 1, "__system": 1},
                 privileges:
                     [{resource: {db: "local", collection: "replset.election"}, actions: ["find"]}]
               },
@@ -3512,15 +3505,8 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: "local",
-                roles: {
-                    "clusterAdmin": 1,
-                    "clusterMonitor": 1,
-                    "readLocal": 1,
-                    "readWriteLocal": 1,
-                    "backup": 1,
-                    "root": 1,
-                    "__system": 1
-                },
+                roles:
+                    {"clusterAdmin": 1, "clusterMonitor": 1, "backup": 1, "root": 1, "__system": 1},
                 privileges:
                     [{resource: {db: "local", collection: "replset.minvalid"}, actions: ["find"]}]
               },
@@ -4023,14 +4009,8 @@ var authCommandsLib = {
           skipSharded: true,
           testcases: [{
               runOnDb: "local",
-              roles: {
-                  "clusterAdmin": 1,
-                  "clusterManager": 1,
-                  "readWriteLocal": 1,
-                  "root": 1,
-                  "__system": 1,
-                  "restore": 1
-              },
+              roles:
+                  {"clusterAdmin": 1, "clusterManager": 1, "root": 1, "__system": 1, "restore": 1},
               privileges:
                   [{resource: {db: "local", collection: "replset.election"}, actions: ["insert"]}],
           }
@@ -4043,14 +4023,8 @@ var authCommandsLib = {
           skipSharded: true,
           testcases: [{
               runOnDb: "local",
-              roles: {
-                  "clusterAdmin": 1,
-                  "clusterManager": 1,
-                  "readWriteLocal": 1,
-                  "root": 1,
-                  "__system": 1,
-                  "restore": 1
-              },
+              roles:
+                  {"clusterAdmin": 1, "clusterManager": 1, "root": 1, "__system": 1, "restore": 1},
               privileges:
                   [{resource: {db: "local", collection: "replset.minvalid"}, actions: ["insert"]}],
           }

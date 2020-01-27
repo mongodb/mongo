@@ -613,6 +613,15 @@ static const int resourceSearchListCapacity = 5;
 /**
  * Builds from "target" an exhaustive list of all ResourcePatterns that match "target".
  *
+ * Some resources are considered to be "normal resources", and are matched by the
+ * forAnyNormalResource pattern. Collections which are not prefixed with "system.",
+ * and which do not belong inside of the "local" or "config" databases are "normal".
+ * Database other than "local" and "config" are normal.
+ *
+ * Most collections are matched by their database's resource. Collections prefixed with "system."
+ * are not. Neither are collections on the "local" database, whose name are prefixed with "replset."
+ *
+ *
  * Stores the resulting list into resourceSearchList, and returns the length.
  *
  * The seach lists are as follows, depending on the type of "target":
@@ -641,15 +650,19 @@ static int buildResourceSearchList(const ResourcePattern& target,
     int size = 0;
     resourceSearchList[size++] = ResourcePattern::forAnyResource();
     if (target.isExactNamespacePattern()) {
-        if (!target.ns().isSystem()) {
-            // Some databases should not be matchable with ResourcePattern::forAnyNormalResource.
-            // 'local' and 'config' are used to store special system collections, which user level
+        // Normal collections can be matched by anyNormalResource, or their database's resource.
+        if (target.ns().isNormalCollection()) {
+            // But even normal collections in non-normal databases should not be matchable with
+            // ResourcePattern::forAnyNormalResource. 'local' and 'config' are
+            // used to store special system collections, which user level
             // administrators should not be able to manipulate.
             if (target.ns().db() != "local" && target.ns().db() != "config") {
                 resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
             }
             resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
         }
+
+        // All collections can be matched by a collection resource for their name
         resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
     } else if (target.isDatabasePattern()) {
         if (target.ns().db() != "local" && target.ns().db() != "config") {
