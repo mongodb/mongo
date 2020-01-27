@@ -29,6 +29,9 @@ selector:
   # Extracts error code from write error, which is obscured by runInsideTransaction.
   - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
 
+  # Induces non-blindly-retriable errors (see SERVER-45767).
+  - jstests/concurrency/fsm_workloads/create_database.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_sharding
