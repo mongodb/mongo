@@ -13,6 +13,7 @@
 (function() {
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
 function doTest(commitOrAbort) {
@@ -41,7 +42,7 @@ function doTest(commitOrAbort) {
     const txnEntry = primary.getDB("config").transactions.findOne();
 
     const oldestRequiredTimestampForCrashRecovery =
-        PrepareHelpers.getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+        getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     // Make sure that the timestamp of the first oplog entry for this transaction matches the

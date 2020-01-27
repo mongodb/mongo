@@ -151,19 +151,6 @@ const PrepareHelpers = (function() {
         return oplogColl.findOne({op: "c", "o.prepare": true});
     }
 
-    /**
-     * Retrieves the oldest required timestamp from the serverStatus output.
-     *
-     * @return {Timestamp} oldest required timestamp for crash recovery.
-     */
-    function getOldestRequiredTimestampForCrashRecovery(database) {
-        const res = database.serverStatus().storageEngine;
-        const ts = res.oldestRequiredTimestampForCrashRecovery;
-        assert(ts instanceof Timestamp,
-               'oldestRequiredTimestampForCrashRecovery was not a Timestamp: ' + tojson(res));
-        return ts;
-    }
-
     return {
         prepareTransaction: prepareTransaction,
         commitTransaction: commitTransaction,
@@ -175,6 +162,5 @@ const PrepareHelpers = (function() {
         awaitOplogTruncation: awaitOplogTruncation,
         awaitMajorityCommitted: awaitMajorityCommitted,
         findPrepareEntry: findPrepareEntry,
-        getOldestRequiredTimestampForCrashRecovery: getOldestRequiredTimestampForCrashRecovery,
     };
 })();

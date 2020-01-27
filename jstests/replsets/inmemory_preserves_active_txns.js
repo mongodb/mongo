@@ -13,6 +13,7 @@
 (function() {
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
 
 // If the test runner passed --storageEngine=inMemory then we know inMemory is compiled into the
 // server. We'll actually use both inMemory and wiredTiger storage engines.
@@ -57,7 +58,7 @@ function doTest(commitOrAbort) {
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
     const oldestRequiredTimestampForCrashRecovery =
-        PrepareHelpers.getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+        getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     jsTestLog("Get transaction entry from config.transactions");

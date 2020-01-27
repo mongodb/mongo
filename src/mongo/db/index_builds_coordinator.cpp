@@ -126,8 +126,12 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
         return false;
     }
 
-    // Now it's fine to trust Collection::numRecords().
-    return 0U == collection->numRecords(opCtx);
+    // Now, it's fine to trust Collection::isEmpty().
+    // Fast counts are prone to both false positives and false negatives on unclean shutdowns. False
+    // negatives can cause to skip index building. And, false positives can cause mismatch in number
+    // of index entries among the nodes in the replica set. So, verify the collection is really
+    // empty by opening the WT cursor and reading the first document.
+    return collection->isEmpty(opCtx);
 }
 
 /**

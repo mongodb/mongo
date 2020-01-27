@@ -415,6 +415,12 @@ public:
 
     virtual uint64_t dataSize(OperationContext* const opCtx) const = 0;
 
+
+    /**
+     * Returns true if the collection does not contain any records.
+     */
+    virtual bool isEmpty(OperationContext* const opCtx) const = 0;
+
     virtual int averageObjectSize(OperationContext* const opCtx) const = 0;
 
     virtual uint64_t getIndexSize(OperationContext* const opCtx,

@@ -288,6 +288,16 @@ public:
 
     uint64_t dataSize(OperationContext* opCtx) const final;
 
+    /**
+     * Currently fast counts are prone to false negative as it is not tolerant to unclean shutdowns.
+     * So, verify that the collection is really empty by opening the collection cursor and reading
+     * the first document.
+     * Expects to hold at least collection lock in mode IS.
+     * TODO SERVER-24266: After making fast counts tolerant to unclean shutdowns, we can make use of
+     * fast count to determine whether the collection is empty and remove cursor checking logic.
+     */
+    bool isEmpty(OperationContext* opCtx) const final;
+
     inline int averageObjectSize(OperationContext* opCtx) const {
         uint64_t n = numRecords(opCtx);
 

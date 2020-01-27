@@ -756,6 +756,25 @@ uint64_t CollectionImpl::dataSize(OperationContext* opCtx) const {
     return _recordStore->dataSize(opCtx);
 }
 
+bool CollectionImpl::isEmpty(OperationContext* opCtx) const {
+    auto cursor = getCursor(opCtx, true /* forward */);
+
+    auto cursorEmptyCollRes = (!cursor->next()) ? true : false;
+    auto fastCount = numRecords(opCtx);
+    auto fastCountEmptyCollRes = (fastCount == 0) ? true : false;
+
+    if (cursorEmptyCollRes != fastCountEmptyCollRes) {
+        BSONObjBuilder bob;
+        bob.appendNumber("fastCount", fastCount);
+        bob.append("cursor", str::stream() << (cursorEmptyCollRes ? "0" : ">=1"));
+
+        LOG(2) << "Detected erroneous fast count for collection " << ns() << "(" << uuid() << ") ["
+               << getRecordStore()->getIdent() << "]. Record count reported by: " << bob.obj();
+    }
+
+    return cursorEmptyCollRes;
+}
+
 uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
                                       BSONObjBuilder* details,
                                       int scale) const {

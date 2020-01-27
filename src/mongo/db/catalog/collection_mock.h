@@ -228,6 +228,10 @@ public:
         std::abort();
     }
 
+    bool isEmpty(OperationContext* opCtx) const {
+        std::abort();
+    }
+
     int averageObjectSize(OperationContext* const opCtx) const {
         std::abort();
     }
