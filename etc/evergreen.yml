@@ -7954,6 +7954,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel70
 
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
@@ -8225,6 +8227,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel70
 
 - name: rhel80
   display_name: SSL RHEL 8.0
@@ -8430,7 +8434,7 @@ buildvariants:
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
-    - rhel70-small
+    - rhel70
 
 ###########################################
 #          Ubuntu buildvariants           #
