@@ -145,7 +145,7 @@ FTSIteratorValue FTSElementIterator::advance() {
 
         // Is the current field an exact match on a weight?
         bool exactMatch = (possibleWeightMatch && i->first == dottedName);
-        double weight = (possibleWeightMatch ? i->second : DEFAULT_WEIGHT);
+        double weight = (exactMatch ? i->second : DEFAULT_WEIGHT);
 
         switch (elem.type()) {
             case String:
