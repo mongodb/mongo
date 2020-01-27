@@ -448,18 +448,20 @@ class PrepareDirectoryForSuite(unittest.TestCase):
 
 class CalculateTimeoutTest(unittest.TestCase):
     def test_min_timeout(self):
-        self.assertEqual(under_test.MIN_TIMEOUT_SECONDS, under_test.calculate_timeout(15, 1))
+        self.assertEqual(under_test.MIN_TIMEOUT_SECONDS + under_test.AVG_SETUP_TIME,
+                         under_test.calculate_timeout(15, 1))
 
     def test_over_timeout_by_one_minute(self):
-        self.assertEqual(360, under_test.calculate_timeout(301, 1))
+        self.assertEqual(660, under_test.calculate_timeout(301, 1))
 
     def test_float_runtimes(self):
-        self.assertEqual(360, under_test.calculate_timeout(300.14, 1))
+        self.assertEqual(660, under_test.calculate_timeout(300.14, 1))
 
     def test_scaling_factor(self):
         scaling_factor = 10
-        self.assertEqual(under_test.MIN_TIMEOUT_SECONDS * scaling_factor,
-                         under_test.calculate_timeout(30, scaling_factor))
+        self.assertEqual(
+            under_test.MIN_TIMEOUT_SECONDS * scaling_factor + under_test.AVG_SETUP_TIME,
+            under_test.calculate_timeout(30, scaling_factor))
 
 
 class EvergreenConfigGeneratorTest(unittest.TestCase):
