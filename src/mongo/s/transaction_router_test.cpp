@@ -3098,7 +3098,17 @@ protected:
 //
 
 TEST_F(TransactionRouterMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold) {
+    const auto originalSlowMS = serverGlobalParams.slowMS;
+    const auto originalSampleRate = serverGlobalParams.sampleRate;
+
     serverGlobalParams.slowMS = 100;
+    serverGlobalParams.sampleRate = 1;
+
+    // Reset the global parameters to their original values after this test exits.
+    ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
+        serverGlobalParams.slowMS = originalSlowMS;
+        serverGlobalParams.sampleRate = originalSampleRate;
+    });
 
     beginTxnWithDefaultTxnNumber();
     tickSource()->advance(Milliseconds(99));
@@ -3107,12 +3117,41 @@ TEST_F(TransactionRouterMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold)
 }
 
 TEST_F(TransactionRouterMetricsTest, LogsTransactionsOverSlowMSThreshold) {
+    const auto originalSlowMS = serverGlobalParams.slowMS;
+    const auto originalSampleRate = serverGlobalParams.sampleRate;
+
     serverGlobalParams.slowMS = 100;
+    serverGlobalParams.sampleRate = 1;
+
+    // Reset the global parameters to their original values after this test exits.
+    ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
+        serverGlobalParams.slowMS = originalSlowMS;
+        serverGlobalParams.sampleRate = originalSampleRate;
+    });
 
     beginTxnWithDefaultTxnNumber();
     tickSource()->advance(Milliseconds(101));
     runCommit(kDummyOkRes);
     assertPrintedExactlyOneSlowLogLine();
+}
+
+TEST_F(TransactionRouterMetricsTest, DoesNotLogTransactionsWithSampleRateZero) {
+    const auto originalSlowMS = serverGlobalParams.slowMS;
+    const auto originalSampleRate = serverGlobalParams.sampleRate;
+
+    serverGlobalParams.slowMS = 100;
+    serverGlobalParams.sampleRate = 0;
+
+    // Reset the global parameters to their original values after this test exits.
+    ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
+        serverGlobalParams.slowMS = originalSlowMS;
+        serverGlobalParams.sampleRate = originalSampleRate;
+    });
+
+    beginTxnWithDefaultTxnNumber();
+    tickSource()->advance(Milliseconds(101));
+    runCommit(kDummyOkRes);
+    assertDidNotPrintSlowLogLine();
 }
 
 TEST_F(TransactionRouterMetricsTest, OnlyLogSlowTransactionsOnce) {

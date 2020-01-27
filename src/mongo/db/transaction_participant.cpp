@@ -65,6 +65,7 @@
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
+#include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
@@ -1884,11 +1885,15 @@ void TransactionParticipant::Participant::_logSlowTransaction(
     // Only log multi-document transactions.
     if (!o().txnState.isInRetryableWriteMode()) {
         const auto tickSource = opCtx->getServiceContext()->getTickSource();
-        // Log the transaction if log message verbosity for transaction component is >= 1 or its
-        // duration is longer than the slowMS command threshold.
-        if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
+        const auto opDuration = duration_cast<Milliseconds>(
             o().transactionMetricsObserver.getSingleTransactionStats().getDuration(
-                tickSource, tickSource->getTicks()) > Milliseconds(serverGlobalParams.slowMS)) {
+                tickSource, tickSource->getTicks()));
+
+        if (shouldLogSlowOpWithSampling(opCtx,
+                                        logger::LogComponent::kTransaction,
+                                        opDuration,
+                                        Milliseconds(serverGlobalParams.slowMS))
+                .first) {
             log(logger::LogComponent::kTransaction)
                 << "transaction "
                 << _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs);

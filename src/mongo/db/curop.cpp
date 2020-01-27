@@ -53,6 +53,7 @@
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include <mongo/db/stats/timer_stats.h>
@@ -421,11 +422,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
-    // Log the operation if it is eligible according to the current slowMS and sampleRate settings.
-    const bool shouldLogOp = (forceLog || shouldLog(component, logger::LogSeverity::Debug(1)));
     const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS);
-
-    const auto client = opCtx->getClient();
 
     // Record the size of the response returned to the client, if applicable.
     if (responseLength) {
@@ -436,14 +433,19 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     _end = curTimeMicros64();
     _debug.executionTimeMicros = durationCount<Microseconds>(elapsedTimeExcludingPauses());
 
+    const auto executionTimeMillis = _debug.executionTimeMicros / 1000;
+
     if (_debug.isReplOplogFetching) {
-        oplogGetMoreStats.recordMillis(_debug.executionTimeMicros / 1000);
+        oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
-    const bool shouldSample =
-        client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
+    bool shouldLogSlowOp, shouldSample;
 
-    if (shouldLogOp || (shouldSample && _debug.executionTimeMicros > slowMs * 1000LL)) {
+    // Log the operation if it is eligible according to the current slowMS and sampleRate settings.
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
+
+    if (forceLog || shouldLogSlowOp) {
         auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
         if (_debug.storageStats == nullptr && opCtx->lockState()->wasGlobalLockTaken() &&
             opCtx->getServiceContext()->getStorageEngine()) {
