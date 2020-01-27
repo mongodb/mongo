@@ -16,8 +16,6 @@ if use_libunwind:
         ],
     )
     env.InjectThirdParty(libraries=['unwind'])
-elif has_option('use-cpu-profiler'):
-    env.FatalError("Compiling with --use-cpu-profiler requires --use-libunwind")
 
 files = [
     'src/base/dynamic_annotations.c',
@@ -66,13 +64,6 @@ else:
         files += ['src/tcmalloc.cc']
     else:
         files += ['src/debugallocation.cc']
-
-if has_option( 'use-cpu-profiler' ):
-    files += [
-        'src/profile-handler.cc',
-        'src/profiledata.cc',
-        'src/profiler.cc',
-        ]
 
 env.Append(
     CPPDEFINES=["NO_HEAP_CHECK"],

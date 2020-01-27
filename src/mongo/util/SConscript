@@ -341,18 +341,6 @@ if has_option('gcov'):
         ],
     )
 
-if has_option('use-cpu-profiler'):
-    quick_exit_env.Append(
-        CPPDEFINES=[
-            'MONGO_CPU_PROFILER',
-        ],
-    )
-
-    if not use_system_version_of_library('tcmalloc'):
-        quick_exit_env.InjectThirdParty(
-            'gperftools'
-        )
-
 quick_exit_env.Library(
     target='quick_exit',
     source=[

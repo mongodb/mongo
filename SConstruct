@@ -377,11 +377,6 @@ add_option('use-system-all',
     nargs=0,
 )
 
-add_option('use-cpu-profiler',
-    help='Link against the google-perftools profiler library',
-    nargs=0,
-)
-
 add_option('build-fast-and-loose',
     choices=['on', 'off', 'auto'],
     const='on',

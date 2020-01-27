@@ -63,10 +63,6 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
-#if defined(MONGO_CPU_PROFILER)
-#include <gperftools/profiler.h>
-#endif
-
 #ifdef MONGO_GCOV
 extern "C" void __gcov_flush();
 #endif
@@ -82,10 +78,6 @@ void quickExit(int code) {
     // RAII here - we never want to unlock this.
     if (quickExitMutex)
         quickExitMutex->lock();
-
-#if defined(MONGO_CPU_PROFILER)
-    ::ProfilerStop();
-#endif
 
 #ifdef MONGO_GCOV
     __gcov_flush();

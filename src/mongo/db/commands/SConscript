@@ -534,23 +534,6 @@ env.Library(
     ]
 )
 
-if has_option('use-cpu-profiler'):
-    profEnv = env.Clone()
-    profEnv.InjectThirdParty('gperftools')
-    profEnv.Library(
-        target='cpuprofiler',
-        source=[
-            'cpuprofile.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/db/commands',
-            '$BUILD_DIR/mongo/db/db_raii',
-        ],
-        PROGDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/mongod',
-        ],
-    )
-
 env.CppUnitTest(
     target="map_reduce_agg_test",
     source=[
