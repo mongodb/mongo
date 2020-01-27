@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface_lookup_single_document.h"
@@ -297,6 +298,49 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     ASSERT_TRUE(unionWithTwo.getNext().isEOF());
     ASSERT_TRUE(unionWithTwo.getNext().isEOF());
     ASSERT_TRUE(unionWithTwo.getNext().isEOF());
+}
+
+TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
+    auto expCtx = getExpCtx();
+    const auto replaceRoot =
+        DocumentSourceReplaceRoot::createFromBson(BSON("$replaceRoot" << BSON("newRoot"
+                                                                              << "$b"))
+                                                      .firstElement(),
+                                                  expCtx);
+    const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
+        expCtx,
+        uassertStatusOK(
+            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx)));
+
+    // With the $unionWith *before* the $replaceRoot, the dependency analysis will report that all
+    // fields are needed.
+    auto pipeline = uassertStatusOK(Pipeline::create({unionWith, replaceRoot}, expCtx));
+
+    auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
+    ASSERT_TRUE(deps.needWholeDocument);
+}
+
+TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBeforeUnion) {
+    auto expCtx = getExpCtx();
+
+    const auto replaceRoot =
+        DocumentSourceReplaceRoot::createFromBson(BSON("$replaceRoot" << BSON("newRoot"
+                                                                              << "$b"))
+                                                      .firstElement(),
+                                                  expCtx);
+    const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
+        expCtx,
+        uassertStatusOK(
+            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx)));
+
+    // With the $unionWith *after* the $replaceRoot, the dependency analysis will now report only
+    // the referenced fields.
+    auto pipeline = uassertStatusOK(Pipeline::create({replaceRoot, unionWith}, expCtx));
+
+    auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("b" << 1 << "_id" << 0));
+    ASSERT_FALSE(deps.needWholeDocument);
 }
 
 }  // namespace
