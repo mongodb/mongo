@@ -268,7 +268,7 @@ variables:
 - &enterprise-windows-nopush-template
   name: enterprise-windows-nopush-template
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   modules:
   - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
@@ -285,14 +285,14 @@ variables:
     multiversion_platform: windows
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-64-vs2019-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -9164,7 +9164,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - windows-64-vs2017-test
+    - windows-64-vs2019-small
   expansions: &enterprise_windows_expansions
     burn_in_tests_build_variant: enterprise-windows
     exe: ".exe"
@@ -9182,25 +9182,25 @@ buildvariants:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-64-vs2019-large
   tasks:
     - name: compile_TG
       distros:
-        - windows-64-vs2017-compile
+        - windows-64-vs2019-large
     - name: burn_in_tests_gen
     - name: buildscripts_test
     - name: unittest_shell_hang_analyzer_gen
     - name: server_discovery_and_monitoring_json_test_TG
     - name: dbtest_TG
       distros:
-        - windows-64-vs2017-compile
+        - windows-64-vs2019-large
     - name: noPassthrough_gen
 
 - name: windows-debug
   display_name: "* Windows DEBUG"
   batchtime: 60 # 1 hour
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   expansions:
     exe: ".exe"
     content_type: application/zip
@@ -9213,11 +9213,11 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-64-vs2019-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
@@ -9230,13 +9230,13 @@ buildvariants:
     # with more RAM for these suites.
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate
     distros:
-      - windows-64-vs2017-compile
+      - windows-64-vs2019-large
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
@@ -9246,17 +9246,17 @@ buildvariants:
   - name: .read_write_concern !.large
   - name: .read_write_concern .large
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: .replica_sets !.large !.encrypt !.auth
   - name: .replica_sets .large
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: session_jscore_passthrough
   - name: sharding_gen
   - name: .stitch
@@ -9268,7 +9268,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   expansions:
     <<: *enterprise_windows_expansions
     push_path: windows
@@ -9278,10 +9278,10 @@ buildvariants:
   tasks:
   - name: compile_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: audit
@@ -9291,7 +9291,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: dbtest_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
@@ -9334,11 +9334,11 @@ buildvariants:
   display_name: "* Enterprise Windows compile_all"
   batchtime: 60 # 1 hour
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   # Do not add more tasks to this list.
 
 - <<: *enterprise-windows-nopush-template
@@ -9362,7 +9362,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   stepback: true
   batchtime: 10080 # 7 days
   expansions:
@@ -9383,7 +9383,7 @@ buildvariants:
   tasks:
   - name: compile_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: jsCore
   - name: replica_sets
   - name: sharding_gen
@@ -9393,7 +9393,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   expansions:
     exe: ".exe"
     msi_target: msi
@@ -9408,11 +9408,11 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-64-vs2019-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: .aggfuzzer .common
   - name: audit
   - name: auth_audit_gen
@@ -9420,7 +9420,7 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.decimal !.compat !.sharding
   - name: .jstestfuzz .common
@@ -9439,7 +9439,7 @@ buildvariants:
 - name: windows
   display_name: Windows
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   expansions:
     exe: ".exe"
     push_path: windows
@@ -9457,11 +9457,11 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-64-vs2019-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: .aggfuzzer .common
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -9471,7 +9471,7 @@ buildvariants:
   - name: .concurrency .common !.txn
   - name: concurrency_replication_causal_consistency
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.auth
@@ -9500,7 +9500,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   expansions:
     exe: ".exe"
     content_type: application/zip
@@ -9517,7 +9517,7 @@ buildvariants:
   # timing-sensitive tests to fail.
   - name: compile_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-64-vs2019-large
   - name: audit
   # Do not add more tasks to this list.
 
@@ -12039,7 +12039,7 @@ buildvariants:
 - name: windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
   run_on:
-  - windows-64-vs2017-test
+  - windows-64-vs2019-small
   stepback: false
   tasks:
   - name: win_shared_scons_cache_pruning
