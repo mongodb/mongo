@@ -195,4 +195,14 @@ class IndexBuildTest {
         const storageEngineSection = serverStatus.storageEngine;
         return storageEngineSection.supportsTwoPhaseIndexBuild;
     }
+
+    /**
+     * Returns true if majority commit quorum is supported by two phase index builds.
+     */
+    static supportsIndexBuildMajorityCommitQuorum(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, enableIndexBuildMajorityCommitQuorum: 1}))
+            .enableIndexBuildMajorityCommitQuorum;
+    }
 }

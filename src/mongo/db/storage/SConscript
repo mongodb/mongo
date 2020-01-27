@@ -437,7 +437,7 @@ env.Library(
     source=[
         'storage_engine_impl.cpp',
         'kv/temporary_kv_record_store.cpp', # TODO: SERVER-41892 Avoid source under kv sub-directory
-        env.Idlc('enable_two_phase_index_build.idl')[0],
+        env.Idlc('two_phase_index_build_knobs.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
