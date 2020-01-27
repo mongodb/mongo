@@ -46,7 +46,7 @@ void LiteParsedDocumentSource::registerParser(const std::string& name, Parser pa
 }
 
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
-    const AggregationRequest& request, const BSONObj& spec) {
+    const NamespaceString& nss, const BSONObj& spec) {
     uassert(40323,
             "A pipeline stage specification object must contain exactly one field.",
             spec.nFields() == 1);
@@ -59,6 +59,6 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second(request, specElem);
+    return it->second(nss, specElem);
 }
 }  // namespace mongo

@@ -312,8 +312,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
-            LiteParsedPipeline resolvedViewLitePipeline(
-                {resolvedView.getValue().getNamespace(), resolvedView.getValue().getPipeline()});
+            LiteParsedPipeline resolvedViewLitePipeline(resolvedView.getValue().getNamespace(),
+                                                        resolvedView.getValue().getPipeline());
 
             const auto& resolvedViewInvolvedNamespaces =
                 resolvedViewLitePipeline.getInvolvedNamespaces();

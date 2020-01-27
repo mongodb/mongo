@@ -43,9 +43,9 @@ public:
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(request.getNamespaceString());
+            return std::make_unique<LiteParsed>(nss);
         }
 
         explicit LiteParsed(NamespaceString nss) : _nss(std::move(nss)) {}
@@ -54,7 +54,8 @@ public:
             return true;
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
             return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::collStats)};
         }
 

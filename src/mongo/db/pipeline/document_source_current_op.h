@@ -47,7 +47,7 @@ public:
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
         LiteParsed(UserMode allUsers, LocalOpsMode localOps)
@@ -57,7 +57,8 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
             PrivilegeVector privileges;
 
             // In a sharded cluster, we always need the inprog privilege to run $currentOp on the

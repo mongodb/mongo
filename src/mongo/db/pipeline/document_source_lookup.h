@@ -62,7 +62,7 @@ public:
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
         LiteParsed(NamespaceString fromNss,
@@ -76,7 +76,8 @@ public:
             return {_foreignNssSet};
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
             PrivilegeVector requiredPrivileges;
             Privilege::addPrivilegeToPrivilegeVector(
                 &requiredPrivileges,
@@ -84,9 +85,9 @@ public:
 
             if (_liteParsedPipeline) {
                 Privilege::addPrivilegesToPrivilegeVector(
-                    &requiredPrivileges, _liteParsedPipeline->requiredPrivileges(isMongos));
+                    &requiredPrivileges,
+                    _liteParsedPipeline->requiredPrivileges(isMongos, bypassDocumentValidation));
             }
-
             return requiredPrivileges;
         }
 

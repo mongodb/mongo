@@ -77,7 +77,7 @@ DocumentSourceOut::~DocumentSourceOut() {
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parseToDifferentDB(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
 
     auto specObj = spec.Obj();
     auto dbElem = specObj["db"];
@@ -90,38 +90,22 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
 
-    ActionSet actions{ActionType::insert, ActionType::remove};
-    if (request.shouldBypassDocumentValidation()) {
-        actions.addAction(ActionType::bypassDocumentValidation);
-    }
-
-    PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
-
-    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss),
-                                                           std::move(privileges));
+    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss));
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
 
     uassert(16990,
             "{} only supports a string argument, but found {}"_format(kStageName,
                                                                       typeName(spec.type())),
             spec.type() == BSONType::String);
-    NamespaceString targetNss{request.getNamespaceString().db(), spec.valueStringData()};
+    NamespaceString targetNss{nss.db(), spec.valueStringData()};
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
 
-    ActionSet actions{ActionType::insert, ActionType::remove};
-    if (request.shouldBypassDocumentValidation()) {
-        actions.addAction(ActionType::bypassDocumentValidation);
-    }
-
-    PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
-
-    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss),
-                                                           std::move(privileges));
+    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss));
 }
 
 void DocumentSourceOut::initialize() {

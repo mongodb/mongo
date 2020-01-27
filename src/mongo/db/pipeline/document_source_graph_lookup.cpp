@@ -50,8 +50,8 @@ using boost::intrusive_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
-std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp::liteParse(
-    const AggregationRequest& request, const BSONElement& spec) {
+std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp::LiteParsed::parse(
+    const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $graphLookup stage specification must be an object, but found "
                           << typeName(spec.type()),
@@ -68,19 +68,15 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
                           << typeName(specObj["from"].type()),
             fromElement.type() == BSONType::String);
 
-    NamespaceString nss(request.getNamespaceString().db(), fromElement.valueStringData());
+    NamespaceString fromNss(nss.db(), fromElement.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid $graphLookup namespace: " << nss.ns(),
-            nss.isValid());
-
-    PrivilegeVector privileges{
-        Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)};
-
-    return std::make_unique<LiteParsed>(std::move(nss), std::move(privileges));
+            str::stream() << "invalid $graphLookup namespace: " << fromNss.ns(),
+            fromNss.isValid());
+    return std::make_unique<LiteParsed>(std::move(fromNss));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,
-                         DocumentSourceGraphLookUp::liteParse,
+                         DocumentSourceGraphLookUp::LiteParsed::parse,
                          DocumentSourceGraphLookUp::createFromBson);
 
 const char* DocumentSourceGraphLookUp::getSourceName() const {

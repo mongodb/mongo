@@ -117,7 +117,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
 }
 
 std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $lookup stage specification must be an object, but found "
                           << typeName(spec.type()),
@@ -133,7 +133,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
                           << typeName(specObj["from"].type()),
             fromElement.type() == BSONType::String);
 
-    NamespaceString fromNss(request.getNamespaceString().db(), fromElement.valueStringData());
+    NamespaceString fromNss(nss.db(), fromElement.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $lookup namespace: " << fromNss.ns(),
             fromNss.isValid());
@@ -145,8 +145,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (pipelineElem) {
         auto pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
-        AggregationRequest foreignAggReq(fromNss, std::move(pipeline));
-        liteParsedPipeline = LiteParsedPipeline(foreignAggReq);
+        liteParsedPipeline = LiteParsedPipeline(fromNss, pipeline);
 
         auto pipelineInvolvedNamespaces = liteParsedPipeline->getInvolvedNamespaces();
         foreignNssSet.insert(pipelineInvolvedNamespaces.begin(), pipelineInvolvedNamespaces.end());

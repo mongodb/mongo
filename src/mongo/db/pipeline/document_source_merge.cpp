@@ -286,14 +286,13 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
 }  // namespace
 
 std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed::parse(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::TypeMismatch,
             "{} requires a string or object argument, but found {}"_format(kStageName,
                                                                            typeName(spec.type())),
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
-    auto mergeSpec =
-        parseMergeSpecAndResolveTargetNamespace(spec, request.getNamespaceString().db());
+    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, nss.db());
     auto targetNss = mergeSpec.getTargetNss();
 
     uassert(ErrorCodes::InvalidNamespace,
@@ -311,15 +310,18 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
                                       MergeWhenNotMatchedMode_serializer(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
 
-    auto actions = ActionSet{getDescriptors().at({whenMatched, whenNotMatched}).actions};
-    if (request.shouldBypassDocumentValidation()) {
+    return std::make_unique<DocumentSourceMerge::LiteParsed>(
+        std::move(targetNss), whenMatched, whenNotMatched);
+}
+
+PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(
+    bool isMongos, bool bypassDocumentValidation) const {
+    auto actions = ActionSet{getDescriptors().at({_whenMatched, _whenNotMatched}).actions};
+    if (bypassDocumentValidation) {
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    PrivilegeVector privileges{{ResourcePattern::forExactNamespace(targetNss), actions}};
-
-    return std::make_unique<DocumentSourceMerge::LiteParsed>(std::move(targetNss),
-                                                             std::move(privileges));
+    return {{ResourcePattern::forExactNamespace(_foreignNss), actions}};
 }
 
 DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,

@@ -59,7 +59,7 @@ REGISTER_DOCUMENT_SOURCE(currentOp,
 constexpr StringData DocumentSourceCurrentOp::kStageName;
 
 std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::LiteParsed::parse(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
     // Need to check the value of allUsers; if true then inprog privilege is required.
     if (spec.type() != BSONType::Object) {
         uasserted(ErrorCodes::TypeMismatch,

@@ -36,7 +36,6 @@
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/stdx/unordered_set.h"
@@ -57,12 +56,12 @@ public:
      * This is the type of parser you should register using REGISTER_DOCUMENT_SOURCE. It need not
      * do any validation of options, only enough parsing to be able to implement the interface.
      *
-     * The AggregationRequest can be used to determine related information like the namespace on
-     * which this aggregation is being performed, and the BSONElement will be the element whose
-     * field name is the name of this stage (e.g. the first and only element in {$limit: 1}).
+     * The NamespaceString can be used to determine the namespace on which this aggregation is being
+     * performed, and the BSONElement will be the element whose field name is the name of this stage
+     * (e.g. the first and only element in {$limit: 1}).
      */
-    using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(
-        const AggregationRequest&, const BSONElement&)>;
+    using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(const NamespaceString&,
+                                                                           const BSONElement&)>;
 
     /**
      * Registers a DocumentSource with a spec parsing function, so that when a stage with the given
@@ -80,7 +79,7 @@ public:
      * Extracts the first field name from 'spec', and delegates to the parser that was registered
      * with that field name using registerParser() above.
      */
-    static std::unique_ptr<LiteParsedDocumentSource> parse(const AggregationRequest& request,
+    static std::unique_ptr<LiteParsedDocumentSource> parse(const NamespaceString& nss,
                                                            const BSONObj& spec);
 
     /**
@@ -91,7 +90,8 @@ public:
     /**
      * Returns a list of the privileges required for this stage.
      */
-    virtual PrivilegeVector requiredPrivileges(bool isMongos) const = 0;
+    virtual PrivilegeVector requiredPrivileges(bool isMongos,
+                                               bool bypassDocumentValidation) const = 0;
 
     /**
      * Returns true if this is a $collStats stage.
@@ -182,7 +182,7 @@ public:
      * your stage doesn't need to communicate any special behavior before registering a
      * DocumentSource using this parser.
      */
-    static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(const AggregationRequest& request,
+    static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(const NamespaceString& nss,
                                                                   const BSONElement& spec) {
         return std::make_unique<LiteParsedDocumentSourceDefault>();
     }
@@ -193,36 +193,27 @@ public:
         return stdx::unordered_set<NamespaceString>();
     }
 
-    PrivilegeVector requiredPrivileges(bool isMongos) const final {
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
         return {};
     }
 };
 
 /**
- * Helper class for DocumentSources which reference one or more foreign collections.
+ * Helper class for DocumentSources which reference a foreign collection.
  */
-class LiteParsedDocumentSourceForeignCollections : public LiteParsedDocumentSource {
+class LiteParsedDocumentSourceForeignCollection : public LiteParsedDocumentSource {
 public:
-    LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss,
-                                               PrivilegeVector privileges)
-        : _foreignNssSet{std::move(foreignNss)}, _requiredPrivileges(std::move(privileges)) {}
-
-    LiteParsedDocumentSourceForeignCollections(stdx::unordered_set<NamespaceString> foreignNssSet,
-                                               PrivilegeVector privileges)
-        : _foreignNssSet(std::move(foreignNssSet)), _requiredPrivileges(std::move(privileges)) {}
+    LiteParsedDocumentSourceForeignCollection(NamespaceString foreignNss)
+        : _foreignNss(std::move(foreignNss)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-        return {_foreignNssSet};
+        return {_foreignNss};
     }
 
-    PrivilegeVector requiredPrivileges(bool isMongos) const final {
-        return _requiredPrivileges;
-    }
+    virtual PrivilegeVector requiredPrivileges(bool isMongos,
+                                               bool bypassDocumentValidation) const = 0;
 
 protected:
-    stdx::unordered_set<NamespaceString> _foreignNssSet;
-
-private:
-    PrivilegeVector _requiredPrivileges;
+    NamespaceString _foreignNss;
 };
 }  // namespace mongo

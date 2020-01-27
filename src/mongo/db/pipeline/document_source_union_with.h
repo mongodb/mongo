@@ -45,7 +45,7 @@ public:
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
         LiteParsed(NamespaceString withNss,
@@ -59,7 +59,7 @@ public:
             return {_foreignNssSet};
         }
 
-        PrivilegeVector requiredPrivileges(bool) const final {
+        PrivilegeVector requiredPrivileges(bool, bool) const final {
             return {};
         }
 

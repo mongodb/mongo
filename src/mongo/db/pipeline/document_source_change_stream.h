@@ -46,9 +46,9 @@ class DocumentSourceChangeStream final {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(request.getNamespaceString());
+            return std::make_unique<LiteParsed>(nss);
         }
 
         explicit LiteParsed(NamespaceString nss) : _nss(std::move(nss)) {}
@@ -66,7 +66,8 @@ public:
         }
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
                 return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};

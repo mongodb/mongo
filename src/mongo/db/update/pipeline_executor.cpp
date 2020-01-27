@@ -50,8 +50,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     // "Resolve" involved namespaces into a map. We have to populate this map so that any
     // $lookups, etc. will not fail instantiation. They will not be used for execution as these
     // stages are not allowed within an update context.
-    AggregationRequest aggRequest(NamespaceString("dummy.namespace"), pipeline);
-    LiteParsedPipeline liteParsedPipeline(aggRequest);
+    LiteParsedPipeline liteParsedPipeline(NamespaceString("dummy.namespace"), pipeline);
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});

@@ -53,11 +53,13 @@ public:
      * May throw a AssertionException if there is an invalid stage specification, although full
      * validation happens later, during Pipeline construction.
      */
-    LiteParsedPipeline(const AggregationRequest& request) {
-        _stageSpecs.reserve(request.getPipeline().size());
+    LiteParsedPipeline(const AggregationRequest& request)
+        : LiteParsedPipeline(request.getNamespaceString(), request.getPipeline()) {}
 
-        for (auto&& rawStage : request.getPipeline()) {
-            _stageSpecs.push_back(LiteParsedDocumentSource::parse(request, rawStage));
+    LiteParsedPipeline(const NamespaceString& nss, const std::vector<BSONObj>& pipelineStages) {
+        _stageSpecs.reserve(pipelineStages.size());
+        for (auto&& rawStage : pipelineStages) {
+            _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage));
         }
     }
 
@@ -77,11 +79,11 @@ public:
     /**
      * Returns a list of the priviliges required for this pipeline.
      */
-    PrivilegeVector requiredPrivileges(bool isMongos) const {
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {
         PrivilegeVector requiredPrivileges;
         for (auto&& spec : _stageSpecs) {
-            Privilege::addPrivilegesToPrivilegeVector(&requiredPrivileges,
-                                                      spec->requiredPrivileges(isMongos));
+            Privilege::addPrivilegesToPrivilegeVector(
+                &requiredPrivileges, spec->requiredPrivileges(isMongos, bypassDocumentValidation));
         }
 
         return requiredPrivileges;

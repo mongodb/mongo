@@ -299,8 +299,7 @@ Status ViewCatalog::_upsertIntoGraph(WithLock lk,
 
 StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     WithLock lk, OperationContext* opCtx, const ViewDefinition& viewDef) const {
-    AggregationRequest request(viewDef.viewOn(), viewDef.pipeline());
-    const LiteParsedPipeline liteParsedPipeline(request);
+    const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
@@ -313,7 +312,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     }
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
-                              request,
+                              AggregationRequest(viewDef.viewOn(), viewDef.pipeline()),
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
                               // We can use a stub MongoProcessInterface because we are only parsing
                               // the Pipeline for validation here. We won't do anything with the
@@ -507,7 +506,6 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
                                                      OperationContext* opCtx,
                                                      StringData ns,
                                                      ViewCatalogLookupBehavior lookupBehavior) {
-
     ViewMap::const_iterator it = _viewMap.find(ns);
     if (it != _viewMap.end()) {
         return it->second;

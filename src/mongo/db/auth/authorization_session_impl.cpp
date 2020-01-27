@@ -280,7 +280,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
 
     // If the first stage of the pipeline is not an initial source, the pipeline is implicitly
     // reading documents from the underlying collection. The client must be authorized to do so.
-    auto liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, pipeline[0]);
+    auto liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipeline[0]);
     if (!liteParsedDocSource->isInitialSource()) {
         Privilege currentPriv =
             Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find);
@@ -289,8 +289,9 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
 
     // Confirm privileges for the pipeline.
     for (auto&& pipelineStage : pipeline) {
-        liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, pipelineStage);
-        PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(isMongos);
+        liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipelineStage);
+        PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
+            isMongos, aggRequest.shouldBypassDocumentValidation());
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
     }
     return privileges;

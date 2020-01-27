@@ -120,26 +120,28 @@ StageConstraints::LookupRequirement computeLookupRequirement(
 }  // namespace
 
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
     std::vector<LiteParsedPipeline> liteParsedPipelines;
 
     for (auto&& rawPipeline : extractRawPipelines(spec)) {
-        liteParsedPipelines.emplace_back(
-            AggregationRequest(request.getNamespaceString(), rawPipeline.second));
+        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, rawPipeline.second));
     }
 
+    return std::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines));
+}
+
+PrivilegeVector DocumentSourceFacet::LiteParsed::requiredPrivileges(
+    bool isMongos, bool bypassDocumentValidation) const {
     PrivilegeVector requiredPrivileges;
-    for (auto&& pipeline : liteParsedPipelines) {
-
-        // A correct isMongos flag is only required for DocumentSourceCurrentOp which is disallowed
-        // in $facet pipelines.
+    for (auto&& pipeline : _liteParsedPipelines) {
+        // A correct isMongos flag is only required for DocumentSourceCurrentOp which is
+        // disallowed in $facet pipelines.
         const bool unusedIsMongosFlag = false;
-        Privilege::addPrivilegesToPrivilegeVector(&requiredPrivileges,
-                                                  pipeline.requiredPrivileges(unusedIsMongosFlag));
+        Privilege::addPrivilegesToPrivilegeVector(
+            &requiredPrivileges,
+            pipeline.requiredPrivileges(unusedIsMongosFlag, bypassDocumentValidation));
     }
-
-    return std::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines),
-                                                             std::move(requiredPrivileges));
+    return requiredPrivileges;
 }
 
 stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()

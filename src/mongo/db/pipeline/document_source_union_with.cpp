@@ -38,7 +38,7 @@ REGISTER_TEST_DOCUMENT_SOURCE(unionWith,
                               DocumentSourceUnionWith::createFromBson);
 
 std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::LiteParsed::parse(
-    const AggregationRequest& request, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
             str::stream()
                 << "the $unionWith stage specification must be an object or string, but found "
@@ -49,16 +49,15 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
     stdx::unordered_set<NamespaceString> foreignNssSet;
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (spec.type() == BSONType::String) {
-        unionNss = NamespaceString(request.getNamespaceString().db(), spec.valueStringData());
+        unionNss = NamespaceString(nss.db(), spec.valueStringData());
     } else {
         auto unionWithSpec =
             UnionWithSpec::parse(IDLParserErrorContext(kStageName), spec.embeddedObject());
-        unionNss = NamespaceString(request.getNamespaceString().db(), unionWithSpec.getColl());
+        unionNss = NamespaceString(nss.db(), unionWithSpec.getColl());
 
         // Recursively lite parse the nested pipeline, if one exists.
         if (unionWithSpec.getPipeline()) {
-            AggregationRequest foreignAggReq(unionNss, std::move(*unionWithSpec.getPipeline()));
-            liteParsedPipeline = LiteParsedPipeline(foreignAggReq);
+            liteParsedPipeline = LiteParsedPipeline(unionNss, *unionWithSpec.getPipeline());
             foreignNssSet.merge(liteParsedPipeline->getInvolvedNamespaces());
         }
     }

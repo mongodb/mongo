@@ -44,23 +44,31 @@ public:
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
      * some cases the foreign collection is allowed to be sharded.
      */
-    class LiteParsed final : public LiteParsedDocumentSourceForeignCollections {
+    class LiteParsed final : public LiteParsedDocumentSourceForeignCollection {
     public:
-        using LiteParsedDocumentSourceForeignCollections::
-            LiteParsedDocumentSourceForeignCollections;
+        using LiteParsedDocumentSourceForeignCollection::LiteParsedDocumentSourceForeignCollection;
 
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        static std::unique_ptr<LiteParsed> parseToDifferentDB(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parseToDifferentDB(const NamespaceString& nss,
                                                               const BSONElement& spec);
 
         bool allowShardedForeignCollection(NamespaceString nss) const final {
-            return _foreignNssSet.find(nss) == _foreignNssSet.end();
+            return _foreignNss != nss;
         }
 
         bool allowedToPassthroughFromMongos() const final {
             return false;
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {
+            ActionSet actions{ActionType::insert, ActionType::remove};
+            if (bypassDocumentValidation) {
+                actions.addAction(ActionType::bypassDocumentValidation);
+            }
+
+            return {Privilege(ResourcePattern::forExactNamespace(_foreignNss), actions)};
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {

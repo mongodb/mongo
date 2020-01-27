@@ -69,16 +69,14 @@ public:
 
     class LiteParsed : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::vector<LiteParsedPipeline> liteParsedPipelines, PrivilegeVector privileges)
-            : _liteParsedPipelines(std::move(liteParsedPipelines)),
-              _requiredPrivileges(std::move(privileges)) {}
+        LiteParsed(std::vector<LiteParsedPipeline> liteParsedPipelines)
+            : _liteParsedPipelines(std::move(liteParsedPipelines)) {}
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
-            return _requiredPrivileges;
-        }
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final;
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
 
@@ -95,7 +93,6 @@ public:
 
     private:
         const std::vector<LiteParsedPipeline> _liteParsedPipelines;
-        const PrivilegeVector _requiredPrivileges;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
