@@ -88,9 +88,8 @@
         st.startBalancer();
 
         assert.soon(function() {
-            let roundNumber =
-                assert.commandWorked(st.s.adminCommand({balancerStatus: 1})).numBalancerRounds;
-            return roundNumber > lastRoundNumber;
+            let res = assert.commandWorked(st.s.adminCommand({balancerStatus: 1}));
+            return res.mode == "full" && res.numBalancerRounds - lastRoundNumber > 1;
         });
 
         st.stopBalancer();
