@@ -263,8 +263,6 @@ variables:
     large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_all_run_unittests_TG
-    requires:
-    - name: burn_in_tests_gen
     distros:
     - windows-64-vs2017-compile
   - name: compile_benchmarks
@@ -8143,8 +8141,6 @@ buildvariants:
     large_distro_name: windows-64-vs2017-compile
   tasks:
     - name: compile_TG
-      requires:
-        - name: burn_in_tests_gen
       distros:
         - windows-64-vs2017-compile
     - name: burn_in_tests_gen
@@ -8234,8 +8230,6 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
   tasks:
   - name: compile_TG
-    requires:
-    - name: burn_in_tests_gen
     distros:
     - windows-64-vs2017-compile
   - name: compile_benchmarks
