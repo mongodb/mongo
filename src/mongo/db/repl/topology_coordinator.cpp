@@ -2299,6 +2299,12 @@ bool TopologyCoordinator::isSafeToStepDown() {
 
     OpTime lastApplied = getMyLastAppliedOpTime();
 
+    // No need to wait for secondaries to catch up if this node has not yet written in the current
+    // term.
+    if (lastApplied.getTerm() != _term) {
+        return true;
+    }
+
     auto tagStatus = _rsConfig.findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
     invariant(tagStatus.isOK());
 

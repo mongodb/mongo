@@ -2215,7 +2215,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     });
 
     auto waitTimeout = std::min(waitTime, stepdownTime);
-    auto lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
 
     // Set up a waiter which will be signaled when we process a heartbeat or updatePosition
     // and have a majority of nodes at our optime.
@@ -2258,6 +2257,15 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             arsd.rstlReacquire();
             lk.lock();
         });
+
+        auto lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
+        auto currentTerm = _topCoord->getTerm();
+        // If termAtStart != currentTerm, tryToStartStepDown would have thrown.
+        invariant(termAtStart == currentTerm);
+        // As we should not wait for secondaries to catch up if this node has not yet written in
+        // this term, invariant that the lastAppliedOpTime we will wait for has the same term as the
+        // current term. Also see TopologyCoordinator::isSafeToStepDown.
+        invariant(lastAppliedOpTime.getTerm() == currentTerm);
 
         auto future = _replicationWaiterList.add_inlock(lastAppliedOpTime, waiterWriteConcern);
 
