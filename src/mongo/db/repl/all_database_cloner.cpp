@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/util/assert_util.h"
@@ -59,8 +61,13 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
     }
     if (isMasterReply.data["ismaster"].trueValue() || isMasterReply.data["secondary"].trueValue())
         return Status::OK();
-    // Nodes in a set always have a version; removed nodes never do.
-    if (!isMasterReply.data["setVersion"]) {
+
+    // There is a window during startup where a node has an invalid configuration and will have
+    // an isMaster response the same as a removed node.  So we must check to see if the node is
+    // removed by checking local configuration.
+    auto otherNodes =
+        ReplicationCoordinator::get(getGlobalServiceContext())->getOtherNodesInReplSet();
+    if (std::find(otherNodes.begin(), otherNodes.end(), getSource()) == otherNodes.end()) {
         Status status(ErrorCodes::NotMasterOrSecondary,
                       str::stream() << "Sync source " << getSource()
                                     << " has been removed from the replication configuration.");
@@ -69,9 +76,8 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
         getSharedData()->setInitialSyncStatusIfOK(lk, status);
         return status;
     }
-    auto source = isMasterReply.data.getStringField("me");
     return Status(ErrorCodes::NotMasterOrSecondary,
-                  str::stream() << "Cannot connect because sync source " << source
+                  str::stream() << "Cannot connect because sync source " << getSource()
                                 << " is neither primary nor secondary.");
 }
 
