@@ -64,10 +64,15 @@ public:
     Status run();
 
     /**
-     * Executes the run() method asychronously on the given taskExecutor, returning the result
-     * as a Future.
+     * Executes the run() method asychronously on the given taskExecutor when the event is
+     * signalled, returning the result as a Future.
+     *
+     * If the executor is valid, the Future is guaranteed to not be ready until the event is
+     * signalled.  If the executor is not valid (e.g. shutting down), the future will be
+     * ready immediately after the call and the EventHandle will be invalid.
      */
-    Future<void> runOnExecutor(executor::TaskExecutor* executor);
+    std::pair<Future<void>, executor::TaskExecutor::EventHandle> runOnExecutorEvent(
+        executor::TaskExecutor* executor);
 
     /**
      * For unit testing, allow stopping after any given stage.
@@ -258,10 +263,10 @@ private:
     // invariant checking.
     bool _active = false;           // (M)
     Status _status = Status::OK();  // (M)
-    // _startedAsync indicates the cloner is being run on some executor using runOnExecutor(),
+    // _startedAsync indicates the cloner is being run on some executor using runOnExecutorEvent(),
     // and is used only for invariant checking.
     bool _startedAsync = false;  // (M)
-    // _promise corresponds to the Future returned by runOnExecutor().  When not running
+    // _promise corresponds to the Future returned by runOnExecutorEvent().  When not running
     // asynchronously, this is a null promise.
     Promise<void> _promise;  // (S)
     // _stopAfterStage is used for unit testing and causes the cloner to exit after a given

@@ -258,7 +258,8 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
     }
 }
 
-Future<void> BaseCloner::runOnExecutor(TaskExecutor* executor) {
+std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEvent(
+    TaskExecutor* executor) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         invariant(!_active && !_startedAsync);
@@ -286,11 +287,18 @@ Future<void> BaseCloner::runOnExecutor(TaskExecutor* executor) {
             return status;
         });
     };
-    auto cbhStatus = executor->scheduleWork(callback);
-    if (!cbhStatus.isOK()) {
-        _promise.setError(cbhStatus.getStatus());
+    TaskExecutor::EventHandle event;
+    auto statusEvent = executor->makeEvent();
+    if (!statusEvent.isOK()) {
+        _promise.setError(statusEvent.getStatus());
+    } else {
+        event = statusEvent.getValue();
+        auto cbhStatus = executor->onEvent(event, callback);
+        if (!cbhStatus.isOK()) {
+            _promise.setError(cbhStatus.getStatus());
+        }
     }
-    return std::move(pf.future);
+    return std::make_pair(std::move(pf.future), event);
 }
 
 

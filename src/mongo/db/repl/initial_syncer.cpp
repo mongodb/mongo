@@ -1075,35 +1075,43 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     LOG(2) << "Starting AllDatabaseCloner: " << _initialSyncState->allDatabaseCloner->toString();
 
-    _initialSyncState->allDatabaseClonerFuture =
-        _initialSyncState->allDatabaseCloner->runOnExecutor(_clonerExec)
-            .onCompletion([this, onCompletionGuard](Status status) mutable {
-                // The completion guard must run on the main executor.  This only makes a difference
-                // for unit tests, but we always schedule it that way to avoid special casing test
-                // code.
-                stdx::unique_lock<Latch> lock(_mutex);
-                auto exec_status = _exec->scheduleWork(
-                    [this, status, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
-                        _allDatabaseClonerCallback(status, onCompletionGuard);
-                    });
-                if (!exec_status.isOK()) {
-                    onCompletionGuard->setResultAndCancelRemainingWork_inlock(
-                        lock, exec_status.getStatus());
-                    // In the shutdown case, it is possible the completion guard will be run
-                    // from this thread (since the lambda holding another copy didn't schedule).
-                    // If it does, we will self-deadlock if we're holding the lock, so release it.
-                    lock.unlock();
-                }
-                // In unit tests, this reset ensures the completion guard does not run during the
-                // destruction of the lambda (which occurs on the wrong executor), except in the
-                // shutdown case.
-                onCompletionGuard.reset();
-            });
-
-    if (!status.isOK()) {
+    auto [startClonerFuture, startCloner] =
+        _initialSyncState->allDatabaseCloner->runOnExecutorEvent(_clonerExec);
+    // runOnExecutorEvent ensures the future is not ready unless an error has occurred.
+    if (startClonerFuture.isReady()) {
+        status = startClonerFuture.getNoThrow();
+        invariant(!status.isOK());
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
     }
+    _initialSyncState->allDatabaseClonerFuture =
+        std::move(startClonerFuture).onCompletion([this, onCompletionGuard](Status status) mutable {
+            // The completion guard must run on the main executor, and never inline.  In unit tests,
+            // without the executor call, it would run on the wrong executor.  In both production
+            // and in unit tests, if the cloner finishes very quickly, the callback could run
+            // in-line and result in self-deadlock.
+            stdx::unique_lock<Latch> lock(_mutex);
+            auto exec_status = _exec->scheduleWork(
+                [this, status, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
+                    _allDatabaseClonerCallback(status, onCompletionGuard);
+                });
+            if (!exec_status.isOK()) {
+                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
+                                                                          exec_status.getStatus());
+                // In the shutdown case, it is possible the completion guard will be run
+                // from this thread (since the lambda holding another copy didn't schedule).
+                // If it does, we will self-deadlock if we're holding the lock, so release it.
+                lock.unlock();
+            }
+            // In unit tests, this reset ensures the completion guard does not run during the
+            // destruction of the lambda (which occurs on the wrong executor), except in the
+            // shutdown case.
+            onCompletionGuard.reset();
+        });
+    lock.unlock();
+    // Start (and therefore finish) the cloners outside the lock.  This ensures onCompletion
+    // is not run with the mutex held, which would result in self-deadlock.
+    _clonerExec->signalEvent(startCloner);
 }
 
 void InitialSyncer::_oplogFetcherCallback(const Status& oplogFetcherFinishStatus,
