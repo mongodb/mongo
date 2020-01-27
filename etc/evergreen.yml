@@ -9341,22 +9341,6 @@ buildvariants:
     - windows-64-vs2019-large
   # Do not add more tasks to this list.
 
-- <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-compile-all-vs2019-canary
-  display_name: "~ Enterprise Windows compile_all VS2019 Canary"
-  batchtime: 1440 # 1 day
-  run_on:
-  - windows-64-vs2019-nonprod
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    task_compile_flags_extra: >-
-      MSVC_VERSION=14.2
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - windows-64-vs2019-nonprod
-  # Do not add more tasks to this list.
-
 - name: enterprise-windows-async
   display_name: "~ Enterprise Windows async"
   modules:
