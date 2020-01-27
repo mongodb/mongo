@@ -599,7 +599,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
-    _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
     _config.DRY_RUN = config.pop("dry_run")
     # EXCLUDE_WITH_ANY_TAGS will always contain the implicitly defined EXCLUDED_TAG.
     _config.EXCLUDE_WITH_ANY_TAGS = [_config.EXCLUDED_TAG]
