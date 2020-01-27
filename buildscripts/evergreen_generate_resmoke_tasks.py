@@ -44,6 +44,7 @@ from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_comma
 
 LOGGER = structlog.getLogger(__name__)
 
+AVG_SETUP_TIME = int(timedelta(minutes=5).total_seconds())
 DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 CONFIG_FILE = "./.evergreen.yml"
 MIN_TIMEOUT_SECONDS = int(timedelta(minutes=5).total_seconds())
@@ -415,7 +416,7 @@ def calculate_timeout(avg_runtime, scaling_factor):
         distance_to_min = 60 - (runtime % 60)
         return int(math.ceil(runtime + distance_to_min))
 
-    return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime)) * scaling_factor
+    return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime)) * scaling_factor + AVG_SETUP_TIME
 
 
 def should_tasks_be_generated(evg_api, task_id):
