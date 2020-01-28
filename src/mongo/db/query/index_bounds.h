@@ -84,6 +84,11 @@ struct OrderedIntervalList {
     OrderedIntervalList reverseClone() const;
 
     Interval::Direction computeDirection() const;
+
+    /**
+     * Returns true if this OIL represents a single [MinKey, MaxKey] bound.
+     */
+    bool isMinToMax() const;
 };
 
 /**

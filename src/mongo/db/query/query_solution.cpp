@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -696,6 +697,70 @@ std::set<StringData> getMultikeyFields(const BSONObj& keyPattern,
     return multikeyFields;
 }
 
+/**
+ * Returns true if the index scan described by 'multikeyFields' and 'bounds' can legally provide the
+ * 'sortSpec', or false if the sort cannot be provided. A multikey index cannot provide a sort if
+ * either of the following is true: 1) the sort spec includes a multikey field that has bounds other
+ * than [minKey, maxKey], 2) there are bounds other than [minKey, maxKey] over a multikey field
+ * which share a path prefix with a component of the sort pattern. These cases are further explained
+ * in SERVER-31898.
+ */
+bool confirmBoundsProvideSortGivenMultikeyness(const BSONObj& sortSpec,
+                                               const IndexBounds& bounds,
+                                               const std::set<StringData>& multikeyFields) {
+    // Forwardize the bounds to correctly apply checks to descending sorts and well as ascending
+    // sorts.
+    const auto ascendingBounds = bounds.forwardize();
+    const auto& fields = ascendingBounds.fields;
+    for (auto&& sortPatternComponent : sortSpec) {
+        if (multikeyFields.count(sortPatternComponent.fieldNameStringData()) == 0) {
+            // If this component of the sort pattern (which must be one of the components of
+            // the index spec) is not multikey, we don't need additional checks.
+            continue;
+        }
+
+        // Bail out if the bounds are specified as a simple range. As a future improvement, we could
+        // extend this optimization to allow simple multikey scans to provide a sort.
+        if (ascendingBounds.isSimpleRange) {
+            return false;
+        }
+
+        // Checks if the current 'sortPatternComponent' has [MinKey, MaxKey].
+        const auto name = sortPatternComponent.fieldNameStringData();
+        for (auto&& intervalList : fields) {
+            if (name == intervalList.name && !intervalList.isMinToMax()) {
+                return false;
+            }
+        }
+
+        // Checks if there is a shared path prefix between the bounds and the sort pattern of
+        // multikey fields.
+        FieldRef refName(name);
+        for (const auto& intervalList : fields) {
+            // Ignores the prefix if the bounds are [MinKey, MaxKey] or if the field is not
+            // multikey.
+            if (intervalList.isMinToMax() ||
+                (multikeyFields.find(intervalList.name) == multikeyFields.end())) {
+                continue;
+            }
+
+            FieldRef boundsPath(intervalList.name);
+            const auto commonPrefixSize = boundsPath.commonPrefixSize(refName);
+            // The interval list name and the sort pattern name will never be equal at this point.
+            // This is because if they are equal and do not have [minKey, maxKey] bounds, we would
+            // already have bailed out of the function. If they do have [minKey, maxKey] bounds,
+            // they will be skipped in the check for [minKey, maxKey] bounds above.
+            invariant(refName != boundsPath);
+            // Checks if there's a common prefix between the interval list name and the sort pattern
+            // name.
+            if (commonPrefixSize > 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 
 /**
  * Populates 'sortsOut' with the sort orders provided by an index scan over 'index', with the given
@@ -816,22 +881,14 @@ void computeSortsForScan(const IndexEntry& index,
         }
     }
 
-    // We cannot provide a sort which involves a multikey field. Prune such sort orders, if the
-    // index is multikey.
     if (index.multikey) {
         for (auto sortsIt = sortsOut->begin(); sortsIt != sortsOut->end();) {
-            bool foundMultikeyField = false;
-            for (auto&& elt : *sortsIt) {
-                if (multikeyFields.find(elt.fieldNameStringData()) != multikeyFields.end()) {
-                    foundMultikeyField = true;
-                    break;
-                }
-            }
-
-            if (foundMultikeyField) {
-                sortsIt = sortsOut->erase(sortsIt);
-            } else {
+            // Erase this sort from 'sortsOut' if it is not compatible with multikey fields in the
+            // index.
+            if (confirmBoundsProvideSortGivenMultikeyness(*sortsIt, bounds, multikeyFields)) {
                 ++sortsIt;
+            } else {
+                sortsIt = sortsOut->erase(sortsIt);
             }
         }
     }

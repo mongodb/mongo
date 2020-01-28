@@ -240,6 +240,10 @@ Interval::Direction OrderedIntervalList::computeDirection() const {
                    : Interval::Direction::kDirectionDescending;
 }
 
+bool OrderedIntervalList::isMinToMax() const {
+    return intervals.size() == 1 && intervals[0].isMinToMax();
+}
+
 // static
 void OrderedIntervalList::complement() {
     BSONObjBuilder minBob;

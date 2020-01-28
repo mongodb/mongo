@@ -300,21 +300,87 @@ explain = coll.explain().aggregate(pipeline);
 assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 
 //
-// Verify that we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a multikey field, even
-// when the field we are grouping by is not multikey.
+// Verify that we use a DISTINCT_SCAN to satisfy a sort on a multikey field if the bounds
+// are [minKey, maxKey].
 //
 pipeline = [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}];
 assertResultsMatchWithAndWithoutHintandIndexes(
     pipeline, [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}]);
 explain = coll.explain().aggregate(pipeline);
-assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), tojson(explain));
+assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+assert.eq({aa: 1, mkB: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+assert.neq(null, getAggPlanStage(explain, "FETCH"));
+assert.eq(null, getAggPlanStage(explain, "SORT"));
 
 //
-// Verify that with dotted paths we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a
-// multikey field, even when the field we are grouping by is not multikey.
+// Verify that we _do not_ attempt a DISTINCT_SCAN because "mkB" is multikey, and we don't use
+// DISTINCT_SCAN for a compound group key.
+//
+pipeline = [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: {aa: "$aa", mkB: "$mkB"}}}];
+assertResultsMatchWithAndWithoutHintandIndexes(
+    pipeline,
+    [{_id: {aa: 1, mkB: [1, 3]}}, {_id: {}}, {_id: {aa: 1, mkB: 2}}, {_id: {aa: 2, mkB: []}}]);
+explain = coll.explain().aggregate(pipeline);
+assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+
+//
+// Verify that with dotted paths we use a DISTINCT_SCAN to satisfy a sort on a multikey field if the
+// bounds are [minKey, maxKey].
 //
 pipeline =
     [{$sort: {"foo.a": 1, "mkFoo.b": 1}}, {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}];
+assertResultsMatchWithAndWithoutHintandIndexes(
+    pipeline,
+    [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}, {_id: 3, accum: [4, 3]}]);
+explain = coll.explain().aggregate(pipeline);
+assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"));
+assert.eq(
+    {"foo.a": 1, "mkFoo.b": 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern, explain);
+assert.neq(null, getAggPlanStage(explain, "FETCH"));
+assert.eq(null, getAggPlanStage(explain, "SORT"));
+
+//
+// Verify that we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a multikey field if
+// the bounds are not [minKey, maxKey].
+//
+pipeline = [
+    {$match: {mkB: {$ne: 9999}}},
+    {$sort: {aa: 1, mkB: 1}},
+    {$group: {_id: "$aa", accum: {$first: "$mkB"}}}
+];
+assertResultsMatchWithAndWithoutHintandIndexes(
+    pipeline, [{_id: 1, accum: [1, 3]}, {_id: null, accum: null}, {_id: 2, accum: []}]);
+explain = coll.explain().aggregate(pipeline);
+assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+
+pipeline = [
+    {$match: {mkB: {$gt: -5}}},
+    {$sort: {aa: 1, mkB: 1}},
+    {$group: {_id: "$aa", accum: {$first: "$mkB"}}}
+];
+assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1, accum: [1, 3]}]);
+explain = coll.explain().aggregate(pipeline);
+assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+
+pipeline = [
+    {$match: {aa: {$ne: 9999}}},
+    {$sort: {aa: 1, mkB: 1}},
+    {$group: {_id: "$aa", accum: {$first: "$mkB"}}}
+];
+assertResultsMatchWithAndWithoutHintandIndexes(
+    pipeline, [{_id: 1, accum: [1, 3]}, {_id: null, accum: null}, {_id: 2, accum: []}]);
+explain = coll.explain().aggregate(pipeline);
+assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+
+//
+// Verify that with dotted paths we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a
+// multikey field if the bounds are not [minKey, maxKey].
+//
+pipeline = [
+    {$match: {"mkFoo.b": {$ne: 20000}}},
+    {$sort: {"foo.a": 1, "mkFoo.b": 1}},
+    {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}
+];
 assertResultsMatchWithAndWithoutHintandIndexes(
     pipeline,
     [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}, {_id: 3, accum: [4, 3]}]);
