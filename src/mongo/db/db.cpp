@@ -121,6 +121,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
+#include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -963,6 +964,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // Join the logical session cache before the transport layer.
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
         lsc->joinOnShutDown();
+    }
+
+    // Terminate the index consistency check.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        PeriodicShardedIndexConsistencyChecker::get(serviceContext).onShutDown();
     }
 
     // Shutdown the TransportLayer so that new connections aren't accepted
