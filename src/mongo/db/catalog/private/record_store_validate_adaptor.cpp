@@ -180,7 +180,7 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
 
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
-        size_t validatedSize;
+        size_t validatedSize = 0;
         Status status = validate(record->id, record->data, &validatedSize);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
