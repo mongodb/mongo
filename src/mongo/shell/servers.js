@@ -1163,9 +1163,7 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
-            // Since options may not be backward compatible, mongod options are not
-            // set on older versions, e.g., mongod-3.0.
-            if (programName.endsWith('mongod')) {
+            if (!programMajorMinorVersion || programMajorMinorVersion >= 306) {
                 if (jsTest.options().storageEngine === "wiredTiger" ||
                     !jsTest.options().storageEngine) {
                     if (jsTest.options().enableMajorityReadConcern !== undefined &&
@@ -1173,6 +1171,14 @@ function appendSetParameterArgs(argArray) {
                         argArray.push(...['--enableMajorityReadConcern',
                                           jsTest.options().enableMajorityReadConcern.toString()]);
                     }
+                }
+            }
+
+            // Since options may not be backward compatible, mongod options are not
+            // set on older versions, e.g., mongod-3.0.
+            if (programName.endsWith('mongod')) {
+                if (jsTest.options().storageEngine === "wiredTiger" ||
+                    !jsTest.options().storageEngine) {
                     if (jsTest.options().storageEngineCacheSizeGB &&
                         !argArrayContains('--wiredTigerCacheSizeGB')) {
                         argArray.push(...['--wiredTigerCacheSizeGB',
