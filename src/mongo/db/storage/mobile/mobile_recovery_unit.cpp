@@ -58,7 +58,7 @@ MobileRecoveryUnit::MobileRecoveryUnit(MobileSessionPool* sessionPool)
 }
 
 MobileRecoveryUnit::~MobileRecoveryUnit() {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _abort();
     RECOVERY_UNIT_TRACE() << "Destroyed.";
 }
@@ -79,12 +79,12 @@ void MobileRecoveryUnit::_abort() {
     _setState(State::kAborting);
     abortRegisteredChanges();
 
-    invariant(!_isActive(), toString(getState()));
+    invariant(!_isActive(), toString(_getState()));
     _setState(State::kInactive);
 }
 
 void MobileRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
 
     RECOVERY_UNIT_TRACE() << "Unit of work Active.";
 
@@ -100,7 +100,7 @@ void MobileRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
 }
 
 void MobileRecoveryUnit::doCommitUnitOfWork() {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
 
     RECOVERY_UNIT_TRACE() << "Unit of work commited, marked inactive.";
 
@@ -108,7 +108,7 @@ void MobileRecoveryUnit::doCommitUnitOfWork() {
 }
 
 void MobileRecoveryUnit::doAbortUnitOfWork() {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
 
     RECOVERY_UNIT_TRACE() << "Unit of work aborted, marked inactive.";
 
@@ -150,7 +150,7 @@ bool MobileRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
 }
 
 void MobileRecoveryUnit::doAbandonSnapshot() {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     if (_isActive()) {
         // We can't be in a WriteUnitOfWork, so it is safe to rollback.
         _txnClose(false);
@@ -186,7 +186,7 @@ void MobileRecoveryUnit::_ensureSession(OperationContext* opCtx) {
 }
 
 void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx, bool readOnly) {
-    invariant(!_isActive(), toString(getState()));
+    invariant(!_isActive(), toString(_getState()));
     RECOVERY_UNIT_TRACE() << "_txnOpen called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
     _ensureSession(opCtx);
 
@@ -222,7 +222,7 @@ void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx, bool readOnly) {
 }
 
 void MobileRecoveryUnit::_txnClose(bool commit) {
-    invariant(_isActive(), toString(getState()));
+    invariant(_isActive(), toString(_getState()));
     RECOVERY_UNIT_TRACE() << "_txnClose called with " << (commit ? "commit " : "rollback ");
 
     if (commit) {

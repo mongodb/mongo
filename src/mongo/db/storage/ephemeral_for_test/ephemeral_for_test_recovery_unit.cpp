@@ -39,16 +39,16 @@
 namespace mongo {
 
 EphemeralForTestRecoveryUnit::~EphemeralForTestRecoveryUnit() {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
 }
 
 void EphemeralForTestRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _setState(State::kInactiveInUnitOfWork);
 }
 
 void EphemeralForTestRecoveryUnit::doCommitUnitOfWork() {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
     _setState(State::kCommitting);
 
     try {
@@ -71,7 +71,7 @@ void EphemeralForTestRecoveryUnit::doCommitUnitOfWork() {
 }
 
 void EphemeralForTestRecoveryUnit::doAbortUnitOfWork() {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
     _setState(State::kAborting);
 
     try {
@@ -101,7 +101,7 @@ bool EphemeralForTestRecoveryUnit::inActiveTxn() const {
 }
 
 void EphemeralForTestRecoveryUnit::doAbandonSnapshot() {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
 }
 
 Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {

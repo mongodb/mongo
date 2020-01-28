@@ -110,7 +110,6 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/tla_plus_trace.h"
 
 namespace mongo {
 namespace repl {

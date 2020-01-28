@@ -41,7 +41,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/sync_source_selector.h"
-#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -959,14 +958,6 @@ public:
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion,
         boost::optional<Date_t> deadline) const = 0;
-
-    /**
-     * Trace a replication event for the RaftMongo.tla spec.
-     */
-    virtual void tlaPlusRaftMongoEvent(
-        OperationContext* opCtx,
-        RaftMongoSpecActionEnum action,
-        boost::optional<Timestamp> oplogReadTimestamp = boost::none) const {}
 
     /**
      * Returns the OpTime that consists of the timestamp of the latest oplog entry and the current

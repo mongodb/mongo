@@ -44,17 +44,17 @@ RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb)
     : _waitUntilDurableCallback(cb), _KVEngine(parentKVEngine) {}
 
 RecoveryUnit::~RecoveryUnit() {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _abort();
 }
 
 void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _setState(State::kInactiveInUnitOfWork);
 }
 
 void RecoveryUnit::doCommitUnitOfWork() {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
 
     if (_dirty) {
         invariant(_forked);
@@ -87,18 +87,18 @@ void RecoveryUnit::doCommitUnitOfWork() {
 }
 
 void RecoveryUnit::doAbortUnitOfWork() {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
     _abort();
 }
 
 bool RecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
     return true;  // This is an in-memory storage engine.
 }
 
 void RecoveryUnit::doAbandonSnapshot() {
-    invariant(!_inUnitOfWork(), toString(getState()));
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _forked = false;
     _dirty = false;
 }

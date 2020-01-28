@@ -59,7 +59,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/util/tla_plus_trace',
     ],
 )
 
@@ -650,10 +649,8 @@ env.Library(
         'replication_coordinator_impl.cpp',
         'replication_coordinator_impl_elect_v1.cpp',
         'replication_coordinator_impl_heartbeat.cpp',
-        'replication_coordinator_impl_tla_plus_trace.cpp',
         'vote_requester.cpp',
         env.Idlc('replication_coordinator_impl.idl')[0],
-        env.Idlc('tla_plus_trace_repl.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/common',
@@ -685,7 +682,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/util/tla_plus_trace',
         'split_horizon',
     ],
 )
@@ -1189,7 +1185,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/util/tla_plus_trace',
         'repl_server_parameters',
     ],
 )

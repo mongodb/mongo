@@ -541,7 +541,6 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // collection counts, reconstruct the prepared transactions now, adding on any additional counts
     // to the now corrected record store.
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
-    _replicationCoordinator->tlaPlusRaftMongoEvent(opCtx, RaftMongoSpecActionEnum::kRollbackOplog);
 }
 
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {

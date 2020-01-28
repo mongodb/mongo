@@ -34,8 +34,6 @@
 #include <cstring>
 
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -43,7 +41,6 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/tla_plus_trace.h"
 
 namespace mongo {
 namespace {
@@ -235,22 +232,6 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         // In order to avoid oplog holes after an unclean shutdown, we must ensure this proposed
         // oplog read timestamp's documents are durable before publishing that timestamp.
         sessionCache->waitUntilDurable(opCtx.get(), /*forceCheckpoint=*/false, false);
-
-        // Log RaftMongo.tla ClientWrite actions when new oplog entries become visible, which is
-        // when they can first cause further actions. If we instead logged entries when they're
-        // written, they could have holes behind them, which would later be filled with entries with
-        // older optimes. Such behavior is not and need not be modeled in RaftMongo.tla.
-        // Skip when term = -1: replSetInitiate has written the first entry and it has the global
-        // lock, logging would deadlock.
-        if (MONGO_unlikely(logForTLAPlusSpecs.shouldFail())) {
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-            if (replCoord->getTerm() != -1) {
-                replCoord->tlaPlusRaftMongoEvent(
-                    opCtx.get(),
-                    repl::RaftMongoSpecActionEnum::kClientWrite,
-                    Timestamp(static_cast<unsigned long long>(newTimestamp)));
-            }
-        }
 
         lk.lock();
         // Publish the new timestamp value.  Avoid going backward.

@@ -63,7 +63,7 @@ void RecoveryUnit::runPreCommitHooks(OperationContext* opCtx) {
 }
 
 void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
-    invariant(_inUnitOfWork(), toString(getState()));
+    invariant(_inUnitOfWork(), toString(_getState()));
     _changes.push_back(std::move(change));
 }
 

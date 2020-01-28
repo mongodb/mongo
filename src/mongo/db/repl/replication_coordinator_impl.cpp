@@ -78,7 +78,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tla_plus_trace_repl_gen.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -99,7 +98,6 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/tla_plus_trace.h"
 
 namespace mongo {
 namespace repl {
@@ -1039,7 +1037,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     if (_applierState != ApplierState::Draining) {
         return;
     }
-    _tlaPlusRaftMongoEvent(lk, opCtx, RaftMongoSpecActionEnum::kBecomePrimaryByMagic);
     lk.unlock();
 
     _externalState->onDrainComplete(opCtx);
@@ -3705,12 +3702,6 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {
     if (_topCoord->updateLastCommittedOpTimeAndWallTime()) {
         _setStableTimestampForStorage(lk);
-        if (MONGO_unlikely(logForTLAPlusSpecs.shouldFail())) {
-            EnsureOperationContext ensureOpCtx;
-            _tlaPlusRaftMongoEvent(lk,
-                                   ensureOpCtx.getOperationContext(),
-                                   RaftMongoSpecActionEnum::kAdvanceCommitPoint);
-        }
     }
 }
 
@@ -3952,15 +3943,6 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
         }
 
         _setStableTimestampForStorage(lk);
-        if (MONGO_unlikely(logForTLAPlusSpecs.shouldFail())) {
-            EnsureOperationContext ensureOpCtx;
-            auto action = fromSyncSource
-                ? RaftMongoSpecActionEnum::kLearnCommitPointFromSyncSourceNeverBeyondLastApplied
-                : RaftMongoSpecActionEnum::kLearnCommitPointWithTermCheck;
-
-            _tlaPlusRaftMongoEvent(lk, ensureOpCtx.getOperationContext(), action);
-        }
-
         // Even if we have no new snapshot, we need to notify waiters that the commit point moved.
         _externalState->notifyOplogMetadataWaiters(committedOpTimeAndWallTime.opTime);
     }

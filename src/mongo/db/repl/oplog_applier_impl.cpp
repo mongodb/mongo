@@ -507,12 +507,6 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
                                 << lastAppliedOpTimeAtEndOfBatch.toString()
                                 << " in the middle of batch application");
 
-
-        // For RaftMongo.tla trace-checking, dump the oplog including new entries, before the new
-        // entries are visible and cause other RaftMongo events.
-        _replCoord->tlaPlusRaftMongoEvent(
-            &opCtx, RaftMongoSpecActionEnum::kAppendOplog, lastOpTimeInBatch.getTimestamp());
-
         // 3. Update oplog visibility by notifying the storage engine of the new oplog entries.
         const bool orderedCommit = true;
         _storageInterface->oplogDiskLocRegister(

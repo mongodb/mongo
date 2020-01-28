@@ -674,18 +674,3 @@ if use_libunwind:
             '$BUILD_DIR/third_party/shim_unwind',
         ],
     )
-
-env.Library(
-    target='tla_plus_trace',
-    source=[
-        'tla_plus_trace.cpp',
-        env.Idlc('tla_plus_trace.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        'fail_point',
-        'net/network',
-    ],
-)

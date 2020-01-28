@@ -74,7 +74,6 @@ public:
         kTracking,
         kTransaction,
         kConnectionPool,
-        kTlaPlusTrace,
         kNumLogComponents
     };
 
