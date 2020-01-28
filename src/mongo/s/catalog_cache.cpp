@@ -202,7 +202,11 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
 CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoWithForcedRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
-    _createOrGetCollectionEntryAndMarkAsNeedsRefresh(nss);
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _createOrGetCollectionEntry(lg, nss);
+    }
+
     return _getCollectionRoutingInfo(opCtx, nss);
 }
 
@@ -250,8 +254,7 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
 
         auto& collEntry = itColl->second;
 
-        if (collEntry->needsRefresh &&
-            (collEntry->epochHasChanged || operationShouldBlockBehindCatalogCacheRefresh(opCtx))) {
+        if (collEntry->needsFullRefresh || operationShouldBlockBehindCatalogCacheRefresh(opCtx)) {
             auto refreshNotification = collEntry->refreshCompletionNotification;
             if (!refreshNotification) {
                 refreshNotification = (collEntry->refreshCompletionNotification =
@@ -283,6 +286,8 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
             if (!refreshStatus.isOK()) {
                 return {refreshStatus, refreshActionTaken};
             }
+
+            setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
 
             // Once the refresh is complete, loop around to get the latest value
             continue;
@@ -376,8 +381,7 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
         // The collection was dropped.
     } else if (itColl->second->routingInfo->getVersion() == ccri._cm->getVersion()) {
         // If the versions match, the last version of the routing information that we used is no
-        // longer valid, so trigger a refresh.
-        itColl->second->needsRefresh = true;
+        // longer valid, so mark the shard as stale.
         itColl->second->routingInfo->setShardStale(staleShardId);
     }
 }
@@ -396,12 +400,12 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     if (shardId && shardVersionsHaveMatchingEpoch(wantedVersion, receivedVersion)) {
         _createOrGetCollectionEntryAndMarkShardStale(nss, *shardId);
     } else {
-        _createOrGetCollectionEntryAndMarkEpochStale(nss);
+        _createOrGetCollectionEntryAndMarkNeedsFullRefresh(nss);
     }
 };
 
 void CatalogCache::onEpochChange(const NamespaceString& nss) {
-    _createOrGetCollectionEntryAndMarkEpochStale(nss);
+    _createOrGetCollectionEntryAndMarkNeedsFullRefresh(nss);
 };
 
 void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
@@ -469,10 +473,9 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
         for (const auto& [collNs, collRoutingInfoEntry] : collInfoMap) {
 
             LOG(3) << "Checking if " << collNs << "has data on shard: " << shardId;
-
-            if (!collRoutingInfoEntry->needsRefresh) {
-                // The set of shards on which this collection contains chunks.
-                std::set<ShardId> shardsOwningDataForCollection;
+            // The set of shards on which this collection contains chunks.
+            std::set<ShardId> shardsOwningDataForCollection;
+            if (collRoutingInfoEntry->routingInfo) {
                 collRoutingInfoEntry->routingInfo->getAllShardIds(&shardsOwningDataForCollection);
 
                 if (shardsOwningDataForCollection.find(shardId) !=
@@ -480,7 +483,6 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
                     LOG(3) << collNs << "has data on shard " << shardId
                            << ", invalidating cache entry";
 
-                    collRoutingInfoEntry->needsRefresh = true;
                     collRoutingInfoEntry->routingInfo->setShardStale(shardId);
                 }
             }
@@ -694,12 +696,9 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
 
         stdx::lock_guard<Latch> lg(_mutex);
 
-        collEntry->epochHasChanged = false;
-        collEntry->needsRefresh = false;
+        collEntry->needsFullRefresh = false;
         collEntry->refreshCompletionNotification->set(Status::OK());
         collEntry->refreshCompletionNotification = nullptr;
-
-        setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
 
         if (!newRoutingInfo) {
             // The refresh found that collection was dropped, so remove it from our cache.
@@ -738,15 +737,14 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     invariant(collEntry->routingInfo.get() == existingRoutingInfo.get());
 }
 
-void CatalogCache::_createOrGetCollectionEntryAndMarkEpochStale(const NamespaceString& nss) {
+void CatalogCache::_createOrGetCollectionEntryAndMarkNeedsFullRefresh(const NamespaceString& nss) {
     stdx::lock_guard<Latch> lg(_mutex);
     auto optionalRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
     if (!optionalRoutingInfoEntry) {
         return;
     }
 
-    optionalRoutingInfoEntry->needsRefresh = true;
-    optionalRoutingInfoEntry->epochHasChanged = true;
+    optionalRoutingInfoEntry->needsFullRefresh = true;
 }
 
 void CatalogCache::_createOrGetCollectionEntryAndMarkShardStale(const NamespaceString& nss,
@@ -757,20 +755,9 @@ void CatalogCache::_createOrGetCollectionEntryAndMarkShardStale(const NamespaceS
         return;
     }
 
-    optionalRoutingInfoEntry->needsRefresh = true;
     if (optionalRoutingInfoEntry->routingInfo) {
         optionalRoutingInfoEntry->routingInfo->setShardStale(staleShardId);
     }
-}
-
-void CatalogCache::_createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss) {
-    stdx::lock_guard<Latch> lg(_mutex);
-    auto optionalRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
-    if (!optionalRoutingInfoEntry) {
-        return;
-    }
-
-    optionalRoutingInfoEntry->needsRefresh = true;
 }
 
 boost::optional<CatalogCache::CollectionRoutingInfoEntry&>

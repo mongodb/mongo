@@ -307,19 +307,19 @@ private:
      * Cache entry describing a collection.
      */
     struct CollectionRoutingInfoEntry {
-        // Specifies whether this cache entry needs a refresh (in which case routingInfo should not
-        // be relied on) or it doesn't, in which case there should be a non-null routingInfo.
-        bool needsRefresh{true};
+        // Specifies whether the namespace needs a full refresh, which indicates that every shard
+        // should block on said upcoming refresh.
+        bool needsFullRefresh{true};
 
-        // Specifies whether the namespace has had an epoch change, which indicates that every
-        // shard should block on an upcoming refresh.
-        bool epochHasChanged{true};
-
-        // Contains a notification to be waited on for the refresh to complete (only available if
-        // needsRefresh is true)
+        // Contains a notification to be waited on for the refresh to complete. The
+        // refreshCompletionNotification is only available if:
+        // 1. needsFullRefresh is true, OR
+        // 2. The operation context for a particular operation is marked as needing refresh.
         std::shared_ptr<Notification<Status>> refreshCompletionNotification;
 
-        // Contains the cached routing information (only available if needsRefresh is false)
+        // Contains the cached routing information. The routingInfo is only available if:
+        // 1. needsFullRefresh is false, AND
+        // 2. The operation context for a particular operation is marked as NOT needing refresh.
         std::shared_ptr<RoutingTableHistory> routingInfo;
     };
 
@@ -363,10 +363,10 @@ private:
 
     /**
      * Marks a collection entry as needing refresh. Will create the collection entry if one does
-     * not exist. Also marks the epoch as changed, which will cause all further targetting requests
-     * against this namespace to block upon a catalog cache refresh.
+     * not exist. Also marks the collection as needing a full refresh, which will cause all further
+     * targeting requests against this namespace to block upon a catalog cache refresh.
      */
-    void _createOrGetCollectionEntryAndMarkEpochStale(const NamespaceString& nss);
+    void _createOrGetCollectionEntryAndMarkNeedsFullRefresh(const NamespaceString& nss);
 
     /**
      * Marks a collection entry as needing refresh. Will create the collection entry if one does
@@ -377,10 +377,9 @@ private:
                                                       const ShardId& shardId);
 
     /**
-     * Marks a collection entry as needing refresh. Will create the collection entry if one does
-     * not exist.
+     * Will create the collection entry if one does not exist.
      */
-    void _createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss);
+    void _createCollectionEntry(const NamespaceString& nss);
 
     /**
      * Retrieves the collection entry for the given namespace, creating the entry if one does not
