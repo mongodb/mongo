@@ -174,9 +174,9 @@ struct DiagnosticInfoHandle {
 };
 const auto getDiagnosticInfoHandle = Client::declareDecoration<DiagnosticInfoHandle>();
 
-MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeLockListeners"))
+MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeDiagnosticListeners"))
 (InitializerContext* context) {
-    class LockListener : public Mutex::LockListener {
+    class DiagnosticListener : public latch_detail::DiagnosticListener {
         void onContendedLock(const Identity& id) override {
             if (auto client = Client::getCurrent()) {
                 auto& handle = getDiagnosticInfoHandle(client);
@@ -209,9 +209,7 @@ MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeLockList
         }
     };
 
-    // Intentionally leaked, people use Latches in detached threads
-    static auto& listener = *new LockListener;
-    Mutex::addLockListener(&listener);
+    latch_detail::installDiagnosticListener<DiagnosticListener>();
 
     return Status::OK();
 }
