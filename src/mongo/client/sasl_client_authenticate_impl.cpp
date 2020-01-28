@@ -146,7 +146,7 @@ Status configureSession(SaslClientSession* session,
     status = bsonExtractStringField(saslParameters, saslCommandUserFieldName, &value);
     if (status.isOK()) {
         session->setParameter(SaslClientSession::parameterUser, value);
-    } else if ((targetDatabase != "$external") || (mechanism != "MONGODB-IAM")) {
+    } else if ((targetDatabase != "$external") || (mechanism != "MONGODB-AWS")) {
         return status;
     }
 
@@ -167,7 +167,7 @@ Status configureSession(SaslClientSession* session,
 
     status = bsonExtractStringField(saslParameters, saslCommandIamSessionToken, &value);
     if (status.isOK()) {
-        session->setParameter(SaslClientSession::parameterIamSessionToken, value);
+        session->setParameter(SaslClientSession::parameterAWSSessionToken, value);
     }
 
     return session->initialize();

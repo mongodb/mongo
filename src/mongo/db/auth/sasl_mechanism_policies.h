@@ -35,9 +35,9 @@
 
 namespace mongo {
 
-struct IAMPolicy {
+struct AWSIAMPolicy {
     static constexpr StringData getName() {
-        return "MONGODB-IAM"_sd;
+        return "MONGODB-AWS"_sd;
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText};

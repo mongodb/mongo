@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/sasl_iam_client_protocol.h"
+#include "mongo/client/sasl_aws_client_protocol.h"
 
 #include <iostream>
 
@@ -37,18 +37,18 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/client/sasl_iam_client_protocol_gen.h"
+#include "mongo/client/sasl_aws_client_protocol_gen.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/kms_message_support.h"
 
 namespace mongo {
-namespace iam {
+namespace awsIam {
 namespace {
-// Secure Random for SASL IAM Nonce generation
-Mutex saslIAMClientMutex = MONGO_MAKE_LATCH("IAMClientMutex");
-SecureRandom saslIAMClientGen;
+// Secure Random for AWS SASL Nonce generation
+Mutex saslAWSClientMutex = MONGO_MAKE_LATCH("IAMAWSClientMutex");
+SecureRandom saslAWSClientGen;
 
 std::vector<char> generateClientNonce() {
 
@@ -56,8 +56,8 @@ std::vector<char> generateClientNonce() {
     ret.resize(kClientFirstNonceLength);
 
     {
-        stdx::lock_guard<Latch> lk(saslIAMClientMutex);
-        saslIAMClientGen.fill(ret.data(), ret.size());
+        stdx::lock_guard<Latch> lk(saslAWSClientMutex);
+        saslAWSClientGen.fill(ret.data(), ret.size());
     }
 
     return ret;
@@ -111,7 +111,7 @@ AWSCredentials parseCredentials(StringData data) {
 std::string generateClientFirst(std::vector<char>* clientNonce) {
     *clientNonce = generateClientNonce();
 
-    IamClientFirst first;
+    AwsClientFirst first;
     first.setNonce(*clientNonce);
     first.setGs2_cb_flag(static_cast<int>('n'));
 
@@ -124,7 +124,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
                                  const std::vector<char>& clientNonce,
                                  const AWSCredentials& credentials) {
     dassert(clientNonce.size() == kClientFirstNonceLength);
-    auto serverFirst = convertFromByteString<IamServerFirst>(serverFirstBase64);
+    auto serverFirst = convertFromByteString<AwsServerFirst>(serverFirstBase64);
 
     uassert(51298,
             "Nonce must be 64 bytes",
@@ -177,7 +177,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
         kms_request_set_secret_key(request.get(), credentials.secretAccessKey.c_str()));
 
 
-    IamClientSecond second;
+    AwsClientSecond second;
 
     if (credentials.sessionToken) {
         // TODO: move this into kms-message
@@ -232,5 +232,5 @@ AWSCredentials parseCredentialsFromECSTaskIamCredentials(StringData data) {
     return parseCredentials<EcsTaskSecurityCredentials>(data);
 }
 
-}  // namespace iam
+}  // namespace awsIam
 }  // namespace mongo

@@ -34,22 +34,22 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/client/sasl_aws_protocol_common.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/client/sasl_iam_protocol_common.h"
 
 namespace mongo {
 /**
- *  Client side authentication session for MONGODB-IAM SASL.
+ *  Client side authentication session for MONGODB-AWS SASL.
  */
-class SaslIAMClientConversation : public SaslClientConversation {
-    SaslIAMClientConversation(const SaslIAMClientConversation&) = delete;
-    SaslIAMClientConversation& operator=(const SaslIAMClientConversation&) = delete;
+class SaslAWSClientConversation : public SaslClientConversation {
+    SaslAWSClientConversation(const SaslAWSClientConversation&) = delete;
+    SaslAWSClientConversation& operator=(const SaslAWSClientConversation&) = delete;
 
 public:
-    explicit SaslIAMClientConversation(SaslClientSession* saslClientSession);
+    explicit SaslAWSClientConversation(SaslClientSession* saslClientSession);
 
-    virtual ~SaslIAMClientConversation() = default;
+    virtual ~SaslAWSClientConversation() = default;
 
     StatusWith<bool> step(StringData inputData, std::string* outputData) override;
 
@@ -57,27 +57,27 @@ private:
     /**
      * Get AWS credentials either from the SASL session or a local HTTP server.
      */
-    iam::AWSCredentials _getCredentials() const;
+    awsIam::AWSCredentials _getCredentials() const;
 
     /**
      * Get AWS credentials from SASL session.
      */
-    iam::AWSCredentials _getUserCredentials() const;
+    awsIam::AWSCredentials _getUserCredentials() const;
 
     /**
      * Get AWS credentials from local HTTP server.
      */
-    iam::AWSCredentials _getLocalAWSCredentials() const;
+    awsIam::AWSCredentials _getLocalAWSCredentials() const;
 
     /**
      * Get AWS credentials from EC2 Instance metadata HTTP server.
      */
-    iam::AWSCredentials _getEc2Credentials() const;
+    awsIam::AWSCredentials _getEc2Credentials() const;
 
     /**
      * Get AWS credentials from ECS Instance metadata HTTP server.
      */
-    iam::AWSCredentials _getEcsCredentials(StringData relativeUri) const;
+    awsIam::AWSCredentials _getEcsCredentials(StringData relativeUri) const;
 
     StatusWith<bool> _firstStep(std::string* outputData);
     StatusWith<bool> _secondStep(StringData inputData, std::string* outputData);

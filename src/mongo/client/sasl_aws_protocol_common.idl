@@ -27,14 +27,14 @@
 #
 
 global:
-    cpp_namespace: "mongo::iam"
+    cpp_namespace: "mongo::awsIam"
 
 imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-    iamClientFirst:
-        description: "SASL IAM Client First message"
+    awsClientFirst:
+        description: "SASL AWS Client First message"
         fields:
           # Must be 32 bytes
           r:
@@ -44,8 +44,8 @@ structs:
             type: int
             cpp_name: gs2_cb_flag
 
-    iamServerFirst:
-        description: "SASL IAM Server First message"
+    awsServerFirst:
+        description: "SASL AWS Server First message"
         fields:
           # Must be 64 bytes
           s:
@@ -55,8 +55,8 @@ structs:
             type: string
             cpp_name: StsHost
 
-    iamClientSecond:
-        description: "SASL IAM Client Second message"
+    awsClientSecond:
+        description: "SASL AWS Client Second message"
         fields:
           a:
             type: string

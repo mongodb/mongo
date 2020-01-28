@@ -33,20 +33,20 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/client/sasl_iam_protocol_common.h"
+#include "mongo/client/sasl_aws_protocol_common.h"
 
 namespace mongo {
-namespace iam {
+namespace awsIam {
 
 /**
- * Generate client first message for IAM Auth.
+ * Generate client first message for AWS Auth.
  *
  * Returns nonce as out parameter for client to store
  */
 std::string generateClientFirst(std::vector<char>* clientNonce);
 
 /**
- * Parse IAM Auth server first message and generate client second.
+ * Parse AWS Auth server first message and generate client second.
  */
 std::string generateClientSecond(StringData serverFirst,
                                  const std::vector<char>& clientNonce,
@@ -114,5 +114,5 @@ AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(StringData data);
  */
 AWSCredentials parseCredentialsFromECSTaskIamCredentials(StringData data);
 
-}  // namespace iam
+}  // namespace awsIam
 }  // namespace mongo

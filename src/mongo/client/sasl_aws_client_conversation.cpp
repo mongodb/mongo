@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/sasl_iam_client_conversation.h"
+#include "mongo/client/sasl_aws_client_conversation.h"
 
 #include <string>
 #include <time.h>
@@ -37,23 +37,23 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/sasl_iam_client_options.h"
-#include "mongo/client/sasl_iam_client_protocol.h"
-#include "mongo/client/sasl_iam_client_protocol_gen.h"
+#include "mongo/client/sasl_aws_client_options.h"
+#include "mongo/client/sasl_aws_client_protocol.h"
+#include "mongo/client/sasl_aws_client_protocol_gen.h"
 #include "mongo/util/net/http_client.h"
 
 namespace mongo {
-namespace iam {
-SASLIamClientGlobalParams saslIamClientGlobalParams;
-}  // namespace iam
+namespace awsIam {
+SASLAwsClientGlobalParams saslAwsClientGlobalParams;
+}  // namespace awsIam
 
 namespace {
 std::string getDefaultEC2Host() {
-    return iam::saslIamClientGlobalParams.awsEC2InstanceMetadataUrl;
+    return awsIam::saslAwsClientGlobalParams.awsEC2InstanceMetadataUrl;
 }
 
 std::string getDefaultECSHost() {
-    return iam::saslIamClientGlobalParams.awsECSInstanceMetadataUrl;
+    return awsIam::saslAwsClientGlobalParams.awsECSInstanceMetadataUrl;
 }
 
 StringData toString(DataBuilder& builder) {
@@ -64,10 +64,10 @@ StringData toString(DataBuilder& builder) {
 }
 }  // namespace
 
-SaslIAMClientConversation::SaslIAMClientConversation(SaslClientSession* saslClientSession)
+SaslAWSClientConversation::SaslAWSClientConversation(SaslClientSession* saslClientSession)
     : SaslClientConversation(saslClientSession) {}
 
-iam::AWSCredentials SaslIAMClientConversation::_getCredentials() const {
+awsIam::AWSCredentials SaslAWSClientConversation::_getCredentials() const {
 
     if (_saslClientSession->hasParameter(SaslClientSession::parameterUser) &&
         _saslClientSession->hasParameter(SaslClientSession::parameterPassword)) {
@@ -77,21 +77,21 @@ iam::AWSCredentials SaslIAMClientConversation::_getCredentials() const {
     }
 }
 
-iam::AWSCredentials SaslIAMClientConversation::_getUserCredentials() const {
-    if (_saslClientSession->hasParameter(SaslClientSession::parameterIamSessionToken)) {
-        return iam::AWSCredentials(
+awsIam::AWSCredentials SaslAWSClientConversation::_getUserCredentials() const {
+    if (_saslClientSession->hasParameter(SaslClientSession::parameterAWSSessionToken)) {
+        return awsIam::AWSCredentials(
             _saslClientSession->getParameter(SaslClientSession::parameterUser).toString(),
             _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString(),
-            _saslClientSession->getParameter(SaslClientSession::parameterIamSessionToken)
+            _saslClientSession->getParameter(SaslClientSession::parameterAWSSessionToken)
                 .toString());
     }
 
-    return iam::AWSCredentials(
+    return awsIam::AWSCredentials(
         _saslClientSession->getParameter(SaslClientSession::parameterUser).toString(),
         _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString());
 }
 
-iam::AWSCredentials SaslIAMClientConversation::_getLocalAWSCredentials() const {
+awsIam::AWSCredentials SaslAWSClientConversation::_getLocalAWSCredentials() const {
     // Check the environment variables
     // These are set by AWS Lambda to pass in credentials and can be set by users.
     StringData awsAccessKeyId = getenv("AWS_ACCESS_KEY_ID");
@@ -100,12 +100,12 @@ iam::AWSCredentials SaslIAMClientConversation::_getLocalAWSCredentials() const {
 
     if (!awsAccessKeyId.empty() && !awsSecretAccessKey.empty()) {
         if (!awsSessionToken.empty()) {
-            return iam::AWSCredentials(awsAccessKeyId.toString(),
-                                       awsSecretAccessKey.toString(),
-                                       awsSessionToken.toString());
+            return awsIam::AWSCredentials(awsAccessKeyId.toString(),
+                                          awsSecretAccessKey.toString(),
+                                          awsSessionToken.toString());
         }
 
-        return iam::AWSCredentials(awsAccessKeyId.toString(), awsSecretAccessKey.toString());
+        return awsIam::AWSCredentials(awsAccessKeyId.toString(), awsSecretAccessKey.toString());
     }
 
     StringData ecsMetadata = getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
@@ -117,7 +117,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getLocalAWSCredentials() const {
 }
 
 
-iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
+awsIam::AWSCredentials SaslAWSClientConversation::_getEc2Credentials() const {
     try {
 
         std::unique_ptr<HttpClient> httpClient = HttpClient::create();
@@ -145,7 +145,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
 
         StringData getRoleOutput = toString(getRoleResult);
 
-        std::string role = iam::parseRoleFromEC2IamSecurityCredentials(getRoleOutput);
+        std::string role = awsIam::parseRoleFromEC2IamSecurityCredentials(getRoleOutput);
 
         // Retrieve the temporary credentials of the EC2 instance
         DataBuilder getRoleCredentialsResult = httpClient->get(
@@ -154,7 +154,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
 
         StringData getRoleCredentialsOutput = toString(getRoleCredentialsResult);
 
-        return iam::parseCredentialsFromEC2IamSecurityCredentials(getRoleCredentialsOutput);
+        return awsIam::parseCredentialsFromEC2IamSecurityCredentials(getRoleCredentialsOutput);
     } catch (const DBException& e) {
         // Wrap exceptions from HTTP to make them clearer
         uassertStatusOKWithContext(
@@ -166,7 +166,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEc2Credentials() const {
     MONGO_UNREACHABLE;
 }
 
-iam::AWSCredentials SaslIAMClientConversation::_getEcsCredentials(StringData relativeUri) const {
+awsIam::AWSCredentials SaslAWSClientConversation::_getEcsCredentials(StringData relativeUri) const {
     try {
 
         std::unique_ptr<HttpClient> httpClient = HttpClient::create();
@@ -179,7 +179,7 @@ iam::AWSCredentials SaslIAMClientConversation::_getEcsCredentials(StringData rel
 
         StringData getRoleOutput = toString(getRoleResult);
 
-        return iam::parseCredentialsFromECSTaskIamCredentials(getRoleOutput);
+        return awsIam::parseCredentialsFromECSTaskIamCredentials(getRoleOutput);
     } catch (const DBException& e) {
         // Wrap exceptions from HTTP to make them clearer
         uassertStatusOKWithContext(e.toStatus(),
@@ -190,10 +190,10 @@ iam::AWSCredentials SaslIAMClientConversation::_getEcsCredentials(StringData rel
     MONGO_UNREACHABLE;
 }
 
-StatusWith<bool> SaslIAMClientConversation::step(StringData inputData, std::string* outputData) {
+StatusWith<bool> SaslAWSClientConversation::step(StringData inputData, std::string* outputData) {
     if (_step > 2) {
         return Status(ErrorCodes::AuthenticationFailed,
-                      str::stream() << "Invalid IAM authentication step: " << _step);
+                      str::stream() << "Invalid AWS authentication step: " << _step);
     }
 
     _step++;
@@ -209,18 +209,18 @@ StatusWith<bool> SaslIAMClientConversation::step(StringData inputData, std::stri
     }
 }
 
-StatusWith<bool> SaslIAMClientConversation::_firstStep(std::string* outputData) {
+StatusWith<bool> SaslAWSClientConversation::_firstStep(std::string* outputData) {
 
-    *outputData = iam::generateClientFirst(&_clientNonce);
+    *outputData = awsIam::generateClientFirst(&_clientNonce);
 
     return false;
 }
 
-StatusWith<bool> SaslIAMClientConversation::_secondStep(StringData inputData,
+StatusWith<bool> SaslAWSClientConversation::_secondStep(StringData inputData,
                                                         std::string* outputData) {
     auto credentials = _getCredentials();
 
-    *outputData = iam::generateClientSecond(inputData, _clientNonce, credentials);
+    *outputData = awsIam::generateClientSecond(inputData, _clientNonce, credentials);
 
     return true;
 }

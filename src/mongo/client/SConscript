@@ -42,10 +42,10 @@ env.Library(
 
 env.Library(
     target=[
-        'sasl_iam_common',
+        'sasl_aws_common',
     ],
     source=[
-        env.Idlc('sasl_iam_protocol_common.idl')[0],
+        env.Idlc('sasl_aws_protocol_common.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -60,18 +60,18 @@ kmsEnv.InjectThirdParty(libraries=['kms-message'])
 
 kmsEnv.Library(
     target=[
-        'sasl_iam_client',
+        'sasl_aws_client',
     ],
     source=[
-        'sasl_iam_client_protocol.cpp',
-        env.Idlc('sasl_iam_client_protocol.idl')[0],
+        'sasl_aws_client_protocol.cpp',
+        env.Idlc('sasl_aws_client_protocol.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/third_party/shim_kms_message',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
-        'sasl_iam_common',
+        'sasl_aws_common',
     ],
 )
 
@@ -89,8 +89,8 @@ saslClientSource = [
 
 if get_option('ssl') == 'on':
     saslClientSource.extend([
-        'sasl_iam_client_conversation.cpp',
-        env.Idlc('sasl_iam_client_options.idl')[0],
+        'sasl_aws_client_conversation.cpp',
+        env.Idlc('sasl_aws_client_options.idl')[0],
     ])
 
 # Add in actual sasl dependencies if sasl is enabled, otherwise
@@ -112,7 +112,7 @@ saslClientEnv.Library(
     target='sasl_client',
     source=saslClientSource,
     LIBDEPS=[
-        "sasl_iam_client" if get_option('ssl') == 'on' else '',
+        "sasl_aws_client" if get_option('ssl') == 'on' else '',
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/executor/remote_command',

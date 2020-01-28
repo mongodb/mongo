@@ -64,7 +64,7 @@ constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
 constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;
 constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
 constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
-constexpr auto kMechanismMongoIAM = "MONGODB-IAM"_sd;
+constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
 constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
 /**

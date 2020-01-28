@@ -32,11 +32,11 @@
 #include <string>
 
 namespace mongo {
-namespace iam {
+namespace awsIam {
 /**
- * SASL IAM Client parameters
+ * SASL AWS Client parameters
  */
-struct SASLIamClientGlobalParams {
+struct SASLAwsClientGlobalParams {
     /**
      * EC2 Instance metadata endpoint.
      */
@@ -53,6 +53,6 @@ struct SASLIamClientGlobalParams {
     std::string awsSessionToken;
 };
 
-extern SASLIamClientGlobalParams saslIamClientGlobalParams;
-}  // namespace iam
+extern SASLAwsClientGlobalParams saslAwsClientGlobalParams;
+}  // namespace awsIam
 }  // namespace mongo

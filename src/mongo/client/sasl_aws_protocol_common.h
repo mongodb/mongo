@@ -37,14 +37,14 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/client/sasl_iam_protocol_common_gen.h"
+#include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/rpc/object_check.h"
 
 namespace mongo {
 
-namespace iam {
+namespace awsIam {
 /**
- * Common constants shared by IAM client and server code.
+ * Common constants shared by AWS client and server code.
  */
 /**
  * Client and Server Nonce lengths
@@ -126,6 +126,6 @@ struct AWSCredentials {
     boost::optional<std::string> sessionToken;
 };
 
-}  // namespace iam
+}  // namespace awsIam
 
 }  // namespace mongo
