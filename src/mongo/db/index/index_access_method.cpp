@@ -586,6 +586,8 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                               17262,
                                               // Hash
                                               16766,
+                                              // Ambiguous array field name
+                                              16746,
                                               // Haystack
                                               16775,
                                               16776,
