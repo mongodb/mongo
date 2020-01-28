@@ -77,22 +77,10 @@ StringData Mutex::getName() const {
     return StringData(_data->identity().name());
 }
 
-void Mutex::addLockListener(LockListener* listener) {
-    auto& state = _getListenerState();
-
-    invariant(!state.isFinalized.load());
-    state.listeners.push_back(listener);
-}
-
-void Mutex::finalizeLockListeners() {
-    auto& state = _getListenerState();
-    state.isFinalized.store(true);
-}
-
 void Mutex::_onContendedLock() noexcept {
     _data->counts().contended.fetchAndAdd(1);
 
-    auto& state = _getListenerState();
+    auto& state = latch_detail::getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -105,7 +93,7 @@ void Mutex::_onContendedLock() noexcept {
 void Mutex::_onQuickLock() noexcept {
     _data->counts().acquired.fetchAndAdd(1);
 
-    auto& state = _getListenerState();
+    auto& state = latch_detail::getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -118,7 +106,7 @@ void Mutex::_onQuickLock() noexcept {
 void Mutex::_onSlowLock() noexcept {
     _data->counts().acquired.fetchAndAdd(1);
 
-    auto& state = _getListenerState();
+    auto& state = latch_detail::getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -131,7 +119,7 @@ void Mutex::_onSlowLock() noexcept {
 void Mutex::_onUnlock() noexcept {
     _data->counts().released.fetchAndAdd(1);
 
-    auto& state = _getListenerState();
+    auto& state = latch_detail::getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -142,12 +130,13 @@ void Mutex::_onUnlock() noexcept {
 }
 
 /**
- * Any MONGO_INITIALIZER that adds a LockListener will want to list FinalizeLockListeners as
- * a dependent initializer. This means that all LockListeners are certified to be added before main
- * and no LockListeners are ever invoked before main.
+ * Any MONGO_INITIALIZER that adds a DiagnosticListener will want to list
+ * FinalizeDiagnosticListeners as a dependent initializer. This means that all DiagnosticListeners
+ * are certified to be added before main and no DiagnosticListeners are ever invoked before main.
  */
-MONGO_INITIALIZER(FinalizeLockListeners)(InitializerContext* context) {
-    Mutex::finalizeLockListeners();
+MONGO_INITIALIZER(FinalizeDiagnosticListeners)(InitializerContext* context) {
+    auto& state = latch_detail::getDiagnosticListenerState();
+    state.isFinalized.store(true);
 
     return Status::OK();
 }
