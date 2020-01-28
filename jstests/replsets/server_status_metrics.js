@@ -171,7 +171,8 @@ assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 500
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}));
+assert.commandFailedWithCode(testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}),
+                             ErrorCodes.FailedToParse);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
