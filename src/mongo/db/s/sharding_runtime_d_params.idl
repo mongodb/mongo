@@ -90,3 +90,20 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: orphanCleanupDelaySecs
         default: 900
+
+    enableShardedIndexConsistencyCheck:
+        description: >-
+          Enable the periodic sharded index consistency check on the config server's primary.
+          The count of sharded collections with inconsistent indexes is exposed via the
+          'shardedIndexConsistency' section in the serverStatus output.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableShardedIndexConsistencyCheck
+        default: true
+
+    shardedIndexConsistencyCheckIntervalMS:
+        description: 'Time interval in milliseconds between subsequent index checks.'
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: shardedIndexConsistencyCheckIntervalMS
+        default: 600000
