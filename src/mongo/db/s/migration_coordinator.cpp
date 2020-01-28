@@ -40,8 +40,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(disableWritingPendingRangeDeletionEntries);
-
 MONGO_FAIL_POINT_DEFINE(hangBeforeMakingCommitDecisionDurable);
 MONGO_FAIL_POINT_DEFINE(hangBeforeMakingAbortDecisionDurable);
 
@@ -74,18 +72,16 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx, bool waitForD
     LOG(0) << _logPrefix() << "Persisting migration coordinator doc";
     migrationutil::persistMigrationCoordinatorLocally(opCtx, _migrationInfo);
 
-    if (!disableWritingPendingRangeDeletionEntries.shouldFail()) {
-        LOG(0) << _logPrefix() << "Persisting range deletion task on donor";
-        RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
-                                            _migrationInfo.getNss(),
-                                            _migrationInfo.getCollectionUuid(),
-                                            _migrationInfo.getDonorShardId(),
-                                            _migrationInfo.getRange(),
-                                            waitForDelete ? CleanWhenEnum::kNow
-                                                          : CleanWhenEnum::kDelayed);
-        donorDeletionTask.setPending(true);
-        migrationutil::persistRangeDeletionTaskLocally(opCtx, donorDeletionTask);
-    }
+    LOG(0) << _logPrefix() << "Persisting range deletion task on donor";
+    RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
+                                        _migrationInfo.getNss(),
+                                        _migrationInfo.getCollectionUuid(),
+                                        _migrationInfo.getDonorShardId(),
+                                        _migrationInfo.getRange(),
+                                        waitForDelete ? CleanWhenEnum::kNow
+                                                      : CleanWhenEnum::kDelayed);
+    donorDeletionTask.setPending(true);
+    migrationutil::persistRangeDeletionTaskLocally(opCtx, donorDeletionTask);
 }
 
 void MigrationCoordinator::setMigrationDecision(Decision decision) {

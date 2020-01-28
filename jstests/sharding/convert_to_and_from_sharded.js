@@ -1,7 +1,7 @@
 /**
  * Test that a replica set member can process basic CRUD operations after switching from being
  * a shardsvr and back to non shardsvr.
- * @tags: [requires_persistence, multiversion_incompatible]
+ * @tags: [requires_persistence]
  */
 (function() {
 "use strict";
@@ -56,7 +56,6 @@ checkBasicCRUD(priConn.getDB('test').sharded);
 for (var x = 0; x < NUM_NODES; x++) {
     replShard.restart(x, {
         shardsvr: '',
-        setParameter: {"failpoint.disableWritingPendingRangeDeletionEntries": "{mode: 'alwaysOn'}"}
     });
 }
 
