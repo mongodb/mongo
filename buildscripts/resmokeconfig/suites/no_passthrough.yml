@@ -10,6 +10,8 @@ selector:
   exclude_files:
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
+  # TODO(SERVER-45821): enable backup_cursor_format.js
+  - src/mongo/db/modules/*/jstests/hot_backups/backup_cursor_format.js
 
 # noPassthrough tests start their own mongod's.
 executor:
