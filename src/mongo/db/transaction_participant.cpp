@@ -844,6 +844,8 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
     }
 
     invariant(!o().txnResourceStash);
+    // If this is a prepared transaction, invariant that it does not hold the RSTL lock.
+    invariant(!o().txnState.isPrepared() || !opCtx->lockState()->isRSTLLocked());
     auto stashStyle = opCtx->writesAreReplicated() ? TxnResources::StashStyle::kPrimary
                                                    : TxnResources::StashStyle::kSecondary;
     o(lk).txnResourceStash = TxnResources(lk, opCtx, stashStyle);

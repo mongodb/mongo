@@ -97,6 +97,13 @@ protected:
             result[i] = opEntry.first;
         }
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
+        // Some unittests reuse the same OperationContext to read the oplog and end up acquiring the
+        // RSTL lock after using the OplogInterfaceLocal. This is a hack to make sure we do not hold
+        // RSTL lock for prepared transactions.
+        if (opCtx->inMultiDocumentTransaction() &&
+            TransactionParticipant::get(opCtx).transactionIsPrepared()) {
+            opCtx->lockState()->unlockRSTLforPrepare();
+        }
         return result;
     }
 
