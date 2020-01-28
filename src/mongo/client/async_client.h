@@ -47,6 +47,18 @@ namespace mongo {
 
 class AsyncDBClient : public std::enable_shared_from_this<AsyncDBClient> {
 public:
+    using RemoteCommandCallbackFn = unique_function<void(const executor::RemoteCommandResponse&)>;
+
+    struct ExhaustRequestParameters {
+        ExhaustRequestParameters(ExhaustRequestParameters&&) = default;
+        ExhaustRequestParameters(const ExhaustRequestParameters&) = delete;
+        ExhaustRequestParameters& operator=(const ExhaustRequestParameters&) = delete;
+
+        RemoteCommandCallbackFn cb;
+        ClockSource* clkSource;
+        Date_t start;
+    };
+
     explicit AsyncDBClient(const HostAndPort& peer,
                            transport::SessionHandle session,
                            ServiceContext* svcCtx)
@@ -63,6 +75,13 @@ public:
     Future<executor::RemoteCommandResponse> runCommandRequest(
         executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
     Future<rpc::UniqueReply> runCommand(OpMsgRequest request, const BatonHandle& baton = nullptr);
+
+    Future<void> runExhaustCommandRequest(executor::RemoteCommandRequest request,
+                                          RemoteCommandCallbackFn&& cb,
+                                          const BatonHandle& baton = nullptr);
+    Future<void> runExhaustCommand(OpMsgRequest request,
+                                   RemoteCommandCallbackFn&& cb,
+                                   const BatonHandle& baton = nullptr);
 
     Future<void> authenticate(const BSONObj& params);
 
@@ -81,7 +100,13 @@ public:
     const HostAndPort& local() const;
 
 private:
-    Future<Message> _call(Message request, const BatonHandle& baton = nullptr);
+    Future<void> _continueReceiveExhaustResponse(
+        ExhaustRequestParameters&& exhaustRequestParameters,
+        boost::optional<int32_t> msgId,
+        const BatonHandle& baton = nullptr);
+    Future<Message> _waitForResponse(boost::optional<int32_t> msgId,
+                                     const BatonHandle& baton = nullptr);
+    Future<void> _call(Message request, int32_t msgId, const BatonHandle& baton = nullptr);
     BSONObj _buildIsMasterRequest(const std::string& appName,
                                   executor::NetworkConnectionHook* hook);
     void _parseIsMasterResponse(BSONObj request,
