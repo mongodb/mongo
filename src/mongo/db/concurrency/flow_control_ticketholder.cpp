@@ -101,7 +101,9 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
     auto currentWaitTime = curTimeMicros64();
     auto updateTotalTime = [&]() {
         auto oldWaitTime = std::exchange(currentWaitTime, curTimeMicros64());
-        _totalTimeAcquiringMicros.fetchAndAddRelaxed(currentWaitTime - oldWaitTime);
+        auto waitTimeDelta = currentWaitTime - oldWaitTime;
+        _totalTimeAcquiringMicros.fetchAndAddRelaxed(waitTimeDelta);
+        stats->timeAcquiringMicros += waitTimeDelta;
     };
 
     stats->waiting = true;
