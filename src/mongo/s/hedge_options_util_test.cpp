@@ -104,16 +104,17 @@ protected:
 
     static inline const std::string kCollName = "testColl";
 
+    static inline const std::string kReadHedgingModeFieldName = "readHedgingMode";
     static inline const std::string kMaxTimeMSThresholdForHedgingFieldName =
         "maxTimeMSThresholdForHedging";
     static inline const std::string kHedgingDelayPercentageFieldName = "hedgingDelayPercentage";
     static inline const std::string kDefaultHedgingDelayMSFieldName = "defaultHedgingDelayMS";
 
     static inline const BSONObj kDefaultParameters =
-        BSON(kMaxTimeMSThresholdForHedgingFieldName
-             << kMaxTimeMSThresholdForHedgingDefault << kHedgingDelayPercentageFieldName
-             << kHedgingDelayPercentageDefault << kDefaultHedgingDelayMSFieldName
-             << kDefaultHedgingDelayMSDefault);
+        BSON(kReadHedgingModeFieldName
+             << "on" << kMaxTimeMSThresholdForHedgingFieldName << gMaxTimeMSThresholdForHedging
+             << kHedgingDelayPercentageFieldName << gHedgingDelayPercentage
+             << kDefaultHedgingDelayMSFieldName << gDefaultHedgingDelayMS);
 
 private:
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
@@ -223,6 +224,19 @@ TEST_F(HedgeOptionsUtilTestFixture, SetAll) {
     checkHedgeOptions(
         parameters, BSON("find" << kCollName << "maxTimeMS" << 500), rspObj, Milliseconds{250});
     checkHedgeOptions(parameters, BSON("find" << kCollName), rspObj, Milliseconds{800});
+}
+
+TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
+    const auto parameters =
+        BSON(kReadHedgingModeFieldName << "off" << kMaxTimeMSThresholdForHedgingFieldName << 1000
+                                       << kHedgingDelayPercentageFieldName << 50
+                                       << kDefaultHedgingDelayMSFieldName << 800);
+    const auto rspObj = BSON("mode"
+                             << "nearest"
+                             << "hedge" << BSONObj());
+
+    checkHedgeOptions(parameters, BSON("find" << kCollName << "maxTimeMS" << 500), rspObj);
+    checkHedgeOptions(parameters, BSON("find" << kCollName), rspObj);
 }
 
 }  // namespace

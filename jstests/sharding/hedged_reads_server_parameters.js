@@ -34,5 +34,16 @@ st.restartMongos(0, {
 assert.commandWorked(st.s.getDB(dbName).runCommand(
     {query: {count: collName}, $readPreference: {mode: "secondaryPreferred", hedge: {}}}));
 
+// readHedgingMode "off".
+st.restartMongos(0, {
+    restart: true,
+    setParameter: {readHedgingMode: "off"},
+});
+
+assert.commandWorked(st.s.getDB(dbName).runCommand({
+    query: {distinct: collName, key: "x"},
+    $readPreference: {mode: "primaryPreferred", hedge: {}}
+}));
+
 st.stop();
 })();

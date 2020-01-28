@@ -29,6 +29,8 @@
 
 global:
   cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/s/mongos_server_parameters.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -57,6 +59,16 @@ server_parameters:
     cpp_vartype: int
     cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
     default: 2000 # 2secs
+
+  readHedgingMode:
+    description: >-
+        Enables hedged reads.
+    set_at: [ startup ]
+    cpp_vartype: std::string
+    cpp_varname: "gReadHedgingMode"
+    default: "on"
+    validator:
+      callback: "validateReadHedgingMode"
 
   maxTimeMSThresholdForHedging:
     description: >-

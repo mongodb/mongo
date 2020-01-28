@@ -413,6 +413,7 @@ env.Library(
 env.Library(
     target='mongos_server_parameters',
     source=[
+        'mongos_server_parameters.cpp',
         env.Idlc('mongos_server_parameters.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
