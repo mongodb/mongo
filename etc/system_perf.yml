@@ -1096,7 +1096,31 @@ buildvariants:
         variant: compile-amazon2
       - name: genny_generate_all_tasks
         variant: compile-amazon2
-  tasks: &standalonetasks
+  tasks:
+    - name: industry_benchmarks
+    - name: linkbench
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
+
+- name: linux-1-node-replSet-cwrwc
+  display_name: Linux 1-Node ReplSet CWRWC
+  batchtime: 2880  # 48 hours
+  modules: *modules
+  expansions:
+    setup: single-replica-cwrwc
+    cluster: single
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  tasks:
     - name: industry_benchmarks
     - name: linkbench
     - name: genny_patch_tasks
@@ -1245,6 +1269,30 @@ buildvariants:
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
     - name: smoke_test
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
+
+- name: linux-shard-lite-cwrwc
+  display_name: Linux Shard Lite Cluster CWRWC
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: shard-lite-cwrwc
+    cluster: shard-lite
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-shard-lite"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  tasks:
+    - name: industry_benchmarks
+    - name: linkbench
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
