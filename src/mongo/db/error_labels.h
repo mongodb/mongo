@@ -37,17 +37,19 @@ namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
 static constexpr StringData kTransientTransaction = "TransientTransactionError"_sd;
 static constexpr StringData kRetryableWrite = "RetryableWriteError"_sd;
-static constexpr StringData kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
+static constexpr StringData kResumableChangeStream = "ResumableChangeStreamError"_sd;
 }  // namespace ErrorLabel
 
 class ErrorLabelBuilder {
 public:
-    ErrorLabelBuilder(const OperationSessionInfoFromClient& sessionOptions,
+    ErrorLabelBuilder(OperationContext* opCtx,
+                      const OperationSessionInfoFromClient& sessionOptions,
                       const std::string& commandName,
                       boost::optional<ErrorCodes::Error> code,
                       boost::optional<ErrorCodes::Error> wcCode,
                       bool isInternalClient)
-        : _sessionOptions(sessionOptions),
+        : _opCtx(opCtx),
+          _sessionOptions(sessionOptions),
           _commandName(commandName),
           _code(code),
           _wcCode(wcCode),
@@ -57,10 +59,11 @@ public:
 
     bool isTransientTransactionError() const;
     bool isRetryableWriteError() const;
-    bool isNonResumableChangeStreamError() const;
+    bool isResumableChangeStreamError() const;
 
 private:
     bool _isCommitOrAbort() const;
+    OperationContext* _opCtx;
     const OperationSessionInfoFromClient& _sessionOptions;
     const std::string& _commandName;
     boost::optional<ErrorCodes::Error> _code;

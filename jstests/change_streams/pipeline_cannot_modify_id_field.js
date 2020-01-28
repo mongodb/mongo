@@ -138,7 +138,10 @@ for (let transform of idModifyingTransformations) {
     assert.soon(() => {
         const getMoreRes = db.runCommand({getMore: cmdRes.cursor.id, collection: coll.getName()});
         return !getMoreRes.ok &&
-            assert.commandFailedWithCode(getMoreRes, ErrorCodes.ChangeStreamFatalError, transform);
+            assert.commandFailedWithCode(
+                getMoreRes,
+                [ErrorCodes.IllegalOperation, ErrorCodes.ChangeStreamFatalError],
+                transform);
     }, transform);
 }
 }());

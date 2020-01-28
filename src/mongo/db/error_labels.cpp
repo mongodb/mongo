@@ -29,6 +29,9 @@
 
 #include "mongo/db/error_labels.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
 
@@ -68,26 +71,63 @@ bool ErrorLabelBuilder::isRetryableWriteError() const {
     return false;
 }
 
-bool ErrorLabelBuilder::isNonResumableChangeStreamError() const {
-    return _code && ErrorCodes::isNonResumableChangeStreamError(_code.get());
+bool ErrorLabelBuilder::isResumableChangeStreamError() const {
+    // Determine whether this operation is a candidate for the ResumableChangeStreamError label.
+    const bool mayNeedResumableChangeStreamErrorLabel =
+        (_commandName == "aggregate" || _commandName == "getMore") && _code && !_wcCode &&
+        (ErrorCodes::isRetriableError(*_code) || ErrorCodes::isNetworkError(*_code) ||
+         ErrorCodes::isNeedRetargettingError(*_code) || _code == ErrorCodes::RetryChangeStream ||
+         _code == ErrorCodes::FailedToSatisfyReadPreference ||
+         _code == ErrorCodes::ElectionInProgress);
+
+    // If the command or exception is not relevant, bail out early.
+    if (!mayNeedResumableChangeStreamErrorLabel) {
+        return false;
+    }
+
+    // We should always have a valid opCtx at this point.
+    invariant(_opCtx);
+
+    // Get the full command object from CurOp. If this is a getMore, get the original command.
+    const auto cmdObj = (_commandName == "aggregate" ? CurOp::get(_opCtx)->opDescription()
+                                                     : CurOp::get(_opCtx)->originatingCommand());
+
+    // Get the namespace string from CurOp. We will need it to build the LiteParsedPipeline.
+    const auto nss = NamespaceString{CurOp::get(_opCtx)->getNS()};
+
+    // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
+    const auto swLitePipe = [&nss, &cmdObj]() -> StatusWith<LiteParsedPipeline> {
+        try {
+            auto aggRequest = uassertStatusOK(AggregationRequest::parseFromBSON(nss, cmdObj));
+            return LiteParsedPipeline(aggRequest);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }();
+
+    // If the pipeline parsed successfully and is a $changeStream, add the label.
+    return swLitePipe.isOK() && swLitePipe.getValue().hasChangeStream();
 }
 
 void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
     // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
-    bool hasTransientTransactionError = false;
+    bool hasTransientTransactionOrRetryableWriteError = false;
     if (isTransientTransactionError()) {
         labels << ErrorLabel::kTransientTransaction;
-        hasTransientTransactionError = true;
+        hasTransientTransactionOrRetryableWriteError = true;
     }
     if (isRetryableWriteError()) {
         // RetryableWriteError and TransientTransactionError are mutually exclusive.
-        invariant(!hasTransientTransactionError);
+        invariant(!hasTransientTransactionOrRetryableWriteError);
         labels << ErrorLabel::kRetryableWrite;
+        hasTransientTransactionOrRetryableWriteError = true;
     }
-    if (isNonResumableChangeStreamError()) {
-        labels << ErrorLabel::kNonResumableChangeStream;
+    // Change streams cannot run in a transaction, and cannot be a retryable write. Since these
+    // labels are only added in the event that we are executing the associated operation, we do
+    // not add a ResumableChangeStreamError label if either of them is set.
+    if (!hasTransientTransactionOrRetryableWriteError && isResumableChangeStreamError()) {
+        labels << ErrorLabel::kResumableChangeStream;
     }
-    return;
 }
 
 bool ErrorLabelBuilder::_isCommitOrAbort() const {
@@ -113,7 +153,8 @@ BSONObj getErrorLabels(OperationContext* opCtx,
     }
 
     BSONArrayBuilder labelArray;
-    ErrorLabelBuilder labelBuilder(sessionOptions, commandName, code, wcCode, isInternalClient);
+    ErrorLabelBuilder labelBuilder(
+        opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
     labelBuilder.build(labelArray);
 
     return (labelArray.arrSize() > 0) ? BSON(kErrorLabelsFieldName << labelArray.arr()) : BSONObj();

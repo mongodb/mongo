@@ -702,7 +702,7 @@ TEST_F(ShardCheckResumabilityTest,
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     ASSERT_THROWS_CODE(
-        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
+        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamHistoryLost);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldSucceedWithNoDocumentsInPipelineAndOplogIsEmpty) {
@@ -742,7 +742,7 @@ TEST_F(ShardCheckResumabilityTest,
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     ASSERT_THROWS_CODE(
-        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
+        shardCheckResumability->getNext(), AssertionException, ErrorCodes::ChangeStreamHistoryLost);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
