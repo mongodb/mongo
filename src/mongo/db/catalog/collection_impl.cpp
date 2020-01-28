@@ -807,7 +807,7 @@ bool CollectionImpl::isEmpty(OperationContext* opCtx) const {
 
     if (cursorEmptyCollRes != fastCountEmptyCollRes) {
         BSONObjBuilder bob;
-        bob.appendNumber("fastCount", fastCount);
+        bob.appendNumber("fastCount", static_cast<long long>(fastCount));
         bob.append("cursor", str::stream() << (cursorEmptyCollRes ? "0" : ">=1"));
 
         LOG(2) << "Detected erroneous fast count for collection " << ns() << "(" << uuid() << ") ["
