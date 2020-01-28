@@ -226,7 +226,7 @@ void DocumentSourceSort::loadDocument(Document&& doc) {
     // already computed the sort key we'd have split the pipeline there, would be merging presorted
     // documents, and wouldn't use this method.
     std::tie(sortKey, docForSorter) = extractSortKey(std::move(doc));
-    _sortExecutor->add(sortKey, std::move(docForSorter));
+    _sortExecutor->add(sortKey, docForSorter);
 }
 
 void DocumentSourceSort::loadingDone() {

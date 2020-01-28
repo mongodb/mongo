@@ -126,11 +126,11 @@ public:
      * Add data item to be sorted of type T with sort key specified by Value to the sort executor.
      * Should only be called before 'loadingDone()' is called.
      */
-    void add(Value sortKey, T data) {
+    void add(const Value& sortKey, const T& data) {
         if (!_sorter) {
             _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
         }
-        _sorter->add(std::move(sortKey), std::move(data));
+        _sorter->add(sortKey, data);
 
         _stats.totalDataSizeBytes += data.memUsageForSorter();
     }

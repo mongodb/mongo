@@ -202,7 +202,7 @@ void WorkingSetMember::resetDocument(SnapshotId snapshot, const BSONObj& obj) {
     doc.value() = md.freeze();
 }
 
-void WorkingSetMember::serializeForSorter(BufBuilder& buf) const {
+void WorkingSetMember::serialize(BufBuilder& buf) const {
     // It is not legal to serialize a Document which has metadata attached to it. Any metadata must
     // reside directly in the WorkingSetMember.
     invariant(!doc.value().metadata());
@@ -232,8 +232,7 @@ void WorkingSetMember::serializeForSorter(BufBuilder& buf) const {
     _metadata.serializeForSorter(buf);
 }
 
-WorkingSetMember WorkingSetMember::deserializeForSorter(BufReader& buf,
-                                                        const SorterDeserializeSettings&) {
+WorkingSetMember WorkingSetMember::deserialize(BufReader& buf) {
     WorkingSetMember wsm;
 
     // First decode the state, which instructs us on how to interpret the rest of the buffer.
@@ -270,6 +269,12 @@ WorkingSetMember WorkingSetMember::deserializeForSorter(BufReader& buf,
     DocumentMetadataFields::deserializeForSorter(buf, &wsm._metadata);
 
     return wsm;
+}
+
+SortableWorkingSetMember SortableWorkingSetMember::getOwned() const {
+    auto ret = *this;
+    ret._holder->makeObjOwnedIfNeeded();
+    return ret;
 }
 
 WorkingSetRegisteredIndexId WorkingSet::registerIndexAccessMethod(

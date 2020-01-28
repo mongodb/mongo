@@ -197,12 +197,14 @@ TEST_F(WorkingSetFixture, MetadataCanBeCorrectlyTransferredBackAndForthFromDocum
 namespace {
 // Serializes the given working set member to a buffer, then returns a working set member resulting
 // from deserializing this buffer.
-WorkingSetMember roundtripWsmThroughSerialization(const WorkingSetMember& wsm) {
+WorkingSetMember roundtripWsmThroughSerialization(WorkingSetMember wsm) {
+    SortableWorkingSetMember sortableWsm{std::move(wsm)};
     BufBuilder builder{};
-    wsm.serializeForSorter(builder);
+    sortableWsm.serializeForSorter(builder);
     BufReader reader{builder.buf(), static_cast<unsigned>(builder.len())};
-    return WorkingSetMember::deserializeForSorter(reader,
-                                                  WorkingSetMember::SorterDeserializeSettings{});
+    auto deserializedSortableWsm = SortableWorkingSetMember::deserializeForSorter(
+        reader, SortableWorkingSetMember::SorterDeserializeSettings{});
+    return deserializedSortableWsm.extract();
 }
 }  // namespace
 

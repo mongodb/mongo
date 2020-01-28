@@ -65,11 +65,11 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
             auto member = _ws->get(id);
             invariant(member->metadata().hasSortKey());
 
-            auto&& extractedMember = _ws->extract(id);
+            SortableWorkingSetMember extractedMember{_ws->extract(id)};
 
             try {
-                auto sortKey = extractedMember.metadata().getSortKey();
-                _sortExecutor.add(std::move(sortKey), std::move(extractedMember));
+                auto sortKey = extractedMember->metadata().getSortKey();
+                _sortExecutor.add(sortKey, extractedMember);
             } catch (const AssertionException&) {
                 // Propagate runtime errors using the FAILED status code.
                 *out = WorkingSetCommon::allocateStatusMember(_ws, exceptionToStatus());
@@ -103,7 +103,7 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    *out = _ws->emplace(std::move(*nextWsm));
+    *out = _ws->emplace(nextWsm->extract());
     return PlanStage::ADVANCED;
 }
 

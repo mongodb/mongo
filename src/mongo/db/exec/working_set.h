@@ -129,9 +129,7 @@ public:
         OWNED_OBJ,
     };
 
-    struct SorterDeserializeSettings {};
-
-    static WorkingSetMember deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
+    static WorkingSetMember deserialize(BufReader& buf);
 
     /**
      * Reset to an "empty" state.
@@ -224,17 +222,7 @@ public:
      */
     void resetDocument(SnapshotId snapshot, const BSONObj& obj);
 
-    void serializeForSorter(BufBuilder& buf) const;
-
-    int memUsageForSorter() const {
-        return getMemUsage();
-    }
-
-    WorkingSetMember getOwned() const {
-        auto ret = *this;
-        ret.makeObjOwnedIfNeeded();
-        return ret;
-    }
+    void serialize(BufBuilder& buf) const;
 
 private:
     friend class WorkingSet;
@@ -242,6 +230,64 @@ private:
     MemberState _state = WorkingSetMember::INVALID;
 
     DocumentMetadataFields _metadata;
+};
+
+/**
+ * A variant of WorkingSetMember that is designed to be compatible with the SortExecutor. Objects of
+ * this type are small, acting only as a handle to the underlying WorkingSetMember. This means that
+ * they can be efficiently copied or moved during the sorting process while the actual
+ * WorkingSetMember data remains in place.
+ *
+ * A SortableWorkingSetMember supports serialization and deserialization so that objects of this
+ * type can be flushed to disk and later recovered.
+ */
+class SortableWorkingSetMember {
+public:
+    struct SorterDeserializeSettings {};
+
+    static SortableWorkingSetMember deserializeForSorter(BufReader& buf,
+                                                         const SorterDeserializeSettings&) {
+        return WorkingSetMember::deserialize(buf);
+    }
+
+    /**
+     * Constructs an empty SortableWorkingSetMember.
+     */
+    SortableWorkingSetMember() = default;
+
+    /**
+     * Constructs a SortableWorkingSetMember from a regular WorkingSetMember. Supports implicit
+     * conversion from WorkingSetMember.
+     */
+    /* implicit */ SortableWorkingSetMember(WorkingSetMember&& wsm)
+        : _holder(std::make_shared<WorkingSetMember>(std::move(wsm))) {}
+
+    void serializeForSorter(BufBuilder& buf) const {
+        _holder->serialize(buf);
+    }
+
+    int memUsageForSorter() const {
+        return _holder->getMemUsage();
+    }
+
+    /**
+     * Extracts and returns the underlying WorkingSetMember held by this SortableWorkingSetMember.
+     */
+    WorkingSetMember extract() {
+        return std::move(*_holder);
+    }
+
+    /**
+     * Returns a reference to the underlying WorkingSetMember.
+     */
+    const WorkingSetMember* operator->() const {
+        return _holder.get();
+    }
+
+    SortableWorkingSetMember getOwned() const;
+
+private:
+    std::shared_ptr<WorkingSetMember> _holder;
 };
 
 /**

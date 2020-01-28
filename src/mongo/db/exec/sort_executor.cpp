@@ -29,8 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/sort_executor.h"
+
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/exec/working_set.h"
 
 namespace mongo {
 namespace {
@@ -57,5 +59,5 @@ MONGO_CREATE_SORTER(mongo::Value,
                     mongo::Document,
                     mongo::SortExecutor<mongo::Document>::Comparator);
 MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::WorkingSetMember,
-                    mongo::SortExecutor<mongo::WorkingSetMember>::Comparator);
+                    mongo::SortableWorkingSetMember,
+                    mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
