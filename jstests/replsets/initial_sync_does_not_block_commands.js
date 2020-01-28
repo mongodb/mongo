@@ -1,7 +1,7 @@
 /**
  * Checks that the 'dbStats' and 'collStats' commands do not block during initial sync.
  *
- * @tags: [requires_replication, requires_fcv_44, requires_document_locking]
+ * @tags: [requires_replication, requires_fcv_44]
  */
 (function() {
 var name = 'initial_sync_does_not_block_commands';
