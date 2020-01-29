@@ -139,8 +139,8 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
                                                   pipeline.requiredPrivileges(unusedIsMongosFlag));
     }
 
-    return stdx::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines),
-                                                              std::move(requiredPrivileges));
+    return stdx::make_unique<DocumentSourceFacet::LiteParsed>(
+        spec.fieldName(), std::move(liteParsedPipelines), std::move(requiredPrivileges));
 }
 
 stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()

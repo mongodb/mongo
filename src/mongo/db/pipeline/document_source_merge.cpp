@@ -316,8 +316,16 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
 
     PrivilegeVector privileges{{ResourcePattern::forExactNamespace(targetNss), actions}};
 
-    return stdx::make_unique<DocumentSourceMerge::LiteParsed>(std::move(targetNss),
-                                                              std::move(privileges));
+    std::vector<LiteParsedPipeline> subPipeline = {};
+    if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
+        auto pipeline = mergeSpec.getWhenMatched()->pipeline;
+        invariant(pipeline);
+        AggregationRequest subRequest(targetNss, *pipeline);
+        LiteParsedPipeline lpp(subRequest);
+        subPipeline.push_back(std::move(lpp));
+    }
+    return std::make_unique<DocumentSourceMerge::LiteParsed>(
+        spec.fieldName(), std::move(targetNss), std::move(privileges), std::move(subPipeline));
 }
 
 DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,

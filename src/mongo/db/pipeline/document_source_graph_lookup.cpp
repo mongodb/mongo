@@ -75,7 +75,7 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
     PrivilegeVector privileges{
         Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)};
 
-    return std::make_unique<LiteParsed>(std::move(nss), std::move(privileges));
+    return std::make_unique<LiteParsed>(spec.fieldName(), std::move(nss), std::move(privileges));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,

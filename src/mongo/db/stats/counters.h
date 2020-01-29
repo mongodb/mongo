@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/with_alignment.h"
 
 namespace mongo {
@@ -139,4 +143,20 @@ private:
 };
 
 extern NetworkCounter networkCounter;
+
+class AggStageCounters {
+public:
+    // Container for a stage count metric along with its corresponding counter.
+    struct StageCounter {
+        StageCounter(StringData name) : metric("aggStageCounters." + name, &counter) {}
+
+        Counter64 counter;
+        ServerStatusMetricField<Counter64> metric;
+    };
+
+    // Map of aggregation stages to the number of occurrences.
+    StringMap<std::unique_ptr<StageCounter>> stageCounterMap = {};
+};
+
+extern AggStageCounters aggStageCounters;
 }  // namespace mongo

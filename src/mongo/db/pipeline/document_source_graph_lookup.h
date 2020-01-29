@@ -41,9 +41,11 @@ class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     class LiteParsed : public LiteParsedDocumentSourceForeignCollections {
     public:
-        LiteParsed(NamespaceString foreignNss, PrivilegeVector privileges)
-            : LiteParsedDocumentSourceForeignCollections(std::move(foreignNss),
-                                                         std::move(privileges)) {}
+        LiteParsed(std::string parseTimeName,
+                   NamespaceString foreignNss,
+                   PrivilegeVector privileges)
+            : LiteParsedDocumentSourceForeignCollections(
+                  std::move(parseTimeName), std::move(foreignNss), std::move(privileges)) {}
 
         bool allowShardedForeignCollection(NamespaceString nss) const override {
             return (_foreignNssSet.find(nss) == _foreignNssSet.end());

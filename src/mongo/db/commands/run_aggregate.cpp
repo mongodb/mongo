@@ -520,9 +520,9 @@ Status runAggregate(OperationContext* opCtx,
 
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
+    const LiteParsedPipeline liteParsedPipeline(request);
     auto curOp = CurOp::get(opCtx);
     {
-        const LiteParsedPipeline liteParsedPipeline(request);
 
         try {
             // Check whether the parsed pipeline supports the given read concern.
@@ -756,6 +756,9 @@ Status runAggregate(OperationContext* opCtx,
         cursors.emplace_back(pin.getCursor());
         pins.emplace_back(std::move(pin));
     }
+
+    // Report usage statistics for each stage in the pipeline.
+    liteParsedPipeline.tickGlobalStageCounters();
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {

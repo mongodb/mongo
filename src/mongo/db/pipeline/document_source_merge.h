@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_writer.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
 
@@ -72,13 +73,29 @@ public:
     public:
         using LiteParsedDocumentSourceForeignCollections::
             LiteParsedDocumentSourceForeignCollections;
+        LiteParsed(std::string parseTimeName,
+                   NamespaceString foreignNss,
+                   PrivilegeVector privileges,
+                   std::vector<LiteParsedPipeline> onMatchedPipeline)
+            : LiteParsedDocumentSourceForeignCollections(
+                  std::move(parseTimeName), std::move(foreignNss), std::move(privileges)),
+              _onMatchedPipeline(std::move(onMatchedPipeline)) {}
 
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec);
 
+        const std::vector<LiteParsedPipeline>& getSubPipelines() const final {
+            return _onMatchedPipeline;
+        }
+
         bool allowedToPassthroughFromMongos() const final {
             return false;
         }
+
+    private:
+        // This corresponds to the pipeline supplied to the 'onMatched' field in $merge and holds
+        // at most one element.
+        std::vector<LiteParsedPipeline> _onMatchedPipeline;
     };
 
     virtual ~DocumentSourceMerge() = default;

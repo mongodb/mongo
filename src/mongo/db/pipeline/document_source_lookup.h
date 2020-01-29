@@ -64,10 +64,12 @@ public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec);
 
-        LiteParsed(NamespaceString fromNss,
+        LiteParsed(std::string parseTimeName,
+                   NamespaceString fromNss,
                    stdx::unordered_set<NamespaceString> foreignNssSet,
-                   boost::optional<LiteParsedPipeline> liteParsedPipeline)
-            : _fromNss{std::move(fromNss)},
+                   std::vector<LiteParsedPipeline> liteParsedPipeline)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _fromNss{std::move(fromNss)},
               _foreignNssSet(std::move(foreignNssSet)),
               _liteParsedPipeline(std::move(liteParsedPipeline)) {}
 
@@ -81,9 +83,10 @@ public:
                 &requiredPrivileges,
                 Privilege(ResourcePattern::forExactNamespace(_fromNss), ActionType::find));
 
-            if (_liteParsedPipeline) {
+            if (!_liteParsedPipeline.empty()) {
+                invariant(_liteParsedPipeline.size() == 1);
                 Privilege::addPrivilegesToPrivilegeVector(
-                    &requiredPrivileges, _liteParsedPipeline->requiredPrivileges(isMongos));
+                    &requiredPrivileges, _liteParsedPipeline[0].requiredPrivileges(isMongos));
             }
 
             return requiredPrivileges;
@@ -103,13 +106,18 @@ public:
 
         bool allowedToPassthroughFromMongos() const {
             // If a sub-pipeline exists, check that all its stages are allowed to pass through.
-            return !_liteParsedPipeline || _liteParsedPipeline->allowedToPassthroughFromMongos();
+            return _liteParsedPipeline.empty() ||
+                _liteParsedPipeline[0].allowedToPassthroughFromMongos();
+        }
+
+        const std::vector<LiteParsedPipeline>& getSubPipelines() const override {
+            return _liteParsedPipeline;
         }
 
     private:
         const NamespaceString _fromNss;
         const stdx::unordered_set<NamespaceString> _foreignNssSet;
-        const boost::optional<LiteParsedPipeline> _liteParsedPipeline;
+        const std::vector<LiteParsedPipeline> _liteParsedPipeline;
     };
 
     GetNextResult getNext() final;

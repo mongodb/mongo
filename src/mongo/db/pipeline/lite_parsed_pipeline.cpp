@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -91,6 +92,20 @@ bool LiteParsedPipeline::verifyIsSupported(
                 allowShardedForeignCollection(nss) || !sharded);
     }
     return sharded;
+}
+
+void LiteParsedPipeline::tickGlobalStageCounters() const {
+    for (auto&& stage : _stageSpecs) {
+        // Tick counter corresponding to current stage.
+        auto entry = aggStageCounters.stageCounterMap.find(stage->getParseTimeName());
+        invariant(entry != aggStageCounters.stageCounterMap.end());
+        entry->second->counter.increment(1);
+
+        // Recursively step through any sub-pipelines.
+        for (auto&& subPipeline : stage->getSubPipelines()) {
+            subPipeline.tickGlobalStageCounters();
+        }
+    }
 }
 
 }  // namespace mongo

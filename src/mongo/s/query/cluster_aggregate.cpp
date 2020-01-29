@@ -733,6 +733,21 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const AggregationRequest& request,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
+    LiteParsedPipeline litePipe(request);
+    auto status = runAggregate(opCtx, namespaces, request, litePipe, privileges, result);
+    if (status.isOK()) {
+        // Report usage statistics for each stage in the pipeline.
+        litePipe.tickGlobalStageCounters();
+    }
+    return status;
+}
+
+Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      const Namespaces& namespaces,
+                                      const AggregationRequest& request,
+                                      const LiteParsedPipeline& litePipe,
+                                      const PrivilegeVector& privileges,
+                                      BSONObjBuilder* result) {
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
     uassert(51143,
             "Cannot specify runtime constants option to a mongos",
@@ -749,7 +764,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto executionNsRoutingInfoStatus =
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
-    LiteParsedPipeline litePipe(request);
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) -> bool {
         const auto resolvedNsRoutingInfo =
             uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));

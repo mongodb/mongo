@@ -159,4 +159,5 @@ void NetworkCounter::append(BSONObjBuilder& b) {
 OpCounters globalOpCounters;
 OpCounters replOpCounters;
 NetworkCounter networkCounter;
+AggStageCounters aggStageCounters;
 }  // namespace mongo

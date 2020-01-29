@@ -84,6 +84,16 @@ public:
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
                                const AggregationRequest& request,
+                               const LiteParsedPipeline& liteParsedPipeline,
+                               const PrivilegeVector& privileges,
+                               BSONObjBuilder* result);
+
+    /**
+     * Convenience version that internally constructs the LiteParsedPipeline.
+     */
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               const AggregationRequest& request,
                                const PrivilegeVector& privileges,
                                BSONObjBuilder* result);
 
