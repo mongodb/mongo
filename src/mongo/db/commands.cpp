@@ -541,7 +541,16 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                                                   const CommandInvocation* invocation) {
     bool closeConnection;
     bool hasErrorCode;
-    long long errorCode;
+    /**
+     * Default value is used to suppress the uassert for `errorExtraInfo` if `errorCode` is not set.
+     */
+    long long errorCode = ErrorCodes::OK;
+    bool hasExtraInfo;
+    /**
+     * errorExtraInfo only holds a reference to the BSONElement of the parent object (data).
+     * The copy constructor of BSONObj handles cloning to keep references valid outside the scope.
+     */
+    BSONElement errorExtraInfo;
     const Command* cmd = invocation->definition();
     failCommand.executeIf(
         [&](const BSONObj& data) {
@@ -561,7 +570,14 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                 uasserted(50985, "Failing command due to 'failCommand' failpoint");
             }
 
-            if (hasErrorCode) {
+            if (hasExtraInfo) {
+                log() << "Failing command '" << cmd->getName()
+                      << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
+                      << " and " << errorExtraInfo << ".";
+                uassertStatusOK(Status(ErrorCodes::Error(errorCode),
+                                       "Failing command due to 'failCommand' failpoint",
+                                       errorExtraInfo.Obj()));
+            } else if (hasErrorCode) {
                 log() << "Failing command '" << cmd->getName()
                       << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
                       << ".";
@@ -575,6 +591,9 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                 closeConnection;
             hasErrorCode = data.hasField("errorCode") &&
                 bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
+            hasExtraInfo = data.hasField("errorExtraInfo") &&
+                bsonExtractTypedField(data, "errorExtraInfo", BSONType::Object, &errorExtraInfo)
+                    .isOK();
             return shouldActivateFailCommandFailPoint(data, invocation, opCtx->getClient()) &&
                 (closeConnection || hasErrorCode);
         });
