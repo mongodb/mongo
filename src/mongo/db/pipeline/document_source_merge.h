@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_writer.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
 
@@ -68,21 +69,22 @@ public:
      * collection is unsharded. This ensures that the unique index verification happens once on
      * mongos and can be bypassed on the shards.
      */
-    class LiteParsed final : public LiteParsedDocumentSourceForeignCollection {
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
     public:
-        LiteParsed(NamespaceString foreignNss,
+        LiteParsed(std::string parseTimeName,
+                   NamespaceString foreignNss,
                    MergeWhenMatchedModeEnum whenMatched,
-                   MergeWhenNotMatchedModeEnum whenNotMatched)
-            : LiteParsedDocumentSourceForeignCollection(std::move(foreignNss)),
+                   MergeWhenNotMatchedModeEnum whenNotMatched,
+                   boost::optional<LiteParsedPipeline> onMatchedPipeline)
+            : LiteParsedDocumentSourceNestedPipelines(
+                  std::move(parseTimeName), std::move(foreignNss), std::move(onMatchedPipeline)),
               _whenMatched(whenMatched),
               _whenNotMatched(whenNotMatched) {}
-
-        using LiteParsedDocumentSourceForeignCollection::LiteParsedDocumentSourceForeignCollection;
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        bool allowedToPassthroughFromMongos() const final {
+        bool allowedToPassthroughFromMongos() const {
             return false;
         }
 

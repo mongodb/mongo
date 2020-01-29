@@ -345,9 +345,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }();
 
-    if (status.isOK())
+    if (status.isOK()) {
         updateHostsTargetedMetrics(opCtx, namespaces.executionNss, routingInfo, involvedNamespaces);
-
+        // Report usage statistics for each stage in the pipeline.
+        liteParsedPipeline.tickGlobalStageCounters();
+    }
     return status;
 }
 

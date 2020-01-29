@@ -40,6 +40,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -507,6 +508,15 @@ private:
                 debug.additiveMetrics.nMatched =
                     response.getN() - (debug.upsert ? response.sizeUpsertDetails() : 0);
                 debug.additiveMetrics.nModified = response.getNModified();
+                for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
+                    // If this was a pipeline style update, record which stages were being used.
+                    auto updateMod = update.getU();
+                    if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
+                        auto pipeline = LiteParsedPipeline(_batchedRequest.getNS(),
+                                                           updateMod.getUpdatePipeline());
+                        pipeline.tickGlobalStageCounters();
+                    }
+                }
                 break;
             case BatchedCommandRequest::BatchType_Delete:
                 for (size_t i = 0; i < numAttempts; ++i) {

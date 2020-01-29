@@ -43,8 +43,9 @@ public:
 
     class LiteParsed : public LiteParsedDocumentSourceForeignCollection {
     public:
-        LiteParsed(NamespaceString foreignNss)
-            : LiteParsedDocumentSourceForeignCollection(std::move(foreignNss)) {}
+        LiteParsed(std::string parseTimeName, NamespaceString foreignNss)
+            : LiteParsedDocumentSourceForeignCollection(std::move(parseTimeName),
+                                                        std::move(foreignNss)) {}
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);

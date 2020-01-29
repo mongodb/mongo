@@ -157,6 +157,11 @@ public:
         return !_stageSpecs.empty() && _stageSpecs.front()->isInitialSource();
     }
 
+    /**
+     * Increments global stage counters corresponding to the stages in this lite parsed pipeline.
+     */
+    void tickGlobalStageCounters() const;
+
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 };

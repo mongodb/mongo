@@ -85,7 +85,7 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $graphLookup namespace: " << fromNss.ns(),
             fromNss.isValid());
-    return std::make_unique<LiteParsed>(std::move(fromNss));
+    return std::make_unique<LiteParsed>(spec.fieldName(), std::move(fromNss));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,

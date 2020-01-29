@@ -100,7 +100,8 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
         }
     }
 
-    return std::make_unique<DocumentSourceCurrentOp::LiteParsed>(allUsers, localOps);
+    return std::make_unique<DocumentSourceCurrentOp::LiteParsed>(
+        spec.fieldName(), allUsers, localOps);
 }
 
 const char* DocumentSourceCurrentOp::getSourceName() const {

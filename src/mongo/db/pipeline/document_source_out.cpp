@@ -91,7 +91,7 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
 
-    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss));
+    return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
@@ -106,7 +106,7 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
 
-    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss));
+    return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
 void DocumentSourceOut::initialize() {

@@ -52,7 +52,6 @@
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -766,6 +765,9 @@ Status runAggregate(OperationContext* opCtx,
         cursors.emplace_back(pin.getCursor());
         pins.emplace_back(std::move(pin));
     }
+
+    // Report usage statistics for each stage in the pipeline.
+    liteParsedPipeline.tickGlobalStageCounters();
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {

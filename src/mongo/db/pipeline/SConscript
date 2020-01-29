@@ -184,6 +184,7 @@ env.Library(
         'lite_parsed_pipeline.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/stats/counters',
         'aggregation_request',
     ]
 )

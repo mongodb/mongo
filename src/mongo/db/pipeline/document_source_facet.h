@@ -72,8 +72,9 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::vector<LiteParsedPipeline> pipelines)
-            : LiteParsedDocumentSourceNestedPipelines(boost::none, std::move(pipelines)) {}
+        LiteParsed(std::string parseTimeName, std::vector<LiteParsedPipeline> pipelines)
+            : LiteParsedDocumentSourceNestedPipelines(
+                  std::move(parseTimeName), boost::none, std::move(pipelines)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override final {

@@ -30,20 +30,26 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/util/string_map.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
 using Parser = LiteParsedDocumentSource::Parser;
 
 namespace {
+
+// Empty vector used by LiteParsedDocumentSources which do not have a sub pipeline.
+inline static std::vector<LiteParsedPipeline> kNoSubPipeline = {};
+
 StringMap<Parser> parserMap;
+
 }  // namespace
 
 void LiteParsedDocumentSource::registerParser(const std::string& name, Parser parser) {
     parserMap[name] = parser;
+    // Initialize a counter for this document source to track how many times it is used.
+    aggStageCounters.stageCounterMap[name] = std::make_unique<AggStageCounters::StageCounter>(name);
 }
 
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
@@ -63,14 +69,24 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     return it->second(nss, specElem);
 }
 
-LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
-    boost::optional<NamespaceString> foreignNss, std::vector<LiteParsedPipeline> pipelines)
-    : _foreignNss(std::move(foreignNss)), _pipelines(std::move(pipelines)) {}
+const std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getSubPipelines() const {
+    return kNoSubPipeline;
+}
 
 LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
-    boost::optional<NamespaceString> foreignNss, boost::optional<LiteParsedPipeline> pipeline)
-    : LiteParsedDocumentSourceNestedPipelines(std::move(foreignNss),
-                                              std::vector<LiteParsedPipeline>{}) {
+    std::string parseTimeName,
+    boost::optional<NamespaceString> foreignNss,
+    std::vector<LiteParsedPipeline> pipelines)
+    : LiteParsedDocumentSource(std::move(parseTimeName)),
+      _foreignNss(std::move(foreignNss)),
+      _pipelines(std::move(pipelines)) {}
+
+LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
+    std::string parseTimeName,
+    boost::optional<NamespaceString> foreignNss,
+    boost::optional<LiteParsedPipeline> pipeline)
+    : LiteParsedDocumentSourceNestedPipelines(
+          std::move(parseTimeName), std::move(foreignNss), std::vector<LiteParsedPipeline>{}) {
     if (pipeline)
         _pipelines.emplace_back(std::move(pipeline.get()));
 }

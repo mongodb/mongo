@@ -231,4 +231,5 @@ OpCounters globalOpCounters;
 OpCounters replOpCounters;
 NetworkCounter networkCounter;
 AuthCounter authCounter;
+AggStageCounters aggStageCounters;
 }  // namespace mongo

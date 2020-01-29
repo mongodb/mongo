@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -52,6 +53,9 @@ class LiteParsedPipeline;
  */
 class LiteParsedDocumentSource {
 public:
+    LiteParsedDocumentSource(std::string parseTimeName)
+        : _parseTimeName(std::move(parseTimeName)) {}
+
     virtual ~LiteParsedDocumentSource() = default;
 
     /*
@@ -64,7 +68,6 @@ public:
      */
     using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(const NamespaceString&,
                                                                            const BSONElement&)>;
-
     /**
      * Registers a DocumentSource with a spec parsing function, so that when a stage with the given
      * name is encountered, it will call 'parser' to construct that stage's specification object.
@@ -146,6 +149,19 @@ public:
      */
     virtual void assertSupportsMultiDocumentTransaction() const {}
 
+    /**
+     * Returns this document source's subpipelines. If none exist, a reference to an empty vector
+     * is returned.
+     */
+    virtual const std::vector<LiteParsedPipeline>& getSubPipelines() const;
+
+    /**
+     * Returns the name of the stage that this LiteParsedDocumentSource represents.
+     */
+    const std::string& getParseTimeName() const {
+        return _parseTimeName;
+    }
+
 protected:
     void transactionNotSupported(StringData stageName) const {
         uasserted(ErrorCodes::OperationNotSupportedInTransaction,
@@ -175,6 +191,9 @@ protected:
         return onlySingleReadConcernSupported(
             stageName, repl::ReadConcernLevel::kLocalReadConcern, level);
     }
+
+private:
+    std::string _parseTimeName;
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {
@@ -186,10 +205,11 @@ public:
      */
     static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(const NamespaceString& nss,
                                                                   const BSONElement& spec) {
-        return std::make_unique<LiteParsedDocumentSourceDefault>();
+        return std::make_unique<LiteParsedDocumentSourceDefault>(spec.fieldName());
     }
 
-    LiteParsedDocumentSourceDefault() = default;
+    LiteParsedDocumentSourceDefault(std::string parseTimeName)
+        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
@@ -205,8 +225,8 @@ public:
  */
 class LiteParsedDocumentSourceForeignCollection : public LiteParsedDocumentSource {
 public:
-    LiteParsedDocumentSourceForeignCollection(NamespaceString foreignNss)
-        : _foreignNss(std::move(foreignNss)) {}
+    LiteParsedDocumentSourceForeignCollection(std::string parseTimeName, NamespaceString foreignNss)
+        : LiteParsedDocumentSource(std::move(parseTimeName)), _foreignNss(std::move(foreignNss)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {_foreignNss};
@@ -224,17 +244,23 @@ protected:
  */
 class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSource {
 public:
-    LiteParsedDocumentSourceNestedPipelines(boost::optional<NamespaceString> foreignNss,
+    LiteParsedDocumentSourceNestedPipelines(std::string parseTimeName,
+                                            boost::optional<NamespaceString> foreignNss,
                                             std::vector<LiteParsedPipeline> pipelines);
 
-    LiteParsedDocumentSourceNestedPipelines(boost::optional<NamespaceString> foreignNss,
+    LiteParsedDocumentSourceNestedPipelines(std::string parseTimeName,
+                                            boost::optional<NamespaceString> foreignNss,
                                             boost::optional<LiteParsedPipeline> pipeline);
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final override;
 
-    bool allowedToPassthroughFromMongos() const final override;
+    bool allowedToPassthroughFromMongos() const override;
 
     bool allowShardedForeignCollection(NamespaceString nss) const override;
+
+    const std::vector<LiteParsedPipeline>& getSubPipelines() const override {
+        return _pipelines;
+    }
 
 protected:
     boost::optional<NamespaceString> _foreignNss;

@@ -46,10 +46,11 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(nss);
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss);
         }
 
-        explicit LiteParsed(NamespaceString nss) : _nss(std::move(nss)) {}
+        explicit LiteParsed(std::string parseTimeName, NamespaceString nss)
+            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

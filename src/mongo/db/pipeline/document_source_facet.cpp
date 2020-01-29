@@ -114,7 +114,8 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
         liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, rawPipeline.second));
     }
 
-    return std::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines));
+    return std::make_unique<DocumentSourceFacet::LiteParsed>(spec.fieldName(),
+                                                             std::move(liteParsedPipelines));
 }
 
 REGISTER_DOCUMENT_SOURCE(facet,

@@ -329,19 +329,28 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
                                       MergeWhenMatchedMode_serializer(whenMatched),
                                       MergeWhenNotMatchedMode_serializer(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
-
-    return std::make_unique<DocumentSourceMerge::LiteParsed>(
-        std::move(targetNss), whenMatched, whenNotMatched);
+    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
+        auto pipeline = mergeSpec.getWhenMatched()->pipeline;
+        invariant(pipeline);
+        liteParsedPipeline = LiteParsedPipeline(nss, *pipeline);
+    }
+    return std::make_unique<DocumentSourceMerge::LiteParsed>(spec.fieldName(),
+                                                             std::move(targetNss),
+                                                             whenMatched,
+                                                             whenNotMatched,
+                                                             std::move(liteParsedPipeline));
 }
 
 PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(
     bool isMongos, bool bypassDocumentValidation) const {
+    invariant(_foreignNss);
     auto actions = ActionSet{getDescriptors().at({_whenMatched, _whenNotMatched}).actions};
     if (bypassDocumentValidation) {
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    return {{ResourcePattern::forExactNamespace(_foreignNss), actions}};
+    return {{ResourcePattern::forExactNamespace(*_foreignNss), actions}};
 }
 
 DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,

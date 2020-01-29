@@ -64,8 +64,11 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(NamespaceString foreignNss, boost::optional<LiteParsedPipeline> pipeline)
-            : LiteParsedDocumentSourceNestedPipelines(std::move(foreignNss), std::move(pipeline)) {}
+        LiteParsed(std::string parseTimeName,
+                   NamespaceString foreignNss,
+                   boost::optional<LiteParsedPipeline> pipeline)
+            : LiteParsedDocumentSourceNestedPipelines(
+                  std::move(parseTimeName), std::move(foreignNss), std::move(pipeline)) {}
 
         /**
          * Lookup from a sharded collection may not be allowed.
