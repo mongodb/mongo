@@ -3743,6 +3743,33 @@ env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 env.Tool('ccache')
 env.Tool('icecream')
 
+resmoke_config = env.Substfile(
+    target="#resmoke.ini",
+    source="buildscripts/resmoke.ini.in",
+    SUBST_DICT={
+        "@install_dir@": "$PREFIX_BINDIR" if get_option("install-mode") == "hygienic" else env.Dir("#").abspath,
+    }
+)
+
+# Substfile does a poor job of detecting if it needs to rebuild a
+# file. Since this file is cheap to generate we make it always build
+# because it's better to spend the < 1 second generating it than
+# having a developer waste time debugging why they're running the
+# wrong binaries from Resmoke.
+#
+# This doesn't make this file always generate, it only generates if
+# the below Depends wiring have changed. Basically it skips SCons'
+# Deciders
+env.AlwaysBuild(resmoke_config)
+if get_option("install-mode") == "hygienic":
+    # We only need to change the config if PREFIX_BINDIR has changed
+    # since Resmoke's installDir flag points here.
+    env.Depends(env.Dir("$PREFIX_BINDIR"), resmoke_config)
+else:
+    # This depends really isn't true but it's the only reliable way
+    # for non-hygienic builds to make sure this file is made.
+    env.Depends(env.Dir("$BUILD_DIR"), resmoke_config)
+
 if get_option('ninja') == 'true':
     ninja_builder = Tool("ninja")
     ninja_builder.generate(env)
@@ -3765,6 +3792,7 @@ if get_option('ninja') == 'true':
             source=[
                 env.Alias("install-all-meta"),
                 env.Alias("test-execution-aliases"),
+                resmoke_config,
             ],
         )
     else:
@@ -3773,6 +3801,7 @@ if get_option('ninja') == 'true':
             source=[
                 env.Alias("all"),
                 env.Alias("test-execution-aliases"),
+                resmoke_config,
             ],
         )
 
@@ -4337,6 +4366,7 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['StaticLibrary'])
         addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
+
 
 env.SConscript(
     dirs=[
