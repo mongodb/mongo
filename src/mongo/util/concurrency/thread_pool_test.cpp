@@ -279,4 +279,36 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
     ASSERT_EQUALS(options.threadNamePrefix + "0", taskThreadName);
 }
 
+TEST(ThreadPoolTest, JoinAllRetiredThreads) {
+    AtomicWord<unsigned long> retiredThreads(0);
+    ThreadPool::Options options;
+    options.minThreads = 4;
+    options.maxThreads = 8;
+    options.maxIdleThreadAge = Milliseconds(100);
+    options.onJoinRetiredThread = [&](const stdx::thread& t) { retiredThreads.addAndFetch(1); };
+    unittest::Barrier barrier(options.maxThreads + 1);
+
+    ThreadPool pool(options);
+    for (auto i = options.maxThreads; i > 0; i--) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    pool.startup();
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepmillis(100);
+    }
+
+    pool.shutdown();
+    pool.join();
+
+    const auto expectedRetiredThreads = options.maxThreads - options.minThreads;
+    ASSERT_EQ(retiredThreads.load(), expectedRetiredThreads);
+    ASSERT_EQ(pool.getStats().numIdleThreads, 0);
+}
+
 }  // namespace

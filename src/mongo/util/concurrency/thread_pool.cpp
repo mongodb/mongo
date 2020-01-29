@@ -134,6 +134,15 @@ void ThreadPool::join() {
     _join_inlock(&lk);
 }
 
+void ThreadPool::_joinRetired_inlock() {
+    while (!_retiredThreads.empty()) {
+        auto& t = _retiredThreads.front();
+        t.join();
+        _options.onJoinRetiredThread(t);
+        _retiredThreads.pop_front();
+    }
+}
+
 void ThreadPool::_join_inlock(stdx::unique_lock<Latch>* lk) {
     _stateChange.wait(*lk, [this] {
         switch (_state) {
@@ -158,6 +167,7 @@ void ThreadPool::_join_inlock(stdx::unique_lock<Latch>* lk) {
         lk->lock();
     }
     --_numIdleThreads;
+    _joinRetired_inlock();
     ThreadList threadsToJoin;
     swap(threadsToJoin, _threads);
     lk->unlock();
@@ -239,7 +249,7 @@ ThreadPool::Stats ThreadPool::getStats() const {
     return result;
 }
 
-void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadName) {
+void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadName) noexcept {
     setThreadName(threadName);
     pool->_options.onCreateThread(threadName);
     const auto poolName = pool->_options.poolName;
@@ -260,6 +270,13 @@ void ThreadPool::_consumeTasks() {
     stdx::unique_lock<Latch> lk(_mutex);
     while (_state == running) {
         if (_pendingTasks.empty()) {
+            /**
+             * Help with garbage collecting retired threads to:
+             * * Reduce the memory overhead of _retiredThreads
+             * * Expedite the shutdown process
+             */
+            _joinRetired_inlock();
+
             if (_threads.size() > _options.minThreads) {
                 // Since there are more than minThreads threads, this thread may be eligible for
                 // retirement. If it isn't now, it may be later, so it must put a time limit on how
@@ -315,14 +332,14 @@ void ThreadPool::_consumeTasks() {
     }
 
     // This thread is ending because it was idle for too long.  Find self in _threads, remove self
-    // from _threads, detach self.
+    // from _threads, and add self to the list of retired threads.
     for (size_t i = 0; i < _threads.size(); ++i) {
         auto& t = _threads[i];
         if (t.get_id() != stdx::this_thread::get_id()) {
             continue;
         }
-        t.detach();
-        t.swap(_threads.back());
+        std::swap(t, _threads.back());
+        _retiredThreads.push_back(std::move(_threads.back()));
         _threads.pop_back();
         return;
     }

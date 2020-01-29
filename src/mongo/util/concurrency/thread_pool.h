@@ -92,6 +92,14 @@ public:
         // This function is run before each worker thread begins consuming tasks.
         using OnCreateThreadFn = std::function<void(const std::string& threadName)>;
         OnCreateThreadFn onCreateThread = [](const std::string&) {};
+
+        /**
+         * This function is called after joining each retired thread.
+         * Since there could be multiple calls to this function in a single critical section,
+         * avoid complex logic in the callback.
+         */
+        using OnJoinRetiredThreadFn = std::function<void(const stdx::thread&)>;
+        OnJoinRetiredThreadFn onJoinRetiredThread = [](const stdx::thread&) {};
     };
 
     /**
@@ -146,6 +154,7 @@ public:
 private:
     using TaskList = std::deque<Task>;
     using ThreadList = std::vector<stdx::thread>;
+    using RetiredThreadList = std::list<stdx::thread>;
 
     /**
      * Representation of the stage of life of a thread pool.
@@ -169,7 +178,7 @@ private:
      * As such, it is advisable to pass the pool pointer as an explicit argument, rather
      * than as the implicit "this" argument.
      */
-    static void _workerThreadBody(ThreadPool* pool, const std::string& threadName);
+    static void _workerThreadBody(ThreadPool* pool, const std::string& threadName) noexcept;
 
     /**
      * Starts a worker thread, unless _options.maxThreads threads are already running or
@@ -210,6 +219,14 @@ private:
      */
     void _setState_inlock(LifecycleState newState);
 
+    /**
+     * Waits for all remaining retired threads to join.
+     * If a thread's _workerThreadBody() were ever to attempt to reacquire
+     * ThreadPool::_mutex after that thread had been added to _retiredThreads,
+     * it could cause a deadlock.
+     */
+    void _joinRetired_inlock();
+
     // These are the options with which the pool was configured at construction time.
     const Options _options;
 
@@ -237,6 +254,9 @@ private:
 
     // List of threads serving as the worker pool.
     ThreadList _threads;
+
+    // List of threads that are retired and pending join
+    RetiredThreadList _retiredThreads;
 
     // Count of idle threads.
     size_t _numIdleThreads = 0;
