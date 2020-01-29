@@ -482,7 +482,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                CollectionShardingRuntime::get(opCtx, getNss())->clearFilteringMetadata();
+                CollectionShardingRuntime::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
                 uassertStatusOK(status.withContext(
                     str::stream() << "Unable to verify migration commit for chunk: "
                                   << redact(_args.toString())
@@ -518,7 +518,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
-        CollectionShardingRuntime::get(opCtx, getNss())->clearFilteringMetadata();
+        CollectionShardingRuntime::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
 
         log() << "Failed to refresh metadata after a "
               << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")

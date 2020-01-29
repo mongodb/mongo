@@ -87,14 +87,17 @@ protected:
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
         auto* const css = CollectionShardingRuntime::get(operationContext(), kNss);
-        css->setFilteringMetadata(operationContext(), CollectionMetadata(cm, ShardId("thisShard")));
+
+        css->refreshMetadata(operationContext(),
+                             stdx::make_unique<CollectionMetadata>(cm, ShardId("thisShard")));
     }
 
     void tearDown() override {
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
             auto* const css = CollectionShardingRuntime::get(operationContext(), kNss);
-            css->clearFilteringMetadata();
+
+            css->refreshMetadata(operationContext(), nullptr);
         }
 
         ShardServerTestFixture::tearDown();

@@ -61,25 +61,19 @@ public:
     static CollectionShardingRuntime* get(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Updates the collection's filtering metadata based on changes received from the config server
-     * and also resolves the pending receives map in case some of these pending receives have
-     * committed on the config server or have been abandoned by the donor shard.
+     * Updates the metadata based on changes received from the config server and also resolves the
+     * pending receives map in case some of these pending receives have completed or have been
+     * abandoned.  If newMetadata is null, unshard the collection.
      *
-     * This method must be called with an exclusive collection lock and it does not acquire any
-     * locks itself.
+     * Must always be called with an exclusive collection lock.
      */
-    void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata);
+    void refreshMetadata(OperationContext* opCtx, std::unique_ptr<CollectionMetadata> newMetadata);
 
     /**
-     * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
-     * shard version match will fail with StaleConfig errors in order to trigger an update.
-     *
-     * It is safe to call this method with only an intent lock on the collection (as opposed to
-     * setFilteringMetadata which requires exclusive), however note that clearing a collection's
-     * filtering metadata will interrupt all in-progress orphan cleanups in which case orphaned data
-     * will remain behind on disk.
+     * Marks the collection as not sharded at stepdown time so that no filtering will occur for
+     * slaveOk queries.
      */
-    void clearFilteringMetadata();
+    void markNotShardedAtStepdown();
 
     /**
      * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
@@ -141,6 +135,7 @@ public:
         _metadataManager->toBSONPending(bb);
     }
 
+
 private:
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         OperationContext*, NamespaceString const&, OID const&, int, CollectionRangeDeleter*);
@@ -151,8 +146,7 @@ private:
     // Contains all the metadata associated with this collection.
     std::shared_ptr<MetadataManager> _metadataManager;
 
-    boost::optional<ScopedCollectionMetadata> _getMetadata(
-        const boost::optional<mongo::LogicalTime>& atClusterTime) override;
+    ScopedCollectionMetadata _getMetadata(OperationContext* opCtx) override;
 };
 
 /**

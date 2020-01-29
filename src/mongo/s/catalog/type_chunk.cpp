@@ -85,9 +85,7 @@ Status extractObject(const BSONObj& obj, const std::string& fieldName, BSONEleme
 
 ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
     : _minKey(std::move(minKey)), _maxKey(std::move(maxKey)) {
-    dassert(SimpleBSONObjComparator::kInstance.evaluate(_minKey < _maxKey),
-            str::stream() << "Illegal chunk range: " << _minKey.toString() << ", "
-                          << _maxKey.toString());
+    dassert(SimpleBSONObjComparator::kInstance.evaluate(_minKey < _maxKey));
 }
 
 StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {

@@ -136,7 +136,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto& metadataManager = csr->_metadataManager;
 
         if (!_checkCollectionMetadataStillValid(
-                nss, epoch, forTestOnly, collection, metadataManager)) {
+                opCtx, nss, epoch, forTestOnly, collection, metadataManager)) {
             return boost::none;
         }
 
@@ -209,11 +209,10 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
 
         const auto scopedCollectionMetadata =
             metadataManager->getActiveMetadata(metadataManager, boost::none);
-        const auto& metadata = *scopedCollectionMetadata;
 
         try {
             wrote = self->_doDeletion(
-                opCtx, collection, metadata->getKeyPattern(), *range, maxToDelete);
+                opCtx, collection, scopedCollectionMetadata->getKeyPattern(), *range, maxToDelete);
         } catch (const DBException& e) {
             wrote = e.toStatus();
             warning() << e.what();
@@ -256,7 +255,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto& metadataManager = csr->_metadataManager;
 
         if (!_checkCollectionMetadataStillValid(
-                nss, epoch, forTestOnly, collection, metadataManager)) {
+                opCtx, nss, epoch, forTestOnly, collection, metadataManager)) {
             return boost::none;
         }
 
@@ -301,6 +300,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
 }
 
 bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
+    OperationContext* opCtx,
     const NamespaceString& nss,
     OID const& epoch,
     CollectionRangeDeleter* forTestOnly,
@@ -310,17 +310,7 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
     const auto scopedCollectionMetadata =
         metadataManager->getActiveMetadata(metadataManager, boost::none);
 
-    if (!scopedCollectionMetadata) {
-        LOG(0) << "Abandoning any range deletions because the metadata for " << nss.ns()
-               << " was reset";
-        stdx::lock_guard<stdx::mutex> lk(metadataManager->_managerLock);
-        metadataManager->_clearAllCleanups(lk);
-        return false;
-    }
-
-    const auto& metadata = *scopedCollectionMetadata;
-
-    if (!forTestOnly && (!collection || !metadata->isSharded())) {
+    if (!forTestOnly && (!collection || !scopedCollectionMetadata->isSharded())) {
         if (!collection) {
             LOG(0) << "Abandoning any range deletions left over from dropped " << nss.ns();
         } else {
@@ -333,9 +323,9 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
         return false;
     }
 
-    if (!forTestOnly && metadata->getCollVersion().epoch() != epoch) {
+    if (!forTestOnly && scopedCollectionMetadata->getCollVersion().epoch() != epoch) {
         LOG(1) << "Range deletion task for " << nss.ns() << " epoch " << epoch << " woke;"
-               << " (current is " << metadata->getCollVersion() << ")";
+               << " (current is " << scopedCollectionMetadata->getCollVersion() << ")";
         return false;
     }
 
