@@ -1267,6 +1267,21 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToFailsWithInitialSyncFlag) {
                        ErrorCodes::InitialSyncActive);
 }
 
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToDoesNotExceedEndPoint) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 5, 10});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(15, 15));
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(10, 10), 1));
+}
+
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoverFromOplogUpToWithoutStableCheckpoint,
              "Fatal Assertion 31399") {
@@ -1276,19 +1291,6 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     _setUpOplog(opCtx, getStorageInterface(), {5});
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
-}
-
-DEATH_TEST_F(ReplicationRecoveryTest,
-             RecoverFromOplogUpToInvalidTimestamp,
-             "Fatal Assertion 31400") {
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    auto opCtx = getOperationContext();
-
-    _setUpOplog(opCtx, getStorageInterface(), {2, 5});
-    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
-
-    recovery.recoverFromOplogUpTo(opCtx, Timestamp::max());
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest,
