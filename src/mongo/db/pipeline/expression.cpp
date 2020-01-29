@@ -4441,34 +4441,28 @@ Value ExpressionSplit::evaluate(const Document& root, Variables* variables) cons
                           << typeName(separatorArg.getType()),
             separatorArg.getType() == BSONType::String);
 
-    std::string input = inputArg.getString();
-    std::string separator = separatorArg.getString();
+    StringData input = inputArg.getStringData();
+    StringData separator = separatorArg.getStringData();
 
     uassert(40087, "$split requires a non-empty separator", !separator.empty());
 
     std::vector<Value> output;
 
-    // Keep track of the index at which the current output string began.
-    size_t splitStartIndex = 0;
+    const char* needle = separator.rawData();
+    const char* const needleEnd = needle + separator.size();
+    const char* remainingHaystack = input.rawData();
+    const char* const haystackEnd = remainingHaystack + input.size();
 
-    // Iterate through 'input' and check to see if 'separator' matches at any point.
-    for (size_t i = 0; i < input.size();) {
-        if (stringHasTokenAtIndex(i, input, separator)) {
-            // We matched; add the current string to our output and jump ahead.
-            StringData splitString(input.c_str() + splitStartIndex, i - splitStartIndex);
-            output.push_back(Value(splitString));
-            i += separator.size();
-            splitStartIndex = i;
-        } else {
-            // We did not match, continue to the next character.
-            ++i;
-        }
+    const char* it = remainingHaystack;
+    while ((it = std::search(remainingHaystack, haystackEnd, needle, needleEnd)) != haystackEnd) {
+        StringData sd(remainingHaystack, it - remainingHaystack);
+        output.push_back(Value(sd));
+        remainingHaystack = it + separator.size();
     }
 
-    StringData splitString(input.c_str() + splitStartIndex, input.size() - splitStartIndex);
+    StringData splitString(remainingHaystack, input.size() - (remainingHaystack - input.rawData()));
     output.push_back(Value(splitString));
-
-    return Value(output);
+    return Value(std::move(output));
 }
 
 REGISTER_EXPRESSION(split, ExpressionSplit::parse);
