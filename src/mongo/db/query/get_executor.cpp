@@ -178,8 +178,8 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto collMetadata =
-            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getCurrentMetadata();
+        auto collMetadata = CollectionShardingState::get(opCtx, canonicalQuery->nss())
+                                ->getMetadataForOperation(opCtx);
         if (collMetadata->isSharded()) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {
@@ -313,7 +313,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             root = make_unique<ShardFilterStage>(
                 opCtx,
-                CollectionShardingState::get(opCtx, canonicalQuery->nss())->getOrphansFilter(opCtx),
+                CollectionShardingState::get(opCtx, canonicalQuery->nss())
+                    ->getMetadataForOperation(opCtx),
                 ws,
                 root.release());
         }

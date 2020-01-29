@@ -281,6 +281,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     }
 
     if (docWasModified) {
+
         // Prepare to write back the modified document
         WriteUnitOfWork wunit(getOpCtx());
 
