@@ -502,7 +502,6 @@ public:
 private:
     void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
         try {
-            opCtx->lockState()->setDebugInfo(redact(_request->body));
             BSONObjBuilder bob = result->getBodyBuilder();
             bool ok = _command->run(opCtx, _dbName, _request->body, bob);
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
