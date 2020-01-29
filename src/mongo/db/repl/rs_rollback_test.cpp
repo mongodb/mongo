@@ -163,9 +163,9 @@ int _createIndexOnEmptyCollection(OperationContext* opCtx,
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
     _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
-        _opCtx.get(), OpTime(Timestamp(Seconds(0), 0), 0));
+        _opCtx.get(), OpTime(Timestamp(Seconds(1), 0), 0));
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(),
-                                                              OpTime(Timestamp(Seconds(1), 0), 0));
+                                                              OpTime(Timestamp(Seconds(2), 0), 0));
     auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock(),
                                RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
