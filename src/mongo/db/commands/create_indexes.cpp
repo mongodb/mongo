@@ -445,7 +445,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     statsTracker.emplace(opCtx,
                          ns,
                          Top::LockType::WriteLocked,
-                         AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                          dbProfilingLevel);
 
     MultiIndexBlock indexer;
@@ -637,7 +637,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     statsTracker.emplace(opCtx,
                          ns,
                          Top::LockType::WriteLocked,
-                         AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                          dbProfilingLevel);
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);

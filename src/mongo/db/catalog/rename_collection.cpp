@@ -360,7 +360,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     AutoStatsTracker statsTracker(opCtx,
                                   source,
                                   Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
                                   db->getProfilingLevel());
 
     if (!targetColl) {
@@ -394,7 +394,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     AutoStatsTracker statsTracker(opCtx,
                                   source,
                                   Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
                                   db->getProfilingLevel());
 
     if (targetColl) {
@@ -496,7 +496,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                                                    opCtx,
                                                    source,
                                                    Top::LockType::NotLocked,
-                                                   AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                                   AutoStatsTracker::LogMode::kUpdateCurOp,
                                                    sourceDB->getProfilingLevel());
 
     Collection* const sourceColl = sourceDB->getCollection(opCtx, source);

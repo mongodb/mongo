@@ -81,7 +81,7 @@ Status _dropView(OperationContext* opCtx,
     AutoStatsTracker statsTracker(opCtx,
                                   collectionName,
                                   Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
                                   db->getProfilingLevel());
 
     if (opCtx->writesAreReplicated() &&
@@ -122,7 +122,7 @@ Status _dropCollection(OperationContext* opCtx,
     AutoStatsTracker statsTracker(opCtx,
                                   collectionName,
                                   Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
                                   db->getProfilingLevel());
 
     if (opCtx->writesAreReplicated() &&

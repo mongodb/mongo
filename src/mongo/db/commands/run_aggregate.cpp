@@ -566,7 +566,7 @@ Status runAggregate(OperationContext* opCtx,
             statsTracker.emplace(opCtx,
                                  nss,
                                  Top::LockType::NotLocked,
-                                 AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  0);
             collatorToUse.emplace(resolveCollator(opCtx, request, nullptr));
         } else {

@@ -60,8 +60,12 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    LogMode logMode,
                                    boost::optional<int> dbProfilingLevel,
                                    Date_t deadline)
-    : _opCtx(opCtx), _lockType(lockType), _nss(nss) {
-    if (!dbProfilingLevel && logMode == LogMode::kUpdateTopAndCurop) {
+    : _opCtx(opCtx), _lockType(lockType), _nss(nss), _logMode(logMode) {
+    if (_logMode == LogMode::kUpdateTop) {
+        return;
+    }
+
+    if (!dbProfilingLevel) {
         // No profiling level was determined, attempt to read the profiling level from the Database
         // object. Since we are only reading the in-memory profiling level out of the database
         // object (which is configured on a per-node basis and not replicated or persisted), we
@@ -74,12 +78,14 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-    if (logMode == LogMode::kUpdateTopAndCurop) {
-        CurOp::get(_opCtx)->enter_inlock(_nss.ns().c_str(), dbProfilingLevel);
-    }
+    CurOp::get(_opCtx)->enter_inlock(_nss.ns().c_str(), dbProfilingLevel);
 }
 
 AutoStatsTracker::~AutoStatsTracker() {
+    if (_logMode == LogMode::kUpdateCurOp) {
+        return;
+    }
+
     auto curOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getServiceContext())
         .record(_opCtx,
