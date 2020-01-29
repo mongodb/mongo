@@ -59,9 +59,9 @@ auto kLatchViolationKey = "hierarchicalAcquisitionLevelViolations"_sd;
 const auto getLatchAnalyzer = ServiceContext::declareDecoration<LatchAnalyzer>();
 
 /**
- * DiagnosticListener sub-class to implement updating set in LatchSetState
+ * LockListener sub-class to implement updating set in LatchSetState
  */
-class DiagnosticListener : public latch_detail::DiagnosticListener {
+class LockListener : public Mutex::LockListener {
 public:
     void onContendedLock(const Identity& id) override {
         if (auto client = Client::getCurrent()) {
@@ -88,10 +88,13 @@ public:
     }
 };
 
-// Register our DiagnosticListener
-MONGO_INITIALIZER_GENERAL(LatchAnalysis, (/* NO PREREQS */), ("FinalizeDiagnosticListeners"))
+// Register our LockListener with the Mutex class
+MONGO_INITIALIZER_GENERAL(LatchAnalysis, (/* NO PREREQS */), ("FinalizeLockListeners"))
 (InitializerContext* context) {
-    latch_detail::installDiagnosticListener<DiagnosticListener>();
+
+    // Intentionally leaked, people use Latches in detached threads
+    static auto& listener = *new LockListener;
+    Mutex::addLockListener(&listener);
 
     return Status::OK();
 }

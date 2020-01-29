@@ -44,11 +44,11 @@ namespace mongo {
  * LatchAnalyzer is a ServiceContext decoration that aggregates latch events
  *
  * This class is intended to provide a platform for hierarchical analysis on latches. To that end,
- * onContention(), onAcquire(), and onRelease() are currently called by a
- * latch_detail::DiagnosticListener subclass defined in source. This class does much more work for
- * each event when the enableLatchAnalysis failpoint is set to "alwaysOn". This failpoint provides a
- * wealth of data for future analysis, but involves additional mutexes and mapping structures that
- * may prove too costly for production usage at the least.
+ * onContention(), onAcquire(), and onRelease() are currently called by a Mutex::LockListener
+ * subclass defined in source. This class does much more work for each event when the
+ * enableLatchAnalysis failpoint is set to "alwaysOn". This failpoint provides a wealth of data for
+ * future analysis, but involves additional mutexes and mapping structures that may prove too costly
+ * for production usage at the least.
  */
 class LatchAnalyzer {
 public:
