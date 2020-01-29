@@ -334,12 +334,7 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
     }
 
     Timestamp appliedUpTo = _applyOplogOperations(opCtx, startPoint, endPoint);
-    if (appliedUpTo != endPoint) {
-        severe() << "Given 'recoverToOplogTimestamp' (" << endPoint.toString()
-                 << ") does not have a corresponding oplog entry with the same timestamp. "
-                 << "The last applied entry in the oplog has timestamp " << appliedUpTo.toString();
-        fassertFailedNoTrace(31400);
-    }
+    invariant(appliedUpTo <= endPoint);
 
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 }
