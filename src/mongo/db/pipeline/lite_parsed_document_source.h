@@ -44,6 +44,8 @@
 
 namespace mongo {
 
+class LiteParsedPipeline;
+
 /**
  * A lightly parsed version of a DocumentSource. It is not executable and not guaranteed to return a
  * parse error when encountering an invalid specification. Instead, the purpose of this class is to
@@ -52,6 +54,9 @@ namespace mongo {
  */
 class LiteParsedDocumentSource {
 public:
+    LiteParsedDocumentSource(std::string parseTimeName)
+        : _parseTimeName(std::move(parseTimeName)) {}
+
     virtual ~LiteParsedDocumentSource() = default;
 
     /*
@@ -142,6 +147,22 @@ public:
      * UserException if not compatible.
      */
     virtual void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {}
+
+    /**
+     * Returns this document source's subpipelines. If none exist, a reference to an empty vector
+     * is returned.
+     */
+    virtual const std::vector<LiteParsedPipeline>& getSubPipelines() const;
+
+    /**
+     * Returns the name of the stage that this LiteParsedDocumentSource represents.
+     */
+    const std::string& getParseTimeName() const {
+        return _parseTimeName;
+    }
+
+private:
+    std::string _parseTimeName;
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {
@@ -153,10 +174,11 @@ public:
      */
     static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(const AggregationRequest& request,
                                                                   const BSONElement& spec) {
-        return stdx::make_unique<LiteParsedDocumentSourceDefault>();
+        return std::make_unique<LiteParsedDocumentSourceDefault>(spec.fieldName());
     }
 
-    LiteParsedDocumentSourceDefault() = default;
+    LiteParsedDocumentSourceDefault(std::string parseTimeName)
+        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
@@ -172,13 +194,20 @@ public:
  */
 class LiteParsedDocumentSourceForeignCollections : public LiteParsedDocumentSource {
 public:
-    LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss,
+    LiteParsedDocumentSourceForeignCollections(std::string parseTimeName,
+                                               NamespaceString foreignNss,
                                                PrivilegeVector privileges)
-        : _foreignNssSet{std::move(foreignNss)}, _requiredPrivileges(std::move(privileges)) {}
+        : LiteParsedDocumentSource(std::move(parseTimeName)),
+          _foreignNssSet{std::move(foreignNss)},
+          _requiredPrivileges(std::move(privileges)) {}
 
-    LiteParsedDocumentSourceForeignCollections(stdx::unordered_set<NamespaceString> foreignNssSet,
+    LiteParsedDocumentSourceForeignCollections(std::string parseTimeName,
+                                               stdx::unordered_set<NamespaceString> foreignNssSet,
                                                PrivilegeVector privileges)
-        : _foreignNssSet(std::move(foreignNssSet)), _requiredPrivileges(std::move(privileges)) {}
+        : LiteParsedDocumentSource(std::move(parseTimeName)),
+          _foreignNssSet(std::move(foreignNssSet)),
+          _requiredPrivileges(std::move(privileges)) {}
+
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {_foreignNssSet};

@@ -336,9 +336,9 @@ Status runAggregate(OperationContext* opCtx,
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     Pipeline* unownedPipeline;
+    const LiteParsedPipeline liteParsedPipeline(request);
     auto curOp = CurOp::get(opCtx);
     {
-        const LiteParsedPipeline liteParsedPipeline(request);
 
         try {
             // Check whether the parsed pipeline supports the given read concern.
@@ -557,6 +557,9 @@ Status runAggregate(OperationContext* opCtx,
         CursorManager::getGlobalCursorManager()->registerCursor(opCtx, std::move(cursorParams));
 
     ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &pin);
+
+    // Report usage statistics for each stage in the pipeline.
+    liteParsedPipeline.tickGlobalStageCounters();
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {

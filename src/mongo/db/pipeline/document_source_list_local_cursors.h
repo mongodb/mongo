@@ -52,9 +52,12 @@ public:
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
+        explicit LiteParsed(std::string parseTimeName)
+            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>();
+            return stdx::make_unique<LiteParsed>(spec.fieldName());
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {

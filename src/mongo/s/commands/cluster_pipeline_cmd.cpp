@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/s/commands/cluster_aggregate.h"
 
 namespace mongo {
@@ -106,8 +107,13 @@ private:
 
         const auto& nss = aggregationRequest.getNamespaceString();
 
-        return ClusterAggregate::runAggregate(
+        auto status = ClusterAggregate::runAggregate(
             opCtx, ClusterAggregate::Namespaces{nss, nss}, aggregationRequest, cmdObj, result);
+        if (status.isOK()) {
+            LiteParsedPipeline lpp(aggregationRequest);
+            lpp.tickGlobalStageCounters();
+        }
+        return status;
     }
 
 } clusterPipelineCmd;

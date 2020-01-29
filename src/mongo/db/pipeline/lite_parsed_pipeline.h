@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -149,6 +150,23 @@ public:
 
         for (auto&& spec : _stageSpecs) {
             spec->assertSupportsReadConcern(readConcern);
+        }
+    }
+
+    /**
+     * Increments global stage counters corresponding to the stages in this lite parsed pipeline.
+     */
+    void tickGlobalStageCounters() const {
+        for (auto&& stage : _stageSpecs) {
+            // Tick counter corresponding to current stage.
+            auto entry = aggStageCounters.stageCounterMap.find(stage->getParseTimeName());
+            invariant(entry != aggStageCounters.stageCounterMap.end());
+            entry->second->counter.increment(1);
+
+            // Recursively step through any sub-pipelines.
+            for (auto&& subPipeline : stage->getSubPipelines()) {
+                subPipeline.tickGlobalStageCounters();
+            }
         }
     }
 

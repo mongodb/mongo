@@ -70,8 +70,8 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::l
 
     PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
 
-    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(targetNss),
-                                                                         std::move(privileges));
+    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(
+        spec.fieldName(), std::move(targetNss), std::move(privileges));
 }
 
 REGISTER_DOCUMENT_SOURCE(out, DocumentSourceOut::liteParse, DocumentSourceOut::createFromBson);

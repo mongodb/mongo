@@ -167,20 +167,20 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
 
     // Recursively lite parse the nested pipeline, if one exists.
     auto pipelineElem = specObj["pipeline"];
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    std::vector<LiteParsedPipeline> liteParsedPipelineVector;
     if (pipelineElem) {
         auto pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
         AggregationRequest foreignAggReq(fromNss, std::move(pipeline));
-        liteParsedPipeline = LiteParsedPipeline(foreignAggReq);
-
-        auto pipelineInvolvedNamespaces = liteParsedPipeline->getInvolvedNamespaces();
+        LiteParsedPipeline liteParsedPipeline(foreignAggReq);
+        auto pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
         foreignNssSet.insert(pipelineInvolvedNamespaces.begin(), pipelineInvolvedNamespaces.end());
+        liteParsedPipelineVector.push_back(std::move(liteParsedPipeline));
     }
-
     foreignNssSet.insert(fromNss);
-
-    return stdx::make_unique<DocumentSourceLookUp::LiteParsed>(
-        std::move(fromNss), std::move(foreignNssSet), std::move(liteParsedPipeline));
+    return stdx::make_unique<DocumentSourceLookUp::LiteParsed>(spec.fieldName(),
+                                                               std::move(fromNss),
+                                                               std::move(foreignNssSet),
+                                                               std::move(liteParsedPipelineVector));
 }
 
 REGISTER_DOCUMENT_SOURCE(lookup,

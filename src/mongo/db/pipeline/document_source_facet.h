@@ -72,8 +72,11 @@ public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::vector<LiteParsedPipeline> liteParsedPipelines, PrivilegeVector privileges)
-            : _liteParsedPipelines(std::move(liteParsedPipelines)),
+        LiteParsed(std::string parseTimeName,
+                   std::vector<LiteParsedPipeline> liteParsedPipelines,
+                   PrivilegeVector privileges)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _liteParsedPipelines(std::move(liteParsedPipelines)),
               _requiredPrivileges(std::move(privileges)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
@@ -81,6 +84,10 @@ public:
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
+
+        const std::vector<LiteParsedPipeline>& getSubPipelines() const final {
+            return _liteParsedPipelines;
+        }
 
     private:
         const std::vector<LiteParsedPipeline> _liteParsedPipelines;

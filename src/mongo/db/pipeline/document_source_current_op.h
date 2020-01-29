@@ -49,8 +49,10 @@ public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec);
 
-        LiteParsed(UserMode allUsers, LocalOpsMode localOps)
-            : _allUsers(allUsers), _localOps(localOps) {}
+        LiteParsed(std::string parseTimeName, UserMode allUsers, LocalOpsMode localOps)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _allUsers(allUsers),
+              _localOps(localOps) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

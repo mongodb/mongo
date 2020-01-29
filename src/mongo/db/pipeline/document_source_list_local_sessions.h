@@ -59,11 +59,12 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-
-            return stdx::make_unique<LiteParsed>(listSessionsParseSpec(kStageName, spec));
+            return stdx::make_unique<LiteParsed>(spec.fieldName(),
+                                                 listSessionsParseSpec(kStageName, spec));
         }
 
-        explicit LiteParsed(const ListSessionsSpec& spec) : _spec(spec) {}
+        explicit LiteParsed(std::string parseTimeName, const ListSessionsSpec& spec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)), _spec(spec) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

@@ -256,6 +256,8 @@ env.Library(
         'lite_parsed_document_source.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/stats/counters',
         'aggregation_request',
     ]
 )

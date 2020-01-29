@@ -32,18 +32,28 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
-#include "mongo/util/string_map.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
 using Parser = LiteParsedDocumentSource::Parser;
 
 namespace {
+
+// Empty vector used by LiteParsedDocumentSources which do not have a sub pipeline.
+std::vector<LiteParsedPipeline> kNoSubPipeline = {};
+
 StringMap<Parser> parserMap;
 }  // namespace
 
 void LiteParsedDocumentSource::registerParser(const std::string& name, Parser parser) {
     parserMap[name] = parser;
+    // Initialize a counter for this document source to track how many times it is used.
+    invariant(
+        aggStageCounters.stageCounterMap
+            .insert(std::make_pair(name, std::make_unique<AggStageCounters::StageCounter>(name)))
+            .second);
 }
 
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
@@ -62,4 +72,9 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
 
     return it->second(request, specElem);
 }
+
+
+const std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getSubPipelines() const {
+    return kNoSubPipeline;
 }
+}  // namespace mongo

@@ -49,10 +49,12 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>(request.getNamespaceString(), spec);
+            return stdx::make_unique<LiteParsed>(
+                spec.fieldName(), request.getNamespaceString(), spec);
         }
 
-        explicit LiteParsed(NamespaceString nss, BSONElement spec) : _nss(std::move(nss)) {
+        explicit LiteParsed(std::string parseTimeName, NamespaceString nss, BSONElement spec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {
             // We don't do any validation here, just a minimal check for the resume token. We also
             // do not need to extract the token unless the stream is running on a single namespace.
             if (_nss.isCollectionlessAggregateNS() || spec.type() != BSONType::Object) {

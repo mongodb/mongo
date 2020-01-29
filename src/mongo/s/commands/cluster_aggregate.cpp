@@ -1129,8 +1129,16 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         nsStruct.requestedNss = namespaces.requestedNss;
         nsStruct.executionNss = resolvedView->getNamespace();
 
-        return ClusterAggregate::runAggregate(
+        auto viewStatus = ClusterAggregate::runAggregate(
             opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
+        if (viewStatus.isOK()) {
+            // If view execution succeeded, count the stages that are part of the view definition.
+            AggregationRequest viewPipeline{resolvedView->getNamespace(),
+                                            resolvedView->getPipeline()};
+            LiteParsedPipeline viewLiteParsed(viewPipeline);
+            viewLiteParsed.tickGlobalStageCounters();
+        }
+        return viewStatus;
     }
 
     return status;
