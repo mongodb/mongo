@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/process_interface_standalone.h"
+#include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -49,7 +49,6 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -72,14 +71,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using boost::intrusive_ptr;
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using write_ops::Insert;
-using write_ops::Update;
-using write_ops::UpdateOpEntry;
 
 namespace {
 
@@ -152,117 +143,26 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) {}
+CommonMongodProcessInterface::CommonMongodProcessInterface(OperationContext* opCtx) {}
 
 std::unique_ptr<TransactionHistoryIteratorBase>
-MongoInterfaceStandalone::createTransactionHistoryIterator(repl::OpTime time) const {
+CommonMongodProcessInterface::createTransactionHistoryIterator(repl::OpTime time) const {
     bool permitYield = true;
     return std::unique_ptr<TransactionHistoryIteratorBase>(
         new TransactionHistoryIterator(time, permitYield));
 }
 
-bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+bool CommonMongodProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
     const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     return metadata->isSharded();
 }
 
-Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
-                                               std::vector<BSONObj>&& objs,
-                                               bool bypassDocValidation) {
-    Insert insertOp(nss);
-    insertOp.setDocuments(std::move(objs));
-    insertOp.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(bypassDocValidation);
-        return wcb;
-    }());
-    return insertOp;
-}
-
-Update MongoInterfaceStandalone::buildUpdateOp(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& nss,
-    BatchedObjects&& batch,
-    UpsertType upsert,
-    bool multi) {
-    Update updateOp(nss);
-    updateOp.setUpdates([&] {
-        std::vector<UpdateOpEntry> updateEntries;
-        for (auto&& obj : batch) {
-            updateEntries.push_back([&] {
-                UpdateOpEntry entry;
-                auto&& [q, u, c] = obj;
-                entry.setQ(std::move(q));
-                entry.setU(std::move(u));
-                entry.setC(std::move(c));
-                entry.setUpsert(upsert != UpsertType::kNone);
-                // TODO SERVER-44884: after branching for 4.5, remove the 'useNewUpsert' flag.
-                entry.setUpsertSupplied({{entry.getUpsert() && expCtx->useNewUpsert,
-                                          upsert == UpsertType::kInsertSuppliedDoc}});
-                entry.setMulti(multi);
-                return entry;
-            }());
-        }
-        return updateEntries;
-    }());
-    updateOp.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
-        return wcb;
-    }());
-    updateOp.setRuntimeConstants(expCtx->getRuntimeConstants());
-    return updateOp;
-}
-
-Status MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        const NamespaceString& ns,
-                                        std::vector<BSONObj>&& objs,
-                                        const WriteConcernOptions& wc,
-                                        boost::optional<OID> targetEpoch) {
-    auto writeResults = performInserts(
-        expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
-
-    // Need to check each result in the batch since the writes are unordered.
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
-        }
-    }
-    return Status::OK();
-}
-
-StatusWith<MongoProcessInterface::UpdateResult> MongoInterfaceStandalone::update(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& ns,
-    BatchedObjects&& batch,
-    const WriteConcernOptions& wc,
-    UpsertType upsert,
-    bool multi,
-    boost::optional<OID> targetEpoch) {
-    auto writeResults =
-        performUpdates(expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
-
-    // Need to check each result in the batch since the writes are unordered.
-    UpdateResult updateResult;
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
-        }
-
-        updateResult.nMatched += result.getValue().getN();
-        updateResult.nModified += result.getValue().getNModified();
-    }
-    return updateResult;
-}
-
-std::vector<Document> MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,
-                                                              const NamespaceString& ns,
-                                                              StringData host,
-                                                              bool addShardName) {
+std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationContext* opCtx,
+                                                                  const NamespaceString& ns,
+                                                                  StringData host,
+                                                                  bool addShardName) {
     AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
     Collection* collection = autoColl.getCollection();
@@ -306,35 +206,29 @@ std::vector<Document> MongoInterfaceStandalone::getIndexStats(OperationContext* 
     return indexStats;
 }
 
-std::list<BSONObj> MongoInterfaceStandalone::getIndexSpecs(OperationContext* opCtx,
-                                                           const NamespaceString& ns,
-                                                           bool includeBuildUUIDs) {
-    return listIndexesEmptyListIfMissing(opCtx, ns, includeBuildUUIDs);
-}
-
-void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  bool includeHistograms,
-                                                  BSONObjBuilder* builder) const {
+void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      bool includeHistograms,
+                                                      BSONObjBuilder* builder) const {
     Top::get(opCtx->getServiceContext()).appendLatencyStats(nss, includeHistograms, builder);
 }
 
-Status MongoInterfaceStandalone::appendStorageStats(OperationContext* opCtx,
-                                                    const NamespaceString& nss,
-                                                    const BSONObj& param,
-                                                    BSONObjBuilder* builder) const {
+Status CommonMongodProcessInterface::appendStorageStats(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        const BSONObj& param,
+                                                        BSONObjBuilder* builder) const {
     return appendCollectionStorageStats(opCtx, nss, param, builder);
 }
 
-Status MongoInterfaceStandalone::appendRecordCount(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   BSONObjBuilder* builder) const {
+Status CommonMongodProcessInterface::appendRecordCount(OperationContext* opCtx,
+                                                       const NamespaceString& nss,
+                                                       BSONObjBuilder* builder) const {
     return appendCollectionRecordCount(opCtx, nss, builder);
 }
 
-Status MongoInterfaceStandalone::appendQueryExecStats(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      BSONObjBuilder* builder) const {
+Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          BSONObjBuilder* builder) const {
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
 
     if (!autoColl.getDb()) {
@@ -365,8 +259,8 @@ Status MongoInterfaceStandalone::appendQueryExecStats(OperationContext* opCtx,
     return Status::OK();
 }
 
-BSONObj MongoInterfaceStandalone::getCollectionOptions(OperationContext* opCtx,
-                                                       const NamespaceString& nss) {
+BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opCtx,
+                                                           const NamespaceString& nss) {
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     BSONObj collectionOptions = {};
     if (!autoColl.getDb()) {
@@ -383,67 +277,7 @@ BSONObj MongoInterfaceStandalone::getCollectionOptions(OperationContext* opCtx,
     return collectionOptions;
 }
 
-void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
-    OperationContext* opCtx,
-    const BSONObj& renameCommandObj,
-    const NamespaceString& targetNs,
-    const BSONObj& originalCollectionOptions,
-    const std::list<BSONObj>& originalIndexes) {
-    NamespaceString sourceNs = NamespaceString(renameCommandObj["renameCollection"].String());
-    doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
-                                                   sourceNs,
-                                                   targetNs,
-                                                   renameCommandObj["dropTarget"].trueValue(),
-                                                   renameCommandObj["stayTemp"].trueValue(),
-                                                   originalIndexes,
-                                                   originalCollectionOptions);
-}
-
-void MongoInterfaceStandalone::createCollection(OperationContext* opCtx,
-                                                const std::string& dbName,
-                                                const BSONObj& cmdObj) {
-    uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
-}
-
-void MongoInterfaceStandalone::createIndexesOnEmptyCollection(
-    OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
-    AutoGetCollection autoColl(opCtx, ns, MODE_X);
-    writeConflictRetry(
-        opCtx, "MongoInterfaceStandalone::createIndexesOnEmptyCollection", ns.ns(), [&] {
-            auto collection = autoColl.getCollection();
-            invariant(collection,
-                      str::stream() << "Failed to create indexes for aggregation because "
-                                       "collection does not exist: "
-                                    << ns << ": " << BSON("indexes" << indexSpecs));
-
-            invariant(0U == collection->numRecords(opCtx),
-                      str::stream() << "Expected empty collection for index creation: " << ns
-                                    << ": numRecords: " << collection->numRecords(opCtx) << ": "
-                                    << BSON("indexes" << indexSpecs));
-
-            // Secondary index builds do not filter existing indexes so we have to do this on the
-            // primary.
-            auto removeIndexBuildsToo = false;
-            auto filteredIndexes = collection->getIndexCatalog()->removeExistingIndexes(
-                opCtx, indexSpecs, removeIndexBuildsToo);
-            if (filteredIndexes.empty()) {
-                return;
-            }
-
-            WriteUnitOfWork wuow(opCtx);
-            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collection->uuid(), filteredIndexes, false  // fromMigrate
-            );
-            wuow.commit();
-        });
-}
-void MongoInterfaceStandalone::dropCollection(OperationContext* opCtx, const NamespaceString& ns) {
-    BSONObjBuilder result;
-    uassertStatusOK(mongo::dropCollection(
-        opCtx, ns, result, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-}
-
-std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> CommonMongodProcessInterface::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
@@ -461,15 +295,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipelin
     return pipeline;
 }
 
-unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
-}
-
-unique_ptr<Pipeline, PipelineDeleter>
-MongoInterfaceStandalone::attachCursorSourceToPipelineForLocalRead(
+std::unique_ptr<Pipeline, PipelineDeleter>
+CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -493,7 +320,7 @@ MongoInterfaceStandalone::attachCursorSourceToPipelineForLocalRead(
     return pipeline;
 }
 
-std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) const {
+std::string CommonMongodProcessInterface::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
         return ShardingState::get(opCtx)->shardId().toString();
     }
@@ -501,24 +328,12 @@ std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) cons
     return std::string();
 }
 
-std::pair<std::vector<FieldPath>, bool>
-MongoInterfaceStandalone::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
-                                                                      const NamespaceString& nss,
-                                                                      UUID uuid) const {
-    return {{"_id"}, false};  // Nothing is sharded.
-}
-
-std::vector<FieldPath> MongoInterfaceStandalone::collectDocumentKeyFieldsActingAsRouter(
-    OperationContext* opCtx, const NamespaceString& nss) const {
-    return {"_id"};  // Nothing is sharded.
-}
-
-std::vector<GenericCursor> MongoInterfaceStandalone::getIdleCursors(
-    const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
+std::vector<GenericCursor> CommonMongodProcessInterface::getIdleCursors(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     return CursorManager::get(expCtx->opCtx)->getIdleCursors(expCtx->opCtx, userMode);
 }
 
-boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
+boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -574,7 +389,7 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-BackupCursorState MongoInterfaceStandalone::openBackupCursor(
+BackupCursorState CommonMongodProcessInterface::openBackupCursor(
     OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
@@ -584,7 +399,8 @@ BackupCursorState MongoInterfaceStandalone::openBackupCursor(
     }
 }
 
-void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, const UUID& backupId) {
+void CommonMongodProcessInterface::closeBackupCursor(OperationContext* opCtx,
+                                                     const UUID& backupId) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         backupCursorHooks->closeBackupCursor(opCtx, backupId);
@@ -593,9 +409,8 @@ void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, const 
     }
 }
 
-BackupCursorExtendState MongoInterfaceStandalone::extendBackupCursor(OperationContext* opCtx,
-                                                                     const UUID& backupId,
-                                                                     const Timestamp& extendTo) {
+BackupCursorExtendState CommonMongodProcessInterface::extendBackupCursor(
+    OperationContext* opCtx, const UUID& backupId, const Timestamp& extendTo) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         return backupCursorHooks->extendBackupCursor(opCtx, backupId, extendTo);
@@ -604,7 +419,7 @@ BackupCursorExtendState MongoInterfaceStandalone::extendBackupCursor(OperationCo
     }
 }
 
-std::vector<BSONObj> MongoInterfaceStandalone::getMatchingPlanCacheEntryStats(
+std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStats(
     OperationContext* opCtx, const NamespaceString& nss, const MatchExpression* matchExp) const {
     const auto serializer = [](const PlanCacheEntry& entry) {
         BSONObjBuilder out;
@@ -627,7 +442,7 @@ std::vector<BSONObj> MongoInterfaceStandalone::getMatchingPlanCacheEntryStats(
     return planCache->getMatchingStats(serializer, predicate);
 }
 
-bool MongoInterfaceStandalone::fieldsHaveSupportingUniqueIndex(
+bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
@@ -655,7 +470,7 @@ bool MongoInterfaceStandalone::fieldsHaveSupportingUniqueIndex(
     return false;
 }
 
-BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
+BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
     OperationContext* opCtx,
     Client* client,
     CurrentOpTruncateMode truncateOps,
@@ -692,14 +507,13 @@ BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
     return builder.obj();
 }
 
-void MongoInterfaceStandalone::_reportCurrentOpsForTransactionCoordinators(
+void CommonMongodProcessInterface::_reportCurrentOpsForTransactionCoordinators(
     OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops) const {
     reportCurrentOpsForTransactionCoordinators(opCtx, includeIdle, ops);
 }
 
-void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
-                                                                CurrentOpUserMode userMode,
-                                                                std::vector<BSONObj>* ops) const {
+void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(
+    OperationContext* opCtx, CurrentOpUserMode userMode, std::vector<BSONObj>* ops) const {
     auto sessionCatalog = SessionCatalog::get(opCtx);
 
     const bool authEnabled =
@@ -721,7 +535,7 @@ void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext
     });
 }
 
-std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefaultCollator(
+std::unique_ptr<CollatorInterface> CommonMongodProcessInterface::_getCollectionDefaultCollator(
     OperationContext* opCtx, StringData dbName, UUID collectionUUID) {
     auto it = _collatorCache.find(collectionUUID);
     if (it == _collatorCache.end()) {
@@ -745,13 +559,13 @@ std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefau
     return collator ? collator->clone() : nullptr;
 }
 
-std::unique_ptr<ResourceYielder> MongoInterfaceStandalone::getResourceYielder() const {
+std::unique_ptr<ResourceYielder> CommonMongodProcessInterface::getResourceYielder() const {
     return std::make_unique<MongoDResourceYielder>();
 }
 
 
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-MongoInterfaceStandalone::ensureFieldsUniqueOrResolveDocumentKey(
+CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<std::vector<std::string>> fields,
     boost::optional<ChunkVersion> targetCollectionVersion,
@@ -777,6 +591,56 @@ MongoInterfaceStandalone::ensureFieldsUniqueOrResolveDocumentKey(
                 fieldsHaveSupportingUniqueIndex(expCtx, outputNs, fieldPaths));
     }
     return {fieldPaths, targetCollectionVersion};
+}
+
+write_ops::Insert CommonMongodProcessInterface::buildInsertOp(const NamespaceString& nss,
+                                                              std::vector<BSONObj>&& objs,
+                                                              bool bypassDocValidation) {
+    write_ops::Insert insertOp(nss);
+    insertOp.setDocuments(std::move(objs));
+    insertOp.setWriteCommandBase([&] {
+        write_ops::WriteCommandBase wcb;
+        wcb.setOrdered(false);
+        wcb.setBypassDocumentValidation(bypassDocValidation);
+        return wcb;
+    }());
+    return insertOp;
+}
+
+Update CommonMongodProcessInterface::buildUpdateOp(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    BatchedObjects&& batch,
+    UpsertType upsert,
+    bool multi) {
+    Update updateOp(nss);
+    updateOp.setUpdates([&] {
+        std::vector<write_ops::UpdateOpEntry> updateEntries;
+        for (auto&& obj : batch) {
+            updateEntries.push_back([&] {
+                write_ops::UpdateOpEntry entry;
+                auto&& [q, u, c] = obj;
+                entry.setQ(std::move(q));
+                entry.setU(std::move(u));
+                entry.setC(std::move(c));
+                entry.setUpsert(upsert != UpsertType::kNone);
+                // TODO SERVER-44884: after branching for 4.5, remove the 'useNewUpsert' flag.
+                entry.setUpsertSupplied({{entry.getUpsert() && expCtx->useNewUpsert,
+                                          upsert == UpsertType::kInsertSuppliedDoc}});
+                entry.setMulti(multi);
+                return entry;
+            }());
+        }
+        return updateEntries;
+    }());
+    updateOp.setWriteCommandBase([&] {
+        write_ops::WriteCommandBase wcb;
+        wcb.setOrdered(false);
+        wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
+        return wcb;
+    }());
+    updateOp.setRuntimeConstants(expCtx->getRuntimeConstants());
+    return updateOp;
 }
 
 }  // namespace mongo

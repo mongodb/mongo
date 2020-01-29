@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/stub_mongo_process_interface_lookup_single_document.h"
+#include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -37,8 +37,7 @@
 
 namespace mongo {
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-StubMongoProcessInterfaceLookupSingleDocument::makePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> StubLookupSingleDocumentProcessInterface::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
@@ -57,7 +56,7 @@ StubMongoProcessInterfaceLookupSingleDocument::makePipeline(
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipelineForLocalRead(
+StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -66,15 +65,14 @@ StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipelineForLo
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipeline(
+StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
     bool allowTargetingShards) {
     return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
 }
 
-
-boost::optional<Document> StubMongoProcessInterfaceLookupSingleDocument::lookupSingleDocument(
+boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,

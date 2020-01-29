@@ -31,16 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/process_interface_shardsvr.h"
+#include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -80,7 +73,7 @@ void attachWriteConcern(BatchedCommandRequest* request, const WriteConcernOption
 
 }  // namespace
 
-void MongoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
+void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionVersion) const {
@@ -91,9 +84,9 @@ void MongoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
 }
 
 std::pair<std::vector<FieldPath>, bool>
-MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
-                                                                       const NamespaceString& nss,
-                                                                       UUID uuid) const {
+ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
+                                                                         const NamespaceString& nss,
+                                                                         UUID uuid) const {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
     const auto metadata = [opCtx, &nss]() -> ScopedCollectionMetadata {
@@ -115,11 +108,11 @@ MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(Operation
     return {_shardKeyToDocumentKeyFields(metadata->getKeyPatternFields()), true};
 }
 
-Status MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& ns,
-                                         std::vector<BSONObj>&& objs,
-                                         const WriteConcernOptions& wc,
-                                         boost::optional<OID> targetEpoch) {
+Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const NamespaceString& ns,
+                                           std::vector<BSONObj>&& objs,
+                                           const WriteConcernOptions& wc,
+                                           boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
@@ -134,7 +127,7 @@ Status MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionCo
     return response.toStatus();
 }
 
-StatusWith<MongoProcessInterface::UpdateResult> MongoInterfaceShardServer::update(
+StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     BatchedObjects&& batch,
@@ -158,7 +151,7 @@ StatusWith<MongoProcessInterface::UpdateResult> MongoInterfaceShardServer::updat
     return {{response.getN(), response.getNModified()}};
 }
 
-unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSourceToPipeline(
+unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
     bool allowTargetingShards) {
@@ -175,7 +168,7 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, pipeline.release());
 }
 
-std::unique_ptr<ShardFilterer> MongoInterfaceShardServer::getShardFilterer(
+std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     const bool aggNsIsCollection = expCtx->uuid != boost::none;
     auto collectionFilter = CollectionShardingState::get(expCtx->opCtx, expCtx->ns)
@@ -183,7 +176,7 @@ std::unique_ptr<ShardFilterer> MongoInterfaceShardServer::getShardFilterer(
     return std::make_unique<ShardFiltererImpl>(std::move(collectionFilter));
 }
 
-void MongoInterfaceShardServer::renameIfOptionsAndIndexesHaveNotChanged(
+void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const BSONObj& renameCommandObj,
     const NamespaceString& destinationNs,
@@ -222,9 +215,9 @@ void MongoInterfaceShardServer::renameIfOptionsAndIndexesHaveNotChanged(
                                str::stream() << "failed while running command " << newCmdObj);
 }
 
-std::list<BSONObj> MongoInterfaceShardServer::getIndexSpecs(OperationContext* opCtx,
-                                                            const NamespaceString& ns,
-                                                            bool includeBuildUUIDs) {
+std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
+                                                              const NamespaceString& ns,
+                                                              bool includeBuildUUIDs) {
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     auto shard = uassertStatusOK(
@@ -243,9 +236,9 @@ std::list<BSONObj> MongoInterfaceShardServer::getIndexSpecs(OperationContext* op
     }
     return std::list<BSONObj>(indexes.docs.begin(), indexes.docs.end());
 }
-void MongoInterfaceShardServer::createCollection(OperationContext* opCtx,
-                                                 const std::string& dbName,
-                                                 const BSONObj& cmdObj) {
+void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
+                                                   const std::string& dbName,
+                                                   const BSONObj& cmdObj) {
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
     BSONObj finalCmdObj = cmdObj;
@@ -271,7 +264,7 @@ void MongoInterfaceShardServer::createCollection(OperationContext* opCtx,
                                    << "write concern failed while running command " << finalCmdObj);
 }
 
-void MongoInterfaceShardServer::createIndexesOnEmptyCollection(
+void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
@@ -299,7 +292,8 @@ void MongoInterfaceShardServer::createIndexesOnEmptyCollection(
                                str::stream()
                                    << "write concern failed while running command " << cmdObj);
 }
-void MongoInterfaceShardServer::dropCollection(OperationContext* opCtx, const NamespaceString& ns) {
+void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
+                                                 const NamespaceString& ns) {
     // Build and execute the dropCollection command against the primary shard of the given
     // database.
     auto cachedDbInfo =

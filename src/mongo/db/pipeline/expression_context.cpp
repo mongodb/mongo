@@ -32,7 +32,7 @@
 #include <utility>
 
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/util/intrusive_counter.h"

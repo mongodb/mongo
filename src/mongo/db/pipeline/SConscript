@@ -4,6 +4,15 @@ Import('env')
 
 env = env.Clone()
 
+env.SConscript(
+    dirs=[
+        'process_interface',
+    ],
+    exports=[
+        'env',
+    ],
+)
+
 env.Library(
     target='aggregation',
     source=[
@@ -145,7 +154,7 @@ env.Library(
     target='document_source_mock',
     source=[
         'document_source_mock.cpp',
-        'stub_mongo_process_interface_lookup_single_document.cpp',
+        'process_interface/stub_lookup_single_document_process_interface.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
@@ -175,93 +184,6 @@ env.Library(
     LIBDEPS=[
         'aggregation_request',
     ]
-)
-
-env.Library(
-    target='mongo_process_interface',
-    source=[
-        'mongo_process_interface.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ]
-)
-
-env.Library(
-    target='mongo_process_common',
-    source=[
-        'mongo_process_common.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
-        'field_path',
-    ]
-)
-
-env.Library(
-    target='process_interface_standalone',
-    source=[
-        'process_interface_standalone.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/repl/speculative_majority_read_info',
-        'mongo_process_common',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/session_catalog',
-        '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
-        '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/scripting/scripting_common',
-    ],
-)
-
-env.Library(
-    target='process_interface_shardsvr',
-    source=[
-        'process_interface_shardsvr.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/write_ops',
-        '$BUILD_DIR/mongo/s/sharding_api',
-        'process_interface_standalone',
-        'sharded_agg_helpers',
-    ],
-)
-
-env.Library(
-    target='mongos_process_interface',
-    source=[
-        'mongos_process_interface.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/s/query/async_results_merger',
-        '$BUILD_DIR/mongo/s/query/cluster_query',
-        'mongo_process_common',
-        'sharded_agg_helpers',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/session_catalog',
-    ],
-)
-
-env.Library(
-    target="process_interface_factory_mongod",
-    source=[
-        "process_interface_factory_mongod.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        'process_interface_shardsvr',
-    ],
 )
 
 env.Library(
@@ -469,10 +391,8 @@ env.CppUnitTest(
         'granularity_rounder_powers_of_two_test.cpp',
         'granularity_rounder_preferred_numbers_test.cpp',
         'lookup_set_cache_test.cpp',
-        'mongos_process_interface_test.cpp',
         'pipeline_metadata_tree_test.cpp',
         'pipeline_test.cpp',
-        'process_interface_standalone_test.cpp',
         'resume_token_test.cpp',
         'semantic_analysis_test.cpp',
         'sequential_document_cache_test.cpp',
@@ -503,11 +423,9 @@ env.CppUnitTest(
         'expression',
         'field_path',
         'granularity_rounder',
-        'mongo_process_common',
-        'mongo_process_interface',
-        'mongos_process_interface',
         'pipeline',
-        'process_interface_shardsvr',
-        'process_interface_standalone',
+        'process_interface/mongod_process_interfaces',
+        'process_interface/mongos_process_interface',
+        'sharded_agg_helpers',
     ]
 )

@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/db/pipeline/mongos_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 
 namespace mongo {
 

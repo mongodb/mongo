@@ -29,20 +29,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+
 #include "mongo/base/shim.h"
-#include "mongo/db/pipeline/process_interface_shardsvr.h"
-#include "mongo/db/s/sharding_state.h"
 
 namespace mongo {
-namespace {
 
-std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
-    return ShardingState::get(opCtx)->enabled() ? std::make_shared<MongoInterfaceShardServer>(opCtx)
-                                                : std::make_shared<MongoInterfaceStandalone>(opCtx);
+std::shared_ptr<MongoProcessInterface> MongoProcessInterface::create(OperationContext* opCtx) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(MongoProcessInterface::create);
+    return w(opCtx);
 }
 
-auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
-    MongoProcessInterface::create, MongoProcessInterfaceCreateImpl);
-
-}  // namespace
 }  // namespace mongo

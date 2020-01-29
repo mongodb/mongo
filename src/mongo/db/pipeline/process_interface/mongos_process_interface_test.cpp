@@ -30,15 +30,15 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/mongos_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-class MongoProcessInterfaceForTest : public MongoSInterface {
+class MongosProcessInterfaceForTest : public MongosProcessInterface {
 public:
-    using MongoSInterface::MongoSInterface;
+    using MongosProcessInterface::MongosProcessInterface;
 
     bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const NamespaceString& nss,
@@ -49,18 +49,18 @@ public:
     bool hasSupportingIndexForFields{true};
 };
 
-class MongoSInterfaceTest : public AggregationContextFixture {
+class MongosProcessInterfaceTest : public AggregationContextFixture {
 public:
-    MongoSInterfaceTest() {
+    MongosProcessInterfaceTest() {
         getExpCtx()->inMongos = true;
     }
 
     auto makeProcessInterface() {
-        return std::make_unique<MongoProcessInterfaceForTest>();
+        return std::make_unique<MongosProcessInterfaceForTest>();
     }
 };
 
-TEST_F(MongoSInterfaceTest, FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecified) {
+TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecified) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion = boost::make_optional(ChunkVersion(0, 0, OID::gen()));
     auto processInterface = makeProcessInterface();
@@ -71,7 +71,7 @@ TEST_F(MongoSInterfaceTest, FailsToEnsureFieldsUniqueIfTargetCollectionVersionIs
                        51179);
 }
 
-TEST_F(MongoSInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByIndex) {
+TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByIndex) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion = boost::none;
     auto processInterface = makeProcessInterface();

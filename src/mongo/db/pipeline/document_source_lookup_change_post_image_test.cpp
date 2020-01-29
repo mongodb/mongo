@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface_lookup_single_document.h"
+#include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 
 namespace mongo {
 namespace {
@@ -52,7 +52,7 @@ using boost::intrusive_ptr;
 using std::deque;
 using std::vector;
 
-using MockMongoInterface = StubMongoProcessInterfaceLookupSingleDocument;
+using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceLookupChangePostImageTest : public AggregationContextFixture {

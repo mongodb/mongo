@@ -30,15 +30,15 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/process_interface_standalone.h"
+#include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-class MongoProcessInterfaceForTest : public MongoInterfaceStandalone {
+class MongoProcessInterfaceForTest : public NonShardServerProcessInterface {
 public:
-    using MongoInterfaceStandalone::MongoInterfaceStandalone;
+    using NonShardServerProcessInterface::NonShardServerProcessInterface;
 
     bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const NamespaceString& nss,

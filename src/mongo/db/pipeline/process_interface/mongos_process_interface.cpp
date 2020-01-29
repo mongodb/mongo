@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/mongos_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -93,14 +93,14 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     auto isIdIndex = index[IndexDescriptor::kIndexNameFieldName].String() == "_id_";
     return (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
         !index.hasField(IndexDescriptor::kPartialFilterExprFieldName) &&
-        MongoProcessCommon::keyPatternNamesExactPaths(
+        CommonProcessInterface::keyPatternNamesExactPaths(
                index.getObjectField(IndexDescriptor::kKeyPatternFieldName), uniqueKeyPaths) &&
         CollatorInterface::collatorsMatch(collation.get(), expCtx->getCollator());
 }
 
 }  // namespace
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::makePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions pipelineOptions) {
@@ -119,7 +119,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::makePipeline(
     return pipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
     bool allowTargetingShards) {
@@ -127,7 +127,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceTo
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, ownedPipeline);
 }
 
-boost::optional<Document> MongoSInterface::lookupSingleDocument(
+boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -241,10 +241,11 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
     return (!finalBatch.empty() ? Document(finalBatch.front()) : boost::optional<Document>{});
 }
 
-BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
-                                                   Client* client,
-                                                   CurrentOpTruncateMode truncateOps,
-                                                   CurrentOpBacktraceMode backtraceMode) const {
+BSONObj MongosProcessInterface::_reportCurrentOpForClient(
+    OperationContext* opCtx,
+    Client* client,
+    CurrentOpTruncateMode truncateOps,
+    CurrentOpBacktraceMode backtraceMode) const {
     BSONObjBuilder builder;
 
     CurOp::reportCurrentOpForClient(opCtx,
@@ -264,9 +265,9 @@ BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
     return builder.obj();
 }
 
-void MongoSInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
-                                                       CurrentOpUserMode userMode,
-                                                       std::vector<BSONObj>* ops) const {
+void MongosProcessInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                                              CurrentOpUserMode userMode,
+                                                              std::vector<BSONObj>* ops) const {
     auto sessionCatalog = SessionCatalog::get(opCtx);
 
     const bool authEnabled =
@@ -291,10 +292,10 @@ void MongoSInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
     });
 }
 
-void MongoSInterface::_reportCurrentOpsForTransactionCoordinators(
+void MongosProcessInterface::_reportCurrentOpsForTransactionCoordinators(
     OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops) const {};
 
-std::vector<GenericCursor> MongoSInterface::getIdleCursors(
+std::vector<GenericCursor> MongosProcessInterface::getIdleCursors(
     const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     invariant(hasGlobalServiceContext());
     auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();
@@ -302,12 +303,12 @@ std::vector<GenericCursor> MongoSInterface::getIdleCursors(
     return cursorManager->getIdleCursors(expCtx->opCtx, userMode);
 }
 
-bool MongoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+bool MongosProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     auto routingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
     return routingInfo.isOK() && routingInfo.getValue().cm();
 }
 
-bool MongoSInterface::fieldsHaveSupportingUniqueIndex(
+bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
@@ -336,7 +337,7 @@ bool MongoSInterface::fieldsHaveSupportingUniqueIndex(
 }
 
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-MongoSInterface::ensureFieldsUniqueOrResolveDocumentKey(
+MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<std::vector<std::string>> fields,
     boost::optional<ChunkVersion> targetCollectionVersion,

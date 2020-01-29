@@ -40,7 +40,7 @@
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/commands/mr_common.h"
-#include "mongo/db/pipeline/mongos_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
@@ -96,7 +96,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         nss,
         runtimeConstants,
         std::move(resolvedCollator),
-        std::make_shared<MongoSInterface>(),
+        std::make_shared<MongosProcessInterface>(),
         std::move(resolvedNamespaces),
         boost::none);  // uuid
     expCtx->inMongos = true;

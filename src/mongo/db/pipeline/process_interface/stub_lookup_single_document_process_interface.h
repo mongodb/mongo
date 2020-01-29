@@ -37,7 +37,7 @@
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 
 namespace mongo {
 
@@ -62,10 +62,9 @@ public:
 /**
  * A mock MongoProcessInterface which allows mocking a foreign pipeline.
  */
-class StubMongoProcessInterfaceLookupSingleDocument final : public StubMongoProcessInterface {
+class StubLookupSingleDocumentProcessInterface final : public StubMongoProcessInterface {
 public:
-    StubMongoProcessInterfaceLookupSingleDocument(
-        std::deque<DocumentSource::GetNextResult> mockResults)
+    StubLookupSingleDocumentProcessInterface(std::deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(

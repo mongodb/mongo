@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -34,8 +34,8 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/javascript_execution.h"
-#include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
 
 namespace mongo {
 
@@ -43,16 +43,14 @@ using write_ops::Insert;
 using write_ops::Update;
 
 /**
- * Class to provide access to mongod-specific implementations of methods required by some
- * document sources.
+ * Provides the implementations of interfaces that are shared across different types of mongod
+ * nodes.
  */
-class MongoInterfaceStandalone : public MongoProcessCommon {
+class CommonMongodProcessInterface : public CommonProcessInterface {
 public:
-    // static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
+    CommonMongodProcessInterface(OperationContext* opCtx);
 
-    MongoInterfaceStandalone(OperationContext* opCtx);
-
-    virtual ~MongoInterfaceStandalone() = default;
+    virtual ~CommonMongodProcessInterface() = default;
 
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
@@ -62,27 +60,12 @@ public:
      * sending request against nss based on this information.
      */
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
-    Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                  const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
-                  const WriteConcernOptions& wc,
-                  boost::optional<OID> targetEpoch) override;
-    StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    const NamespaceString& ns,
-                                    BatchedObjects&& batch,
-                                    const WriteConcernOptions& wc,
-                                    UpsertType upsert,
-                                    bool multi,
-                                    boost::optional<OID> targetEpoch) override;
 
     std::vector<Document> getIndexStats(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         StringData host,
                                         bool addShardName) final;
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs);
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,
@@ -98,39 +81,14 @@ public:
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final override;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
-    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const BSONObj& renameCommandObj,
-                                                 const NamespaceString& targetNs,
-                                                 const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes);
-    void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
-                          const BSONObj& cmdObj);
-    void createIndexesOnEmptyCollection(OperationContext* opCtx,
-                                        const NamespaceString& ns,
-                                        const std::vector<BSONObj>& indexSpecs);
-    void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{}) final;
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards = true) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
-        // We'll never do shard filtering on a standalone.
-        return nullptr;
-    }
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const override;
-    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext* opCtx, const NamespaceString&) const override;
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
@@ -155,38 +113,15 @@ public:
                                          const NamespaceString& nss,
                                          const std::set<FieldPath>& fieldPaths) const;
 
-    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const final {
-        return boost::none;  // Nothing is sharded here.
-    }
-    virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const NamespaceString& nss,
-                                              ChunkVersion targetCollectionVersion) const override {
-        uasserted(51020, "unexpected request to consult sharding catalog on non-shardsvr");
-    }
-
-    std::unique_ptr<ResourceYielder> getResourceYielder() const override;
+    std::unique_ptr<ResourceYielder> getResourceYielder() const final;
 
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            boost::optional<std::vector<std::string>> fields,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
-                                           const NamespaceString& outputNs) const override;
+                                           const NamespaceString& outputNs) const final;
 
 protected:
-    BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
-                                      Client* client,
-                                      CurrentOpTruncateMode truncateOps,
-                                      CurrentOpBacktraceMode backtraceMode) const final;
-
-    void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
-                                          CurrentOpUserMode userMode,
-                                          std::vector<BSONObj>* ops) const final;
-
-    void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
-                                                     bool includeIdle,
-                                                     std::vector<BSONObj>* ops) const final;
     /**
      * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
      */
@@ -202,6 +137,19 @@ protected:
                          BatchedObjects&& batch,
                          UpsertType upsert,
                          bool multi);
+
+    BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
+                                      Client* client,
+                                      CurrentOpTruncateMode truncateOps,
+                                      CurrentOpBacktraceMode backtraceMode) const final;
+
+    void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                          CurrentOpUserMode userMode,
+                                          std::vector<BSONObj>* ops) const final;
+
+    void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                     bool includeIdle,
+                                                     std::vector<BSONObj>* ops) const final;
 
 private:
     /**

@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/mongo_process_common.h"
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
+std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     CurrentOpConnectionsMode connMode,
     CurrentOpSessionsMode sessionMode,
@@ -129,7 +129,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     return ops;
 }
 
-std::vector<FieldPath> MongoProcessCommon::collectDocumentKeyFieldsActingAsRouter(
+std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     if (auto chunkManager =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
@@ -141,8 +141,8 @@ std::vector<FieldPath> MongoProcessCommon::collectDocumentKeyFieldsActingAsRoute
     return {"_id"};
 }
 
-bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
-                                                   const std::set<FieldPath>& uniqueKeyPaths) {
+bool CommonProcessInterface::keyPatternNamesExactPaths(
+    const BSONObj& keyPattern, const std::set<FieldPath>& uniqueKeyPaths) {
     size_t nFieldsMatched = 0;
     for (auto&& elem : keyPattern) {
         if (!elem.isNumber()) {
@@ -156,7 +156,7 @@ bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-boost::optional<ChunkVersion> MongoProcessCommon::refreshAndGetCollectionVersion(
+boost::optional<ChunkVersion> CommonProcessInterface::refreshAndGetCollectionVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
     const bool forceRefreshFromThisThread = false;
     auto routingInfo = uassertStatusOK(
@@ -169,7 +169,7 @@ boost::optional<ChunkVersion> MongoProcessCommon::refreshAndGetCollectionVersion
     return boost::none;
 }
 
-std::vector<FieldPath> MongoProcessCommon::_shardKeyToDocumentKeyFields(
+std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(
     const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const {
     std::vector<FieldPath> result;
     bool gotId = false;
@@ -183,7 +183,7 @@ std::vector<FieldPath> MongoProcessCommon::_shardKeyToDocumentKeyFields(
     return result;
 }
 
-std::set<FieldPath> MongoProcessCommon::_convertToFieldPaths(
+std::set<FieldPath> CommonProcessInterface::_convertToFieldPaths(
     const std::vector<std::string>& fields) const {
     std::set<FieldPath> fieldPaths;
 
@@ -196,7 +196,7 @@ std::set<FieldPath> MongoProcessCommon::_convertToFieldPaths(
     return fieldPaths;
 }
 
-std::string MongoProcessCommon::getHostAndPort(OperationContext* opCtx) const {
+std::string CommonProcessInterface::getHostAndPort(OperationContext* opCtx) const {
     return getHostNameCachedAndPort();
 }
 

@@ -29,37 +29,45 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/mongo_process_interface.h"
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/pipeline/pipeline.h"
-
-#include "mongo/util/assert_util.h"
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
 
 namespace mongo {
 
 /**
- * A stub MongoProcessInterface that provides default implementations of all methods, which can then
- * be individually overridden for testing. This class may also be used in scenarios where a
- * placeholder MongoProcessInterface is required by an interface but will not be called. To
- * guarantee the latter, method implementations in this class are marked MONGO_UNREACHABLE.
+ * Class to provide access to mongos-specific implementations of methods required by some
+ * document sources.
  */
-class StubMongoProcessInterface : public MongoProcessInterface {
+class MongosProcessInterface : public CommonProcessInterface {
 public:
-    virtual ~StubMongoProcessInterface() = default;
+    MongosProcessInterface() = default;
+
+    virtual ~MongosProcessInterface() = default;
+
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        boost::optional<BSONObj> readConcern,
+        bool allowSpeculativeMajorityRead = false) final;
+
+    std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              CurrentOpUserMode userMode) const final;
 
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const override {
         MONGO_UNREACHABLE;
     }
 
-    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
-        return false;
-    }
+    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
                   std::vector<BSONObj>&& objs,
                   const WriteConcernOptions& wc,
-                  boost::optional<OID>) override {
+                  boost::optional<OID>) final {
         MONGO_UNREACHABLE;
     }
 
@@ -76,172 +84,138 @@ public:
     std::vector<Document> getIndexStats(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         StringData host,
-                                        bool addShardName) override {
+                                        bool addShardName) final {
         MONGO_UNREACHABLE;
     }
 
     std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                      const NamespaceString& ns,
-                                     bool includeBuildUUIDs) override {
+                                     bool includeBuildUUIDs) final {
         MONGO_UNREACHABLE;
     }
 
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,
-                            BSONObjBuilder* builder) const override {
+                            BSONObjBuilder* builder) const final {
         MONGO_UNREACHABLE;
     }
 
     Status appendStorageStats(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& param,
-                              BSONObjBuilder* builder) const override {
+                              BSONObjBuilder* builder) const final {
         MONGO_UNREACHABLE;
     }
 
     Status appendRecordCount(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             BSONObjBuilder* builder) const override {
+                             BSONObjBuilder* builder) const final {
         MONGO_UNREACHABLE;
     }
 
     Status appendQueryExecStats(OperationContext* opCtx,
                                 const NamespaceString& nss,
-                                BSONObjBuilder* builder) const override {
+                                BSONObjBuilder* builder) const final {
         MONGO_UNREACHABLE;
     }
 
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }
 
-    void renameIfOptionsAndIndexesHaveNotChanged(
-        OperationContext* opCtx,
-        const BSONObj& renameCommandObj,
-        const NamespaceString& targetNs,
-        const BSONObj& originalCollectionOptions,
-        const std::list<BSONObj>& originalIndexes) override {
+    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
+                                                 const BSONObj& renameCommandObj,
+                                                 const NamespaceString& targetNs,
+                                                 const BSONObj& originalCollectionOptions,
+                                                 const std::list<BSONObj>& originalIndexes) final {
         MONGO_UNREACHABLE;
     }
 
     void createCollection(OperationContext* opCtx,
                           const std::string& dbName,
-                          const BSONObj& cmdObj) override {
+                          const BSONObj& cmdObj) final {
         MONGO_UNREACHABLE;
     }
 
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
-                                        const std::vector<BSONObj>& indexSpecs) override {
-        MONGO_UNREACHABLE;
-    }
-    void dropCollection(OperationContext* opCtx, const NamespaceString& ns) override {
+                                        const std::vector<BSONObj>& indexSpecs) final {
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions opts) override {
+    void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final {
         MONGO_UNREACHABLE;
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         Pipeline* pipeline,
-        bool allowTargetingShards = true) override {
-        MONGO_UNREACHABLE;
-    }
+        bool allowTargetingShards = true) final;
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
+        // It is not meaningful to perform a "local read" on mongos.
         MONGO_UNREACHABLE;
     }
 
     std::unique_ptr<ShardFilterer> getShardFilterer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
-        MONGO_UNREACHABLE;
+        return nullptr;
     }
 
-    std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       CurrentOpConnectionsMode connMode,
-                                       CurrentOpSessionsMode sessionMode,
-                                       CurrentOpUserMode userMode,
-                                       CurrentOpTruncateMode truncateMode,
-                                       CurrentOpCursorMode cursorMode,
-                                       CurrentOpBacktraceMode backtraceMode) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::string getShardName(OperationContext* opCtx) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::string getHostAndPort(OperationContext* opCtx) const override {
+    std::string getShardName(OperationContext* opCtx) const final {
         MONGO_UNREACHABLE;
     }
 
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext*, const NamespaceString&, UUID) const override {
+        OperationContext* opCtx, const NamespaceString&, UUID) const final {
         MONGO_UNREACHABLE;
     }
 
-    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    boost::optional<Document> lookupSingleDocument(
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+        const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss,
-        UUID collectionUUID,
-        const Document& documentKey,
-        boost::optional<BSONObj> readConcern,
-        bool allowSpeculativeMajorityRead) {
-        MONGO_UNREACHABLE;
-    }
+        const MakePipelineOptions pipelineOptions) final;
 
-    std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              CurrentOpUserMode userMode) const {
-        MONGO_UNREACHABLE;
-    }
-
+    /**
+     * The following methods only make sense for data-bearing nodes and should never be called on
+     * a mongos.
+     */
     BackupCursorState openBackupCursor(OperationContext* opCtx,
                                        const StorageEngine::BackupOptions& options) final {
-        return BackupCursorState{UUID::gen(), boost::none, {}};
+        MONGO_UNREACHABLE;
     }
 
-    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {}
+    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {
+        MONGO_UNREACHABLE;
+    }
 
     BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
                                                const UUID& backupId,
                                                const Timestamp& extendTo) final {
-        return {{}};
-    }
-
-    std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
-                                                        const NamespaceString&,
-                                                        const MatchExpression*) const override {
         MONGO_UNREACHABLE;
     }
 
-    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& nss,
-                                         const std::set<FieldPath>& fieldPaths) const override {
-        return true;
+    /**
+     * Mongos does not have a plan cache, so this method should never be called on mongos. Upstream
+     * checks are responsible for generating an error if a user attempts to introspect the plan
+     * cache on mongos.
+     */
+    std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
+                                                        const NamespaceString&,
+                                                        const MatchExpression*) const final {
+        MONGO_UNREACHABLE;
     }
 
-    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const override {
-        return boost::none;
-    }
+    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>&,
+                                         const NamespaceString&,
+                                         const std::set<FieldPath>& fieldPaths) const;
 
-    void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>&,
                                       const NamespaceString&,
-                                      ChunkVersion) const override {
-        uasserted(51019, "Unexpected check of routing table");
+                                      ChunkVersion) const final {
+        MONGO_UNREACHABLE;
     }
 
     std::unique_ptr<ResourceYielder> getResourceYielder() const override {
@@ -252,16 +226,21 @@ public:
     ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            boost::optional<std::vector<std::string>> fields,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
-                                           const NamespaceString& outputNs) const override {
-        if (!fields) {
-            return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
-        }
+                                           const NamespaceString& outputNs) const override;
 
-        std::set<FieldPath> fieldPaths;
-        for (const auto& field : *fields) {
-            fieldPaths.insert(FieldPath(field));
-        }
-        return {fieldPaths, targetCollectionVersion};
-    }
+protected:
+    BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
+                                      Client* client,
+                                      CurrentOpTruncateMode truncateOps,
+                                      CurrentOpBacktraceMode backtraceMode) const final;
+
+    void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                          CurrentOpUserMode userMode,
+                                          std::vector<BSONObj>* ops) const final;
+
+    void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                     bool includeIdle,
+                                                     std::vector<BSONObj>* ops) const final;
 };
+
 }  // namespace mongo

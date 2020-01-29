@@ -32,17 +32,17 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/mongo_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 
 namespace mongo {
 
 /**
- * MongoProcessCommon provides base implementations of any MongoProcessInterface methods whose code
- * is largely identical on mongoD and mongoS.
+ * CommonProcessInterface provides base implementations of any MongoProcessInterface methods
+ * whose code is largely identical on mongoD and mongoS.
  */
-class MongoProcessCommon : public MongoProcessInterface {
+class CommonProcessInterface : public MongoProcessInterface {
 public:
-    virtual ~MongoProcessCommon() = default;
+    virtual ~CommonProcessInterface() = default;
 
     /**
      * Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and
@@ -80,7 +80,7 @@ protected:
     /**
      * Returns a BSONObj representing a report of the operation which is currently being
      * executed by the supplied client. This method is called by the getCurrentOps method of
-     * MongoProcessCommon to delegate to the mongoS- or mongoD- specific implementation.
+     * CommonProcessInterface to delegate to the mongoS- or mongoD- specific implementation.
      */
     virtual BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                               Client* client,

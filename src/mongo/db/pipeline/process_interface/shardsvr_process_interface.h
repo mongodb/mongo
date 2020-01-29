@@ -31,16 +31,16 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/process_interface_standalone.h"
+#include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 
 namespace mongo {
 
 /**
  * Specialized version of the MongoDInterface when this node is a shard server.
  */
-class MongoInterfaceShardServer final : public MongoInterfaceStandalone {
+class ShardServerProcessInterface final : public CommonMongodProcessInterface {
 public:
-    using MongoInterfaceStandalone::MongoInterfaceStandalone;
+    using CommonMongodProcessInterface::CommonMongodProcessInterface;
 
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,

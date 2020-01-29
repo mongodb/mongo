@@ -35,7 +35,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/process_interface_standalone.h"
+#include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
@@ -46,7 +46,8 @@ namespace {
 class MapReduceFixture : public ServiceContextMongoDTest {
 protected:
     MapReduceFixture() : _expCtx((new ExpressionContextForTest())) {
-        _expCtx->mongoProcessInterface = std::make_shared<MongoInterfaceStandalone>(_expCtx->opCtx);
+        _expCtx->mongoProcessInterface =
+            std::make_shared<NonShardServerProcessInterface>(_expCtx->opCtx);
     }
 
     boost::intrusive_ptr<ExpressionContextForTest>& getExpCtx() {

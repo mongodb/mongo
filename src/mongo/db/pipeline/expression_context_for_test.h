@@ -32,7 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_test_service_context.h"
 
