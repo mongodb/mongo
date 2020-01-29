@@ -1014,6 +1014,7 @@ buildvariants:
     - name: tpcc
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+    - name: industry_benchmarks_wmajority
 
 - name: linux-standalone
   display_name: Linux Standalone
