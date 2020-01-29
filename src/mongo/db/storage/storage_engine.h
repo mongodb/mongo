@@ -549,6 +549,14 @@ public:
      */
     virtual void waitForJournalFlush(OperationContext* opCtx) const = 0;
 
+    /**
+     * Ensures interruption of the JournalFlusher if it is or will be acquiring a lock.
+     *
+     * TODO: this function will be moved above the Storage Engine layer along with the
+     * JournalFlusher in SERVER-45847.
+     */
+    virtual void interruptJournalFlusherForReplStateChange() const = 0;
+
     struct IndexIdentifier {
         const RecordId catalogId;
         const NamespaceString nss;

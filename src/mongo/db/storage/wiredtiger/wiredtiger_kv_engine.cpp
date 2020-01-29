@@ -247,17 +247,33 @@ public:
         ThreadClient tc(name(), getGlobalServiceContext());
         LOG(1) << "starting " << name() << " thread";
 
+        // Initialize the thread's opCtx.
+        _uniqueCtx.emplace(tc->makeOperationContext());
         while (true) {
-            auto opCtx = tc->makeOperationContext();
             try {
-                _sessionCache->waitUntilDurable(opCtx.get(),
+                ON_BLOCK_EXIT([&] {
+                    // We do not want to miss an interrupt for the next round. Therefore, the opCtx
+                    // will be reset after a flushing round finishes.
+                    //
+                    // It is fine if the opCtx is signaled between finishing and resetting because
+                    // state changes will be seen before the next round. We want to catch any
+                    // interrupt signals that occur after state is checked at the start of a round:
+                    // the time during or before the next flush.
+                    stdx::lock_guard<Latch> lk(_opCtxMutex);
+                    _uniqueCtx.reset();
+                    _uniqueCtx.emplace(tc->makeOperationContext());
+                });
+
+                _sessionCache->waitUntilDurable(_uniqueCtx->get(),
                                                 /*forceCheckpoint*/ false,
                                                 /*stableCheckpoint*/ false);
 
                 // Signal the waiters that a round completed.
                 _currentSharedPromise->emplaceValue();
             } catch (const AssertionException& e) {
-                invariant(e.code() == ErrorCodes::ShutdownInProgress);
+                invariant(ErrorCodes::isShutdownError(e.code()) ||
+                              e.code() == ErrorCodes::InterruptedDueToReplStateChange,
+                          e.toString());
 
                 // Signal the waiters that the fsync was interrupted.
                 _currentSharedPromise->setError(e.toStatus());
@@ -282,6 +298,8 @@ public:
                 LOG(1) << "stopping " << name() << " thread";
                 _nextSharedPromise->setError(
                     Status(ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."));
+                stdx::lock_guard<Latch> lk(_opCtxMutex);
+                _uniqueCtx.reset();
                 return;
             }
 
@@ -332,8 +350,27 @@ public:
         myFuture.get();
     }
 
+    /**
+     * Interrupts the journal flusher thread via its operation context with an
+     * InterruptedDueToReplStateChange error.
+     */
+    void interruptJournalFlusherForReplStateChange() {
+        stdx::lock_guard<Latch> lk(_opCtxMutex);
+        if (_uniqueCtx) {
+            stdx::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
+            _uniqueCtx->get()->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+        }
+    }
+
 private:
     WiredTigerSessionCache* _sessionCache;
+
+    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
+    mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("WiredTigerJournalFlusherOpCtxMutex");
+
+    // Saves a reference to the flusher thread's operation context so it can be interrupted if the
+    // flusher is active.
+    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
     // Protects the state below.
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("WiredTigerJournalFlusherStateMutex");
@@ -2216,6 +2253,13 @@ void WiredTigerKVEngine::waitForJournalFlush(OperationContext* opCtx) const {
         _journalFlusher->waitForJournalFlush();
     } else {
         opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+    }
+}
+
+
+void WiredTigerKVEngine::interruptJournalFlusherForReplStateChange() const {
+    if (_journalFlusher) {
+        _journalFlusher->interruptJournalFlusherForReplStateChange();
     }
 }
 

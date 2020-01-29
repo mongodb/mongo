@@ -472,6 +472,11 @@ public:
     }
 
     /**
+     * See `StorageEngine::interruptJournalFlusherForReplStateChange()`
+     */
+    virtual void interruptJournalFlusherForReplStateChange() const {}
+
+    /**
      * Methods to access the storage engine's timestamps.
      */
     virtual Timestamp getCheckpointTimestamp() const {
