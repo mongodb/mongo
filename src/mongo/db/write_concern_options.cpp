@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -152,13 +151,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
     }
 
     if (wEl.isNumber()) {
-        auto wNumNodes = wEl.safeNumberLong();
-        if (wNumNodes < 0 || wNumNodes > static_cast<long long>(repl::ReplSetConfig::kMaxMembers)) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "w has to be a non-negative number and not greater than "
-                                        << repl::ReplSetConfig::kMaxMembers);
-        }
-        writeConcern.wNumNodes = static_cast<int>(wNumNodes);
+        writeConcern.wNumNodes = wEl.numberInt();
         writeConcern.usedDefaultW = false;
     } else if (wEl.type() == String) {
         writeConcern.wNumNodes = 0;

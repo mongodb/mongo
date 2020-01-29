@@ -110,15 +110,6 @@ TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNotNumberOrString) {
     ASSERT_EQUALS("w has to be a number or a string", status.reason());
 }
 
-TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNegativeOrExceedsMaxMembers) {
-    auto st1 = WriteConcernOptions::parse(BSON("w" << 123)).getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, st1);
-
-    auto st2 = WriteConcernOptions::parse(BSON("w" << -1)).getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, st2);
-    ASSERT_EQUALS(st1.reason(), st2.reason());
-}
-
 TEST(WriteConcernOptionsTest, ParseSetsWNumNodesIfWIsANumber) {
     auto sw = WriteConcernOptions::parse(BSON("w" << 3));
     ASSERT_OK(sw.getStatus());

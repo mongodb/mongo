@@ -49,20 +49,11 @@ checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: 1})), (c
 });
 
 primaryDB.createCollection(collName);
-checkWriteConcern(
-    () => {
-        /**
-         * Depending on the value for kMaxMembers, the following will return a different error code:
-         * FailedToParse: if kMaxMembers < 100000
-         * UnsatisfiableWriteConcern: otherwise
-         */
-        let result = primaryDB.dropDatabase({w: 100000});
-        assert(result.code == ErrorCodes.FailedToParse ||
-               result.code == ErrorCodes.UnsatisfiableWriteConcern);
-    },
-    (cmdObj) => {
-        assert.eq(cmdObj.writeConcern, {w: 100000});
-    });
+checkWriteConcern(() => assert.commandFailedWithCode(primaryDB.dropDatabase({w: 100000}),
+                                                     ErrorCodes.UnsatisfiableWriteConcern),
+                  (cmdObj) => {
+                      assert.eq(cmdObj.writeConcern, {w: 100000});
+                  });
 
 rst.stopSet();
 })();
