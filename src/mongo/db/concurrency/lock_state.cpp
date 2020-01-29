@@ -651,7 +651,7 @@ bool LockerImpl::wasGlobalLockTakenInModeConflictingWithWrites() const {
 }
 
 bool LockerImpl::wasGlobalLockTaken() const {
-    return _globalLockMode;
+    return _globalLockMode != (1 << MODE_NONE);
 }
 
 void LockerImpl::setGlobalLockTakenInMode(LockMode mode) {
