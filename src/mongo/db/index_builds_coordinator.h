@@ -127,7 +127,8 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const std::vector<BSONObj>& specs,
-        const UUID& buildUUID);
+        const UUID& buildUUID,
+        RepairData repair);
 
     /**
      * TODO: not yet implemented.
@@ -407,7 +408,7 @@ protected:
     /**
      * Runs the index build.
      * Rebuilding an index in recovery mode verifies each document to ensure that it is a valid
-     * BSON object. It will remove any documents with invalid BSON.
+     * BSON object. If repair is kYes, it will remove any documents with invalid BSON.
      *
      * Returns the number of records and the size of the data iterated over, if successful.
      */
@@ -415,7 +416,8 @@ protected:
         OperationContext* opCtx,
         Collection* collection,
         ReplIndexBuildState::IndexCatalogStats& indexCatalogStats,
-        const UUID& buildUUID) noexcept;
+        const UUID& buildUUID,
+        RepairData repair) noexcept;
 
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");

@@ -154,7 +154,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
+        fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 
     // Open all databases and repopulate the CollectionCatalog.

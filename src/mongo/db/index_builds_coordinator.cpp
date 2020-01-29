@@ -154,7 +154,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<BSONObj>& specs,
-    const UUID& buildUUID) {
+    const UUID& buildUUID,
+    RepairData repair) {
     // Index builds in recovery mode have the global write lock.
     invariant(opCtx->lockState()->isW());
 
@@ -245,7 +246,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         wuow.commit();
     }
 
-    return _runIndexRebuildForRecovery(opCtx, collection, indexCatalogStats, buildUUID);
+    return _runIndexRebuildForRecovery(opCtx, collection, indexCatalogStats, buildUUID, repair);
 }
 
 Future<void> IndexBuildsCoordinator::joinIndexBuilds(const NamespaceString& nss,
@@ -956,7 +957,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     OperationContext* opCtx,
     Collection* collection,
     ReplIndexBuildState::IndexCatalogStats& indexCatalogStats,
-    const UUID& buildUUID) noexcept {
+    const UUID& buildUUID,
+    RepairData repair) noexcept {
     // Index builds in recovery mode have the global write lock.
     invariant(opCtx->lockState()->isW());
 
@@ -980,8 +982,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     try {
         log() << "Index builds manager starting: " << buildUUID << ": " << nss;
 
-        std::tie(numRecords, dataSize) = uassertStatusOK(
-            _indexBuildsManager.startBuildingIndexForRecovery(opCtx, collection->ns(), buildUUID));
+        std::tie(numRecords, dataSize) =
+            uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
+                opCtx, collection->ns(), buildUUID, repair));
 
         uassertStatusOK(
             _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
