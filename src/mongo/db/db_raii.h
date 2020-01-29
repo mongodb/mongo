@@ -48,21 +48,21 @@ class AutoStatsTracker {
 
 public:
     /**
-     *Describes which diagnostics to update during the lifetime of this object.
+     * Describes which diagnostics to update during the lifetime of this object.
      */
     enum class LogMode {
-        kUpdateTop,  // Increments the Top counter for this operation type and this namespace upon
-                     // destruction.
-        kUpdateTopAndCurop,  // In addition to incrementing the Top counter, adjusts state on the
-                             // CurOp object associated with the OperationContext. Updates the
-                             // namespace to be 'nss', starts a timer for the operation (if it
-                             // hasn't started already), and figures out and records the profiling
-                             // level of the operation.
+        kUpdateTop,    // Increments the Top counter for this operation type and this namespace
+                       // upon destruction.
+        kUpdateCurOp,  // Adjusts the state on the CurOp object associated with the
+                       // OperationContext. Updates the namespace to be 'nss', starts a timer
+                       // for the operation (if it hasn't already started), and figures out and
+                       // records the profiling level of the operation.
+        kUpdateTopAndCurOp,  // Performs the operations of both the LogModes specified above.
     };
 
     /**
-     * If 'logMode' is 'kUpdateTopAndCurop', sets up and records state on the CurOp object attached
-     * to 'opCtx', as described above.
+     * If 'logMode' is 'kUpdateCurOp' or 'kUpdateTopAndCurOp', sets up and records state on the
+     * CurOp object attached to 'opCtx', as described above.
      */
     AutoStatsTracker(OperationContext* opCtx,
                      const NamespaceString& nss,
@@ -72,7 +72,8 @@ public:
                      Date_t deadline = Date_t::max());
 
     /**
-     * Records stats about the current operation via Top.
+     * Records stats about the current operation via Top, if 'logMode' is 'kUpdateTop' or
+     * 'kUpdateTopAndCurOp'.
      */
     ~AutoStatsTracker();
 
@@ -80,6 +81,7 @@ private:
     OperationContext* _opCtx;
     Top::LockType _lockType;
     const NamespaceString _nss;
+    const LogMode _logMode;
 };
 
 /**
@@ -160,7 +162,7 @@ public:
         const NamespaceStringOrUUID& nsOrUUID,
         AutoGetCollection::ViewMode viewMode = AutoGetCollection::ViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max(),
-        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurop);
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
     Database* getDb() const {
         return _autoCollForRead.getDb();

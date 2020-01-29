@@ -405,7 +405,7 @@ public:
                     statsTracker.emplace(opCtx,
                                          _request.nss,
                                          Top::LockType::NotLocked,
-                                         AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                          dbProfilingLevel);
                 }
             } else {
@@ -434,7 +434,7 @@ public:
                 statsTracker.emplace(opCtx,
                                      _request.nss,
                                      Top::LockType::ReadLocked,
-                                     AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                      readLock->getDb() ? readLock->getDb()->getProfilingLevel()
                                                        : doNotChangeProfilingLevel);
 

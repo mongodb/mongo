@@ -71,7 +71,7 @@ Status _createView(OperationContext* opCtx,
         AutoStatsTracker statsTracker(opCtx,
                                       nss,
                                       Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                       db->getProfilingLevel());
 
         if (opCtx->writesAreReplicated() &&
@@ -123,7 +123,7 @@ Status _createCollection(OperationContext* opCtx,
         AutoStatsTracker statsTracker(opCtx,
                                       nss,
                                       Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                       autoDb.getDb()->getProfilingLevel());
 
         if (opCtx->writesAreReplicated() &&

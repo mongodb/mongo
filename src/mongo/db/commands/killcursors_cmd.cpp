@@ -70,7 +70,7 @@ private:
             statsTracker.emplace(opCtx,
                                  nss,
                                  Top::LockType::NotLocked,
-                                 AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  dbProfilingLevel);
         }
 

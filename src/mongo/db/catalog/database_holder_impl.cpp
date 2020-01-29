@@ -201,7 +201,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
             break;
         }
 
-        Top::get(serviceContext).collectionDropped(coll->ns(), true);
+        Top::get(serviceContext).collectionDropped(coll->ns());
     }
 
     close(opCtx, name);
