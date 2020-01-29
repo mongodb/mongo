@@ -18,6 +18,7 @@
 load("jstests/aggregation/extras/merge_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // For arrayEq, assertErrorCode, and
                                               // orderedArrayEq.
+load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 
 let viewsDB = db.getSiblingDB("views_aggregation");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -31,28 +32,20 @@ let assertAggResultEq = function(collection, pipeline, expected, ordered) {
     assert(success, tojson({got: arr, expected: expected}));
 };
 let byPopulation = function(a, b) {
-    if (a.pop < b.pop)
-        return -1;
-    else if (a.pop > b.pop)
-        return 1;
-    else
-        return 0;
+    return a.pop - b.pop;
 };
 
 // Populate a collection with some test data.
-let allDocuments = [];
-allDocuments.push({_id: "New York", state: "NY", pop: 7});
-allDocuments.push({_id: "Newark", state: "NJ", pop: 3});
-allDocuments.push({_id: "Palo Alto", state: "CA", pop: 10});
-allDocuments.push({_id: "San Francisco", state: "CA", pop: 4});
-allDocuments.push({_id: "Trenton", state: "NJ", pop: 5});
+const allDocuments = [
+    {_id: "New York", state: "NY", pop: 7},
+    {_id: "Newark", state: "NJ", pop: 3},
+    {_id: "Palo Alto", state: "CA", pop: 10},
+    {_id: "San Francisco", state: "CA", pop: 4},
+    {_id: "Trenton", state: "NJ", pop: 5},
+];
 
 let coll = viewsDB.coll;
-let bulk = coll.initializeUnorderedBulkOp();
-allDocuments.forEach(function(doc) {
-    bulk.insert(doc);
-});
-assert.commandWorked(bulk.execute());
+assert.commandWorked(coll.insert(allDocuments));
 
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "emptyPipelineView", viewOn: "coll"}));
@@ -66,160 +59,174 @@ assert.commandWorked(viewsDB.runCommand({
     pipeline: [{$match: {pop: {$gte: 0}}}, {$sort: {pop: 1}}]
 }));
 
-// Find all documents with empty aggregations.
-assertAggResultEq("emptyPipelineView", [], allDocuments);
-assertAggResultEq("identityView", [], allDocuments);
-assertAggResultEq("identityView", [{$match: {}}], allDocuments);
+(function testBasicAggregations() {
+    // Find all documents with empty aggregations.
+    assertAggResultEq("emptyPipelineView", [], allDocuments);
+    assertAggResultEq("identityView", [], allDocuments);
+    assertAggResultEq("identityView", [{$match: {}}], allDocuments);
 
-// Filter documents on a view with $match.
-assertAggResultEq(
-    "popSortedView", [{$match: {state: "NY"}}], [{_id: "New York", state: "NY", pop: 7}]);
+    // Filter documents on a view with $match.
+    assertAggResultEq(
+        "popSortedView", [{$match: {state: "NY"}}], [{_id: "New York", state: "NY", pop: 7}]);
 
-// An aggregation still works on a view that strips _id.
-assertAggResultEq("noIdView", [{$match: {state: "NY"}}], [{state: "NY", pop: 7}]);
+    // An aggregation still works on a view that strips _id.
+    assertAggResultEq("noIdView", [{$match: {state: "NY"}}], [{state: "NY", pop: 7}]);
 
-// Aggregations work on views that sort.
-const doOrderedSort = true;
-assertAggResultEq("popSortedView", [], allDocuments.sort(byPopulation), doOrderedSort);
-assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Palo Alto"}]);
+    // Aggregations work on views that sort.
+    const doOrderedSort = true;
+    assertAggResultEq("popSortedView", [], allDocuments.sort(byPopulation), doOrderedSort);
+    assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Palo Alto"}]);
+})();
 
-// Test that the $out stage errors when writing to a view namespace.
-assertErrorCode(coll, [{$out: "emptyPipelineView"}], ErrorCodes.CommandNotSupportedOnView);
+(function testAggStagesWritingToViews() {
+    // Test that the $out stage errors when writing to a view namespace.
+    assertErrorCode(coll, [{$out: "emptyPipelineView"}], ErrorCodes.CommandNotSupportedOnView);
 
-// Test that the $merge stage errors when writing to a view namespace.
-assertMergeFailsForAllModesWithCode({
-    source: viewsDB.coll,
-    target: viewsDB.emptyPipelineView,
-    errorCodes: [ErrorCodes.CommandNotSupportedOnView]
-});
+    // Test that the $merge stage errors when writing to a view namespace.
+    assertMergeFailsForAllModesWithCode({
+        source: viewsDB.coll,
+        target: viewsDB.emptyPipelineView,
+        errorCodes: [ErrorCodes.CommandNotSupportedOnView]
+    });
 
-// Test that the $merge stage errors when writing to a view namespace in a foreign database.
-let foreignDB = db.getSiblingDB("views_aggregation_foreign");
-foreignDB.view.drop();
-assert.commandWorked(foreignDB.createView("view", "coll", []));
+    // Test that the $merge stage errors when writing to a view namespace in a foreign database.
+    let foreignDB = db.getSiblingDB("views_aggregation_foreign");
+    foreignDB.view.drop();
+    assert.commandWorked(foreignDB.createView("view", "coll", []));
 
-assertMergeFailsForAllModesWithCode({
-    source: viewsDB.coll,
-    target: foreignDB.view,
-    errorCodes: [ErrorCodes.CommandNotSupportedOnView]
-});
+    assertMergeFailsForAllModesWithCode({
+        source: viewsDB.coll,
+        target: foreignDB.view,
+        errorCodes: [ErrorCodes.CommandNotSupportedOnView]
+    });
+})();
 
-// Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
-const validatedCollName = "collectionWithValidator";
-viewsDB[validatedCollName].drop();
-assert.commandWorked(
-    viewsDB.createCollection(validatedCollName, {validator: {illegalField: {$exists: false}}}));
+(function testOptionsForwarding() {
+    // Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
+    const validatedCollName = "collectionWithValidator";
+    viewsDB[validatedCollName].drop();
+    assert.commandWorked(
+        viewsDB.createCollection(validatedCollName, {validator: {illegalField: {$exists: false}}}));
 
-viewsDB.invalidDocs.drop();
-viewsDB.invalidDocsView.drop();
-assert.commandWorked(viewsDB.invalidDocs.insert({illegalField: "present"}));
-assert.commandWorked(viewsDB.createView("invalidDocsView", "invalidDocs", []));
+    viewsDB.invalidDocs.drop();
+    viewsDB.invalidDocsView.drop();
+    assert.commandWorked(viewsDB.invalidDocs.insert({illegalField: "present"}));
+    assert.commandWorked(viewsDB.createView("invalidDocsView", "invalidDocs", []));
 
-assert.commandWorked(
-    viewsDB.runCommand({
-        aggregate: "invalidDocsView",
-        pipeline: [{$out: validatedCollName}],
-        cursor: {},
-        bypassDocumentValidation: true
-    }),
-    "Expected $out insertions to succeed since 'bypassDocumentValidation' was specified");
+    assert.commandWorked(
+        viewsDB.runCommand({
+            aggregate: "invalidDocsView",
+            pipeline: [{$out: validatedCollName}],
+            cursor: {},
+            bypassDocumentValidation: true
+        }),
+        "Expected $out insertions to succeed since 'bypassDocumentValidation' was specified");
 
-// Test that an aggregate on a view propagates the 'allowDiskUse' option.
-const extSortLimit = 100 * 1024 * 1024;
-const largeStrSize = 10 * 1024 * 1024;
-const largeStr = new Array(largeStrSize).join('x');
-viewsDB.largeColl.drop();
-for (let i = 0; i <= extSortLimit / largeStrSize; ++i) {
-    assert.commandWorked(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
-}
-assertErrorCode(viewsDB.largeColl,
-                [{$sort: {x: -1}}],
-                16819,
-                "Expected in-memory sort to fail due to excessive memory usage");
-viewsDB.largeView.drop();
-assert.commandWorked(viewsDB.createView("largeView", "largeColl", []));
-assertErrorCode(viewsDB.largeView,
-                [{$sort: {x: -1}}],
-                16819,
-                "Expected in-memory sort to fail due to excessive memory usage");
+    // Test that an aggregate on a view propagates the 'allowDiskUse' option.
+    const extSortLimit = 100 * 1024 * 1024;
+    const largeStrSize = 10 * 1024 * 1024;
+    const largeStr = new Array(largeStrSize).join('x');
+    viewsDB.largeColl.drop();
+    for (let i = 0; i <= extSortLimit / largeStrSize; ++i) {
+        assert.commandWorked(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
+    }
+    assertErrorCode(viewsDB.largeColl,
+                    [{$sort: {x: -1}}],
+                    16819,
+                    "Expected in-memory sort to fail due to excessive memory usage");
+    viewsDB.largeView.drop();
+    assert.commandWorked(viewsDB.createView("largeView", "largeColl", []));
+    assertErrorCode(viewsDB.largeView,
+                    [{$sort: {x: -1}}],
+                    16819,
+                    "Expected in-memory sort to fail due to excessive memory usage");
 
-assert.commandWorked(
-    viewsDB.runCommand(
-        {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
-    "Expected aggregate to succeed since 'allowDiskUse' was specified");
+    assert.commandWorked(
+        viewsDB.runCommand(
+            {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
+        "Expected aggregate to succeed since 'allowDiskUse' was specified");
+})();
 
 // Test explain modes on a view.
-let explainPlan = assert.commandWorked(
-    viewsDB.popSortedView.explain("queryPlanner").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-assert.eq(
-    explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
-assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+(function testExplainOnView() {
+    let explainPlan = assert.commandWorked(
+        viewsDB.popSortedView.explain("queryPlanner").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
+              "views_aggregation.coll",
+              explainPlan);
+    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
 
-explainPlan = assert.commandWorked(
-    viewsDB.popSortedView.explain("executionStats").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-assert.eq(
-    explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
-assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
-assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
-assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
-       explainPlan);
+    explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("executionStats")
+                                           .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
+              "views_aggregation.coll",
+              explainPlan);
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
+    assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
+           explainPlan);
 
-explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("allPlansExecution")
-                                       .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-assert.eq(
-    explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
-assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
-assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
-assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
-       explainPlan);
+    explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("allPlansExecution")
+                                           .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
+              "views_aggregation.coll",
+              explainPlan);
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
+           explainPlan);
 
-// Passing a value of true for the explain option to the aggregation command, without using the
-// shell explain helper, should continue to work.
-explainPlan = assert.commandWorked(
-    viewsDB.popSortedView.aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true}));
-assert.eq(
-    explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
-assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+    // Passing a value of true for the explain option to the aggregation command, without using the
+    // shell explain helper, should continue to work.
+    explainPlan = assert.commandWorked(
+        viewsDB.popSortedView.aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true}));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
+              "views_aggregation.coll",
+              explainPlan);
+    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
 
-// Test allPlansExecution explain mode on the base collection.
-explainPlan = assert.commandWorked(
-    viewsDB.coll.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-assert.eq(
-    explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
-assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
-assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
-assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
-       explainPlan);
+    // Test allPlansExecution explain mode on the base collection.
+    explainPlan = assert.commandWorked(
+        viewsDB.coll.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
+              "views_aggregation.coll",
+              explainPlan);
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
+           explainPlan);
 
-// The explain:true option should not work when paired with the explain shell helper.
-assert.throws(function() {
-    viewsDB.popSortedView.explain("executionStats").aggregate([{$limit: 1}, {$match: {pop: 3}}], {
-        explain: true
+    // The explain:true option should not work when paired with the explain shell helper.
+    assert.throws(function() {
+        viewsDB.popSortedView.explain("executionStats")
+            .aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true});
     });
-});
+})();
 
-// The remaining tests involve $lookup and $graphLookup. We cannot lookup into sharded
-// collections, so skip these tests if running in a sharded configuration.
-let isMasterResponse = assert.commandWorked(viewsDB.runCommand("isMaster"));
-const isMongos = (isMasterResponse.msg === "isdbgrid");
-if (isMongos) {
-    jsTest.log("Tests are being run on a mongos; skipping all $lookup and $graphLookup tests.");
-    return;
-}
+(
+    function testLookupAndGraphLookup() {
+        // We cannot lookup into sharded collections, so skip these tests if running in a sharded
+        // configuration.
+        if (FixtureHelpers.isMongos(db)) {
+            jsTest.log(
+                "Tests are being run on a mongos; skipping all $lookup and $graphLookup tests.");
+            return;
+        }
 
-// Test that the $lookup stage resolves the view namespace referenced in the 'from' field.
-assertAggResultEq(
-    coll.getName(),
-    [
-        {$match: {_id: "New York"}},
-        {$lookup: {from: "identityView", localField: "_id", foreignField: "_id", as: "matched"}},
-        {$unwind: "$matched"},
-        {$project: {_id: 1, matchedId: "$matched._id"}}
-    ],
-    [{_id: "New York", matchedId: "New York"}]);
+        // Test that the $lookup stage resolves the view namespace referenced in the 'from' field.
+        assertAggResultEq(
+        coll.getName(),
+        [
+            {$match: {_id: "New York"}},
+            {$lookup: {from: "identityView", localField: "_id", foreignField: "_id", as: "matched"}},
+            {$unwind: "$matched"},
+            {$project: {_id: 1, matchedId: "$matched._id"}}
+        ],
+        [{_id: "New York", matchedId: "New York"}]);
 
-// Test that the $graphLookup stage resolves the view namespace referenced in the 'from' field.
-assertAggResultEq(coll.getName(),
+        // Test that the $graphLookup stage resolves the view namespace referenced in the 'from'
+        // field.
+        assertAggResultEq(coll.getName(),
                       [
                         {$match: {_id: "New York"}},
                         {
@@ -236,9 +243,9 @@ assertAggResultEq(coll.getName(),
                       ],
                       [{_id: "New York", matchedId: "New York"}]);
 
-// Test that the $lookup stage resolves the view namespace referenced in the 'from' field of
-// another $lookup stage nested inside of it.
-assert.commandWorked(viewsDB.runCommand({
+        // Test that the $lookup stage resolves the view namespace referenced in the 'from' field of
+        // another $lookup stage nested inside of it.
+        assert.commandWorked(viewsDB.runCommand({
     create: "viewWithLookupInside",
     viewOn: coll.getName(),
     pipeline: [
@@ -248,7 +255,7 @@ assert.commandWorked(viewsDB.runCommand({
     ]
 }));
 
-assertAggResultEq(
+        assertAggResultEq(
         coll.getName(),
         [
           {$match: {_id: "New York"}},
@@ -265,9 +272,9 @@ assertAggResultEq(
         ],
         [{_id: "New York", matchedId1: "New York", matchedId2: "New York"}]);
 
-// Test that the $graphLookup stage resolves the view namespace referenced in the 'from' field
-// of a $lookup stage nested inside of it.
-let graphLookupPipeline = [
+        // Test that the $graphLookup stage resolves the view namespace referenced in the 'from'
+        // field of a $lookup stage nested inside of it.
+        let graphLookupPipeline = [
         {$match: {_id: "New York"}},
         {
           $graphLookup: {
@@ -282,13 +289,13 @@ let graphLookupPipeline = [
         {$project: {_id: 1, matchedId1: "$matched._id", matchedId2: "$matched.matchedId"}}
     ];
 
-assertAggResultEq(coll.getName(),
-                  graphLookupPipeline,
-                  [{_id: "New York", matchedId1: "New York", matchedId2: "New York"}]);
+        assertAggResultEq(coll.getName(),
+                          graphLookupPipeline,
+                          [{_id: "New York", matchedId1: "New York", matchedId2: "New York"}]);
 
-// Test that the $lookup stage on a view with a nested $lookup on a different view resolves the
-// view namespaces referenced in their respective 'from' fields.
-assertAggResultEq(
+        // Test that the $lookup stage on a view with a nested $lookup on a different view resolves
+        // the view namespaces referenced in their respective 'from' fields.
+        assertAggResultEq(
         coll.getName(),
         [
           {$match: {_id: "Trenton"}},
@@ -321,9 +328,33 @@ assertAggResultEq(
            }]
         }]);
 
-// Test that the $facet stage resolves the view namespace referenced in the 'from' field of a
-// $lookup stage nested inside of a $graphLookup stage.
-assertAggResultEq(coll.getName(),
-                  [{$facet: {nested: graphLookupPipeline}}],
-                  [{nested: [{_id: "New York", matchedId1: "New York", matchedId2: "New York"}]}]);
-}());
+        // Test that the $facet stage resolves the view namespace referenced in the 'from' field of
+        // a $lookup stage nested inside of a $graphLookup stage.
+        assertAggResultEq(
+            coll.getName(),
+            [{$facet: {nested: graphLookupPipeline}}],
+            [{nested: [{_id: "New York", matchedId1: "New York", matchedId2: "New York"}]}]);
+    })();
+
+(function testUnionReadFromView() {
+    if (FixtureHelpers.isMongos(db)) {
+        // TODO SERVER-45563 enable these tests in sharded environments.
+        jsTest.log("Tests are being run on a mongos; skipping all $unionWith view tests.");
+        return;
+    }
+    assert.eq(allDocuments.length, coll.aggregate([]).itcount());
+    assert.eq(2 * allDocuments.length,
+              coll.aggregate([{$unionWith: "emptyPipelineView"}]).itcount());
+    assert.eq(2 * allDocuments.length, coll.aggregate([{$unionWith: "identityView"}]).itcount());
+    assert.eq(
+        2 * allDocuments.length,
+        coll.aggregate(
+                [{$unionWith: {coll: "noIdView", pipeline: [{$match: {_id: {$exists: false}}}]}}])
+            .itcount());
+    assert.eq(
+        allDocuments.length + 1,
+        coll.aggregate(
+                [{$unionWith: {coll: "identityView", pipeline: [{$match: {_id: "New York"}}]}}])
+            .itcount());
+})();
+})();
