@@ -127,9 +127,9 @@ void BSONFormatter::operator()(boost::log::record_view const& rec,
                    extract<LogSeverity>(attributes::severity(), rec).get().toStringDataCompact());
     builder.append(constants::kComponentFieldName,
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog());
+    builder.append(constants::kIdFieldName, extract<int32_t>(attributes::id(), rec).get());
     builder.append(constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get());
-    builder.append(constants::kIdFieldName, extract<int32_t>(attributes::id(), rec).get());
 
     detail::NameExtractor nameExtractor;
     attrs.apply(nameExtractor);

@@ -168,8 +168,8 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    R"("{}":{{"$date":"{}"}},)"  // timestamp
                    R"("{}":"{}"{: <{}})"        // severity with padding for the comma
                    R"("{}":"{}"{: <{}})"        // component with padding for the comma
-                   R"("{}":"{}",)"              // context
                    R"("{}":{},)"                // id
+                   R"("{}":"{}",)"              // context
                    R"("{}":")",                 // message
                                                 // timestamp
                    constants::kTimestampFieldName,
@@ -184,12 +184,12 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    component,
                    ",",
                    9 - component.size(),
-                   // context
-                   constants::kContextFieldName,
-                   extract<StringData>(attributes::threadName(), rec).get(),
                    // id
                    constants::kIdFieldName,
                    extract<int32_t>(attributes::id(), rec).get(),
+                   // context
+                   constants::kContextFieldName,
+                   extract<StringData>(attributes::threadName(), rec).get(),
                    // message
                    constants::kMessageFieldName);
 
