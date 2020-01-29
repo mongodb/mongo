@@ -289,7 +289,8 @@ TEST_F(ReplCoordTest,
                                                                                 << "node2:12345"))),
                                                &result1);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "is not electable under the new configuration version");
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "is not electable under the new configuration with term");
     ASSERT_FALSE(getExternalState()->threadsStarted());
 }
 

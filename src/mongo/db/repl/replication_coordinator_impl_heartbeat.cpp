@@ -443,13 +443,15 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     switch (_rsConfigState) {
         case kConfigUninitialized:
         case kConfigSteady:
-            LOG_FOR_HEARTBEATS(1) << "Received new config via heartbeat with version "
+            LOG_FOR_HEARTBEATS(1) << "Received new config via heartbeat with term "
+                                  << newConfig.getConfigTerm() << ", version "
                                   << newConfig.getConfigVersion();
             break;
         case kConfigInitiating:
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
-            LOG_FOR_HEARTBEATS(1) << "Ignoring new configuration with version "
+            LOG_FOR_HEARTBEATS(1) << "Ignoring new configuration with term "
+                                  << newConfig.getConfigTerm() << ", version "
                                   << newConfig.getConfigVersion()
                                   << " because already in the midst of a configuration process.";
             return;
@@ -464,7 +466,8 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
-        LOG_FOR_HEARTBEATS(2) << "Rescheduling heartbeat reconfig to version "
+        LOG_FOR_HEARTBEATS(2) << "Rescheduling heartbeat reconfig to config with term "
+                              << newConfig.getConfigTerm() << ", version "
                               << newConfig.getConfigVersion()
                               << " to be processed after election is cancelled.";
 
@@ -515,7 +518,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                      "it is invalid: "
                   << myIndex.getStatus();
     } else {
-        LOG_FOR_HEARTBEATS(2) << "Config with version " << newConfig.getConfigVersion()
+        LOG_FOR_HEARTBEATS(2) << "Config with term " << newConfig.getConfigTerm() << ", version "
+                              << newConfig.getConfigVersion()
                               << " validated for reconfig; persisting to disk.";
 
         auto opCtx = cc().makeOperationContext();
@@ -552,7 +556,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             shouldStartDataReplication = true;
         }
 
-        LOG_FOR_HEARTBEATS(2) << "New configuration with version " << newConfig.getConfigVersion()
+        LOG_FOR_HEARTBEATS(2) << "New configuration with term " << newConfig.getConfigTerm()
+                              << ", version " << newConfig.getConfigVersion()
                               << " persisted to local storage; installing new config in memory";
     }
 
@@ -596,8 +601,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         stdx::lock_guard<Latch> lk(_mutex);
         if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
             LOG_FOR_HEARTBEATS(0)
-                << "Waiting for election to complete before finishing reconfig to version "
-                << newConfig.getConfigVersion();
+                << "Waiting for election to complete before finishing reconfig to config with term "
+                << newConfig.getConfigTerm() << ", version " << newConfig.getConfigVersion();
             // Wait for the election to complete and the node's Role to be set to follower.
             _replExecutor
                 ->onEvent(electionFinishedEvent,

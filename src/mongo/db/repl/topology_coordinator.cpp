@@ -1524,6 +1524,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                               Date_t::fromDurationSinceEpoch(Seconds(_electionTime.getSecs())));
             }
             bb.appendIntOrLL("configVersion", _rsConfig.getConfigVersion());
+            bb.appendIntOrLL("configTerm", _rsConfig.getConfigTerm());
             bb.append("self", true);
             bb.append("lastHeartbeatMessage", "");
             membersOut.push_back(bb.obj());
