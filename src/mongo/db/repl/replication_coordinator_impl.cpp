@@ -3008,6 +3008,11 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(OperationContext*
     }
 }
 
+void ReplicationCoordinatorImpl::incrementTopologyVersion(OperationContext* opCtx) {
+    stdx::lock_guard lk(_mutex);
+    _fulfillTopologyChangePromise(opCtx, lk);
+}
+
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk,
                                                                       OperationContext* opCtx) {

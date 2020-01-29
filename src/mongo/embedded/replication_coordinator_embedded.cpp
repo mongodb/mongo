@@ -494,6 +494,10 @@ TopologyVersion ReplicationCoordinatorEmbedded::getTopologyVersion() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::incrementTopologyVersion(OperationContext* opCtx) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::awaitIsMasterResponse(
     OperationContext* opCtx,
     const repl::SplitHorizon::Parameters& horizonParams,

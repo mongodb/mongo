@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -187,6 +188,19 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
             SessionKiller::Matcher matcherAllSessions(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
             killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
+        }
+        const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
+        const bool isReplSet =
+            replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+        // We only want to increment the server TopologyVersion when the minWireVersion has changed.
+        // This can only happen in two scenarios:
+        // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
+        // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
+        const auto shouldIncrementTopologyVersion =
+            newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42 ||
+            newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44;
+        if (isReplSet && shouldIncrementTopologyVersion) {
+            replCoordinator->incrementTopologyVersion(opCtx);
         }
     });
 }

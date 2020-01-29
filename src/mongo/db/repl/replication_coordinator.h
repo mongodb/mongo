@@ -947,6 +947,12 @@ public:
         const size_t numOpsRunning) const = 0;
 
     /**
+     * Increment the server TopologyVersion and fulfill the promise of any currently waiting
+     * isMaster request.
+     */
+    virtual void incrementTopologyVersion(OperationContext* opCtx) = 0;
+
+    /**
      * Constructs and returns an IsMasterResponse. Will block until the given deadline waiting for a
      * significant topology change if the 'counter' field of 'clientTopologyVersion' is equal to the
      * current TopologyVersion 'counter' from the TopologyCoordinator. Returns immediately if

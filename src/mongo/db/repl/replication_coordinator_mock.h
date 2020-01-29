@@ -321,6 +321,8 @@ public:
 
     virtual TopologyVersion getTopologyVersion() const;
 
+    virtual void incrementTopologyVersion(OperationContext* opCtx) override;
+
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
