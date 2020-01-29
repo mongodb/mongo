@@ -81,7 +81,13 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
         auto* const css = CollectionShardingRuntime::get(opCtx, ns);
-        const auto metadata = css->getCurrentMetadata();
+        const auto optMetadata = css->getCurrentMetadataIfKnown();
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Unable to establish sharding status for collection " << ns.ns(),
+                optMetadata);
+
+        const auto& metadata = *optMetadata;
+
         if (!metadata->isSharded()) {
             LOG(0) << "skipping orphaned data cleanup for " << ns.ns()
                    << ", collection is not sharded";

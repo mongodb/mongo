@@ -46,7 +46,10 @@
 #include "mongo/db/service_context.h"
 
 namespace mongo {
-namespace {
+
+using std::unique_ptr;
+using std::string;
+using std::stringstream;
 
 class CmdCloneCollectionAsCapped : public ErrmsgCommandDeprecated {
 public:
@@ -84,9 +87,9 @@ public:
         out->push_back(Privilege(ResourcePattern::forExactNamespace(nss), targetActions));
     }
     bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
+                   const string& dbname,
                    const BSONObj& jsobj,
-                   std::string& errmsg,
+                   string& errmsg,
                    BSONObjBuilder& result) {
         const auto fromElt = jsobj["cloneCollectionAsCapped"];
         const auto toElt = jsobj["toCollection"];
@@ -137,13 +140,13 @@ public:
         uassertStatusOK(status);
         return true;
     }
-
 } cmdCloneCollectionAsCapped;
 
-/**
- * Converts the given collection to a capped collection w/ the specified size. This command is not
- * highly used, and is not currently supported with sharded environments.
- */
+/* jan2010:
+   Converts the given collection to a capped collection w/ the specified size.
+   This command is not highly used, and is not currently supported with sharded
+   environments.
+   */
 class CmdConvertToCapped : public ErrmsgCommandDeprecated {
 public:
     CmdConvertToCapped() : ErrmsgCommandDeprecated("convertToCapped") {}
@@ -165,9 +168,9 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
+                   const string& dbname,
                    const BSONObj& jsobj,
-                   std::string& errmsg,
+                   string& errmsg,
                    BSONObjBuilder& result) {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
         long long size = jsobj.getField("size").safeNumberLong();
@@ -182,6 +185,4 @@ public:
     }
 
 } cmdConvertToCapped;
-
-}  // namespace
-}  // namespace mongo
+}

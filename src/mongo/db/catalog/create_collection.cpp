@@ -51,7 +51,6 @@
 
 namespace mongo {
 namespace {
-
 /**
  * Shared part of the implementation of the createCollection versions for replicated and regular
  * collection creation.
@@ -100,10 +99,8 @@ Status createCollection(OperationContext* opCtx,
 
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
-
         const bool shardVersionCheck = true;
         OldClientContext ctx(opCtx, nss.ns(), shardVersionCheck);
-
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotMaster,

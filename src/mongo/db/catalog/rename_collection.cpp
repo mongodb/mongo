@@ -144,8 +144,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // We stay in source context the whole time. This is mostly to set the CurOp namespace.
     boost::optional<OldClientContext> ctx;
-    const bool shardVersionCheck = true;
-    ctx.emplace(opCtx, source.ns(), shardVersionCheck);
+    ctx.emplace(opCtx, source.ns());
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool userInitiatedWritesAndNotPrimary =

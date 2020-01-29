@@ -72,7 +72,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
@@ -155,7 +154,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     }
 
     // If we're in a sharded environment, we need to filter out documents we don't own.
-    if (OperationShardingState::isOperationVersioned(opCtx)) {
+    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
         auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
             opCtx,
             CollectionShardingState::get(opCtx, collection->ns())->getOrphansFilter(opCtx),
@@ -218,7 +217,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         return {cq.getStatus()};
     }
 
-    return getExecutorFind(opCtx, collection, std::move(cq.getValue()), plannerOpts);
+    return getExecutorFind(opCtx, collection, nss, std::move(cq.getValue()), plannerOpts);
 }
 
 BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {
