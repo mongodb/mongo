@@ -128,8 +128,14 @@ public:
             // This should really be impossible because we check above that the top of the oplog is
             // strictly > appliedThrough. If this fails it represents a serious bug in either the
             // storage engine or query's implementation of OplogReplay.
-            severe() << "Couldn't find any entries in the oplog >= "
-                     << _oplogApplicationStartPoint.toBSON() << " which should be impossible.";
+            std::stringstream ss;
+            ss << " >= " << _oplogApplicationStartPoint.toBSON();
+            if (_oplogApplicationEndPoint) {
+                ss << " and <= " << _oplogApplicationEndPoint->toBSON();
+            }
+
+            severe() << "Couldn't find any entries in the oplog" << ss.str()
+                     << ", which should be impossible.";
             fassertFailedNoTrace(40293);
         }
 
@@ -334,7 +340,12 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
     }
 
     Timestamp appliedUpTo = _applyOplogOperations(opCtx, startPoint, endPoint);
-    invariant(appliedUpTo <= endPoint);
+    if (appliedUpTo.isNull()) {
+        log() << "No stored oplog entries to apply for recovery between " << startPoint.toString()
+              << " (inclusive) and " << endPoint.toString() << " (inclusive).";
+    } else {
+        invariant(appliedUpTo <= endPoint);
+    }
 
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 }
@@ -490,6 +501,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     }
 
     Timestamp appliedUpTo = _applyOplogOperations(opCtx, oplogApplicationStartPoint, topOfOplog);
+    invariant(!appliedUpTo.isNull());
     invariant(appliedUpTo == topOfOplog,
               str::stream() << "Did not apply to top of oplog. Applied through: "
                             << appliedUpTo.toString()
@@ -533,6 +545,11 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
                                "applied with optime: "
                             << applyThroughOpTime.toBSON());
     oplogBuffer.shutdown(opCtx);
+
+    // The applied up to timestamp will be null if no oplog entries were applied.
+    if (applyThroughOpTime.isNull()) {
+        return Timestamp();
+    }
 
     // We may crash before setting appliedThrough. If we have a stable checkpoint, we will recover
     // to that checkpoint at a replication consistent point, and applying the oplog is safe.

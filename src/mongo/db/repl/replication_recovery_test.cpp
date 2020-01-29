@@ -52,6 +52,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1320,7 +1321,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
 
     _setUpOplog(opCtx, getStorageInterface(), {});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(0, 0), 1));
 
     startCapturingLogMessages();
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
@@ -1357,6 +1357,121 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToDoesNotExceedEndPoint) {
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(15, 15));
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(10, 10), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithNoOperationsToRecover) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {1, 1580148188, std::numeric_limits<int>::max()});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1580148188, 1580148188));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1580148188, 1580148188), 1));
+
+    startCapturingLogMessages();
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(1580148193, 1));
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(
+        1,
+        countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery between"));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransactions) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1, 1));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    opCtx->setLogicalSessionId(sessionId);
+
+    {
+        MongoDOperationContextSession ocs(opCtx);
+
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(sessionId);
+        sessionInfo.setTxnNumber(1);
+
+        const auto lastDate = Date_t::now();
+        const auto prepareOp =
+            _makeTransactionOplogEntry({Timestamp(3, 3), 1},
+                                       repl::OpTypeEnum::kCommand,
+                                       BSON("applyOps" << BSONArray() << "prepare" << true),
+                                       OpTime(Timestamp(0, 0), -1),
+                                       0,
+                                       sessionInfo,
+                                       lastDate);
+        ASSERT_OK(getStorageInterface()->insertDocument(
+            opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(3, 3)}, 1));
+    }
+
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(3, 3));
+
+    {
+        MongoDOperationContextSession ocs(opCtx);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp(3, 3));
+        ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+    }
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogUpToWithEmptyOplogReconstructsPreparedTransactions) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1, 1));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    opCtx->setLogicalSessionId(sessionId);
+
+    {
+        MongoDOperationContextSession ocs(opCtx);
+
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(sessionId);
+        sessionInfo.setTxnNumber(1);
+
+        const auto lastDate = Date_t::now();
+        const auto prepareOp =
+            _makeTransactionOplogEntry({Timestamp(1, 1), 1},
+                                       repl::OpTypeEnum::kCommand,
+                                       BSON("applyOps" << BSONArray() << "prepare" << true),
+                                       OpTime(Timestamp(0, 0), -1),
+                                       0,
+                                       sessionInfo,
+                                       lastDate);
+        ASSERT_OK(getStorageInterface()->insertDocument(
+            opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(1, 1)}, 1));
+
+        const BSONObj doc = BSON("_id" << sessionId.toBSON() << "txnNum" << static_cast<long>(1)
+                                       << "lastWriteOpTime" << OpTime(Timestamp(1, 1), 1)
+                                       << "lastWriteDate" << lastDate << "state"
+                                       << "prepared");
+        ASSERT_OK(getStorageInterface()->insertDocument(
+            opCtx, NamespaceString::kSessionTransactionsTableNamespace, {doc, Timestamp(1, 1)}, 1));
+    }
+
+    startCapturingLogMessages();
+    recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 1));
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(
+        1,
+        countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery between"));
+
+    {
+        MongoDOperationContextSession ocs(opCtx);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp(1, 1));
+        ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+    }
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest,

@@ -98,6 +98,7 @@ Timestamp ReplicationConsistencyMarkersMock::getOplogTruncateAfterPoint(
 void ReplicationConsistencyMarkersMock::setAppliedThrough(OperationContext* opCtx,
                                                           const OpTime& optime,
                                                           bool setTimestamp) {
+    invariant(!optime.isNull());
     stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
     _appliedThrough = optime;
 }
