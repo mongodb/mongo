@@ -74,16 +74,19 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
     const auto currentShardVersion = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentShardVersionIfKnown();
+        const auto currentMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
+        if (currentMetadata->isSharded()) {
+            return currentMetadata->getShardVersion();
+        }
+
+        return ChunkVersion::UNSHARDED();
     }();
 
-    if (currentShardVersion) {
-        if (currentShardVersion->epoch() == shardVersionReceived.epoch() &&
-            currentShardVersion->majorVersion() >= shardVersionReceived.majorVersion()) {
-            // Don't need to remotely reload if we're in the same epoch and the requested version is
-            // smaller than the one we know about. This means that the remote side is behind.
-            return;
-        }
+    if (currentShardVersion.epoch() == shardVersionReceived.epoch() &&
+        currentShardVersion.majorVersion() >= shardVersionReceived.majorVersion()) {
+        // Don't need to remotely reload if we're in the same epoch and the requested version is
+        // smaller than the one we know about. This means that the remote side is behind.
+        return;
     }
 
     forceShardFilteringMetadataRefresh(opCtx, nss, forceRefreshFromThisThread);
@@ -133,69 +136,58 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
-    auto* const shardingState = ShardingState::get(opCtx);
+    auto const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    auto routingInfo =
+    const auto routingInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
             opCtx, nss, forceRefreshFromThisThread));
-    auto cm = routingInfo.cm();
+    const auto cm = routingInfo.cm();
 
     if (!cm) {
         // No chunk manager, so unsharded.
 
         // Exclusive collection lock needed since we're now changing the metadata
         AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
-        CollectionShardingRuntime::get(opCtx, nss)
-            ->setFilteringMetadata(opCtx, CollectionMetadata());
+
+        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
+        css->setFilteringMetadata(opCtx, CollectionMetadata());
 
         return ChunkVersion::UNSHARDED();
     }
 
-    // Optimistic check with only IS lock in order to avoid threads piling up on the collection X
-    // lock below
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto optMetadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadataIfKnown();
+        auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
         // We already have newer version
-        if (optMetadata) {
-            const auto& metadata = *optMetadata;
-            if (metadata->isSharded() &&
-                metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
-                metadata->getCollVersion() >= cm->getVersion()) {
-                LOG(1) << "Skipping refresh of metadata for " << nss << " "
-                       << metadata->getCollVersion() << " with an older " << cm->getVersion();
-                return metadata->getShardVersion();
-            }
+        if (metadata->isSharded() &&
+            metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
+            metadata->getCollVersion() >= cm->getVersion()) {
+            LOG(1) << "Skipping refresh of metadata for " << nss << " "
+                   << metadata->getCollVersion() << " with an older " << cm->getVersion();
+            return metadata->getShardVersion();
         }
     }
 
     // Exclusive collection lock needed since we're now changing the metadata
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
+
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
-    {
-        auto optMetadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadataIfKnown();
+    auto metadata = css->getMetadata(opCtx);
 
-        // We already have newer version
-        if (optMetadata) {
-            const auto& metadata = *optMetadata;
-            if (metadata->isSharded() &&
-                metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
-                metadata->getCollVersion() >= cm->getVersion()) {
-                LOG(1) << "Skipping refresh of metadata for " << nss << " "
-                       << metadata->getCollVersion() << " with an older " << cm->getVersion();
-                return metadata->getShardVersion();
-            }
-        }
+    // We already have newer version
+    if (metadata->isSharded() && metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
+        metadata->getCollVersion() >= cm->getVersion()) {
+        LOG(1) << "Skipping refresh of metadata for " << nss << " " << metadata->getCollVersion()
+               << " with an older " << cm->getVersion();
+        return metadata->getShardVersion();
     }
 
-    CollectionMetadata metadata(std::move(cm), shardingState->shardId());
-    const auto newShardVersion = metadata.getShardVersion();
+    css->setFilteringMetadata(opCtx, CollectionMetadata(cm, shardingState->shardId()));
 
-    css->setFilteringMetadata(opCtx, std::move(metadata));
-    return newShardVersion;
+    return css->getMetadata(opCtx)->getShardVersion();
 }
 
 Status onDbVersionMismatchNoExcept(

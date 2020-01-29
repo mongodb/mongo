@@ -157,7 +157,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
         auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
             opCtx,
-            CollectionShardingState::get(opCtx, collection->ns())->getMetadataForOperation(opCtx),
+            CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
             ws.get(),
             stage.release());
         return PlanExecutor::make(opCtx,
@@ -610,7 +610,7 @@ DBClientBase* PipelineD::MongoDInterface::directClient() {
 bool PipelineD::MongoDInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     auto const css = CollectionShardingState::get(opCtx, nss);
-    return css->getCurrentMetadata()->isSharded();
+    return css->getMetadata(opCtx)->isSharded();
 }
 
 BSONObj PipelineD::MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -752,7 +752,7 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     auto css = CollectionShardingState::get(expCtx->opCtx, expCtx->ns);
     uassert(4567,
             str::stream() << "from collection (" << expCtx->ns.ns() << ") cannot be sharded",
-            !css->getCurrentMetadata()->isSharded());
+            !css->getMetadata(expCtx->opCtx)->isSharded());
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
@@ -800,7 +800,7 @@ std::pair<std::vector<FieldPath>, bool> PipelineD::MongoDInterface::collectDocum
 
     auto scm = [opCtx, &nss]() -> ScopedCollectionMetadata {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     // Collection is not sharded or UUID mismatch implies collection has been dropped and recreated

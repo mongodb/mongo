@@ -44,7 +44,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 boost::optional<ChunkVersion> extractOptionalVersion(const BSONObj& obj, StringData field) {
     auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);
     if (swChunkVersion == ErrorCodes::NoSuchKey)
-        return boost::none;
+        return ChunkVersion::UNSHARDED();
     return uassertStatusOK(std::move(swChunkVersion));
 }
 

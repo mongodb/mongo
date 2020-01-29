@@ -231,8 +231,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.
-        auto rangePreserver =
-            CollectionShardingState::get(opCtx, nss)->getMetadataForOperation(opCtx);
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
         const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         const PlanExecutor::YieldPolicy yieldPolicy =

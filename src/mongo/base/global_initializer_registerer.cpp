@@ -50,6 +50,7 @@ GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
         std::move(prerequisites),
         std::move(dependents));
 
+
     if (Status::OK() != status) {
         std::cerr << "Attempt to add global initializer failed, status: " << status << std::endl;
         ::abort();

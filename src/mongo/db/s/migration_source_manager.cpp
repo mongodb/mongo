@@ -112,6 +112,19 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
     executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }
 
+Status checkCollectionEpochMatches(const ScopedCollectionMetadata& metadata, OID expectedEpoch) {
+    if (metadata->isSharded() && metadata->getCollVersion().epoch() == expectedEpoch)
+        return Status::OK();
+
+    return {ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "The collection was dropped or recreated since the migration began. "
+                          << "Expected collection epoch: "
+                          << expectedEpoch.toString()
+                          << ", but found: "
+                          << (metadata->isSharded() ? metadata->getCollVersion().epoch().toString()
+                                                    : "unsharded collection.")};
+}
+
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
@@ -157,15 +170,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             collectionUUID = autoColl.getCollection()->uuid().value();
         }
 
-        auto optMetadata =
-            CollectionShardingState::get(opCtx, getNss())->getCurrentMetadataIfKnown();
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "The collection's sharding state was cleared by a concurrent operation",
-                optMetadata);
-
-        auto& metadata = *optMetadata;
+        auto metadata = CollectionShardingState::get(opCtx, getNss())->getMetadata(opCtx);
         uassert(ErrorCodes::IncompatibleShardingMetadata,
-                "Cannot move chunks for an unsharded collection",
+                str::stream() << "cannot move chunks for an unsharded collection",
                 metadata->isSharded());
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
@@ -234,7 +241,14 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
 
     {
         // Register for notifications from the replication subsystem
-        const auto metadata = _getCurrentMetadataAndCheckEpoch(opCtx);
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
+        auto* const css = CollectionShardingRuntime::get(opCtx, getNss());
+
+        const auto metadata = css->getMetadata(opCtx);
+        Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
+        if (!status.isOK())
+            return status;
 
         // Having the metadata manager registered on the collection sharding state is what indicates
         // that a chunk on that collection is being migrated. With an active migration, write
@@ -243,9 +257,6 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-        auto* const css = CollectionShardingRuntime::get(opCtx, getNss());
         invariant(nullptr == std::exchange(msmForCsr(css), this));
         _state = kCloning;
     }
@@ -285,7 +296,19 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
-    _notifyChangeStreamsOnRecipientFirstChunk(opCtx, _getCurrentMetadataAndCheckEpoch(opCtx));
+    {
+        const auto metadata = [&] {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
+            return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata(opCtx);
+        }();
+
+        Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
+        if (!status.isOK())
+            return status;
+
+        _notifyChangeStreamsOnRecipientFirstChunk(opCtx, metadata);
+    }
 
     // Mark the shard as running critical operation, which requires recovery on crash.
     //
@@ -361,7 +384,15 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     BSONObjBuilder builder;
 
     {
-        const auto metadata = _getCurrentMetadataAndCheckEpoch(opCtx);
+        const auto metadata = [&] {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
+            return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata(opCtx);
+        }();
+
+        Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
+        if (!status.isOK())
+            return status;
 
         boost::optional<ChunkType> controlChunkType = boost::none;
         ChunkType differentChunk;
@@ -504,7 +535,18 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                           << "' after commit failed");
     }
 
-    const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch(opCtx);
+    auto refreshedMetadata = [&] {
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
+        return CollectionShardingState::get(opCtx, getNss())->getMetadata(opCtx);
+    }();
+
+    if (!refreshedMetadata->isSharded()) {
+        return {ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Chunk move failed because collection '" << getNss().ns()
+                              << "' is no longer sharded. The migration commit error was: "
+                              << migrationCommitStatus.toString()};
+    }
 
     if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
         // This condition may only happen if the migration commit has failed for any reason
@@ -529,8 +571,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     }
 
     // Migration succeeded
-    LOG(0) << "Migration succeeded and updated collection version to "
-           << refreshedMetadata->getCollVersion();
+    log() << "Migration succeeded and updated collection version to "
+          << refreshedMetadata->getCollVersion();
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
@@ -617,32 +659,6 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
         warning() << "Failed to clean up migration: " << redact(_args.toString())
                   << "due to: " << redact(ex);
     }
-}
-
-ScopedCollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch(
-    OperationContext* opCtx) {
-    auto metadata = [&] {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
-        auto* const css = CollectionShardingRuntime::get(opCtx, getNss());
-
-        const auto optMetadata = css->getCurrentMetadataIfKnown();
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "The collection's sharding state was cleared by a concurrent operation",
-                optMetadata);
-        return *optMetadata;
-    }();
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "The collection was dropped or recreated since the migration began. "
-                          << "Expected collection epoch: "
-                          << _collectionEpoch.toString()
-                          << ", but found: "
-                          << (metadata->isSharded() ? metadata->getCollVersion().epoch().toString()
-                                                    : "unsharded collection."),
-            metadata->isSharded() && metadata->getCollVersion().epoch() == _collectionEpoch);
-
-    return metadata;
 }
 
 void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
