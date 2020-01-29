@@ -135,8 +135,15 @@ const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
                                          {"coordinateCommitTransaction", 1},
                                          {"prepareTransaction", 1}};
 
+auto getCommandInvocationHooksHandle =
+    ServiceContext::declareDecoration<std::shared_ptr<CommandInvocationHooks>>();
+
 }  // namespace
 
+void CommandInvocationHooks::set(ServiceContext* serviceContext,
+                                 std::shared_ptr<CommandInvocationHooks> hooks) {
+    getCommandInvocationHooksHandle(serviceContext) = std::move(hooks);
+}
 
 //////////////////////////////////////////////////////////////
 // CommandHelpers
@@ -163,6 +170,23 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
         appendCommandStatusNoThrow(body, ex.toStatus());
     }
     return replyBuilder.releaseBody();
+}
+
+void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
+                                          const OpMsgRequest& request,
+                                          CommandInvocation* invocation,
+                                          rpc::ReplyBuilderInterface* response) {
+    auto hooks = getCommandInvocationHooksHandle(opCtx->getServiceContext());
+
+    if (hooks) {
+        hooks->onBeforeRun(opCtx, request, invocation);
+    }
+
+    invocation->run(opCtx, response);
+
+    if (hooks) {
+        hooks->onAfterRun(opCtx, request, invocation);
+    }
 }
 
 void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,

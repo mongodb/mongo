@@ -402,6 +402,7 @@ mongod = env.Program(
         'db/logical_session_cache_factory_mongod',
         'db/logical_time_metadata_hook',
         'db/matcher/expressions_mongod_only',
+        'db/mirror_maestro',
         'db/mongod_options',
         'db/ops/write_ops_parsers',
         'db/periodic_runner_job_abort_expired_transactions',

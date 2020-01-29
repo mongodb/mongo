@@ -465,6 +465,28 @@ env.Clone().InjectModule("enterprise").Library(
 )
 
 env.Library(
+    target='mirror_maestro',
+    source=[
+        'mirror_maestro.cpp',
+        env.Idlc('mirror_maestro.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        'service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'repl/replica_set_messages',
+        'repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+    ],
+)
+
+env.Library(
     target="commands",
     source=[
         'commands.cpp',

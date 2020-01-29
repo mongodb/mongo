@@ -193,6 +193,10 @@ public:
             return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 
+        bool supportsReadMirroring() const override {
+            return true;
+        }
+
         bool canIgnorePrepareConflicts() const override {
             return true;
         }

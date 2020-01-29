@@ -96,6 +96,7 @@
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_impl.h"
@@ -273,6 +274,22 @@ void initWireSpec() {
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     spec.isInternalClient = true;
+}
+
+void initializeCommandHooks(ServiceContext* serviceContext) {
+    class MongodCommandInvocationHooks final : public CommandInvocationHooks {
+        void onBeforeRun(OperationContext* opCtx,
+                         const OpMsgRequest& request,
+                         CommandInvocation* invocation) {}
+        void onAfterRun(OperationContext* opCtx,
+                        const OpMsgRequest& request,
+                        CommandInvocation* invocation) {
+            MirrorMaestro::tryMirror(opCtx, request, invocation);
+        }
+    };
+
+    MirrorMaestro::init(serviceContext);
+    CommandInvocationHooks::set(serviceContext, std::make_shared<MongodCommandInvocationHooks>());
 }
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
@@ -698,6 +715,8 @@ ExitCode _initAndListen(int listenPort) {
 
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
 
+    initializeCommandHooks(serviceContext);
+
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
@@ -1032,6 +1051,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             }
         }
     }
+
+    MirrorMaestro::shutdown(serviceContext);
 
     WaitForMajorityService::get(serviceContext).shutDown();
 

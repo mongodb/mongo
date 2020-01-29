@@ -515,6 +515,7 @@ void _abortUnpreparedOrStashPreparedTransaction(
 }  // namespace
 
 void invokeWithSessionCheckedOut(OperationContext* opCtx,
+                                 const OpMsgRequest& request,
                                  CommandInvocation* invocation,
                                  const OperationSessionInfoFromClient& sessionOptions,
                                  rpc::ReplyBuilderInterface* replyBuilder) {
@@ -590,7 +591,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     });
 
     try {
-        invocation->run(opCtx, replyBuilder);
+        CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.
@@ -743,9 +744,10 @@ bool runCommandImpl(OperationContext* opCtx,
                 errorBuilder.append("errmsg", "failWithErrorCodeInRunCommand enabled.");
                 replyBuilder->setCommandReply(errorBuilder.obj());
             } else if (shouldCheckOutSession) {
-                invokeWithSessionCheckedOut(opCtx, invocation, sessionOptions, replyBuilder);
+                invokeWithSessionCheckedOut(
+                    opCtx, request, invocation, sessionOptions, replyBuilder);
             } else {
-                invocation->run(opCtx, replyBuilder);
+                CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
             }
         } catch (const DBException& ex) {
             // Do no-op write before returning NoSuchTransaction if command has writeConcern.
@@ -769,9 +771,9 @@ bool runCommandImpl(OperationContext* opCtx,
     } else {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         if (shouldCheckOutSession) {
-            invokeWithSessionCheckedOut(opCtx, invocation, sessionOptions, replyBuilder);
+            invokeWithSessionCheckedOut(opCtx, request, invocation, sessionOptions, replyBuilder);
         } else {
-            invocation->run(opCtx, replyBuilder);
+            CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
         }
     }
 

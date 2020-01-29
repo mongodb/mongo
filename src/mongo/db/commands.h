@@ -67,6 +67,36 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
+/**
+ * A simple set of type-erased hooks for pre and post command actions.
+ *
+ * These hooks will only run on external requests that form CommandInvocations (a.k.a. OP_MSG
+ * requests). They are not applied for runCommandDirectly() or raw CommandInvocation::run() calls.
+ */
+class CommandInvocationHooks {
+public:
+    /**
+     * Set the current hooks
+     */
+    static void set(ServiceContext* serviceContext, std::shared_ptr<CommandInvocationHooks> hooks);
+
+    virtual ~CommandInvocationHooks() = default;
+
+    /**
+     * A behavior to perform before CommandInvocation::run()
+     */
+    virtual void onBeforeRun(OperationContext* opCtx,
+                             const OpMsgRequest& request,
+                             CommandInvocation* invocation) = 0;
+
+    /**
+     * A behavior to perform after CommandInvocation::run()
+     */
+    virtual void onAfterRun(OperationContext* opCtx,
+                            const OpMsgRequest& request,
+                            CommandInvocation* invocation) = 0;
+};
+
 // Various helpers unrelated to any single command or to the command registry.
 // Would be a namespace, but want to keep it closed rather than open.
 // Some of these may move to the BasicCommand shim if they are only for legacy implementations.
@@ -192,6 +222,16 @@ struct CommandHelpers {
      * It is illegal to call this if the command does not exist.
      */
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
+
+    /**
+     * Runs a previously parsed CommandInvocation and propagates the result to the
+     * ReplyBuilderInterface. This function is agnostic to the derived type of the CommandInvocation
+     * but may mirror, forward, or do other supplementary actions with the request.
+     */
+    static void runCommandInvocation(OperationContext* opCtx,
+                                     const OpMsgRequest& request,
+                                     CommandInvocation* invocation,
+                                     rpc::ReplyBuilderInterface* response);
 
     /**
      * If '!invocation', we're logging about a Command pre-parse. It has to punt on the logged
@@ -504,6 +544,13 @@ public:
                                                             "default read concern not permitted"};
         return {{level != repl::ReadConcernLevel::kLocalReadConcern, kReadConcernNotSupported},
                 {kDefaultReadConcernNotPermitted}};
+    }
+
+    /**
+     * Returns this invocation's support for readMirroring.
+     */
+    virtual bool supportsReadMirroring() const {
+        return false;
     }
 
     /**

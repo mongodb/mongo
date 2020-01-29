@@ -167,6 +167,7 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
  * Invokes the given command and aborts the transaction on any non-retryable errors.
  */
 void invokeInTransactionRouter(OperationContext* opCtx,
+                               const OpMsgRequest& request,
                                CommandInvocation* invocation,
                                rpc::ReplyBuilderInterface* result) {
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -176,7 +177,7 @@ void invokeInTransactionRouter(OperationContext* opCtx,
     txnRouter.setDefaultAtClusterTime(opCtx);
 
     try {
-        invocation->run(opCtx, result);
+        CommandHelpers::runCommandInvocation(opCtx, request, invocation, result);
     } catch (const DBException& e) {
         if (ErrorCodes::isSnapshotError(e.code()) ||
             ErrorCodes::isNeedRetargettingError(e.code()) ||
@@ -273,9 +274,9 @@ void execCommandClient(OperationContext* opCtx,
 
     auto txnRouter = TransactionRouter::get(opCtx);
     if (txnRouter) {
-        invokeInTransactionRouter(opCtx, invocation, result);
+        invokeInTransactionRouter(opCtx, request, invocation, result);
     } else {
-        invocation->run(opCtx, result);
+        CommandHelpers::runCommandInvocation(opCtx, request, invocation, result);
     }
 
     if (invocation->supportsWriteConcern()) {
