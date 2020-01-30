@@ -184,6 +184,7 @@ selector:
   - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_delete_transaction.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_update_transaction.js
+  - jstests/concurrency/fsm_workloads/random_moveChunk_index_operations.js
 
   # JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't
   # considered a retryable or transient transaction error.

@@ -6,22 +6,12 @@
  */
 "use strict";
 
+load("jstests/sharding/libs/sharded_index_util.js");  // for findInconsistentIndexesAcrossShards
+
 ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
     if (jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {
         print("Skipping index consistency check across the cluster");
         return;
-    }
-
-    /**
-     * Returns true if the array contains the given BSON object.
-     */
-    function containsBSON(arr, targetObj) {
-        for (const obj of arr) {
-            if (bsonWoCompare(obj, targetObj) === 0) {
-                return true;
-            }
-        }
-        return false;
     }
 
     print("Checking consistency of indexes across the cluster");
@@ -57,13 +47,7 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
                     ])
                     .toArray();
             }
-            return mongos.getCollection(ns)
-                .aggregate([
-                    {$indexStats: {}},
-                    {$group: {_id: "$shard", indexes: {$push: {spec: "$spec"}}}},
-                    {$project: {_id: 0, shard: "$_id", indexes: 1}}
-                ])
-                .toArray();
+            return ShardedIndexUtil.getPerShardIndexes(mongos.getCollection(ns));
         };
     }
 
@@ -75,12 +59,6 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
         const getIndexDocsForNs = makeGetIndexDocsFunc(ns);
         print(`Checking that the indexes for ${ns} are consistent across shards...`);
 
-        // Find the indexes on each shard. For example:
-        // [{"shard" : "rs0",
-        //   "indexes" : [{"spec" : {"v" : 2, "key" : {"_id" : 1}, "name" : "_id_"}},
-        //                {"spec" : {"v" : 2, "key" : {"x" : 1}, "name" : "x_1"}}]},
-        //  {"shard" : "rs1",
-        //   "indexes" : [{"spec" : {"v" : 2, "key" : {"_id" :1}, "name" : "_id_"}}]}];
         const indexDocs = requiresAuth ? authutil.asCluster(mongos, keyFile, getIndexDocsForNs)
                                        : getIndexDocsForNs();
 
@@ -89,27 +67,13 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
             continue;
         }
 
-        // Find indexes that exist on all shards. For the example above:
-        // [{"spec" : {"v" : 2, "key" : {"_id" : 1}, "name" : "_id_"}}];
-        let consistentIndexes = indexDocs[0].indexes;
-        for (let i = 1; i < indexDocs.length; i++) {
-            consistentIndexes =
-                consistentIndexes.filter(index => containsBSON(indexDocs[i].indexes, index));
-        }
+        const inconsistentIndexes =
+            ShardedIndexUtil.findInconsistentIndexesAcrossShards(indexDocs, isMixedVersion);
 
-        // Find inconsistent indexes. For the example above:
-        // {"rs0": [{"spec" : {"v" : 2, "key" : {"x" : 1}, "name" : "x_1"}}], "rs1" : []};
-        const inconsistentIndexesOnShard = {};
-        let isConsistent = true;
-        for (const indexDoc of indexDocs) {
-            const inconsistentIndexes =
-                indexDoc.indexes.filter(index => !containsBSON(consistentIndexes, index));
-            inconsistentIndexesOnShard[isMixedVersion ? indexDoc.host : indexDoc.shard] =
-                inconsistentIndexes;
-            isConsistent = inconsistentIndexes.length === 0;
+        for (const shard in inconsistentIndexes) {
+            const shardInconsistentIndexes = inconsistentIndexes[shard];
+            assert(shardInconsistentIndexes.length === 0,
+                   `found inconsistent indexes for ${ns}: ${tojson(inconsistentIndexes)}`);
         }
-
-        assert(isConsistent,
-               `found inconsistent indexes for ${ns}: ${tojson(inconsistentIndexesOnShard)}`);
     }
 };
