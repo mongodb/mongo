@@ -60,7 +60,10 @@ function buildIndexOnNodeAsStandalone(node) {
         restart: true,
         dbpath: node.dbpath,
         port: standalonePort,
-        setParameter: {disableLogicalSessionCacheRefresh: true},
+        setParameter: {
+            disableLogicalSessionCacheRefresh: true,
+            ttlMonitorEnabled: false,
+        },
     });
     if (jsTestOptions().keyFile) {
         assert(jsTest.authenticate(standalone),
