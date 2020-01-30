@@ -1449,10 +1449,11 @@ TEST_F(ReplicationRecoveryTest,
         ASSERT_OK(getStorageInterface()->insertDocument(
             opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(1, 1)}, 1));
 
-        const BSONObj doc = BSON("_id" << sessionId.toBSON() << "txnNum" << static_cast<long>(1)
-                                       << "lastWriteOpTime" << OpTime(Timestamp(1, 1), 1)
-                                       << "lastWriteDate" << lastDate << "state"
-                                       << "prepared");
+        const BSONObj doc =
+            BSON("_id" << sessionId.toBSON() << "txnNum" << static_cast<long long>(1)
+                       << "lastWriteOpTime" << OpTime(Timestamp(1, 1), 1) << "lastWriteDate"
+                       << lastDate << "state"
+                       << "prepared");
         ASSERT_OK(getStorageInterface()->insertDocument(
             opCtx, NamespaceString::kSessionTransactionsTableNamespace, {doc, Timestamp(1, 1)}, 1));
     }
