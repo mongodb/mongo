@@ -290,14 +290,10 @@ variables:
   - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2019-large
-  - name: compile_benchmarks
-    distros:
-    - windows-64-vs2019-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: auth_audit_gen
-  - name: .benchmarks
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.gcm
@@ -398,7 +394,7 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
-  - enterprise-windows
+  - enterprise-windows-required
 
 # List of all variants that use the packages.tgz
 - package_variants: &package_variants
@@ -9126,44 +9122,6 @@ buildvariants:
 #         Windows buildvariants           #
 ###########################################
 
-- name: enterprise-windows-required
-  display_name: "! Enterprise Windows"
-  batchtime: 60 # 1 hour
-  modules:
-    - enterprise
-  run_on:
-    - windows-64-vs2019-small
-  expansions: &enterprise_windows_expansions
-    burn_in_tests_build_variant: enterprise-windows
-    exe: ".exe"
-    msi_target: msi
-    mh_target: archive-mh archive-mh-debug
-    content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python37/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    target_resmoke_time: 20
-    large_distro_name: windows-64-vs2019-large
-  tasks:
-    - name: compile_TG
-      distros:
-        - windows-64-vs2019-large
-    - name: burn_in_tests_gen
-    - name: buildscripts_test
-    - name: unittest_shell_hang_analyzer_gen
-    - name: server_discovery_and_monitoring_json_test_TG
-    - name: dbtest_TG
-      distros:
-        - windows-64-vs2019-large
-    - name: noPassthrough_gen
-
 - name: windows-debug
   display_name: "* Windows DEBUG"
   batchtime: 60 # 1 hour
@@ -9230,34 +9188,44 @@ buildvariants:
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
 
-- name: enterprise-windows
-  display_name: "* Enterprise Windows"
+- name: enterprise-windows-required
+  display_name: "! Enterprise Windows"
   batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
   - windows-64-vs2019-small
   expansions:
-    <<: *enterprise_windows_expansions
+    exe: ".exe"
+    msi_target: msi
+    mh_target: archive-mh archive-mh-debug
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    large_distro_name: windows-64-vs2019-large
     push_path: windows
     push_bucket: downloads.10gen.com
     push_name: windows
     push_arch: x86_64-enterprise
   tasks:
-  - name: compile_TG
-    distros:
-    - windows-64-vs2019-large
-  - name: compile_benchmarks
+  - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2019-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
-  - name: .benchmarks
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
-  - name: dbtest_TG
     distros:
     - windows-64-vs2019-large
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
@@ -9278,14 +9246,25 @@ buildvariants:
   - name: .replica_sets .multi_oplog
   - name: replica_sets_ese_gen
   - name: sasl
+  - name: server_discovery_and_monitoring_json_test_TG
   - name: .sharding .txns
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
   - name: snmp
+  - name: unittest_shell_hang_analyzer_gen
   - name: push
     distros:
     - rhel70-small
+
+- <<: *enterprise-windows-nopush-template
+  name: enterprise-windows-benchmarks
+  display_name: "~ Enterprise Windows (Benchmarks)"
+  tasks:
+  - name: compile_benchmarks
+    distros:
+    - windows-64-vs2019-large
+  - name: .benchmarks
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-wtdevelop
@@ -9296,18 +9275,6 @@ buildvariants:
   expansions:
     <<: *enterprise-windows-nopush-expansions-template
     use_wt_develop: true
-
-- <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-compile-all
-  display_name: "* Enterprise Windows compile_all"
-  batchtime: 60 # 1 hour
-  run_on:
-  - windows-64-vs2019-small
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - windows-64-vs2019-large
-  # Do not add more tasks to this list.
 
 - name: enterprise-windows-async
   display_name: "~ Enterprise Windows async"
@@ -10158,14 +10125,10 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel70
-  - name: compile_benchmarks
-    distros:
-    - rhel70
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
-  - name: .benchmarks
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
@@ -10219,14 +10182,10 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel80-build
-  - name: compile_benchmarks
-    distros:
-    - rhel80-build
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
-  - name: .benchmarks
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
@@ -10263,9 +10222,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel70
-  - name: compile_benchmarks
-    distros:
-    - rhel70
   - name: jsCore
   - name: libunwind_tests
 
@@ -10299,14 +10255,10 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel70
-  - name: compile_benchmarks
-    distros:
-    - rhel70
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
-  - name: .benchmarks
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
@@ -11417,9 +11369,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
-  - name: compile_benchmarks
-    distros:
-    - rhel62-large
   - name: burn_in_tests_gen
   - name: burn_in_tests_multiversion_gen
   - name: .aggfuzzer
@@ -11427,7 +11376,6 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: burn_in_tags_gen
-  - name: .benchmarks
     distros:
     - centos6-perf
   - name: buildscripts_test
@@ -11517,9 +11465,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
-  - name: compile_benchmarks
-    distros:
-    - rhel62-large
   - name: burn_in_tests_gen
   - name: burn_in_tests_multiversion_gen
   - name: .aggfuzzer
@@ -11527,7 +11472,6 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: burn_in_tags_gen
-  - name: .benchmarks
     distros:
     - centos6-perf
   - name: buildscripts_test
@@ -11740,9 +11684,11 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_fast_memory
   tasks:
   - name: compile_all_run_unittests_TG
+  - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
   - name: audit
+  - name: .benchmarks
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
@@ -11828,9 +11774,11 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
+  - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
   - name: audit
+  - name: .benchmarks
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
