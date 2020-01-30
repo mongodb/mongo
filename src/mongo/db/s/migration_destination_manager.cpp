@@ -343,14 +343,15 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     // Note: It is expected that the FCV cannot change while the node is donating or receiving a
     // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
     // chunks via the ActiveMigrationsRegistry.
-    _useFCV44Protocol =
-        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
+    _enableResumableRangeDeleter =
+        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
+        !disableResumableRangeDeleter.load();
 
     _state = READY;
     _stateChangedCV.notify_all();
     _errmsg = "";
 
-    if (_useFCV44Protocol) {
+    if (_enableResumableRangeDeleter) {
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Missing migrationId in FCV 4.4",
                 cloneRequest.hasMigrationId());
@@ -767,7 +768,7 @@ void MigrationDestinationManager::_migrateThread() {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
 
-    if (!_useFCV44Protocol) {
+    if (!_enableResumableRangeDeleter) {
         if (getState() != DONE) {
             _forgetPending(opCtx.get(), ChunkRange(_min, _max));
         }
@@ -812,7 +813,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
 
         // 2. Ensure any data which might have been left orphaned in the range being moved has been
         // deleted.
-        if (_useFCV44Protocol) {
+        if (_enableResumableRangeDeleter) {
             while (migrationutil::checkForConflictingDeletions(
                 opCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
                 LOG(0) << "Migration paused because range overlaps with a "

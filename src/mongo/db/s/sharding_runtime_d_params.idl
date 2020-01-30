@@ -90,3 +90,10 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: orphanCleanupDelaySecs
         default: 900
+
+    disableResumableRangeDeleter:
+        description: 'Disable the resumable range deleter and revert to prior behavior.'
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool> 
+        cpp_varname : disableResumableRangeDeleter
+        default: false

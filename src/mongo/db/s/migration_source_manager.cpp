@@ -50,6 +50,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -116,6 +117,12 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
     executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }
 
+bool isFCVLatest() {
+    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
+
+    return fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
+}
+
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
@@ -143,12 +150,13 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
     // chunks via the ActiveMigrationsRegistry.
     auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
+
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Can't donate chunk while FCV is upgrading/downgrading",
             fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44 &&
                 fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42);
-    _useFCV44Protocol =
-        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
+
+    _enableResumableRangeDeleter = isFCVLatest() && !disableResumableRangeDeleter.load();
 
     // Disallow moving a chunk to ourselves
     uassert(ErrorCodes::InvalidOptions,
@@ -283,7 +291,7 @@ Status MigrationSourceManager::startClone() {
         auto lockedCsr = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
 
-        if (_useFCV44Protocol) {
+        if (_enableResumableRangeDeleter) {
             _coordinator = std::make_unique<migrationutil::MigrationCoordinator>(
                 migrationId,
                 _args.getFromShardId(),
@@ -306,7 +314,7 @@ Status MigrationSourceManager::startClone() {
             _opCtx, readConcernArgs, PrepareConflictBehavior::kEnforce);
     }
 
-    if (_useFCV44Protocol) {
+    if (_enableResumableRangeDeleter) {
         _coordinator->startMigration(_opCtx, _args.getWaitForDelete());
     }
 
@@ -426,7 +434,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         ChunkType migratedChunkType;
         migratedChunkType.setMin(_args.getMinKey());
         migratedChunkType.setMax(_args.getMaxKey());
-        if (_useFCV44Protocol) {
+        if (isFCVLatest()) {
             migratedChunkType.setVersion(_chunkVersion);
         }
 
@@ -467,7 +475,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
     if (!migrationCommitStatus.isOK()) {
-        if (_useFCV44Protocol) {
+        if (isFCVLatest()) {
             migrationutil::ensureChunkVersionIsGreaterThan(_opCtx, _args.getRange(), _chunkVersion);
         } else {
             // This is the FCV 4.2 and below protocol.
@@ -542,7 +550,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                     "have re-received the chunk"};
         }
 
-        if (_useFCV44Protocol) {
+        if (_enableResumableRangeDeleter) {
             _coordinator->setMigrationDecision(
                 migrationutil::MigrationCoordinator::Decision::kAborted);
         }
@@ -555,7 +563,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     LOG(0) << "Migration succeeded and updated collection version to "
            << refreshedMetadata->getCollVersion();
 
-    if (_useFCV44Protocol) {
+    if (_enableResumableRangeDeleter) {
         _coordinator->setMigrationDecision(
             migrationutil::MigrationCoordinator::Decision::kCommitted);
     }
@@ -595,7 +603,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         << "Moved chunks successfully but failed to clean up " << getNss().ns() << " range "
         << redact(range.toString()) << " due to: ";
 
-    if (_useFCV44Protocol) {
+    if (_enableResumableRangeDeleter) {
         if (_args.getWaitForDelete()) {
             log() << "Waiting for cleanup of " << getNss().ns() << " range "
                   << redact(range.toString());
@@ -778,7 +786,7 @@ void MigrationSourceManager::_cleanup() {
         ShardingStateRecovery::endMetadataOp(_opCtx);
     }
 
-    if (_useFCV44Protocol) {
+    if (_enableResumableRangeDeleter) {
         if (_state >= kCloning && _state < kCommittingOnConfig) {
             invariant(_coordinator);
             _coordinator->setMigrationDecision(

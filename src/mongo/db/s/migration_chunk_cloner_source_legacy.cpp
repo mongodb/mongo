@@ -44,6 +44,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
@@ -279,7 +280,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
     BSONObjBuilder cmdBuilder;
 
     auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
-    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
+        !disableResumableRangeDeleter.load()) {
         StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
                                                 _args.getNss(),
                                                 migrationId,
@@ -292,7 +294,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                                 _shardKeyPattern.toBSON(),
                                                 _args.getSecondaryThrottle());
     } else {
-        // TODO (SERVER-44787): Remove this overload after 4.4 is released.
+        // TODO (SERVER-44787): Remove this overload after 4.4 is released AND
+        // disableResumableRangeDeleter has been removed from server parameters.
         StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
                                                 _args.getNss(),
                                                 _sessionId,

@@ -202,7 +202,9 @@ private:
 
     stdx::thread _migrateThreadHandle;
 
-    bool _useFCV44Protocol{false};
+    // Whether to use the resumable range deleter. This decision is based on whether the FCV 4.2 or
+    // FCV 4.4 protocol are in use and the disableResumableRangeDeleter option is off.
+    bool _enableResumableRangeDeleter{true};
 
     UUID _migrationId;
     NamespaceString _nss;

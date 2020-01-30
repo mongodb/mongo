@@ -74,12 +74,10 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
                                    std::move(sessionIdStatus.getValue()),
                                    std::move(secondaryThrottleStatus.getValue()));
 
-    // TODO (SERVER-44787): Remove this FCV check after 4.4 is released.
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        if (obj.getField("uuid"))
-            request._migrationId = UUID::parse(obj);
-    }
+    // TODO (SERVER-44787): Remove this existence check after 4.4 is released and the
+    // disableResumableRangeDeleter option is removed.
+    if (obj.getField("uuid"))
+        request._migrationId = UUID::parse(obj);
 
     {
         std::string fromShardConnectionString;
