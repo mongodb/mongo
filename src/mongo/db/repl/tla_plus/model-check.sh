@@ -22,4 +22,5 @@ fi
 echo "Downloading tla2tools.jar"
 curl -LO tla.msr-inria.inria.fr/tlatoolbox/dist/tla2tools.jar
 cd "$1"
-java -cp ../tla2tools.jar tlc2.TLC "$TLA_FILE"
+# Note, cpuinfo is only available on Linux.
+java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -workers $(grep -c processor /proc/cpuinfo) "$TLA_FILE"

@@ -30,7 +30,7 @@ VARIABLE committedEntries
 \* The server's term number.
 VARIABLE currentTerm
 
-\* The server's state ("Follower", "Candidate", or "Leader").
+\* The server's state ("Follower" or "Leader").
 VARIABLE state
 
 \* The commit point learned by each server.
@@ -299,12 +299,6 @@ TwoPrimariesInSameTerm ==
         /\ state[j] = "Leader"
 
 NoTwoPrimariesInSameTerm == ~TwoPrimariesInSameTerm
-
-\* NeverRollbackCommitted and NeverRollbackBeforeCommitPoint can be violated,
-\* although it's not ultimately a safety issue: SERVER-39626. The issue
-\* requires at least 5 servers, 3 terms, and oplogs of length 4+, which are
-\* larger limits than we can easily model-check. The properties
-\* are here if you want to experiment with them.
 
 RollbackCommitted(i) ==
     /\ [term |-> LastTerm(log[i]), index |-> Len(log[i])] \in committedEntries
