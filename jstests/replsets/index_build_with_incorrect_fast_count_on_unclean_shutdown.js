@@ -1,6 +1,8 @@
 /*
  * Test that index builder doesn't skip building index when the fast count value is incorrect
  * on unclean shutdowns.
+ *
+ *  @tags: [requires_persistence]
  */
 (function() {
 
