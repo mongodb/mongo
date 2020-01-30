@@ -75,7 +75,8 @@ BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"
 
 MULTIVERSION_CONFIG_KEY = gen_multiversion.MULTIVERSION_CONFIG_KEY
-MULTIVERSION_TAG = gen_multiversion.PASSTHROUGH_TAG
+MULTIVERSION_PASSTHROUGH_TAG = gen_multiversion.PASSTHROUGH_TAG
+RANDOM_MULTIVERSION_REPLSETS_TAG = gen_multiversion.RANDOM_REPLSETS_TAG
 BURN_IN_MULTIVERSION_TASK = gen_multiversion.BURN_IN_TASK
 TASK_PATH_SUFFIX = "/data/multiversion"
 
@@ -555,10 +556,11 @@ def _get_task_runtime_history(evg_api: Optional[EvergreenApi], project: str, tas
             raise
 
 
-def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
-                                 generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                                 evg_api: Optional[EvergreenApi], include_gen_task: bool = True,
-                                 task_prefix: str = "burn_in") -> Configuration:
+def create_generate_tasks_config(
+        evg_config: Configuration, tests_by_task: Dict, generate_config: GenerateConfig,
+        repeat_config: RepeatConfig, evg_api: Optional[EvergreenApi],
+        evg_project_config: EvergreenProjectConfig, include_gen_task: bool = True,
+        task_prefix: str = "burn_in") -> Configuration:
     # pylint: disable=too-many-arguments,too-many-locals
     """
     Create the config for the Evergreen generate.tasks file.
@@ -575,13 +577,20 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
     task_list = TaskList(evg_config)
     resmoke_options = repeat_config.generate_resmoke_options()
     for task in sorted(tests_by_task):
-        multiversion_path = tests_by_task[task].get("use_multiversion")
-        task_runtime_stats = _get_task_runtime_history(evg_api, generate_config.project, task,
-                                                       generate_config.build_variant)
-        resmoke_args = tests_by_task[task]["resmoke_args"]
         test_list = tests_by_task[task]["tests"]
-        distro = tests_by_task[task].get("distro", generate_config.distro)
         for index, test in enumerate(test_list):
+            if task in evg_project_config.get_task_names_by_tag(RANDOM_MULTIVERSION_REPLSETS_TAG):
+                # Exclude files that should be blacklisted from multiversion testing.
+                files_to_exclude = gen_multiversion.get_exclude_files(task, TASK_PATH_SUFFIX)
+                if test in files_to_exclude:
+                    LOGGER.debug("Files to exclude", files_to_exclude=files_to_exclude, test=test,
+                                 suite=task)
+                    continue
+            multiversion_path = tests_by_task[task].get("use_multiversion")
+            task_runtime_stats = _get_task_runtime_history(evg_api, generate_config.project, task,
+                                                           generate_config.build_variant)
+            resmoke_args = tests_by_task[task]["resmoke_args"]
+            distro = tests_by_task[task].get("distro", generate_config.distro)
             # Evergreen always uses a unix shell, even on Windows, so instead of using os.path.join
             # here, just use the forward slash; otherwise the path separator will be treated as
             # the escape character on Windows.
@@ -717,6 +726,7 @@ def create_tests_by_task(build_variant: str, repo: Repo, evg_conf: EvergreenProj
 # pylint: disable=too-many-arguments
 def create_generate_tasks_file(tests_by_task: Dict, generate_config: GenerateConfig,
                                repeat_config: RepeatConfig, evg_api: Optional[EvergreenApi],
+                               evg_project_config: EvergreenProjectConfig,
                                task_prefix: str = 'burn_in', include_gen_task: bool = True) -> Dict:
     """
     Create an Evergreen generate.tasks file to run the given tasks and tests.
@@ -735,7 +745,7 @@ def create_generate_tasks_file(tests_by_task: Dict, generate_config: GenerateCon
                                                                generate_config)
     else:
         evg_config = create_generate_tasks_config(
-            evg_config, tests_by_task, generate_config, repeat_config, evg_api,
+            evg_config, tests_by_task, generate_config, repeat_config, evg_api, evg_project_config,
             include_gen_task=include_gen_task, task_prefix=task_prefix)
 
     json_config = evg_config.to_map()
@@ -821,16 +831,16 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
 
     if generate_tasks_file:
         if generate_config.use_multiversion:
-            multiversion_tasks = evg_conf.get_task_names_by_tag(MULTIVERSION_TAG)
+            multiversion_tasks = evg_conf.get_task_names_by_tag(MULTIVERSION_PASSTHROUGH_TAG)
             LOGGER.debug("Multiversion tasks by tag", tasks=multiversion_tasks,
-                         tag=MULTIVERSION_TAG)
-            # We expect the number of suites with MULTIVERSION_TAG to be the same as in
+                         tag=MULTIVERSION_PASSTHROUGH_TAG)
+            # We expect the number of suites with MULTIVERSION_PASSTHROUGH_TAG to be the same as in
             # multiversion_suites. Multiversion passthrough suites must include
             # MULTIVERSION_CONFIG_KEY as a root level key and must be set to true.
             multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
             assert len(multiversion_tasks) == len(multiversion_suites)
         json_config = create_generate_tasks_file(tests_by_task, generate_config, repeat_config,
-                                                 evg_api)
+                                                 evg_api, evg_conf)
         _write_json_file(json_config, generate_tasks_file)
     elif not no_exec:
         run_tests(tests_by_task, resmoke_cmd)

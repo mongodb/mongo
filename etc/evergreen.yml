@@ -5409,6 +5409,7 @@ tasks:
     vars:
       pip_dir: ${workdir}/src/etc/pip
   - func: "upload pip requirements"
+  - func: "do multiversion setup"
   - func: "generate burn in tags"
     vars:
       max_revisions: 25

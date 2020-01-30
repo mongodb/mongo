@@ -512,17 +512,21 @@ TESTS_BY_TASK = {
 
 
 class TestCreateGenerateTasksConfig(unittest.TestCase):
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_no_tasks_given(self):
         evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant")
         repeat_config = MagicMock()
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, {}, gen_config,
-                                                             repeat_config, None)
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
+
+        evg_config = under_test.create_generate_tasks_config(
+            evg_config, {}, gen_config, repeat_config, None, evg_project_config)
 
         evg_config_dict = evg_config.to_map()
         self.assertNotIn("tasks", evg_config_dict)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_one_task_one_test(self):
         n_tasks = 1
         n_tests = 1
@@ -533,8 +537,10 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         repeat_config.generate_resmoke_options.return_value = resmoke_options
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
+
+        evg_config = under_test.create_generate_tasks_config(
+            evg_config, tests_by_task, gen_config, repeat_config, None, evg_project_config)
 
         evg_config_dict = evg_config.to_map()
         tasks = evg_config_dict["tasks"]
@@ -544,6 +550,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         self.assertIn("--suites=suite_0", cmd[1]["vars"]["resmoke_args"])
         self.assertIn("tests_0", cmd[1]["vars"]["resmoke_args"])
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_n_task_m_test(self):
         n_tasks = 3
         n_tests = 5
@@ -552,12 +559,15 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         repeat_config = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
+
+        evg_config = under_test.create_generate_tasks_config(
+            evg_config, tests_by_task, gen_config, repeat_config, None, evg_project_config)
 
         evg_config_dict = evg_config.to_map()
         self.assertEqual(n_tasks * n_tests, len(evg_config_dict["tasks"]))
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_multiversion_path_is_used(self):
         n_tasks = 1
         n_tests = 1
@@ -569,8 +579,10 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         multiversion_path = "multiversion_path"
         tests_by_task[first_task]["use_multiversion"] = multiversion_path
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
+
+        evg_config = under_test.create_generate_tasks_config(
+            evg_config, tests_by_task, gen_config, repeat_config, None, evg_project_config)
 
         evg_config_dict = evg_config.to_map()
         tasks = evg_config_dict["tasks"]
@@ -678,6 +690,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
 
 class TestCreateGenerateTasksFile(unittest.TestCase):
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
     def test_gen_tasks_configuration_is_returned(self, gen_tasks_config_mock):
         evg_api = MagicMock()
@@ -693,12 +706,14 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         }
 
         gen_tasks_config_mock.return_value = evg_config
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
 
         config = under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config,
-                                                       evg_api)
+                                                       evg_api, evg_project_config)
 
         self.assertEqual(config, evg_config.to_map.return_value)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(ns("create_generate_tasks_config"))
     def test_gen_tasks_multiversion_configuration_is_returned(self, gen_tasks_config_mock):  # pylint: disable=invalid-name
         evg_api = MagicMock()
@@ -726,11 +741,13 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         }  # yapf: disable
 
         gen_tasks_config_mock.return_value = evg_config
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
 
         config = under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config,
-                                                       evg_api)
+                                                       evg_api, evg_project_config)
         self.assertEqual(config, evg_config.to_map.return_value)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch("buildscripts.burn_in_tests.sys.exit")
     @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
     def test_cap_on_task_generate(self, gen_tasks_config_mock, exit_mock):
@@ -747,10 +764,12 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         }
 
         gen_tasks_config_mock.return_value = evg_config
+        evg_project_config = get_evergreen_config("etc/evergreen.yml")
 
         exit_mock.side_effect = ValueError("exiting")
         with self.assertRaises(ValueError):
-            under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config, evg_api)
+            under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config, evg_api,
+                                                  evg_project_config)
 
         exit_mock.assert_called_once()
 

@@ -52,6 +52,7 @@ SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
 BURN_IN_TASK = "burn_in_tests_multiversion"
 MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
 PASSTHROUGH_TAG = "multiversion_passthrough"
+RANDOM_REPLSETS_TAG = "random_multiversion_replica_sets"
 EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible"
 
 # The directory in which BACKPORTS_REQUIRED_FILE resides.
