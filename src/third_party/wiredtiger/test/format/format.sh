@@ -17,8 +17,8 @@ onintr()
 trap 'onintr' 2
 
 usage() {
-	echo "usage: $0 [-aFSv] [-c config] "
-	echo "    [-b format-binary] [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
+	echo "usage: $0 [-aFSv] [-b format-binary] [-c config] "
+	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
 	echo
 	echo "    -a           abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
@@ -27,6 +27,7 @@ usage() {
 	echo "    -h home      run directory (defaults to .)"
 	echo "    -j parallel  jobs to execute in parallel (defaults to 8)"
 	echo "    -n total     total jobs to execute (defaults to no limit)"
+	echo "    -R           run timing stress split test configurations (defaults to off)"
 	echo "    -S           run smoke-test configurations (defaults to off)"
 	echo "    -t minutes   minutes to run (defaults to no limit)"
 	echo "    -v           verbose output (defaults to off)"
@@ -70,6 +71,7 @@ home="."
 minutes=0
 parallel_jobs=8
 smoke_test=0
+timing_stress_split_test=0
 total_jobs=0
 verbose=0
 format_binary="./t"
@@ -105,6 +107,9 @@ while :; do
 			exit 1
 		}
 		shift ; shift ;;
+	-R)
+		timing_stress_split_test=1
+		shift ;;
 	-S)
 		smoke_test=1
 		shift ;;
@@ -141,7 +146,7 @@ verbose "$name: run starting at $(date)"
 	echo "$name: directory \"$home\" not found"
 	exit 1
 }
-home=$(cd $home && echo $PWD)
+home=$(cd $home > /dev/null || exit 1 && echo $PWD)
 
 # Config is possibly relative to our current directory and we're about to change directories.
 # Get an absolute path for config if it's local.
@@ -361,14 +366,20 @@ format()
 	if [[ $smoke_test -ne 0 ]]; then
 		args=${smoke_list[$smoke_next]}
 		smoke_next=$(($smoke_next + 1))
-		echo "$name: starting smoke-test job in $dir"
+		echo "$name: starting smoke-test job in $dir ($(date))"
+	elif [[ $timing_stress_split_test -ne 0 ]]; then
+		args=$format_args
+		for k in {1..7}; do
+			args+=" timing_stress_split_$k=$(($RANDOM%2))"
+		done
+		echo "$name: starting timing-stress-split job in $dir ($(date))"
 	else
 		args=$format_args
 
 		# If abort/recovery testing is configured, do it 5% of the time.
 		[[ $abort_test -ne 0 ]] && [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args abort=1"
 
-		echo "$name: starting job in $dir"
+		echo "$name: starting job in $dir ($(date))"
 	fi
 
 	cmd="$format_binary -c "$config" -h "$dir" -1 $args quiet=1"

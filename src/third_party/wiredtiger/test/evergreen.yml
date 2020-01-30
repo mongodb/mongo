@@ -371,6 +371,55 @@ tasks:
         vars:
           posix_configure_flags: --enable-strict --enable-diagnostic
 
+  - name: compile-gcc
+    tags: ["pull_request", "pull_request_compilers"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-4.8 CXX=g++-4.8 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-5 CXX=g++-5 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-6 CXX=g++-6 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-6 CXX=g++-6 CFLAGS="-ggdb -fPIC" CPPFLAGS=-fvisibility=hidden
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-7 CXX=g++-7 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-8 CXX=g++-8 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=gcc-9 CXX=g++-9 CFLAGS="-ggdb -fPIC"
+
+  - name: compile-clang
+    tags: ["pull_request", "pull_request_compilers"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-3.9 CXX=clang++-3.9 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-4.0 CXX=clang++-4.0 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-5.0 CXX=clang++-5.0 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-6.0 CXX=clang++-6.0 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-7 CXX=clang++-7 CFLAGS="-ggdb -fPIC"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=clang-8 CXX=clang++-8 CFLAGS="-ggdb -fPIC"
+
   - name: make-check-test
     depends_on:
       - name: compile
@@ -1674,7 +1723,7 @@ tasks:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row direct_io=1 firstfit=1 internal_key_truncation=1
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row firstfit=1 internal_key_truncation=1
       - func: "format test"
         vars:
           extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
@@ -1905,6 +1954,21 @@ tasks:
           format_test_script_args: -S
           times: 16
 
+  - name: race-condition-stress-sanitizer-test
+    # set an evergreen timeout of 25 hours
+    exec_timeout_secs: 90000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC="/opt/mongodbtoolchain/v3/bin/clang -fsanitize=address" PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer"
+          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+      - func: "format test script"
+        vars:
+          # set a format.sh timeout of 24 hours
+          format_test_script_args: -R -t 1440
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+
   - name: recovery-stress-test
     #set a 25 hours timeout
     exec_timeout_secs: 90000
@@ -2018,6 +2082,47 @@ tasks:
             cp ../../../bench/wtperf/split_heavy.wtperf .
             ./wtperf -O ./split_heavy.wtperf -o verbose=2
 
+  - name: static-wt-build-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --disable-shared --with-builtins=snappy,zlib
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+
+            # Delete wt util
+            rm -f wt
+            # Build static wt util
+            make CC='eval "g++ -static"' ${smp_command|}
+            # -V option displays Wiredtiger library version
+            ./wt -V
+
+            if [ $? -ne 0 ]; then
+              echo "Error, WT util is not generated or is not functioning"
+              exit 1
+            fi
+
+            ldd wt || wt_static_build=1
+
+            if [ $wt_static_build -ne 1 ]; then
+              echo "Error, WT util is not statically linked"
+              exit 1
+            fi
+
+  - name: compatibility-test-for-wiredtiger-releases
+    commands:
+      - func: "get project"
+      - command: subprocess.exec
+        params:
+          working_dir: "wiredtiger"
+          command: bash test/evergreen/compatibility_test_for_wiredtiger_releases.sh
+
 buildvariants:
 - name: ubuntu1804
   display_name: Ubuntu 18.04
@@ -2029,7 +2134,7 @@ buildvariants:
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
-    - name: ".pull_request !.windows_only"
+    - name: ".pull_request !.windows_only !.pull_request_compilers"
     - name: compile-msan
     - name: make-check-msan-test
     - name: compile-ubsan
@@ -2053,7 +2158,20 @@ buildvariants:
     - name: split-stress-test
     - name: format-stress-test
     - name: format-stress-smoke-test
+    - name: race-condition-stress-sanitizer-test
     - name: checkpoint-stress-test
+    - name: static-wt-build-test
+
+- name: ubuntu1804-compilers
+  display_name: Ubuntu 18.04 Compilers
+  run_on:
+  - ubuntu1804-wt-build
+  expansions:
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-lz4 --enable-snappy --enable-zlib --enable-zstd --enable-python
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+  tasks:
+    - name: ".pull_request_compilers"
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
@@ -2108,6 +2226,22 @@ buildvariants:
     - name: unit-test
     - name: fops
     - name: time-shift-sensitivity-test
+    - name: compile-msan
+    - name: make-check-msan-test
+    - name: compile-ubsan
+    - name: ubsan-test
+    - name: linux-directio
+    - name: syscall-linux
+    - name: compile-asan
+    - name: make-check-asan-test
+    - name: checkpoint-filetypes-test
+    - name: unit-test-long
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
+    - name: compile-wtperf
+    - name: wtperf-test
+    - name: ftruncate-test
+    - name: long-test
 
 - name: large-scale-test
   display_name: Large scale testing
@@ -2124,6 +2258,7 @@ buildvariants:
   - ubuntu1804-test
   tasks:
     - name: compatibility-test-for-mongodb-releases
+    - name: compatibility-test-for-wiredtiger-releases
 
 - name: windows-64
   display_name: Windows 64-bit
@@ -2193,9 +2328,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: unit-test
-  - name: format-stress-ppc-zseries-test
-  - name: format-stress-smoke-test
-  - name: format-wtperf-test
 
 - name: ubuntu1804-zseries
   display_name: Ubuntu 18.04 zSeries

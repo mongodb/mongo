@@ -678,15 +678,15 @@ __curjoin_get_key(WT_CURSOR *cursor, ...)
 
     cjoin = (WT_CURSOR_JOIN *)cursor;
 
-    va_start(ap, cursor);
     JOINABLE_CURSOR_API_CALL(cursor, session, get_key, NULL);
 
     if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) || !cjoin->iter->positioned)
         WT_ERR_MSG(session, EINVAL, "join cursor must be advanced with next()");
-    WT_ERR(__wt_cursor_get_keyv(cursor, cursor->flags, ap));
+    va_start(ap, cursor);
+    ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
+    va_end(ap);
 
 err:
-    va_end(ap);
     API_END_RET(session, ret);
 }
 
@@ -704,16 +704,16 @@ __curjoin_get_value(WT_CURSOR *cursor, ...)
 
     cjoin = (WT_CURSOR_JOIN *)cursor;
 
-    va_start(ap, cursor);
     JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
 
     if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) || !cjoin->iter->positioned)
         WT_ERR_MSG(session, EINVAL, "join cursor must be advanced with next()");
 
-    WT_ERR(__wt_curtable_get_valuev(cjoin->main, ap));
+    va_start(ap, cursor);
+    ret = __wt_curtable_get_valuev(cjoin->main, ap);
+    va_end(ap);
 
 err:
-    va_end(ap);
     API_END_RET(session, ret);
 }
 

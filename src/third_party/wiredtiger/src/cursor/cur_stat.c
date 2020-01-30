@@ -48,7 +48,6 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
     va_list ap;
 
     cst = (WT_CURSOR_STAT *)cursor;
-    va_start(ap, cursor);
     CURSOR_API_CALL(cursor, session, get_key, NULL);
 
     WT_ERR(__cursor_needkey(cursor));
@@ -58,14 +57,18 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
         WT_ERR(__wt_buf_initsize(session, &cursor->key, size));
         WT_ERR(__wt_struct_pack(session, cursor->key.mem, size, cursor->key_format, cst->key));
 
+        va_start(ap, cursor);
         item = va_arg(ap, WT_ITEM *);
         item->data = cursor->key.data;
         item->size = cursor->key.size;
-    } else
+        va_end(ap);
+    } else {
+        va_start(ap, cursor);
         *va_arg(ap, int *) = cst->key;
+        va_end(ap);
+    }
 
 err:
-    va_end(ap);
     API_END_RET(session, ret);
 }
 
@@ -86,7 +89,6 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
     va_list ap;
 
     cst = (WT_CURSOR_STAT *)cursor;
-    va_start(ap, cursor);
     CURSOR_API_CALL(cursor, session, get_value, NULL);
 
     WT_ERR(__cursor_needvalue(cursor));
@@ -98,24 +100,27 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
         WT_ERR(__wt_struct_pack(
           session, cursor->value.mem, size, cursor->value_format, desc, cst->pv.data, cst->v));
 
+        va_start(ap, cursor);
         item = va_arg(ap, WT_ITEM *);
         item->data = cursor->value.data;
         item->size = cursor->value.size;
+        va_end(ap);
     } else {
         /*
          * Don't drop core if the statistics value isn't requested; NULL pointer support isn't
          * documented, but it's a cheap test.
          */
+        va_start(ap, cursor);
         if ((p = va_arg(ap, const char **)) != NULL)
             *p = desc;
         if ((p = va_arg(ap, const char **)) != NULL)
             *p = cst->pv.data;
         if ((v = va_arg(ap, uint64_t *)) != NULL)
             *v = cst->v;
+        va_end(ap);
     }
 
 err:
-    va_end(ap);
     API_END_RET(session, ret);
 }
 

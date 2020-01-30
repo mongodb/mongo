@@ -495,6 +495,13 @@ connection_runtime_config = [
             adjust log archiving to retain the log records of this number
             of checkpoints. Zero or one means perform normal archiving.''',
             min='0', max='1024'),
+        Config('cursor_copy', 'false', r'''
+            if true, use the system allocator to make a copy of any data
+            returned by a cursor operation and return the copy instead.
+            The copy is freed on the next cursor operation. This allows
+            memory sanitizers to detect inappropriate references to memory
+            owned by cursors.''',
+            type='boolean'),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force
             lookaside eviction to happen more aggressively. This includes but
@@ -1610,8 +1617,7 @@ methods = {
 
 'WT_CONNECTION.query_timestamp' : Method([
     Config('get', 'all_durable', r'''
-        specify which timestamp to query: \c all_committed returns the largest
-        timestamp such that all timestamps up to that value have committed,
+        specify which timestamp to query:
         \c all_durable returns the largest timestamp such that all timestamps
         up to that value have been made durable, \c last_checkpoint returns the
         timestamp of the most recent stable checkpoint, \c oldest returns the
@@ -1622,7 +1628,7 @@ methods = {
         timestamp of the most recent stable checkpoint taken prior to a shutdown
         and \c stable returns the most recent \c stable_timestamp set with
         WT_CONNECTION::set_timestamp. See @ref transaction_timestamps''',
-        choices=['all_committed','all_durable','last_checkpoint',
+        choices=['all_durable','last_checkpoint',
             'oldest','oldest_reader','pinned','recovery','stable']),
 ]),
 

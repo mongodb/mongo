@@ -2266,7 +2266,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     WT_TXN_STATE *txn_state;
     uint64_t elapsed, time_start, time_stop;
     uint64_t initial_progress, max_progress;
-    bool timer;
+    bool app_thread;
 
     WT_TRACK_OP_INIT(session);
 
@@ -2286,8 +2286,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     __wt_evict_server_wake(session);
 
     /* Track how long application threads spend doing eviction. */
-    timer = !F_ISSET(session, WT_SESSION_INTERNAL);
-    if (timer)
+    app_thread = !F_ISSET(session, WT_SESSION_INTERNAL);
+    if (app_thread)
         time_start = __wt_clock(session);
 
     for (initial_progress = cache->eviction_progress;; ret = 0) {
@@ -2300,10 +2300,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
             if (ret == WT_ROLLBACK) {
                 --cache->evict_aggressive_score;
                 WT_STAT_CONN_INCR(session, txn_fail_cache);
-                if (timer)
-                    WT_IGNORE_RET(__wt_msg(session,
-                      "Application thread returned a rollback error because "
-                      "it was forced to evict and eviction is stuck"));
+                if (app_thread)
+                    WT_TRET(__wt_msg(session, "%s", session->txn.rollback_reason));
             }
             WT_ERR(ret);
         }
@@ -2343,7 +2341,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
             goto err;
         }
         /* Stop if we've exceeded the time out. */
-        if (timer && cache->cache_max_wait_us != 0) {
+        if (app_thread && cache->cache_max_wait_us != 0) {
             time_stop = __wt_clock(session);
             if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) >
               cache->cache_max_wait_us)
@@ -2352,7 +2350,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     }
 
 err:
-    if (timer) {
+    if (app_thread) {
         time_stop = __wt_clock(session);
         elapsed = WT_CLOCKDIFF_US(time_stop, time_start);
         WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
