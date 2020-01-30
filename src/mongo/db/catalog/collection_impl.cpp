@@ -273,7 +273,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
     }
     _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
     _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
-
     getIndexCatalog()->init(opCtx).transitional_ignore();
     _initialized = true;
 }

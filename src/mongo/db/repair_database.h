@@ -43,32 +43,6 @@ class OperationContext;
 class Status;
 class StringData;
 
-typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
-
-/**
- * Returns a pair of parallel vectors. The first item is the index name. The second is the
- * `BSONObj` "index spec" with an index name matching the `filter`.
- *
- * @param filter is a predicate that is passed in an index name, returning true if the index
- *               should be included in the result.
- */
-StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           RecordId catalogId,
-                                           std::function<bool(const std::string&)> filter =
-                                               [](const std::string& indexName) { return true; });
-
-/**
- * Rebuilds the indexes provided by the 'indexSpecs' on the given collection.
- * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
- * When 'repair' is set to kYes, this function will delete corrupt records when found, rather than
- * crashing.
- */
-enum class RepairData { kYes, kNo };
-Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  Collection* collection,
-                                  const std::vector<BSONObj>& indexSpecs,
-                                  RepairData repair);
-
 /**
  * Repairs a database using a storage engine-specific, best-effort process.
  * Some data may be lost or modified in the process but the output will

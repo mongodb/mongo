@@ -73,6 +73,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
@@ -80,6 +81,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(skipUnindexingDocumentWhenDeleted);
+MONGO_FAIL_POINT_DEFINE(skipIndexNewRecords);
 
 using std::endl;
 using std::string;
@@ -122,7 +124,6 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
     }
 
     CollectionQueryInfo::get(_collection).init(opCtx);
-
     return Status::OK();
 }
 
@@ -1345,6 +1346,10 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
                                        IndexCatalogEntry* index,
                                        const std::vector<BsonRecord>& bsonRecords,
                                        int64_t* keysInsertedOut) {
+    if (MONGO_unlikely(skipIndexNewRecords.shouldFail())) {
+        return Status::OK();
+    }
+
     const MatchExpression* filter = index->getFilterExpression();
     if (!filter)
         return _indexFilteredRecords(opCtx, index, bsonRecords, keysInsertedOut);

@@ -36,7 +36,7 @@
 
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repair_database.h"
+#include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/platform/mutex.h"
 

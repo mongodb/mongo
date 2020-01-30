@@ -722,7 +722,8 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
     auto uuid = collectionCatalog.lookupUUIDByNSS(opCtx, nss).get();
     collectionCatalog.deregisterCollection(uuid);
     _initCollection(opCtx, catalogId, nss, false);
-    return Status::OK();
+
+    return status;
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(

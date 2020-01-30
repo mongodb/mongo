@@ -299,7 +299,7 @@ env.Library(
         'collection_catalog',
         'database_holder',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repair_database',
+        '$BUILD_DIR/mongo/db/rebuild_indexes',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )

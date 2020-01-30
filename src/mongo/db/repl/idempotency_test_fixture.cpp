@@ -598,8 +598,13 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
         ValidateResults validateResults;
         BSONObjBuilder bob;
 
-        ASSERT_OK(CollectionValidation::validate(
-            _opCtx.get(), nss, /*fullValidate=*/true, false, &validateResults, &bob));
+        ASSERT_OK(
+            CollectionValidation::validate(_opCtx.get(),
+                                           nss,
+                                           CollectionValidation::ValidateOptions::kFullValidation,
+                                           false,
+                                           &validateResults,
+                                           &bob));
         ASSERT_TRUE(validateResults.valid);
     }
 

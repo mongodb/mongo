@@ -923,6 +923,20 @@ env.Library(
 )
 
 env.Library(
+    target="rebuild_indexes",
+    source=[
+        "rebuild_indexes.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
+    ],
+    LIBDEPS_PRIVATE=[
+        'index_builds_coordinator_interface',
+        'catalog/index_key_validate',
+    ],
+)
+
+env.Library(
     target="repair_database",
     source=[
         "repair_database.cpp",
@@ -935,6 +949,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'index_builds_coordinator_interface',
+        'rebuild_indexes',
+        'catalog/collection_validation',
         'catalog/database_holder',
         'catalog/document_validation',
         'catalog/index_key_validate',
@@ -1084,6 +1100,7 @@ env.Library(
         "repair_database_and_check_version.cpp",
     ],
     LIBDEPS_PRIVATE=[
+        'rebuild_indexes',
         'catalog/catalog_helpers',
         'catalog/database_holder',
         'commands/mongod_fcv',

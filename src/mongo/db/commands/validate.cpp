@@ -170,9 +170,12 @@ public:
             _validationNotifier.notify_all();
         });
 
+        auto options = (fullValidate) ? CollectionValidation::ValidateOptions::kFullValidation
+                                      : CollectionValidation::ValidateOptions::kNoFullValidation;
+
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(
-            opCtx, nss, fullValidate, background, &validateResults, &result);
+            opCtx, nss, options, background, &validateResults, &result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

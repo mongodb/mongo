@@ -107,6 +107,52 @@ let runTest = function(mongodOptions) {
     assert.eq(orphanColl.count(), 1);
 
     MongoRunner.stopMongod(mongod);
+
+    /**
+     * Test 4. Create two collections, and an index on each. Corrupt one collection's .wt file
+     * in an unrecoverable way, leave the other as is, then run repair.
+     * Verify that repair rebuilds the index on the corrupted collection but does not rebuild
+     * the index on the unaffected collection.
+     */
+
+    let createIndexedColl = function(collName) {
+        let coll = mongod.getDB(baseName)[collName];
+        assert.commandWorked(coll.insert(doc));
+        assert.commandWorked(coll.createIndex({a: 1}, {name: indexName}));
+        assertQueryUsesIndex(coll, doc, indexName);
+        return coll;
+    };
+
+    const corruptedCollName = "corrupted_coll";
+    const healthyCollName = "healthy_coll";
+
+    mongod = startMongodOnExistingPath(dbpath, mongodOptions);
+
+    let corruptedColl = createIndexedColl(corruptedCollName);
+    let corruptedOriginalIndexUri = getUriForIndex(corruptedColl, indexName);
+    let corruptedCollUri = getUriForColl(corruptedColl);
+
+    let healthyColl = createIndexedColl(healthyCollName);
+    let healthyIndexUri = getUriForIndex(healthyColl, indexName);
+    let healthyCollUri = getUriForColl(healthyColl);
+
+    let corruptedCollFile = dbpath + corruptedCollUri + ".wt";
+
+    MongoRunner.stopMongod(mongod);
+
+    jsTestLog("corrupting collection file: " + corruptedCollFile);
+    corruptFile(corruptedCollFile);
+
+    assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
+    mongod = startMongodOnExistingPath(dbpath, mongodOptions);
+
+    corruptedColl = mongod.getDB(baseName)[corruptedCollName];
+    healthyColl = mongod.getDB(baseName)[healthyCollName];
+
+    assert.neq(corruptedOriginalIndexUri, getUriForIndex(corruptedColl, indexName));
+    assert.eq(healthyIndexUri, getUriForIndex(healthyColl, indexName));
+
+    MongoRunner.stopMongod(mongod);
 };
 
 runTest({});

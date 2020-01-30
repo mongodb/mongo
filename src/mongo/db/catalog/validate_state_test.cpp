@@ -108,12 +108,18 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
     auto opCtx = operationContext();
 
     ASSERT_THROWS_CODE(CollectionValidation::ValidateState(
-                           opCtx, kNss, /*background*/ false, /*fullValidate*/ false),
+                           opCtx,
+                           kNss,
+                           /*background*/ false,
+                           CollectionValidation::ValidateOptions::kNoFullValidation),
                        AssertionException,
                        ErrorCodes::NamespaceNotFound);
 
     ASSERT_THROWS_CODE(CollectionValidation::ValidateState(
-                           opCtx, kNss, /*background*/ true, /*fullValidate*/ false),
+                           opCtx,
+                           kNss,
+                           /*background*/ true,
+                           CollectionValidation::ValidateOptions::kNoFullValidation),
                        AssertionException,
                        ErrorCodes::NamespaceNotFound);
 }
@@ -132,7 +138,7 @@ TEST_F(ValidateStateTest, UncheckpointedCollectionShouldThrowCursorNotFoundError
     // error is thrown when attempting to open cursors.
     createCollectionAndPopulateIt(opCtx, kNss);
     CollectionValidation::ValidateState validateState(
-        opCtx, kNss, /*background*/ true, /*fullValidate*/ false);
+        opCtx, kNss, /*background*/ true, CollectionValidation::ValidateOptions::kNoFullValidation);
     ASSERT_THROWS_CODE(
         validateState.initializeCursors(opCtx), AssertionException, ErrorCodes::CursorNotFound);
 }
@@ -154,7 +160,10 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
     {
         // Open the cursors.
         CollectionValidation::ValidateState validateState(
-            opCtx, kNss, /*background*/ false, /*fullValidate*/ false);
+            opCtx,
+            kNss,
+            /*background*/ false,
+            CollectionValidation::ValidateOptions::kNoFullValidation);
         validateState.initializeCursors(opCtx);
 
         // Make sure all of the indexes were found and cursors opened against them. Including the
@@ -169,7 +178,10 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
 
     // Check that foreground validation behaves just the same with checkpoint'ed data.
     CollectionValidation::ValidateState validateState(
-        opCtx, kNss, /*background*/ false, /*fullValidate*/ false);
+        opCtx,
+        kNss,
+        /*background*/ false,
+        CollectionValidation::ValidateOptions::kNoFullValidation);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 5);
 }
@@ -193,7 +205,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnCheckpointedIndexes) {
 
     // Open the cursors.
     CollectionValidation::ValidateState validateState(
-        opCtx, kNss, /*background*/ true, /*fullValidate*/ false);
+        opCtx, kNss, /*background*/ true, CollectionValidation::ValidateOptions::kNoFullValidation);
     validateState.initializeCursors(opCtx);
 
     // Make sure the uncheckpoint'ed indexes are not found.
@@ -238,7 +250,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
     // The two inconsistent indexes should not be found.
     // (Note the _id index was create with collection creation, so we have 3 indexes.)
     CollectionValidation::ValidateState validateState(
-        opCtx, kNss, /*background*/ true, /*fullValidate*/ false);
+        opCtx, kNss, /*background*/ true, CollectionValidation::ValidateOptions::kNoFullValidation);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 3);
 }
@@ -269,7 +281,10 @@ TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereL
     // (Note the _id index was create with collection creation, so we have 3 indexes.)
     {
         CollectionValidation::ValidateState validateState(
-            opCtx, kNss, /*background*/ true, /*fullValidate*/ false);
+            opCtx,
+            kNss,
+            /*background*/ true,
+            CollectionValidation::ValidateOptions::kNoFullValidation);
         validateState.initializeCursors(opCtx);
         ASSERT_EQ(validateState.getIndexes().size(), 3);
     }
@@ -279,7 +294,7 @@ TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereL
     opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx);  // provokes a checkpoint.
 
     CollectionValidation::ValidateState validateState(
-        opCtx, kNss, /*background*/ true, /*fullValidate*/ false);
+        opCtx, kNss, /*background*/ true, CollectionValidation::ValidateOptions::kNoFullValidation);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 3);
 }

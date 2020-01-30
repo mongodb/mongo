@@ -323,7 +323,7 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, Validate
 
     // Do not fail on finding too few index entries compared to collection entries when full:false.
     bool hasTooFewKeys = false;
-    bool noErrorOnTooFewKeys = !_validateState->isFullValidate();
+    bool noErrorOnTooFewKeys = !_validateState->isFullIndexValidation();
 
     if (idx->isIdIndex() && numTotalKeys != _numRecords) {
         hasTooFewKeys = (numTotalKeys < _numRecords);
@@ -367,7 +367,7 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, Validate
         }
     }
 
-    if (!_validateState->isFullValidate() && hasTooFewKeys) {
+    if (!_validateState->isFullIndexValidation() && hasTooFewKeys) {
         std::string warning = str::stream()
             << "index " << idx->indexName() << " has fewer keys than records."
             << " Please re-run the validate command with {full: true}";

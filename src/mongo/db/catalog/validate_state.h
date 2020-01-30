@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -57,7 +58,7 @@ public:
     ValidateState(OperationContext* opCtx,
                   const NamespaceString& nss,
                   bool background,
-                  bool fullValidate);
+                  ValidateOptions options);
 
     const NamespaceString& nss() const {
         return _nss;
@@ -67,8 +68,12 @@ public:
         return _background;
     }
 
-    bool isFullValidate() const {
-        return _fullValidate;
+    bool isFullCollectionValidation() const {
+        return (_options & ValidateOptions::kFullRecordStoreValidation);
+    }
+
+    bool isFullIndexValidation() const {
+        return (_options & ValidateOptions::kFullIndexValidation);
     }
 
     const UUID uuid() const {
@@ -164,7 +169,7 @@ private:
 
     NamespaceString _nss;
     bool _background;
-    bool _fullValidate;
+    ValidateOptions _options;
     OptionalCollectionUUID _uuid;
 
     boost::optional<AutoGetDb> _databaseLock;

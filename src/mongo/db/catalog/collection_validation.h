@@ -41,11 +41,30 @@ class Status;
 
 namespace CollectionValidation {
 
+enum class ValidateOptions {
+    kNoFullValidation = 0,
+
+    // If the FullRecordStoreValidation option is set, validate() will do a full validation of the
+    // underlying record store using the storage engine's validation functionality. For WiredTiger
+    // this results in a call to verify().
+    kFullRecordStoreValidation = 1 << 0,
+    // If set, validate() will validate the internal structure of each index, and checks consistency
+    // of the number of keys in the index compared to the internal structure.
+    kFullIndexValidation = 1 << 1,
+    // Includes all of the full validations above.
+    kFullValidation = kFullRecordStoreValidation | kFullIndexValidation,
+};
+
+inline bool operator&(ValidateOptions lhs, ValidateOptions rhs) {
+    return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
+}
+
 /**
  * Expects the caller to hold no locks.
  *
- * Background validation does not support full validation and so the combination of level =
- * 'kValidateTrue' and background = 'True' is prohibited.
+ * Background validation does not support any type of full validation above.
+ * The combination of background = true and options of anything other than kNoFullValidation is
+ * prohibited.
  *
  * @return OK if the validate run successfully
  *         OK will be returned even if corruption is found
@@ -53,7 +72,7 @@ namespace CollectionValidation {
  */
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
-                const bool fullValidate,
+                ValidateOptions options,
                 bool background,
                 ValidateResults* results,
                 BSONObjBuilder* output);

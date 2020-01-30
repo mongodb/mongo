@@ -42,7 +42,7 @@
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repair_database.h"
+#include "mongo/db/rebuild_indexes.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
