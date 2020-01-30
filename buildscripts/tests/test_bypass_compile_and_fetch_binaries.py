@@ -149,32 +149,29 @@ pytests/test2.py
 class TestFindBuildForPreviousCompileTask(unittest.TestCase):
     def test_find_build(self):
         target = under_test.TargetBuild(project="project", revision="a22", build_variant="variant")
-        expected_build_id = "project_variant_patch_a22_date"
         evergreen_api = MagicMock()
-        version_response = MagicMock()
-        evergreen_api.version_by_id.return_value = version_response
-        version_response.build_by_variant.return_value = MagicMock(id=expected_build_id)
+        version_response = evergreen_api.version_by_id.return_value
 
-        build_id = under_test.find_build_for_previous_compile_task(evergreen_api, target)
-        self.assertEqual(build_id, expected_build_id)
+        build = under_test.find_build_for_previous_compile_task(evergreen_api, target)
+        self.assertEqual(build, version_response.build_by_variant.return_value)
 
 
 class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
     def test_fetch_artifacts_with_task_with_artifact(self):
         revision = "a22"
         build_id = "project_variant_patch_a22_date"
+        build = MagicMock(id=build_id)
 
         artifact_mock = MagicMock()
         artifact_mock.name = "Binaries"
         artifact_mock.url = "http://s3.amazon.com/mciuploads/mongodb/build_var//binaries/mongo-test.tgz"
         artifacts_mock = [artifact_mock]
 
-        task_response = MagicMock(status="success")
+        task_response = MagicMock(status="success", display_name="compile")
         task_response.artifacts = artifacts_mock
-        evergreen_api = MagicMock()
-        evergreen_api.task_by_id.return_value = task_response
+        build.get_tasks.return_value = [task_response]
 
-        artifact_files = under_test.fetch_artifacts(evergreen_api, build_id, revision)
+        artifact_files = under_test.fetch_artifacts(build, revision)
         expected_file = {
             "name": artifact_mock.name,
             "link": artifact_mock.url,
@@ -185,40 +182,46 @@ class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
     def test_fetch_artifacts_with_task_with_no_artifacts(self):
         revision = "a22"
         build_id = "project_variant_patch_a22_date"
+        build = MagicMock(id=build_id)
 
         artifacts_mock = []
 
-        task_response = MagicMock(status="success")
+        task_response = MagicMock(status="success", display_name="compile")
         task_response.artifacts = artifacts_mock
-        evergreen_api = MagicMock()
-        evergreen_api.task_by_id.return_value = task_response
+        build.get_tasks.return_value = [task_response]
 
-        artifact_files = under_test.fetch_artifacts(evergreen_api, build_id, revision)
+        artifact_files = under_test.fetch_artifacts(build, revision)
         self.assertEqual(len(artifact_files), 0)
 
     def test_fetch_artifacts_with_task_with_null_artifacts(self):
         revision = "a22"
         build_id = "project_variant_patch_a22_date"
+        build = MagicMock(id=build_id)
 
-        task_response = MagicMock(status="failure")
+        task_response = MagicMock(status="failure", display_name="compile")
         task_response.is_success.return_value = False
-        evergreen_api = MagicMock()
-        evergreen_api.task_by_id.return_value = task_response
+        build.get_tasks.return_value = [task_response]
 
         with self.assertRaises(ValueError):
-            under_test.fetch_artifacts(evergreen_api, build_id, revision)
+            under_test.fetch_artifacts(build, revision)
 
 
 class TestFindPreviousCompileTask(unittest.TestCase):
     def test_find_task(self):
-        revision = "a22"
-        build_id = "project_variant_patch_a22_date"
-        evergreen_api = MagicMock()
-        task_response = MagicMock(status="success")
-        evergreen_api.task_by_id.return_value = task_response
+        task_response = MagicMock(status="success", display_name="compile")
+        build = MagicMock()
+        build.get_tasks.return_value = [task_response]
 
-        task = under_test.find_previous_compile_task(evergreen_api, build_id, revision)
+        task = under_test.find_previous_compile_task(build)
         self.assertEqual(task, task_response)
+
+    def test_build_with_no_compile(self):
+        task_response = MagicMock(status="success", display_name="not_compile")
+        build = MagicMock()
+        build.get_tasks.return_value = [task_response]
+
+        with self.assertRaises(AssertionError):
+            under_test.find_previous_compile_task(build)
 
 
 class TestUpdateArtifactPermissions(unittest.TestCase):

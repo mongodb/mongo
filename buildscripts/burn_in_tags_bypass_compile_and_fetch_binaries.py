@@ -17,39 +17,6 @@ LOGGER = structlog.get_logger(__name__)
 EVG_CONFIG_FILE = ".evergreen.yml"
 
 
-def _retrieve_used_build_id(build):
-    """
-    Determine what build_id should be used for downloading artifacts.
-
-    If bypass_compile was used by the main compile task, then our expansions should use the
-    same references.
-
-    :param build: Evergreen build containing the compile task to use.
-    :return: build_id that should be used for expansions.
-    """
-    log = LOGGER.bind(build_id=build.id)
-    tasks = build.get_tasks()
-    possible_compile_tasks = {task for task in tasks if task.display_name == "compile"}
-    if len(possible_compile_tasks) != 1:
-        log.warning("Could not find 'compile' task")
-        raise ValueError(f"Compile task not found in {build.id}")
-
-    compile_task = possible_compile_tasks.pop()
-
-    # We will use the 'Binaries' artifact to see what build_id to use.
-    binary_artifacts = [
-        artifact for artifact in compile_task.artifacts if artifact.name == "Binaries"
-    ]
-    for artifact in binary_artifacts:
-        log.info("Checking artifact for build_id", url=artifact.url)
-        build_id = artifact.url.split("/")[-1].split(".")[0]
-        prefix = "mongo-"
-        return build_id[len(prefix):]
-
-    log.warning("Count not determine build_id")
-    raise ValueError(f"Could not determine build id for bypass compile in {build.id}")
-
-
 @click.command()
 @click.option("--project", required=True, help="The evergreen project.")
 @click.option("--build-variant", required=True, help="Build variant where compile is running.")
@@ -82,10 +49,10 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals
     evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
 
     version = evg_api.version_by_id(version_id)
-    build_id = _retrieve_used_build_id(version.build_by_variant(build_variant))
+    build = version.build_by_variant(build_variant)
 
     target = TargetBuild(project=project, revision=revision, build_variant=build_variant)
-    gather_artifacts_and_update_expansions(build_id, target, json_artifact, out_file, evg_api)
+    gather_artifacts_and_update_expansions(build, target, json_artifact, out_file)
 
 
 if __name__ == "__main__":
