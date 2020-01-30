@@ -3592,7 +3592,7 @@ TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {
                   getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 }
 
-TEST_F(ReplCoordTest, DoNotProcessUpdatePositionWhenItsConfigVersionIsIncorrect) {
+TEST_F(ReplCoordTest, ProcessUpdatePositionWhenItsConfigVersionIsDifferent) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -3601,10 +3601,7 @@ TEST_F(ReplCoordTest, DoNotProcessUpdatePositionWhenItsConfigVersionIsIncorrect)
                                                << "_id" << 0)
                                           << BSON("host"
                                                   << "node2:12345"
-                                                  << "_id" << 1)
-                                          << BSON("host"
-                                                  << "node3:12345"
-                                                  << "_id" << 2))),
+                                                  << "_id" << 1))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
@@ -3620,28 +3617,27 @@ TEST_F(ReplCoordTest, DoNotProcessUpdatePositionWhenItsConfigVersionIsIncorrect)
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
     writeConcern.wNumNodes = 1;
 
-    // receive updatePosition with incorrect config version
+    // receive updatePosition with a different config version, 3
+    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(time2, Date_t() + Seconds(100));
+    auto updatePositionConfigVersion = 3;
     UpdatePositionArgs args;
-    ASSERT_OK(args.initialize(
-        BSON(UpdatePositionArgs::kCommandFieldName
-             << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                << 3 << UpdatePositionArgs::kMemberIdFieldName << 1
-                                << UpdatePositionArgs::kDurableOpTimeFieldName << time2.toBSON()
-                                << UpdatePositionArgs::kDurableWallTimeFieldName
-                                << Date_t() + Seconds(time2.getSecs())
-                                << UpdatePositionArgs::kAppliedOpTimeFieldName << time2.toBSON()
-                                << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                << Date_t() + Seconds(time2.getSecs()))))));
+    ASSERT_OK(args.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
+                           << updatePositionConfigVersion << UpdatePositionArgs::kMemberIdFieldName
+                           << 1 << UpdatePositionArgs::kDurableOpTimeFieldName << time2.toBSON()
+                           << UpdatePositionArgs::kDurableWallTimeFieldName
+                           << Date_t() + Seconds(time2.getSecs())
+                           << UpdatePositionArgs::kAppliedOpTimeFieldName << time2.toBSON()
+                           << UpdatePositionArgs::kAppliedWallTimeFieldName
+                           << Date_t() + Seconds(time2.getSecs()))))));
 
     auto opCtx = makeOperationContext();
 
-
-    long long cfgver;
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  getReplCoord()->processReplSetUpdatePosition(args, &cfgver));
-    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
-                  getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, nullptr));
+    ASSERT_OK(getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 }
 
 TEST_F(ReplCoordTest, DoNotProcessUpdatePositionOfMembersWhoseIdsAreNotInTheConfig) {
@@ -5023,7 +5019,7 @@ TEST_F(ReplCoordTest, WaitUntilOpTimeforReadRejectsUnsupportedMajorityReadConcer
     ASSERT_OK(status);
 }
 
-TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatchOurs) {
+TEST_F(ReplCoordTest, DoNotIgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatchOurs) {
     // Ensure that we do not process ReplSetMetadata when ConfigVersions do not match.
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -5041,25 +5037,30 @@ TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatc
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // lower configVersion
+    auto lowerConfigVersion = 1;
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastCommittedWall"
-                              << Date_t() + Seconds(100) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "configVersion" << 1
-                              << "primaryIndex" << 2 << "term" << 2 << "syncSourceIndex" << 1)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2)
+                                  << "lastCommittedWall" << Date_t() + Seconds(100)
+                                  << "lastOpVisible" << BSON("ts" << Timestamp(10, 0) << "t" << 2)
+                                  << "configVersion" << lowerConfigVersion << "primaryIndex" << 2
+                                  << "term" << 2 << "syncSourceIndex" << 1)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
-    ASSERT_EQUALS(0, getReplCoord()->getTerm());
+    // term should advance
+    ASSERT_EQUALS(2, getReplCoord()->getTerm());
 
     // higher configVersion
-    StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(
-        BSON(rpc::kReplSetMetadataFieldName
-             << BSON("lastOpCommitted"
-                     << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastCommittedWall"
-                     << Date_t() + Seconds(100) << "lastOpVisible"
-                     << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "configVersion" << 100
-                     << "primaryIndex" << 2 << "term" << 2 << "syncSourceIndex" << 1)));
+    auto higherConfigVersion = 100;
+    StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2)
+                                  << "lastCommittedWall" << Date_t() + Seconds(100)
+                                  << "lastOpVisible" << BSON("ts" << Timestamp(10, 0) << "t" << 2)
+                                  << "configVersion" << higherConfigVersion << "primaryIndex" << 2
+                                  << "term" << 2 << "syncSourceIndex" << 1)));
     getReplCoord()->processReplSetMetadata(metadata2.getValue());
-    ASSERT_EQUALS(0, getReplCoord()->getTerm());
+    // term should advance
+    ASSERT_EQUALS(2, getReplCoord()->getTerm());
 }
 
 TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeIsNewer) {

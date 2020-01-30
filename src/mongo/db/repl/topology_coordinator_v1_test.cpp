@@ -208,11 +208,13 @@ protected:
     // Only set visibleOpTime, primaryIndex and syncSourceIndex
     ReplSetMetadata makeReplSetMetadata(OpTime visibleOpTime = OpTime(),
                                         int primaryIndex = -1,
-                                        int syncSourceIndex = -1) {
+                                        int syncSourceIndex = -1,
+                                        long long configVersion = -1) {
+        auto configIn = (configVersion != -1) ? configVersion : _currentConfig.getConfigVersion();
         return ReplSetMetadata(_topo->getTerm(),
                                OpTimeAndWallTime(),
                                visibleOpTime,
-                               _currentConfig.getConfigVersion(),
+                               configIn,
                                OID(),
                                primaryIndex,
                                syncSourceIndex);
@@ -5625,6 +5627,44 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotR
     // set up complete, time for actual check
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
+}
+
+TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferentConfigVersion) {
+    // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+    // "host2" because it has a different config version.
+    OpTime election = OpTime();
+    // Our last op time applied must be behind host2, or we'll hit the case where we change
+    // sync sources due to the sync source being behind, without a sync source, and not primary.
+    OpTime lastOpTimeApplied = OpTime(Timestamp(400, 0), 0);
+    OpTime syncSourceOpTime = OpTime(Timestamp(400, 1), 0);
+
+    // Update the config version to 7.
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 7 << "term" << 2LL << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2"))),
+                 0);
+
+    topoCoordSetMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    // We should not want to change our sync source from "host2" even though it has a different
+    // config version.
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime(), -1, -1, 8 /* different config version */),
+        makeOplogQueryMetadata(syncSourceOpTime),
+        now()));
+    ASSERT_FALSE(
+        getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
+                                              makeReplSetMetadata(syncSourceOpTime, -1, -1, 8),
+                                              boost::none,
+                                              now()));
 }
 
 class HeartbeatResponseTestOneRetryV1 : public HeartbeatResponseTestV1 {

@@ -1071,16 +1071,22 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
            << " has reached optime: " << args.appliedOpTime
            << " and is durable through: " << args.durableOpTime;
 
-    if (args.cfgver != _rsConfig.getConfigVersion()) {
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << memberId
-            << " whose config version of " << args.cfgver << " doesn't match our config version of "
-            << _rsConfig.getConfigVersion();
-        LOG(1) << errmsg;
-        *configVersion = _rsConfig.getConfigVersion();
-        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+    // If we're in FCV 4.4, allow replSetUpdatePosition commands between config versions.
+    if (!serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+        if (args.cfgver != _rsConfig.getConfigVersion()) {
+            std::string errmsg = str::stream()
+                << "Received replSetUpdatePosition for node with memberId " << memberId
+                << " whose config version of " << args.cfgver
+                << " doesn't match our config version of " << _rsConfig.getConfigVersion();
+            LOG(1) << errmsg;
+            *configVersion = _rsConfig.getConfigVersion();
+            return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+        }
     }
 
+    // While we can accept replSetUpdatePosition commands across config versions, we still do not
+    // allow receiving them from a node that is not in our config.
     auto* memberData = _findMemberDataByMemberId(memberId.getData());
     if (!memberData) {
         invariant(!_rsConfig.findMemberByID(memberId.getData()));
@@ -2612,13 +2618,20 @@ bool TopologyCoordinator::shouldChangeSyncSource(
         return true;
     }
 
-    if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
-        log() << "Choosing new sync source because the config version supplied by " << currentSource
-              << ", " << replMetadata.getConfigVersion() << ", does not match ours, "
-              << _rsConfig.getConfigVersion();
-        return true;
+    // If we're in FCV 4.4, allow data replication between config versions. Otherwise, change
+    // our sync source.
+    if (!serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+        if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
+            log() << "Choosing new sync source because the config version supplied by "
+                  << currentSource << ", " << replMetadata.getConfigVersion()
+                  << ", does not match ours, " << _rsConfig.getConfigVersion();
+            return true;
+        }
     }
 
+    // While we can allow data replication across config versions, we still do not allow syncing
+    // from a node that is not in our config.
     const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
     if (currentSourceIndex == -1) {
         log() << "Choosing new sync source because " << currentSource.toString()

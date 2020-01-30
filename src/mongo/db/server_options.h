@@ -228,9 +228,8 @@ struct ServerGlobalParams {
             return _version.store(version);
         }
 
-        bool isVersionUpgradingOrUpgraded() {
-            return (getVersion() == Version::kUpgradingTo44 ||
-                    getVersion() == Version::kFullyUpgradedTo44);
+        bool isVersion(Version version) {
+            return _version.load() == version;
         }
 
     private:
