@@ -42,6 +42,7 @@
 
 #include <deque>
 #include <fmt/format.h>
+#include <forward_list>
 
 namespace mongo::logv2 {
 namespace {
@@ -57,28 +58,58 @@ struct TextValueExtractor {
             unescapedStr = val.toString();
         }
         _storage.push_back(unescapedStr);
-        operator()(name, _storage.back());
+        operator()(name, StringData(_storage.back()));
     }
 
     void operator()(StringData name, const BSONObj* val) {
         _storage.push_back(val->jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0));
-        operator()(name, _storage.back());
+        operator()(name, StringData(_storage.back()));
     }
 
     void operator()(StringData name, const BSONArray* val) {
         _storage.push_back(val->jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
-        operator()(name, _storage.back());
+        operator()(name, StringData(_storage.back()));
     }
 
     template <typename Period>
     void operator()(StringData name, const Duration<Period>& val) {
         _storage.push_back(val.toString());
-        args.push_back(fmt::internal::make_arg<fmt::format_context>(_storage.back()));
+        operator()(name, StringData(_storage.back()));
     }
 
-    template <typename T>
-    void operator()(StringData name, const T& val) {
-        args.push_back(fmt::internal::make_arg<fmt::format_context>(val));
+    void operator()(StringData name, bool val) {
+        _namedBool.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedBool.front());
+    }
+
+    void operator()(StringData name, int val) {
+        _namedInt.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedInt.front());
+    }
+
+    void operator()(StringData name, unsigned int val) {
+        _namedUInt.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedUInt.front());
+    }
+
+    void operator()(StringData name, long long val) {
+        _namedLL.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedLL.front());
+    }
+
+    void operator()(StringData name, unsigned long long val) {
+        _namedULL.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedULL.front());
+    }
+
+    void operator()(StringData name, double val) {
+        _namedDouble.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedDouble.front());
+    }
+
+    void operator()(StringData name, StringData val) {
+        _namedStringData.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedStringData.front());
     }
 
     boost::container::small_vector<fmt::basic_format_arg<fmt::format_context>,
@@ -86,7 +117,19 @@ struct TextValueExtractor {
         args;
 
 private:
+    template <typename T>
+    void add(const T& named) {
+        args.push_back(fmt::internal::make_arg<fmt::format_context>(named));
+    }
+
     std::deque<std::string> _storage;
+    std::forward_list<fmt::internal::named_arg<bool, char>> _namedBool;
+    std::forward_list<fmt::internal::named_arg<int, char>> _namedInt;
+    std::forward_list<fmt::internal::named_arg<unsigned int, char>> _namedUInt;
+    std::forward_list<fmt::internal::named_arg<long long, char>> _namedLL;
+    std::forward_list<fmt::internal::named_arg<unsigned long long, char>> _namedULL;
+    std::forward_list<fmt::internal::named_arg<double, char>> _namedDouble;
+    std::forward_list<fmt::internal::named_arg<StringData, char>> _namedStringData;
 };
 
 }  // namespace

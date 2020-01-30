@@ -43,7 +43,6 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/name_extractor.h"
-#include "mongo/logv2/named_arg_formatter.h"
 #include "mongo/util/str_escape.h"
 #include "mongo/util/time_support.h"
 
@@ -170,7 +169,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    R"("{}":"{}"{: <{}})"        // component with padding for the comma
                    R"("{}":{},)"                // id
                    R"("{}":"{}",)"              // context
-                   R"("{}":")",                 // message
+                   R"("{}":"{}")",              // message
                                                 // timestamp
                    constants::kTimestampFieldName,
                    dateToISOStringUTC(extract<Date_t>(attributes::timeStamp(), rec).get()),
@@ -191,28 +190,11 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get(),
                    // message
-                   constants::kMessageFieldName);
-
-    // Insert the attribute names back into the message string using a special formatter and format
-    // into buffer
-    detail::NameExtractor nameExtractor;
-    attrs.apply(nameExtractor);
-
-    fmt::vformat_to<detail::NamedArgFormatter, char>(
-        buffer,
-        extract<StringData>(attributes::message(), rec).get().toString(),
-        fmt::basic_format_args<fmt::format_context>(nameExtractor.nameArgs.data(),
-                                                    nameExtractor.nameArgs.size()));
-
-    if (attrs.empty()) {
-        // If no attributes we can just close the message string
-        buffer.push_back('"');
-    } else {
-        // otherwise, add attribute field name and opening brace
-        fmt::format_to(buffer, R"(","{}":{{)", constants::kAttributesFieldName);
-    }
+                   constants::kMessageFieldName,
+                   extract<StringData>(attributes::message(), rec).get());
 
     if (!attrs.empty()) {
+        fmt::format_to(buffer, R"(,"{}":{{)", constants::kAttributesFieldName);
         // comma separated list of attributes (no opening/closing brace are added here)
         JSONValueExtractor extractor(buffer);
         attrs.apply(extractor);

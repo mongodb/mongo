@@ -24,11 +24,9 @@ Replacement fields are placed in the message string with curly braces `{}`. Ever
 
 Attributes are created with the `_attr` user-defined literal. The intermediate object that gets instantiated provides the assignment operator `=` for assigning a value to the attribute.
 
-Attributes are associated with replacement fields in the message string by index. The first replacement field (from left to right) is associated with the first attribute and so forth. This order can be changed by providing an index as the *arg_id* in the replacement field ([grammar](https://fmt.dev/6.1.1/syntax.html)). `{1}` would associate with attribute at index 1.
+Attributes are associated with replacement fields in the message string by name or index, using names is strongly recommended. When using unnamed replacement fields, attributes map to replacement fields in the order they appear in the message string. 
 
 It is allowed to have more attributes than replacement fields in a log statement. However, having fewer attributes than replacement fields is not allowed.
-
-Libfmt supports named replacement fields within the message string, this is not supported in the log system. However, *format spec* is supported but will only affect the human readable text output format.
 
 The message string must be a compile time constant. This is to be able to add compile time verification of log statements in the future.
 
@@ -40,7 +38,7 @@ LOGV2(1000, "Logging event, no replacement fields is OK");
 ```
 const BSONObj& slowOperation = ...;
 Milliseconds time = ...;
-LOGV2(1001, "Operation {} is slow, took: {}", "op"_attr = slowOperation, "opTime"_attr = time);
+LOGV2(1001, "Operation {op} is slow, took: {duration}", "op"_attr = slowOperation, "duration"_attr = time);
 ```
 ```
 LOGV2(1002, "Replication state change", "from"_attr = getOldState(), "to"_attr = getNewState());
@@ -85,10 +83,9 @@ Debug-level logging is slightly different where an additional parameter (as inte
 ##### Examples
 
 ```
-// Index specifier in replacement field
 Status status = ...;
 int remainingAttempts = ...;
-LOGV2_ERROR(1004, "Initial sync failed. {1} attempts left. Reason: {0}", "reason"_attr = status, "remaining"_attr = remainingAttempts);
+LOGV2_ERROR(1004, "Initial sync failed. {remaining} attempts left. Reason: {reason}", "reason"_attr = status, "remaining"_attr = remainingAttempts);
 ```
 
 ### Log Tags
@@ -236,15 +233,15 @@ mapLog indicates that it is a range coming from an associative container where t
 
 ```
 std::array<int, 20> arrayOfInts = ...;
-LOGV2(1010, "log container directly: {}", "values"_attr = arrayOfInts);
-LOGV2(1011, "log iterator range: {}", "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
-LOGV2(1012, "log first five elements: {}", "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
+LOGV2(1010, "log container directly: {values}", "values"_attr = arrayOfInts);
+LOGV2(1011, "log iterator range: {values}", "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
+LOGV2(1012, "log first five elements: {values}", "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
 ``` 
 
 ```
 StringMap<BSONObj> bsonMap = ...;
-LOGV2(1013, "log map directly: {}", "values"_attr = bsonMap);
-LOGV2(1014, "log map iterator range: {}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
+LOGV2(1013, "log map directly: {values}", "values"_attr = bsonMap);
+LOGV2(1014, "log map iterator range: {values}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
 ``` 
 
 ### Duration types
@@ -291,7 +288,7 @@ builder.append("second"_sd, "str");
 
 std::vector<int> vec = {1, 2, 3};
 
-LOGV2_ERROR(1020, "Example (b: {}), (vec: {})", 
+LOGV2_ERROR(1020, "Example (b: {bson}), (vec: {vector})", 
             "bson"_attr = builder.obj(), 
             "vector"_attr = vec,
             "optional"_attr = boost::none);
