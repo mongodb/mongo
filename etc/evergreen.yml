@@ -975,8 +975,19 @@ functions:
         set -o verbose
         set -o errexit
 
+        if [ -n "${burn_in_bypass}" ]; then
+          ${activate_virtualenv}
+          # Evergreen executable is in $HOME, so add that to the path.
+          PATH=$PATH:$HOME $python buildscripts/burn_in_tags_bypass_compile_and_fetch_binaries.py            \
+            --project ${project}                                               \
+            --build-variant ${burn_in_bypass}                                  \
+            --revision ${revision}                                             \
+            --out-file bypass_compile_expansions.yml                           \
+            --version-id ${version_id}                                         \
+            --json-artifact artifacts.json
+
         # For patch builds determine if we can bypass compile.
-        if [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
+        elif [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
           ${activate_virtualenv}
           # Evergreen executable is in $HOME, so add that to the path.
           PATH=$PATH:$HOME $python buildscripts/bypass_compile_and_fetch_binaries.py            \

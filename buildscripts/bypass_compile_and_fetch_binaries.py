@@ -14,7 +14,7 @@ import urllib.request
 
 import click
 
-from evergreen.api import RetryingEvergreenApi
+from evergreen.api import RetryingEvergreenApi, EvergreenApi, Build, Task
 from git.repo import Repo
 import requests
 import structlog
@@ -281,7 +281,7 @@ def should_bypass_compile(patch_file, build_variant):
     return True
 
 
-def find_build_for_previous_compile_task(evg_api, target):
+def find_build_for_previous_compile_task(evg_api: EvergreenApi, target: TargetBuild) -> Build:
     """
     Find build_id of the base revision.
 
@@ -292,35 +292,32 @@ def find_build_for_previous_compile_task(evg_api, target):
     project_prefix = target.project.replace("-", "_")
     version_of_base_revision = "{}_{}".format(project_prefix, target.revision)
     version = evg_api.version_by_id(version_of_base_revision)
-    build_id = version.build_by_variant(target.build_variant).id
-    return build_id
+    build = version.build_by_variant(target.build_variant)
+    return build
 
 
-def find_previous_compile_task(evg_api, build_id, revision):
+def find_previous_compile_task(build: Build) -> Task:
     """
-    Find compile task that should be used for skip compile..
+    Find compile task that should be used for skip compile.
 
-    :param evg_api: Evergreen.py object.
-    :param build_id: Build id of the desired compile task.
-    :param revision: The base revision being run against.
+    :param build: Build containing the desired compile task.
     :return: Evergreen.py object containing data about the desired compile task.
     """
-    index = build_id.find(revision)
-    compile_task_id = "{}compile_{}".format(build_id[:index], build_id[index:])
-    task = evg_api.task_by_id(compile_task_id)
-    return task
+    tasks = [task for task in build.get_tasks() if task.display_name == "compile"]
+    assert len(tasks) == 1
+    return tasks[0]
 
 
-def fetch_artifacts(evg_api, build_id, revision):
+def fetch_artifacts(build: Build, revision: str):
     """
     Fetch artifacts from a given revision.
 
-    :param evg_api: Evergreen.py object.
-    :param build_id: Build id of the desired artifacts.
+    :param build: Build id of the desired artifacts.
     :param revision: The revision being fetched from.
     :return: Artifacts from the revision.
     """
-    task = find_previous_compile_task(evg_api, build_id, revision)
+    LOGGER.info("Fetching artifacts", build_id=build.id, revision=revision)
+    task = find_previous_compile_task(build)
     if task is None or not task.is_success():
         LOGGER.warning(
             "Could not retrieve artifacts because the compile task for base commit"
@@ -330,7 +327,7 @@ def fetch_artifacts(evg_api, build_id, revision):
     artifacts = []
     for artifact in task.artifacts:
         filename = os.path.basename(artifact.url)
-        if filename.startswith(build_id):
+        if filename.startswith(build.id):
             LOGGER.info("Retrieving archive", filename=filename)
             # This is the artifacts.tgz as referenced in evergreen.yml.
             try:
@@ -395,24 +392,23 @@ def update_artifact_permissions(permission_dict):
         os.chmod(path, perm)
 
 
-def gather_artifacts_and_update_expansions(build_id, target, json_artifact_file, expansions_file,
-                                           evg_api):
+def gather_artifacts_and_update_expansions(build: Build, target: TargetBuild, json_artifact_file,
+                                           expansions_file):
     """
     Fetch the artifacts for this build and save them to be used by other tasks.
 
-    :param build_id: build_id of build with artifacts.
+    :param build: build containing artifacts.
     :param target: Target build being bypassed.
     :param json_artifact_file: File to write json artifacts to.
     :param expansions_file: Files to write expansions to.
-    :param evg_api: Evergreen Api.
     """
-    artifacts = fetch_artifacts(evg_api, build_id, target.revision)
+    artifacts = fetch_artifacts(build, target.revision)
     update_artifact_permissions(ARTIFACTS_NEEDING_PERMISSIONS)
     write_out_artifacts(json_artifact_file, artifacts)
 
-    LOGGER.info("Creating expansions files", target=target, build_id=build_id)
+    LOGGER.info("Creating expansions files", target=target, build_id=build.id)
 
-    expansions = generate_bypass_expansions(target, build_id)
+    expansions = generate_bypass_expansions(target, build.id)
     write_out_bypass_compile_expansions(expansions_file, **expansions)
 
 
@@ -452,13 +448,13 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-stateme
     # Determine if we should bypass compile based on modified patch files.
     if should_bypass_compile(patch_file, build_variant):
         evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
-        build_id = find_build_for_previous_compile_task(evg_api, target)
-        if not build_id:
+        build = find_build_for_previous_compile_task(evg_api, target)
+        if not build:
             LOGGER.warning("Could not find build id. Default compile bypass to false.",
                            revision=revision, project=project)
             return
 
-        gather_artifacts_and_update_expansions(build_id, target, json_artifact, out_file, evg_api)
+        gather_artifacts_and_update_expansions(build, target, json_artifact, out_file)
 
 
 if __name__ == "__main__":
