@@ -189,9 +189,12 @@ The `ReplicationCoordinator` communicates with the storage layer and other nodes
 [`ReplicationCoordinatorExternalState`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_coordinator_external_state.h).
 The external state also manages and owns all of the replication threads.
 
-The `TopologyCoordinator` is in charge of maintaining state about the topology of the cluster. It is
-non-blocking and does a large amount of a node's decision making surrounding replication. Most
-replication command requests and responses are filled in here.
+The `TopologyCoordinator` is in charge of maintaining state about the topology of the cluster. On
+significant changes (anything that affects the response to isMaster), the TopologyCoordinator updates
+its TopologyVersion. The [`isMaster`](https://github.com/mongodb/mongo/blob/r4.3.3/src/mongo/db/repl/replication_info.cpp#L258) command awaits changes in the TopologyVersion before returning.
+
+The `TopologyCoordinator` is non-blocking and does a large amount of a node's decision making
+surrounding replication. Most replication command requests and responses are filled in here.
 
 Both coordinators maintain views of the entire cluster and the state of each node, though there are
 plans to merge these together.
