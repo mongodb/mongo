@@ -124,7 +124,7 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
     return checked_cast<CollectionShardingRuntime*>(css);
 }
 
-ScopedCollectionMetadata CollectionShardingRuntime::getOrphansFilter(OperationContext* opCtx,
+ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(OperationContext* opCtx,
                                                                      bool isCollection) {
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime, isCollection);

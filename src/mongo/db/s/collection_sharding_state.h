@@ -87,27 +87,28 @@ public:
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
-     * Returns the orphan chunk filtering metadata that the current operation should be using for
+     * Returns the chunk filtering object that the current operation should be using for
      * the collection.
      *
-     * If the operation context contains an 'atClusterTime', the returned filtering metadata will be
+     * If the operation context contains an 'atClusterTime', the returned filtering object will be
      * tied to a specific point in time. Otherwise, it will reference the latest time available. If
      * the operation is not associated with a shard version (refer to
      * OperationShardingState::isOperationVersioned for more info on that), returns an UNSHARDED
      * metadata object.
      *
-     * The intended users of this method are callers which need to perform orphan filtering. Use
+     * The intended users of this method are callers which need to perform filtering. Use
      * 'getCurrentMetadata' for other cases, like obtaining information about sharding-related
      * properties of the collection are necessary that won't change under collection IX/IS lock
      * (e.g., isSharded or the shard key).
      *
      * The returned object is safe to access even after the collection lock has been dropped.
      */
-    virtual ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx,
+
+    virtual ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                                       bool isCollection) = 0;
 
     /**
-     * See the comments for 'getOrphansFilter' above for more information on this method.
+     * See the comments for 'getOwnershipFilter' above for more information on this method.
      */
     virtual ScopedCollectionMetadata getCurrentMetadata() = 0;
 

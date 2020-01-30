@@ -55,15 +55,14 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     if (!repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime())
         return;
 
-    const auto metadata = csr->getOrphansFilter(opCtx, true /* isCollection */);
-    if (!metadata->isSharded())
+    const auto collectionFilter = csr->getOwnershipFilter(opCtx, true /* isCollection */);
+    if (!collectionFilter.isSharded())
         return;
 
-    auto chunkManager = metadata->getChunkManager();
-    auto shardKey = chunkManager->getShardKeyPattern().extractShardKeyFromDoc(doc);
+    auto shardKey = collectionFilter.extractShardKeyFromDoc(doc);
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
-    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(shardKey);
+    auto chunk = collectionFilter.findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
     // read concern parameter.

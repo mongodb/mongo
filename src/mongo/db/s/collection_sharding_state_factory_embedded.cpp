@@ -53,7 +53,7 @@ const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
 class CollectionShardingStateStandalone final : public CollectionShardingState {
 public:
-    ScopedCollectionMetadata getOrphansFilter(OperationContext*, bool) override {
+    ScopedCollectionFilter getOwnershipFilter(OperationContext*, bool) override {
         return {kUnshardedCollection};
     }
 

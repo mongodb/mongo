@@ -122,14 +122,14 @@ protected:
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     prepareTestData();
 
-    const auto testFn = [](const ScopedCollectionMetadata& metadata) {
-        ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -500)));
-        ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 50)));
-        ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -50)));
-        ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 500)));
-    };
-
     {
+        const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
+            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
+            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)));
+            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)));
+            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
+        };
+
         BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                          << "snapshot"
                                                          << "atClusterTime" << Timestamp(100, 0)));
@@ -139,10 +139,17 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getOrphansFilter(operationContext(), true /* isCollection */));
+        testFilterFn(css->getOwnershipFilter(operationContext(), true /* isCollection */));
     }
 
     {
+        const auto testFn = [](const ScopedCollectionMetadata& metadata) {
+            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -500)));
+            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 50)));
+            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -50)));
+            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 500)));
+        };
+
         const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(100, 0)));
         testFn(scm);
     }
@@ -152,14 +159,14 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     prepareTestData();
 
-    const auto testFn = [](const ScopedCollectionMetadata& metadata) {
-        ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -500)));
-        ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 50)));
-        ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -50)));
-        ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 500)));
-    };
-
     {
+        const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
+            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
+            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)));
+            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)));
+            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
+        };
+
         BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                          << "snapshot"
                                                          << "atClusterTime" << Timestamp(50, 0)));
@@ -169,10 +176,17 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getOrphansFilter(operationContext(), true /* isCollection */));
+        testFilterFn(css->getOwnershipFilter(operationContext(), true /* isCollection */));
     }
 
     {
+        const auto testFn = [](const ScopedCollectionMetadata& metadata) {
+            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -500)));
+            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 50)));
+            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -50)));
+            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 500)));
+        };
+
         const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(50, 0)));
         testFn(scm);
     }
@@ -182,22 +196,22 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStaleChunkHistory) {
     prepareTestData();
 
-    const auto testFn = [](const ScopedCollectionMetadata& metadata) {
-        ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -500)),
-                           AssertionException,
-                           ErrorCodes::StaleChunkHistory);
-        ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << 50)),
-                           AssertionException,
-                           ErrorCodes::StaleChunkHistory);
-        ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -50)),
-                           AssertionException,
-                           ErrorCodes::StaleChunkHistory);
-        ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << 500)),
-                           AssertionException,
-                           ErrorCodes::StaleChunkHistory);
-    };
-
     {
+        const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
+            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+        };
+
         BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                          << "snapshot"
                                                          << "atClusterTime" << Timestamp(10, 0)));
@@ -207,10 +221,25 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getOrphansFilter(operationContext(), true /* isCollection */));
+        testFilterFn(css->getOwnershipFilter(operationContext(), true /* isCollection */));
     }
 
     {
+        const auto testFn = [](const ScopedCollectionMetadata& metadata) {
+            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -500)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << 50)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -50)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << 500)),
+                               AssertionException,
+                               ErrorCodes::StaleChunkHistory);
+        };
+
         const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(10, 0)));
         testFn(scm);
     }

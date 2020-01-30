@@ -64,8 +64,37 @@ public:
         return get();
     }
 
-private:
+    bool isSharded() const {
+        return _impl->get().isSharded();
+    }
+
+    const BSONObj& getKeyPattern() const {
+        return _impl->get().getKeyPattern();
+    }
+
+    const BSONObj extractShardKeyFromDoc(const BSONObj& doc) const {
+        return _impl->get().getChunkManager()->getShardKeyPattern().extractShardKeyFromDoc(doc);
+    }
+
+protected:
     std::shared_ptr<Impl> _impl;
+};
+
+class ScopedCollectionFilter : public ScopedCollectionMetadata {
+public:
+    ScopedCollectionFilter(std::shared_ptr<Impl> impl)
+        : ScopedCollectionMetadata(std::move(impl)) {}
+
+    ScopedCollectionFilter(ScopedCollectionMetadata&& scopedMetadata)
+        : ScopedCollectionMetadata(std::move(scopedMetadata)) {}
+
+    bool keyBelongsToMe(const BSONObj& key) const {
+        return _impl->get().keyBelongsToMe(key);
+    }
+
+    Chunk findIntersectingChunkWithSimpleCollation(const BSONObj& shardKey) const {
+        return _impl->get().getChunkManager()->findIntersectingChunkWithSimpleCollation(shardKey);
+    }
 };
 
 }  // namespace mongo

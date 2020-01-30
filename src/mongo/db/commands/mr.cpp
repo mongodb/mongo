@@ -1415,10 +1415,10 @@ bool runMapReduce(OperationContext* opCtx,
 
     uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
 
-    const auto metadata = [&] {
+    const auto collectionFilter = [&] {
         AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
         return CollectionShardingState::get(opCtx, config.nss)
-            ->getOrphansFilter(opCtx, autoColl.getCollection());
+            ->getOwnershipFilter(opCtx, autoColl.getCollection());
     }();
 
     bool shouldHaveData = false;
@@ -1513,9 +1513,9 @@ bool runMapReduce(OperationContext* opCtx,
 
                 // Check to see if this is a new object we don't own yet because of a chunk
                 // migration
-                if (metadata->isSharded()) {
-                    ShardKeyPattern kp(metadata->getKeyPattern());
-                    if (!metadata->keyBelongsToMe(kp.extractShardKeyFromDoc(o))) {
+                if (collectionFilter.isSharded()) {
+                    ShardKeyPattern kp(collectionFilter.getKeyPattern());
+                    if (!collectionFilter.keyBelongsToMe(kp.extractShardKeyFromDoc(o))) {
                         continue;
                     }
                 }

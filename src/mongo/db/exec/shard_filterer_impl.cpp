@@ -37,9 +37,9 @@
 
 namespace mongo {
 
-ShardFiltererImpl::ShardFiltererImpl(ScopedCollectionMetadata md) : _metadata(std::move(md)) {
-    if (_metadata->isSharded()) {
-        _keyPattern = ShardKeyPattern(_metadata->getKeyPattern());
+ShardFiltererImpl::ShardFiltererImpl(ScopedCollectionFilter cf) : _collectionFilter(std::move(cf)) {
+    if (_collectionFilter.isSharded()) {
+        _keyPattern = ShardKeyPattern(_collectionFilter.getKeyPattern());
     }
 }
 
@@ -49,14 +49,14 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::_shardKeyBelongsToMe(
         return DocumentBelongsResult::kNoShardKey;
     }
 
-    return _metadata->keyBelongsToMe(shardKey) ? DocumentBelongsResult::kBelongs
-                                               : DocumentBelongsResult::kDoesNotBelong;
+    return _collectionFilter.keyBelongsToMe(shardKey) ? DocumentBelongsResult::kBelongs
+                                                      : DocumentBelongsResult::kDoesNotBelong;
 }
 
 
 ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     const WorkingSetMember& wsm) const {
-    if (!_metadata->isSharded()) {
+    if (!_collectionFilter.isSharded()) {
         return DocumentBelongsResult::kBelongs;
     }
 
@@ -76,7 +76,7 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
 
 ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     const Document& doc) const {
-    if (!_metadata->isSharded()) {
+    if (!_collectionFilter.isSharded()) {
         return DocumentBelongsResult::kBelongs;
     }
     return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromDoc(doc.toBson()));
