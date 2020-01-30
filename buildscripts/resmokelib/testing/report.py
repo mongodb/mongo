@@ -93,7 +93,6 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         unittest.TestResult.startTest(self, test)
 
         test_info = _TestInfo(test.id(), test.test_name, test.dynamic)
-        test_info.start_time = time.time()
 
         basename = test.basename()
         command = test.as_command()
@@ -113,6 +112,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         test_info.url_endpoint = test_logger.url_endpoint
 
         test.override_logger(test_logger)
+        test_info.start_time = time.time()
 
     def stopTest(self, test):  # pylint: disable=invalid-name
         """Call after 'test' has run."""
