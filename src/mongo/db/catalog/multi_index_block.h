@@ -208,6 +208,19 @@ public:
                                  RecoveryUnit::ReadSource readSource,
                                  IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
 
+
+    /**
+     * Retries key generation and insertion for all records skipped during the collection scanning
+     * phase.
+     *
+     * Index builds ignore key generation errors on secondaries. In steady-state replication, all
+     * writes from the primary are eventually applied, so an index build should always succeed when
+     * the primary commits. In two-phase index builds, a secondary may become primary in the middle
+     * of an index build, so it must ensure that before it finishes, it has indexed all documents in
+     * a collection, requiring a call to this function upon completion.
+     */
+    Status retrySkippedRecords(OperationContext* opCtx, Collection* collection);
+
     /**
      * Check any constraits that may have been temporarily violated during the index build for
      * background indexes using an IndexBuildInterceptor to capture writes. The caller is
@@ -363,6 +376,8 @@ private:
     // Duplicate key constraints should be checked at least once in the MultiIndexBlock.
     bool _constraintsChecked = false;
 
+    // A unique identifier associating this index build with a two-phase index build within a
+    // replica set.
     boost::optional<UUID> _buildUUID;
 
     // Protects member variables of this class declared below.

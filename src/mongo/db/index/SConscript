@@ -36,6 +36,20 @@ env.Library(
 )
 
 env.Library(
+        target='skipped_record_tracker',
+        source=[
+            'skipped_record_tracker.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/service_context',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/curop',
+        ],
+)
+
+env.Library(
         target='key_generator',
         source=[
             'btree_key_generator.cpp',
@@ -111,6 +125,7 @@ serveronlyEnv.Library(
         'index_descriptor',
     ],
     LIBDEPS_PRIVATE=[
+        'skipped_record_tracker',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ],
@@ -145,6 +160,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'duplicate_key_tracker',
+        'skipped_record_tracker',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/index_timestamp_helper',

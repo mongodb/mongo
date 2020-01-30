@@ -1321,7 +1321,8 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                        &keys,
                                        &multikeyMetadataKeys,
                                        &multikeyPaths,
-                                       bsonRecord.id);
+                                       bsonRecord.id,
+                                       IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
         Status status = _indexKeys(opCtx,
                                    index,
@@ -1475,7 +1476,8 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                    &keys,
                                    nullptr,
                                    nullptr,
-                                   loc);
+                                   loc,
+                                   IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
     // Tests can enable this failpoint to produce index corruption scenarios where an index has
     // extra keys.

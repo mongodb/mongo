@@ -2590,6 +2590,162 @@ Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPer
     return Status::OK();
 }
 
+class IndexBuildsResolveErrorsDuringStateChangeToPrimary : public StorageTimestampTest {
+public:
+    void run() {
+
+        NamespaceString nss("unittests.timestampIndexBuilds");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        auto collection = autoColl.getCollection();
+
+        // Indexing of parallel arrays is not allowed, so these are deemed "bad".
+        const auto badDoc1 =
+            BSON("_id" << 0 << "a" << BSON_ARRAY(0 << 1) << "b" << BSON_ARRAY(0 << 1));
+        const auto badDoc2 =
+            BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3) << "b" << BSON_ARRAY(2 << 3));
+        const auto badDoc3 =
+            BSON("_id" << 2 << "a" << BSON_ARRAY(4 << 5) << "b" << BSON_ARRAY(4 << 5));
+
+        // NOTE: This test does not test any timestamp reads.
+        const LogicalTime insert1 = _clock->reserveTicks(1);
+        {
+            log() << "inserting " << badDoc1;
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(badDoc1, insert1.asTimestamp(), presentTerm));
+            wuow.commit();
+        }
+
+        const LogicalTime insert2 = _clock->reserveTicks(1);
+        {
+            log() << "inserting " << badDoc2;
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(badDoc2, insert2.asTimestamp(), presentTerm));
+            wuow.commit();
+        }
+
+        const IndexCatalogEntry* buildingIndex = nullptr;
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] {
+            indexer.cleanUpAfterBuild(_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        });
+
+        // Provide a build UUID, indicating that this is a two-phase index build.
+        const auto buildUUID = UUID::gen();
+        indexer.setTwoPhaseBuildUUID(buildUUID);
+
+        const LogicalTime indexInit = _clock->reserveTicks(3);
+
+        // First, simulate being a secondary. Indexing errors are ignored.
+        {
+            ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_SECONDARY}));
+            _coordinatorMock->alwaysAllowWrites(false);
+            repl::UnreplicatedWritesBlock unreplicatedWrites(_opCtx);
+
+            {
+                TimestampBlock tsBlock(_opCtx, indexInit.asTimestamp());
+
+                auto swSpecs =
+                    indexer.init(_opCtx,
+                                 collection,
+                                 {BSON("v" << 2 << "name"
+                                           << "a_1_b_1"
+                                           << "ns" << collection->ns().ns() << "key"
+                                           << BSON("a" << 1 << "b" << 1))},
+                                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection));
+                ASSERT_OK(swSpecs.getStatus());
+            }
+
+            auto indexCatalog = collection->getIndexCatalog();
+            buildingIndex = indexCatalog->getEntry(
+                indexCatalog->findIndexByName(_opCtx, "a_1_b_1", /* includeUnfinished */ true));
+            ASSERT(buildingIndex);
+
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, collection));
+
+            ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+
+            // There should be one skipped record from the collection scan.
+            ASSERT_FALSE(buildingIndex->indexBuildInterceptor()
+                             ->getSkippedRecordTracker()
+                             ->areAllRecordsApplied(_opCtx));
+        }
+
+        // As a primary, stop ignoring indexing errors.
+        ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_PRIMARY}));
+
+        {
+            // This write will not succeed because the node is a primary and the document is not
+            // indexable.
+            log() << "attempting to insert " << badDoc3;
+            WriteUnitOfWork wuow(_opCtx);
+            ASSERT_THROWS_CODE(
+                collection->insertDocument(
+                    _opCtx,
+                    InsertStatement(badDoc3, indexInit.addTicks(1).asTimestamp(), presentTerm),
+                    /* opDebug */ nullptr,
+                    /* noWarn */ false),
+                DBException,
+                ErrorCodes::CannotIndexParallelArrays);
+            wuow.commit();
+        }
+
+        // There should skipped records from failed collection scans and writes.
+        ASSERT_FALSE(
+            buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
+                _opCtx));
+        // This fails because the bad record is still invalid.
+        auto status = indexer.retrySkippedRecords(_opCtx, collection);
+        ASSERT_EQ(status.code(), ErrorCodes::CannotIndexParallelArrays);
+
+        ASSERT_FALSE(
+            buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
+                _opCtx));
+        ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+
+        // Update one documents to be valid, and delete the other. These modifications are written
+        // to the side writes table and must be drained.
+        Helpers::upsert(_opCtx, collection->ns().ns(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
+        {
+            RecordId badRecord =
+                Helpers::findOne(_opCtx, collection, BSON("_id" << 1), false /* requireIndex */);
+            WriteUnitOfWork wuow(_opCtx);
+            collection->deleteDocument(_opCtx, kUninitializedStmtId, badRecord, nullptr);
+            wuow.commit();
+        }
+
+        ASSERT_FALSE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
+                                                RecoveryUnit::ReadSource::kUnset,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+
+        // This succeeds because the bad documents are now either valid or removed.
+        ASSERT_OK(indexer.retrySkippedRecords(_opCtx, collection));
+        ASSERT_TRUE(
+            buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
+                _opCtx));
+        ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+        ASSERT_OK(indexer.checkConstraints(_opCtx));
+
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            ASSERT_OK(indexer.commit(
+                _opCtx,
+                collection,
+                [&](const BSONObj& indexSpec) {
+                    _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                        _opCtx, collection->ns(), collection->uuid(), indexSpec, false);
+                },
+                MultiIndexBlock::kNoopOnCommitFn));
+            wuow.commit();
+        }
+    }
+};
+
 class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTest {
 public:
     void run() {
@@ -3696,6 +3852,7 @@ public:
         addIf<AbortPreparedMultiOplogEntryTransaction>();
         addIf<PreparedMultiDocumentTransaction>();
         addIf<AbortedPreparedMultiDocumentTransaction>();
+        addIf<IndexBuildsResolveErrorsDuringStateChangeToPrimary>();
     }
 };
 

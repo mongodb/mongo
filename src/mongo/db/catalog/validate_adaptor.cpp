@@ -102,7 +102,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                      &documentKeySet,
                      &multikeyMetadataKeys,
                      &multikeyPaths,
-                     recordId);
+                     recordId,
+                     IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
         if (!descriptor->isMultikey() &&
             iam->shouldMarkIndexAsMultikey(

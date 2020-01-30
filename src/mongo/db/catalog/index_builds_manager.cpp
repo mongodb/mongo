@@ -115,14 +115,6 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<IndexBuildRecoveryState> IndexBuildsManager::recoverIndexBuild(
-    const NamespaceString& nss, const UUID& buildUUID, std::vector<std::string> indexNames) {
-
-    // TODO: Not yet implemented.
-
-    return IndexBuildRecoveryState::Building;
-}
-
 Status IndexBuildsManager::startBuildingIndex(OperationContext* opCtx,
                                               Collection* collection,
                                               const UUID& buildUUID) {
@@ -217,13 +209,11 @@ Status IndexBuildsManager::drainBackgroundWrites(
     return builder->drainBackgroundWrites(opCtx, readSource, drainYieldPolicy);
 }
 
-Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {
-    auto multiIndexBlockPtr = _getBuilder(buildUUID);
-    // TODO: verify that the index builder is in the expected state.
-
-    // TODO: Not yet implemented.
-
-    return Status::OK();
+Status IndexBuildsManager::retrySkippedRecords(OperationContext* opCtx,
+                                               const UUID& buildUUID,
+                                               Collection* collection) {
+    auto builder = _getBuilder(buildUUID);
+    return builder->retrySkippedRecords(opCtx, collection);
 }
 
 Status IndexBuildsManager::checkIndexConstraintViolations(OperationContext* opCtx,

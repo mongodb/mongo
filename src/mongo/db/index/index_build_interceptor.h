@@ -34,6 +34,7 @@
 #include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"
@@ -53,6 +54,12 @@ public:
 
     enum class Op { kInsert, kDelete };
 
+    /**
+     * Indicates whether this interceptor will allow tracking of documents skipped due to key
+     * generation errors. When 'kTrack', a SkippedRecordTracker is created.
+     */
+    enum class TrackSkippedRecords { kNoTrack, kTrack };
+
     static bool typeCanFastpathMultikeyUpdates(IndexType type);
 
     /**
@@ -62,7 +69,9 @@ public:
      *
      * deleteTemporaryTable() must be called before destruction to delete the temporary tables.
      */
-    IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
+    IndexBuildInterceptor(OperationContext* opCtx,
+                          IndexCatalogEntry* entry,
+                          TrackSkippedRecords trackSkippedRecords);
 
     /**
      * Deletes the temporary side writes and duplicate key constraint violations tables. Must be
@@ -120,6 +129,21 @@ public:
                                 RecoveryUnit::ReadSource readSource,
                                 DrainYieldPolicy drainYieldPolicy);
 
+    SkippedRecordTracker* getSkippedRecordTracker() {
+        return _skippedRecordTracker.get();
+    }
+
+    const SkippedRecordTracker* getSkippedRecordTracker() const {
+        return _skippedRecordTracker.get();
+    }
+
+    /**
+     * Tries to index previously skipped records. For each record, if the new indexing attempt is
+     * successful, keys are written directly to the index. Unsuccessful key generation or writes
+     * will return errors.
+     */
+    Status retrySkippedRecords(OperationContext* opCtx, const Collection* collection);
+
     /**
      * Returns 'true' if there are no visible records remaining to be applied from the side writes
      * table. Ensure that this returns 'true' when an index build is completed.
@@ -130,6 +154,7 @@ public:
      * Returns true if all recorded duplicate key constraint violations have been checked.
      */
     bool areAllConstraintsChecked(OperationContext* opCtx) const;
+
 
     /**
      * When an index builder wants to commit, use this to retrieve any recorded multikey paths
@@ -158,8 +183,12 @@ private:
     // The entry for the index that is being built.
     IndexCatalogEntry* _indexCatalogEntry;
 
-    // This temporary record store is owned by the interceptor and dropped along with it.
+    // This temporary record store records intercepted keys that will be written into the index by
+    // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.
     std::unique_ptr<TemporaryRecordStore> _sideWritesTable;
+
+    // Records RecordIds that have been skipped due to indexing errors.
+    std::unique_ptr<SkippedRecordTracker> _skippedRecordTracker;
 
     std::unique_ptr<DuplicateKeyTracker> _duplicateKeyTracker;
 

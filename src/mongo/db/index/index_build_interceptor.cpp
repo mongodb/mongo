@@ -67,11 +67,17 @@ bool IndexBuildInterceptor::typeCanFastpathMultikeyUpdates(IndexType indexType) 
     return (indexType == INDEX_BTREE);
 }
 
-IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
+IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
+                                             IndexCatalogEntry* entry,
+                                             TrackSkippedRecords trackSkippedRecords)
     : _indexCatalogEntry(entry),
       _sideWritesTable(
           opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)),
       _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
+
+    if (TrackSkippedRecords::kTrack == trackSkippedRecords) {
+        _skippedRecordTracker = std::make_unique<SkippedRecordTracker>(_indexCatalogEntry);
+    }
 
     if (entry->descriptor()->unique()) {
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
@@ -91,6 +97,9 @@ void IndexBuildInterceptor::deleteTemporaryTables(OperationContext* opCtx) {
     _sideWritesTable->deleteTemporaryTable(opCtx);
     if (_duplicateKeyTracker) {
         _duplicateKeyTracker->deleteTemporaryTable(opCtx);
+    }
+    if (_skippedRecordTracker) {
+        _skippedRecordTracker->deleteTemporaryTable(opCtx);
     }
 }
 
@@ -392,6 +401,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         Op op,
                                         int64_t* const numKeysOut) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
     // Maintain parity with IndexAccessMethods handling of key counting. Only include
     // `multikeyMetadataKeys` when inserting.
     *numKeysOut = keys.size() + (op == Op::kInsert ? multikeyMetadataKeys.size() : 0);
@@ -480,5 +490,14 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     std::vector<Timestamp> timestamps(records.size());
     return _sideWritesTable->rs()->insertRecords(opCtx, &records, timestamps);
 }
+
+Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
+                                                  const Collection* collection) {
+    if (!_skippedRecordTracker) {
+        return Status::OK();
+    }
+    return _skippedRecordTracker->retrySkippedRecords(opCtx, collection);
+}
+
 
 }  // namespace mongo

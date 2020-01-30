@@ -895,7 +895,8 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         id1);
+                         id1,
+                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
@@ -1292,7 +1293,8 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid);
+                         rid,
+                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -1492,7 +1494,8 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid);
+                         rid,
+                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -1527,7 +1530,8 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid);
+                         rid,
+                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 

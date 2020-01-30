@@ -692,6 +692,20 @@ Status MultiIndexBlock::drainBackgroundWrites(
     return Status::OK();
 }
 
+Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, Collection* collection) {
+    for (auto&& index : _indexes) {
+        auto interceptor = index.block->getEntry()->indexBuildInterceptor();
+        if (!interceptor)
+            continue;
+
+        auto status = interceptor->retrySkippedRecords(opCtx, collection);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
     _constraintsChecked = true;
 

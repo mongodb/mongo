@@ -109,8 +109,13 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     _indexCatalogEntry =
         _indexCatalog->createIndexEntry(opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
 
+    // Only track skipped records with two-phase index builds, which is indicated by a present build
+    // UUID.
+    const auto trackSkipped = (_buildUUID) ? IndexBuildInterceptor::TrackSkippedRecords::kTrack
+                                           : IndexBuildInterceptor::TrackSkippedRecords::kNoTrack;
     if (_method == IndexBuildMethod::kHybrid) {
-        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, _indexCatalogEntry);
+        _indexBuildInterceptor =
+            std::make_unique<IndexBuildInterceptor>(opCtx, _indexCatalogEntry, trackSkipped);
         _indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 
@@ -161,6 +166,13 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
         UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
 
     if (_indexBuildInterceptor) {
+        // Skipped records are only checked when we complete an index build as primary.
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const auto skippedRecordsTracker = _indexBuildInterceptor->getSkippedRecordTracker();
+        if (skippedRecordsTracker && replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
+            invariant(skippedRecordsTracker->areAllRecordsApplied(opCtx));
+        }
+
         // An index build should never be completed with writes remaining in the interceptor.
         invariant(_indexBuildInterceptor->areAllWritesApplied(opCtx));
 

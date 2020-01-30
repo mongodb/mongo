@@ -1865,6 +1865,16 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
         RecoveryUnit::ReadSource::kUnset,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
+    // Retry indexing records that may have been skipped while relaxing constraints (i.e. as
+    // secondary), but only if we are primary and committing the index build and during two-phase
+    // builds. Single-phase index builds are not resilient to state transitions.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (IndexBuildProtocol::kTwoPhase == replState->protocol &&
+        replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
+        uassertStatusOK(
+            _indexBuildsManager.retrySkippedRecords(opCtx, replState->buildUUID, collection));
+    }
+
     // Index constraint checking phase.
     uassertStatusOK(
         _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));

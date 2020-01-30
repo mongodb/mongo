@@ -87,21 +87,7 @@ public:
                            SetupOptions options = {});
 
     /**
-     * Recovers the index build from its persisted state and sets it up to run again.
-     *
-     * Returns an enum reflecting the point up to which the build was recovered, so the caller knows
-     * where to recommence.
-     *
-     * TODO: Not yet implemented.
-     */
-    StatusWith<IndexBuildRecoveryState> recoverIndexBuild(const NamespaceString& nss,
-                                                          const UUID& buildUUID,
-                                                          std::vector<std::string> indexNames);
-
-    /**
      * Runs the scanning/insertion phase of the index build..
-     *
-     * TODO: Not yet implemented.
      */
     Status startBuildingIndex(OperationContext* opCtx,
                               Collection* collection,
@@ -126,17 +112,15 @@ public:
                                  IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
 
     /**
-     * Persists information in the index catalog entry to reflect the successful completion of the
-     * scanning/insertion phase.
-     *
-     * TODO: Not yet implemented.
+     * Retries the key generation and insertion of records that were skipped during the scanning
+     * phase due to error suppression.
      */
-    Status finishBuildingPhase(const UUID& buildUUID);
+    Status retrySkippedRecords(OperationContext* opCtx,
+                               const UUID& buildUUID,
+                               Collection* collection);
 
     /**
      * Runs the index constraint violation checking phase of the index build..
-     *
-     * TODO: Not yet implemented.
      */
     Status checkIndexConstraintViolations(OperationContext* opCtx, const UUID& buildUUID);
 
@@ -158,9 +142,6 @@ public:
      *
      * Returns true if a build existed to be signaled, as opposed to having already finished and
      * been cleared away, or not having yet started..
-     *
-     * TODO: Not yet fully implemented. The MultiIndexBlock::abort function that is called is
-     * not yet implemented.
      */
     bool abortIndexBuild(const UUID& buildUUID, const std::string& reason);
 
