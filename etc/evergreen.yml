@@ -3886,7 +3886,7 @@ tasks:
         task_compile_flags: >-
           --ninja
         targets:
-          new.build.ninja
+          build.ninja
     - command: shell.exec
       params:
         working_dir: src

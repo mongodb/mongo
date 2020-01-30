@@ -3817,6 +3817,29 @@ if get_option('ninja') == 'true':
 
     env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja)
 
+
+    def ninja_test_list_builder(env, node):
+        test_files = env["MONGO_TEST_REGISTRY"][node.path]
+        files = "\\n".join(test_files)
+        return {
+            "outputs": node.get_path(),
+            "rule": "TEST_LIST",
+            "implicit": test_files,
+            "variables": {
+                "files": files,
+            }
+        }
+
+    env.NinjaRule(
+        rule="TEST_LIST",
+        description="Compiling test list: $out",
+        command="{}echo '$files' > '$out'".format(
+            "cmd.exe /c " if env["PLATFORM"] == "win32" else "",
+        ),
+    )
+    env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
+
+
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
 

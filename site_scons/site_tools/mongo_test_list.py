@@ -64,5 +64,6 @@ def exists(env):
 
 
 def generate(env):
+    env["MONGO_TEST_REGISTRY"] = TEST_REGISTRY
     env.Append(BUILDERS={"TestList": TEST_LIST_BUILDER})
     env.AddMethod(register_test, "RegisterTest")
