@@ -63,6 +63,8 @@ namespace mongo {
 namespace migrationutil {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeFilteringMetadataRefresh);
+
 const char kSourceShard[] = "source";
 const char kDestinationShard[] = "destination";
 const char kIsDonorShard[] = "isDonorShard";
@@ -550,6 +552,8 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
 
                 ensureChunkVersionIsGreaterThan(
                     opCtx, doc.getRange(), doc.getPreMigrationChunkVersion());
+
+                hangBeforeFilteringMetadataRefresh.pauseWhileSet();
 
                 refreshFilteringMetadataUntilSuccess(opCtx, doc.getNss());
 
