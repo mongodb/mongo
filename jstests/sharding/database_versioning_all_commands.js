@@ -33,7 +33,7 @@ function containsCollection(shard, dbName, collName) {
     assert.commandWorked(res);
     let collections = res.cursor.firstBatch;
     for (let collection of collections) {
-        if (collection["name"] == collName) {
+        if (collection["name"] === collName) {
             return true;
         }
     }
@@ -72,8 +72,9 @@ function validateCommandTestCase(testCase) {
     assert(typeof (testCase.command) === "function");
     assert(testCase.runsAgainstAdminDb ? typeof (testCase.runsAgainstAdminDb) === "boolean" : true);
     assert(typeof (testCase.sendsDbVersion) === "boolean");
-    assert(testCase.setUp ? typeof (testCase.setUp) === "function" : true,
-           "setUp must be a function: " + tojson(testCase));
+    assert(testCase.explicitlyCreateCollection
+               ? typeof (testCase.explicitlyCreateCollection) === "boolean"
+               : true);
     assert(testCase.cleanUp ? typeof (testCase.cleanUp) === "function" : true,
            "cleanUp must be a function: " + tojson(testCase));
 }
@@ -90,8 +91,8 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
                primaryShardBefore + ", database version before: " + tojson(dbVersionBefore) +
                ", primary shard after: " + primaryShardAfter);
 
-    if (testCase.setUp) {
-        testCase.setUp(st.s0, dbName, collName);
+    if (testCase.explicitlyCreateCollection) {
+        assert.commandWorked(primaryShardBefore.getDB(dbName).runCommand({create: collName}));
     }
 
     // Ensure all nodes know the dbVersion before the movePrimary.
@@ -143,6 +144,8 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
 
     if (testCase.cleanUp) {
         testCase.cleanUp(st.s0, dbName, collName);
+    } else {
+        assert(st.s0.getDB(dbName).getCollection(collName).drop());
     }
 }
 
@@ -178,11 +181,12 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
         primary: primaryShardAfter.shardName,
         version: currDbVersion
     }));
+
     const dbVersionAfter =
         st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
-    if (testCase.setUp) {
-        testCase.setUp(st.s0, dbName, collName);
+    if (testCase.explicitlyCreateCollection) {
+        assert.commandWorked(primaryShardAfter.getDB(dbName).runCommand({create: collName}));
     }
 
     // The only change after the drop/recreate database should be that the old primary shard should
@@ -199,7 +203,7 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     }
 
     if (testCase.sendsDbVersion) {
-        // If the command participates in database versioning, all nodes should now know the new
+        // If the command participates in database versioning all nodes should now know the new
         // dbVersion:
         // 1. The mongos should have sent the stale dbVersion to the old primary shard
         // 2. The old primary shard should have returned StaleDbVersion and refreshed
@@ -222,6 +226,8 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     // Clean up.
     if (testCase.cleanUp) {
         testCase.cleanUp(st.s0, dbName, collName);
+    } else {
+        assert(st.s0.getDB(dbName).getCollection(collName).drop());
     }
     assert.commandWorked(st.s0.getDB(dbName).dropDatabase());
 }
@@ -263,31 +269,19 @@ let testCases = {
     collMod: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {collMod: collName};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     collStats: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {collStats: collName};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     commitTransaction: {skip: "unversioned and uses special targetting rules"},
@@ -299,16 +293,10 @@ let testCases = {
     convertToCapped: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {convertToCapped: collName, size: 8192};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     count: {
@@ -327,27 +315,18 @@ let testCases = {
     },
     create: {
         run: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             command: function(dbName, collName) {
                 return {create: collName};
-            },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             },
         }
     },
     createIndexes: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]};
-            },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             },
         }
     },
@@ -357,16 +336,10 @@ let testCases = {
     dataSize: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {dataSize: dbName + "." + collName};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     dbStats: {
@@ -406,18 +379,7 @@ let testCases = {
             }
         },
     },
-    drop: {
-        run: {
-            sendsDbVersion: false,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
-            command: function(dbName, collName) {
-                return {drop: collName};
-            }
-        }
-    },
+    drop: {skip: "does not forward command to primary shard"},
     dropAllRolesFromDatabase: {skip: "always targets the config server"},
     dropAllUsersFromDatabase: {skip: "always targets the config server"},
     dropConnections: {skip: "not on a user database"},
@@ -425,16 +387,10 @@ let testCases = {
     dropIndexes: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {dropIndexes: collName, index: "*"};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     dropRole: {skip: "always targets the config server"},
@@ -475,10 +431,7 @@ let testCases = {
         },
         explain: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {explain: {findAndModify: collName, query: {_id: 0}, remove: true}};
             }
@@ -506,10 +459,6 @@ let testCases = {
             command: function(dbName, collName) {
                 return {insert: collName, documents: [{_id: 1}]};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                // Implicitly creates the collection.
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     invalidateUserCache: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -533,16 +482,10 @@ let testCases = {
     listIndexes: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {listIndexes: collName};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     listShards: {skip: "does not forward command to primary shard"},
@@ -616,16 +559,10 @@ let testCases = {
     planCacheSetFilter: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {planCacheSetFilter: collName, query: {_id: "A"}, indexes: [{_id: 1}]};
             },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
         }
     },
     profile: {skip: "not supported in mongos"},
@@ -641,10 +578,7 @@ let testCases = {
         run: {
             runsAgainstAdminDb: true,
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {
                     renameCollection: dbName + "." + collName,
@@ -670,19 +604,13 @@ let testCases = {
     setIndexCommitQuorum: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {
                     setIndexCommitQuorum: collName,
                     indexNames: ["index"],
                     commitQuorum: "majority"
                 };
-            },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             },
         }
     },
@@ -717,7 +645,7 @@ let testCases = {
                         updates: [{q: {_id: 2}, u: {_id: 2}, upsert: true, multi: false}]
                     }
                 };
-            }
+            },
         }
     },
     updateRole: {skip: "always targets the config server"},
@@ -727,15 +655,9 @@ let testCases = {
     validate: {
         run: {
             sendsDbVersion: true,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
+            explicitlyCreateCollection: true,
             command: function(dbName, collName) {
                 return {validate: collName};
-            },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             },
         }
     },
@@ -793,7 +715,7 @@ assert.commandWorked(listCommandsRes);
     const collName = "foo";
 
     // Create the database by creating a collection in it.
-    assert.commandWorked(st.s0.getDB(dbName).createCollection(collName));
+    assert.commandWorked(st.s0.getDB(dbName).createCollection("dummy"));
 
     for (let command of Object.keys(listCommandsRes.commands)) {
         let testCase = testCases[command];

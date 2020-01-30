@@ -33,6 +33,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/create_collection_gen.h"
@@ -67,12 +69,50 @@ public:
         return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, true);
     }
 
+    void checkCollectionOptions(OperationContext* opCtx,
+                                const NamespaceString& ns,
+                                const CollectionOptions& options) {
+        auto dbName = ns.db();
+        auto dbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+        BSONObjBuilder listCollCmd;
+        listCollCmd.append("listCollections", 1);
+        listCollCmd.append("filter", BSON("name" << ns.coll()));
+
+        auto response = executeCommandAgainstDatabasePrimary(
+            opCtx,
+            dbName,
+            dbInfo,
+            CommandHelpers::filterCommandRequestForPassthrough(listCollCmd.obj()),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kIdempotent);
+        uassertStatusOK(response.swResponse);
+        auto responseData = response.swResponse.getValue().data;
+        auto listCollectionsStatus = mongo::getStatusFromCommandResult(responseData);
+        uassertStatusOK(listCollectionsStatus);
+        auto cursorObj = responseData["cursor"].Obj();
+        auto collections = cursorObj["firstBatch"].Obj();
+        BSONObjIterator collIter(collections);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "cannot find ns: " << ns.ns(),
+                collIter.more());
+
+        auto collectionDetails = collIter.next();
+        CollectionOptions actualOptions =
+            uassertStatusOK(CollectionOptions::parse(collectionDetails["options"].Obj()));
+        // TODO: SERVER-33048 check idIndex field
+
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "ns: " << ns.ns() << " already exists with different options: "
+                              << actualOptions.toBSON(),
+                options.matchesStorageOptions(
+                    actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
-
         createShardDatabase(opCtx, dbName);
 
         uassert(ErrorCodes::InvalidOptions,
@@ -82,29 +122,30 @@ public:
                 "the 'temp' field is an invalid option",
                 !cmdObj.hasField("temp"));
 
-        ConfigsvrCreateCollection configCreateCmd(nss);
-        configCreateCmd.setDbName(NamespaceString::kAdminDb);
-
-        {
-            BSONObjIterator cmdIter(cmdObj);
-            invariant(cmdIter.more());  // At least the command namespace should be present
-            cmdIter.next();
-            BSONObjBuilder optionsBuilder;
-            CommandHelpers::filterCommandRequestForPassthrough(&cmdIter, &optionsBuilder);
-            configCreateCmd.setOptions(optionsBuilder.obj());
-        }
-
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto response = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        // Manually forward the create collection command to the primary shard.
+        const auto dbInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+        auto response = executeCommandAgainstDatabasePrimary(
             opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(cmdObj, configCreateCmd.toBSON({})),
-                opCtx->getWriteConcern()),
+            dbName,
+            dbInfo,
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kIdempotent);
 
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+
+        uassertStatusOK(response.swResponse);
+        const auto createStatus =
+            mongo::getStatusFromCommandResult(response.swResponse.getValue().data);
+        if (createStatus == ErrorCodes::NamespaceExists) {
+            CollectionOptions options = uassertStatusOK(CollectionOptions::parse(cmdObj));
+            checkCollectionOptions(opCtx, nss, options);
+        } else {
+            uassertStatusOK(createStatus);
+        }
+        uassertStatusOK(
+            getWriteConcernStatusFromCommandResult(response.swResponse.getValue().data));
         return true;
     }
 
