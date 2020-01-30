@@ -674,6 +674,7 @@ void MigrationSourceManager::cleanupOnError() {
 }
 
 void MigrationSourceManager::abortDueToConflictingIndexOperation() {
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
     _opCtx->markKilled();
     _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
 }
