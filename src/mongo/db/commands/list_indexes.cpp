@@ -155,9 +155,13 @@ public:
                     str::stream() << "ns does not exist: " << ctx.getNss().ns(),
                     collection);
             nss = ctx.getNss();
+
+            auto expCtx = make_intrusive<ExpressionContext>(
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+
             auto indexList = listIndexesInLock(opCtx, collection, nss, includeBuildUUIDs);
             auto ws = std::make_unique<WorkingSet>();
-            auto root = std::make_unique<QueuedDataStage>(opCtx, ws.get());
+            auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
             for (auto&& indexSpec : indexList) {
                 WorkingSetID id = ws->allocate();

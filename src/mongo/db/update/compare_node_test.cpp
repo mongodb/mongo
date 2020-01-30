@@ -296,9 +296,10 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
 
 TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     auto update = fromjson("{$min: {a: 'dba'}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+    expCtx->setCollator(std::move(collator));
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
@@ -359,12 +360,14 @@ DEATH_TEST_REGEX(CompareNodeTest,
                  CannotSetCollatorIfCollatorIsNonNull,
                  "Invariant failure.*!_collator") {
     auto update = fromjson("{$max: {a: 1}}");
-    CollatorInterfaceMock caseInsensitiveCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
+
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&caseInsensitiveCollator);
+    expCtx->setCollator(std::move(collator));
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
-    node.setCollator(&caseInsensitiveCollator);
+    node.setCollator(expCtx->getCollator());
 }
 
 DEATH_TEST_REGEX(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {

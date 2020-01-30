@@ -280,4 +280,13 @@ let res = coll.insert({a: 1, b: 0});
 assert.writeError(res);
 assert.eq(res.getWriteError().code, 16608);
 assert.commandWorked(coll.insert({a: -1, b: -1}));
+
+// The validator can contain an $expr that respects the collation.
+coll.drop();
+// Create collection with validator that uses case insensitive collation.
+assert.commandWorked(db.createCollection(
+    collName,
+    {validator: {$expr: {$eq: ["$a", "foobar"]}}, collation: {locale: "en", strength: 2}}));
+assert.commandWorked(coll.insert({a: "foobar"}));
+assert.commandWorked(coll.insert({a: "fooBAR"}));
 })();

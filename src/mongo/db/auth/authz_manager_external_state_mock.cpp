@@ -186,9 +186,8 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
                                                 bool upsert,
                                                 const BSONObj& writeConcern) {
     namespace mmb = mutablebson;
-    const CollatorInterface* collator = nullptr;
     boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, collator, collectionName));
+        new ExpressionContext(opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionName));
     UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     driver.parse(updatePattern, arrayFilters);
@@ -299,9 +298,8 @@ Status AuthzManagerExternalStateMock::_queryVector(
     const NamespaceString& collectionName,
     const BSONObj& query,
     std::vector<BSONObjCollection::iterator>* result) {
-    const CollatorInterface* collator = nullptr;
     boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, collator, collectionName));
+        new ExpressionContext(opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionName));
     StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query, std::move(expCtx));
     if (!parseResult.isOK()) {
         return parseResult.getStatus();

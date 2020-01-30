@@ -42,12 +42,12 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 
-NearStage::NearStage(OperationContext* opCtx,
+NearStage::NearStage(ExpressionContext* expCtx,
                      const char* typeName,
                      StageType type,
                      WorkingSet* workingSet,
                      const IndexDescriptor* indexDescriptor)
-    : RequiresIndexStage(typeName, opCtx, indexDescriptor, workingSet),
+    : RequiresIndexStage(typeName, expCtx, indexDescriptor, workingSet),
       _workingSet(workingSet),
       _searchState(SearchState_Initializing),
       _nextIntervalStats(nullptr),
@@ -67,7 +67,7 @@ NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
 
 
 PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
-    PlanStage::StageState state = initialize(getOpCtx(), _workingSet, out);
+    PlanStage::StageState state = initialize(opCtx(), _workingSet, out);
     if (state == PlanStage::IS_EOF) {
         _searchState = SearchState_Buffering;
         return PlanStage::NEED_TIME;
@@ -139,7 +139,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
 
     if (!_nextInterval) {
         StatusWith<CoveredInterval*> intervalStatus =
-            nextInterval(getOpCtx(), _workingSet, collection());
+            nextInterval(opCtx(), _workingSet, collection());
         if (!intervalStatus.isOK()) {
             _searchState = SearchState_Finished;
             *error = intervalStatus.getStatus();

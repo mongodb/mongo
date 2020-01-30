@@ -611,9 +611,10 @@ TEST_F(PushNodeTest, ApplyWithEmbeddedFieldSort) {
 
 TEST_F(PushNodeTest, ApplySortWithCollator) {
     auto update = fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 

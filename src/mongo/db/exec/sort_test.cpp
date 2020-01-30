@@ -49,6 +49,8 @@ using namespace mongo;
 
 namespace {
 
+static const NamespaceString kNss("db.dummy");
+
 class SortStageDefaultTest : public ServiceContextMongoDTest {
 public:
     static constexpr uint64_t kMaxMemoryUsageBytes = 1024u * 1024u;
@@ -59,7 +61,7 @@ public:
         CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
     }
 
-    OperationContext* getOpCtx() {
+    OperationContext* opCtx() {
         return _opCtx.get();
     }
 
@@ -82,8 +84,11 @@ public:
         // so it's fine to declare
         WorkingSet ws;
 
+        auto expCtx = make_intrusive<ExpressionContext>(
+            opCtx(), CollatorInterface::cloneCollator(collator), kNss);
+
         // QueuedDataStage will be owned by SortStageDefault.
-        auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj.getField("input");
         ASSERT(inputElt.isABSONObj());
@@ -102,10 +107,6 @@ public:
         }
 
         auto sortPattern = fromjson(patternStr);
-
-        // Create an ExpressionContext for the SortKeyGeneratorStage.
-        auto expCtx =
-            make_intrusive<ExpressionContext>(getOpCtx(), collator, NamespaceString("foo"));
 
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
             expCtx, std::move(queuedDataStage), &ws, sortPattern);
@@ -168,11 +169,10 @@ private:
 TEST_F(SortStageDefaultTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
-    // Create an ExpressionContext for the SortKeyGeneratorStage.
-    auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), nullptr, NamespaceString("foo"));
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
 
     // QueuedDataStage will be owned by SortStageDefault.
-    auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
+    auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
     auto sortKeyGen =
         std::make_unique<SortKeyGeneratorStage>(expCtx, std::move(queuedDataStage), &ws, BSONObj());
     auto sortPattern = BSON("a" << 1);

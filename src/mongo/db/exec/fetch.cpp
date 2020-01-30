@@ -49,12 +49,12 @@ using std::vector;
 // static
 const char* FetchStage::kStageType = "FETCH";
 
-FetchStage::FetchStage(OperationContext* opCtx,
+FetchStage::FetchStage(ExpressionContext* expCtx,
                        WorkingSet* ws,
                        std::unique_ptr<PlanStage> child,
                        const MatchExpression* filter,
                        const Collection* collection)
-    : RequiresCollectionStage(kStageType, opCtx, collection),
+    : RequiresCollectionStage(kStageType, expCtx, collection),
       _ws(ws),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _idRetrying(WorkingSet::INVALID_ID) {
@@ -101,9 +101,9 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
 
             try {
                 if (!_cursor)
-                    _cursor = collection()->getCursor(getOpCtx());
+                    _cursor = collection()->getCursor(opCtx());
 
-                if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, _cursor, collection()->ns())) {
+                if (!WorkingSetCommon::fetch(opCtx(), _ws, id, _cursor, collection()->ns())) {
                     _ws->free(id);
                     return NEED_TIME;
                 }
@@ -151,7 +151,7 @@ void FetchStage::doDetachFromOperationContext() {
 
 void FetchStage::doReattachToOperationContext() {
     if (_cursor)
-        _cursor->reattachToOperationContext(getOpCtx());
+        _cursor->reattachToOperationContext(opCtx());
 }
 
 PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,

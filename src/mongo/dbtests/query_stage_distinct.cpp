@@ -54,7 +54,8 @@ static const NamespaceString nss{"unittests.QueryStageDistinct"};
 
 class DistinctBase {
 public:
-    DistinctBase() : _client(&_opCtx) {}
+    DistinctBase()
+        : _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)), _client(&_opCtx) {}
 
     virtual ~DistinctBase() {
         _client.dropCollection(nss.ns());
@@ -98,6 +99,7 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 
 private:
     DBDirectClient _client;
@@ -142,7 +144,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_opCtx, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), std::move(params), &ws);
 
         WorkingSetID wsid;
         // Get our first result.
@@ -210,7 +212,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_opCtx, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), std::move(params), &ws);
 
         // We should see each number in the range [1, 6] exactly once.
         std::set<int> seen;
@@ -279,7 +281,7 @@ public:
         params.bounds.fields.push_back(bOil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_opCtx, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), std::move(params), &ws);
 
         WorkingSetID wsid;
         PlanStage::StageState state;

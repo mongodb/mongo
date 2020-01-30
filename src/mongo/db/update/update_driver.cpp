@@ -304,8 +304,6 @@ Status UpdateDriver::update(StringData matchedField,
 }
 
 void UpdateDriver::setCollator(const CollatorInterface* collator) {
-    _expCtx->setCollator(collator);
-
     if (_updateExecutor) {
         _updateExecutor->setCollator(collator);
     }

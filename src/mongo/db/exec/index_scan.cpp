@@ -59,11 +59,11 @@ namespace mongo {
 // static
 const char* IndexScan::kStageType = "IXSCAN";
 
-IndexScan::IndexScan(OperationContext* opCtx,
+IndexScan::IndexScan(ExpressionContext* expCtx,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor, workingSet),
+    : RequiresIndexStage(kStageType, expCtx, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(params.keyPattern.getOwned()),
       _bounds(std::move(params.bounds)),
@@ -89,7 +89,7 @@ IndexScan::IndexScan(OperationContext* opCtx,
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
-    _indexCursor = indexAccessMethod()->newCursor(getOpCtx(), _forward);
+    _indexCursor = indexAccessMethod()->newCursor(opCtx(), _forward);
 
     // We always seek once to establish the cursor position.
     ++_specificStats.seeks;
@@ -231,7 +231,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = kv->loc;
     member->keyData.push_back(IndexKeyDatum(
-        _keyPattern, kv->key, workingSetIndexId(), getOpCtx()->recoveryUnit()->getSnapshotId()));
+        _keyPattern, kv->key, workingSetIndexId(), opCtx()->recoveryUnit()->getSnapshotId()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_addKeyMetadata) {
@@ -270,7 +270,7 @@ void IndexScan::doDetachFromOperationContext() {
 
 void IndexScan::doReattachToOperationContext() {
     if (_indexCursor)
-        _indexCursor->reattachToOperationContext(getOpCtx());
+        _indexCursor->reattachToOperationContext(opCtx());
 }
 
 std::unique_ptr<PlanStageStats> IndexScan::getStats() {

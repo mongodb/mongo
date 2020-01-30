@@ -73,12 +73,12 @@ void getShardKeyAndImmutablePaths(OperationContext* opCtx,
 }
 }  // namespace
 
-UpsertStage::UpsertStage(OperationContext* opCtx,
+UpsertStage::UpsertStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : UpdateStage(opCtx, params, ws, collection) {
+    : UpdateStage(expCtx, params, ws, collection) {
     // We should never create this stage for a non-upsert request.
     invariant(_params.request->isUpsert());
     _children.emplace_back(child);
@@ -114,7 +114,7 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
 
     // Determine whether this is a user-initiated or internal request.
     const bool isInternalRequest =
-        !getOpCtx()->writesAreReplicated() || _params.request->isFromMigration();
+        !opCtx()->writesAreReplicated() || _params.request->isFromMigration();
 
     // Generate the new document to be inserted.
     _specificStats.objInserted = _produceNewDocumentForInsert(isInternalRequest);
@@ -132,7 +132,7 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
         BSONObj newObj = _specificStats.objInserted;
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
-        member->resetDocument(getOpCtx()->recoveryUnit()->getSnapshotId(), newObj.getOwned());
+        member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), newObj.getOwned());
         member->transitionToOwnedObj();
         return PlanStage::ADVANCED;
     }
@@ -147,7 +147,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // 'q' field belong to this shard, but those in the 'u' field do not. In this case we need to
     // throw so that MongoS can target the insert to the correct shard.
     if (_shouldCheckForShardKeyUpdate) {
-        auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
+        auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
         const auto& metadata = css->getCurrentMetadata();
 
         if (metadata->isSharded()) {
@@ -162,7 +162,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                         "query, since its shard key belongs on a different shard. Cross-shard "
                         "upserts are only allowed when running in a transaction or with "
                         "retryWrites: true.",
-                        getOpCtx()->getTxnNumber());
+                        opCtx()->getTxnNumber());
                 uasserted(WouldChangeOwningShardInfo(
                               _params.request->getQuery(), newDocument, true /* upsert */),
                           "The document we are inserting belongs on a different shard");
@@ -172,13 +172,13 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
 
     if (MONGO_unlikely(hangBeforeUpsertPerformsInsert.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeUpsertPerformsInsert, getOpCtx(), "hangBeforeUpsertPerformsInsert");
+            &hangBeforeUpsertPerformsInsert, opCtx(), "hangBeforeUpsertPerformsInsert");
     }
 
-    writeConflictRetry(getOpCtx(), "upsert", collection()->ns().ns(), [&] {
-        WriteUnitOfWork wunit(getOpCtx());
+    writeConflictRetry(opCtx(), "upsert", collection()->ns().ns(), [&] {
+        WriteUnitOfWork wunit(opCtx());
         uassertStatusOK(
-            collection()->insertDocument(getOpCtx(),
+            collection()->insertDocument(opCtx(),
                                          InsertStatement(_params.request->getStmtId(), newDocument),
                                          _params.opDebug,
                                          _params.request->isFromMigration()));
@@ -192,13 +192,13 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
 BSONObj UpsertStage::_produceNewDocumentForInsert(bool isInternalRequest) {
     // Obtain the sharding metadata. This will be needed to compute the shardKey paths. The metadata
     // must remain in scope since it owns the pointers used by 'shardKeyPaths' and 'immutablePaths'.
-    auto* css = CollectionShardingState::get(getOpCtx(), _params.request->getNamespaceString());
+    auto* css = CollectionShardingState::get(opCtx(), _params.request->getNamespaceString());
     auto metadata = css->getCurrentMetadata();
 
     // Compute the set of shard key paths and the set of immutable paths. Either may be empty.
     FieldRefSet shardKeyPaths, immutablePaths;
     getShardKeyAndImmutablePaths(
-        getOpCtx(), metadata, isInternalRequest, &shardKeyPaths, &immutablePaths);
+        opCtx(), metadata, isInternalRequest, &shardKeyPaths, &immutablePaths);
 
     // Reset the document into which we will be writing.
     _doc.reset();

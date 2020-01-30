@@ -61,14 +61,15 @@ TEST(MatchExpressionParserLeafTest, NullCollation) {
 TEST(MatchExpressionParserLeafTest, Collation) {
     BSONObj query = BSON("x"
                          << "string");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
@@ -104,14 +105,15 @@ TEST(MatchExpressionParserLeafTest, EQNullCollation) {
 TEST(MatchExpressionParserLeafTest, EQCollation) {
     BSONObj query = BSON("x" << BSON("$eq"
                                      << "string"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleGT1) {
@@ -139,14 +141,15 @@ TEST(MatchExpressionParserLeafTest, GTNullCollation) {
 TEST(MatchExpressionParserLeafTest, GTCollation) {
     BSONObj query = BSON("x" << BSON("$gt"
                                      << "abc"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GT, result.getValue()->matchType());
     GTMatchExpression* match = static_cast<GTMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleLT1) {
@@ -175,14 +178,15 @@ TEST(MatchExpressionParserLeafTest, LTNullCollation) {
 TEST(MatchExpressionParserLeafTest, LTCollation) {
     BSONObj query = BSON("x" << BSON("$lt"
                                      << "abc"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LT, result.getValue()->matchType());
     LTMatchExpression* match = static_cast<LTMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
@@ -211,14 +215,15 @@ TEST(MatchExpressionParserLeafTest, GTENullCollation) {
 TEST(MatchExpressionParserLeafTest, GTECollation) {
     BSONObj query = BSON("x" << BSON("$gte"
                                      << "abc"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GTE, result.getValue()->matchType());
     GTEMatchExpression* match = static_cast<GTEMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
@@ -247,14 +252,15 @@ TEST(MatchExpressionParserLeafTest, LTENullCollation) {
 TEST(MatchExpressionParserLeafTest, LTECollation) {
     BSONObj query = BSON("x" << BSON("$lte"
                                      << "abc"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LTE, result.getValue()->matchType());
     LTEMatchExpression* match = static_cast<LTEMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleNE1) {
@@ -285,16 +291,17 @@ TEST(MatchExpressionParserLeafTest, NENullCollation) {
 TEST(MatchExpressionParserLeafTest, NECollation) {
     BSONObj query = BSON("x" << BSON("$ne"
                                      << "string"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::EQ, child->matchType());
     EqualityMatchExpression* eqMatch = static_cast<EqualityMatchExpression*>(child);
-    ASSERT_TRUE(eqMatch->getCollator() == &collator);
+    ASSERT_TRUE(eqMatch->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
@@ -357,22 +364,24 @@ TEST(MatchExpressionParserLeafTest, IdCollation) {
 TEST(MatchExpressionParserLeafTest, IdNullCollation) {
     BSONObj query = BSON("$id"
                          << "string");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, RefCollation) {
     BSONObj query = BSON("$ref"
                          << "coll");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
@@ -383,9 +392,10 @@ TEST(MatchExpressionParserLeafTest, RefCollation) {
 TEST(MatchExpressionParserLeafTest, DbCollation) {
     BSONObj query = BSON("$db"
                          << "db");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
@@ -416,14 +426,15 @@ TEST(MatchExpressionParserLeafTest, INNullCollation) {
 
 TEST(MatchExpressionParserLeafTest, INCollation) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY("string")));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::MATCH_IN, result.getValue()->matchType());
     InMatchExpression* match = static_cast<InMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == &collator);
+    ASSERT_TRUE(match->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
@@ -760,16 +771,17 @@ TEST(MatchExpressionParserLeafTest, NINNullCollation) {
 
 TEST(MatchExpressionParserLeafTest, NINCollation) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY("string")));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::MATCH_IN, child->matchType());
     InMatchExpression* inMatch = static_cast<InMatchExpression*>(child);
-    ASSERT_TRUE(inMatch->getCollator() == &collator);
+    ASSERT_TRUE(inMatch->getCollator() == expCtx->getCollator());
 }
 
 TEST(MatchExpressionParserLeafTest, Regex1) {

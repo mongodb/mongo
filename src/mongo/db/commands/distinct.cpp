@@ -169,7 +169,7 @@ public:
         Collection* const collection = ctx->getCollection();
 
         auto executor = uassertStatusOK(
-            getExecutorDistinct(opCtx, collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
+            getExecutorDistinct(collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(executor.get(), collection, verbosity, BSONObj(), &bodyBuilder);
@@ -225,7 +225,7 @@ public:
         Collection* const collection = ctx->getCollection();
 
         auto executor =
-            getExecutorDistinct(opCtx, collection, QueryPlannerParams::DEFAULT, &parsedDistinct);
+            getExecutorDistinct(collection, QueryPlannerParams::DEFAULT, &parsedDistinct);
         uassertStatusOK(executor.getStatus());
 
         {

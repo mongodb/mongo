@@ -46,7 +46,7 @@ namespace mongo {
  */
 class CountStage final : public PlanStage {
 public:
-    CountStage(OperationContext* opCtx,
+    CountStage(ExpressionContext* expCtx,
                Collection* collection,
                long long limit,
                long long skip,

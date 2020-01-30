@@ -87,7 +87,7 @@ struct CountScanParams {
  */
 class CountScan final : public RequiresIndexStage {
 public:
-    CountScan(OperationContext* opCtx, CountScanParams params, WorkingSet* workingSet);
+    CountScan(ExpressionContext* expCtx, CountScanParams params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;

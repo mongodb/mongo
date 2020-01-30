@@ -59,12 +59,12 @@ using std::vector;
 
 const char* SubplanStage::kStageType = "SUBPLAN";
 
-SubplanStage::SubplanStage(OperationContext* opCtx,
+SubplanStage::SubplanStage(ExpressionContext* expCtx,
                            const Collection* collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
-    : RequiresAllIndicesStage(kStageType, opCtx, collection),
+    : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),
       _plannerParams(params),
       _query(cq) {
@@ -122,7 +122,7 @@ Status SubplanStage::planSubqueries() {
         MatchExpression* orChild = _orExpression->getChild(i);
 
         // Turn the i-th child into its own query.
-        auto statusWithCQ = CanonicalQuery::canonicalize(getOpCtx(), *_query, orChild);
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), *_query, orChild);
         if (!statusWithCQ.isOK()) {
             str::stream ss;
             ss << "Can't canonicalize subchild " << orChild->debugString() << " "
@@ -263,7 +263,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             // messages that can be generated if pickBestPlan yields.
             invariant(_children.empty());
             _children.emplace_back(
-                std::make_unique<MultiPlanStage>(getOpCtx(),
+                std::make_unique<MultiPlanStage>(expCtx(),
                                                  collection(),
                                                  branchResult->canonicalQuery.get(),
                                                  MultiPlanStage::CachingMode::SometimesCache));
@@ -275,7 +275,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {
-                auto nextPlanRoot = StageBuilder::build(getOpCtx(),
+                auto nextPlanRoot = StageBuilder::build(opCtx(),
                                                         collection(),
                                                         *branchResult->canonicalQuery,
                                                         *branchResult->solutions[ix],
@@ -362,8 +362,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     // Use the index tags from planning each branch to construct the composite solution,
     // and set that solution as our child stage.
     _ws->clear();
-    auto root =
-        StageBuilder::build(getOpCtx(), collection(), *_query, *_compositeSolution.get(), _ws);
+    auto root = StageBuilder::build(opCtx(), collection(), *_query, *_compositeSolution.get(), _ws);
     invariant(_children.empty());
     _children.emplace_back(std::move(root));
 
@@ -385,7 +384,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
 
     if (1 == solutions.size()) {
         // Only one possible plan.  Run it.  Build the stages from the solution.
-        auto root = StageBuilder::build(getOpCtx(), collection(), *_query, *solutions[0], _ws);
+        auto root = StageBuilder::build(opCtx(), collection(), *_query, *solutions[0], _ws);
         invariant(_children.empty());
         _children.emplace_back(std::move(root));
 
@@ -398,7 +397,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
         invariant(_children.empty());
-        _children.emplace_back(new MultiPlanStage(getOpCtx(), collection(), _query));
+        _children.emplace_back(new MultiPlanStage(expCtx(), collection(), _query));
         MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
@@ -407,7 +406,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
             }
 
             auto nextPlanRoot =
-                StageBuilder::build(getOpCtx(), collection(), *_query, *solutions[ix], _ws);
+                StageBuilder::build(opCtx(), collection(), *_query, *solutions[ix], _ws);
 
             multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
         }

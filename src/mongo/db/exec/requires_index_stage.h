@@ -48,7 +48,7 @@ namespace mongo {
 class RequiresIndexStage : public RequiresCollectionStage {
 public:
     RequiresIndexStage(const char* stageType,
-                       OperationContext* opCtx,
+                       ExpressionContext* expCtx,
                        const IndexDescriptor* indexDescriptor,
                        WorkingSet* workingSet);
 

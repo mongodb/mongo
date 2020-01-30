@@ -52,12 +52,12 @@ using fts::FTSSpec;
 
 const char* TextOrStage::kStageType = "TEXT_OR";
 
-TextOrStage::TextOrStage(OperationContext* opCtx,
+TextOrStage::TextOrStage(ExpressionContext* expCtx,
                          const FTSSpec& ftsSpec,
                          WorkingSet* ws,
                          const MatchExpression* filter,
                          const Collection* collection)
-    : RequiresCollectionStage(kStageType, opCtx, collection),
+    : RequiresCollectionStage(kStageType, expCtx, collection),
       _ftsSpec(ftsSpec),
       _ws(ws),
       _scoreIterator(_scores.end()),
@@ -97,7 +97,7 @@ void TextOrStage::doDetachFromOperationContext() {
 
 void TextOrStage::doReattachToOperationContext() {
     if (_recordCursor)
-        _recordCursor->reattachToOperationContext(getOpCtx());
+        _recordCursor->reattachToOperationContext(opCtx());
 }
 
 std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
@@ -152,7 +152,7 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
 PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
     *out = WorkingSet::INVALID_ID;
     try {
-        _recordCursor = collection()->getCursor(getOpCtx());
+        _recordCursor = collection()->getCursor(opCtx());
         _internalState = State::kReadingTerms;
         return PlanStage::NEED_TIME;
     } catch (const WriteConflictException&) {
@@ -268,8 +268,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
         // already.
         try {
-            if (!WorkingSetCommon::fetch(
-                    getOpCtx(), _ws, wsid, _recordCursor, collection()->ns())) {
+            if (!WorkingSetCommon::fetch(opCtx(), _ws, wsid, _recordCursor, collection()->ns())) {
                 _ws->free(wsid);
                 textRecordData->score = -1;
                 return NEED_TIME;

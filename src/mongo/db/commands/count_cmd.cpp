@@ -170,8 +170,11 @@ public:
         // version on initial entry into count.
         auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
 
+        auto expCtx = makeExpressionContextForGetExecutor(
+            opCtx, request.getCollation().value_or(BSONObj()), nss);
+
         auto statusWithPlanExecutor =
-            getExecutorCount(opCtx, collection, request, true /*explain*/, nss);
+            getExecutorCount(expCtx, collection, request, true /*explain*/, nss);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -228,7 +231,12 @@ public:
         auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
 
         auto statusWithPlanExecutor =
-            getExecutorCount(opCtx, collection, request, false /*explain*/, nss);
+            getExecutorCount(makeExpressionContextForGetExecutor(
+                                 opCtx, request.getCollation().value_or(BSONObj()), nss),
+                             collection,
+                             request,
+                             false /*explain*/,
+                             nss);
         uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());

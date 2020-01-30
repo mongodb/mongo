@@ -51,7 +51,7 @@ class UpsertStage final : public UpdateStage {
     UpsertStage& operator=(const UpsertStage&) = delete;
 
 public:
-    UpsertStage(OperationContext* opCtx,
+    UpsertStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
                 Collection* collection,

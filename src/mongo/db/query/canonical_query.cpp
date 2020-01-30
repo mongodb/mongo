@@ -152,8 +152,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make MatchExpression.
     boost::intrusive_ptr<ExpressionContext> newExpCtx;
     if (!expCtx.get()) {
-        newExpCtx.reset(
-            new ExpressionContext(opCtx, collator.get(), qr->nss(), qr->getRuntimeConstants()));
+        newExpCtx = make_intrusive<ExpressionContext>(
+            opCtx, std::move(collator), qr->nss(), qr->getRuntimeConstants());
     } else {
         newExpCtx = expCtx;
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
@@ -175,7 +175,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                  std::move(qr),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
-                 std::move(collator),
                  projectionPolicies);
 
     if (!initStatus.isOK()) {
@@ -200,11 +199,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         return qrStatus;
     }
 
-    std::unique_ptr<CollatorInterface> collator;
-    if (baseQuery.getCollator()) {
-        collator = baseQuery.getCollator()->clone();
-    }
-
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     Status initStatus = cq->init(opCtx,
@@ -212,7 +206,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  std::move(qr),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
-                                 std::move(collator),
                                  ProjectionPolicies::findProjectionPolicies());
 
     if (!initStatus.isOK()) {
@@ -226,11 +219,9 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             std::unique_ptr<QueryRequest> qr,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
-                            std::unique_ptr<CollatorInterface> collator,
                             const ProjectionPolicies& projectionPolicies) {
     _expCtx = expCtx;
     _qr = std::move(qr);
-    _collator = std::move(collator);
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
 
@@ -305,15 +296,13 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
 }
 
 void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
-    _collator = std::move(collator);
+    auto collatorRaw = collator.get();
+    // We must give the ExpressionContext the same collator.
+    _expCtx->setCollator(std::move(collator));
 
     // The collator associated with the match expression tree is now invalid, since we have reset
-    // the object owned by '_collator'. We must associate the match expression tree with the new
-    // value of '_collator'.
-    _root->setCollator(_collator.get());
-
-    // In a similar vein, we must give the ExpressionContext the same collator.
-    _expCtx->setCollator(_collator.get());
+    // the collator owned by the ExpressionContext.
+    _root->setCollator(collatorRaw);
 }
 
 // static

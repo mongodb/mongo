@@ -47,6 +47,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/service_context.h"
@@ -97,14 +98,14 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     if (_descriptor->isPartial()) {
         const BSONObj& filter = _descriptor->partialFilterExpression();
 
-        boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, _collator.get(), ns()));
+        _expCtxForFilter = make_intrusive<ExpressionContext>(
+            opCtx, CollatorInterface::cloneCollator(_collator.get()), ns());
 
         // Parsing the partial filter expression is not expected to fail here since the
         // expression would have been successfully parsed upstream during index creation.
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filter,
-                                         std::move(expCtx),
+                                         _expCtxForFilter,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kBanAllSpecialFeatures);
         invariant(statusWithMatcher.getStatus());

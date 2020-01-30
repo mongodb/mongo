@@ -69,7 +69,7 @@ struct GeoNearParams {
 class GeoNear2DStage final : public NearStage {
 public:
     GeoNear2DStage(const GeoNearParams& nearParams,
-                   OperationContext* opCtx,
+                   ExpressionContext* expCtx,
                    WorkingSet* workingSet,
                    const IndexDescriptor* twoDIndex);
 
@@ -92,14 +92,14 @@ private:
                          const GeoNearParams* nearParams,
                          const R2Annulus& fullBounds);
 
-        PlanStage::StageState work(OperationContext* opCtx,
+        PlanStage::StageState work(ExpressionContext* expCtx,
                                    WorkingSet* workingSet,
                                    const IndexDescriptor* twoDIndex,
                                    WorkingSetID* out,
                                    double* estimatedDistance);
 
     private:
-        void buildIndexScan(OperationContext* opCtx,
+        void buildIndexScan(ExpressionContext* expCtx,
                             WorkingSet* workingSet,
                             const IndexDescriptor* twoDIndex);
 
@@ -135,7 +135,7 @@ private:
 class GeoNear2DSphereStage final : public NearStage {
 public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
-                         OperationContext* opCtx,
+                         ExpressionContext* expCtx,
                          WorkingSet* workingSet,
                          const IndexDescriptor* s2Index);
 
@@ -163,14 +163,14 @@ private:
 
         // Search for a document in neighbors at current level.
         // Return IS_EOF is such document exists and set the estimated distance to the nearest doc.
-        PlanStage::StageState work(OperationContext* opCtx,
+        PlanStage::StageState work(ExpressionContext* expCtx,
                                    WorkingSet* workingSet,
                                    const IndexDescriptor* s2Index,
                                    WorkingSetID* out,
                                    double* estimatedDistance);
 
     private:
-        void buildIndexScan(OperationContext* opCtx,
+        void buildIndexScan(ExpressionContext* expCtx,
                             WorkingSet* workingSet,
                             const IndexDescriptor* s2Index);
 

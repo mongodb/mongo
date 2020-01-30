@@ -58,7 +58,8 @@ static const NamespaceString nss("unittests.PlanExecutorInvalidationTest");
  */
 class PlanExecutorInvalidationTest : public unittest::Test {
 public:
-    PlanExecutorInvalidationTest() : _client(&_opCtx) {
+    PlanExecutorInvalidationTest()
+        : _client(&_opCtx), _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)) {
         _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
         _client.dropCollection(nss.ns());
 
@@ -76,7 +77,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(&_opCtx, collection(), params, ws.get(), nullptr));
+            new CollectionScan(_expCtx.get(), collection(), params, ws.get(), nullptr));
 
         // Create a plan executor to hold it
         auto qr = std::make_unique<QueryRequest>(nss);
@@ -131,6 +132,8 @@ public:
     OperationContext& _opCtx = *_opCtxPtr;
     unique_ptr<dbtests::WriteContextForTests> _ctx;
     DBDirectClient _client;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 TEST_F(PlanExecutorInvalidationTest, ExecutorToleratesDeletedDocumentsDuringYield) {

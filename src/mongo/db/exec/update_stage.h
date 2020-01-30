@@ -81,7 +81,7 @@ class UpdateStage : public RequiresMutableCollectionStage {
     UpdateStage& operator=(const UpdateStage&) = delete;
 
 public:
-    UpdateStage(OperationContext* opCtx,
+    UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
                 Collection* collection,
@@ -126,7 +126,7 @@ public:
                                                  const DuplicateKeyErrorInfo& errorInfo);
 
 protected:
-    UpdateStage(OperationContext* opCtx,
+    UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
                 Collection* collection);

@@ -43,10 +43,10 @@ using std::vector;
 
 const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 
-MultiIteratorStage::MultiIteratorStage(OperationContext* opCtx,
+MultiIteratorStage::MultiIteratorStage(ExpressionContext* expCtx,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : RequiresCollectionStage(kStageType, opCtx, collection), _ws(ws) {}
+    : RequiresCollectionStage(kStageType, expCtx, collection), _ws(ws) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
@@ -74,8 +74,7 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     *out = _ws->allocate();
     WorkingSetMember* member = _ws->get(*out);
     member->recordId = record->id;
-    member->resetDocument(getOpCtx()->recoveryUnit()->getSnapshotId(),
-                          record->data.releaseToBson());
+    member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
     _ws->transitionToRecordIdAndObj(*out);
     return PlanStage::ADVANCED;
 }
@@ -105,7 +104,7 @@ void MultiIteratorStage::doDetachFromOperationContext() {
 
 void MultiIteratorStage::doReattachToOperationContext() {
     for (auto&& iterator : _iterators) {
-        iterator->reattachToOperationContext(getOpCtx());
+        iterator->reattachToOperationContext(opCtx());
     }
 }
 

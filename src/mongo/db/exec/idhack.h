@@ -48,12 +48,12 @@ class RecordCursor;
 class IDHackStage final : public RequiresIndexStage {
 public:
     /** Takes ownership of all the arguments -collection. */
-    IDHackStage(OperationContext* opCtx,
+    IDHackStage(ExpressionContext* expCtx,
                 CanonicalQuery* query,
                 WorkingSet* ws,
                 const IndexDescriptor* descriptor);
 
-    IDHackStage(OperationContext* opCtx,
+    IDHackStage(ExpressionContext* expCtx,
                 const BSONObj& key,
                 WorkingSet* ws,
                 const IndexDescriptor* descriptor);

@@ -45,13 +45,13 @@ using std::vector;
 // static
 const char* CountStage::kStageType = "COUNT";
 
-CountStage::CountStage(OperationContext* opCtx,
+CountStage::CountStage(ExpressionContext* expCtx,
                        Collection* collection,
                        long long limit,
                        long long skip,
                        WorkingSet* ws,
                        PlanStage* child)
-    : PlanStage(kStageType, opCtx), _limit(limit), _skip(skip), _leftToSkip(_skip), _ws(ws) {
+    : PlanStage(kStageType, expCtx), _limit(limit), _skip(skip), _leftToSkip(_skip), _ws(ws) {
     invariant(_skip >= 0);
     invariant(_limit >= 0);
     invariant(child);

@@ -100,6 +100,21 @@ public:
      */
     std::unique_ptr<CanonicalQuery> releaseParsedQuery();
 
+    /**
+     * This may return nullptr, specifically in cases where the query is IDHACK eligible.
+     */
+    const CanonicalQuery* parsedQuery() const {
+        return _canonicalQuery.get();
+    }
+
+    /**
+     * Always guaranteed to return a valid expression context.
+     */
+    boost::intrusive_ptr<ExpressionContext> expCtx() {
+        invariant(_expCtx.get());
+        return _expCtx;
+    }
+
 private:
     // Transactional context.  Not owned by us.
     OperationContext* _opCtx;
@@ -109,6 +124,8 @@ private:
 
     // Parsed query object, or NULL if the query proves to be an id hack query.
     std::unique_ptr<CanonicalQuery> _canonicalQuery;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 }  // namespace mongo

@@ -97,6 +97,19 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
+boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
+    OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
+    invariant(opCtx);
+
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss);
+    if (!requestCollation.isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
+                                      ->makeFromBSON(requestCollation);
+        expCtx->setCollator(uassertStatusOK(std::move(statusWithCollator)));
+    }
+    return expCtx;
+}
+
 // static
 void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
                                std::vector<IndexEntry>* indexEntries) {
@@ -368,7 +381,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "Collection {ns} does not exist. Using EOF plan: {canonicalQuery_Short}",
                     "ns"_attr = ns,
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
-        root = std::make_unique<EOFStage>(opCtx);
+        root = std::make_unique<EOFStage>(canonicalQuery->getExpCtx().get());
         return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
@@ -377,10 +390,10 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     plannerParams.options = plannerOptions;
     fillOutPlannerParams(opCtx, collection, canonicalQuery.get(), &plannerParams);
 
-    // If the canonical query does not have a user-specified collation, set it from the collection
-    // default.
+    // If the canonical query does not have a user-specified collation and no one has given the
+    // CanonicalQuery a collation already, set it from the collection default.
     if (canonicalQuery->getQueryRequest().getCollation().isEmpty() &&
-        collection->getDefaultCollator()) {
+        canonicalQuery->getCollator() == nullptr && collection->getDefaultCollator()) {
         canonicalQuery->setCollator(collection->getDefaultCollator()->clone());
     }
 
@@ -393,12 +406,13 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "Using idhack: {canonicalQuery_Short}",
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
 
-        root = std::make_unique<IDHackStage>(opCtx, canonicalQuery.get(), ws, descriptor);
+        root = std::make_unique<IDHackStage>(
+            canonicalQuery->getExpCtx().get(), canonicalQuery.get(), ws, descriptor);
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             root = std::make_unique<ShardFilterStage>(
-                opCtx,
+                canonicalQuery->getExpCtx().get(),
                 CollectionShardingState::get(opCtx, canonicalQuery->nss())
                     ->getOwnershipFilter(opCtx),
                 ws,
@@ -410,7 +424,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         // Add a SortKeyGeneratorStage if the query requested sortKey metadata.
         if (canonicalQuery->metadataDeps()[DocumentMetadataFields::kSortKey]) {
             root = std::make_unique<SortKeyGeneratorStage>(
-                canonicalQuery->getExpCtx(),
+                canonicalQuery->getExpCtx().get(),
                 std::move(root),
                 ws,
                 canonicalQuery->getQueryRequest().getSort());
@@ -422,7 +436,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             // the exception the $meta sortKey projection, which can be used along with the
             // returnKey.
             root = std::make_unique<ReturnKeyStage>(
-                opCtx,
+                canonicalQuery->getExpCtx().get(),
                 cqProjection
                     ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*cqProjection)
                     : std::vector<FieldPath>{},
@@ -443,7 +457,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     std::move(root));
             } else {
                 root = std::make_unique<ProjectionStageSimple>(
-                    canonicalQuery->getExpCtx(),
+                    canonicalQuery->getExpCtx().get(),
                     canonicalQuery->getQueryRequest().getProj(),
                     canonicalQuery->getProj(),
                     ws,
@@ -498,13 +512,14 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 //
                 // 'decisionWorks' is used to determine whether the existing cache entry should
                 // be evicted, and the query replanned.
-                auto cachedPlanStage = std::make_unique<CachedPlanStage>(opCtx,
-                                                                         collection,
-                                                                         ws,
-                                                                         canonicalQuery.get(),
-                                                                         plannerParams,
-                                                                         cs->decisionWorks,
-                                                                         std::move(root));
+                auto cachedPlanStage =
+                    std::make_unique<CachedPlanStage>(canonicalQuery->getExpCtx().get(),
+                                                      collection,
+                                                      ws,
+                                                      canonicalQuery.get(),
+                                                      plannerParams,
+                                                      cs->decisionWorks,
+                                                      std::move(root));
                 return PrepareExecutionResult(std::move(canonicalQuery),
                                               std::move(querySolution),
                                               std::move(cachedPlanStage));
@@ -520,7 +535,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
 
         root = std::make_unique<SubplanStage>(
-            opCtx, collection, ws, plannerParams, canonicalQuery.get());
+            canonicalQuery->getExpCtx().get(), collection, ws, plannerParams, canonicalQuery.get());
         return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
@@ -572,8 +587,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     } else {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
-        auto multiPlanStage =
-            std::make_unique<MultiPlanStage>(opCtx, collection, canonicalQuery.get());
+        auto multiPlanStage = std::make_unique<MultiPlanStage>(
+            canonicalQuery->getExpCtx().get(), collection, canonicalQuery.get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (solutions[ix]->cacheData.get()) {
@@ -715,11 +730,12 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
 //
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
-    OperationContext* opCtx,
     OpDebug* opDebug,
     Collection* collection,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
+    auto expCtx = parsedDelete->expCtx();
+    OperationContext* opCtx = expCtx->opCtx;
     const DeleteRequest* request = parsedDelete->getRequest();
 
     const NamespaceString& nss(request->getNamespaceString());
@@ -763,7 +779,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
                     "nss_ns"_attr = nss.ns(),
                     "request_getQuery"_attr = redact(request->getQuery()));
         return PlanExecutor::make(
-            opCtx, std::move(ws), std::make_unique<EOFStage>(opCtx), nullptr, policy, nss);
+            opCtx, std::move(ws), std::make_unique<EOFStage>(expCtx.get()), nullptr, policy, nss);
     }
 
     if (!parsedDelete->hasParsedQuery()) {
@@ -794,9 +810,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
                         "unparsedQuery"_attr = redact(unparsedQuery));
 
             auto idHackStage = std::make_unique<IDHackStage>(
-                opCtx, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
-            unique_ptr<DeleteStage> root = std::make_unique<DeleteStage>(
-                opCtx, std::move(deleteStageParams), ws.get(), collection, idHackStage.release());
+                expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), descriptor);
+            unique_ptr<DeleteStage> root =
+                std::make_unique<DeleteStage>(expCtx.get(),
+                                              std::move(deleteStageParams),
+                                              ws.get(),
+                                              collection,
+                                              idHackStage.release());
             return PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, policy);
         }
 
@@ -831,7 +851,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
 
     invariant(root);
     root = std::make_unique<DeleteStage>(
-        opCtx, std::move(deleteStageParams), ws.get(), collection, root.release());
+        cq->getExpCtx().get(), std::move(deleteStageParams), ws.get(), collection, root.release());
 
     if (!request->getProj().isEmpty()) {
         invariant(request->shouldReturnDeleted());
@@ -861,11 +881,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
 //
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
-    OperationContext* opCtx,
     OpDebug* opDebug,
     Collection* collection,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
+    auto expCtx = parsedUpdate->expCtx();
+    OperationContext* opCtx = expCtx->opCtx;
+
     const UpdateRequest* request = parsedUpdate->getRequest();
     UpdateDriver* driver = parsedUpdate->getDriver();
 
@@ -918,7 +940,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
                     "nss_ns"_attr = nss.ns(),
                     "request_getQuery"_attr = redact(request->getQuery()));
         return PlanExecutor::make(
-            opCtx, std::move(ws), std::make_unique<EOFStage>(opCtx), nullptr, policy, nss);
+            opCtx, std::move(ws), std::make_unique<EOFStage>(expCtx.get()), nullptr, policy, nss);
     }
 
     // Pass index information to the update driver, so that it can determine for us whether the
@@ -937,7 +959,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
             const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
             const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
-                parsedUpdate->getCollator(), collection->getDefaultCollator());
+                expCtx->getCollator(), collection->getDefaultCollator());
 
             if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
@@ -988,10 +1010,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     updateStageParams.canonicalQuery = cq.get();
 
     const bool isUpsert = updateStageParams.request->isUpsert();
-    root = (isUpsert ? std::make_unique<UpsertStage>(
-                           opCtx, updateStageParams, ws.get(), collection, root.release())
-                     : std::make_unique<UpdateStage>(
-                           opCtx, updateStageParams, ws.get(), collection, root.release()));
+    root =
+        (isUpsert
+             ? std::make_unique<UpsertStage>(
+                   cq->getExpCtx().get(), updateStageParams, ws.get(), collection, root.release())
+             : std::make_unique<UpdateStage>(
+                   cq->getExpCtx().get(), updateStageParams, ws.get(), collection, root.release()));
 
     if (!request->getProj().isEmpty()) {
         invariant(request->shouldReturnAnyDocs());
@@ -1157,11 +1181,12 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
-    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Collection* collection,
     const CountCommand& request,
     bool explain,
     const NamespaceString& nss) {
+    OperationContext* opCtx = expCtx->opCtx;
     unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
     auto qr = std::make_unique<QueryRequest>(nss);
@@ -1171,7 +1196,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     qr->setHint(request.getHint());
     qr->setExplain(explain);
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ = CanonicalQuery::canonicalize(
         opCtx,
         std::move(qr),
@@ -1197,7 +1221,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
         // machinery always assumes that the root stage for a count operation is a CountStage, so in
         // this case we put a CountStage on top of an EOFStage.
         unique_ptr<PlanStage> root = std::make_unique<CountStage>(
-            opCtx, collection, limit, skip, ws.get(), new EOFStage(opCtx));
+            expCtx.get(), collection, limit, skip, ws.get(), new EOFStage(expCtx.get()));
         return PlanExecutor::make(opCtx, std::move(ws), std::move(root), nullptr, yieldPolicy, nss);
     }
 
@@ -1212,7 +1236,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
 
     if (useRecordStoreCount) {
         unique_ptr<PlanStage> root =
-            std::make_unique<RecordStoreFastCountStage>(opCtx, collection, skip, limit);
+            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), collection, skip, limit);
         return PlanExecutor::make(opCtx, std::move(ws), std::move(root), nullptr, yieldPolicy, nss);
     }
 
@@ -1233,7 +1257,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     invariant(root);
 
     // Make a CountStage to be the new root.
-    root = std::make_unique<CountStage>(opCtx, collection, limit, skip, ws.get(), root.release());
+    root = std::make_unique<CountStage>(
+        expCtx.get(), collection, limit, skip, ws.get(), root.release());
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be NULL. Takes ownership of all args other than 'collection' and 'opCtx'
     return PlanExecutor::make(std::move(cq),
@@ -1641,10 +1666,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWithoutPr
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
-    OperationContext* opCtx,
-    Collection* collection,
-    size_t plannerOptions,
-    ParsedDistinct* parsedDistinct) {
+    Collection* collection, size_t plannerOptions, ParsedDistinct* parsedDistinct) {
+    auto expCtx = parsedDistinct->getQuery()->getExpCtx();
+    OperationContext* opCtx = expCtx->opCtx;
     const auto yieldPolicy = opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
                                                                  : PlanExecutor::YIELD_AUTO;
 
@@ -1652,7 +1676,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
         // Treat collections that do not exist as empty collections.
         return PlanExecutor::make(parsedDistinct->releaseQuery(),
                                   std::make_unique<WorkingSet>(),
-                                  std::make_unique<EOFStage>(opCtx),
+                                  std::make_unique<EOFStage>(expCtx.get()),
                                   collection,
                                   yieldPolicy);
     }

@@ -321,9 +321,10 @@ TEST_F(AddToSetNodeTest, ApplyCreateEmptyArrayIsNotNoop) {
 
 TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
     auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
@@ -341,9 +342,10 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
 
 TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
     auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'def']}}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
@@ -385,12 +387,13 @@ DEATH_TEST_REGEX(AddToSetNodeTest,
                  CannotSetCollatorIfCollatorIsNonNull,
                  "Invariant failure.*!_collator") {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    CollatorInterfaceMock caseInsensitiveCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto caseInsensitiveCollator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&caseInsensitiveCollator);
+    expCtx->setCollator(std::move(caseInsensitiveCollator));
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
-    node.setCollator(&caseInsensitiveCollator);
+    node.setCollator(expCtx->getCollator());
 }
 
 DEATH_TEST_REGEX(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {

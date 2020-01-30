@@ -222,9 +222,16 @@ protected:
 
     /**
      * Helper function to parse a MatchExpression.
+     *
+     * If the caller wants a collator to be used with the match expression, pass an expression
+     * context owning that collator as the second argument. The expression context passed must
+     * outlive the returned match expression.
+     *
+     * If no ExpressionContext is passed a default-constructed ExpressionContextForTest will be
+     * used.
      */
-    static std::unique_ptr<MatchExpression> parseMatchExpression(
-        const BSONObj& obj, const CollatorInterface* collator = nullptr);
+    std::unique_ptr<MatchExpression> parseMatchExpression(
+        const BSONObj& obj, const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr);
 
     //
     // Data members.
@@ -234,6 +241,8 @@ protected:
 
     QueryTestServiceContext serviceContext;
     ServiceContext::UniqueOperationContext opCtx;
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;

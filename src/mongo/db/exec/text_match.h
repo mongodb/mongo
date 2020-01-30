@@ -56,7 +56,7 @@ class RecordID;
  */
 class TextMatchStage final : public PlanStage {
 public:
-    TextMatchStage(OperationContext* opCtx,
+    TextMatchStage(ExpressionContext* expCtx,
                    std::unique_ptr<PlanStage> child,
                    const FTSQueryImpl& query,
                    const FTSSpec& spec,

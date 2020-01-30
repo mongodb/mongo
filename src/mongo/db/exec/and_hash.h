@@ -48,12 +48,12 @@ namespace mongo {
  */
 class AndHashStage final : public PlanStage {
 public:
-    AndHashStage(OperationContext* opCtx, WorkingSet* ws);
+    AndHashStage(ExpressionContext* expCtx, WorkingSet* ws);
 
     /**
      * For testing only. Allows tests to set memory usage threshold.
      */
-    AndHashStage(OperationContext* opCtx, WorkingSet* ws, size_t maxMemUsage);
+    AndHashStage(ExpressionContext* expCtx, WorkingSet* ws, size_t maxMemUsage);
 
     void addChild(std::unique_ptr<PlanStage> child);
 

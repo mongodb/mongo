@@ -71,8 +71,11 @@ public:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
         OperationContext* opCtx) {
+        // Create a mock ExpressionContext.
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, kTestNss);
+
         auto workingSet = std::make_unique<WorkingSet>();
-        auto queuedDataStage = std::make_unique<QueuedDataStage>(opCtx, workingSet.get());
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
         return unittest::assertGet(PlanExecutor::make(opCtx,
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),

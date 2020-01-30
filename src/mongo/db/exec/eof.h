@@ -39,7 +39,7 @@ namespace mongo {
  */
 class EOFStage final : public PlanStage {
 public:
-    EOFStage(OperationContext* opCtx);
+    EOFStage(ExpressionContext* expCtx);
 
     ~EOFStage();
 

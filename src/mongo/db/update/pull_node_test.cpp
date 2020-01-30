@@ -319,9 +319,10 @@ TEST_F(PullNodeTest, ApplyWithCollation) {
     // With the collation, this update will pull any string whose reverse is greater than the
     // reverse of the "abc" string.
     auto update = fromjson("{$pull : {a: {$gt: 'abc'}}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullNode node;
     ASSERT_OK(node.init(update["$pull"]["a"], expCtx));
 
@@ -338,9 +339,10 @@ TEST_F(PullNodeTest, ApplyWithCollation) {
 
 TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectNonStringMatches) {
     auto update = fromjson("{$pull : {a: {$lt: 1}}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullNode node;
     ASSERT_OK(node.init(update["$pull"]["a"], expCtx));
 
@@ -357,9 +359,10 @@ TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectNonStringMatches) {
 
 TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectRegexMatches) {
     auto update = fromjson("{$pull : {a: /a/}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullNode node;
     ASSERT_OK(node.init(update["$pull"]["a"], expCtx));
 
@@ -376,9 +379,10 @@ TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectRegexMatches) {
 
 TEST_F(PullNodeTest, ApplyStringLiteralMatchWithCollation) {
     auto update = fromjson("{$pull : {a: 'c'}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullNode node;
     ASSERT_OK(node.init(update["$pull"]["a"], expCtx));
 
@@ -395,9 +399,10 @@ TEST_F(PullNodeTest, ApplyStringLiteralMatchWithCollation) {
 
 TEST_F(PullNodeTest, ApplyCollationDoesNotAffectNumberLiteralMatches) {
     auto update = fromjson("{$pull : {a: 99}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullNode node;
     ASSERT_OK(node.init(update["$pull"]["a"], expCtx));
 
@@ -584,9 +589,10 @@ TEST_F(PullNodeTest, ApplyComplexDocAndMatching3) {
 
 TEST_F(PullNodeTest, ApplyFullPredicateWithCollation) {
     auto update = fromjson("{$pull: {'a.b': {x: 'blah'}}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullNode node;
     ASSERT_OK(node.init(update["$pull"]["a.b"], expCtx));
 

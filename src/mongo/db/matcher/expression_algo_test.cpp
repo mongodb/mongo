@@ -52,9 +52,9 @@ class ParsedMatchExpression {
 public:
     ParsedMatchExpression(const std::string& str, const CollatorInterface* collator = nullptr)
         : _obj(fromjson(str)) {
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        expCtx->setCollator(collator);
-        StatusWithMatchExpression result = MatchExpressionParser::parse(_obj, std::move(expCtx));
+        _expCtx = make_intrusive<ExpressionContextForTest>();
+        _expCtx->setCollator(CollatorInterface::cloneCollator(collator));
+        StatusWithMatchExpression result = MatchExpressionParser::parse(_obj, _expCtx);
         ASSERT_OK(result.getStatus());
         _expr = std::move(result.getValue());
     }
@@ -66,6 +66,7 @@ public:
 private:
     const BSONObj _obj;
     std::unique_ptr<MatchExpression> _expr;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {

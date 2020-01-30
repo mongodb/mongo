@@ -95,7 +95,7 @@ struct DistinctParams {
  */
 class DistinctScan final : public RequiresIndexStage {
 public:
-    DistinctScan(OperationContext* opCtx, DistinctParams params, WorkingSet* workingSet);
+    DistinctScan(ExpressionContext* expCtx, DistinctParams params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;

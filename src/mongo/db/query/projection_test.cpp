@@ -55,9 +55,8 @@ projection_ast::Projection createProjection(const BSONObj& query,
                                             ProjectionPolicies policies = {}) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const CollatorInterface* collator = nullptr;
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), collator, kTestNss));
+        new ExpressionContext(opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), kTestNss));
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT_OK(statusWithMatcher.getStatus());
@@ -85,9 +84,8 @@ void assertInvalidProjection(const char* queryStr, const char* projStr) {
     BSONObj projObj = fromjson(projStr);
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const CollatorInterface* collator = nullptr;
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), collator, kTestNss));
+        new ExpressionContext(opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), kTestNss));
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT_OK(statusWithMatcher.getStatus());

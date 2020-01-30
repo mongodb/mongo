@@ -43,7 +43,7 @@ namespace mongo {
  */
 class ProjectionStage : public PlanStage {
 protected:
-    ProjectionStage(boost::intrusive_ptr<ExpressionContext> expCtx,
+    ProjectionStage(ExpressionContext* expCtx,
                     const BSONObj& projObj,
                     WorkingSet* ws,
                     std::unique_ptr<PlanStage> child,
@@ -117,7 +117,7 @@ public:
     /**
      * ProjectionNodeCovered should obtain a fast-path object through this constructor.
      */
-    ProjectionStageCovered(boost::intrusive_ptr<ExpressionContext> expCtx,
+    ProjectionStageCovered(ExpressionContext* expCtx,
                            const BSONObj& projObj,
                            const projection_ast::Projection* projection,
                            WorkingSet* ws,
@@ -156,7 +156,7 @@ public:
     /**
      * ProjectionNodeSimple should obtain a fast-path object through this constructor.
      */
-    ProjectionStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
+    ProjectionStageSimple(ExpressionContext* expCtx,
                           const BSONObj& projObj,
                           const projection_ast::Projection* projection,
                           WorkingSet* ws,

@@ -261,7 +261,7 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
 
 TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
     CollatorInterfaceMock collatorCompareLower(CollatorInterfaceMock::MockType::kToLowerString);
-    getExpCtx()->setCollator(&collatorCompareLower);
+    getExpCtx()->setCollator(collatorCompareLower.clone());
 
     Timestamp resumeTimestamp(100, 1);
 

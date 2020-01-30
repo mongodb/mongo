@@ -71,7 +71,7 @@ namespace mongo {
  */
 class ShardFilterStage final : public PlanStage {
 public:
-    ShardFilterStage(OperationContext* opCtx,
+    ShardFilterStage(ExpressionContext* expCtx,
                      ScopedCollectionFilter collectionFilter,
                      WorkingSet* ws,
                      std::unique_ptr<PlanStage> child);

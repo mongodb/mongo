@@ -59,8 +59,8 @@ public:
         _matchExpression = MatchExpression::optimize(std::move(_matchExpression));
     }
 
-    void setCollator(CollatorInterface* collator) {
-        _expCtx->setCollator(collator);
+    void setCollator(std::unique_ptr<CollatorInterface> collator) {
+        _expCtx->setCollator(std::move(collator));
         if (_matchExpression) {
             _matchExpression->setCollator(_expCtx->getCollator());
         }
@@ -548,7 +548,7 @@ TEST_F(ExprMatchTest,
 TEST_F(ExprMatchTest, InitialCollationUsedForComparisons) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
-    setCollator(collator.get());
+    setCollator(std::move(collator));
     createMatcher(fromjson("{$expr: {$eq: ['$x', 'abc']}}"));
 
     ASSERT_TRUE(matches(BSON("x"
@@ -563,7 +563,7 @@ TEST_F(ExprMatchTest, SetCollatorChangesCollationUsedForComparisons) {
 
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
-    setCollator(collator.get());
+    setCollator(std::move(collator));
 
     ASSERT_TRUE(matches(BSON("x"
                              << "AbC")));

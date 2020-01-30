@@ -88,6 +88,9 @@ protected:
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
     DBDirectClient _client;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx =
+        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss());
 };
 
 
@@ -116,7 +119,7 @@ public:
         ASSERT_EQUALS(size_t(1), recordIds.size());
 
         // Create a mock stage that returns the WSM.
-        auto mockStage = std::make_unique<QueuedDataStage>(&_opCtx, &ws);
+        auto mockStage = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
 
         // Mock data.
         {
@@ -140,7 +143,7 @@ public:
         }
 
         auto fetchStage =
-            std::make_unique<FetchStage>(&_opCtx, &ws, std::move(mockStage), nullptr, coll);
+            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, coll);
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state;
@@ -183,7 +186,7 @@ public:
         ASSERT_EQUALS(size_t(1), recordIds.size());
 
         // Create a mock stage that returns the WSM.
-        auto mockStage = std::make_unique<QueuedDataStage>(&_opCtx, &ws);
+        auto mockStage = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
 
         // Mock data.
         {
@@ -200,17 +203,14 @@ public:
 
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 6);
-        const CollatorInterface* collator = nullptr;
-        const boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(&_opCtx, collator, nss()));
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filterObj, expCtx);
+            MatchExpressionParser::parse(filterObj, _expCtx);
         verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         auto fetchStage = std::make_unique<FetchStage>(
-            &_opCtx, &ws, std::move(mockStage), filterExpr.get(), coll);
+            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), coll);
 
         // First call should return a fetch request as it's not in memory.
         WorkingSetID id = WorkingSet::INVALID_ID;

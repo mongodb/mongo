@@ -46,8 +46,8 @@ using std::vector;
 // static
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
-DistinctScan::DistinctScan(OperationContext* opCtx, DistinctParams params, WorkingSet* workingSet)
-    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor, workingSet),
+DistinctScan::DistinctScan(ExpressionContext* expCtx, DistinctParams params, WorkingSet* workingSet)
+    : RequiresIndexStage(kStageType, expCtx, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
       _scanDirection(params.scanDirection),
@@ -78,7 +78,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     boost::optional<IndexKeyEntry> kv;
     try {
         if (!_cursor)
-            _cursor = indexAccessMethod()->newCursor(getOpCtx(), _scanDirection == 1);
+            _cursor = indexAccessMethod()->newCursor(opCtx(), _scanDirection == 1);
         kv = _cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
             _seekPoint,
             indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
@@ -125,7 +125,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             member->keyData.push_back(IndexKeyDatum(_keyPattern,
                                                     kv->key,
                                                     workingSetIndexId(),
-                                                    getOpCtx()->recoveryUnit()->getSnapshotId()));
+                                                    opCtx()->recoveryUnit()->getSnapshotId()));
             _workingSet->transitionToRecordIdAndIdx(id);
 
             *out = id;
@@ -156,7 +156,7 @@ void DistinctScan::doDetachFromOperationContext() {
 
 void DistinctScan::doReattachToOperationContext() {
     if (_cursor)
-        _cursor->reattachToOperationContext(getOpCtx());
+        _cursor->reattachToOperationContext(opCtx());
 }
 
 unique_ptr<PlanStageStats> DistinctScan::getStats() {

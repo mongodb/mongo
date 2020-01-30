@@ -133,7 +133,7 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(&_opCtx, collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -155,7 +155,7 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(&_opCtx, collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -185,6 +185,9 @@ protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
 
+    boost::intrusive_ptr<ExpressionContext> _expCtx =
+        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+
 private:
     DBDirectClient _client;
 };
@@ -200,8 +203,7 @@ public:
             dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
-            const CollatorInterface* collator = nullptr;
-            UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
+            UpdateDriver driver(_expCtx);
             Collection* collection = ctx.getCollection();
             ASSERT(collection);
 
@@ -230,10 +232,10 @@ public:
             params.canonicalQuery = cq.get();
 
             auto ws = make_unique<WorkingSet>();
-            auto eofStage = make_unique<EOFStage>(&_opCtx);
+            auto eofStage = make_unique<EOFStage>(_expCtx.get());
 
-            auto updateStage =
-                make_unique<UpsertStage>(&_opCtx, params, ws.get(), collection, eofStage.release());
+            auto updateStage = make_unique<UpsertStage>(
+                _expCtx.get(), params, ws.get(), collection, eofStage.release());
 
             runUpdate(updateStage.get());
         }
@@ -271,8 +273,7 @@ public:
 
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
-            const CollatorInterface* collator = nullptr;
-            UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
+            UpdateDriver driver(_expCtx);
             Collection* coll =
                 CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
             ASSERT(coll);
@@ -309,11 +310,11 @@ public:
             updateParams.canonicalQuery = cq.get();
 
             auto ws = make_unique<WorkingSet>();
-            auto cs =
-                make_unique<CollectionScan>(&_opCtx, coll, collScanParams, ws.get(), cq->root());
+            auto cs = make_unique<CollectionScan>(
+                _expCtx.get(), coll, collScanParams, ws.get(), cq->root());
 
             auto updateStage =
-                make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, cs.release());
+                make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, cs.release());
 
             const UpdateStats* stats =
                 static_cast<const UpdateStats*>(updateStage->getSpecificStats());
@@ -386,8 +387,7 @@ public:
         Collection* coll = ctx.getCollection();
         ASSERT(coll);
         UpdateRequest request(nss);
-        const CollatorInterface* collator = nullptr;
-        UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
+        UpdateDriver driver(_expCtx);
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();
@@ -412,7 +412,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
+        auto qds = make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -426,7 +426,7 @@ public:
         updateParams.canonicalQuery = cq.get();
 
         const auto updateStage =
-            make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, qds.release());
+            make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -478,8 +478,7 @@ public:
         Collection* coll = ctx.getCollection();
         ASSERT(coll);
         UpdateRequest request(nss);
-        const CollatorInterface* collator = nullptr;
-        UpdateDriver driver(new ExpressionContext(&_opCtx, collator, nss));
+        UpdateDriver driver(_expCtx);
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();
@@ -504,7 +503,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
+        auto qds = make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -518,7 +517,7 @@ public:
         updateParams.canonicalQuery = cq.get();
 
         auto updateStage =
-            make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, qds.release());
+            make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;

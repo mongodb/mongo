@@ -118,6 +118,9 @@ protected:
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
     ClockSource* const _clock = _opCtx->getServiceContext()->getFastClockSource();
 
+    boost::intrusive_ptr<ExpressionContext> _expCtx =
+        make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, nss);
+
     DBDirectClient _client;
 };
 
@@ -133,30 +136,28 @@ std::unique_ptr<CanonicalQuery> makeCanonicalQuery(OperationContext* opCtx,
     return cq;
 }
 
-unique_ptr<PlanStage> getIxScanPlan(OperationContext* opCtx,
+unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
                                     const Collection* coll,
                                     WorkingSet* sharedWs,
                                     int desiredFooValue) {
     std::vector<const IndexDescriptor*> indexes;
-    coll->getIndexCatalog()->findIndexesByKeyPattern(opCtx, BSON("foo" << 1), false, &indexes);
+    coll->getIndexCatalog()->findIndexesByKeyPattern(
+        expCtx->opCtx, BSON("foo" << 1), false, &indexes);
     ASSERT_EQ(indexes.size(), 1U);
 
-    IndexScanParams ixparams(opCtx, indexes[0]);
+    IndexScanParams ixparams(expCtx->opCtx, indexes[0]);
     ixparams.bounds.isSimpleRange = true;
     ixparams.bounds.startKey = BSON("" << desiredFooValue);
     ixparams.bounds.endKey = BSON("" << desiredFooValue);
     ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
     ixparams.direction = 1;
 
-    auto ixscan = std::make_unique<IndexScan>(opCtx, ixparams, sharedWs, nullptr);
-    return std::make_unique<FetchStage>(opCtx, sharedWs, std::move(ixscan), nullptr, coll);
+    auto ixscan = std::make_unique<IndexScan>(expCtx, ixparams, sharedWs, nullptr);
+    return std::make_unique<FetchStage>(expCtx, sharedWs, std::move(ixscan), nullptr, coll);
 }
 
-unique_ptr<MatchExpression> makeMatchExpressionFromFilter(OperationContext* opCtx,
+unique_ptr<MatchExpression> makeMatchExpressionFromFilter(ExpressionContext* expCtx,
                                                           BSONObj filterObj) {
-    const CollatorInterface* collator = nullptr;
-    const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, collator, nss));
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj, expCtx);
     ASSERT_OK(statusWithMatcher.getStatus());
     unique_ptr<MatchExpression> filter = std::move(statusWithMatcher.getValue());
@@ -165,19 +166,19 @@ unique_ptr<MatchExpression> makeMatchExpressionFromFilter(OperationContext* opCt
 }
 
 
-unique_ptr<PlanStage> getCollScanPlan(OperationContext* opCtx,
+unique_ptr<PlanStage> getCollScanPlan(ExpressionContext* expCtx,
                                       const Collection* coll,
                                       WorkingSet* sharedWs,
                                       MatchExpression* matchExpr) {
     CollectionScanParams csparams;
     csparams.direction = CollectionScanParams::FORWARD;
 
-    unique_ptr<PlanStage> root(new CollectionScan(opCtx, coll, csparams, sharedWs, matchExpr));
+    unique_ptr<PlanStage> root(new CollectionScan(expCtx, coll, csparams, sharedWs, matchExpr));
 
     return root;
 }
 
-std::unique_ptr<MultiPlanStage> runMultiPlanner(OperationContext* opCtx,
+std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
                                                 const NamespaceString& nss,
                                                 const Collection* coll,
                                                 int desiredFooValue) {
@@ -185,23 +186,24 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(OperationContext* opCtx,
     // Every call to work() returns something so this should clearly win (by current scoring
     // at least).
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
-    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(opCtx, coll, sharedWs.get(), desiredFooValue);
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(expCtx, coll, sharedWs.get(), desiredFooValue);
 
     // Plan 1: CollScan.
     BSONObj filterObj = BSON("foo" << desiredFooValue);
-    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(opCtx, filterObj);
-    unique_ptr<PlanStage> collScanRoot = getCollScanPlan(opCtx, coll, sharedWs.get(), filter.get());
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(expCtx, filterObj);
+    unique_ptr<PlanStage> collScanRoot =
+        getCollScanPlan(expCtx, coll, sharedWs.get(), filter.get());
 
     // Hand the plans off to the MPS.
-    auto cq = makeCanonicalQuery(opCtx, nss, BSON("foo" << desiredFooValue));
+    auto cq = makeCanonicalQuery(expCtx->opCtx, nss, BSON("foo" << desiredFooValue));
 
-    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(opCtx, coll, cq.get());
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(expCtx, coll, cq.get());
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     // Plan 0 aka the first plan aka the index scan should be the best.
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
-                                opCtx->getServiceContext()->getFastClockSource());
+                                expCtx->opCtx->getServiceContext()->getFastClockSource());
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
     ASSERT_EQUALS(0, mps->bestPlanIdx());
@@ -231,19 +233,19 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     // Every call to work() returns something so this should clearly win (by current scoring
     // at least).
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
-    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_opCtx.get(), coll, sharedWs.get(), 7);
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_expCtx.get(), coll, sharedWs.get(), 7);
 
     // Plan 1: CollScan with matcher.
     BSONObj filterObj = BSON("foo" << 7);
-    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(_opCtx.get(), filterObj);
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(_expCtx.get(), filterObj);
     unique_ptr<PlanStage> collScanRoot =
-        getCollScanPlan(_opCtx.get(), coll, sharedWs.get(), filter.get());
+        getCollScanPlan(_expCtx.get(), coll, sharedWs.get(), filter.get());
 
     // Hand the plans off to the MPS.
     auto cq = makeCanonicalQuery(_opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -287,7 +289,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
 
     // Run an index scan and collection scan, searching for {foo: 7}.
-    auto mps = runMultiPlanner(_opCtx.get(), nss, coll, 7);
+    auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
 
     // Be sure that an inactive cache entry was added.
     PlanCache* cache = CollectionQueryInfo::get(coll).getPlanCache();
@@ -299,7 +301,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
 
     // Run the multi-planner again. The index scan will again win, but the number of works
     // will be greater, since {foo: 5} appears more frequently in the collection.
-    mps = runMultiPlanner(_opCtx.get(), nss, coll, 5);
+    mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
 
     // The last plan run should have required far more works than the previous plan. This means
     // that the 'works' in the cache entry should have doubled.
@@ -310,14 +312,14 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
 
     // Run the exact same query again. This will still take more works than 'works', and
     // should cause the cache entry's 'works' to be doubled again.
-    mps = runMultiPlanner(_opCtx.get(), nss, coll, 5);
+    mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(*cq));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(firstQueryWorks * 2 * 2, entry->works);
 
     // Run the query yet again. This time, an active cache entry should be created.
-    mps = runMultiPlanner(_opCtx.get(), nss, coll, 5);
+    mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(*cq));
     ASSERT_TRUE(entry->isActive);
@@ -342,14 +344,14 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisa
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
 
     // Run an index scan and collection scan, searching for {foo: 7}.
-    auto mps = runMultiPlanner(_opCtx.get(), nss, coll, 7);
+    auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
 
     // Be sure that an _active_ cache entry was added.
     PlanCache* cache = CollectionQueryInfo::get(coll).getPlanCache();
     ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
 
     // Run the multi-planner again. The entry should still be active.
-    mps = runMultiPlanner(_opCtx.get(), nss, coll, 5);
+    mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
 
     ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
 }
@@ -394,7 +396,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     ASSERT_EQUALS(solutions.size(), 3U);
 
     // Fill out the MultiPlanStage.
-    unique_ptr<MultiPlanStage> mps(new MultiPlanStage(_opCtx.get(), collection, cq.get()));
+    unique_ptr<MultiPlanStage> mps(new MultiPlanStage(_expCtx.get(), collection, cq.get()));
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPR.
     for (size_t i = 0; i < solutions.size(); ++i) {
@@ -465,8 +467,8 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     const int nDocs = 500;
 
     auto ws = std::make_unique<WorkingSet>();
-    auto firstPlan = std::make_unique<QueuedDataStage>(_opCtx.get(), ws.get());
-    auto secondPlan = std::make_unique<QueuedDataStage>(_opCtx.get(), ws.get());
+    auto firstPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
+    auto secondPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
 
     for (int i = 0; i < nDocs; ++i) {
         addMember(firstPlan.get(), ws.get(), BSON("x" << 1));
@@ -482,7 +484,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     qr->setFilter(BSON("x" << 1));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
     unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
     mps->addPlan(std::make_unique<QuerySolution>(), std::move(firstPlan), ws.get());
@@ -571,20 +573,20 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     // Every call to work() returns something so this should clearly win (by current scoring
     // at least).
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
-    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_opCtx.get(), coll, sharedWs.get(), 7);
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_expCtx.get(), coll, sharedWs.get(), 7);
 
     // Make the filter.
     BSONObj filterObj = BSON("foo" << 7);
-    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(_opCtx.get(), filterObj);
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(_expCtx.get(), filterObj);
     unique_ptr<PlanStage> collScanRoot =
-        getCollScanPlan(_opCtx.get(), coll, sharedWs.get(), filter.get());
+        getCollScanPlan(_expCtx.get(), coll, sharedWs.get(), filter.get());
 
 
     auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filterObj);
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
-    MultiPlanStage multiPlanStage(opCtx(),
+    MultiPlanStage multiPlanStage(_expCtx.get(),
                                   ctx.getCollection(),
                                   canonicalQuery.get(),
                                   MultiPlanStage::CachingMode::NeverCache);
@@ -615,19 +617,19 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     // Every call to work() returns something so this should clearly win (by current scoring
     // at least).
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
-    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_opCtx.get(), coll, sharedWs.get(), 7);
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_expCtx.get(), coll, sharedWs.get(), 7);
 
     // Plan 1: CollScan.
     BSONObj filterObj = BSON("foo" << 7);
-    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(_opCtx.get(), filterObj);
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(_expCtx.get(), filterObj);
     unique_ptr<PlanStage> collScanRoot =
-        getCollScanPlan(_opCtx.get(), coll, sharedWs.get(), filter.get());
+        getCollScanPlan(_expCtx.get(), coll, sharedWs.get(), filter.get());
 
     auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
-    MultiPlanStage multiPlanStage(opCtx(),
+    MultiPlanStage multiPlanStage(_expCtx.get(),
                                   ctx.getCollection(),
                                   canonicalQuery.get(),
                                   MultiPlanStage::CachingMode::NeverCache);
@@ -649,7 +651,7 @@ protected:
     }
 
 public:
-    ThrowyPlanStage(OperationContext* opCtx) : PlanStage("throwy", opCtx) {}
+    ThrowyPlanStage(ExpressionContext* expCtx) : PlanStage("throwy", expCtx) {}
     bool isEOF() final {
         return false;
     }
@@ -673,15 +675,15 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
                                  << "query"));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
-    MultiPlanStage multiPlanStage(opCtx(),
+    MultiPlanStage multiPlanStage(_expCtx.get(),
                                   ctx.getCollection(),
                                   canonicalQuery.get(),
                                   MultiPlanStage::CachingMode::NeverCache);
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
     multiPlanStage.addPlan(
-        createQuerySolution(), std::make_unique<ThrowyPlanStage>(opCtx()), sharedWs.get());
+        createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());
     multiPlanStage.addPlan(
-        createQuerySolution(), std::make_unique<ThrowyPlanStage>(opCtx()), sharedWs.get());
+        createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());
 
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
     ASSERT_THROWS_WITH_CHECK(multiPlanStage.pickBestPlan(&yieldPolicy),

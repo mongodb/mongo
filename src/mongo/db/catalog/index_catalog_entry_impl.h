@@ -51,6 +51,7 @@ class IndexAccessMethod;
 class IndexDescriptor;
 class MatchExpression;
 class OperationContext;
+class ExpressionContext;
 
 class IndexCatalogEntryImpl : public IndexCatalogEntry {
     IndexCatalogEntryImpl(const IndexCatalogEntryImpl&) = delete;
@@ -224,6 +225,8 @@ private:
 
     std::unique_ptr<CollatorInterface> _collator;
     std::unique_ptr<MatchExpression> _filterExpression;
+    // Special ExpressionContext used to evaluate the partial filter expression.
+    boost::intrusive_ptr<ExpressionContext> _expCtxForFilter;
 
     // cached stuff
 

@@ -46,7 +46,7 @@ namespace mongo {
  */
 class PipelineProxyStage : public PlanStage {
 public:
-    PipelineProxyStage(OperationContext* opCtx,
+    PipelineProxyStage(ExpressionContext* expCtx,
                        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                        WorkingSet* ws);
 
@@ -86,7 +86,7 @@ public:
     static const char* kStageType;
 
 protected:
-    PipelineProxyStage(OperationContext* opCtx,
+    PipelineProxyStage(ExpressionContext* expCtx,
                        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                        WorkingSet* ws,
                        const char* stageTypeName);

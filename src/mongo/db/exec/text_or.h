@@ -67,7 +67,7 @@ public:
         kDone,
     };
 
-    TextOrStage(OperationContext* opCtx,
+    TextOrStage(ExpressionContext* expCtx,
                 const FTSSpec& ftsSpec,
                 WorkingSet* ws,
                 const MatchExpression* filter,

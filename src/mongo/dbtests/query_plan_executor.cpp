@@ -116,7 +116,7 @@ public:
 
         // Make the stage.
         unique_ptr<PlanStage> root(
-            new CollectionScan(&_opCtx, coll, csparams, ws.get(), cq.get()->root()));
+            new CollectionScan(cq->getExpCtx().get(), coll, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =
@@ -153,9 +153,9 @@ public:
 
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
-        auto ixscan = std::make_unique<IndexScan>(&_opCtx, ixparams, ws.get(), nullptr);
+        auto ixscan = std::make_unique<IndexScan>(_expCtx.get(), ixparams, ws.get(), nullptr);
         unique_ptr<PlanStage> root =
-            std::make_unique<FetchStage>(&_opCtx, ws.get(), std::move(ixscan), nullptr, coll);
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ixscan), nullptr, coll);
 
         auto qr = std::make_unique<QueryRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
@@ -173,6 +173,9 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx =
+        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
@@ -203,8 +206,6 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
 
     // Create the aggregation pipeline.
     std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
-        new ExpressionContextForTest(&_opCtx, AggregationRequest(nss, rawPipeline));
 
     // Create an "inner" plan executor and register it with the cursor manager so that it can
     // get notified when the collection is dropped.
@@ -215,12 +216,12 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     // in the pipeline.
     innerExec->saveState();
     auto cursorSource = DocumentSourceCursor::create(
-        collection, std::move(innerExec), expCtx, DocumentSourceCursor::CursorType::kRegular);
-    auto pipeline = Pipeline::create({cursorSource}, expCtx);
+        collection, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
+    auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
     // Create the output PlanExecutor that pulls results from the pipeline.
     auto ws = std::make_unique<WorkingSet>();
-    auto proxy = std::make_unique<PipelineProxyStage>(&_opCtx, std::move(pipeline), ws.get());
+    auto proxy = std::make_unique<PipelineProxyStage>(_expCtx.get(), std::move(pipeline), ws.get());
 
     auto statusWithPlanExecutor = PlanExecutor::make(
         &_opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::NO_YIELD);

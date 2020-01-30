@@ -97,8 +97,8 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;
-    auto exec = uassertStatusOK(getExecutorUpdate(
-        opCtx, nullOpDebug, collection, &parsedUpdate, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(nullOpDebug, collection, &parsedUpdate, boost::none /* verbosity */));
 
     uassertStatusOK(exec->executePlan());
 
@@ -111,8 +111,8 @@ BSONObj applyUpdateOperators(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const BSONObj& from,
                              const BSONObj& operators) {
-    const CollatorInterface* collator = nullptr;
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator, nss));
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
     UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     driver.parse(operators, arrayFilters);

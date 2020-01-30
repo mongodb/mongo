@@ -117,12 +117,12 @@ auto rehydrateIndexKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) 
 }
 }  // namespace
 
-ProjectionStage::ProjectionStage(boost::intrusive_ptr<ExpressionContext> expCtx,
+ProjectionStage::ProjectionStage(ExpressionContext* expCtx,
                                  const BSONObj& projObj,
                                  WorkingSet* ws,
                                  std::unique_ptr<PlanStage> child,
                                  const char* stageType)
-    : PlanStage{expCtx->opCtx, std::move(child), stageType},
+    : PlanStage{expCtx, std::move(child), stageType},
       _projObj{expCtx->explain ? boost::make_optional(projObj.getOwned()) : boost::none},
       _ws{*ws} {}
 
@@ -178,7 +178,7 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
                                                const projection_ast::Projection* projection,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child)
-    : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
+    : ProjectionStage{expCtx.get(), projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
       _requestedMetadata{projection->metadataDeps()},
       _projectType{projection->type()},
       _executor{projection_executor::buildProjectionExecutor(
@@ -230,7 +230,7 @@ Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     return Status::OK();
 }
 
-ProjectionStageCovered::ProjectionStageCovered(boost::intrusive_ptr<ExpressionContext> expCtx,
+ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
                                                const BSONObj& projObj,
                                                const projection_ast::Projection* projection,
                                                WorkingSet* ws,
@@ -287,7 +287,7 @@ Status ProjectionStageCovered::transform(WorkingSetMember* member) const {
     return Status::OK();
 }
 
-ProjectionStageSimple::ProjectionStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
+ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
                                              const BSONObj& projObj,
                                              const projection_ast::Projection* projection,
                                              WorkingSet* ws,

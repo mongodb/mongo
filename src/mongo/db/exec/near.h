@@ -104,7 +104,7 @@ protected:
     /**
      * Subclasses of NearStage must provide basics + a stats object which gets owned here.
      */
-    NearStage(OperationContext* opCtx,
+    NearStage(ExpressionContext* expCtx,
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,

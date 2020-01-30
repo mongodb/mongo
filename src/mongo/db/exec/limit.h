@@ -45,7 +45,7 @@ namespace mongo {
  */
 class LimitStage final : public PlanStage {
 public:
-    LimitStage(OperationContext* opCtx,
+    LimitStage(ExpressionContext* expCtx,
                long long limit,
                WorkingSet* ws,
                std::unique_ptr<PlanStage> child);

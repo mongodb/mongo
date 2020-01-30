@@ -99,7 +99,7 @@ class DeleteStage final : public RequiresMutableCollectionStage {
     DeleteStage& operator=(const DeleteStage&) = delete;
 
 public:
-    DeleteStage(OperationContext* opCtx,
+    DeleteStage(ExpressionContext* expCtx,
                 std::unique_ptr<DeleteStageParams> params,
                 WorkingSet* ws,
                 Collection* collection,

@@ -229,9 +229,8 @@ public:
         const NamespaceString nss("unittests.matchertests");
         AutoGetCollectionForReadCommand ctx(&opCtx, nss);
 
-        const CollatorInterface* collator = nullptr;
-        const boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtxPtr.get(), collator, kTestNss));
+        const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
+            opCtxPtr.get(), std::unique_ptr<CollatorInterface>(nullptr), kTestNss));
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
             expCtx,
@@ -291,9 +290,10 @@ template <typename M>
 class Collator {
 public:
     void run() {
-        CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+        auto collator =
+            std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        expCtx->setCollator(&collator);
+        expCtx->setCollator(std::move(collator));
         M matcher(BSON("a"
                        << "string"),
                   expCtx);

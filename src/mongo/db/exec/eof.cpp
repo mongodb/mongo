@@ -43,7 +43,7 @@ using std::vector;
 // static
 const char* EOFStage::kStageType = "EOF";
 
-EOFStage::EOFStage(OperationContext* opCtx) : PlanStage(kStageType, opCtx) {}
+EOFStage::EOFStage(ExpressionContext* expCtx) : PlanStage(kStageType, expCtx) {}
 
 EOFStage::~EOFStage() {}
 

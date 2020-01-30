@@ -60,6 +60,7 @@ public:
     CountStageTest()
         : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
           _ctx(&_opCtx, ns()),
+          _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, kTestNss)),
           _coll(nullptr) {}
 
     virtual ~CountStageTest() {}
@@ -94,7 +95,8 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, _coll, params, &ws, nullptr));
+        unique_ptr<CollectionScan> scan(
+            new CollectionScan(_expCtx.get(), _coll, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -146,11 +148,8 @@ public:
 
         unique_ptr<WorkingSet> ws(new WorkingSet);
 
-        const CollatorInterface* collator = nullptr;
-        const boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(&_opCtx, collator, kTestNss));
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(request.getQuery(), expCtx);
+            MatchExpressionParser::parse(request.getQuery(), _expCtx);
         ASSERT(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
 
@@ -161,7 +160,7 @@ public:
             scan = createCollScan(expression.get(), ws.get());
         }
 
-        CountStage countStage(&_opCtx,
+        CountStage countStage(_expCtx.get(),
                               _coll,
                               request.getLimit().value_or(0),
                               request.getSkip().value_or(0),
@@ -216,14 +215,14 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new IndexScan(&_opCtx, params, ws, expr);
+        return new IndexScan(_expCtx.get(), params, ws, expr);
     }
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {
         CollectionScanParams params;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new CollectionScan(&_opCtx, _coll, params, ws, expr);
+        return new CollectionScan(_expCtx.get(), _coll, params, ws, expr);
     }
 
     static const char* ns() {
@@ -240,6 +239,7 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
     Collection* _coll;
 };
 

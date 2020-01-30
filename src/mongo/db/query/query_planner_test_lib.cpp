@@ -76,9 +76,8 @@ bool filterMatches(const BSONObj& testFilter,
     }
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(testCollator.get());
-    StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(testFilter, std::move(expCtx));
+    expCtx->setCollator(std::move(testCollator));
+    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(testFilter, expCtx);
     if (!statusWithMatcher.isOK()) {
         return false;
     }

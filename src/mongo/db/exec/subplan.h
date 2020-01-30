@@ -69,7 +69,7 @@ class OperationContext;
  */
 class SubplanStage final : public RequiresAllIndicesStage {
 public:
-    SubplanStage(OperationContext* opCtx,
+    SubplanStage(ExpressionContext* expCtx,
                  const Collection* collection,
                  WorkingSet* ws,
                  const QueryPlannerParams& params,

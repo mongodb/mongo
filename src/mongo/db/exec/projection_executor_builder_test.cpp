@@ -231,8 +231,9 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectFindElemMatch) {
 }
 
 TEST_F(ProjectionExecutorTestWithFallBackToDefault, ElemMatchRespectsCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    getExpCtx()->setCollator(&collator);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+    getExpCtx()->setCollator(std::move(collator));
 
     auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {$gte: 'abc'}}}"));
     auto executor = createProjectionExecutor(proj);

@@ -34,6 +34,7 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
@@ -105,16 +106,18 @@ class RecordId;
  */
 class PlanStage {
 public:
-    PlanStage(const char* typeName, OperationContext* opCtx)
-        : _commonStats(typeName), _opCtx(opCtx) {}
+    PlanStage(const char* typeName, ExpressionContext* expCtx)
+        : _commonStats(typeName), _opCtx(expCtx->opCtx), _expCtx(expCtx) {
+        invariant(expCtx);
+    }
 
 protected:
     /**
      * Obtain a PlanStage given a child stage. Called during the construction of derived
      * PlanStage types with a single direct descendant.
      */
-    PlanStage(OperationContext* opCtx, std::unique_ptr<PlanStage> child, const char* typeName)
-        : PlanStage(typeName, opCtx) {
+    PlanStage(ExpressionContext* expCtx, std::unique_ptr<PlanStage> child, const char* typeName)
+        : PlanStage(typeName, expCtx) {
         _children.push_back(std::move(child));
     }
 
@@ -358,14 +361,14 @@ protected:
     /**
      * Does stage-specific detaching.
      *
-     * Implementations of this method cannot use the pointer returned from getOpCtx().
+     * Implementations of this method cannot use the pointer returned from opCtx().
      */
     virtual void doDetachFromOperationContext() {}
 
     /**
      * Does stage-specific attaching.
      *
-     * If an OperationContext* is needed, use getOpCtx(), which will return a valid
+     * If an OperationContext* is needed, use opCtx(), which will return a valid
      * OperationContext* (the one to which the stage is reattaching).
      */
     virtual void doReattachToOperationContext() {}
@@ -377,8 +380,12 @@ protected:
 
     ClockSource* getClock() const;
 
-    OperationContext* getOpCtx() const {
+    OperationContext* opCtx() const {
         return _opCtx;
+    }
+
+    ExpressionContext* expCtx() const {
+        return _expCtx;
     }
 
     Children _children;
@@ -386,6 +393,10 @@ protected:
 
 private:
     OperationContext* _opCtx;
+
+    // The PlanExecutor holds a strong reference to this which ensures that this pointer remains
+    // valid for the entire lifetime of the PlanStage.
+    ExpressionContext* _expCtx;
 };
 
 }  // namespace mongo

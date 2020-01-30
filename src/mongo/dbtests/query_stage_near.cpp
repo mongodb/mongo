@@ -60,6 +60,9 @@ const BSONObj kTestKeyPattern = BSON("testIndex" << 1);
 class QueryStageNearTest : public unittest::Test {
 public:
     void setUp() override {
+        _expCtx =
+            make_intrusive<ExpressionContext>(_opCtx, nullptr, NamespaceString(kTestNamespace));
+
         directClient.createCollection(kTestNamespace);
         ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace, kTestKeyPattern));
 
@@ -75,6 +78,8 @@ protected:
     const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
     OperationContext* const _opCtx = _uniqOpCtx.get();
     DBDirectClient directClient{_opCtx};
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     boost::optional<AutoGetCollectionForRead> _autoColl;
     const IndexDescriptor* _mockGeoIndex;
@@ -95,11 +100,14 @@ public:
         double max;
     };
 
-    MockNearStage(OperationContext* opCtx,
+    MockNearStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   WorkingSet* workingSet,
                   const IndexDescriptor* indexDescriptor)
-        : NearStage(
-              opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, indexDescriptor),
+        : NearStage(expCtx.get(),
+                    "MOCK_DISTANCE_SEARCH_STAGE",
+                    STAGE_UNKNOWN,
+                    workingSet,
+                    indexDescriptor),
           _pos(0) {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
@@ -116,7 +124,7 @@ public:
 
         bool lastInterval = _pos == static_cast<int>(_intervals.size());
 
-        auto queuedStage = std::make_unique<QueuedDataStage>(opCtx, workingSet);
+        auto queuedStage = std::make_unique<QueuedDataStage>(expCtx(), workingSet);
 
         for (unsigned int i = 0; i < interval.data.size(); i++) {
             // Add all documents from the lastInterval into the QueuedDataStage.
@@ -178,7 +186,7 @@ TEST_F(QueryStageNearTest, Basic) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_opCtx, &workingSet, _mockGeoIndex);
+    MockNearStage nearStage(_expCtx.get(), &workingSet, _mockGeoIndex);
 
     // First set of results
     mockData.clear();
@@ -217,7 +225,7 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     auto* coll = autoColl.getCollection();
     ASSERT(coll);
 
-    MockNearStage nearStage(_opCtx, &workingSet, _mockGeoIndex);
+    MockNearStage nearStage(_expCtx.get(), &workingSet, _mockGeoIndex);
 
     // Empty set of results
     mockData.clear();

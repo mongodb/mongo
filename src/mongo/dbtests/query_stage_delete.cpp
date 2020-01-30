@@ -91,7 +91,7 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(&_opCtx, collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -118,6 +118,9 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx =
+        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
 
 private:
     DBDirectClient _client;
@@ -147,11 +150,12 @@ public:
         deleteStageParams->isMulti = true;
 
         WorkingSet ws;
-        DeleteStage deleteStage(&_opCtx,
-                                std::move(deleteStageParams),
-                                &ws,
-                                coll,
-                                new CollectionScan(&_opCtx, coll, collScanParams, &ws, nullptr));
+        DeleteStage deleteStage(
+            _expCtx.get(),
+            std::move(deleteStageParams),
+            &ws,
+            coll,
+            new CollectionScan(_expCtx.get(), coll, collScanParams, &ws, nullptr));
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
 
@@ -203,7 +207,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = std::make_unique<QueuedDataStage>(&_opCtx, ws.get());
+        auto qds = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -218,7 +222,7 @@ public:
         deleteParams->canonicalQuery = cq.get();
 
         const auto deleteStage = std::make_unique<DeleteStage>(
-            &_opCtx, std::move(deleteParams), ws.get(), coll, qds.release());
+            _expCtx.get(), std::move(deleteParams), ws.get(), coll, qds.release());
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
 

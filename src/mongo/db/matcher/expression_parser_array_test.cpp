@@ -766,8 +766,9 @@ TEST(MatchExpressionParserArrayTest, AllStringNullCollation) {
 TEST(MatchExpressionParserArrayTest, AllStringCollation) {
     BSONObj query = BSON("x" << BSON("$all" << BSON_ARRAY("string")));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    expCtx->setCollator(&collator);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    expCtx->setCollator(std::move(collator));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
     ASSERT_EQUALS(MatchExpression::AND, result.getValue()->matchType());
@@ -775,6 +776,6 @@ TEST(MatchExpressionParserArrayTest, AllStringCollation) {
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::EQ, child->matchType());
     EqualityMatchExpression* eqMatch = static_cast<EqualityMatchExpression*>(child);
-    ASSERT_TRUE(eqMatch->getCollator() == &collator);
+    ASSERT_TRUE(eqMatch->getCollator() == expCtx->getCollator());
 }
 }  // namespace mongo

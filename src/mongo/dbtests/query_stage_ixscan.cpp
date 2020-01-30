@@ -49,7 +49,8 @@ public:
     IndexScanTest()
         : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
           _ctx(&_opCtx, ns()),
-          _coll(nullptr) {}
+          _coll(nullptr),
+          _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss())) {}
 
     virtual ~IndexScanTest() {}
 
@@ -110,7 +111,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = nullptr;
-        return new IndexScan(&_opCtx, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -134,7 +135,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         MatchExpression* filter = nullptr;
-        return new IndexScan(&_opCtx, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), params, &_ws, filter);
     }
 
     static const char* ns() {
@@ -153,6 +154,8 @@ protected:
     Collection* _coll;
 
     WorkingSet _ws;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 // SERVER-15958: Some IndexScanStats info must be initialized on construction of an IndexScan.

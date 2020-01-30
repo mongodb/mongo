@@ -185,6 +185,53 @@ public:
     };
 
     /**
+     * A Collection::Validator represents a filter that is applied to all documents that are
+     * inserted. Enforcement of Validators being well formed is done lazily, so the 'Validator'
+     * class may represent a validator which is not well formed.
+     */
+    struct Validator {
+
+        /**
+         * Returns whether the validator's filter is well formed.
+         */
+        bool isOK() const {
+            return filter.isOK();
+        }
+
+        /**
+         * Returns OK or the error encounter when parsing the validator.
+         */
+        Status getStatus() const {
+            return filter.getStatus();
+        }
+
+        /**
+         * Empty means no validator. This must outlive 'filter'.
+         */
+        BSONObj validatorDoc;
+
+        /**
+         * A special ExpressionContext used to evaluate the filter match expression. This should
+         * outlive 'filter'.
+         */
+        boost::intrusive_ptr<ExpressionContext> expCtxForFilter;
+
+        /**
+         * The collection validator MatchExpression. This is stored as a StatusWith, as we lazily
+         * enforce that collection validators are well formed.
+         *
+         * -A non-OK Status indicates that the validator is not well formed, and any attempts to
+         * enforce the validator should error.
+         *
+         * -A value of Status::OK/nullptr indicates that there is no validator.
+         *
+         * -Anything else indicates a well formed validator. The MatchExpression will maintain
+         * pointers into _validatorDoc.
+         */
+        StatusWithMatchExpression filter = {nullptr};
+    };
+
+    /**
      * Callback function for callers of insertDocumentForBulkLoader().
      */
     using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
@@ -354,7 +401,7 @@ public:
     /**
      * Returns a non-ok Status if validator is not legal for this collection.
      */
-    virtual StatusWithMatchExpression parseValidator(
+    virtual Validator parseValidator(
         OperationContext* opCtx,
         const BSONObj& validator,
         MatchExpressionParser::AllowedFeatureSet allowedFeatures,

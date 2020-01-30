@@ -56,12 +56,12 @@ using std::vector;
 // static
 const char* CollectionScan::kStageType = "COLLSCAN";
 
-CollectionScan::CollectionScan(OperationContext* opCtx,
+CollectionScan::CollectionScan(ExpressionContext* expCtx,
                                const Collection* collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : RequiresCollectionStage(kStageType, opCtx, collection),
+    : RequiresCollectionStage(kStageType, expCtx, collection),
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _params(params) {
@@ -117,11 +117,11 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // snapshot where the oplog entries are not yet visible even after the wait.
                 invariant(!_params.tailable && collection()->ns().isOplog());
 
-                getOpCtx()->recoveryUnit()->abandonSnapshot();
-                collection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(getOpCtx());
+                opCtx()->recoveryUnit()->abandonSnapshot();
+                collection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx());
             }
 
-            _cursor = collection()->getCursor(getOpCtx(), forward);
+            _cursor = collection()->getCursor(opCtx(), forward);
 
             if (!_lastSeenId.isNull()) {
                 invariant(_params.tailable);
@@ -171,7 +171,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
             StatusWith<RecordId> goal = oploghack::keyForOptime(*_params.minTs);
             if (goal.isOK()) {
                 boost::optional<RecordId> startLoc =
-                    collection()->getRecordStore()->oplogStartHack(getOpCtx(), goal.getValue());
+                    collection()->getRecordStore()->oplogStartHack(opCtx(), goal.getValue());
                 if (startLoc && !startLoc->isNull()) {
                     LOGV2_DEBUG(20584, 3, "Using direct oplog seek");
                     record = _cursor->seekExact(*startLoc);
@@ -215,8 +215,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = record->id;
-    member->resetDocument(getOpCtx()->recoveryUnit()->getSnapshotId(),
-                          record->data.releaseToBson());
+    member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
     _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
@@ -283,7 +282,7 @@ void CollectionScan::doDetachFromOperationContext() {
 
 void CollectionScan::doReattachToOperationContext() {
     if (_cursor)
-        _cursor->reattachToOperationContext(getOpCtx());
+        _cursor->reattachToOperationContext(opCtx());
 }
 
 unique_ptr<PlanStageStats> CollectionScan::getStats() {

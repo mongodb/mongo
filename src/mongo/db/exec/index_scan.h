@@ -108,7 +108,7 @@ public:
         HIT_END
     };
 
-    IndexScan(OperationContext* opCtx,
+    IndexScan(ExpressionContext* expCtx,
               IndexScanParams params,
               WorkingSet* workingSet,
               const MatchExpression* filter);

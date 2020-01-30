@@ -61,11 +61,11 @@ using std::vector;
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 
-MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
+MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
                                const Collection* collection,
                                CanonicalQuery* cq,
                                CachingMode cachingMode)
-    : RequiresCollectionStage(kStageType, opCtx, collection),
+    : RequiresCollectionStage(kStageType, expCtx, collection),
       _cachingMode(cachingMode),
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
@@ -203,7 +203,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // make sense.
     ScopedTimer timer(getClock(), &_commonStats.executionTimeMillis);
 
-    size_t numWorks = getTrialPeriodWorks(getOpCtx(), collection());
+    size_t numWorks = getTrialPeriodWorks(opCtx(), collection());
     size_t numResults = getTrialPeriodNumToReturn(*_query);
 
     try {
@@ -365,7 +365,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                 ->set(*_query,
                       solutions,
                       std::move(ranking),
-                      getOpCtx()->getServiceContext()->getPreciseClockSource()->now())
+                      opCtx()->getServiceContext()->getPreciseClockSource()->now())
                 .transitional_ignore();
         }
     }

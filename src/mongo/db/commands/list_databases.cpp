@@ -126,9 +126,8 @@ public:
         if (auto filterObj = cmd.getFilter()) {
             // The collator is null because database metadata objects are compared using simple
             // binary comparison.
-            const CollatorInterface* collator = nullptr;
-            boost::intrusive_ptr<ExpressionContext> expCtx(
-                new ExpressionContext(opCtx, collator, NamespaceString(dbname)));
+            auto expCtx = make_intrusive<ExpressionContext>(
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(dbname));
             auto matcher =
                 uassertStatusOK(MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
             filter = std::move(matcher);

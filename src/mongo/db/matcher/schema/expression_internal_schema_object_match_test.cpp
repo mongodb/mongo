@@ -176,9 +176,10 @@ TEST(InternalSchemaObjectMatchExpression, EquivalentReturnsCorrectResults) {
 }
 
 TEST(InternalSchemaObjectMatchExpression, SubExpressionRespectsCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     auto query = fromjson(
         "{a: {$_internalSchemaObjectMatch: {"
         "	b: {$eq: 'FOO'}"

@@ -39,10 +39,10 @@ namespace mongo {
 
 const char* ChangeStreamProxyStage::kStageType = "CHANGE_STREAM_PROXY";
 
-ChangeStreamProxyStage::ChangeStreamProxyStage(OperationContext* opCtx,
+ChangeStreamProxyStage::ChangeStreamProxyStage(ExpressionContext* expCtx,
                                                std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                                WorkingSet* ws)
-    : PipelineProxyStage(opCtx, std::move(pipeline), ws, kStageType) {
+    : PipelineProxyStage(expCtx, std::move(pipeline), ws, kStageType) {
     // Set _postBatchResumeToken to the initial PBRT that was added to the expression context during
     // pipeline construction, and use it to obtain the starting time for _latestOplogTimestamp.
     invariant(!_pipeline->getContext()->initialPostBatchResumeToken.isEmpty());

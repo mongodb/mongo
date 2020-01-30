@@ -103,10 +103,9 @@ ExpressionContext::ExpressionContext(
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
-      _ownedCollator(std::move(collator)),
-      _unownedCollator(_ownedCollator.get()),
-      _documentComparator(_unownedCollator),
-      _valueComparator(_unownedCollator),
+      _collator(std::move(collator)),
+      _documentComparator(_collator.get()),
+      _valueComparator(_collator.get()),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
     if (runtimeConstants) {
@@ -127,7 +126,7 @@ ExpressionContext::ExpressionContext(
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
-                                     const CollatorInterface* collator,
+                                     std::unique_ptr<CollatorInterface> collator,
                                      const NamespaceString& nss,
                                      const boost::optional<RuntimeConstants>& runtimeConstants)
     : ns(nss),
@@ -137,9 +136,9 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
-      _unownedCollator(collator),
-      _documentComparator(_unownedCollator),
-      _valueComparator(_unownedCollator) {
+      _collator(std::move(collator)),
+      _documentComparator(_collator.get()),
+      _valueComparator(_collator.get()) {
     if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
     }
@@ -159,38 +158,18 @@ void ExpressionContext::checkForInterrupt() {
 ExpressionContext::CollatorStash::CollatorStash(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<CollatorInterface> newCollator)
-    : _expCtx(expCtx),
-      _originalCollatorOwned(std::move(_expCtx->_ownedCollator)),
-      _originalCollatorUnowned(_expCtx->_unownedCollator) {
+    : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_collator)) {
     _expCtx->setCollator(std::move(newCollator));
 }
 
 ExpressionContext::CollatorStash::~CollatorStash() {
-    if (_originalCollatorOwned) {
-        _expCtx->setCollator(std::move(_originalCollatorOwned));
-    } else {
-        _expCtx->setCollator(_originalCollatorUnowned);
-        if (!_originalCollatorUnowned && _expCtx->_ownedCollator) {
-            // If the original collation was 'nullptr', we cannot distinguish whether it was owned
-            // or not. We always set '_ownedCollator' with the stash, so should reset it to null
-            // here.
-            _expCtx->_ownedCollator = nullptr;
-        }
-    }
+    _expCtx->setCollator(std::move(_originalCollator));
 }
 
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(
     std::unique_ptr<CollatorInterface> newCollator) {
     // This constructor of CollatorStash is private, so we can't use make_unique().
     return std::unique_ptr<CollatorStash>(new CollatorStash(this, std::move(newCollator)));
-}
-
-void ExpressionContext::setCollator(const CollatorInterface* collator) {
-    _unownedCollator = collator;
-
-    // Document/Value comparisons must be aware of the collation.
-    _documentComparator = DocumentComparator(_unownedCollator);
-    _valueComparator = ValueComparator(_unownedCollator);
 }
 
 intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
@@ -200,7 +179,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     auto collator = updatedCollator
         ? std::move(*updatedCollator)
-        : (_ownedCollator ? _ownedCollator->clone() : std::unique_ptr<CollatorInterface>{});
+        : (_collator ? _collator->clone() : std::unique_ptr<CollatorInterface>{});
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,
@@ -222,16 +201,6 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->tempDir = tempDir;
     expCtx->useNewUpsert = useNewUpsert;
     expCtx->jsHeapLimitMB = jsHeapLimitMB;
-
-    // ExpressionContext is used both universally in Agg and in Find within a $expr. In the case
-    // that this context is for use in $expr, the collator will be unowned and we will pass nullptr
-    // in the constructor call above. If this is the case we must manually update the unowned
-    // collator argument in the new ExpressionContext to match the old one. SERVER-31294 tracks an
-    // effort to divorce the ExpressionContext from general Agg resources by creating an
-    // AggregationContext. If that effort comes to fruition, this special-case collator handling
-    // will be made unnecessary.
-    if (!updatedCollator && !collator && _unownedCollator)
-        expCtx->setCollator(_unownedCollator);
 
     expCtx->variables = variables;
     expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());

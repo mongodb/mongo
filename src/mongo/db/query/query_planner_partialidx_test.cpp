@@ -36,6 +36,8 @@
 namespace mongo {
 namespace {
 
+const static NamespaceString kNs("db.dummyNs");
+
 TEST_F(QueryPlannerTest, PartialIndexEq) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
@@ -448,9 +450,14 @@ TEST_F(QueryPlannerTest, PartialIndexNor) {
 TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 'cba'}}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj, &collator);
-    addIndex(fromjson("{a: 1}"), filterExpr.get(), &collator);
+
+    auto expCtxForPartialFilter = make_intrusive<ExpressionContext>(
+        opCtx.get(),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        kNs);
+    std::unique_ptr<MatchExpression> filterExpr =
+        parseMatchExpression(filterObj, expCtxForPartialFilter);
+    addIndex(fromjson("{a: 1}"), filterExpr.get(), expCtxForPartialFilter->getCollator());
 
     runQueryAsCommand(
         fromjson("{find: 'testns', filter: {a: 'abc'}, collation: {locale: 'reverse'}}"));
@@ -468,9 +475,14 @@ TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
 TEST_F(QueryPlannerTest, PartialIndexNoStringComparisonNonMatchingCollators) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj, &collator);
-    addIndex(fromjson("{a: 1}"), filterExpr.get(), &collator);
+
+    auto expCtxForPartialFilter = make_intrusive<ExpressionContext>(
+        opCtx.get(),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        kNs);
+    std::unique_ptr<MatchExpression> filterExpr =
+        parseMatchExpression(filterObj, expCtxForPartialFilter);
+    addIndex(fromjson("{a: 1}"), filterExpr.get(), expCtxForPartialFilter->getCollator());
 
     runQueryAsCommand(fromjson("{find: 'testns', filter: {a: 1}, collation: {locale: 'reverse'}}"));
     assertNumSolutions(1U);

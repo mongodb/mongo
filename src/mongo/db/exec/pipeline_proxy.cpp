@@ -46,16 +46,16 @@ using std::vector;
 
 const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 
-PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
+PipelineProxyStage::PipelineProxyStage(ExpressionContext* expCtx,
                                        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                        WorkingSet* ws)
-    : PipelineProxyStage(opCtx, std::move(pipeline), ws, kStageType) {}
+    : PipelineProxyStage(expCtx, std::move(pipeline), ws, kStageType) {}
 
-PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
+PipelineProxyStage::PipelineProxyStage(ExpressionContext* expCtx,
                                        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                        WorkingSet* ws,
                                        const char* stageTypeName)
-    : PlanStage(stageTypeName, opCtx),
+    : PlanStage(stageTypeName, expCtx),
       _pipeline(std::move(pipeline)),
       _includeMetaData(_pipeline->getContext()->needsMerge),  // send metadata to merger
       _ws(ws) {
@@ -112,11 +112,11 @@ void PipelineProxyStage::doDetachFromOperationContext() {
 }
 
 void PipelineProxyStage::doReattachToOperationContext() {
-    _pipeline->reattachToOperationContext(getOpCtx());
+    _pipeline->reattachToOperationContext(opCtx());
 }
 
 void PipelineProxyStage::doDispose() {
-    _pipeline->dispose(getOpCtx());
+    _pipeline->dispose(opCtx());
 }
 
 unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {

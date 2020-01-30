@@ -878,7 +878,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
 
     if (!collectionOptions.validator.isEmpty()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, collator.get(), nss));
+            new ExpressionContext(opCtx, std::move(collator), nss));
 
         // Save this to a variable to avoid reading the atomic variable multiple times.
         const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();

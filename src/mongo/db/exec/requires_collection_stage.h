@@ -55,8 +55,8 @@ namespace mongo {
 template <typename CollectionT>
 class RequiresCollectionStageBase : public PlanStage {
 public:
-    RequiresCollectionStageBase(const char* stageType, OperationContext* opCtx, CollectionT coll)
-        : PlanStage(stageType, opCtx),
+    RequiresCollectionStageBase(const char* stageType, ExpressionContext* expCtx, CollectionT coll)
+        : PlanStage(stageType, expCtx),
           _collection(coll),
           _collectionUUID(_collection->uuid()),
           _databaseEpoch(getDatabaseEpoch(_collection)),
@@ -94,8 +94,8 @@ private:
     // collection pointer 'coll' must be non-null and must point to a valid collection.
     uint64_t getDatabaseEpoch(CollectionT coll) const {
         invariant(coll);
-        auto databaseHolder = DatabaseHolder::get(getOpCtx());
-        auto db = databaseHolder->getDb(getOpCtx(), coll->ns().ns());
+        auto databaseHolder = DatabaseHolder::get(opCtx());
+        auto db = databaseHolder->getDb(opCtx(), coll->ns().ns());
         invariant(db);
         return db->epoch();
     }

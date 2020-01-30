@@ -255,16 +255,17 @@ public:
         const bool nameOnly = jsobj["nameOnly"].trueValue();
         const bool authorizedCollections = jsobj["authorizedCollections"].trueValue();
 
+        // The collator is null because collection objects are compared using binary comparison.
+        auto expCtx = make_intrusive<ExpressionContext>(
+            opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(dbname));
+
         // Check for 'filter' argument.
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
             if (filterElt.type() != mongo::Object) {
                 uasserted(ErrorCodes::BadValue, "\"filter\" must be an object");
             }
-            // The collator is null because collection objects are compared using binary comparison.
-            const CollatorInterface* collator = nullptr;
-            boost::intrusive_ptr<ExpressionContext> expCtx(
-                new ExpressionContext(opCtx, collator, NamespaceString(StringData(dbname))));
+
             StatusWithMatchExpression statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
             uassertStatusOK(statusWithMatcher.getStatus());
@@ -299,7 +300,7 @@ public:
                                                              cursorNss);
 
             auto ws = std::make_unique<WorkingSet>();
-            auto root = std::make_unique<QueuedDataStage>(opCtx, ws.get());
+            auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
             if (db) {
                 if (auto collNames = _getExactNameMatches(matcher.get())) {

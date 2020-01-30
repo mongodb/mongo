@@ -154,7 +154,7 @@ public:
     }
 
     const CollatorInterface* getCollator() const {
-        return _collator.get();
+        return _expCtx->getCollator();
     }
 
     /**
@@ -227,7 +227,6 @@ private:
                 std::unique_ptr<QueryRequest> qr,
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
-                std::unique_ptr<CollatorInterface> collator,
                 const ProjectionPolicies& projectionPolicies);
 
     // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
@@ -249,8 +248,6 @@ private:
 
     // Keeps track of what metadata has been explicitly requested.
     QueryMetadataBitSet _metadataDeps;
-
-    std::unique_ptr<CollatorInterface> _collator;
 
     bool _canHaveNoopMatchNodes = false;
 };

@@ -56,11 +56,8 @@ long long deleteObjects(OperationContext* opCtx,
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    auto exec = uassertStatusOK(getExecutorDelete(opCtx,
-                                                  &CurOp::get(opCtx)->debug(),
-                                                  collection,
-                                                  &parsedDelete,
-                                                  boost::none /* verbosity */));
+    auto exec = uassertStatusOK(getExecutorDelete(
+        &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
 
     uassertStatusOK(exec->executePlan());
 

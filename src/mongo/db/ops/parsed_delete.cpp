@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/assert_util.h"
@@ -58,6 +59,21 @@ Status ParsedDelete::parseRequest() {
     // It is invalid to request that a ProjectionStage be applied to the DeleteStage if the
     // DeleteStage would not return the deleted document.
     invariant(_request->getProj().isEmpty() || _request->shouldReturnDeleted());
+
+    std::unique_ptr<CollatorInterface> collator(nullptr);
+    if (!_request->getCollation().isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(_opCtx->getServiceContext())
+                                      ->makeFromBSON(_request->getCollation());
+
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
+        }
+        collator = uassertStatusOK(std::move(statusWithCollator));
+    }
+    _expCtx = make_intrusive<ExpressionContext>(_opCtx,
+                                                std::move(collator),
+                                                _request->getNamespaceString(),
+                                                _request->getRuntimeConstants());
 
     if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
@@ -94,11 +110,10 @@ Status ParsedDelete::parseQueryToCQ() {
         qr->setRuntimeConstants(*runtimeConstants);
     }
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(_opCtx,
                                      std::move(qr),
-                                     std::move(expCtx),
+                                     _expCtx,
                                      extensionsCallback,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
 

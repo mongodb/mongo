@@ -254,9 +254,10 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
 
 TEST_F(PullAllNodeTest, ApplyWithCollator) {
     auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 

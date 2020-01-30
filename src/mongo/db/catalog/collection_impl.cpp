@@ -256,7 +256,6 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
       _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
                       _ns.db() != "local"),
       _indexCatalog(std::make_unique<IndexCatalogImpl>(this)),
-      _swValidator{nullptr},
       _cappedNotifier(_recordStore && _recordStore->isCapped()
                           ? std::make_unique<CappedInsertNotifier>()
                           : nullptr) {
@@ -288,22 +287,23 @@ void CollectionImpl::init(OperationContext* opCtx) {
     auto collectionOptions =
         DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, getCatalogId());
     _collator = parseCollation(opCtx, _ns, collectionOptions.collation);
-    _validatorDoc = collectionOptions.validator.getOwned();
+    auto validatorDoc = collectionOptions.validator.getOwned();
 
     // Enforce that the validator can be used on this namespace.
-    uassertStatusOK(checkValidatorCanBeUsedOnNs(_validatorDoc, ns(), _uuid));
+    uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, ns(), _uuid));
     // Store the result (OK / error) of parsing the validator, but do not enforce that the result is
     // OK. This is intentional, as users may have validators on disk which were considered well
     // formed in older versions but not in newer versions.
-    _swValidator =
-        parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!_swValidator.isOK()) {
+    _validator =
+        parseValidator(opCtx, validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!_validator.isOK()) {
         // Log an error and startup warning if the collection validator is malformed.
         LOGV2_WARNING_OPTIONS(20293,
                               {logv2::LogTag::kStartupWarnings},
-                              "Collection {ns} has malformed validator: {swValidator_getStatus}",
+                              "Collection {ns} has malformed validator: {validatorStatus}",
+                              "Collection has malformed validator",
                               "ns"_attr = _ns,
-                              "swValidator_getStatus"_attr = _swValidator.getStatus());
+                              "validatorStatus"_attr = _validator.getStatus());
     }
     _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
     _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
@@ -366,11 +366,11 @@ bool CollectionImpl::findDoc(OperationContext* opCtx,
 }
 
 Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& document) const {
-    if (!_swValidator.isOK()) {
-        return _swValidator.getStatus();
+    if (!_validator.isOK()) {
+        return _validator.getStatus();
     }
 
-    const auto* const validatorMatchExpr = _swValidator.getValue().get();
+    const auto* const validatorMatchExpr = _validator.filter.getValue().get();
     if (!validatorMatchExpr)
         return Status::OK();
 
@@ -394,26 +394,26 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
 }
 
-StatusWithMatchExpression CollectionImpl::parseValidator(
+Collection::Validator CollectionImpl::parseValidator(
     OperationContext* opCtx,
     const BSONObj& validator,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
         maxFeatureCompatibilityVersion) const {
     if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail())) {
-        return {nullptr};
+        return {validator, nullptr, nullptr};
     }
 
     if (validator.isEmpty())
-        return {nullptr};
+        return {validator, nullptr, nullptr};
 
     Status canUseValidatorInThisContext = checkValidatorCanBeUsedOnNs(validator, ns(), _uuid);
     if (!canUseValidatorInThisContext.isOK()) {
-        return canUseValidatorInThisContext;
+        return {validator, nullptr, canUseValidatorInThisContext};
     }
 
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, _collator.get(), ns()));
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, CollatorInterface::cloneCollator(_collator.get()), ns());
 
     // The MatchExpression and contained ExpressionContext created as part of the validator are
     // owned by the Collection and will outlive the OperationContext they were created under.
@@ -430,11 +430,14 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
         MatchExpressionParser::parse(validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
 
     if (!statusWithMatcher.isOK()) {
-        return StatusWithMatchExpression{
+        return {
+            validator,
+            boost::intrusive_ptr<ExpressionContext>(nullptr),
             statusWithMatcher.getStatus().withContext("Parsing of collection validator failed")};
     }
 
-    return statusWithMatcher;
+    return Collection::Validator{
+        validator, std::move(expCtx), std::move(statusWithMatcher.getValue())};
 }
 
 Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
@@ -443,8 +446,8 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     dassert(opCtx->lockState()->isWriteLocked());
 
     // Since this is only for the OpLog, we can assume these for simplicity.
-    invariant(_swValidator.isOK());
-    invariant(_swValidator.getValue() == nullptr);
+    invariant(_validator.isOK());
+    invariant(_validator.filter.getValue() == nullptr);
     invariant(!_indexCatalog->haveAnyIndexes());
 
     Status status = _recordStore->insertRecords(opCtx, records, timestamps);
@@ -806,7 +809,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 }
 
 bool CollectionImpl::updateWithDamagesSupported() const {
-    if (!_swValidator.isOK() || _swValidator.getValue() != nullptr)
+    if (!_validator.isOK() || _validator.filter.getValue() != nullptr)
         return false;
 
     return _recordStore->updateWithDamagesSupported();
@@ -986,22 +989,18 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
 
     // Note that, by the time we reach this, we should have already done a pre-parse that checks for
     // banned features, so we don't need to include that check again.
-    auto statusWithMatcher =
+    auto newValidator =
         parseValidator(opCtx, validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!statusWithMatcher.isOK())
-        return statusWithMatcher.getStatus();
+    if (!newValidator.isOK())
+        return newValidator.getStatus();
 
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, getCatalogId(), validatorDoc, getValidationLevel(), getValidationAction());
 
-    opCtx->recoveryUnit()->onRollback([this,
-                                       oldValidator = std::move(_swValidator),
-                                       oldValidatorDoc = std::move(_validatorDoc)]() mutable {
-        this->_swValidator = std::move(oldValidator);
-        this->_validatorDoc = std::move(oldValidatorDoc);
+    opCtx->recoveryUnit()->onRollback([this, oldValidator = std::move(_validator)]() mutable {
+        this->_validator = std::move(oldValidator);
     });
-    _swValidator = std::move(statusWithMatcher);
-    _validatorDoc = std::move(validatorDoc);
+    _validator = std::move(newValidator);
     return Status::OK();
 }
 
@@ -1038,8 +1037,11 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
     auto oldValidationLevel = _validationLevel;
     _validationLevel = levelSW.getValue();
 
-    DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, getCatalogId(), _validatorDoc, getValidationLevel(), getValidationAction());
+    DurableCatalog::get(opCtx)->updateValidator(opCtx,
+                                                getCatalogId(),
+                                                _validator.validatorDoc,
+                                                getValidationLevel(),
+                                                getValidationAction());
     opCtx->recoveryUnit()->onRollback(
         [this, oldValidationLevel]() { this->_validationLevel = oldValidationLevel; });
 
@@ -1058,8 +1060,11 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     _validationAction = actionSW.getValue();
 
 
-    DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, getCatalogId(), _validatorDoc, getValidationLevel(), getValidationAction());
+    DurableCatalog::get(opCtx)->updateValidator(opCtx,
+                                                getCatalogId(),
+                                                _validator.validatorDoc,
+                                                getValidationLevel(),
+                                                getValidationAction());
     opCtx->recoveryUnit()->onRollback(
         [this, oldValidationAction]() { this->_validationAction = oldValidationAction; });
 
@@ -1073,26 +1078,23 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
     opCtx->recoveryUnit()->onRollback([this,
-                                       oldValidator = std::move(_swValidator),
-                                       oldValidatorDoc = std::move(_validatorDoc),
+                                       oldValidator = std::move(_validator),
                                        oldValidationLevel = _validationLevel,
                                        oldValidationAction = _validationAction]() mutable {
-        this->_swValidator = std::move(oldValidator);
-        this->_validatorDoc = std::move(oldValidatorDoc);
+        this->_validator = std::move(oldValidator);
         this->_validationLevel = oldValidationLevel;
         this->_validationAction = oldValidationAction;
     });
 
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, getCatalogId(), newValidator, newLevel, newAction);
-    _validatorDoc = std::move(newValidator);
 
-    auto validatorSW =
-        parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!validatorSW.isOK()) {
-        return validatorSW.getStatus();
+    auto validator =
+        parseValidator(opCtx, newValidator, MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!validator.isOK()) {
+        return validator.getStatus();
     }
-    _swValidator = std::move(validatorSW.getValue());
+    _validator = std::move(validator);
 
     auto levelSW = _parseValidationLevel(newLevel);
     if (!levelSW.isOK()) {

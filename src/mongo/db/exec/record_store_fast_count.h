@@ -42,7 +42,7 @@ class RecordStoreFastCountStage final : public RequiresCollectionStage {
 public:
     static const char* kStageType;
 
-    RecordStoreFastCountStage(OperationContext* opCtx,
+    RecordStoreFastCountStage(ExpressionContext* expCtx,
                               Collection* collection,
                               long long skip,
                               long long limit);

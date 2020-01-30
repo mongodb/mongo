@@ -57,14 +57,14 @@ namespace mongo {
 // static
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
-CachedPlanStage::CachedPlanStage(OperationContext* opCtx,
+CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
                                  Collection* collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  std::unique_ptr<PlanStage> root)
-    : RequiresAllIndicesStage(kStageType, opCtx, collection),
+    : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),
       _canonicalQuery(cq),
       _plannerParams(params),
@@ -227,7 +227,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     if (1 == solutions.size()) {
         // Only one possible plan. Build the stages from the solution.
         auto newRoot =
-            StageBuilder::build(getOpCtx(), collection(), *_canonicalQuery, *solutions[0], _ws);
+            StageBuilder::build(opCtx(), collection(), *_canonicalQuery, *solutions[0], _ws);
         _children.emplace_back(std::move(newRoot));
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
@@ -249,7 +249,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     auto cachingMode = shouldCache ? MultiPlanStage::CachingMode::AlwaysCache
                                    : MultiPlanStage::CachingMode::NeverCache;
     _children.emplace_back(
-        new MultiPlanStage(getOpCtx(), collection(), _canonicalQuery, cachingMode));
+        new MultiPlanStage(expCtx(), collection(), _canonicalQuery, cachingMode));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {
@@ -258,7 +258,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         }
 
         auto nextPlanRoot =
-            StageBuilder::build(getOpCtx(), collection(), *_canonicalQuery, *solutions[ix], _ws);
+            StageBuilder::build(opCtx(), collection(), *_canonicalQuery, *solutions[ix], _ws);
 
         multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
     }

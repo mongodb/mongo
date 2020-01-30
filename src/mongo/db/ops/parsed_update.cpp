@@ -45,8 +45,9 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
-      _driver(new ExpressionContext(
+      _expCtx(make_intrusive<ExpressionContext>(
           opCtx, nullptr, _request->getNamespaceString(), _request->getRuntimeConstants())),
+      _driver(_expCtx),
       _canonicalQuery(),
       _extensionsCallback(extensionsCallback) {}
 
@@ -81,11 +82,11 @@ Status ParsedUpdate::parseRequest() {
         if (!collator.isOK()) {
             return collator.getStatus();
         }
-        _collator = std::move(collator.getValue());
+        _expCtx->setCollator(std::move(collator.getValue()));
     }
 
-    auto statusWithArrayFilters = parseArrayFilters(
-        _request->getArrayFilters(), _opCtx, _collator.get(), _request->getNamespaceString());
+    auto statusWithArrayFilters =
+        parseArrayFilters(_expCtx, _request->getArrayFilters(), _request->getNamespaceString());
     if (!statusWithArrayFilters.isOK()) {
         return statusWithArrayFilters.getStatus();
     }
@@ -147,9 +148,8 @@ Status ParsedUpdate::parseQueryToCQ() {
         qr->setRuntimeConstants(*runtimeConstants);
     }
 
-    boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        _opCtx, std::move(qr), std::move(expCtx), _extensionsCallback, allowedMatcherFeatures);
+        _opCtx, std::move(qr), _expCtx, _extensionsCallback, allowedMatcherFeatures);
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());
     }
@@ -165,7 +165,7 @@ Status ParsedUpdate::parseQueryToCQ() {
 }
 
 void ParsedUpdate::parseUpdate() {
-    _driver.setCollator(_collator.get());
+    _driver.setCollator(_expCtx->getCollator());
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
 
@@ -176,13 +176,11 @@ void ParsedUpdate::parseUpdate() {
 }
 
 StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
-ParsedUpdate::parseArrayFilters(const std::vector<BSONObj>& rawArrayFiltersIn,
-                                OperationContext* opCtx,
-                                CollatorInterface* collator,
+ParsedUpdate::parseArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                const std::vector<BSONObj>& rawArrayFiltersIn,
                                 const NamespaceString& nss) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFiltersOut;
     for (auto rawArrayFilter : rawArrayFiltersIn) {
-        boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator, nss));
         auto parsedArrayFilter =
             MatchExpressionParser::parse(rawArrayFilter,
                                          std::move(expCtx),
@@ -240,12 +238,18 @@ UpdateDriver* ParsedUpdate::getDriver() {
 }
 
 void ParsedUpdate::setCollator(std::unique_ptr<CollatorInterface> collator) {
-    _collator = std::move(collator);
+    auto* rawCollator = collator.get();
 
-    _driver.setCollator(_collator.get());
+    if (_canonicalQuery) {
+        _canonicalQuery->setCollator(std::move(collator));
+    } else {
+        _expCtx->setCollator(std::move(collator));
+    }
+
+    _driver.setCollator(rawCollator);
 
     for (auto&& arrayFilter : _arrayFilters) {
-        arrayFilter.second->getFilter()->setCollator(_collator.get());
+        arrayFilter.second->getFilter()->setCollator(rawCollator);
     }
 }
 

@@ -449,7 +449,7 @@ TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto caseInsensitive =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
-    expCtx->setCollator(caseInsensitive.get());
+    expCtx->setCollator(std::move(caseInsensitive));
 
     auto trim = Expression::parseExpression(expCtx,
                                             BSON("$trim" << BSON("input"

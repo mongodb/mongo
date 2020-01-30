@@ -43,11 +43,11 @@ using std::vector;
 // static
 const char* SkipStage::kStageType = "SKIP";
 
-SkipStage::SkipStage(OperationContext* opCtx,
+SkipStage::SkipStage(ExpressionContext* expCtx,
                      long long toSkip,
                      WorkingSet* ws,
                      std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, opCtx), _ws(ws), _toSkip(toSkip) {
+    : PlanStage(kStageType, expCtx), _ws(ws), _toSkip(toSkip) {
     _children.emplace_back(std::move(child));
 }
 

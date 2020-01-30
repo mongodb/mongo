@@ -41,10 +41,19 @@
 namespace mongo {
 namespace {
 
-std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj,
-                                                      const CollatorInterface* collator = nullptr) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(collator);
+/**
+ * Produce a MatchExpression from BSON.
+ *
+ * If the caller would like the MatchExpression to have a collation associated with it, they may
+ * pass in an ExpressionContext owning the collation. Otherwise the caller may pass nullptr and a
+ * default-constructed ExpressionContextForTest will be used.
+ */
+std::unique_ptr<MatchExpression> parseMatchExpression(
+    const BSONObj& obj, boost::intrusive_ptr<ExpressionContext> expCtx = nullptr) {
+    if (!expCtx) {
+        expCtx = make_intrusive<ExpressionContextForTest>();
+    }
+
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse query: " << obj.toString()
@@ -400,6 +409,9 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
     entry.collator = &collator;
     state.updateDiscriminators({entry});
 
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(collator.clone());
+
     auto discriminators = state.getDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
     ASSERT(discriminators.find("a_1") != discriminators.end());
@@ -409,14 +421,13 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
     // Index collator matches query collator.
     ASSERT_EQ(true,
               disc.isMatchCompatibleWithIndex(
-                  parseMatchExpression(fromjson("{a: 'abc'}"), &collator).get()));
+                  parseMatchExpression(fromjson("{a: 'abc'}"), expCtx).get()));
     ASSERT_EQ(true,
               disc.isMatchCompatibleWithIndex(
-                  parseMatchExpression(fromjson("{a: {$in: ['abc', 'xyz']}}"), &collator).get()));
-    ASSERT_EQ(
-        true,
-        disc.isMatchCompatibleWithIndex(
-            parseMatchExpression(fromjson("{a: {$_internalExprEq: 'abc'}}}"), &collator).get()));
+                  parseMatchExpression(fromjson("{a: {$in: ['abc', 'xyz']}}"), expCtx).get()));
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$_internalExprEq: 'abc'}}}"), expCtx).get()));
 
     // Expression is not a ComparisonMatchExpression, InternalExprEqMatchExpression or
     // InMatchExpression.
@@ -547,6 +558,10 @@ TEST(PlanCacheIndexabilityTest, WildcardWithCollationDiscriminator) {
     auto entryProjExecPair = makeWildcardEntry(BSON("a.$**" << 1));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     entryProjExecPair.first.collator = &collator;
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(collator.clone());
+
     state.updateDiscriminators({entryProjExecPair.first});
 
     const auto unindexedPathDiscriminators = state.buildWildcardDiscriminators("notIndexed");
@@ -563,7 +578,7 @@ TEST(PlanCacheIndexabilityTest, WildcardWithCollationDiscriminator) {
         parseMatchExpression(fromjson("{a: \"hello world\"}"), nullptr).get()));
     // Match expression which uses the same collation as the index is.
     ASSERT_TRUE(disc.isMatchCompatibleWithIndex(
-        parseMatchExpression(fromjson("{a: \"hello world\"}"), &collator).get()));
+        parseMatchExpression(fromjson("{a: \"hello world\"}"), expCtx).get()));
 }
 
 TEST(PlanCacheIndexabilityTest, WildcardPartialIndexDiscriminator) {

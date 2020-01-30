@@ -255,7 +255,7 @@ public:
     GetNextResult getNext() {
         pExpCtx->checkForInterrupt();
 
-        if (MONGO_likely(!pExpCtx->explain)) {
+        if (MONGO_likely(!pExpCtx->shouldCollectExecStats())) {
             return doGetNext();
         }
 

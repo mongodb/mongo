@@ -37,6 +37,7 @@
 #include <memory>
 
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -48,6 +49,8 @@ namespace {
 
 using std::unique_ptr;
 
+const static NamespaceString kNss("db.dummy");
+
 class QueuedDataStageTest : public ServiceContextMongoDTest {
 public:
     QueuedDataStageTest() {
@@ -56,7 +59,7 @@ public:
     }
 
 protected:
-    OperationContext* getOpCtx() {
+    OperationContext* opCtx() {
         return _opCtx.get();
     }
 
@@ -69,7 +72,8 @@ private:
 //
 TEST_F(QueuedDataStageTest, getValidStats) {
     WorkingSet ws;
-    auto mock = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
+    auto mock = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
     const CommonStats* commonStats = mock->getCommonStats();
     ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
     const SpecificStats* specificStats = mock->getSpecificStats();
@@ -84,7 +88,8 @@ TEST_F(QueuedDataStageTest, getValidStats) {
 TEST_F(QueuedDataStageTest, validateStats) {
     WorkingSet ws;
     WorkingSetID wsID;
-    auto mock = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
+    auto mock = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
 
     // make sure that we're at all zero
     const CommonStats* stats = mock->getCommonStats();

@@ -44,9 +44,13 @@ namespace mongo {
 
 namespace {
 
+const NamespaceString kTestNss = NamespaceString("db.dummy");
+
 class TrialStageTest : public unittest::Test {
 public:
-    TrialStageTest() : _opCtx(cc().makeOperationContext()) {}
+    TrialStageTest()
+        : _opCtx(cc().makeOperationContext()),
+          _expCtx(make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, kTestNss)) {}
 
 protected:
     // Pushes BSONObjs from the given vector into the given QueuedDataStage. Each empty BSONObj in
@@ -98,11 +102,14 @@ protected:
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     WorkingSet _ws;
+
+protected:
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
+    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 20 results and no NEED_TIMEs.
     std::vector<BSONObj> trialResults;
@@ -114,7 +121,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
     // Set the minimum advanced-to-works ratio to 0.75. Because every work() will result in an
     // ADVANCE, the trial plan will succeed.
     auto trialStage = std::make_unique<TrialStage>(
-        opCtx(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
+        _expCtx.get(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
 
     ASSERT_OK(trialStage->pickBestPlan(yieldPolicy().get()));
 
@@ -131,8 +138,8 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
 }
 
 TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
+    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 5 results and no NEED_TIMEs.
     std::vector<BSONObj> trialResults;
@@ -144,7 +151,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
     // We schedule the trial to run for 10 works. Because we hit EOF after 5 results, we will end
     // the trial phase early and adopt the successful trial plan.
     auto trialStage = std::make_unique<TrialStage>(
-        opCtx(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
+        _expCtx.get(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
 
     ASSERT_OK(trialStage->pickBestPlan(yieldPolicy().get()));
 
@@ -166,8 +173,8 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
 }
 
 TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
+    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 20 results. Every second result will produce a NEED_TIME.
     std::vector<BSONObj> trialResults;
@@ -187,7 +194,7 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
     // Set the minimum advanced-to-works ratio to 0.75. Because every second work() will result in a
     // NEED_TIME and the actual ratio is thus 0.5, the trial plan will fail.
     auto trialStage = std::make_unique<TrialStage>(
-        opCtx(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
+        _expCtx.get(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
 
     ASSERT_OK(trialStage->pickBestPlan(yieldPolicy().get()));
 
@@ -204,8 +211,8 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
 }
 
 TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialPlanDies) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
+    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 2 results followed by a PlanStage::FAILURE.
     queueData({BSON("_id" << 0), BSON("_id" << 1)}, trialPlan.get());
@@ -222,7 +229,7 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialPlanDies) {
     // We schedule the trial to run for 10 works. Because we will encounter a PlanStage::FAILURE
     // before this point, the trial will complete early and the backup plan will be adopted.
     auto trialStage = std::make_unique<TrialStage>(
-        opCtx(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
+        _expCtx.get(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
 
     ASSERT_OK(trialStage->pickBestPlan(yieldPolicy().get()));
 

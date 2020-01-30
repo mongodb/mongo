@@ -46,7 +46,7 @@ namespace {
 std::unique_ptr<SortKeyGenerator> makeSortKeyGen(const BSONObj& sortSpec,
                                                  const CollatorInterface* collator) {
     boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContextForTest());
-    pExpCtx->setCollator(collator);
+    pExpCtx->setCollator(CollatorInterface::cloneCollator(collator));
     SortPattern sortPattern{sortSpec, pExpCtx};
     return std::make_unique<SortKeyGenerator>(std::move(sortPattern), collator);
 }

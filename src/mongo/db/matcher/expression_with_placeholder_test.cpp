@@ -88,9 +88,10 @@ TEST(ExpressionWithPlaceholderTest, ParseElemMatch) {
 }
 
 TEST(ExpressionWithPlaceholderTest, ParseCollation) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(&collator);
+    expCtx->setCollator(std::move(collator));
     auto rawFilter = fromjson("{i: 'abc'}");
     auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
