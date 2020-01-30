@@ -53,7 +53,7 @@ def _install_action_function(_env, node):
         "outputs": get_outputs(node),
         "rule": "INSTALL",
         "pool": "install_pool",
-        "inputs": [get_path(src_file(s)) for s in node.sources],
+        "inputs": sorted([get_path(src_file(s)) for s in node.sources]),
         "implicit": get_dependencies(node),
     }
 
@@ -65,8 +65,8 @@ def _lib_symlink_action_function(_env, node):
     if not symlinks or symlinks is None:
         return None
 
-    outputs = [link.get_dir().rel_path(linktgt) for link, linktgt in symlinks]
-    inputs = [link.get_path() for link, _ in symlinks]
+    outputs = sorted([link.get_dir().rel_path(linktgt) for link, linktgt in symlinks])
+    inputs = sorted([link.get_path() for link, _ in symlinks])
 
     return {
         "outputs": outputs,
@@ -96,15 +96,15 @@ def alias_to_ninja_build(node):
     return {
         "outputs": get_outputs(node),
         "rule": "phony",
-        "implicit": [
+        "implicit": sorted([
             get_path(n) for n in node.children() if is_valid_dependent_node(n)
-        ],
+        ]),
     }
 
 
 def get_dependencies(node):
     """Return a list of dependencies for node."""
-    return [get_path(src_file(child)) for child in node.children()]
+    return sorted([get_path(src_file(child)) for child in node.children()])
 
 
 def get_inputs(node):
@@ -115,7 +115,7 @@ def get_inputs(node):
     else:
         inputs = node.sources
 
-    inputs = [get_path(src_file(o)) for o in inputs]
+    inputs = sorted([get_path(src_file(o)) for o in inputs])
     return inputs
 
 
@@ -130,7 +130,7 @@ def get_outputs(node):
         else:
             outputs = [node]
 
-    outputs = [get_path(o) for o in outputs]
+    outputs = sorted([get_path(o) for o in outputs])
     return outputs
 
 
@@ -241,7 +241,7 @@ class SConsToNinjaTranslator:
         if len(results) == 1:
             return results[0]
 
-        all_outputs = list({output for build in results for output in build["outputs"]})
+        all_outputs = sorted(list({output for build in results for output in build["outputs"]}))
         # If we have no outputs we're done
         if not all_outputs:
             return None
@@ -586,12 +586,12 @@ class NinjaState:
             ninja.build(
                 outputs="_generated_sources",
                 rule="phony",
-                implicit=list(generated_source_files),
+                implicit=sorted(list(generated_source_files)),
             )
 
         template_builders = []
 
-        for build in self.builds:
+        for build in sorted(self.builds, key=lambda x: x["outputs"][0]):
             if build["rule"] == "TEMPLATE":
                 template_builders.append(build)
                 continue
@@ -678,6 +678,7 @@ class NinjaState:
             template_builds.update(template_builder)
 
         if template_builds.get("outputs", []):
+            template_builds["outputs"] = sorted(template_builds["outputs"])
             ninja.build(**template_builds)
 
         # We have to glob the SCons files here to teach the ninja file
@@ -694,11 +695,11 @@ class NinjaState:
         ninja.build(
             ninja_file,
             rule="REGENERATE",
-            implicit=[
+            implicit=sorted([
                 self.env.File("#SConstruct").get_abspath(),
                 os.path.abspath(__file__),
             ]
-            + glob("src/**/SConscript", recursive=True),
+            + glob("src/**/SConscript", recursive=True)),
         )
 
         ninja.build(
@@ -745,8 +746,27 @@ class NinjaState:
         elif fallback_default_target is not None:
             ninja.default(fallback_default_target)
 
-        with open(ninja_file, "w") as build_ninja:
-            build_ninja.write(content.getvalue())
+        # Grab the contents of our buffer, we're going to compare it
+        # to the existing ninja file (if there is one). This way we
+        # don't unnecessarily update the ninja file which would cause
+        # a full rebuild of the tree. Since we have the restat
+        # variable set to true on the REGENERATE rule if we don't
+        # write the file Ninja will re-determine after we complete if
+        # the file actually changed and remove targets from the build
+        # queue if they didn't need to be rebuilt.
+        new_build_ninja = content.getvalue()
+
+        if os.path.isfile(ninja_file):
+            with open(ninja_file, "r") as build_ninja:
+                old_build_ninja = build_ninja.read()
+        else:
+            old_build_ninja = ""
+
+        if new_build_ninja != old_build_ninja:
+            with open(ninja_file, "w") as build_ninja:
+                build_ninja.write(new_build_ninja)
+        else:
+            print(ninja_file, "is already up to date.")
 
         self.__generated = True
 
