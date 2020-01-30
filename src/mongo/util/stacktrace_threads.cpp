@@ -550,7 +550,6 @@ void State::printToEmitter(AbstractEmitter& emitter) {
                         const auto* file = metaGen.findFile(soBase);
                         if (file == nullptr)
                             continue;
-                        StringData id = file->id();
                         BSONObjBuilder outLibrary(soMapArr.subobjStart());
 
                         // Replace "b" with the `file->id()`. Pass everything else through.
