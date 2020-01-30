@@ -636,17 +636,25 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
     updateCurOpForCommitOrAbort(opCtx, kCommitIndexBuildFieldName, buildUUID);
 
     invariant(oplogEntry.cause);
+    uassert(31420,
+            str::stream()
+                << "No commit timestamp set while applying abortIndexBuild operation. Build UUID: "
+                << buildUUID,
+            !opCtx->recoveryUnit()->getCommitTimestamp().isNull());
+
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     indexBuildsCoord->abortIndexBuildByBuildUUID(
         opCtx,
         buildUUID,
+        opCtx->recoveryUnit()->getCommitTimestamp(),
         str::stream() << "abortIndexBuild oplog entry encountered: " << *oplogEntry.cause);
 }
 
 void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                                         const UUID& buildUUID,
+                                                        Timestamp abortTimestamp,
                                                         const std::string& reason) {
-    if (!abortIndexBuildByBuildUUIDNoWait(opCtx, buildUUID, reason)) {
+    if (!abortIndexBuildByBuildUUIDNoWait(opCtx, buildUUID, abortTimestamp, reason)) {
         return;
     }
 
@@ -658,6 +666,7 @@ void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
 bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(OperationContext* opCtx,
                                                               const UUID& buildUUID,
+                                                              Timestamp abortTimestamp,
                                                               const std::string& reason) {
     _indexBuildsManager.abortIndexBuild(buildUUID, reason);
 
@@ -674,7 +683,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(OperationContext* 
     {
         stdx::unique_lock<Latch> lk(replState->mutex);
         replState->aborted = true;
-        replState->abortTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
+        replState->abortTimestamp = abortTimestamp;
         replState->abortReason = reason;
         replState->condVar.notify_all();
     }
@@ -720,10 +729,12 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
             // oplog entries, and consequently does not have a timestamp to delete the index from
             // the durable catalog. This abort will replicate to the old primary, now secondary, to
             // abort the build.
+            // Use a null timestamp because the primary will generate its own timestamp with an
+            // oplog entry.
             // Do not wait for the index build to exit, because it may reacquire locks that are not
             // available until stepUp completes.
             abortIndexBuildByBuildUUIDNoWait(
-                opCtx, replState->buildUUID, "unique indexes do not support failover");
+                opCtx, replState->buildUUID, Timestamp(), "unique indexes do not support failover");
             return;
         }
 
@@ -747,37 +758,29 @@ IndexBuilds IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
     IndexBuilds buildsAborted;
 
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [this, &buildsAborted](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [this, opCtx, &buildsAborted](
+                            std::shared_ptr<ReplIndexBuildState> replState) {
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             log() << "IndexBuildsCoordinator::onRollback - not aborting single phase index build: "
                   << replState->buildUUID;
             return;
         }
-
         const std::string reason = "rollback";
-        _indexBuildsManager.abortIndexBuild(replState->buildUUID, reason);
 
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (!replState->aborted) {
-
-            IndexBuildDetails aborted{replState->collectionUUID};
-            // Record the index builds aborted due to rollback. This allows any rollback algorithm
-            // to efficiently restart all unfinished index builds without having to scan all indexes
-            // in all collections.
-            for (auto spec : replState->indexSpecs) {
-                aborted.indexSpecs.emplace_back(spec.getOwned());
-            }
-            buildsAborted.insert({replState->buildUUID, aborted});
-
-            // Leave abort timestamp as null. This will unblock the index build and allow it to
-            // complete using a ghost timestamp. Subsequently, the rollback algorithm can decide how
-            // to undo the index build depending on the state of the oplog.
-            invariant(replState->abortTimestamp.isNull(), replState->buildUUID.toString());
-            invariant(!replState->aborted, replState->buildUUID.toString());
-            replState->aborted = true;
-            replState->abortReason = reason;
-            replState->condVar.notify_all();
+        IndexBuildDetails aborted{replState->collectionUUID};
+        // Record the index builds aborted due to rollback. This allows any rollback algorithm
+        // to efficiently restart all unfinished index builds without having to scan all indexes
+        // in all collections.
+        for (auto spec : replState->indexSpecs) {
+            aborted.indexSpecs.emplace_back(spec.getOwned());
         }
+        buildsAborted.insert({replState->buildUUID, aborted});
+
+        // Leave abort timestamp as null. This will unblock the index build and allow it to
+        // complete without cleaning up. Subsequently, the rollback algorithm can decide how to
+        // undo the index build depending on the state of the oplog. Waits for index build
+        // thread to exit.
+        abortIndexBuildByBuildUUID(opCtx, replState->buildUUID, Timestamp(), reason);
     };
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onRollback - "_sd, onIndexBuild);
     return buildsAborted;

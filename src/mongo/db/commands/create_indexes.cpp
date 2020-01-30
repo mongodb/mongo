@@ -904,9 +904,12 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // independently of this command invocation. We'll defensively abort the index build
             // with the assumption that if the index build was already in the midst of tearing down,
             // this be a no-op.
+            // Use a null abort timestamp because the index build will generate its own timestamp
+            // on cleanup.
             indexBuildsCoord->abortIndexBuildByBuildUUIDNoWait(
                 opCtx,
                 buildUUID,
+                Timestamp(),
                 str::stream() << "Index build interrupted: " << buildUUID << ": "
                               << interruptionEx.toString());
             log() << "Index build aborted: " << buildUUID;
@@ -924,9 +927,12 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 throw;
             }
 
+            // Use a null abort timestamp because the index build will generate a ghost timestamp
+            // for the single-phase build on cleanup.
             indexBuildsCoord->abortIndexBuildByBuildUUIDNoWait(
                 opCtx,
                 buildUUID,
+                Timestamp(),
                 str::stream() << "Index build interrupted due to change in replication state: "
                               << buildUUID << ": " << ex.toString());
             log() << "Index build aborted due to NotMaster error: " << buildUUID;

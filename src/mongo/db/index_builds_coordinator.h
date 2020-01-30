@@ -238,6 +238,7 @@ public:
      */
     void abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                     const UUID& buildUUID,
+                                    Timestamp abortTimestamp,
                                     const std::string& reason);
 
     /**
@@ -246,6 +247,7 @@ public:
      */
     bool abortIndexBuildByBuildUUIDNoWait(OperationContext* opCtx,
                                           const UUID& buildUUID,
+                                          Timestamp abortTimestamp,
                                           const std::string& reason);
     /**
      * Returns number of index builds in process.

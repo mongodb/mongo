@@ -12,29 +12,14 @@
 (function() {
 'use strict';
 
+load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 load('jstests/replsets/libs/rollback_test.js');
 
-const dbName = "dbWithBgIndex";
-const collName = 'coll';
 let bgIndexThread;
 
-function hangIndexBuildsFailpoint(node, fpMode) {
-    assert.commandWorked(node.adminCommand(
-        {configureFailPoint: 'hangAfterStartingIndexBuildUnlocked', mode: fpMode}));
-}
-
-/**
- * A function to create a background index on the test collection in a parallel shell.
- */
-function createBgIndexFn() {
-    // Re-define constants, since they are not shared between shells.
-    const dbName = "dbWithBgIndex";
-    const collName = "coll";
-    let testDB = db.getSiblingDB(dbName);
-    jsTestLog("Starting background index build from parallel shell.");
-    assert.commandWorked(testDB[collName].createIndex({x: 1}, {background: true}));
-}
+const dbName = "dbWithBgIndex";
+const collName = "coll";
 
 /**
  * Operations that will get replicated to both replica set nodes before rollback.
@@ -52,20 +37,19 @@ function CommonOps(node) {
     const testColl = testDB.getCollection(collName);
     assert.commandWorked(testColl.insert({a: 1}));
 
-    // Hang background index builds.
-    hangIndexBuildsFailpoint(node, "alwaysOn");
+    // Puase all index builds.
+    IndexBuildTest.pauseIndexBuilds(node);
 
-    jsTestLog("Starting background index build parallel shell.");
-    bgIndexThread = startParallelShell(createBgIndexFn, node.port);
+    jsTestLog("Starting background index build in parallel shell.");
+    bgIndexThread = IndexBuildTest.startIndexBuild(node, testColl.getFullName(), {x: 1});
 
-    // Make sure the index build started and hit the failpoint.
-    jsTestLog("Waiting for background index build to start and hang due to failpoint.");
-    checkLog.contains(node, "index build: starting on " + testDB[collName].getFullName());
-    checkLog.contains(node, "Hanging index build with no locks");
+    jsTestLog("Waiting for background index build to start.");
+    IndexBuildTest.waitForIndexBuildToStart(testDB, collName, "x_1");
 }
 
 const rollbackTest = new RollbackTest();
 const originalPrimary = rollbackTest.getPrimary();
+const testDB = originalPrimary.getDB(dbName);
 CommonOps(originalPrimary);
 
 // Insert a document so that there is an operation to rollback.
@@ -76,17 +60,12 @@ assert.commandWorked(rollbackNode.getDB(dbName)["rollbackColl"].insert({x: 1}));
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 
+IndexBuildTest.resumeIndexBuilds(originalPrimary);
+
 // Make sure that rollback is hung waiting for the background index operation to complete.
 jsTestLog("Waiting for rollback to block on the background index build completion.");
 let msg1 = "Waiting for all background operations to complete before starting rollback";
-let msg2 = "Waiting for 1 background operations to complete on database '" + dbName + "'";
 checkLog.contains(rollbackNode, msg1);
-checkLog.contains(rollbackNode, msg2);
-
-// Now turn off the index build failpoint, allowing rollback to continue and finish.
-jsTestLog(
-    "Disabling 'hangAfterStartingIndexBuildUnlocked' failpoint on the rollback node so background index build can complete.");
-hangIndexBuildsFailpoint(rollbackNode, "off");
 
 // Make sure the background index build completed before rollback started.
 checkLog.contains(rollbackNode,
@@ -94,6 +73,9 @@ checkLog.contains(rollbackNode,
 
 // Wait for rollback to finish.
 rollbackTest.transitionToSteadyStateOperations();
+
+// Ensure index build is not running.
+IndexBuildTest.waitForIndexBuildToStop(testDB, collName, "x_1");
 
 // Check the replica set.
 rollbackTest.stop();

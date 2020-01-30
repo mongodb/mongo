@@ -430,7 +430,8 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 }
 
                 // Inserts the index name to be dropped into the set of indexes that
-                // need to be dropped for the collection.
+                // need to be dropped for the collection. Any errors dropping the index are ignored
+                // if it does not exist.
                 fixUpInfo.indexesToDrop[*uuid].insert(indexName);
 
                 return Status::OK();
@@ -448,9 +449,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 // If the index build has been committed or aborted, and the commit or abort
                 // oplog entry has also been rolled back, the index build will have been added
-                // to the set to be restarted. Remove it, and then add it to the set to be
-                // dropped. If the index has already been dropped by abort, then this is a
-                // no-op.
+                // to the set to be restarted. An index build may also be in the set to be restarted
+                // if it was in-progress and aborted before rollback.
+                // Remove it, and then add it to the set to be dropped. If the index has already
+                // been dropped by abort, then this is a no-op.
                 auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
                 auto buildUUID = indexBuildOplogEntry.buildUUID;
                 auto existingIt = buildsToRestart.find(buildUUID);
@@ -465,7 +467,9 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                     for (auto& indexName : indexBuildOplogEntry.indexNames) {
                         fixUpInfo.indexesToDrop[*uuid].insert(indexName);
                     }
-                    return Status::OK();
+                    // Intentionally allow this index build to be added to both 'indexesToDrop' and
+                    // 'unfinishedIndexesToDrop', since we can not tell at this point if it is
+                    // finished or not.
                 }
 
                 // If the index build was not committed or aborted, the index build is
@@ -1145,6 +1149,17 @@ Status _syncRollback(OperationContext* opCtx,
         }
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
+    } catch (const DBException& e) {
+        // If we encounter an error during rollback, but we aborted index builds beforehand, we
+        // will be unable to successfully perform any more rollback attempts. The knowledge of these
+        // aborted index builds gets lost after the first attempt.
+        if (abortedIndexBuilds.size()) {
+            return Status{ErrorCodes::UnrecoverableRollbackError,
+                          "Index builds aborted prior to rollback cannot be restarted by "
+                          "subsequent rollback attempts"}
+                .withContext(e.what());
+        }
+        throw;
     }
 
     if (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
