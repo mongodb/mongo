@@ -181,7 +181,7 @@ protected:
     /**
      * Returns the OpTime of the last oplog entry fetched and processed.
      */
-    OpTime _getLastOpTimeFetched() const;
+    virtual OpTime _getLastOpTimeFetched() const;
 
     // =============== AbstractAsyncComponent overrides ================
 

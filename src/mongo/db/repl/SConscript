@@ -1226,6 +1226,7 @@ env.CppUnitTest(
         'oplog_buffer_collection_test.cpp',
         'oplog_buffer_proxy_test.cpp',
         'oplog_entry_test.cpp',
+        'oplog_fetcher_mock.cpp',
         'oplog_fetcher_test.cpp',
         'oplog_test.cpp',
         'optime_extract_test.cpp',

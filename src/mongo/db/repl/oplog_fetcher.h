@@ -426,6 +426,12 @@ public:
      */
     DBClientConnection* getDBClientConnection_forTest() const;
 
+protected:
+    /**
+     * Returns the OpTime of the last oplog entry fetched and processed.
+     */
+    virtual OpTime _getLastOpTimeFetched() const;
+
 private:
     // =============== AbstractAsyncComponent overrides ================
 
@@ -509,11 +515,6 @@ private:
      * unreachable.
      */
     Milliseconds _getRetriedFindMaxTime() const;
-
-    /**
-     * Returns the OpTime of the last oplog entry fetched and processed.
-     */
-    OpTime _getLastOpTimeFetched() const;
 
     // Protects member data of this OplogFetcher.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogFetcher::_mutex");

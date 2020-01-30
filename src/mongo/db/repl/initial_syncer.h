@@ -152,6 +152,24 @@ public:
      */
     using CreateClientFn = std::function<std::unique_ptr<DBClientConnection>()>;
 
+    /**
+     * Type of function to create an OplogFetcher.
+     */
+    using CreateOplogFetcherFn = std::function<std::unique_ptr<OplogFetcher>(
+        executor::TaskExecutor* executor,
+        OpTime lastFetched,
+        HostAndPort source,
+        NamespaceString nss,
+        ReplSetConfig config,
+        std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+        int requiredRBID,
+        bool requireFresherSyncSource,
+        DataReplicatorExternalState* dataReplicatorExternalState,
+        OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
+        OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+        const int batchSize,
+        OplogFetcher::StartingPoint startingPoint)>;
+
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
@@ -246,6 +264,24 @@ public:
      * For testing only
      */
     void setCreateClientFn_forTest(const CreateClientFn& createClientFn);
+
+    /**
+     *
+     * Overrides how the initial syncer creates the OplogFetcher.
+     *
+     * For testing only.
+     */
+    void setCreateOplogFetcherFn_forTest(const CreateOplogFetcherFn& createOplogFetcherFn);
+
+    /**
+     *
+     * Get a raw pointer to the OplogFetcher. Block up to 10s until the underlying OplogFetcher has
+     * started. It is the caller's responsibility to not reuse this pointer beyond the lifetime of
+     * the underlying OplogFetcher.
+     *
+     * For testing only.
+     */
+    OplogFetcher* getOplogFetcher_forTest() const;
 
     /**
      *
@@ -729,6 +765,9 @@ private:
 
     // Used to create the DBClientConnection for the cloners
     CreateClientFn _createClientFn;
+
+    // Used to create the OplogFetcher for the InitialSyncer.
+    CreateOplogFetcherFn _createOplogFetcherFn;
 
     // Contains stats on the current initial sync request (includes all attempts).
     // To access these stats in a user-readable format, use getInitialSyncProgress().
