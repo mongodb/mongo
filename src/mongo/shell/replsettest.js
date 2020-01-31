@@ -1404,17 +1404,30 @@ var ReplSetTest = function(opts) {
      * Calls awaitReplication() which requires all connections in 'nodes' to be authenticated.
      */
     this.stepUp = function(node) {
-        this.awaitReplication();
-        this.awaitNodesAgreeOnAppliedOpTime();
-        this.awaitNodesAgreeOnPrimary();
-        if (this.getPrimary() === node) {
-            return;
-        }
+        assert.soon(() => {
+            this.awaitReplication();
+            this.awaitNodesAgreeOnAppliedOpTime();
+            this.awaitNodesAgreeOnPrimary();
+            if (this.getPrimary() === node) {
+                return true;
+            }
 
-        jsTest.log("Stepping up: " + node.host + " in stepUp");
-        assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-        this.awaitNodesAgreeOnPrimary();
-        assert.eq(this.getPrimary(), node, 'failed to step up node ' + node.host + ' in stepUp');
+            jsTest.log("Stepping up: " + node.host + " in stepUp");
+
+            try {
+                assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+            } catch (e) {
+                jsTestLog('Failed to step up node ' + node.host + ' in stepUp');
+                return false;
+            }
+            this.awaitNodesAgreeOnPrimary();
+            if (this.getPrimary() === node) {
+                return true;
+            }
+
+            jsTest.log(node.host + ' is not primary after stepUp command');
+            return false;
+        }, "Timed out while waiting for stepUp to succeed on node in port: " + node.port);
     };
 
     /**
