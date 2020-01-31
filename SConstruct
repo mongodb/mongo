@@ -3796,14 +3796,8 @@ if get_option('ninja') == 'true':
         description="Generating $out",
         deps="msvc",
     )
-
-    def get_idlc_command(env, node, action, targets, sources, executor=None):
-        _, variables = env.NinjaGetShellCommand(node, action, targets, sources, executor=executor)
-        variables["msvc_deps_prefix"] = "import file:"
-        return "IDLC", variables
-
-    env.NinjaRuleMapping("$IDLCCOM", get_idlc_command)
-    env.NinjaRuleMapping(env["IDLCCOM"], get_idlc_command)
+    env.NinjaRuleMapping("$IDLCCOM", "IDLC")
+    env.NinjaRuleMapping(env["IDLCCOM"], "IDLC")
 
     # We can create empty files for FAKELIB in Ninja because it
     # does not care about content signatures. We have to

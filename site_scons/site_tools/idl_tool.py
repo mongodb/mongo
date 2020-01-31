@@ -40,6 +40,12 @@ def idlc_emitter(target, source, env):
     target_source = env.File(base_file_name + "_gen.cpp")
     target_header = env.File(base_file_name + "_gen.h")
 
+    # When generating ninja we need to inform each IDL build the
+    # string it should search for to find implicit dependencies.
+    if env.get("GENERATING_NINJA", False):
+        setattr(target_source.attributes, "NINJA_EXTRA_VARS", {"msvc_deps_prefix": "import file:"})
+        setattr(target_header.attributes, "NINJA_EXTRA_VARS", {"msvc_deps_prefix": "import file:"})
+
     env.Alias("generated-sources", [target_source, target_header])
 
     return [target_source, target_header], source
