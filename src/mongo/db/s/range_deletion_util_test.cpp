@@ -735,6 +735,7 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
 
     // Should cause an invariant failure.
     queriesCompletePf.promise.setError(Status(ErrorCodes::InternalError, "Some unexpected error"));
+    cleanupComplete.get();
 }
 
 }  // namespace
