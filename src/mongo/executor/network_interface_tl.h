@@ -88,45 +88,36 @@ public:
     void dropConnections(const HostAndPort& hostAndPort) override;
 
 private:
+    struct RequestState;
+
     struct CommandState final : public std::enable_shared_from_this<CommandState> {
         CommandState(NetworkInterfaceTL* interface_,
                      RemoteCommandRequestOnAny request_,
-                     const TaskExecutor::CallbackHandle& cbHandle_,
-                     Promise<RemoteCommandOnAnyResponse> promise_);
-        ~CommandState();
+                     const TaskExecutor::CallbackHandle& cbHandle_);
+        virtual ~CommandState() = default;
 
         // Create a new CommandState in a shared_ptr
         // Prefer this over raw construction
         static auto make(NetworkInterfaceTL* interface,
                          RemoteCommandRequestOnAny request,
-                         const TaskExecutor::CallbackHandle& cbHandle,
-                         Promise<RemoteCommandOnAnyResponse> promise);
+                         const TaskExecutor::CallbackHandle& cbHandle);
 
         /**
-         * Return the client object bound to the current command or nullptr if there isn't one.
-         *
-         * This is only useful on the networking thread (i.e. the reactor).
+         * Use the current RequestState to send out a command request.
          */
-        AsyncDBClient* client();
+        virtual Future<RemoteCommandResponse> sendRequest();
+
+        /**
+         * Return the maximum number of request failures this Command can tolerate
+         */
+        virtual size_t maxRequestFailures() {
+            return 1;
+        }
 
         /**
          * Set a timer to fulfill the promise with a timeout error.
          */
-        void setTimer();
-
-        /**
-         * Cancel the current client operation or do nothing if there is no client.
-         *
-         * This must be called from the networking thread (i.e. the reactor).
-         */
-        void cancel();
-
-        /**
-         * Return the current connection to the pool and unset it locally.
-         *
-         * This must be called from the networking thread (i.e. the reactor).
-         */
-        void returnConnection(Status status);
+        virtual void setTimer();
 
         /**
          * Fulfill the promise for the Command.
@@ -135,24 +126,81 @@ private:
          * swap on CommandState::done for you and return early if it was already true. It does not
          * do so currently.
          */
-        void tryFinish(Status status);
+        void tryFinish(Status status) noexcept;
+
+        /**
+         * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
+         * finished.
+         */
+        void doMetadataHook(const RemoteCommandOnAnyResponse& response);
 
         NetworkInterfaceTL* interface;
 
         RemoteCommandRequestOnAny requestOnAny;
-        boost::optional<RemoteCommandRequest> request;
         TaskExecutor::CallbackHandle cbHandle;
         Date_t deadline = RemoteCommandRequest::kNoExpirationDate;
-        Date_t start;
+
+        ClockSource::StopWatch stopwatch;
 
         BatonHandle baton;
         std::unique_ptr<transport::ReactorTimer> timer;
 
-        StrongWeakFinishLine finishLine;
-        ConnectionPool::ConnectionHandle conn;
+        std::weak_ptr<RequestState> requestStatePtr;
 
-        AtomicWord<bool> done;
+        StrongWeakFinishLine finishLine;
         Promise<RemoteCommandOnAnyResponse> promise;
+    };
+
+    struct RequestState final : public std::enable_shared_from_this<RequestState> {
+        RequestState(std::shared_ptr<CommandState> cmdState_)
+            : cmdState{std::move(cmdState_)},
+              connFinishLine(cmdState->requestOnAny.target.size()) {}
+        ~RequestState();
+
+        /**
+         * Return the client object bound to the current command or nullptr if there isn't one.
+         *
+         * This is only useful on the networking thread (i.e. the reactor).
+         */
+        AsyncDBClient* client() noexcept;
+
+        /**
+         * Cancel the current client operation or do nothing if there is no client.
+         *
+         * This must be called from the networking thread (i.e. the reactor).
+         */
+        void cancel() noexcept;
+
+        /**
+         * Return the current connection to the pool and unset it locally.
+         *
+         * This must be called from the networking thread (i.e. the reactor).
+         */
+        void returnConnection(Status status) noexcept;
+
+        /**
+         * Attempt to send a request using the given connection
+         */
+        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
+
+        /**
+         * Resolve an eventual response
+         */
+        void resolve(Future<RemoteCommandResponse> future) noexcept;
+
+        NetworkInterfaceTL* interface() noexcept {
+            return cmdState->interface;
+        }
+
+        std::shared_ptr<CommandState> cmdState;
+
+        ClockSource::StopWatch stopwatch;
+
+        StrongWeakFinishLine connFinishLine;
+
+        boost::optional<RemoteCommandRequest> request;
+        HostAndPort host;
+        ConnectionPool::ConnectionHandle conn;
     };
 
     struct AlarmState {
