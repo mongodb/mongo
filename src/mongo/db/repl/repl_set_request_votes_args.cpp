@@ -83,14 +83,14 @@ Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_cfgver);
+    status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_cfgVer);
     if (!status.isOK())
         return status;
 
     // In order to be compatible with FCV 4.2, default the config term to -1 if we are unable
     // parse a configTerm field from the args.
     status = bsonExtractIntegerFieldWithDefault(
-        argsObj, kConfigTermFieldName, OpTime::kUninitializedTerm, &_cfgterm);
+        argsObj, kConfigTermFieldName, OpTime::kUninitializedTerm, &_cfgTerm);
     if (!status.isOK())
         return status;
 
@@ -122,11 +122,11 @@ long long ReplSetRequestVotesArgs::getCandidateIndex() const {
 }
 
 long long ReplSetRequestVotesArgs::getConfigVersion() const {
-    return _cfgver;
+    return _cfgVer;
 }
 
 long long ReplSetRequestVotesArgs::getConfigTerm() const {
-    return _cfgterm;
+    return _cfgTerm;
 }
 
 OpTime ReplSetRequestVotesArgs::getLastDurableOpTime() const {
@@ -143,8 +143,8 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kDryRunFieldName, _dryRun);
     builder->append(kTermFieldName, _term);
     builder->appendIntOrLL(kCandidateIndexFieldName, _candidateIndex);
-    builder->appendIntOrLL(kConfigVersionFieldName, _cfgver);
-    builder->appendIntOrLL(kConfigTermFieldName, _cfgterm);
+    builder->appendIntOrLL(kConfigVersionFieldName, _cfgVer);
+    builder->appendIntOrLL(kConfigTermFieldName, _cfgTerm);
     _lastDurableOpTime.append(builder, kLastDurableOpTimeFieldName);
 }
 
