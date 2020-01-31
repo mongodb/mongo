@@ -204,9 +204,10 @@ a table, creating the table if it does not yet exist.  The data should
 be the format produced by the \c dump command; see @ref dump_formats for
 details.
 
-By default, if the table already exists, data in the table will be
-overwritten by the new data (use the \c -n option to make an attempt to
-overwrite existing data return an error).
+By default, if the table already exists, key/value pairs in the table
+will be overwritten by new data with matching keys (use the \c -n option
+to make an attempt to overwrite existing data return an error).  Existing
+keys will not be removed.
 
 @subsection util_load_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
@@ -279,7 +280,9 @@ In the case of inserting values into a column-store table, each value
 is appended to the table; in the case of inserting values into a
 row-store table, lines are handled in pairs, where the first line is the
 key and the second line is the value.  If the row-store table already
-exists, data in the table will be overwritten by the new data.
+exists, key/value pairs in the table will be overwritten by new data
+with matching keys.  For either column-store or row-store tables, existing
+keys will not be removed.
 
 @subsection util_loadtext_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input] uri</code>

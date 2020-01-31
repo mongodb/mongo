@@ -214,7 +214,9 @@ report_failure()
 
 	echo "$name: job in $dir failed"
 	echo "$name: $dir log:"
-	sed 's/^/    > /' < $log
+	sed 's/^/    /' < $log
+	echo "$name: $dir/CONFIG:"
+	sed 's/^/    /' < $dir/CONFIG
 }
 
 # Resolve/cleanup completed jobs.

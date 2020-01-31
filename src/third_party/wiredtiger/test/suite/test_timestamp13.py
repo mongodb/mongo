@@ -70,7 +70,7 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.query_timestamp('get=unknown'),
             '/not a permitted choice for key/')
 
-        self.session.commit_transaction()
+        self.session.rollback_transaction()
         # Querying a session's timestamps will error when not in a transaction.
         for query in query_choices:
             self.assertRaises(

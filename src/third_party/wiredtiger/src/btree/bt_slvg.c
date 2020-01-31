@@ -250,13 +250,17 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_scr_alloc(session, 0, &ss->tmp2));
 
     /*
-     * Step 1: Inform the underlying block manager that we're salvaging the file.
+     * !!! (Don't format the comment.)
+     * Step 1:
+     * Inform the underlying block manager that we're salvaging the file.
      */
     WT_ERR(bm->salvage_start(bm, session));
 
     /*
-     * Step 2: Read the file and build in-memory structures that reference any leaf or overflow
-     * page. Any pages other than leaf or overflow pages are added to the free list.
+     * !!! (Don't format the comment.)
+     * Step 2:
+     * Read the file and build in-memory structures that reference any leaf or overflow page. Any
+     * pages other than leaf or overflow pages are added to the free list.
      *
      * Turn off read checksum and verification error messages while we're reading the file, we
      * expect to see corrupted blocks.
@@ -267,60 +271,54 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(ret);
 
     /*
+     * !!! (Don't format the comment.)
      * Step 3:
-     * Discard any page referencing a non-existent overflow page.  We do
-     * this before checking overlapping key ranges on the grounds that a
-     * bad key range we can use is better than a terrific key range that
-     * references pages we don't have. On the other hand, we subsequently
-     * discard key ranges where there are better overlapping ranges, and
-     * it would be better if we let the availability of an overflow value
-     * inform our choices as to the key ranges we select, ideally on a
-     * per-key basis.
+     * Discard any page referencing a non-existent overflow page.  We do this before checking
+     * overlapping key ranges on the grounds that a bad key range we can use is better than a
+     * terrific key range that references pages we don't have. On the other hand, we subsequently
+     * discard key ranges where there are better overlapping ranges, and it would be better if
+     * we let the availability of an overflow value inform our choices as to the key ranges we
+     * select, ideally on a per-key basis.
      *
-     * A complicating problem is found in variable-length column-store
-     * objects, where we potentially split key ranges within RLE units.
-     * For example, if there's a page with rows 15-20 and we later find
-     * row 17 with a larger LSN, the range splits into 3 chunks, 15-16,
-     * 17, and 18-20.  If rows 15-20 were originally a single value (an
-     * RLE of 6), and that record is an overflow record, we end up with
-     * two chunks, both of which want to reference the same overflow value.
+     * A complicating problem is found in variable-length column-store objects, where we
+     * potentially split key ranges within RLE units.  For example, if there's a page with rows
+     * 15-20 and we later find row 17 with a larger LSN, the range splits into 3 chunks, 15-16,
+     * 17, and 18-20.  If rows 15-20 were originally a single value (an RLE of 6), and that
+     * record is an overflow record, we end up with two chunks, both of which want to reference
+     * the same overflow value.
      *
-     * Instead of the approach just described, we're first discarding any
-     * pages referencing non-existent overflow pages, then we're reviewing
-     * our key ranges and discarding any that overlap.  We're doing it that
-     * way for a few reasons: absent corruption, missing overflow items are
-     * strong arguments the page was replaced (on the other hand, some kind
-     * of file corruption is probably why we're here); it's a significant
-     * amount of additional complexity to simultaneously juggle overlapping
-     * ranges and missing overflow items; finally, real-world applications
-     * usually don't have a lot of overflow items, as WiredTiger supports
+     * Instead of the approach just described, we're first discarding any pages referencing
+     * non-existent overflow pages, then we're reviewing our key ranges and discarding any
+     * that overlap.  We're doing it that way for a few reasons: absent corruption, missing
+     * overflow items are strong arguments the page was replaced (on the other hand, some kind
+     * of file corruption is probably why we're here); it's a significant amount of additional
+     * complexity to simultaneously juggle overlapping ranges and missing overflow items; finally,
+     * real-world applications usually don't have a lot of overflow items, as WiredTiger supports
      * very large page sizes, overflow items shouldn't be common.
      *
      * Step 4:
-     * Add unreferenced overflow page blocks to the free list so they are
-     * reused immediately.
+     * Add unreferenced overflow page blocks to the free list so they are reused immediately.
      */
     WT_ERR(__slvg_ovfl_reconcile(session, ss));
     WT_ERR(__slvg_ovfl_discard(session, ss));
 
     /*
+     * !!! (Don't format the comment.)
      * Step 5:
-     * Walk the list of pages looking for overlapping ranges to resolve.
-     * If we find a range that needs to be resolved, set a global flag
-     * and a per WT_TRACK flag on the pages requiring modification.
+     * Walk the list of pages looking for overlapping ranges to resolve.  If we find a range
+     * that needs to be resolved, set a global flag and a per WT_TRACK flag on the pages requiring
+     * modification.
      *
      * This requires sorting the page list by key, and secondarily by LSN.
      *
      * !!!
-     * It's vanishingly unlikely and probably impossible for fixed-length
-     * column-store files to have overlapping key ranges.  It's possible
-     * for an entire key range to go missing (if a page is corrupted and
-     * lost), but because pages can't split, it shouldn't be possible to
-     * find pages where the key ranges overlap.  That said, we check for
-     * it and clean up after it in reconciliation because it doesn't cost
-     * much and future column-store formats or operations might allow for
-     * fixed-length format ranges to overlap during salvage, and I don't
-     * want to have to retrofit the code later.
+     * It's vanishingly unlikely and probably impossible for fixed-length column-store files
+     * to have overlapping key ranges.  It's possible for an entire key range to go missing (if
+     * a page is corrupted and lost), but because pages can't split, it shouldn't be possible to
+     * find pages where the key ranges overlap.  That said, we check for it and clean up after
+     * it in reconciliation because it doesn't cost much and future column-store formats or
+     * operations might allow for fixed-length format ranges to overlap during salvage, and I
+     * don't want to have to retrofit the code later.
      */
     __wt_qsort(ss->pages, (size_t)ss->pages_next, sizeof(WT_TRACK *), __slvg_trk_compare_key);
     if (ss->page_type == WT_PAGE_ROW_LEAF)
@@ -329,8 +327,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ERR(__slvg_col_range(session, ss));
 
     /*
-     * Step 6: We may have lost key ranges in column-store databases, that is, some part of the
-     * record number space is gone; look for missing ranges.
+     * !!! (Don't format the comment.)
+     * Step 6:
+     * We may have lost key ranges in column-store databases, that is, some part of the record
+     * number space is gone; look for missing ranges.
      */
     switch (ss->page_type) {
     case WT_PAGE_COL_FIX:
@@ -342,8 +342,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /*
-     * Step 7: Build an internal page that references all of the leaf pages, and write it, as well
-     * as any merged pages, to the file.
+     * !!! (Don't format the comment.)
+     * Step 7:
+     * Build an internal page that references all of the leaf pages, and write it, as well as any
+     * merged pages, to the file.
      *
      * Count how many leaf pages we have (we could track this during the array shuffling/splitting,
      * but that's a lot harder).
@@ -365,25 +367,31 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
         }
 
     /*
-     * Step 8: If we had to merge key ranges, we have to do a final pass through the leaf page array
-     * and discard file pages used during key merges. We can't do it earlier: if we free'd the leaf
-     * pages we're merging as we merged them, the write of subsequent leaf pages or the internal
-     * page might allocate those free'd file blocks, and if the salvage run subsequently fails, we'd
-     * have overwritten pages used to construct the final key range. In other words, if the salvage
-     * run fails, we don't want to overwrite data the next salvage run might need.
+     * !!! (Don't format the comment.)
+     * Step 8:
+     * If we had to merge key ranges, we have to do a final pass through the leaf page array
+     * and discard file pages used during key merges. We can't do it earlier: if we free'd the
+     * leaf pages we're merging as we merged them, the write of subsequent leaf pages or the
+     * internal page might allocate those free'd file blocks, and if the salvage run subsequently
+     * fails, we'd have overwritten pages used to construct the final key range. In other words,
+     * if the salvage run fails, we don't want to overwrite data the next salvage run might need.
      */
     if (ss->merge_free)
         WT_ERR(__slvg_merge_block_free(session, ss));
 
     /*
-     * Step 9: Evict any newly created root page, creating a checkpoint.
+     * !!! (Don't format the comment.)
+     * Step 9:
+     * Evict any newly created root page, creating a checkpoint.
      */
     WT_ERR(__slvg_checkpoint(session, &ss->root_ref));
 
-/*
- * Step 10: Inform the underlying block manager that we're done.
- */
 err:
+    /*
+     * !!! (Don't format the comment.)
+     * Step 10:
+     * Inform the underlying block manager that we're done.
+     */
     WT_TRET(bm->salvage_end(bm, session));
 
     /* Discard any root page we created. */
@@ -714,40 +722,89 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_TRA
 }
 
 /*
+ * !!! (Don't format the comment.)
+ * When pages split, the key range is split across multiple pages.  If not all
+ * of the old versions of the page are overwritten, or not all of the new pages
+ * are written, or some of the pages are corrupted, salvage will read different
+ * pages with overlapping key ranges, at different LSNs.
+ *
+ * We salvage all of the key ranges we find, at the latest LSN value: this means
+ * we may resurrect pages of deleted items, as page deletion doesn't write leaf
+ * pages and salvage will read and instantiate the contents of an old version of
+ * the deleted page.
+ *
+ * The leaf page array is sorted in key order, and secondarily on LSN: what this
+ * means is that for each new key range, the first page we find is the best page
+ * for that key. The process is to walk forward from each page until we reach a
+ * page with a starting key after the current page's stopping key.
+ *
+ * For each of page, check to see if they overlap the current page's key range.
+ * If they do, resolve the overlap.  Because WiredTiger rarely splits pages,
+ * overlap resolution usually means discarding a page because the key ranges
+ * are the same, and one of the pages is simply an old version of the other.
+ *
+ * However, it's possible more complex resolution is necessary.  For example,
+ * here's an improbably complex list of page ranges and LSNs:
+ *
+ *	Page	Range	LSN
+ *	 30	 A-G	 3
+ *	 31	 C-D	 4
+ *	 32	 B-C	 5
+ *	 33	 C-F	 6
+ *	 34	 C-D	 7
+ *	 35	 F-M	 8
+ *	 36	 H-O	 9
+ *
+ * We walk forward from each page reviewing all other pages in the array that
+ * overlap the range.  For each overlap, the current or the overlapping
+ * page is updated so the page with the most recent information for any range
+ * "owns" that range.  Here's an example for page 30.
+ *
+ * Review page 31: because page 31 has the range C-D and a higher LSN than page
+ * 30, page 30 would "split" into two ranges, A-C and E-G, conceding the C-D
+ * range to page 31.  The new track element would be inserted into array with
+ * the following result:
+ *
+ *	Page	Range	LSN
+ *	 30	 A-C	 3		<< Changed WT_TRACK element
+ *	 31	 C-D	 4
+ *	 32	 B-C	 5
+ *	 33	 C-F	 6
+ *	 34	 C-D	 7
+ *	 30	 E-G	 3		<< New WT_TRACK element
+ *	 35	 F-M	 8
+ *	 36	 H-O	 9
+ *
+ * Continue the review of the first element, using its new values.
+ *
+ * Review page 32: because page 31 has the range B-C and a higher LSN than page
+ * 30, page 30's A-C range would be truncated, conceding the B-C range to page
+ * 32.
+ *	 30	 A-B	 3
+ *		 E-G	 3
+ *	 31	 C-D	 4
+ *	 32	 B-C	 5
+ *	 33	 C-F	 6
+ *	 34	 C-D	 7
+ *
+ * Review page 33: because page 33 has a starting key (C) past page 30's ending
+ * key (B), we stop evaluating page 30's A-B range, as there can be no further
+ * overlaps.
+ *
+ * This process is repeated for each page in the array.
+ *
+ * When page 33 is processed, we'd discover that page 33's C-F range overlaps
+ * page 30's E-G range, and page 30's E-G range would be updated, conceding the
+ * E-F range to page 33.
+ *
+ * This is not computationally expensive because we don't walk far forward in
+ * the leaf array because it's sorted by starting key, and because WiredTiger
+ * splits are rare, the chance of finding the kind of range overlap requiring
+ * re-sorting the array is small.
+ */
+/*
  * __slvg_col_range --
- *     Figure out the leaf pages we need and free the leaf pages we don't. When pages split, the key
- *     range is split across multiple pages. If not all of the old versions of the page are
- *     overwritten, or not all of the new pages are written, or some of the pages are corrupted,
- *     salvage will read different pages with overlapping key ranges, at different LSNs. We salvage
- *     all of the key ranges we find, at the latest LSN value: this means we may resurrect pages of
- *     deleted items, as page deletion doesn't write leaf pages and salvage will read and
- *     instantiate the contents of an old version of the deleted page. The leaf page array is sorted
- *     in key order, and secondarily on LSN: what this means is that for each new key range, the
- *     first page we find is the best page for that key. The process is to walk forward from each
- *     page until we reach a page with a starting key after the current page's stopping key. For
- *     each of page, check to see if they overlap the current page's key range. If they do, resolve
- *     the overlap. Because WiredTiger rarely splits pages, overlap resolution usually means
- *     discarding a page because the key ranges are the same, and one of the pages is simply an old
- *     version of the other. However, it's possible more complex resolution is necessary. For
- *     example, here's an improbably complex list of page ranges and LSNs: Page Range LSN 30 A-G 3
- *     31 C-D 4 32 B-C 5 33 C-F 6 34 C-D 7 35 F-M 8 36 H-O 9 We walk forward from each page
- *     reviewing all other pages in the array that overlap the range. For each overlap, the current
- *     or the overlapping page is updated so the page with the most recent information for any range
- *     "owns" that range. Here's an example for page 30. Review page 31: because page 31 has the
- *     range C-D and a higher LSN than page 30, page 30 would "split" into two ranges, A-C and E-G,
- *     conceding the C-D range to page 31. The new track element would be inserted into array with
- *     the following result: Page Range LSN 30 A-C 3 << Changed WT_TRACK element 31 C-D 4 32 B-C 5
- *     33 C-F 6 34 C-D 7 30 E-G 3 << New WT_TRACK element 35 F-M 8 36 H-O 9 Continue the review of
- *     the first element, using its new values. Review page 32: because page 31 has the range B-C
- *     and a higher LSN than page 30, page 30's A-C range would be truncated, conceding the B-C
- *     range to page 32. 30 A-B 3 E-G 3 31 C-D 4 32 B-C 5 33 C-F 6 34 C-D 7 Review page 33: because
- *     page 33 has a starting key (C) past page 30's ending key (B), we stop evaluating page 30's
- *     A-B range, as there can be no further overlaps. This process is repeated for each page in the
- *     array. When page 33 is processed, we'd discover that page 33's C-F range overlaps page 30's
- *     E-G range, and page 30's E-G range would be updated, conceding the E-F range to page 33. This
- *     is not computationally expensive because we don't walk far forward in the leaf array because
- *     it's sorted by starting key, and because WiredTiger splits are rare, the chance of finding
- *     the kind of range overlap requiring re-sorting the array is small.
+ *     Figure out the leaf pages we need and free the leaf pages we don't.
  */
 static int
 __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
@@ -820,6 +877,7 @@ __slvg_col_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
       __wt_addr_string(session, b_trk->trk_addr, b_trk->trk_addr_size, ss->tmp2));
 
     /*
+     * !!! (Don't format the comment.)
      * The key ranges of two WT_TRACK pages in the array overlap -- choose
      * the ranges we're going to take from each.
      *
@@ -919,15 +977,12 @@ __slvg_col_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
     if (a_trk->trk_gen > b_trk->trk_gen) {
 delete_b:
         /*
-         * After page and overflow reconciliation, one (and only one)
-         * page can reference an overflow record.  But, if we split a
-         * page into multiple chunks, any of the chunks might own any
-         * of the backing overflow records, so overflow records won't
-         * normally be discarded until after the merge phase completes.
-         * (The merge phase is where the final pages are written, and
-         * we figure out which overflow records are actually used.)
-         * If freeing a chunk and there are no other references to the
-         * underlying shared information, the overflow records must be
+         * After page and overflow reconciliation, one (and only one) page can reference an overflow
+         * record. But, if we split a page into multiple chunks, any of the chunks might own any of
+         * the backing overflow records, so overflow records won't normally be discarded until after
+         * the merge phase completes. (The merge phase is where the final pages are written, and we
+         * figure out which overflow records are actually used.) If freeing a chunk and there are no
+         * other references to the underlying shared information, the overflow records must be
          * useless, discard them to keep the final file size small.
          */
         if (b_trk->shared->ref == 1)
@@ -1009,11 +1064,11 @@ __slvg_col_trk_update_start(uint32_t slot, WT_STUFF *ss)
      * longer be in the right location.
      *
      * For example, imagine page #1 has the key range 30-50, it split, and
-     * we wrote page #2 with key range 30-40, and page #3 key range with
-     * 40-50, where pages #2 and #3 have larger LSNs than page #1.  When the
+     * we wrote page #2 with key range 30-40, and page #3 key range with 40-50, where pages #2 and
+     * #3 have larger LSNs than page #1.  When the
      * key ranges were sorted, page #2 came first, then page #1 (because of
-     * their earlier start keys than page #3), and page #2 came before page
-     * #1 because of its LSN.  When we resolve the overlap between page #2
+     * their earlier start keys than page #3), and page #2 came before page #1 because of its LSN.
+     * When we resolve the overlap between page #2
      * and page #1, we truncate the initial key range of page #1, and it now
      * sorts after page #3, because it has the same starting key of 40, and
      * a lower LSN.
@@ -1124,15 +1179,12 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
         WT_REF_SET_STATE(ref, WT_REF_DISK);
 
         /*
-         * If the page's key range is unmodified from when we read it
-         * (in other words, we didn't merge part of this page with
-         * another page), we can use the page without change, and the
-         * only thing we need to do is mark all overflow records the
-         * page references as in-use.
+         * If the page's key range is unmodified from when we read it (in other words, we didn't
+         * merge part of this page with another page), we can use the page without change, and the
+         * only thing we need to do is mark all overflow records the page references as in-use.
          *
-         * If we did merge with another page, we have to build a page
-         * reflecting the updated key range.  Note, that requires an
-         * additional pass to free the merge page's backing blocks.
+         * If we did merge with another page, we have to build a page reflecting the updated key
+         * range. Note, that requires an additional pass to free the merge page's backing blocks.
          */
         if (F_ISSET(trk, WT_TRACK_MERGE)) {
             ss->merge_free = true;
@@ -1210,13 +1262,11 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
     }
 
     /*
-     * We can't discard the original blocks associated with this page now.
-     * (The problem is we don't want to overwrite any original information
-     * until the salvage run succeeds -- if we free the blocks now, the next
-     * merge page we write might allocate those blocks and overwrite them,
-     * and should the salvage run eventually fail, the original information
-     * would have been lost.)  Clear the reference addr so eviction doesn't
-     * free the underlying blocks.
+     * We can't discard the original blocks associated with this page now. (The problem is we don't
+     * want to overwrite any original information until the salvage run succeeds -- if we free the
+     * blocks now, the next merge page we write might allocate those blocks and overwrite them, and
+     * should the salvage run eventually fail, the original information would have been lost.) Clear
+     * the reference addr so eviction doesn't free the underlying blocks.
      */
     __wt_ref_addr_free(session, ref);
 
@@ -1410,8 +1460,9 @@ __slvg_row_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
       __wt_addr_string(session, b_trk->trk_addr, b_trk->trk_addr_size, ss->tmp2));
 
 /*
- * The key ranges of two WT_TRACK pages in the array overlap -- choose
- * the ranges we're going to take from each.
+ * !!! (Don't format the comment.)
+ * The key ranges of two WT_TRACK pages in the array overlap -- choose the ranges we're going to
+ * take from each.
  *
  * We can think of the overlap possibilities as 11 different cases:
  *
@@ -1432,11 +1483,11 @@ __slvg_row_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
  * #10			AAAAAA			A is middle of B
  * #11			AAAAAAAAAA		A is a suffix of B
  *
- * Note the leaf page array was sorted by key and a_trk appears earlier
- * in the array than b_trk, so cases #2/8, #10 and #11 are impossible.
+ * Note the leaf page array was sorted by key and a_trk appears earlier in the array than b_trk, so
+ * cases #2/8, #10 and #11 are impossible.
  *
- * Finally, there's one additional complicating factor -- final ranges
- * are assigned based on the page's LSN.
+ * Finally, there's one additional complicating factor -- final ranges are assigned based on the
+ * page's LSN.
  */
 #define A_TRK_START (&a_trk->row_start)
 #define A_TRK_STOP (&a_trk->row_stop)
@@ -1514,15 +1565,12 @@ __slvg_row_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
     if (a_trk->trk_gen > b_trk->trk_gen) {
 delete_b:
         /*
-         * After page and overflow reconciliation, one (and only one)
-         * page can reference an overflow record.  But, if we split a
-         * page into multiple chunks, any of the chunks might own any
-         * of the backing overflow records, so overflow records won't
-         * normally be discarded until after the merge phase completes.
-         * (The merge phase is where the final pages are written, and
-         * we figure out which overflow records are actually used.)
-         * If freeing a chunk and there are no other references to the
-         * underlying shared information, the overflow records must be
+         * After page and overflow reconciliation, one (and only one) page can reference an overflow
+         * record. But, if we split a page into multiple chunks, any of the chunks might own any of
+         * the backing overflow records, so overflow records won't normally be discarded until after
+         * the merge phase completes. (The merge phase is where the final pages are written, and we
+         * figure out which overflow records are actually used.) If freeing a chunk and there are no
+         * other references to the underlying shared information, the overflow records must be
          * useless, discard them to keep the final file size small.
          */
         if (b_trk->shared->ref == 1)
@@ -1617,11 +1665,11 @@ __slvg_row_trk_update_start(WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t sl
      * longer be in the right location.
      *
      * For example, imagine page #1 has the key range 30-50, it split, and
-     * we wrote page #2 with key range 30-40, and page #3 key range with
-     * 40-50, where pages #2 and #3 have larger LSNs than page #1.  When the
+     * we wrote page #2 with key range 30-40, and page #3 key range with 40-50, where pages #2 and
+     * #3 have larger LSNs than page #1.  When the
      * key ranges were sorted, page #2 came first, then page #1 (because of
-     * their earlier start keys than page #3), and page #2 came before page
-     * #1 because of its LSN.  When we resolve the overlap between page #2
+     * their earlier start keys than page #3), and page #2 came before page #1 because of its LSN.
+     * When we resolve the overlap between page #2
      * and page #1, we truncate the initial key range of page #1, and it now
      * sorts after page #3, because it has the same starting key of 40, and
      * a lower LSN.
@@ -1701,8 +1749,10 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
     WT_REF *ref, **refp;
     WT_TRACK *trk;
     uint32_t i;
+    u_int decr_cnt;
 
     addr = NULL;
+    decr_cnt = 0;
 
     /* Allocate a row-store root (internal) page and fill it in. */
     WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, true, &page));
@@ -1736,15 +1786,12 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
         WT_REF_SET_STATE(ref, WT_REF_DISK);
 
         /*
-         * If the page's key range is unmodified from when we read it
-         * (in other words, we didn't merge part of this page with
-         * another page), we can use the page without change, and the
-         * only thing we need to do is mark all overflow records the
-         * page references as in-use.
+         * If the page's key range is unmodified from when we read it (in other words, we didn't
+         * merge part of this page with another page), we can use the page without change, and the
+         * only thing we need to do is mark all overflow records the page references as in-use.
          *
-         * If we did merge with another page, we have to build a page
-         * reflecting the updated key range.  Note, that requires an
-         * additional pass to free the merge page's backing blocks.
+         * If we did merge with another page, we have to build a page reflecting the updated key
+         * range. Note, that requires an additional pass to free the merge page's backing blocks.
          */
         if (F_ISSET(trk, WT_TRACK_MERGE)) {
             ss->merge_free = true;
@@ -1757,13 +1804,30 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
             WT_ERR(__slvg_ovfl_ref_all(session, trk));
         }
         ++ref;
+
+        /*
+         * !!!
+         * There's a risk the page we're building is too large for the cache. The right fix would be
+         * to write the keys out to an on-disk file and delay allocating the page image until we're
+         * ready to reconcile the new root page, and then read keys in from that backing file during
+         * the reconciliation of the root page. For now, make sure the eviction threads don't see us
+         * as a threat.
+         */
+        if (page->memory_footprint > WT_MEGABYTE) {
+            ++decr_cnt;
+            __wt_cache_page_inmem_decr(session, page, WT_MEGABYTE);
+        }
     }
+    if (decr_cnt != 0)
+        __wt_cache_page_inmem_incr(session, page, decr_cnt * WT_MEGABYTE);
 
     __wt_root_ref_init(session, &ss->root_ref, page, false);
 
     if (0) {
 err:
         __wt_free(session, addr);
+        if (decr_cnt != 0)
+            __wt_cache_page_inmem_incr(session, page, decr_cnt * WT_MEGABYTE);
         __wt_page_out(session, &page);
     }
     return (ret);
@@ -1866,13 +1930,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
     cookie->skip = skip_start;
 
     /*
-     * We can't discard the original blocks associated with this page now.
-     * (The problem is we don't want to overwrite any original information
-     * until the salvage run succeeds -- if we free the blocks now, the next
-     * merge page we write might allocate those blocks and overwrite them,
-     * and should the salvage run eventually fail, the original information
-     * would have been lost.)  Clear the reference addr so eviction doesn't
-     * free the underlying blocks.
+     * We can't discard the original blocks associated with this page now. (The problem is we don't
+     * want to overwrite any original information until the salvage run succeeds -- if we free the
+     * blocks now, the next merge page we write might allocate those blocks and overwrite them, and
+     * should the salvage run eventually fail, the original information would have been lost.) Clear
+     * the reference addr so eviction doesn't free the underlying blocks.
      */
     __wt_ref_addr_free(session, ref);
 

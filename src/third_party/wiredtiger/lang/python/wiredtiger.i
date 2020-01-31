@@ -50,7 +50,7 @@ This provides an API similar to the C API, with the following modifications:
 %feature("autodoc", "0");
 
 %pythoncode %{
-from .packing import pack, unpack
+from packing import pack, unpack
 ## @endcond
 %}
 

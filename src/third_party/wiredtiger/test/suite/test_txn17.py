@@ -57,24 +57,26 @@ class test_txn17(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.rollback_transaction(),
                 '/only permitted in a running transaction/')
 
-        # Test API functionality tagged as requires_notransaction.
-        # Begin a transaction and execute all the following tests under it.
-        self.session.begin_transaction()
-
         # Cannot begin a transaction while a transaction is already running.
+        self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.begin_transaction(),
                 '/not permitted in a running transaction/')
+        self.session.rollback_transaction()
 
         # Cannot take a checkpoint while a transaction is running.
+        self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.checkpoint(),
                 '/not permitted in a running transaction/')
+        self.session.rollback_transaction()
 
         # Cannot call transaction_sync while a transaction is running.
+        self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.transaction_sync(),
                 '/not permitted in a running transaction/')
+        self.session.rollback_transaction()
 
 if __name__ == '__main__':
     wttest.run()

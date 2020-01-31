@@ -473,17 +473,27 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
  *     Search and return exact matching records only, including uncommitted ones.
  */
 int
-__wt_btcur_search_uncommitted(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
+__wt_btcur_search_uncommitted(WT_CURSOR *cursor, WT_UPDATE **updp)
 {
     WT_BTREE *btree;
-    WT_CURSOR *cursor;
+    WT_CURSOR_BTREE *cbt;
     WT_SESSION_IMPL *session;
     WT_UPDATE *upd;
 
+    *updp = NULL;
+
+    cbt = (WT_CURSOR_BTREE *)cursor;
     btree = cbt->btree;
-    cursor = &cbt->iface;
     session = (WT_SESSION_IMPL *)cursor->session;
-    *updp = upd = NULL; /* -Wuninitialized */
+    upd = NULL; /* -Wuninitialized */
+
+    /*
+     * Not calling the cursor initialization functions, we don't want to be tapped for eviction nor
+     * do we want other standard cursor semantics like snapshots, just discard the hazard pointer
+     * from the last operation. This also depends on the fact we're not setting the cursor's active
+     * flag, this is really a special chunk of code and not to be modified without careful thought.
+     */
+    WT_RET(__cursor_reset(cbt));
 
     WT_RET(btree->type == BTREE_ROW ? __cursor_row_search(cbt, false, NULL, NULL) :
                                       __cursor_col_search(cbt, NULL, NULL));

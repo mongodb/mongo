@@ -162,7 +162,7 @@ functions:
         set -o errexit
         set -o verbose
         for i in $(seq ${times|1}); do
-          ./t -1 -c ${config|../../../test/format/CONFIG.stress} ${extra_args|} 2>&1
+          ./t -1 -c ${config|../../../test/format/CONFIG.stress} ${extra_args|} || ( [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG ) 2>&1
         done
   "format test script":
     command: shell.exec
@@ -172,7 +172,8 @@ functions:
         set -o errexit
         set -o verbose
         for i in $(seq ${times|1}); do
-          ${test_env_vars|} ${format_test_setting|} ./format.sh ${smp_command|} ${format_test_script_args|} 2>&1
+          ${format_test_setting|}
+          ${test_env_vars|} ./format.sh ${smp_command|} ${format_test_script_args|} 2>&1
         done
   "many dbs test":
     command: shell.exec
@@ -1637,18 +1638,20 @@ tasks:
         vars:
           make_command: make all
       - func: "make check all"
-  
+
+  # Use format.sh to run tests in parallel (x4) for just under two hours (the
+  # default Evergreen timeout) on the higher spec build distros. This allows
+  # us to perform multiple test runs while ensuring a long-running config does
+  # not result in an Evergreen test timeout failure.
   - name: linux-directio
     depends_on:
     - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - func: "format test"
+      - func: "format test script"
         vars:
-          times: 3
-          config: ../../../test/format/CONFIG.stress
-          extra_args: -C "direct_io=[data]"
+          format_test_script_args: -t 110 -j 4 direct_io=1
 
   - name: format-linux-no-ftruncate
     depends_on:
@@ -1940,6 +1943,16 @@ tasks:
           # run for 24 hours ( 24 * 60 = 1440 minutes), don't stop at failed tests, use default config
           format_test_script_args: -t 1440
   
+  - name: format-stress-sanitizer-lsm-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger address sanitizer"
+      - func: "format test script"
+        vars:
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          # Run for 30 mins, and explicitly set data_source to LSM with a large cache
+          format_test_script_args: -t 30 data_source=lsm cache_minimum=5000
+
   - name: format-stress-sanitizer-smoke-test
     #set a 7 hours timeout
     exec_timeout_secs: 25200
@@ -2140,6 +2153,7 @@ buildvariants:
     - name: compile-ubsan
     - name: ubsan-test
     - name: linux-directio
+      distros: ubuntu1804-build
     - name: syscall-linux
     - name: make-check-asan-test
     - name: configure-combinations
@@ -2155,6 +2169,7 @@ buildvariants:
     - name: recovery-stress-test
     - name: format-stress-sanitizer-test
     - name: format-stress-sanitizer-smoke-test
+    - name: format-stress-sanitizer-lsm-test
     - name: split-stress-test
     - name: format-stress-test
     - name: format-stress-smoke-test
@@ -2231,6 +2246,7 @@ buildvariants:
     - name: compile-ubsan
     - name: ubsan-test
     - name: linux-directio
+      distros: rhel80-build
     - name: syscall-linux
     - name: compile-asan
     - name: make-check-asan-test
@@ -2328,6 +2344,9 @@ buildvariants:
   tasks:
   - name: compile
   - name: unit-test
+  - name: format-stress-ppc-zseries-test
+  - name: format-stress-smoke-test
+  - name: format-wtperf-test
 
 - name: ubuntu1804-zseries
   display_name: Ubuntu 18.04 zSeries

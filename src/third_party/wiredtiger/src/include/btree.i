@@ -1053,7 +1053,7 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
  */
 static inline void
 __wt_ref_info(
-  WT_SESSION_IMPL *session, WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
+  WT_SESSION_IMPL *session, WT_REF *ref, const uint8_t **addrp, size_t *sizep, bool *is_leafp)
 {
     WT_ADDR *addr;
     WT_CELL_UNPACK *unpack, _unpack;
@@ -1072,33 +1072,61 @@ __wt_ref_info(
     if (addr == NULL) {
         *addrp = NULL;
         *sizep = 0;
-        if (typep != NULL)
-            *typep = 0;
+        if (is_leafp != NULL)
+            *is_leafp = false;
     } else if (__wt_off_page(page, addr)) {
         *addrp = addr->addr;
         *sizep = addr->size;
-        if (typep != NULL)
-            switch (addr->type) {
-            case WT_ADDR_INT:
-                *typep = WT_CELL_ADDR_INT;
-                break;
-            case WT_ADDR_LEAF:
-                *typep = WT_CELL_ADDR_LEAF;
-                break;
-            case WT_ADDR_LEAF_NO:
-                *typep = WT_CELL_ADDR_LEAF_NO;
-                break;
-            default:
-                *typep = 0;
-                break;
-            }
+        if (is_leafp != NULL)
+            *is_leafp = addr->type != WT_ADDR_INT;
     } else {
         __wt_cell_unpack(session, page, (WT_CELL *)addr, unpack);
         *addrp = unpack->data;
         *sizep = unpack->size;
-        if (typep != NULL)
-            *typep = unpack->type;
+
+        if (is_leafp != NULL)
+            *is_leafp = unpack->type != WT_ADDR_INT;
     }
+}
+
+/*
+ * __wt_ref_info_lock --
+ *     Lock the WT_REF and return the addr/size and type triplet for a reference.
+ */
+static inline void
+__wt_ref_info_lock(
+  WT_SESSION_IMPL *session, WT_REF *ref, uint8_t *addr_buf, size_t *sizep, bool *is_leafp)
+{
+    size_t size;
+    uint32_t previous_state;
+    const uint8_t *addr;
+    bool is_leaf;
+
+    /*
+     * The WT_REF address references either an on-page cell or in-memory structure, and eviction
+     * frees both. If our caller is already blocking eviction (either because the WT_REF is locked
+     * or there's a hazard pointer on the page), no locking is required, and the caller should call
+     * the underlying function directly. Otherwise, our caller is not blocking eviction and we lock
+     * here, and copy out the address instead of returning a reference.
+     */
+    for (;; __wt_yield()) {
+        previous_state = ref->state;
+        if (previous_state != WT_REF_LOCKED &&
+          WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+            break;
+    }
+
+    __wt_ref_info(session, ref, &addr, &size, &is_leaf);
+
+    if (addr_buf != NULL) {
+        if (addr != NULL)
+            memcpy(addr_buf, addr, size);
+        *sizep = size;
+    }
+    if (is_leafp != NULL)
+        *is_leafp = is_leaf;
+
+    WT_REF_SET_STATE(ref, previous_state);
 }
 
 /*

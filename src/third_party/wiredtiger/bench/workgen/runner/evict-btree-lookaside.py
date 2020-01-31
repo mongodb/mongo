@@ -81,7 +81,7 @@ from workgen import *
 context = Context()
 homedir = "WT_TEST"
 conn_config =   "cache_size=1G,checkpoint=(wait=60,log_size=2GB),\
-                eviction=(threads_min=12,threads_max=12),log=(enabled=true),session_max=600,\
+                eviction=(threads_min=12,threads_max=12),log=(enabled=true),session_max=800,\
                 eviction_target=60,statistics=(fast),statistics_log=(wait=1,json)"# explicitly added
 conn = wiredtiger_open(homedir, "create," + conn_config)
 s = conn.open_session("")
@@ -119,7 +119,7 @@ s.create(log_name, wtperf_table_config + "key_format=S,value_format=S," +\
         compress_table_config + table_config + ",log=(enabled=true)")
 log_table = Table(log_name)
 
-ops = Operation(Operation.OP_SEARCH, tables[0])
+ops = Operation(Operation.OP_SEARCH, tables[0],Key(Key.KEYGEN_PARETO, 0, ParetoOptions(1)))
 ops = op_multi_table(ops, tables, False)
 ops = op_log_like(ops, log_table, 0)
 thread0 = Thread(ops)
@@ -131,8 +131,6 @@ thread1 = Thread(ops)
 # These operations include log_like operations, which will increase the number
 # of insert/update operations by a factor of 2.0. This may cause the
 # actual operations performed to be above the throttle.
-thread1.options.throttle=500
-thread1.options.throttle_burst=1.0
 
 ops = Operation(Operation.OP_UPDATE, tables[0])
 ops = op_multi_table(ops, tables, False)
@@ -156,10 +154,10 @@ ops = Operation(Operation.OP_SLEEP, "0.1") + \
       Operation(Operation.OP_LOG_FLUSH, "")
 logging_thread = Thread(ops)
 
-workload = Workload(context, 350 * thread0 + 10 * thread1 +\
-                    50 * thread2 + 100 * thread3 + logging_thread)
+workload = Workload(context, 400 * thread0 + 100 * thread1 +\
+                    10 * thread2 + 100 * thread3 + logging_thread)
 workload.options.report_interval=5
-workload.options.run_time=300
+workload.options.run_time=500
 workload.options.max_latency=50000
 workload.run(conn)
 

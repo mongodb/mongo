@@ -68,8 +68,7 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         c_never = self.session.open_cursor(uri_never)
         c_none = self.session.open_cursor(uri_none)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(1))
+        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(1))
         c_always['key1'] = 'value1'
         c_def['key1'] = 'value1'
         c_never['key1'] = 'value1'
@@ -103,7 +102,7 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         msg = "/timestamp set on this transaction/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.assertEquals(c_never.search(), 0), msg)
-        self.session.commit_transaction()
+        self.session.rollback_transaction()
         c_always.close()
         c_def.close()
         c_never.close()
@@ -131,7 +130,7 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         msg = "/none set on this transaction/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.assertEquals(c_always.search(), 0), msg)
-        self.session.commit_transaction()
+        self.session.rollback_transaction()
         c_always.close()
         c_def.close()
         c_never.close()
