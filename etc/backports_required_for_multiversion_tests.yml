@@ -51,6 +51,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/step_down_on_secondary.js
 - ticket: SERVER-45010
   test_file: jstests/replsets/rollback_dup_ids_clean_shutdown_during_rollback.js
+- ticket: SERVER-45906
+  test_file: jstests/replsets/trigger_initial_stable_checkpoint.js
 
 sharding_multiversion:
 - ticket: SERVER-38691
