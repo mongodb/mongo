@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+class LiteParsedPipeline;
+
 /**
  * A lightly parsed version of a DocumentSource. It is not executable and not guaranteed to return a
  * parse error when encountering an invalid specification. Instead, the purpose of this class is to
@@ -215,5 +217,27 @@ public:
 
 protected:
     NamespaceString _foreignNss;
+};
+
+/**
+ * Helper class for DocumentSources which can reference one or more child pipelines.
+ */
+class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSource {
+public:
+    LiteParsedDocumentSourceNestedPipelines(boost::optional<NamespaceString> foreignNss,
+                                            std::vector<LiteParsedPipeline> pipelines);
+
+    LiteParsedDocumentSourceNestedPipelines(boost::optional<NamespaceString> foreignNss,
+                                            boost::optional<LiteParsedPipeline> pipeline);
+
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final override;
+
+    bool allowedToPassthroughFromMongos() const final override;
+
+    bool allowShardedForeignCollection(NamespaceString nss) const override;
+
+protected:
+    boost::optional<NamespaceString> _foreignNss;
+    std::vector<LiteParsedPipeline> _pipelines;
 };
 }  // namespace mongo

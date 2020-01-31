@@ -130,37 +130,6 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
     return std::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines));
 }
 
-PrivilegeVector DocumentSourceFacet::LiteParsed::requiredPrivileges(
-    bool isMongos, bool bypassDocumentValidation) const {
-    PrivilegeVector requiredPrivileges;
-    for (auto&& pipeline : _liteParsedPipelines) {
-        // A correct isMongos flag is only required for DocumentSourceCurrentOp which is
-        // disallowed in $facet pipelines.
-        const bool unusedIsMongosFlag = false;
-        Privilege::addPrivilegesToPrivilegeVector(
-            &requiredPrivileges,
-            pipeline.requiredPrivileges(unusedIsMongosFlag, bypassDocumentValidation));
-    }
-    return requiredPrivileges;
-}
-
-stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()
-    const {
-    stdx::unordered_set<NamespaceString> involvedNamespaces;
-    for (auto&& liteParsedPipeline : _liteParsedPipelines) {
-        auto involvedInSubPipe = liteParsedPipeline.getInvolvedNamespaces();
-        involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
-    }
-    return involvedNamespaces;
-}
-
-bool DocumentSourceFacet::LiteParsed::allowShardedForeignCollection(NamespaceString nss) const {
-    return std::all_of(
-        _liteParsedPipelines.begin(), _liteParsedPipelines.end(), [&nss](auto&& pipeline) {
-            return pipeline.allowShardedForeignCollection(nss);
-        });
-}
-
 REGISTER_DOCUMENT_SOURCE(facet,
                          DocumentSourceFacet::LiteParsed::parse,
                          DocumentSourceFacet::createFromBson);

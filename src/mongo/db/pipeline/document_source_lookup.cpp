@@ -138,23 +138,41 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
             str::stream() << "invalid $lookup namespace: " << fromNss.ns(),
             fromNss.isValid());
 
-    stdx::unordered_set<NamespaceString> foreignNssSet;
-
     // Recursively lite parse the nested pipeline, if one exists.
     auto pipelineElem = specObj["pipeline"];
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (pipelineElem) {
         auto pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
         liteParsedPipeline = LiteParsedPipeline(fromNss, pipeline);
-
-        auto pipelineInvolvedNamespaces = liteParsedPipeline->getInvolvedNamespaces();
-        foreignNssSet.insert(pipelineInvolvedNamespaces.begin(), pipelineInvolvedNamespaces.end());
     }
 
-    foreignNssSet.insert(fromNss);
+    return std::make_unique<DocumentSourceLookUp::LiteParsed>(std::move(fromNss),
+                                                              std::move(liteParsedPipeline));
+}
 
-    return std::make_unique<DocumentSourceLookUp::LiteParsed>(
-        std::move(fromNss), std::move(foreignNssSet), std::move(liteParsedPipeline));
+PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
+    bool isMongos, bool bypassDocumentValidation) const {
+    PrivilegeVector requiredPrivileges;
+    invariant(_pipelines.size() <= 1);
+    invariant(_foreignNss);
+
+    // If no pipeline is specified or the local/foreignField syntax was used, then assume that we're
+    // reading directly from the collection.
+    if (_pipelines.empty() || !_pipelines[0].startsWithInitialSource()) {
+        Privilege::addPrivilegeToPrivilegeVector(
+            &requiredPrivileges,
+            Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find));
+    }
+
+    // Add the sub-pipeline privileges, if one was specified.
+    if (!_pipelines.empty()) {
+        const LiteParsedPipeline& pipeline = _pipelines[0];
+        Privilege::addPrivilegesToPrivilegeVector(
+            &requiredPrivileges,
+            std::move(pipeline.requiredPrivileges(isMongos, bypassDocumentValidation)));
+    }
+
+    return requiredPrivileges;
 }
 
 REGISTER_DOCUMENT_SOURCE(lookup,

@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -61,4 +62,44 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
 
     return it->second(nss, specElem);
 }
+
+LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
+    boost::optional<NamespaceString> foreignNss, std::vector<LiteParsedPipeline> pipelines)
+    : _foreignNss(std::move(foreignNss)), _pipelines(std::move(pipelines)) {}
+
+LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
+    boost::optional<NamespaceString> foreignNss, boost::optional<LiteParsedPipeline> pipeline)
+    : LiteParsedDocumentSourceNestedPipelines(std::move(foreignNss),
+                                              std::vector<LiteParsedPipeline>{}) {
+    if (pipeline)
+        _pipelines.emplace_back(std::move(pipeline.get()));
+}
+
+stdx::unordered_set<NamespaceString>
+LiteParsedDocumentSourceNestedPipelines::getInvolvedNamespaces() const {
+    stdx::unordered_set<NamespaceString> involvedNamespaces;
+    if (_foreignNss)
+        involvedNamespaces.insert(*_foreignNss);
+
+    for (auto&& pipeline : _pipelines) {
+        auto involvedInSubPipe = pipeline.getInvolvedNamespaces();
+        involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
+    }
+    return involvedNamespaces;
+}
+
+bool LiteParsedDocumentSourceNestedPipelines::allowedToPassthroughFromMongos() const {
+    // If any of the sub-pipelines doesn't allow pass through, then return false.
+    return std::all_of(_pipelines.cbegin(), _pipelines.cend(), [](const auto& subPipeline) {
+        return subPipeline.allowedToPassthroughFromMongos();
+    });
+}
+
+bool LiteParsedDocumentSourceNestedPipelines::allowShardedForeignCollection(
+    NamespaceString nss) const {
+    return std::all_of(_pipelines.begin(), _pipelines.end(), [&nss](auto&& pipeline) {
+        return pipeline.allowShardedForeignCollection(nss);
+    });
+}
+
 }  // namespace mongo

@@ -67,32 +67,24 @@ public:
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     };
 
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::vector<LiteParsedPipeline> liteParsedPipelines)
-            : _liteParsedPipelines(std::move(liteParsedPipelines)) {}
+        LiteParsed(std::vector<LiteParsedPipeline> pipelines)
+            : LiteParsedDocumentSourceNestedPipelines(boost::none, std::move(pipelines)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final;
-
-        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
-
-        bool allowShardedForeignCollection(NamespaceString nss) const final;
-
-        bool allowedToPassthroughFromMongos() const {
-            // If any of the sub-pipelines doesn't allow pass through, then return false.
-            return std::all_of(_liteParsedPipelines.cbegin(),
-                               _liteParsedPipelines.cend(),
-                               [](const auto& subPipeline) {
-                                   return subPipeline.allowedToPassthroughFromMongos();
-                               });
+                                           bool bypassDocumentValidation) const override final {
+            PrivilegeVector requiredPrivileges;
+            for (auto&& pipeline : _pipelines) {
+                Privilege::addPrivilegesToPrivilegeVector(
+                    &requiredPrivileges,
+                    pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
+            }
+            return requiredPrivileges;
         }
-
-    private:
-        const std::vector<LiteParsedPipeline> _liteParsedPipelines;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

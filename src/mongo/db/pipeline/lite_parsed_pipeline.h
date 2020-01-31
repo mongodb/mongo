@@ -150,6 +150,13 @@ public:
         const boost::optional<ExplainOptions::Verbosity> explain,
         bool enableMajorityReadConcern) const;
 
+    /**
+     * Returns true if the first stage in the pipeline does not require an input source.
+     */
+    bool startsWithInitialSource() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isInitialSource();
+    }
+
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 };

@@ -60,36 +60,13 @@ public:
         Variables::Id id;
     };
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(NamespaceString fromNss,
-                   stdx::unordered_set<NamespaceString> foreignNssSet,
-                   boost::optional<LiteParsedPipeline> liteParsedPipeline)
-            : _fromNss{std::move(fromNss)},
-              _foreignNssSet(std::move(foreignNssSet)),
-              _liteParsedPipeline(std::move(liteParsedPipeline)) {}
-
-        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-            return {_foreignNssSet};
-        }
-
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final {
-            PrivilegeVector requiredPrivileges;
-            Privilege::addPrivilegeToPrivilegeVector(
-                &requiredPrivileges,
-                Privilege(ResourcePattern::forExactNamespace(_fromNss), ActionType::find));
-
-            if (_liteParsedPipeline) {
-                Privilege::addPrivilegesToPrivilegeVector(
-                    &requiredPrivileges,
-                    _liteParsedPipeline->requiredPrivileges(isMongos, bypassDocumentValidation));
-            }
-            return requiredPrivileges;
-        }
+        LiteParsed(NamespaceString foreignNss, boost::optional<LiteParsedPipeline> pipeline)
+            : LiteParsedDocumentSourceNestedPipelines(std::move(foreignNss), std::move(pipeline)) {}
 
         /**
          * Lookup from a sharded collection may not be allowed.
@@ -100,18 +77,12 @@ public:
             if (foreignShardedAllowed) {
                 return true;
             }
-            return (_foreignNssSet.find(nss) == _foreignNssSet.end());
+            auto involvedNss = getInvolvedNamespaces();
+            return (involvedNss.find(nss) == involvedNss.end());
         }
 
-        bool allowedToPassthroughFromMongos() const {
-            // If a sub-pipeline exists, check that all its stages are allowed to pass through.
-            return !_liteParsedPipeline || _liteParsedPipeline->allowedToPassthroughFromMongos();
-        }
-
-    private:
-        const NamespaceString _fromNss;
-        const stdx::unordered_set<NamespaceString> _foreignNssSet;
-        const boost::optional<LiteParsedPipeline> _liteParsedPipeline;
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override final;
     };
 
     const char* getSourceName() const final;

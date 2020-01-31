@@ -1737,6 +1737,105 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_collStats_facet",
+          command: {
+              aggregate: "foo", 
+              pipeline: [
+                {$collStats: {latencyStats: {}}}, 
+                {$facet: {matched: [{$match: {a: 1}}]}}
+              ], 
+              cursor: {}
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {
+                    read: 1,
+                    readAnyDatabase: 1,
+                    readWrite: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdmin: 1,
+                    dbAdminAnyDatabase: 1,
+                    dbOwner: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    backup: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["collStats"]}]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_collStats_within_lookup",
+          command: {
+              aggregate: "foo", 
+              pipeline: [
+                {$lookup: {
+                    from: "lookupColl", 
+                    pipeline: [{
+                        $collStats: {latencyStats: {}}
+                    }], 
+                    as: "result"
+                }}, 
+              ], 
+              cursor: {}
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("lookupColl");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.lookupColl.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "lookupColl"}, actions: ["collStats"]},
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}
+                ],
+              },
+          ]
+        },
+        {
+          testname: "aggregate_collStats_within_union",
+          command: {
+              aggregate: "foo", 
+              pipeline: [
+                {$unionWith: {coll: "unionColl", pipeline: [{$collStats: {latencyStats: {}}}]}}, 
+              ], 
+              cursor: {}
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("unionColl");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.unionColl.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges:
+                    [{resource: {db: firstDbName, collection: "unionColl"}, actions: ["collStats"]},
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}],
+              },
+          ]
+        },
+        {
           testname: "aggregate_facet",
           command: {
               aggregate: "foo",
@@ -5660,7 +5759,102 @@ var authCommandsLib = {
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
           ]
-		},
+        },
+        {
+          testname: "aggregate_union_with_basic",
+          command: {
+              aggregate: "baseColl",
+              pipeline: [{$unionWith: "unionColl"}],
+              cursor: {}
+          },
+          setup: function(db) {
+              db.createCollection("baseColl");
+              db.createCollection("unionColl");
+          },
+          teardown: function(db) {
+              db.baseColl.drop();
+              db.unionColl.drop();
+          },
+          testcases: [
+              // Missing required privileges on base collection.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "unionColl"}, actions: ["find"]}
+                ],
+                expectAuthzFailure: true,
+              },
+              // Missing required privileges on nested collection.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "baseColl"}, actions: ["find"]},
+                ],
+                expectAuthzFailure: true,
+              },
+              // All required privileges.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "baseColl"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "unionColl"}, actions: ["find"]},
+                ],
+              },
+          ]
+        },
+        {
+          testname: "aggregate_union_with_sub_pipeline",
+          command: {
+              aggregate: "baseColl",
+              pipeline: [{$unionWith: {coll: "unionColl", pipeline: [
+                {$lookup: {from: "lookupColl", localField: "_id", foreignField: "_id", as: "results"}}]
+              }}],
+              cursor: {}
+          },
+          setup: function(db) {
+              db.createCollection("baseColl");
+              db.createCollection("unionColl");
+              db.createCollection("lookupColl");
+          },
+          teardown: function(db) {
+              db.baseColl.drop();
+              db.unionColl.drop();
+              db.lookupColl.drop();
+          },
+          testcases: [
+              // Missing required privileges on nested collection.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "baseColl"}, actions: ["find"]},
+                ],
+                expectAuthzFailure: true,
+              },
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "baseColl"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "unionColl"}, actions: ["find"]},
+                ],
+                expectAuthzFailure: true,
+              },
+              // All required privileges.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "baseColl"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "unionColl"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "lookupColl"}, actions: ["find"]},
+                ],
+              },
+          ]
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

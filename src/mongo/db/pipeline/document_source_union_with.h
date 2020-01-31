@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
@@ -43,38 +44,16 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(NamespaceString withNss,
-                   stdx::unordered_set<NamespaceString> foreignNssSet,
-                   boost::optional<LiteParsedPipeline> liteParsedPipeline)
-            : _withNss{std::move(withNss)},
-              _foreignNssSet(std::move(foreignNssSet)),
-              _liteParsedPipeline(std::move(liteParsedPipeline)) {}
+        LiteParsed(NamespaceString foreignNss, boost::optional<LiteParsedPipeline> pipeline)
+            : LiteParsedDocumentSourceNestedPipelines(std::move(foreignNss), std::move(pipeline)) {}
 
-        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-            return {_foreignNssSet};
-        }
-
-        PrivilegeVector requiredPrivileges(bool, bool) const final {
-            return {};
-        }
-
-        bool allowShardedForeignCollection(NamespaceString) const final {
-            return true;
-        }
-
-        bool allowedToPassthroughFromMongos() const final {
-            return true;
-        }
-
-    private:
-        const NamespaceString _withNss;
-        const stdx::unordered_set<NamespaceString> _foreignNssSet;
-        const boost::optional<LiteParsedPipeline> _liteParsedPipeline;
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override final;
     };
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
