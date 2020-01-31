@@ -192,7 +192,9 @@ TEMPLATE(typename ListenerT)
 REQUIRES(std::is_base_of_v<DiagnosticListener, ListenerT>)
 void installDiagnosticListener() {
     auto& state = getDiagnosticListenerState();
-    state.listeners.push_back(new ListenerT());
+
+    static auto listener = ListenerT();
+    state.listeners.push_back(&listener);
     invariant(!state.isFinalized.load());
 }
 
