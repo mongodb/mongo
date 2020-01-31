@@ -1505,6 +1505,9 @@ private:
     // This set should also be cleared if a rollback occurs.
     std::set<OpTimeAndWallTime> _stableOpTimeCandidates;  // (M)
 
+    // A flag that enables/disables advancement of the stable timestamp for storage.
+    bool _shouldSetStableTimestamp = true;  // (M)
+
     // Used to signal threads that are waiting for new committed snapshots.
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
 

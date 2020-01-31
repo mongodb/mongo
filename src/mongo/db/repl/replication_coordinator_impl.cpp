@@ -2817,6 +2817,14 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     auto configStateGuard =
         makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigUninitialized); }); });
+
+    // When writing our first oplog entry below, disable advancement of the stable timestamp so that
+    // we don't set it before setting our initial data timestamp. We will set it after we set our
+    // initialDataTimestamp. This will ensure we trigger an initial stable checkpoint properly.
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        _shouldSetStableTimestamp = false;
+    }
+
     lk.unlock();
 
     ReplSetConfig newConfig;
@@ -2873,6 +2881,14 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     // to data on disk. We do this after writing the "initiating set" oplog entry.
     _storage->setInitialDataTimestamp(getServiceContext(),
                                       lastAppliedOpTimeAndWallTime.opTime.getTimestamp());
+
+    // Set our stable timestamp for storage and re-enable stable timestamp advancement after we have
+    // set our initial data timestamp.
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        stdx::unique_lock<Latch> lk(_mutex);
+        _shouldSetStableTimestamp = true;
+        _setStableTimestampForStorage(lk);
+    }
 
     _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
 
@@ -3725,6 +3741,10 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStabl
 MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
+    if (!_shouldSetStableTimestamp) {
+        LOG(2) << "Not setting stable timestamp for storage.";
+        return;
+    }
     // Get the current stable optime.
     auto stableOpTime = _recalculateStableOpTime(lk);
 
