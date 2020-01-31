@@ -9,9 +9,9 @@
 function runTest(conn, failPointConn, restartFn) {
     // Set a default rwc.
     assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}));
+        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}));
     let res = assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1}));
-    assert.eq(res.defaultReadConcern, {level: "majority"});
+    assert.eq(res.defaultReadConcern, {level: "local"});
 
     // Restart the node with disabled rwc refreshes.
     restartFn();
@@ -27,7 +27,7 @@ function runTest(conn, failPointConn, restartFn) {
     assert.commandWorked(
         failPointConn.adminCommand({configureFailPoint: "failRWCDefaultsLookup", mode: "off"}));
     res = assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1}));
-    assert.eq(res.defaultReadConcern, {level: "majority"});
+    assert.eq(res.defaultReadConcern, {level: "local"});
 
     // Unset the default read concern so it won't interfere with testing hooks.
     assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}}));

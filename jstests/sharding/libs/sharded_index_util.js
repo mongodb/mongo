@@ -49,11 +49,13 @@ var ShardedIndexUtil = (function() {
 
     let getPerShardIndexes = function(coll) {
         return coll
-            .aggregate([
-                {$indexStats: {}},
-                {$group: {_id: "$shard", indexes: {$push: {spec: "$spec"}}}},
-                {$project: {_id: 0, shard: "$_id", indexes: 1}}
-            ])
+            .aggregate(
+                [
+                    {$indexStats: {}},
+                    {$group: {_id: "$shard", indexes: {$push: {spec: "$spec"}}}},
+                    {$project: {_id: 0, shard: "$_id", indexes: 1}}
+                ],
+                {readConcern: {level: "local"}})
             .toArray();
     };
 
