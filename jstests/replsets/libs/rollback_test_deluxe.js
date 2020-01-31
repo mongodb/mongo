@@ -334,12 +334,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
                     return false;
                 }
 
-                // Fail early if the rbid is greater than lastRBID+1.
-                let rbid = res.rbid;
-                assert.lte(rbid,
-                           lastRBID + 1,
-                           `RBID is too large. current RBID: ${rbid}, last RBID: ${lastRBID}`);
-                return rbid === lastRBID + 1;
+                return res.rbid > lastRBID;
             }, `Timed out waiting for RBID to increment on ${node.host}`);
         }
 
