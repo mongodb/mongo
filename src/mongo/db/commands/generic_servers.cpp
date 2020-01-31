@@ -121,7 +121,7 @@ public:
         bSys.append("cpuAddrSize", static_cast<int>(p.getAddrSize()));
         bSys.append("memSizeMB", static_cast<long long>(p.getSystemMemSizeMB()));
         bSys.append("memLimitMB", static_cast<long long>(p.getMemSizeMB()));
-        bSys.append("numCores", static_cast<int>(p.getNumCores()));
+        bSys.append("numCores", static_cast<int>(p.getNumAvailableCores()));
         bSys.append("cpuArch", p.getArch());
         bSys.append("numaEnabled", p.hasNumaEnabled());
         bOs.append("type", p.getOsType());
