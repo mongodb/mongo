@@ -4265,18 +4265,10 @@ env.Alias("distsrc", "distsrc-tgz")
 #
 # psutil.cpu_count returns None when it can't determine the number. This always
 # fails on BSD's for example.
-cpu_count = psutil.cpu_count()
-
-# If using icecream try to set the number of jobs higher than the
-# cpu_count since the cluster will have more concurrency. We want to
-# avoid doing this 8x scaling when ninja is enabled with Icecream
-# however since the ninja tool reads num_jobs to build local pools for
-# execution. So only do the scaling if Scons is driving the icecream
-# build.
-if cpu_count is not None and 'ICECC' in env and get_option('ninja') != 'true':
-    env.SetOption('num_jobs', 8 * cpu_count)
-elif cpu_count is not None:
-    env.SetOption('num_jobs', cpu_count)
+if psutil.cpu_count() is not None and 'ICECC' not in env:
+    env.SetOption('num_jobs', psutil.cpu_count())
+elif psutil.cpu_count() and 'ICECC' in env:
+    env.SetOption('num_jobs', 8 * psutil.cpu_count())
 
 
 # Do this as close to last as possible before reading SConscripts, so
