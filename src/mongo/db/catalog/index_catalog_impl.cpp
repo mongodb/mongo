@@ -66,6 +66,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -105,8 +106,6 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         const string& indexName = indexNames[i];
         BSONObj spec =
             durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), indexName).getOwned();
-        invariant(durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName));
-
         BSONObj keyPattern = spec.getObjectField("key");
         auto descriptor =
             std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
@@ -115,10 +114,26 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
                 .registerTTLInfo(std::make_pair(_collection->uuid(), indexName));
         }
 
-        const bool initFromDisk = true;
-        const bool isReadyIndex = true;
-        IndexCatalogEntry* entry =
-            createIndexEntry(opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
+        // We intentionally do not drop or rebuild unfinished two-phase index builds before
+        // initializing the IndexCatalog when starting a replica set member in standalone mode. This
+        // is because the index build cannot complete until it receives a replicated commit or
+        // abort oplog entry.
+        if (!durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName)) {
+            invariant(getReplSetMemberInStandaloneMode(opCtx->getServiceContext()));
+            auto buildUUID =
+                durableCatalog->getIndexBuildUUID(opCtx, _collection->getCatalogId(), indexName);
+            invariant(buildUUID);
+
+            // Indicate that this index is "frozen". It is not ready but is not currently in
+            // progress either. These indexes may be dropped.
+            auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
+            IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
+            fassert(31433, !entry->isReady(opCtx));
+            continue;
+        }
+
+        auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
+        IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
 
         fassert(17340, entry->isReady(opCtx));
     }
@@ -346,8 +361,7 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
 
 IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       std::unique_ptr<IndexDescriptor> descriptor,
-                                                      bool initFromDisk,
-                                                      bool isReadyIndex) {
+                                                      CreateIndexEntryFlags flags) {
     Status status = _isSpecOk(opCtx, descriptor->infoObj());
     if (!status.isOK()) {
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
@@ -359,9 +373,13 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     std::string ident = engine->getCatalog()->getIndexIdent(
         opCtx, _collection->getCatalogId(), descriptor->indexName());
 
+    bool isReadyIndex = CreateIndexEntryFlags::kIsReady & flags;
+    bool frozen = CreateIndexEntryFlags::kFrozen & flags;
+    invariant(!frozen || !isReadyIndex);
+
     auto* const descriptorPtr = descriptor.get();
     auto entry = std::make_shared<IndexCatalogEntryImpl>(
-        opCtx, ident, std::move(descriptor), &CollectionQueryInfo::get(_collection));
+        opCtx, ident, std::move(descriptor), &CollectionQueryInfo::get(_collection), frozen);
 
     IndexDescriptor* desc = entry->descriptor();
 
@@ -373,6 +391,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     entry->init(std::move(accessMethod));
 
+
     IndexCatalogEntry* save = entry.get();
     if (isReadyIndex) {
         _readyIndexes.add(std::move(entry));
@@ -380,6 +399,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         _buildingIndexes.add(std::move(entry));
     }
 
+    bool initFromDisk = CreateIndexEntryFlags::kInitFromDisk & flags;
     if (!initFromDisk &&
         UncommittedCollections::getForTxn(opCtx, descriptorPtr->parentNS()) == nullptr) {
         opCtx->recoveryUnit()->onRollback([this, opCtx, isReadyIndex, descriptor = descriptorPtr] {
@@ -745,6 +765,17 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                 return Status(ErrorCodes::IndexOptionsConflict,
                               str::stream() << "Index with name: " << name
                                             << " already exists with different options");
+
+
+            // If an identical index exists, but it is frozen, return an error with a different
+            // code to the user, forcing the user to drop before recreating the index.
+            auto entry = getEntry(desc);
+            if (entry->isFrozen()) {
+                return Status(ErrorCodes::CannotCreateIndex,
+                              str::stream() << "An identical, unfinished index already exists. The "
+                                               "index must be dropped first: "
+                                            << name << ", spec: " << desc->infoObj());
+            }
 
             // Index already exists with the same options, so no need to build a new
             // one (not an error). Most likely requested by a client using ensureIndex.
@@ -1233,10 +1264,8 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // to the CollectionQueryInfo.
     auto newDesc =
         std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
-    const bool initFromDisk = false;
-    const bool isReadyIndex = true;
     const IndexCatalogEntry* newEntry =
-        createIndexEntry(opCtx, std::move(newDesc), initFromDisk, isReadyIndex);
+        createIndexEntry(opCtx, std::move(newDesc), CreateIndexEntryFlags::kIsReady);
     invariant(newEntry->isReady(opCtx));
     CollectionQueryInfo::get(_collection).addedIndex(opCtx, newEntry->descriptor());
 

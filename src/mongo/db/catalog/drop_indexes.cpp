@@ -43,6 +43,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/log.h"
@@ -58,20 +59,31 @@ namespace {
 constexpr auto kIndexFieldName = "index"_sd;
 
 /**
- * Drops single index by name.
+ * Drops single index given a descriptor.
  */
-Status dropIndexByName(OperationContext* opCtx,
-                       Collection* collection,
-                       IndexCatalog* indexCatalog,
-                       const std::string& indexToDelete) {
-    auto desc = indexCatalog->findIndexByName(opCtx, indexToDelete);
-    if (!desc) {
-        return Status(ErrorCodes::IndexNotFound,
-                      str::stream() << "index not found with name [" << indexToDelete << "]");
-    }
-
+Status dropIndexByDescriptor(OperationContext* opCtx,
+                             Collection* collection,
+                             IndexCatalog* indexCatalog,
+                             const IndexDescriptor* desc) {
     if (desc->isIdIndex()) {
         return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
+    }
+
+    // Support dropping unfinished indexes, but only if the index is 'frozen'. These indexes only
+    // exist in standalone mode.
+    auto entry = indexCatalog->getEntry(desc);
+    if (entry->isFrozen()) {
+        invariant(!entry->isReady(opCtx));
+        invariant(getReplSetMemberInStandaloneMode(opCtx->getServiceContext()));
+        // Return here. No need to fall through to op observer on standalone.
+        return indexCatalog->dropUnfinishedIndex(opCtx, desc);
+    }
+
+    // Do not allow dropping unfinished indexes that are not frozen.
+    if (!entry->isReady(opCtx)) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream()
+                          << "can't drop unfinished index with name: " << desc->indexName());
     }
 
     auto s = indexCatalog->dropIndex(opCtx, desc);
@@ -111,13 +123,20 @@ Status wrappedRun(OperationContext* opCtx,
             return Status::OK();
         }
 
-        return dropIndexByName(opCtx, collection, indexCatalog, indexToDelete);
+        bool includeUnfinished = true;
+        auto desc = indexCatalog->findIndexByName(opCtx, indexToDelete, includeUnfinished);
+        if (!desc) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream() << "index not found with name [" << indexToDelete << "]");
+        }
+        return dropIndexByDescriptor(opCtx, collection, indexCatalog, desc);
     }
 
     if (indexElem.type() == Object) {
+        const bool includeUnfinished = true;
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(
-            opCtx, indexElem.embeddedObject(), false, &indexes);
+            opCtx, indexElem.embeddedObject(), includeUnfinished, &indexes);
         if (indexes.empty()) {
             return Status(ErrorCodes::IndexNotFound,
                           str::stream()
@@ -146,15 +165,7 @@ Status wrappedRun(OperationContext* opCtx,
                           "name of '*', or downgrade to 3.4 to drop only this index.");
         }
 
-        Status s = indexCatalog->dropIndex(opCtx, desc);
-        if (!s.isOK()) {
-            return s;
-        }
-
-        opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
-
-        return Status::OK();
+        return dropIndexByDescriptor(opCtx, collection, indexCatalog, desc);
     }
 
     // The 'index' field contains a list of names of indexes to drop.
@@ -170,7 +181,14 @@ Status wrappedRun(OperationContext* opCtx,
             }
 
             auto indexToDelete = indexNameElem.String();
-            auto status = dropIndexByName(opCtx, collection, indexCatalog, indexToDelete);
+            bool includeUnfinished = true;
+            auto desc = indexCatalog->findIndexByName(opCtx, indexToDelete, includeUnfinished);
+            if (!desc) {
+                return Status(ErrorCodes::IndexNotFound,
+                              str::stream()
+                                  << "index not found with name [" << indexToDelete << "]");
+            }
+            auto status = dropIndexByDescriptor(opCtx, collection, indexCatalog, desc);
             if (!status.isOK()) {
                 return status.withContext(
                     str::stream() << "dropIndexes " << collection->ns() << " ("

@@ -62,12 +62,14 @@ using std::string;
 IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              const std::string& ident,
                                              std::unique_ptr<IndexDescriptor> descriptor,
-                                             CollectionQueryInfo* const queryInfo)
+                                             CollectionQueryInfo* const queryInfo,
+                                             bool isFrozen)
     : _ident(ident),
       _descriptor(std::move(descriptor)),
       _queryInfo(queryInfo),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
+      _isFrozen(isFrozen),
       _isDropped(false),
       _prefix(DurableCatalog::get(opCtx)->getIndexPrefix(
           opCtx, _descriptor->getCollection()->getCatalogId(), _descriptor->indexName())) {
@@ -143,6 +145,11 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     if (kDebugBuild)
         invariant(_isReady == _catalogIsReady(opCtx));
     return _isReady;
+}
+
+bool IndexCatalogEntryImpl::isFrozen() const {
+    invariant(!_isFrozen || !_isReady);
+    return _isFrozen;
 }
 
 bool IndexCatalogEntryImpl::isMultikey() const {

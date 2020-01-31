@@ -104,10 +104,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     if (!status.isOK())
         return status;
 
-    const bool initFromDisk = false;
-    const bool isReadyIndex = false;
     _indexCatalogEntry =
-        _indexCatalog->createIndexEntry(opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
+        _indexCatalog->createIndexEntry(opCtx, std::move(descriptor), CreateIndexEntryFlags::kNone);
 
     // Only track skipped records with two-phase index builds, which is indicated by a present build
     // UUID.

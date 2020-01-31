@@ -131,8 +131,7 @@ public:
 
     IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
                                         std::unique_ptr<IndexDescriptor> descriptor,
-                                        bool initFromDisk,
-                                        bool isReadyIndex) override {
+                                        CreateIndexEntryFlags flags) override {
         return nullptr;
     }
 

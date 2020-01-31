@@ -133,6 +133,12 @@ public:
     // if this ready is ready for queries
     virtual bool isReady(OperationContext* const opCtx) const = 0;
 
+    /**
+     * Returns true if this index is not ready, and it is not currently in the process of being
+     * built either.
+     */
+    virtual bool isFrozen() const = 0;
+
     virtual KVPrefix getPrefix() const = 0;
 
     /**

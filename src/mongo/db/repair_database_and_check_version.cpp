@@ -316,6 +316,15 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 
+
+    // Two-phase index builds depend on a replicated 'commitIndexBuild' oplog entry to commit.
+    // Therefore, when a replica set member is started in standalone mode, we cannot restart the
+    // index build.
+    if (getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
+        log() << "Not restarting unfinished index builds because we are in standalone mode";
+        return;
+    }
+
     // Once all unfinished indexes have been rebuilt, restart any unfinished index builds. This will
     // not build any indexes to completion, but rather start the background thread to build the
     // index, and wait for a replicated commit or abort oplog entry.

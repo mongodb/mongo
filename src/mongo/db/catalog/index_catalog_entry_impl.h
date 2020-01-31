@@ -60,7 +60,8 @@ public:
     IndexCatalogEntryImpl(OperationContext* opCtx,
                           const std::string& ident,
                           std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-                          CollectionQueryInfo* queryInfo);              // not owned, optional
+                          CollectionQueryInfo* queryInfo,               // not owned, optional
+                          bool isFrozen);
 
     ~IndexCatalogEntryImpl() final;
 
@@ -164,6 +165,8 @@ public:
     // if this ready is ready for queries
     bool isReady(OperationContext* opCtx) const final;
 
+    bool isFrozen() const final;
+
     KVPrefix getPrefix() const final {
         return _prefix;
     }
@@ -214,8 +217,9 @@ private:
 
     // cached stuff
 
-    Ordering _ordering;           // TODO: this might be b-tree specific
-    bool _isReady;                // cache of NamespaceDetails info
+    Ordering _ordering;  // TODO: this might be b-tree specific
+    bool _isReady;       // cache of NamespaceDetails info
+    bool _isFrozen;
     AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
 
     // Set to true if this index supports path-level multikey tracking.

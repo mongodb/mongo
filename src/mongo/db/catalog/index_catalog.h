@@ -77,6 +77,34 @@ enum class IndexBuildMethod {
     kForeground,
 };
 
+enum class CreateIndexEntryFlags : int {
+    kNone = 0x0,
+    /**
+     * kInitFromDisk avoids registering a change to undo this operation when set to true. You
+     * must set this flag if calling this function outside of a WriteUnitOfWork.
+     */
+    kInitFromDisk = 0x1,
+    /**
+     * kIsReady controls whether the index will be directly available for query usage without
+     * needing to complete the IndexBuildBlock process.
+     */
+    kIsReady = 0x2,
+    /**
+     * kFrozen indicates that the index is not usable and that it is not currently being
+     * built. This is used when starting a node in standalone mode and a two-phase index build
+     * is incomplete. kIsReady must not also be set.
+     */
+    kFrozen = 0x4
+};
+
+inline bool operator&(CreateIndexEntryFlags lhs, CreateIndexEntryFlags rhs) {
+    return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
+}
+
+inline CreateIndexEntryFlags operator|(CreateIndexEntryFlags lhs, CreateIndexEntryFlags rhs) {
+    return CreateIndexEntryFlags(static_cast<int>(lhs) | static_cast<int>(rhs));
+}
+
 /**
  * The IndexCatalog is owned by the Collection and is responsible for the lookup and lifetimes of
  * the indexes in a collection. Every collection has exactly one instance of this class.
@@ -284,16 +312,11 @@ public:
     /*
      * Creates an index entry with the provided descriptor on the catalog's collection.
      *
-     * 'initFromDisk' avoids registering a change to undo this operation when set to true. You must
-     * set this flag if calling this function outside of a WriteUnitOfWork.
-     *
-     * 'isReadyIndex' controls whether the index will be directly available for query usage without
-     * needing to complete the IndexBuildBlock process.
      */
+
     virtual IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
                                                 std::unique_ptr<IndexDescriptor> descriptor,
-                                                bool initFromDisk,
-                                                bool isReadyIndex) = 0;
+                                                CreateIndexEntryFlags flags) = 0;
 
     /**
      * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
