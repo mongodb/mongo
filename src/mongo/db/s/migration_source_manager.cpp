@@ -434,9 +434,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         ChunkType migratedChunkType;
         migratedChunkType.setMin(_args.getMinKey());
         migratedChunkType.setMax(_args.getMaxKey());
-        if (isFCVLatest()) {
-            migratedChunkType.setVersion(_chunkVersion);
-        }
+        migratedChunkType.setVersion(_chunkVersion);
 
         CommitChunkMigrationRequest::appendAsCommand(
             &builder,
@@ -475,68 +473,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
     if (!migrationCommitStatus.isOK()) {
-        if (isFCVLatest()) {
-            migrationutil::ensureChunkVersionIsGreaterThan(_opCtx, _args.getRange(), _chunkVersion);
-        } else {
-            // This is the FCV 4.2 and below protocol.
-
-            // Need to get the latest optime in case the refresh request goes to a secondary --
-            // otherwise the read won't wait for the write that _configsvrCommitChunkMigration may
-            // have done
-            log() << "Error occurred while committing the migration. Performing a majority write "
-                     "against the config server to obtain its latest optime"
-                  << causedBy(redact(migrationCommitStatus));
-
-            Status status = ShardingLogging::get(_opCtx)->logChangeChecked(
-                _opCtx,
-                "moveChunk.validating",
-                getNss().ns(),
-                BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                           << _args.getFromShardId() << "to" << _args.getToShardId()),
-                ShardingCatalogClient::kMajorityWriteConcern);
-
-            if ((ErrorCodes::isInterruption(status.code()) ||
-                 ErrorCodes::isShutdownError(status.code()) ||
-                 status == ErrorCodes::CallbackCanceled) &&
-                globalInShutdownDeprecated()) {
-                // Since the server is already doing a clean shutdown, this call will just join the
-                // previous shutdown call
-                shutdown(waitForShutdown());
-            }
-
-            // If we failed to get the latest config optime because we stepped down as primary, then
-            // it is safe to fail without crashing because the new primary will fetch the latest
-            // optime when it recovers the sharding state recovery document, as long as we also
-            // clear the metadata for this collection, forcing subsequent callers to do a full
-            // refresh. Check if this node can accept writes for this collection as a proxy for it
-            // being primary.
-            if (!status.isOK()) {
-                UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-                AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
-                if (!repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(_opCtx,
-                                                                                   getNss())) {
-                    CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
-                    uassertStatusOK(status.withContext(
-                        str::stream()
-                        << "Unable to verify migration commit for chunk: "
-                        << redact(_args.toString())
-                        << " because the node's replication role changed. Metadata was cleared "
-                           "for: "
-                        << getNss().ns()
-                        << ", so it will get a full refresh when accessed again."));
-                }
-            }
-
-            fassert(40137,
-                    status.withContext(str::stream() << "Failed to commit migration for chunk "
-                                                     << _args.toString() << " due to "
-                                                     << redact(migrationCommitStatus)
-                                                     << ". Updating the optime with a write before "
-                                                        "refreshing the metadata also failed"));
-        }
+        migrationutil::ensureChunkVersionIsGreaterThan(_opCtx, _args.getRange(), _chunkVersion);
     }
 
-    // Incrementally refresh the metadata before leaving the critical section.
     migrationutil::refreshFilteringMetadataUntilSuccess(_opCtx, getNss());
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
