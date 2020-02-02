@@ -167,12 +167,6 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx,
 }
 
 bool MultiIndexBlock::areHybridIndexBuildsEnabled() {
-    // The mobile storage engine does not suport dupsAllowed mode on bulk builders, which means that
-    // it does not support hybrid builds. See SERVER-38550
-    if (storageGlobalParams.engine == "mobile") {
-        return false;
-    }
-
     return enableHybridIndexBuilds.load();
 }
 

@@ -189,15 +189,6 @@ add_option('wiredtiger',
     type='choice',
 )
 
-add_option('mobile-se',
-    choices=['on', 'off'],
-    const='on',
-    default='off',
-    help='Enable Mobile Storage Engine',
-    nargs='?',
-    type='choice',
-)
-
 js_engine_choices = ['mozjs', 'none']
 add_option('js-engine',
     choices=js_engine_choices,
@@ -341,7 +332,6 @@ for pack in [
     ('kms-message',),
     ('pcre',),
     ('snappy',),
-    ('sqlite',),
     ('stemmer',),
     ('tcmalloc',),
     ('libunwind',),
@@ -2038,10 +2028,6 @@ if get_option('wiredtiger') == 'on':
         wiredtiger = True
         env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
 
-mobile_se = False
-if get_option('mobile-se') == 'on':
-    mobile_se = True
-
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
     # and the tuning to 'generic'. The choice of 'nocona' is selected because it
@@ -3392,11 +3378,6 @@ def doConfigure(myenv):
             myenv.ConfError("Cannot find wiredtiger headers")
         conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
 
-    if use_system_version_of_library("sqlite"):
-        if not conf.CheckCXXHeader( "sqlite3.h" ):
-            myenv.ConfError("Cannot find sqlite headers")
-        conf.FindSysLibDep("sqlite", ["sqlite3"])
-
     conf.env.Append(
         CPPDEFINES=[
             ("BOOST_THREAD_VERSION", "5"),
@@ -4185,7 +4166,6 @@ Export([
     'get_option',
     'has_option',
     'http_client',
-    'mobile_se',
     'module_sconscripts',
     'optBuild',
     'serverJs',

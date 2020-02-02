@@ -4,7 +4,6 @@ import libdeps
 import json
 
 Import("env use_system_version_of_library usemozjs get_option")
-Import("mobile_se")
 Import("use_libunwind")
 Import("use_system_libunwind")
 Import("use_vendored_libunwind")
@@ -22,7 +21,6 @@ gperftoolsSuffix = '-2.7'
 timelibSuffix = '-2018.01'
 tomcryptSuffix = '-1.18.2'
 benchmarkSuffix = '-1.4.1'
-sqliteSuffix = '-amalgamation-3260000'
 
 thirdPartyEnvironmentModifications = {
    'fmt' : {
@@ -119,11 +117,6 @@ if not use_system_version_of_library('zlib'):
 if not use_system_version_of_library('zstd'):
     thirdPartyEnvironmentModifications['zstd'] = {
         'CPPPATH' : ['#/src/third_party/zstandard' + zstdSuffix + '/zstd/lib'],
-    }
-
-if not use_system_version_of_library('sqlite'):
-    thirdPartyEnvironmentModifications['sqlite'] = {
-        'CPPPATH' : ['#/src/third_party/sqlite' + sqliteSuffix + '/sqlite'],
     }
 
 if not use_system_version_of_library('google-benchmark'):
@@ -580,26 +573,6 @@ if wiredtiger:
         source=[
             'shim_wiredtiger.cpp'
         ])
-
-if use_system_version_of_library("sqlite"):
-    sqliteEnv = env.Clone(
-        SYSLIBDEPS=[
-            env['LIBDEPS_SQLITE_SYSLIBDEP']
-        ])
-else:
-    sqliteEnv = env.Clone()
-    sqliteEnv.InjectThirdParty(libraries=['sqlite'])
-    sqliteEnv.SConscript('sqlite' + sqliteSuffix + '/SConscript', exports={ 'env' : sqliteEnv })
-    sqliteEnv = sqliteEnv.Clone(
-        LIBDEPS_INTERFACE=[
-            'sqlite' + sqliteSuffix + '/sqlite3',
-        ])
-
-sqliteEnv.Library(
-    target='shim_sqlite',
-    source=[
-        'shim_sqlite.cpp',
-    ])
 
 if use_system_version_of_library("asio"):
     # Normally, we would request LIBDEPS_ASIO_SYSLIBDEP here, but on most systems, the system asio

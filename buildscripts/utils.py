@@ -22,8 +22,7 @@ def get_all_source_files(arr=None, prefix="."):
         # pylint: disable=too-many-boolean-expressions
         if (fx.startswith(".") or fx.startswith("pcre-") or fx.startswith("32bit")
                 or fx.startswith("mongodb-") or fx.startswith("debian")
-                or fx.startswith("mongo-cxx-driver") or fx.startswith("sqlite") or "gotools" in fx
-                or fx.find("mozjs") != -1):
+                or fx.startswith("mongo-cxx-driver") or "gotools" in fx or fx.find("mozjs") != -1):
             continue
         # pylint: enable=too-many-boolean-expressions
 

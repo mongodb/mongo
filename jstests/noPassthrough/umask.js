@@ -21,10 +21,6 @@ const permissiveUmask = Number.parseInt("666", 8);
 const exceptions = [
     // The lock file gets created with explicit 644 permissions
     'mongod.lock',
-    // Mobile se files get created with 644 permissions when honoring the system umask
-    'mobile.sqlite',
-    'mobile.sqlite-shm',
-    'mobile.sqlite-wal',
 ];
 
 let mongodOptions = MongoRunner.mongodOptions({

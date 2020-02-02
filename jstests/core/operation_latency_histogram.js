@@ -11,8 +11,6 @@
 //     incompatible_with_embedded,
 // ]
 //
-// TODO (SERVER-36055): Correct error code reported when run on mobile, and then we can remove the
-// tag incompatible_with_embedded.
 
 (function() {
 "use strict";

@@ -68,7 +68,7 @@ function runTest(mongod) {
      {user: "admin", dbs: admin_dbs, authDbs: admin_dbs},
     ].forEach(function(test) {
         function filterSpecial(db) {
-            // Returning of local/config varies with sharding/mobile/etc..
+            // Returning of local/config varies with sharding, etc..
             // Ignore these for simplicity.
             return (db !== 'local') && (db !== 'config');
         }

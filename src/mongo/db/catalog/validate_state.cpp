@@ -116,11 +116,6 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
 void ValidateState::_yieldCursors(OperationContext* opCtx) {
     invariant(!_background);
 
-    // Mobile does not support saving and restoring cursors, so we skip yielding cursors for it.
-    if (storageGlobalParams.engine == "mobile") {
-        return;
-    }
-
     // Save all the cursors.
     for (const auto& indexCursor : _indexCursors) {
         indexCursor.second->save();

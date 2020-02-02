@@ -4,11 +4,6 @@
 (function() {
 "use strict";
 
-if (jsTest.options().storageEngine === "mobile") {
-    print("Skipping test because storage engine isn't mobile");
-    return;
-}
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB(jsTest.name());

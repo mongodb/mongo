@@ -5624,15 +5624,6 @@ tasks:
       resmoke_args: --suites=change_streams_multi_stmt_txn_sharded_collections_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: disk_mobile
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=disk_mobile --storageEngine=mobile
-      resmoke_jobs_max: 1
-
-- <<: *task_template
   name: disk_wiredtiger
   commands:
   - func: "do setup"
@@ -6201,7 +6192,7 @@ tasks:
 
 - <<: *task_template
   name: mongosTest
-  tags: ["misc_js", "non_mobile", "non_read_maj"]
+  tags: ["misc_js", "non_read_maj"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6266,7 +6257,7 @@ tasks:
       resmoke_args: --suites=bulk_gle_passthrough --storageEngine=wiredTiger
 
 - name: slow1_gen
-  tags: ["misc_js", "non_win_dbg", "non_mobile"]
+  tags: ["misc_js", "non_win_dbg"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6423,7 +6414,7 @@ tasks:
       fallback_num_sub_suites: 37
 
 - name: parallel_gen
-  tags: ["misc_js", "non_mobile"]
+  tags: ["misc_js"]
   depends_on:
   - name: jsCore
   commands:
@@ -6436,7 +6427,7 @@ tasks:
 
 - <<: *task_template
   name: parallel_compatibility
-  tags: ["misc_js", "non_mobile"]
+  tags: ["misc_js"]
   depends_on:
   - name: jsCore_compatibility
   commands:
@@ -7510,29 +7501,6 @@ tasks:
       <<: *powercycle_test
       client_options: "--numCrudClients=20 --numFsmClients=20 --writeConcern='{\"w\": \"majority\"}'"
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
-
-- name: powercycle_mobile
-  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  depends_on:
-  - name: compile
-  commands:
-  - func: "do setup"
-  - func: "set up remote credentials"
-    vars:
-      <<: *powercycle_remote_credentials
-  - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
-  - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
-    vars:
-      <<: *powercycle_test
-      # We do 5 rather than 15 loops when running against the mobile storage engine because
-      # collection validation otherwise starts to take several minutes after each loop.
-      client_options: --testLoops=5 --numCrudClients=20 --numFsmClients=20
-      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine mobile\"
 
 - name: idl_tests
   depends_on:
@@ -9612,7 +9580,7 @@ buildvariants:
     - rhel70-small
 
 ###########################################
-#          Mobile SDK buildvariants       #
+#          Embedded SDK buildvariants     #
 ###########################################
 
 - name: embedded-sdk-macos
@@ -10821,7 +10789,7 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
+    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
     multiversion_platform: ubuntu1604
@@ -10843,7 +10811,7 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
+    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
   tasks:

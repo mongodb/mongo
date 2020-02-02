@@ -3,11 +3,6 @@
 (function() {
 "use strict";
 
-if (jsTest.options().storageEngine === "mobile") {
-    print("Skipping test because storage engine isn't mobile");
-    return;
-}
-
 load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 load("jstests/libs/fixture_helpers.js");      // For "FixtureHelpers".
 

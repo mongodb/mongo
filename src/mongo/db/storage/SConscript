@@ -9,7 +9,6 @@ env.SConscript(
         'devnull',
         'ephemeral_for_test',
         'kv',
-        'mobile',
         'wiredtiger',
     ],
     exports=[

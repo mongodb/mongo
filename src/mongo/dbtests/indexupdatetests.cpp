@@ -658,17 +658,9 @@ class IndexUpdateTests : public OldStyleSuiteSpecification {
 public:
     IndexUpdateTests() : OldStyleSuiteSpecification("indexupdate") {}
 
-    // Must be evaluated at test run() time, not static-init time.
-    static bool shouldSkip() {
-        return mongo::storageGlobalParams.engine == "mobile";
-    }
-
     template <typename T>
     void addIf() {
-        addNameCallback(nameForTestClass<T>(), [] {
-            if (!shouldSkip())
-                T().run();
-        });
+        addNameCallback(nameForTestClass<T>(), [] { T().run(); });
     }
 
     void setupTests() {

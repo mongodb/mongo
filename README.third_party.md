@@ -43,7 +43,6 @@ a notice will be included in
 | [SafeInt]                  | MIT               | 3.22             | 3.0.20p           |                      |                                 |
 | [scons]                    | MIT               | 3.0.4            | 3.0.4             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.7            | 1.1.7             |          ✗           |                ✗                |
-| [sqlite]                   | Public Domain     | 3300100          | 3260000           |          ✗           |                ✗                |
 | [timelib]                  | MIT               | 2018.01          | 2018.01           |                      |                ✗                |
 | [TomCrypt]                 | Public Domain     | 1.18.2           | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 12.1.0           | 8.0.0             |          ✗           |                ✗                |
@@ -75,7 +74,6 @@ a notice will be included in
 [SafeInt]: https://github.com/dcleblanc/SafeInt
 [scons]: https://github.com/SCons/scons
 [Snappy]: https://github.com/google/snappy/releases
-[sqlite]: https://sqlite.org/
 [timelib]: https://github.com/derickr/timelib
 [TomCrypt]: https://github.com/libtom/libtomcrypt/releases
 [Unicode]: http://www.unicode.org/versions/enumeratedversions.html

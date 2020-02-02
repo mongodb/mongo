@@ -1,8 +1,5 @@
 /**
  * Test interactions with big index keys. There should be no size limit for index keys.
- * Note: mobile storage engine does not support background index build so the background index build
- * tests are moved from index_bigkeys.js to this file. index_bigkeys.js will still be run with
- * mobile storage engine.
  *
  * assumes_no_implicit_index_creation: Cannot implicitly shard accessed collections because of extra
  * shard key index in sharded collection.

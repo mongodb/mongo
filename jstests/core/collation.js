@@ -1796,17 +1796,12 @@ if (!isMongos) {
 
     var cloneCollOutput = db.runCommand(
         {cloneCollectionAsCapped: coll.getName(), toCollection: clonedColl.getName(), size: 4096});
-    if (jsTest.options().storageEngine === "mobile") {
-        // Capped collections are not supported by the mobile storage engine
-        assert.commandFailedWithCode(cloneCollOutput, ErrorCodes.InvalidOptions);
-    } else {
-        assert.commandWorked(cloneCollOutput);
-        const clonedCollectionInfos = db.getCollectionInfos({name: clonedColl.getName()});
-        assert.eq(clonedCollectionInfos.length, 1, tojson(clonedCollectionInfos));
-        assert.eq(originalCollectionInfos[0].options.collation,
-                  clonedCollectionInfos[0].options.collation);
-        assert.eq([{_id: "FOO"}], clonedColl.find({_id: "foo"}).toArray());
-    }
+    assert.commandWorked(cloneCollOutput);
+    const clonedCollectionInfos = db.getCollectionInfos({name: clonedColl.getName()});
+    assert.eq(clonedCollectionInfos.length, 1, tojson(clonedCollectionInfos));
+    assert.eq(originalCollectionInfos[0].options.collation,
+              clonedCollectionInfos[0].options.collation);
+    assert.eq([{_id: "FOO"}], clonedColl.find({_id: "foo"}).toArray());
 }
 
 // Test that the find command's min/max options respect the collation.
