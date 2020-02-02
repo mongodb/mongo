@@ -155,12 +155,8 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
-          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --install-mode=hygienic install-core MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb
           mkdir -p mongodb/jstests/hooks
-          mv mongo${extension|} mongodb/bin
-          mv mongod${extension|} mongodb/bin
-          mv mongos${extension|} mongodb/bin
-          mv mongocryptd mongodb/bin || /bin/true
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests"
@@ -928,7 +924,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      mongocryptd
+      install-mongocryptd
   run_on:
       - "amazon2-build"
   tasks:
