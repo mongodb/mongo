@@ -18,6 +18,7 @@ import os
 import importlib
 import io
 import shutil
+import shlex
 
 from threading import Lock
 from glob import glob
@@ -36,7 +37,6 @@ NINJA_CUSTOM_HANDLERS = "__NINJA_CUSTOM_HANDLERS"
 NINJA_BUILD = "NINJA_BUILD"
 NINJA_WHEREIS_MEMO = {}
 NINJA_STAT_MEMO = {}
-MEMO_LOCK = Lock()
 
 __NINJA_RULE_MAPPING = {}
 
@@ -52,7 +52,6 @@ def _install_action_function(_env, node):
     return {
         "outputs": get_outputs(node),
         "rule": "INSTALL",
-        "pool": "install_pool",
         "inputs": [get_path(src_file(s)) for s in node.sources],
         "implicit": get_dependencies(node),
     }
@@ -188,12 +187,8 @@ class SConsToNinjaTranslator:
         if isinstance(action, COMMAND_TYPES):
             return get_command(node.env if node.env else self.env, node, action)
 
-        # Return the node to indicate that SCons is required
-        return {
-            "rule": "SCONS",
-            "outputs": get_outputs(node),
-            "implicit": get_dependencies(node),
-        }
+        raise Exception("Got an unbuildable ListAction for: {}".format(str(node)))
+
 
     def handle_func_action(self, node, action):
         """Determine how to handle the function action."""
@@ -211,19 +206,13 @@ class SConsToNinjaTranslator:
         if handler is not None:
             return handler(node.env if node.env else self.env, node)
 
-        print(
+        raise Exception(
             "Found unhandled function action {}, "
             " generating scons command to build\n"
             "Note: this is less efficient than Ninja,"
             " you can write your own ninja build generator for"
             " this function using NinjaRegisterFunctionHandler".format(name)
         )
-
-        return {
-            "rule": "SCONS",
-            "outputs": get_outputs(node),
-            "implicit": get_dependencies(node),
-        }
 
     # pylint: disable=too-many-branches
     def handle_list_action(self, node, action):
@@ -233,7 +222,7 @@ class SConsToNinjaTranslator:
             for act in action.list
             if act is not None
         ]
-        results = [result for result in results if result is not None]
+        results = [result for result in results if result is not None and result["outputs"]]
         if not results:
             return None
 
@@ -242,28 +231,7 @@ class SConsToNinjaTranslator:
             return results[0]
 
         all_outputs = list({output for build in results for output in build["outputs"]})
-        # If we have no outputs we're done
-        if not all_outputs:
-            return None
-
-        # Used to verify if all rules are the same
-        all_one_rule = len(
-            [
-                r
-                for r in results
-                if isinstance(r, dict) and r["rule"] == results[0]["rule"]
-            ]
-        ) == len(results)
-        dependencies = get_dependencies(node)
-
-        if not all_one_rule:
-            # If they aren't all the same rule use scons to generate these
-            # outputs. At this time nothing hits this case.
-            return {
-                "outputs": all_outputs,
-                "rule": "SCONS",
-                "implicit": dependencies,
-            }
+        dependencies = list({dep for build in results for dep in build["implicit"]})
 
         if results[0]["rule"] == "CMD":
             cmdline = ""
@@ -296,7 +264,10 @@ class SConsToNinjaTranslator:
                 ninja_build = {
                     "outputs": all_outputs,
                     "rule": "CMD",
-                    "variables": {"cmd": cmdline},
+                    "variables": {
+                        "cmd": cmdline,
+                        "env": get_command_env(node.env if node.env else self.env),
+                    },
                     "implicit": dependencies,
                 }
 
@@ -316,16 +287,8 @@ class SConsToNinjaTranslator:
             return {
                 "outputs": all_outputs,
                 "rule": "INSTALL",
-                "pool": "install_pool",
                 "inputs": [get_path(src_file(s)) for s in node.sources],
                 "implicit": dependencies,
-            }
-
-        elif results[0]["rule"] == "SCONS":
-            return {
-                "outputs": all_outputs,
-                "rule": "SCONS",
-                "inputs": dependencies,
             }
 
         raise Exception("Unhandled list action with rule: " + results[0]["rule"])
@@ -376,16 +339,41 @@ class NinjaState:
 
         self.rules = {
             "CMD": {
-                "command": "cmd /c $cmd" if sys.platform == "win32" else "$cmd",
+                "command": "cmd /c $env$cmd" if sys.platform == "win32" else "$env$cmd",
                 "description": "Building $out",
+                "pool": "local_pool",
             },
             # We add the deps processing variables to this below. We
-            # don't pipe this through cmd.exe on Windows because we
+            # don't pipe these through cmd.exe on Windows because we
             # use this to generate a compile_commands.json database
             # which can't use the shell command as it's compile
-            # command. This does mean that we assume anything using
-            # CMD_W_DEPS is a straight up compile which is true today.
-            "CMD_W_DEPS": {"command": "$cmd", "description": "Building $out"},
+            # command.
+            "CC": {
+                "command": "$env$CC @$out.rsp",
+                "description": "Compiling $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+            },
+            "CXX": {
+                "command": "$env$CXX @$out.rsp",
+                "description": "Compiling $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+            },
+            "LINK": {
+                "command": "$env$LINK @$out.rsp",
+                "description": "Linking $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+                "pool": "local_pool",
+            },
+            "AR": {
+                "command": "$env$AR @$out.rsp",
+                "description": "Archiving $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+                "pool": "local_pool",
+            },
             "SYMLINK": {
                 "command": (
                     "cmd /c mklink $out $in"
@@ -397,6 +385,7 @@ class NinjaState:
             "INSTALL": {
                 "command": "$COPY $in $out",
                 "description": "Install $out",
+                "pool": "install_pool",
                 # On Windows cmd.exe /c copy does not always correctly
                 # update the timestamp on the output file. This leads
                 # to a stuck constant timestamp in the Ninja database
@@ -453,15 +442,17 @@ class NinjaState:
         }
 
         self.pools = {
+            "local_pool": self.env.GetOption("num_jobs"),
             "install_pool": self.env.GetOption("num_jobs") / 2,
             "scons_pool": 1,
         }
 
-        if env["PLATFORM"] == "win32":
-            self.rules["CMD_W_DEPS"]["deps"] = "msvc"
-        else:
-            self.rules["CMD_W_DEPS"]["deps"] = "gcc"
-            self.rules["CMD_W_DEPS"]["depfile"] = "$out.d"
+        for rule in ["CC", "CXX"]:
+            if env["PLATFORM"] == "win32":
+                self.rules[rule]["deps"] = "msvc"
+            else:
+                self.rules[rule]["deps"] = "gcc"
+                self.rules[rule]["depfile"] = "$out.d"
 
         self.rules.update(env.get(NINJA_RULES, {}))
         self.pools.update(env.get(NINJA_POOLS, {}))
@@ -497,7 +488,6 @@ class NinjaState:
                     build = getattr(child.attributes, NINJA_BUILD, False)
                     if build is False:
                         build = self.translator.action_to_ninja_build(child)
-                        setattr(child.attributes, NINJA_BUILD, build)
                 else:
                     build = None
 
@@ -511,7 +501,7 @@ class NinjaState:
         """Check if output ends with a known generated suffix."""
         _, suffix = splitext(output)
         return suffix in self.generated_suffixes
-        
+
     def has_generated_sources(self, output):
         """
         Determine if output indicates this is a generated header file.
@@ -621,12 +611,13 @@ class NinjaState:
                 # builder and multiple phony targets that match the
                 # file names of the remaining outputs. This way any
                 # build can depend on any output from any build.
-                first_output, remaining_outputs = build["outputs"][0], build["outputs"][1:]
+                first_output, remaining_outputs = (
+                    build["outputs"][0],
+                    build["outputs"][1:],
+                )
                 if remaining_outputs:
                     ninja.build(
-                        outputs=remaining_outputs,
-                        rule="phony",
-                        implicit=first_output,
+                        outputs=remaining_outputs, rule="phony", implicit=first_output,
                     )
 
                 build["outputs"] = first_output
@@ -684,17 +675,15 @@ class NinjaState:
             variables={"cmd": "echo $SCONS_INVOCATION_W_TARGETS"},
         )
 
-        # Note the use of CMD_W_DEPS below. CMD_W_DEPS are always
-        # compile commands in this generator. If we ever change the
-        # name/s of the rules that include compile commands
-        # (i.e. something like CC/CXX) we will need to update this
-        # build to reflect that complete list.
+        # If we ever change the name/s of the rules that include
+        # compile commands (i.e. something like CC) we will need to
+        # update this build to reflect that complete list.
         ninja.build(
             "compile_commands.json",
             rule="CMD",
             pool="console",
             variables={
-                "cmd": "ninja -f {} -t compdb CMD_W_DEPS > compile_commands.json".format(
+                "cmd": "ninja -f {} -t compdb CC,CXX > compile_commands.json".format(
                     ninja_file
                 )
             },
@@ -758,65 +747,123 @@ def src_file(node):
     return get_path(node)
 
 
-# TODO: Make the Rules smarter. Instead of just using a "cmd" rule
-# everywhere we should be smarter about generating CC, CXX, LINK,
-# etc. rules
-def get_command(env, node, action):  # pylint: disable=too-many-branches
-    """Get the command to execute for node."""
-    if node.env:
-        sub_env = node.env
-    else:
-        sub_env = env
+def get_comstr(env, action, targets, sources):
+    """Get the un-substituted string for action."""
+    # Despite being having "list" in it's name this member is not
+    # actually a list. It's the pre-subst'd string of the command. We
+    # use it to determine if the command we're about to generate needs
+    # to use a custom Ninja rule. By default this redirects CC, CXX,
+    # AR, SHLINK, and LINK commands to their respective rules but the
+    # user can inject custom Ninja rules and tie them to commands by
+    # using their pre-subst'd string.
+    if hasattr(action, "process"):
+        return action.cmd_list
 
-    executor = node.get_executor()
-    if executor is not None:
-        tlist = executor.get_all_targets()
-        slist = executor.get_all_sources()
-    else:
-        if hasattr(node, "target_peers"):
-            tlist = node.target_peers
+    return action.genstring(targets, sources, env)
+
+
+def get_command_env(env):
+    try:
+        return env["NINJA_ENV_VAR_CACHE"]
+    except KeyError:
+        pass
+
+    # Scan the ENV looking for any keys which do not exist in
+    # os.environ or differ from it. We assume if it's a new or
+    # differing key from the process environment then it's
+    # important to pass down to commands in the Ninja file.
+    ENV = get_default_ENV(env)
+    scons_specified_env = {
+        key: value
+        for key, value in ENV.items()
+        if key not in os.environ or os.environ.get(key, None) != value
+    }
+
+    windows = env["PLATFORM"] == "win32"
+    command_env = ""
+    for key, value in scons_specified_env.items():
+        # Ensure that the ENV values are all strings:
+        if is_List(value):
+            # If the value is a list, then we assume it is a
+            # path list, because that's a pretty common list-like
+            # value to stick in an environment variable:
+            value = flatten_sequence(value)
+            value = joinpath(map(str, value))
         else:
-            tlist = [node]
-        slist = node.sources
+            # If it isn't a string or a list, then we just coerce
+            # it to a string, which is the proper way to handle
+            # Dir and File instances and will produce something
+            # reasonable for just about everything else:
+            value = str(value)
 
-    # Retrieve the repository file for all sources
-    slist = [rfile(s) for s in slist]
+        if windows:
+            command_env += "set '{}={}' && ".format(key, value)
+        else:
+            command_env += "{}={} ".format(key, value)
 
-    # Get the dependencies for all targets
-    implicit = list({dep for tgt in tlist for dep in get_dependencies(tgt)})
+    env["NINJA_ENV_VAR_CACHE"] = command_env
+    return command_env
 
-    # Generate a real CommandAction
-    if isinstance(action, SCons.Action.CommandGeneratorAction):
-        # pylint: disable=protected-access
-        action = action._generate(tlist, slist, sub_env, 1, executor=executor)
 
-    rule = "CMD"
+def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
+    """Generate a response file command provider for rule name."""
 
+    # If win32 and working on a compile rule then we don't want to
+    # calculate an environment for this command. It's a compile
+    # command and compiledb doesn't support shell syntax on
+    # Windows. We need the shell syntax to use environment variables
+    # on Windows so we just skip this platform / rule combination to
+    # keep the compiledb working.
+    #
+    # On POSIX we can still set environment variables even for compile
+    # commands so we do so.
+    use_command_env = not (env["PLATFORM"] == "win32" and rule in ["CC", "CXX"])
+    if "$" in tool:
+        tool_is_dynamic = True
+
+    def get_response_file_command(env, node, action, targets, sources, executor=None):
+        if hasattr(action, "process"):
+            cmd_list, _, _ = action.process(targets, sources, env, executor=executor)
+            cmd_list = [str(c) for c in cmd_list[0]]
+        else:
+            command = generate_command(
+                env, node, action, targets, sources, executor=executor
+            )
+            cmd_list = shlex.split(command)
+
+        if tool_is_dynamic:
+            tool_command = env.subst(tool, target=targets, source=sources, executor=executor)
+        else:
+            tool_command = tool
+
+        try:
+            # Add 1 so we always keep the actual tool inside of cmd
+            tool_idx = cmd_list.index(tool_command) + 1
+        except ValueError:
+            raise Exception("Could not find tool {} in {} generated from {}".format(tool, cmd_list, get_comstr(env, action, targets, sources)))
+
+        cmd, rsp_content = cmd_list[:tool_idx], cmd_list[tool_idx:]
+        variables = {"rspc": rsp_content}
+        variables[rule] = cmd
+        if use_command_env:
+            variables["env"] = get_command_env(env)
+        return rule, variables
+
+    return get_response_file_command
+
+
+def generate_command(env, node, action, targets, sources, executor=None):
     # Actions like CommandAction have a method called process that is
     # used by SCons to generate the cmd_line they need to run. So
     # check if it's a thing like CommandAction and call it if we can.
     if hasattr(action, "process"):
-        cmd_list, _, _ = action.process(tlist, slist, sub_env, executor=executor)
-
-        # Despite being having "list" in it's name this member is not
-        # actually a list. It's the pre-subst'd string of the command. We
-        # use it to determine if the command we generated needs to use a
-        # custom Ninja rule. By default this redirects CC/CXX commands to
-        # CMD_W_DEPS but the user can inject custom Ninja rules and tie
-        # them to commands by using their pre-subst'd string.
-        rule = __NINJA_RULE_MAPPING.get(action.cmd_list, "CMD")
-
+        cmd_list, _, _ = action.process(targets, sources, env, executor=executor)
         cmd = _string_from_cmd_list(cmd_list[0])
     else:
         # Anything else works with genstring, this is most commonly hit by
         # ListActions which essentially call process on all of their
         # commands and concatenate it for us.
         genstring = action.genstring(tlist, slist, sub_env)
-
-        # Detect if we have a custom rule for this
-        # "ListActionCommandAction" type thing.
-        rule = __NINJA_RULE_MAPPING.get(genstring, "CMD")
-
         if executor is not None:
             cmd = sub_env.subst(genstring, executor=executor)
         else:
@@ -844,59 +891,59 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         if cmd.endswith("&&"):
             cmd = cmd[0:-2].strip()
 
-    outputs = get_outputs(node)
-    command_env = ""
-    windows = env["PLATFORM"] == "win32"
+    return cmd
 
-    # If win32 and rule == CMD_W_DEPS then we don't want to calculate
-    # an environment for this command. It's a compile command and
-    # compiledb doesn't support shell syntax on Windows. We need the
-    # shell syntax to use environment variables on Windows so we just
-    # skip this platform / rule combination to keep the compiledb
-    # working.
-    #
-    # On POSIX we can still set environment variables even for compile
-    # commands so we do so.
-    if not (windows and rule == "CMD_W_DEPS"):
 
-        # Scan the ENV looking for any keys which do not exist in
-        # os.environ or differ from it. We assume if it's a new or
-        # differing key from the process environment then it's
-        # important to pass down to commands in the Ninja file.
-        ENV = get_default_ENV(sub_env)
-        scons_specified_env = {
-            key: value
-            for key, value in ENV.items()
-            if key not in os.environ or os.environ.get(key, None) != value
-        }
+def get_shell_command(env, node, action, targets, sources, executor=None):
+    return (
+        "CMD",
+        {
+            "cmd": generate_command(env, node, action, targets, sources, executor=None),
+            "env": get_command_env(env),
+        },
+    )
 
-        for key, value in scons_specified_env.items():
-            # Ensure that the ENV values are all strings:
-            if is_List(value):
-                # If the value is a list, then we assume it is a
-                # path list, because that's a pretty common list-like
-                # value to stick in an environment variable:
-                value = flatten_sequence(value)
-                value = joinpath(map(str, value))
-            else:
-                # If it isn't a string or a list, then we just coerce
-                # it to a string, which is the proper way to handle
-                # Dir and File instances and will produce something
-                # reasonable for just about everything else:
-                value = str(value)
 
-            if windows:
-                command_env += "set '{}={}' && ".format(key, value)
-            else:
-                command_env += "{}={} ".format(key, value)
+def get_command(env, node, action):  # pylint: disable=too-many-branches
+    """Get the command to execute for node."""
+    if node.env:
+        sub_env = node.env
+    else:
+        sub_env = env
 
-    variables = {"cmd": command_env + cmd}
-    extra_vars = getattr(node.attributes, "NINJA_EXTRA_VARS", {})
-    if extra_vars:
-        variables.update(extra_vars)
+    executor = node.get_executor()
+    if executor is not None:
+        tlist = executor.get_all_targets()
+        slist = executor.get_all_sources()
+    else:
+        if hasattr(node, "target_peers"):
+            tlist = node.target_peers
+        else:
+            tlist = [node]
+        slist = node.sources
+
+    # Retrieve the repository file for all sources
+    slist = [rfile(s) for s in slist]
+
+    # Generate a real CommandAction
+    if isinstance(action, SCons.Action.CommandGeneratorAction):
+        # pylint: disable=protected-access
+        action = action._generate(tlist, slist, sub_env, 1, executor=executor)
+
+    variables = {}
+
+    comstr = get_comstr(sub_env, action, tlist, slist)
+    if not comstr:
+        return None
+
+    provider = __NINJA_RULE_MAPPING.get(comstr, get_shell_command)
+    rule, variables = provider(sub_env, node, action, tlist, slist, executor=executor)
+
+    # Get the dependencies for all targets
+    implicit = list({dep for tgt in tlist for dep in get_dependencies(tgt)})
 
     ninja_build = {
-        "outputs": outputs,
+        "outputs": get_outputs(node),
         "inputs": get_inputs(node),
         "implicit": implicit,
         "rule": rule,
@@ -1006,7 +1053,7 @@ def register_custom_rule_mapping(env, pre_subst_string, rule):
     __NINJA_RULE_MAPPING[pre_subst_string] = rule
 
 
-def register_custom_rule(env, rule, command, description="", deps=None):
+def register_custom_rule(env, rule, command, description="", deps=None, pool=None):
     """Allows specification of Ninja rules from inside SCons files."""
     rule_obj = {
         "command": command,
@@ -1015,6 +1062,9 @@ def register_custom_rule(env, rule, command, description="", deps=None):
 
     if deps is not None:
         rule_obj["deps"] = deps
+
+    if pool is not None:
+        rule_obj["pool"] = pool
 
     env[NINJA_RULES][rule] = rule_obj
 
@@ -1057,11 +1107,6 @@ def ninja_stat(_self, path):
     running in a no_exec build the file system state should not
     change. For these reasons we patch SCons.Node.FS.LocalFS.stat to
     use our eternal memoized dictionary.
-    
-    Since this is happening during the Node walk it's being run while
-    threaded, we have to protect adding to the memoized dictionary
-    with a threading.Lock otherwise many targets miss the memoization
-    due to racing.
     """
     global NINJA_STAT_MEMO
 
@@ -1073,9 +1118,7 @@ def ninja_stat(_self, path):
         except os.error:
             result = None
 
-        with MEMO_LOCK:
-            NINJA_STAT_MEMO[path] = result
-
+        NINJA_STAT_MEMO[path] = result
         return result
 
 
@@ -1127,71 +1170,11 @@ def ninja_always_serial(self, num, taskmaster):
     self.job = SCons.Job.Serial(taskmaster)
 
 
-class NinjaEternalTempFile(SCons.Platform.TempFileMunge):
+class NinjaNoResponseFiles(SCons.Platform.TempFileMunge):
     """Overwrite the __call__ method of SCons' TempFileMunge to not delete."""
 
     def __call__(self, target, source, env, for_signature):
-        if for_signature:
-            return self.cmd
-
-        node = target[0] if SCons.Util.is_List(target) else target
-        if node is not None:
-            cmdlist = getattr(node.attributes, "tempfile_cmdlist", None)
-            if cmdlist is not None:
-                return cmdlist
-
-        cmd = super().__call__(target, source, env, for_signature)
-
-        # If TempFileMunge.__call__ returns a string it means that no
-        # response file was needed. No processing required so just
-        # return the command.
-        if isinstance(cmd, str):
-            return cmd
-
-        # Strip the removal commands from the command list.
-        #
-        # SCons' TempFileMunge class has some very strange
-        # behavior where it, as part of the command line, tries to
-        # delete the response file after executing the link
-        # command. We want to keep those response files since
-        # Ninja will keep using them over and over. The
-        # TempFileMunge class creates a cmdlist to do this, a
-        # common SCons convention for executing commands see:
-        # https://github.com/SCons/scons/blob/master/src/engine/SCons/Action.py#L949
-        #
-        # This deletion behavior is not configurable. So we wanted
-        # to remove the deletion command from the command list by
-        # simply slicing it out here. Unfortunately for some
-        # strange reason TempFileMunge doesn't make the "rm"
-        # command it's own list element. It appends it to the
-        # tempfile argument to cmd[0] (which is CC/CXX) and then
-        # adds the tempfile again as it's own element.
-        #
-        # So we just kind of skip that middle element. Since the
-        # tempfile is in the command list on it's own at the end we
-        # can cut it out entirely. This is what I would call
-        # "likely to break" in future SCons updates. Hopefully it
-        # breaks because they start doing the right thing and not
-        # weirdly splitting these arguments up. For reference a
-        # command list that we get back from the OG TempFileMunge
-        # looks like this:
-        #
-        # [
-        #     'g++',
-        #     '@/mats/tempfiles/random_string.lnk\nrm',
-        #     '/mats/tempfiles/random_string.lnk',
-        # ]
-        #
-        # Note the weird newline and rm command in the middle
-        # element and the lack of TEMPFILEPREFIX on the last
-        # element.
-        prefix = env.subst("$TEMPFILEPREFIX")
-        if not prefix:
-            prefix = "@"
-
-        new_cmdlist = [cmd[0], prefix + cmd[-1]]
-        setattr(node.attributes, "tempfile_cmdlist", new_cmdlist)
-        return new_cmdlist
+        return self.cmd
 
     def _print_cmd_str(*_args, **_kwargs):
         """Disable this method"""
@@ -1228,6 +1211,11 @@ def generate(env):
     else:
         env.Append(CCFLAGS=["-MMD", "-MF", "${TARGET}.d"])
 
+    # Provide a way for custom rule authors to easily access command
+    # generation.
+    env.AddMethod(get_shell_command, "NinjaGetShellCommand")
+    env.AddMethod(gen_get_response_file_command, "NinjaGenResponseFileProvider")
+
     # Provides a way for users to handle custom FunctionActions they
     # want to translate to Ninja.
     env[NINJA_CUSTOM_HANDLERS] = {}
@@ -1252,8 +1240,27 @@ def generate(env):
     # deleted you would get a very subtly incorrect Ninja file and
     # might not catch it.
     env.AddMethod(register_custom_rule_mapping, "NinjaRuleMapping")
-    env.NinjaRuleMapping("${CCCOM}", "CMD_W_DEPS")
-    env.NinjaRuleMapping("${CXXCOM}", "CMD_W_DEPS")
+
+    # Normally in SCons actions for the Program and *Library builders
+    # will return "${*COM}" as their pre-subst'd command line. However
+    # if a user in a SConscript overwrites those values via key access
+    # like env["LINKCOM"] = "$( $ICERUN $)" + env["LINKCOM"] then
+    # those actions no longer return the "bracketted" string and
+    # instead return something that looks more expanded. So to
+    # continue working even if a user has done this we map both the
+    # "bracketted" and semi-expanded versions.
+    def robust_rule_mapping(var, rule, tool):
+        provider = gen_get_response_file_command(env, rule, tool)
+        env.NinjaRuleMapping("${" + var + "}", provider)
+        env.NinjaRuleMapping(env[var], provider)
+
+    robust_rule_mapping("CCCOM", "CC", env["CC"])
+    robust_rule_mapping("SHCCCOM", "LINK", env["CC"])
+    robust_rule_mapping("CXXCOM", "CXX", env["CXX"])
+    robust_rule_mapping("SHCXXCOM", "LINK", env["CXX"])
+    robust_rule_mapping("LINKCOM", "LINK", "$LINK")
+    robust_rule_mapping("SHLINKCOM", "LINK", "$SHLINK")
+    robust_rule_mapping("ARCOM", "AR", env["AR"])
 
     # Make SCons node walk faster by preventing unnecessary work
     env.Decider("timestamp-match")
@@ -1262,6 +1269,22 @@ def generate(env):
     # requires that all generated sources are added as order_only
     # dependencies to any builds that *might* use them.
     env["NINJA_GENERATED_SOURCE_SUFFIXES"] = [".h", ".hpp"]
+
+    if env["PLATFORM"] != "win32" and env.get("RANLIBCOM"):
+        # There is no way to translate the ranlib list action into
+        # Ninja so add the s flag and disable ranlib.
+        #
+        # This is equivalent to Meson.
+        # https://github.com/mesonbuild/meson/blob/master/mesonbuild/linkers.py#L143
+        old_arflags = str(env["ARFLAGS"])
+        if "s" not in old_arflags:
+            old_arflags += "s"
+
+        env["ARFLAGS"] = SCons.Util.CLVar([old_arflags])
+
+        # Disable running ranlib, since we added 's' above
+        env["RANLIBCOM"] = ""
+
 
     # This is the point of no return, anything after this comment
     # makes changes to SCons that are irreversible and incompatible
@@ -1367,7 +1390,7 @@ def generate(env):
     if not os.path.isdir(os.environ["TMPDIR"]):
         env.Execute(SCons.Defaults.Mkdir(os.environ["TMPDIR"]))
 
-    env["TEMPFILE"] = NinjaEternalTempFile
+    env["TEMPFILE"] = NinjaNoResponseFiles
 
     # Force the SConsign to be written, we benefit from SCons caching of
     # implicit dependencies and conftests. Unfortunately, we have to do this

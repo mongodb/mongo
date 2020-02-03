@@ -3776,9 +3776,16 @@ if get_option('ninja') == 'true':
         command="cmd /c $cmd" if env.TargetOSIs("windows") else "$cmd",
         description="Generating $out",
         deps="msvc",
+        pool="local_pool",
     )
-    env.NinjaRuleMapping("$IDLCCOM", "IDLC")
-    env.NinjaRuleMapping(env["IDLCCOM"], "IDLC")
+
+    def get_idlc_command(env, node, action, targets, sources, executor=None):
+        _, variables = env.NinjaGetShellCommand(node, action, targets, sources, executor=executor)
+        variables["msvc_deps_prefix"] = "import file:"
+        return "IDLC", variables
+
+    env.NinjaRuleMapping("$IDLCCOM", get_idlc_command)
+    env.NinjaRuleMapping(env["IDLCCOM"], get_idlc_command)
 
     # We can create empty files for FAKELIB in Ninja because it
     # does not care about content signatures. We have to
@@ -4239,10 +4246,11 @@ env.Alias("distsrc", "distsrc-tgz")
 #
 # psutil.cpu_count returns None when it can't determine the number. This always
 # fails on BSD's for example.
-if psutil.cpu_count() is not None and 'ICECC' not in env:
-    env.SetOption('num_jobs', psutil.cpu_count())
-elif psutil.cpu_count() and 'ICECC' in env:
-    env.SetOption('num_jobs', 8 * psutil.cpu_count())
+cpu_count = psutil.cpu_count()
+if cpu_count is not None and 'ICECC' in env and get_option("ninja") != "true":
+    env.SetOption('num_jobs', 8 * cpu_count)
+elif cpu_count is not None:
+    env.SetOption('num_jobs', cpu_count)
 
 
 # Do this as close to last as possible before reading SConscripts, so
