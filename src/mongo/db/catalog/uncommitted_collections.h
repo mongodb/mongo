@@ -92,7 +92,9 @@ public:
                        Timestamp createTs,
                        UncommittedCollectionsMap* map);
 
-    bool hasExclusiveAccessToCollection(OperationContext* opCtx, const NamespaceString& nss) const;
+    bool isUncommittedCollection(OperationContext* opCtx, const NamespaceString& nss) const;
+    void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss) const;
 
     static void clear(UncommittedCollectionsMap* map) {
         map->_collections.clear();

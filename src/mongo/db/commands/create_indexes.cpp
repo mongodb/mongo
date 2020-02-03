@@ -375,8 +375,9 @@ void checkCollectionShardingState(OperationContext* opCtx, const NamespaceString
 }
 
 /**
- * Attempts to create indexes in `specs` on a non-existent collection with namespace `ns`, thereby
- * implicitly creating the collection.
+ * Attempts to create indexes in `specs` on a non-existent collection (or empty collection created
+ * in the same multi-document transaction) with namespace `ns`. In the former case, the collection
+ * is implicitly created.
  * Returns a BSONObj containing fields to be appended to the result of the calling function.
  * `commitQuorum` is passed only to be appended to the result, for completeness. It is otherwise
  * unused.
@@ -385,7 +386,8 @@ void checkCollectionShardingState(OperationContext* opCtx, const NamespaceString
 BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& specs,
-                                        boost::optional<CommitQuorumOptions> commitQuorum) {
+                                        boost::optional<CommitQuorumOptions> commitQuorum,
+                                        bool createCollImplicitly) {
     BSONObjBuilder createResult;
 
     WriteUnitOfWork wunit(opCtx);
@@ -396,39 +398,44 @@ BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
             "Cannot create indexes on a view",
             !db || !ViewCatalog::get(db)->lookup(opCtx, ns.ns()));
 
-    // We need to create the collection.
-    BSONObjBuilder builder;
-    builder.append("create", ns.coll());
-    CollectionOptions options;
-    builder.appendElements(options.toBSON());
-    BSONObj idIndexSpec;
+    if (createCollImplicitly) {
+        // We need to create the collection.
+        BSONObjBuilder builder;
+        builder.append("create", ns.coll());
+        CollectionOptions options;
+        builder.appendElements(options.toBSON());
+        BSONObj idIndexSpec;
 
-    if (MONGO_unlikely(hangBeforeCreateIndexesCollectionCreate.shouldFail())) {
-        // Simulate a scenario where a conflicting collection creation occurs
-        // mid-index build.
-        log() << "Hanging create collection due to failpoint "
-                 "'hangBeforeCreateIndexesCollectionCreate'";
-        hangBeforeCreateIndexesCollectionCreate.pauseWhileSet();
+        if (MONGO_unlikely(hangBeforeCreateIndexesCollectionCreate.shouldFail())) {
+            // Simulate a scenario where a conflicting collection creation occurs
+            // mid-index build.
+            log() << "Hanging create collection due to failpoint "
+                     "'hangBeforeCreateIndexesCollectionCreate'";
+            hangBeforeCreateIndexesCollectionCreate.pauseWhileSet();
+        }
+
+        auto createStatus =
+            createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
+
+        if (createStatus == ErrorCodes::NamespaceExists) {
+            throw WriteConflictException();
+        }
+
+        uassertStatusOK(createStatus);
     }
 
-    auto createStatus =
-        createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
-    if (createStatus == ErrorCodes::NamespaceExists) {
-        // We should retry the createIndexes command so we can perform the checks for index
-        // and/or collection existence again.
-        throw WriteConflictException();
-    }
-
-    uassertStatusOK(createStatus);
-
-    // Obtain the newly-created collection object.
+    // By this point, we have exclusive access to our collection, either because we created the
+    // collection implicitly as part of createIndexes or because the collection was created earlier
+    // in the same multi-document transaction.
     auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
-    invariant(
-        UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, collection->ns()));
-    /**
-     * TODO(SERVER-44849) Ensure the collection, which may or may not have been created earlier
-     * in the same multi-document transaction, is empty.
-     */
+    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
+                                                                               collection->ns());
+    invariant(opCtx->inMultiDocumentTransaction() || createCollImplicitly);
+
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot create new indexes on non-empty collection " << ns
+                          << " in a multi-document transaction.",
+            collection->numRecords(opCtx) == 0);
 
     const int numIndexesBefore = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
     auto filteredSpecs =
@@ -497,33 +504,39 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 return true;
             }
 
-            // TODO SERVER-44849 Remove once createIndexes on new indexes is permitted
-            // inside transactions.
-            uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                    str::stream() << "Cannot create new indexes on " << ns
-                                  << " in a multi-document transaction.",
-                    !opCtx->inMultiDocumentTransaction());
-
             auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
-            if (!collection) {
-                auto createIndexesResult =
-                    runCreateIndexesOnNewCollection(opCtx, ns, specs, commitQuorum);
-                // No further sources of WriteConflicts can occur at this point, so it is safe to
-                // append elements to `result` inside the writeConflictRetry loop.
-                result.appendBool(kCreateCollectionAutomaticallyFieldName, true);
-                result.appendElements(createIndexesResult);
-                return true;
+            if (collection &&
+                !UncommittedCollections::get(opCtx).isUncommittedCollection(opCtx, ns)) {
+                // The collection exists and was not created in the same multi-document transaction
+                // as the createIndexes.
+                collectionUUID = collection->uuid();
+                result.appendBool(kCreateCollectionAutomaticallyFieldName, false);
+                return false;
             }
 
-            collectionUUID = collection->uuid();
-            result.appendBool(kCreateCollectionAutomaticallyFieldName, false);
-            return false;
+            bool createCollImplicitly = collection ? false : true;
+
+            auto createIndexesResult = runCreateIndexesOnNewCollection(
+                opCtx, ns, specs, commitQuorum, createCollImplicitly);
+            // No further sources of WriteConflicts can occur at this point, so it is safe to
+            // append elements to `result` inside the writeConflictRetry loop.
+            result.appendBool(kCreateCollectionAutomaticallyFieldName, true);
+            result.appendElements(createIndexesResult);
+            return true;
         });
 
         if (indexExists) {
             // No need to proceed if the index either already existed or has just been built.
             return true;
         }
+
+        // If the index does not exist by this point, the index build must go through the index
+        // builds coordinator and take an exclusive lock. We should not take exclusive locks inside
+        // of transactions, so we fail early here if we are inside of a transaction.
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create new indexes on existing collection " << ns
+                              << " in a multi-document transaction.",
+                !opCtx->inMultiDocumentTransaction());
     }
 
     // Use AutoStatsTracker to update Top.

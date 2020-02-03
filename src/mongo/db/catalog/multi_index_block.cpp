@@ -117,8 +117,7 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx,
     }
 
     auto nss = collection->ns();
-    invariant(UncommittedCollections::get(opCtx).hasExclusiveAccessToCollection(opCtx, nss),
-              nss.toString());
+    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     while (true) {
         try {

@@ -247,17 +247,28 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    CollectionUUID uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-    BSONObjBuilder builder;
-    builder.append("createIndexes", nss.coll());
-    builder.appendElements(indexDoc);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry.setNss(nss.getCommandNS());
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setObject(builder.done());
-    oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry);
+    if (inMultiDocumentTransaction) {
+        invariant(serverGlobalParams.featureCompatibility.getVersion() ==
+                  ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+        auto operation = MutableOplogEntry::makeCreateIndexesCommand(nss, uuid, indexDoc);
+        txnParticipant.addTransactionOperation(opCtx, operation);
+    } else {
+        BSONObjBuilder builder;
+        builder.append("createIndexes", nss.coll());
+        builder.appendElements(indexDoc);
+
+        MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(nss.getCommandNS());
+        oplogEntry.setUuid(uuid);
+        oplogEntry.setObject(builder.done());
+        oplogEntry.setFromMigrateIfTrue(fromMigrate);
+        logOperation(opCtx, &oplogEntry);
+    }
 }
 
 void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,

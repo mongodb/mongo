@@ -127,12 +127,8 @@ void UncommittedCollections::commit(OperationContext* opCtx,
     map->_nssIndex.erase(nss);
 }
 
-bool UncommittedCollections::hasExclusiveAccessToCollection(OperationContext* opCtx,
-                                                            const NamespaceString& nss) const {
-    if (opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X)) {
-        return true;
-    }
-
+bool UncommittedCollections::isUncommittedCollection(OperationContext* opCtx,
+                                                     const NamespaceString& nss) const {
     if (_resourcesPtr->_nssIndex.count(nss) == 1) {
         // If the collection is found in the local catalog, the appropriate locks must have already
         // been taken.
@@ -141,6 +137,13 @@ bool UncommittedCollections::hasExclusiveAccessToCollection(OperationContext* op
     }
 
     return false;
+}
+
+void UncommittedCollections::invariantHasExclusiveAccessToCollection(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X) ||
+                  isUncommittedCollection(opCtx, nss),
+              nss.toString());
 }
 
 }  // namespace mongo

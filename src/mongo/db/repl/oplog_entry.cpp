@@ -215,6 +215,23 @@ ReplOperation MutableOplogEntry::makeCreateCommand(const NamespaceString nss,
     return op;
 }
 
+ReplOperation MutableOplogEntry::makeCreateIndexesCommand(const NamespaceString nss,
+                                                          CollectionUUID uuid,
+                                                          const BSONObj& indexDoc) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kCommand);
+    op.setNss(nss.getCommandNS());
+    op.setUuid(uuid);
+
+    BSONObjBuilder builder;
+    builder.append("createIndexes", nss.coll());
+    builder.appendElements(indexDoc);
+
+    op.setObject(builder.obj());
+
+    return op;
+}
+
 ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
                                                      boost::optional<UUID> uuid,
                                                      const BSONObj& docToDelete) {
