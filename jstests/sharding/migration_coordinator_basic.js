@@ -128,9 +128,7 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // The durable state for coordinating the migration is eventually cleaned up.
     assertEventuallyDoesNotHaveMigrationCoordinatorDoc(st.shard0);
-    // TODO (SERVER-44159): Delete document from config.rangeDeletions when CollectionRangeDeleter
-    // finishes deleting a range
-    // assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
+    assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
 })();
 
@@ -189,9 +187,7 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // The durable state for coordinating the migration is eventually cleaned up.
     assertEventuallyDoesNotHaveMigrationCoordinatorDoc(st.shard0);
-    // TODO (SERVER-44159): Delete document from config.rangeDeletions when CollectionRangeDeleter
-    // finishes deleting a range
-    // assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
+    assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
 
     migrationCommitVersionErrorFailpoint.off();
