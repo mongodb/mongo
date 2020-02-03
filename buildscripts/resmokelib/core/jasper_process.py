@@ -53,7 +53,7 @@ class Process(_process.Process):
     def stop(self, mode=None):
         """Terminate the process."""
 
-        should_kill = mode == fixture_interface.TerminationMode.KILL
+        should_kill = mode == fixture_interface.TeardownMode.KILL
         signal = self.jasper_pb2.Signals.Value("TERMINATE")
         if sys.platform == "win32":
             if not should_kill:

@@ -4,6 +4,7 @@ import subprocess
 import os
 import datetime
 
+import buildscripts.resmokelib.testing.fixtures.interface as fixture_interface
 from . import interface
 from ... import core
 from ... import utils
@@ -42,7 +43,7 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             self.return_code = process.wait(self.DEFAULT_TIMEOUT.total_seconds())
         except subprocess.TimeoutExpired:
             # If the test timeout, then no errors were detected. Thus, the return code should be 0.
-            process.stop(mode=interface.TerminationMode.KILL)
+            process.stop(mode=fixture_interface.TeardownMode.KILL)
             process.wait()
             self.logger.info("%s timed out. No errors were found.", self.short_description())
             self.return_code = 0
