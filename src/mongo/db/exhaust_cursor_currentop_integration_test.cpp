@@ -363,6 +363,10 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
         &static_cast<DBClientReplicaSet*>(fixtureQueryConn.get())->masterConn();
     std::unique_ptr<DBClientCursor> queryCursor;
 
+    // Enable a failpoint to block getMore during execution to avoid races between getCursorId() and
+    // receiving new batches.
+    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, true);
+
     // Initiate a tailable awaitData exhaust cursor with lastKnownCommittedOpTime being the
     // lastAppliedOpTime.
     auto queryThread = startExhaustQuery(queryConn,
@@ -370,13 +374,21 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
                                          QueryOption_CursorTailable | QueryOption_AwaitData,
                                          Milliseconds(1000),  // awaitData timeout
                                          lastAppliedOpTime);  // lastKnownCommittedOpTime
+
+    // Assert non-zero cursorId.
+    auto cursorId = queryCursor->getCursorId();
+    ASSERT_NE(cursorId, 0LL);
+
+    // Disable failpoint and allow exhaust queries to run.
+    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, false);
+
     ON_BLOCK_EXIT([&conn, &queryThread] { queryThread.wait(); });
 
     // Test that the cursor's lastKnownCommittedOpTime is eventually advanced to the
     // lastAppliedOpTime.
-    auto curOpMatch = BSON("command.collection"
-                           << testNSS.coll() << "command.getMore" << queryCursor->getCursorId()
-                           << "cursor.lastKnownCommittedOpTime" << lastAppliedOpTime);
+    auto curOpMatch =
+        BSON("command.collection" << testNSS.coll() << "command.getMore" << cursorId
+                                  << "cursor.lastKnownCommittedOpTime" << lastAppliedOpTime);
     ASSERT(confirmCurrentOpContents(conn, curOpMatch));
 
     // Inserting more records to unblock awaitData and advance the commit point.
@@ -392,9 +404,9 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
 
     // Test that the cursor's lastKnownCommittedOpTime is eventually advanced to the
     // new lastAppliedOpTime.
-    curOpMatch = BSON("command.collection"
-                      << testNSS.coll() << "command.getMore" << queryCursor->getCursorId()
-                      << "cursor.lastKnownCommittedOpTime" << lastAppliedOpTime);
+    curOpMatch =
+        BSON("command.collection" << testNSS.coll() << "command.getMore" << cursorId
+                                  << "cursor.lastKnownCommittedOpTime" << lastAppliedOpTime);
     ASSERT(confirmCurrentOpContents(conn, curOpMatch));
 }
 }  // namespace mongo
