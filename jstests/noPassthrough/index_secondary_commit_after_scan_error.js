@@ -74,9 +74,18 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx();
 assert.eq(0, exitCode, 'expected shell to exit successfully');
 
+// Wait until the secondary process exits. We don't use ReplSetTest.stop() because if the secondary
+// hasn't processed the commitIndexBuild oplog entry yet, the node will get signaled to shutdown
+// cleanly and return an exit code of 0.
+let res;
+assert.soon(function() {
+    res = checkProgram(secondary.pid);
+    return !res.alive;
+});
+
 // Secondary should crash on receiving the unexpected commitIndexBuild oplog entry.
 const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
-rst.stop(secondary, undefined, {allowedExitCode: fassertProcessExitCode});
+assert.eq(fassertProcessExitCode, res.exitCode);
 assert(rawMongoProgramOutput().match('Fatal assertion 51101 OperationFailed: Index build:'),
        'Index build should have aborted secondary due to unexpected commitIndexBuild oplog entry.');
 
