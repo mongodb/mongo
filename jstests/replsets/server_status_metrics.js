@@ -1,7 +1,11 @@
 /**
  * Tests metrics in serverStatus related to replication.
  *
- * @tags: [requires_fcv_44]
+ * The test for metrics.repl.network.oplogGetMoresProcessed requires a storage engine that supports
+ * document-level locking because it uses the planExecutorHangBeforeShouldWaitForInserts failpoint
+ * to block oplog fetching getMores while trying to do oplog writes. Thus we need a document-level
+ * locking storage engine so that oplog writes would not conflict with oplog reads.
+ * @tags: [requires_document_locking, requires_fcv_44]
  */
 
 (function() {
