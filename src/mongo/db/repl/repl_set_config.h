@@ -63,7 +63,11 @@ public:
     // should never be included in a valid configuration document.
     static const std::string kRepairedFieldName;
 
-    static const size_t kMaxMembers = 50;
+    /**
+     * Inline `kMaxMembers` to allow others (e.g, `WriteConcernOptions`) use
+     * the constant without linking to `repl_set_config.cpp`.
+     */
+    inline static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
     static const Milliseconds kInfiniteCatchUpTimeout;
     static const Milliseconds kCatchUpDisabled;
