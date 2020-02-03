@@ -540,6 +540,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                                                   const CommandInvocation* invocation) {
     bool closeConnection;
+    bool blockConnection;
     bool hasErrorCode;
     /**
      * Default value is used to suppress the uassert for `errorExtraInfo` if `errorCode` is not set.
@@ -570,6 +571,23 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                 uasserted(50985, "Failing command due to 'failCommand' failpoint");
             }
 
+            if (blockConnection) {
+                long long blockTimeMS = 0;
+                uassert(ErrorCodes::InvalidOptions,
+                        "must specify 'blockTimeMS' when 'blockConnection' is true",
+                        data.hasField("blockTimeMS") &&
+                            bsonExtractIntegerField(data, "blockTimeMS", &blockTimeMS).isOK());
+                uassert(ErrorCodes::InvalidOptions,
+                        "'blockTimeMS' must be non-negative",
+                        blockTimeMS >= 0);
+
+                log() << "Blocking command '" << cmd->getName()
+                      << "' via 'failCommand' failpoint for " << blockTimeMS << " milliseconds";
+                opCtx->sleepFor(Milliseconds{blockTimeMS});
+                log() << "Unblocking command '" << cmd->getName()
+                      << "' via 'failCommand' failpoint";
+            }
+
             if (hasExtraInfo) {
                 log() << "Failing command '" << cmd->getName()
                       << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
@@ -594,8 +612,11 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
             hasExtraInfo = data.hasField("errorExtraInfo") &&
                 bsonExtractTypedField(data, "errorExtraInfo", BSONType::Object, &errorExtraInfo)
                     .isOK();
+            blockConnection = data.hasField("blockConnection") &&
+                bsonExtractBooleanField(data, "blockConnection", &blockConnection).isOK() &&
+                blockConnection;
             return shouldActivateFailCommandFailPoint(data, invocation, opCtx->getClient()) &&
-                (closeConnection || hasErrorCode);
+                (closeConnection || blockConnection || hasErrorCode);
         });
 }
 
