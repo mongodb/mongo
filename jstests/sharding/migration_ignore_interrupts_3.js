@@ -55,19 +55,8 @@ var joinMoveChunk = moveChunkParallel(
 waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
 // Abort migration on donor side, recipient is unaware.
-let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
-var abortedMigration = false;
-let inProgressStr = '';
-while (inProgressOps.hasNext()) {
-    let op = inProgressOps.next();
-    inProgressStr += tojson(op);
-    if (op.command.moveChunk) {
-        admin.killOp(op.opid);
-        abortedMigration = true;
-    }
-}
-assert.eq(
-    true, abortedMigration, "Failed to abort migration, current running ops: " + inProgressStr);
+killRunningMoveChunk(admin);
+
 unpauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
 assert.throws(function() {
     joinMoveChunk();

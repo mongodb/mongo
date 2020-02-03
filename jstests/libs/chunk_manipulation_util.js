@@ -144,7 +144,9 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
             let op = in_progress.next();
             inProgressStr += tojson(op);
 
-            if (op.command && op.command.moveChunk) {
+            // TODO (SERVER-45993): Remove the 4.2 and prior branch once 4.4 becomes last-stable.
+            if ((op.desc && op.desc === "MoveChunk") ||
+                (op.command && op.command.moveChunk /* required for v4.2 and prior */)) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
                 if (op.msg && op.msg.startsWith(searchString)) {
@@ -252,4 +254,37 @@ function runCommandDuringTransferMods(
     // Turn off the fail point and wait for moveChunk to complete.
     unpauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk();
+}
+
+function killRunningMoveChunk(admin) {
+    let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
+    var abortedMigration = false;
+    let inProgressStr = '';
+    let opIdsToKill = {};
+    while (inProgressOps.hasNext()) {
+        let op = inProgressOps.next();
+        inProgressStr += tojson(op);
+
+        // For 4.4 binaries and later.
+        if (op.desc && op.desc === "MoveChunk") {
+            opIdsToKill["MoveChunk"] = op.opid;
+        }
+        // TODO (SERVER-45993): Remove this branch once 4.4 becomes last-stable.
+        // For 4.2 binaries and prior.
+        if (op.command && op.command.moveChunk) {
+            opIdsToKill["moveChunkCommand"] = op.opid;
+        }
+    }
+
+    if (opIdsToKill.MoveChunk) {
+        admin.killOp(opIdsToKill.MoveChunk);
+        abortedMigration = true;
+    } else if (opIdsToKill.moveChunkCommand) {
+        // TODO (SERVER-45993): Remove this branch once 4.4 becomes last-stable.
+        admin.killOp(opIdsToKill.moveChunkCommand);
+        abortedMigration = true;
+    }
+
+    assert.eq(
+        true, abortedMigration, "Failed to abort migration, current running ops: " + inProgressStr);
 }
