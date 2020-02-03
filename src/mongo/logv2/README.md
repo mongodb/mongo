@@ -332,3 +332,39 @@ long | int64 (0x12)
 unsigned long | int64 (0x12)
 long long | int64 (0x12)
 unsigned long long | int64 (0x12)
+
+# Style guide
+
+### Message string
+
+* Prefer pithy noun phrases or short sentence describing what is being logged
+* Avoid using replacement fields when not needed to describe meaning of log or attributes
+* Avoid ending with punctuation (.)
+
+### Attribute names
+
+* Should be small number of camelCased words being understandable as description with just the message string as context for someone with reasonable understanding of mongod behavior
+* Do not add unit suffix when logging duration type (it will be added by log system)
+* Prefer naming attribute "duration" and use Milliseconds of unit when logging real-time durations as part of performance warnings.
+* Prefer adding unit suffix if available when logging integral or floating point attributes
+
+##### Examples
+
+```
+LOGV2(1040, "Replica set state transition on this node", "oldState"_attr = getOldState(), "newState"_attr = getNewState());
+
+{ ..., "id": 1040, "msg": "Replica set state transition on this node", "attr": { "oldState": "SECONARY", "newState": "PRIMARY" } }
+```
+ 
+ ```
+LOGV2(1041, "Transition to PRIMARY complete");
+
+{ ... , "id": 1041, "msg": "Transition to PRIMARY complete", "attr": {} }
+```
+
+```
+LOGV2(1042, "Slow query", "duration"_attr = getDurationMillis());
+
+{ ..., "id": 1042, "msg": "Slow query", "attr": { "durationMillis": 1000 } }
+
+```
