@@ -338,9 +338,6 @@ private:
         InsertDeleteOptions options;
     };
 
-    Status _dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
-                                std::vector<BSONObj>* dupKeysInserted);
-
     /**
      * Returns the current state.
      */
