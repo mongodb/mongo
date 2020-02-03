@@ -1121,7 +1121,7 @@ StatusWith<OCSPCertIDSet> validateResponse(SSL_CTX* context,
     // OCSP_basic_verify takes in the Response from the responder and verifies
     // that the signer of the OCSP response is in intermediateCerts. Then it tries
     // to form a chain from the signer certificate to the trusted CA in the store.
-    if (OCSP_basic_verify(basicResponse.get(), intermediateCerts, store, 0) != 0) {
+    if (OCSP_basic_verify(basicResponse.get(), intermediateCerts, store, 0) != 1) {
         return getSSLFailure("Failed to verify signature from OCSP response.");
     }
 

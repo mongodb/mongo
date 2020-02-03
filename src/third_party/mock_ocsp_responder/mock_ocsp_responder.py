@@ -414,6 +414,7 @@ class OCSPResponseBuilder(object):
                     'tbs_response_data': response_data,
                     'signature_algorithm': {'algorithm': signature_algorithm_id},
                     'signature': signature_bytes,
+                    'certs': certs,
                 }
             }
         })
