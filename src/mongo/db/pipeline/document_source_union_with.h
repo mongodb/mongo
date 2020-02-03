@@ -71,13 +71,16 @@ public:
     GetModPathsReturn getModifiedPaths() const final;
 
     StageConstraints constraints(Pipeline::SplitState) const final {
-        return StageConstraints(StreamType::kStreaming,
-                                PositionRequirement::kNone,
-                                HostTypeRequirement::kAnyShard,
-                                DiskUseRequirement::kNoDiskUse,
-                                FacetRequirement::kAllowed,
-                                TransactionRequirement::kNotAllowed,
-                                LookupRequirement::kNotAllowed);
+        return StageConstraints(
+            StreamType::kStreaming,
+            PositionRequirement::kNone,
+            HostTypeRequirement::kAnyShard,
+            DiskUseRequirement::kNoDiskUse,
+            FacetRequirement::kAllowed,
+            TransactionRequirement::kNotAllowed,
+            // The check to disallow $unionWith on a sharded collection within $lookup happens
+            // outside of the constraints as long as the involved namespaces are reported correctly.
+            LookupRequirement::kAllowed);
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;

@@ -222,19 +222,6 @@ assert.eq(resSet,
           fullResults,
           "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults));
 
-// Test that $unionWith fails if it is inside a $lookup.
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [{
-        "$lookup":
-            {from: collB.getName(), pipeline: [{$unionWith: collC.getName()}], as: "extraField"}
-    }],
-    cursor: {}
-    // On standalone we expect 51047 (unionWith can't be in lookup) on sharded we expect 28769
-    // (Cannot lookup on sharded collection)
-}),
-                             [51047, 28769]);
-
 // Test that $unionWith on a non-existent collection succeeds.
 resSet = getDocsFromCollection(collA);
 checkResults(testDB.runCommand({
