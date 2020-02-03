@@ -498,8 +498,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                                                   StringData commandName,
                                                   const NamespaceString& nss) {
-    bool closeConnection, hasErrorCode;
-    long long errorCode;
+    bool closeConnection, hasErrorCode, blockConnection, hasBlockTimeMS;
+    long long errorCode, blockTimeMS;
 
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
         closeConnection = data.hasField("closeConnection") &&
@@ -507,9 +507,13 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
             closeConnection;
         hasErrorCode = data.hasField("errorCode") &&
             bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
+        blockConnection = data.hasField("blockConnection") &&
+            bsonExtractBooleanField(data, "blockConnection", &blockConnection).isOK();
+        hasBlockTimeMS = data.hasField("blockTimeMS") &&
+            bsonExtractIntegerField(data, "blockTimeMS", &blockTimeMS).isOK();
 
         return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient(), nss) &&
-            (closeConnection || hasErrorCode);
+            (closeConnection || blockConnection || hasErrorCode);
     }) {
         if (closeConnection) {
             opCtx->getClient()->session()->end();
@@ -524,6 +528,19 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                   << ".";
             uasserted(ErrorCodes::Error(errorCode),
                       "Failing command due to 'failCommand' failpoint");
+        }
+
+        if (blockConnection) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "must specify 'blockTimeMS' when 'blockConnection' is true",
+                    hasBlockTimeMS);
+            uassert(
+                ErrorCodes::InvalidOptions, "'blockTimeMS' must be non-negative", blockTimeMS >= 0);
+
+            log() << "Blocking command via 'failCommand' failpoint for " << blockTimeMS
+                  << " milliseconds";
+            opCtx->sleepFor(Milliseconds{blockTimeMS});
+            log() << "Unblocking command via 'failCommand' failpoint";
         }
     }
 }

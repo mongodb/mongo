@@ -16,6 +16,53 @@ const getThreadName = function() {
 
 let threadName = getThreadName();
 
+// Test idempotent configureFailPoint.
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        errorCode: ErrorCodes.NotMaster,
+        failCommands: ["ping"],
+        threadName: threadName,
+    }
+}));
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+// Configure failCommand again and verify that it still works correctly.
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        errorCode: ErrorCodes.NotMaster,
+        failCommands: ["ping"],
+        threadName: threadName,
+    }
+}));
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
+
+// Test switching command sets.
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        errorCode: ErrorCodes.NotMaster,
+        failCommands: ["ping"],
+        threadName: threadName,
+    }
+}));
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        errorCode: ErrorCodes.NotMaster,
+        failCommands: ["isMaster"],
+        threadName: threadName,
+    }
+}));
+assert.commandWorked(testDB.runCommand({ping: 1}));
+assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
+
 // Test failing with a particular error code.
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
