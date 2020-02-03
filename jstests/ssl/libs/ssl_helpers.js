@@ -59,7 +59,14 @@ var replShouldFail = function(name, opt1, opt2) {
     ssl_options1 = opt1;
     ssl_options2 = opt2;
     ssl_name = name;
-    assert.throws(load, [replSetTestFile], "This setup should have failed");
+    // This will cause an assert.soon() in ReplSetTest to fail. This normally triggers the hang
+    // analyzer, but since we do not want to run it on expected timeouts, we temporarily disable it.
+    MongoRunner.runHangAnalyzer.disable();
+    try {
+        assert.throws(load, [replSetTestFile], "This setup should have failed");
+    } finally {
+        MongoRunner.runHangAnalyzer.enable();
+    }
     // Note: this leaves running mongod processes.
 };
 
