@@ -63,9 +63,9 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
 using namespace mongo::repl;
 using namespace mongo::repl::rollback_internal;
 
@@ -2918,25 +2918,25 @@ TEST_F(RSRollbackTest, RollbackInvalidatesDefaultRWConcernCache) {
     // Put initial defaults in the cache.
     {
         RWConcernDefault origDefaults;
-        origDefaults.setEpoch(Timestamp(10, 20));
-        origDefaults.setSetTime(Date_t::fromMillisSinceEpoch(1234));
+        origDefaults.setUpdateOpTime(Timestamp(10, 20));
+        origDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
         _lookupMock.setLookupCallReturnValue(std::move(origDefaults));
     }
     auto origCachedDefaults = rwcDefaults.getDefault(_opCtx.get());
-    ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getEpoch());
-    ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getSetTime());
+    ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getUpdateOpTime());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getUpdateWallClockTime());
 
     // Change the mock's defaults, but don't invalidate the cache yet. The cache should still return
     // the original defaults.
     {
         RWConcernDefault newDefaults;
-        newDefaults.setEpoch(Timestamp(50, 20));
-        newDefaults.setSetTime(Date_t::fromMillisSinceEpoch(5678));
+        newDefaults.setUpdateOpTime(Timestamp(50, 20));
+        newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
         _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
         auto cachedDefaults = rwcDefaults.getDefault(_opCtx.get());
-        ASSERT_EQ(Timestamp(10, 20), *cachedDefaults.getEpoch());
-        ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *cachedDefaults.getSetTime());
+        ASSERT_EQ(Timestamp(10, 20), *cachedDefaults.getUpdateOpTime());
+        ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *cachedDefaults.getUpdateWallClockTime());
     }
 
     // Rollback via refetch should invalidate the cache and getting the defaults should now return
@@ -2949,8 +2949,9 @@ TEST_F(RSRollbackTest, RollbackInvalidatesDefaultRWConcernCache) {
     _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), coll->uuid(), doc);
 
     auto newCachedDefaults = rwcDefaults.getDefault(_opCtx.get());
-    ASSERT_EQ(Timestamp(50, 20), *newCachedDefaults.getEpoch());
-    ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getSetTime());
+    ASSERT_EQ(Timestamp(50, 20), *newCachedDefaults.getUpdateOpTime());
+    ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getUpdateWallClockTime());
 }
 
 }  // namespace
+}  // namespace mongo

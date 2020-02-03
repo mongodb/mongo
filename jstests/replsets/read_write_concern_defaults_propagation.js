@@ -1,11 +1,10 @@
 // Tests propagation of RWC defaults across a replica set.
 //
 // @tags: [requires_fcv_44]
-
-load("jstests/libs/read_write_concern_defaults_propagation.js");
-
 (function() {
 'use strict';
+
+load("jstests/libs/read_write_concern_defaults_propagation_common.js");
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();

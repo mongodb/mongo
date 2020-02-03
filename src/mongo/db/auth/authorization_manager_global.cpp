@@ -38,10 +38,23 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
 
-// This setting is unique in that it is read-only.
-// The IDL subststem doesn't actually allow for that,
-// so we'll pretend it's startup-settable, then override it here.
+ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
+    "CreateAuthorizationManager",
+    {"OIDGeneration", "EndStartupOptionStorage"},
+    [](ServiceContext* service) {
+        auto authzManager = AuthorizationManager::create();
+        authzManager->setAuthEnabled(serverGlobalParams.authState ==
+                                     ServerGlobalParams::AuthState::kEnabled);
+        authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
+        AuthorizationManager::set(service, std::move(authzManager));
+    });
+
+}  // namespace
+
+// This setting is unique in that it is read-only. The IDL subststem doesn't actually allow for
+// that, so we'll pretend it's startup-settable, then override it here.
 AuthzVersionParameter::AuthzVersionParameter(StringData name, ServerParameterType)
     : ServerParameter(ServerParameterSet::getGlobal(), name, false, false) {}
 
@@ -57,16 +70,5 @@ void AuthzVersionParameter::append(OperationContext* opCtx,
 Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
     return {ErrorCodes::InternalError, "set called on unsettable server parameter"};
 }
-
-ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
-    "CreateAuthorizationManager",
-    {"OIDGeneration", "EndStartupOptionStorage"},
-    [](ServiceContext* service) {
-        auto authzManager = AuthorizationManager::create();
-        authzManager->setAuthEnabled(serverGlobalParams.authState ==
-                                     ServerGlobalParams::AuthState::kEnabled);
-        authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
-        AuthorizationManager::set(service, std::move(authzManager));
-    });
 
 }  // namespace mongo

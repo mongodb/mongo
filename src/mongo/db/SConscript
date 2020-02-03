@@ -374,7 +374,7 @@ env.Library(
     target='read_write_concern_defaults',
     source=[
         'read_write_concern_defaults.cpp',
-        env.Idlc('rw_concern_default.idl')[0],
+        env.Idlc('read_write_concern_defaults.idl')[0],
     ],
     LIBDEPS=[
         'repl/read_concern_args',

@@ -35,14 +35,15 @@ function verifyServerStatus(conn,
 
     if (expectNoDefaultsDocument) {
         // When defaults have never been set (or the defaults document was deleted) the response
-        // should only contain localSetTime.
-        assert.hasFields(defaultsRes, ["localSetTime"]);
-        assert.eq(undefined, defaultsRes.setTime, tojson(defaultsRes));
-        assert.eq(undefined, defaultsRes.epoch, tojson(defaultsRes));
+        // should only contain localUpdateWallClockTime.
+        assert.hasFields(defaultsRes, ["localUpdateWallClockTime"]);
+        assert.eq(undefined, defaultsRes.updateWallClockTime, tojson(defaultsRes));
+        assert.eq(undefined, defaultsRes.updateOpTime, tojson(defaultsRes));
     } else {
         // These fields are always set once a read or write concern has been set at least once and
         // the defaults document is still present.
-        assert.hasFields(defaultsRes, ["epoch", "setTime", "localSetTime"]);
+        assert.hasFields(defaultsRes,
+                         ["updateOpTime", "updateWallClockTime", "localUpdateWallClockTime"]);
     }
 }
 
@@ -83,7 +84,7 @@ function testServerStatus(conn) {
         // Wait for the cache to discover the defaults were deleted. Note the cache is invalidated
         // on delete on a mongod, so this is only to handle the mongos case.
         const res = conn.adminCommand({getDefaultRWConcern: 1, inMemory: true});
-        return !res.hasOwnProperty("epoch");
+        return !res.hasOwnProperty("updateOpTime");
     }, "mongos failed to pick up deleted default rwc", undefined, 1000, {runHangAnalyzer: false});
     verifyServerStatus(conn, {expectNoDefaultsDocument: true});
 }

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/read_write_concern_defaults.h"
 
@@ -45,7 +46,11 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        return ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx).toBSON();
+        auto rwcDefault = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
+        GetDefaultRWConcernResponse response;
+        response.setRWConcernDefault(rwcDefault);
+        response.setLocalUpdateWallClockTime(rwcDefault.localUpdateWallClockTime());
+        return response.toBSON();
     }
 
 } defaultRWConcernServerStatus;

@@ -40,7 +40,6 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/rw_concern_default_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
@@ -82,6 +81,17 @@ void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdNam
             serverGlobalParams.clusterRole != ClusterRole::ShardServer);
 }
 
+auto makeResponse(const ReadWriteConcernDefaults::RWConcernDefaultAndTime& rwcDefault,
+                  bool inMemory) {
+    GetDefaultRWConcernResponse response;
+    response.setRWConcernDefault(rwcDefault);
+    response.setLocalUpdateWallClockTime(rwcDefault.localUpdateWallClockTime());
+    if (inMemory)
+        response.setInMemory(true);
+
+    return response;
+}
+
 class SetDefaultRWConcernCommand : public TypedCommand<SetDefaultRWConcernCommand> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -121,7 +131,7 @@ public:
 
             // Refresh to populate the cache with the latest defaults.
             rwcDefaults.refreshIfNecessary(opCtx);
-            return rwcDefaults.getDefault(opCtx);
+            return makeResponse(rwcDefaults.getDefault(opCtx), false);
         }
 
     private:
@@ -166,15 +176,14 @@ public:
             assertNotStandaloneOrShardServer(opCtx, GetDefaultRWConcern::kCommandName);
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            if (request().getInMemory() && *request().getInMemory()) {
-                auto rwc = rwcDefaults.getDefault(opCtx);
-                rwc.setInMemory(true);
-                return rwc;
+            const bool inMemory = request().getInMemory().value_or(false);
+            if (!inMemory) {
+                // If not asking for the in-memory values, force a refresh to find the most recent
+                // defaults
+                rwcDefaults.refreshIfNecessary(opCtx);
             }
 
-            // Force a refresh to find the most recent defaults, then return them.
-            rwcDefaults.refreshIfNecessary(opCtx);
-            return rwcDefaults.getDefault(opCtx);
+            return makeResponse(rwcDefaults.getDefault(opCtx), inMemory);
         }
 
     private:
@@ -195,5 +204,6 @@ public:
         }
     };
 } getDefaultRWConcernCommand;
+
 }  // namespace
 }  // namespace mongo

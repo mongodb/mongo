@@ -28,12 +28,10 @@
 global:
     cpp_namespace: "mongo"
 
-
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/write_concern_options.idl"
-
 
 structs:
     RWConcernDefault:
@@ -48,19 +46,15 @@ structs:
                 description: "The default write concern"
                 type: WriteConcern
                 optional: true
-            epoch:
-                description: "The epoch (unique generation id) of when the default read or write concern was last set"
+            updateOpTime:
+                description: "The optime of when the default read or write concern was last set. On
+                              replica sets it advances with the primary's optime and on clusters it
+                              advances with the config server primary's optime."
                 type: timestamp
                 optional: true
-            setTime:
-                description: "The wallclock time when the default read or write concern was last set by an administrator"
+            updateWallClockTime:
+                description: "The wallclock time when the default read or write concern was last set
+                              by an administrator. This value is only informational and must not be
+                              used for any recency comparisons."
                 type: date
-                optional: true
-            localSetTime:
-                description: "The wallclock time when this node updated its understanding of the default read or write concern"
-                type: date
-                optional: true
-            inMemory:
-                description: "Whether these defaults were from the inMemory cache"
-                type: bool
                 optional: true

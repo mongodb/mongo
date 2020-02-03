@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -51,7 +52,11 @@ public:
             return {};
         }
 
-        return ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx).toBSON();
+        auto rwcDefault = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
+        GetDefaultRWConcernResponse response;
+        response.setRWConcernDefault(rwcDefault);
+        response.setLocalUpdateWallClockTime(rwcDefault.localUpdateWallClockTime());
+        return response.toBSON();
     }
 
 } defaultRWConcernServerStatus;

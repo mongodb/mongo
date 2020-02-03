@@ -32,13 +32,12 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/invalidating_lru_cache.h"
 
 namespace mongo {
-
-class OperationContext;
 
 /**
  * Serves as a container of the non-templatised parts of the ReadThroughCache class below.
@@ -214,10 +213,80 @@ protected:
  */
 template <typename Key, typename Value>
 class ReadThroughCache : public ReadThroughCacheBase {
+    /**
+     * Data structure wrapping and expanding on the values stored in the cache.
+     */
+    struct StoredValue {
+        Value value;
+
+        // Contains the wallclock time of when the value was fetched from the backing storage. This
+        // value is not precise and should only be used for diagnostics purposes (i.e., it cannot be
+        // relied on to perform any recency comparisons for example).
+        Date_t updateWallClockTime;
+    };
+    using Cache = InvalidatingLRUCache<Key, StoredValue>;
+
 public:
-    using Cache = InvalidatingLRUCache<Key, Value>;
-    using ValueHandle = typename Cache::ValueHandle;
     using LookupFn = std::function<boost::optional<Value>(OperationContext*, const Key&)>;
+
+    /**
+     * Common type for values returned from the cache.
+     */
+    class ValueHandle {
+    public:
+        // The two constructors below are present in order to offset the fact that the cache doesn't
+        // support pinning items. Their only usage must be in the authorization mananager for the
+        // internal authentication user.
+        ValueHandle(Value&& value) : _valueHandle({std::move(value), Date_t::min()}) {}
+        ValueHandle() = default;
+
+        operator bool() const {
+            return bool(_valueHandle);
+        }
+
+        bool isValid() const {
+            return _valueHandle.isValid();
+        }
+
+        Value* get() {
+            return &_valueHandle->value;
+        }
+
+        const Value* get() const {
+            return &_valueHandle->value;
+        }
+
+        Value& operator*() {
+            return *get();
+        }
+
+        const Value& operator*() const {
+            return *get();
+        }
+
+        Value* operator->() {
+            return get();
+        }
+
+        const Value* operator->() const {
+            return get();
+        }
+
+        /**
+         * See the comments for `StoredValue::updateWallClockTime` above.
+         */
+        Date_t updateWallClockTime() const {
+            return _valueHandle->updateWallClockTime;
+        }
+
+    private:
+        friend class ReadThroughCache;
+
+        ValueHandle(typename Cache::ValueHandle&& valueHandle)
+            : _valueHandle(std::move(valueHandle)) {}
+
+        typename Cache::ValueHandle _valueHandle;
+    };
 
     /**
      * If 'key' is found in the cache, returns a ValidHandle, otherwise invokes the blocking
@@ -233,7 +302,7 @@ public:
         while (true) {
             auto cachedValue = _cache.get(key);
             if (cachedValue)
-                return cachedValue;
+                return ValueHandle(std::move(cachedValue));
 
             // Otherwise make sure we have the locks we need and check whether and wait on another
             // thread is fetching into the cache
@@ -244,7 +313,7 @@ public:
             }
 
             if (cachedValue)
-                return cachedValue;
+                return ValueHandle(std::move(cachedValue));
 
             // If there's still no value in the cache, then we need to go and get it. Take the slow
             // path.
@@ -252,14 +321,16 @@ public:
 
             auto value = lookup(opCtx, key);
             if (!value)
-                return cachedValue;
+                return ValueHandle();
 
             // All this does is re-acquire the _cacheWriteMutex if we don't hold it already - a
             // caller may also call endFetchPhase() after this returns.
             guard.endFetchPhase();
 
             if (guard.isSameCacheGeneration())
-                return _cache.insertOrAssignAndGet(key, std::move(*value));
+                return ValueHandle(_cache.insertOrAssignAndGet(
+                    key,
+                    {std::move(*value), opCtx->getServiceContext()->getFastClockSource()->now()}));
 
             // If the cache generation changed while this thread was in fetch mode, the data
             // associated with the value may now be invalid, so we will throw out the fetched value
@@ -270,10 +341,10 @@ public:
     /**
      * Invalidates the given 'key' and immediately replaces it with a new value.
      */
-    ValueHandle insertOrAssignAndGet(const Key& key, Value&& newValue) {
+    ValueHandle insertOrAssignAndGet(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
         CacheGuard guard(this);
         _updateCacheGeneration(guard);
-        return _cache.insertOrAssignAndGet(key, std::move(newValue));
+        return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime});
     }
 
     /**
@@ -290,8 +361,9 @@ public:
     void invalidateIf(const Pred& predicate) {
         CacheGuard guard(this);
         _updateCacheGeneration(guard);
-        _cache.invalidateIf(
-            [&](const Key& key, const Value* value) { return predicate(key, value); });
+        _cache.invalidateIf([&](const Key& key, const StoredValue* storedValue) {
+            return predicate(key, &storedValue->value);
+        });
     }
 
     void invalidateAll() {

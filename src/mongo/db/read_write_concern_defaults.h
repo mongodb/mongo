@@ -32,8 +32,8 @@
 #include <map>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/rw_concern_default_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/mutex.h"
@@ -75,7 +75,28 @@ public:
     boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
     boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
 
-    RWConcernDefault getDefault(OperationContext* opCtx);
+    class RWConcernDefaultAndTime : public RWConcernDefault {
+    public:
+        RWConcernDefaultAndTime() = default;
+        RWConcernDefaultAndTime(RWConcernDefault rwcd, Date_t localUpdateWallClockTime)
+            : RWConcernDefault(std::move(rwcd)),
+              _localUpdateWallClockTime(localUpdateWallClockTime) {}
+
+        Date_t localUpdateWallClockTime() const {
+            return _localUpdateWallClockTime;
+        }
+
+    private:
+        Date_t _localUpdateWallClockTime;
+    };
+
+    /**
+     * Returns the current set of read/write concern defaults along with the wallclock time when
+     * they were cached (for diagnostic purposes).
+     */
+    RWConcernDefaultAndTime getDefault(OperationContext* opCtx) {
+        return _getDefault(opCtx).value_or(RWConcernDefaultAndTime());
+    }
 
     /**
      * Returns true if the RC level is permissible to use as a default, and false if it cannot be a
@@ -128,12 +149,12 @@ public:
     /**
      * Sets the given read write concern as the defaults in the cache.
      */
-    void setDefault(RWConcernDefault&& rwc);
+    void setDefault(OperationContext* opCtx, RWConcernDefault&& rwc);
 
 private:
     enum class Type { kReadWriteConcernEntry };
 
-    boost::optional<RWConcernDefault> _getDefault(OperationContext* opCtx);
+    boost::optional<RWConcernDefaultAndTime> _getDefault(OperationContext* opCtx);
 
     class Cache : public ReadThroughCache<Type, RWConcernDefault> {
         Cache(const Cache&) = delete;

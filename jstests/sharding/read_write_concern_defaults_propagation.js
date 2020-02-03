@@ -1,16 +1,14 @@
 // Tests propagation of RWC defaults across a sharded cluster.
 //
 // @tags: [requires_fcv_44]
-
-load("jstests/libs/read_write_concern_defaults_propagation.js");
-
 (function() {
 'use strict';
+
+load("jstests/libs/read_write_concern_defaults_propagation_common.js");
 
 var st = new ShardingTest({
     shards: 1,
     mongos: 3,
-    config: 3,
     other: {
         rs: true,
         rs0: {nodes: 1},
