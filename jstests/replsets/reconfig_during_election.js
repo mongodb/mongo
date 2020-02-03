@@ -1,5 +1,6 @@
 /**
- * SERVER-37255: replSetReconfig runs on a node that is concurrently processing an election win.
+ * SERVER-37255: replSetReconfig runs on a node that is concurrently processing an election win and
+ * does not result in an invariant.
  */
 
 (function() {
@@ -39,7 +40,11 @@ jsTestLog("Try to interrupt it with a reconfig");
 
 config.members[nodes.indexOf(candidate)].priority = 2;
 config.version++;
-assert.commandWorked(candidate.adminCommand({replSetReconfig: config, force: true}));
+// While the candidate is stepping up, it it possible for the RstlKillOpThread to kill this reconfig
+// command before it succeeds. Failing with an InterruptedDueToReplStateChange error is acceptable
+// here because we are testing that the reconfig command does not cause the server to invariant.
+assert.commandWorkedOrFailedWithCode(candidate.adminCommand({replSetReconfig: config, force: true}),
+                                     ErrorCodes.InterruptedDueToReplStateChange);
 
 failPoint.off();
 
