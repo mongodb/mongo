@@ -145,6 +145,8 @@ public:
               std::string* actualServer) override;
     Status recv(mongo::Message& m, int lastRequestId) override;
 
+    void shutdownAndDisallowReconnect() override;
+
     // Methods to simulate network responses.
     using Responses = std::vector<StatusWith<mongo::Message>>;
     void setCallResponses(Responses responses);
@@ -156,7 +158,6 @@ public:
 
     mongo::ConnectionString::ConnectionType type() const override;
     bool isFailed() const override;
-    double getSoTimeout() const override;
     std::string getServerAddress() const override;
     std::string toString() const override;
 

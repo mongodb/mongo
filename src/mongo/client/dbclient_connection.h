@@ -196,7 +196,7 @@ public:
      *
      * This is the only method that is allowed to be called from other threads.
      */
-    void shutdownAndDisallowReconnect();
+    virtual void shutdownAndDisallowReconnect();
 
     void setWireVersions(int minWireVersion, int maxWireVersion) {
         _minWireVersion = minWireVersion;

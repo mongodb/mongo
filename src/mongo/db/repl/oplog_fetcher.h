@@ -398,7 +398,7 @@ public:
     /**
      * Returns the `find` query run on the sync source's oplog.
      */
-    BSONObj getFindQuery_forTest(bool initialFind) const;
+    BSONObj getFindQuery_forTest(long long findTimeout) const;
 
     /**
      * Returns the OpTime of the last oplog entry fetched and processed.
@@ -425,6 +425,17 @@ public:
      * this pointer beyond the lifetime of the underlying client. Used for testing only.
      */
     DBClientConnection* getDBClientConnection_forTest() const;
+
+    /**
+     * Returns how long the `find` command should wait before timing out.
+     */
+    Milliseconds getInitialFindMaxTime_forTest() const;
+
+    /**
+     * Returns how long the `find` command should wait before timing out, if we are retrying the
+     * `find` due to an error.
+     */
+    Milliseconds getRetriedFindMaxTime_forTest() const;
 
 protected:
     /**
@@ -460,25 +471,24 @@ private:
      * a new one. If OplogFetcherRestartDecision's shouldContinue function indicates it should not
      * create a new cursor, it will call _finishCallback.
      */
-    void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData);
+    void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData) noexcept;
 
     /**
      * Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
-     * exhaust cursor. If it is not successful in creating a new cursor, it will retry based on the
-     * OplogFetcherRestartDecision's shouldContinue function.
+     * exhaust cursor.
      *
      * Before running the query, it will set a RequestMetadataWriter to modify the request to
      * include $oplogQueryData and $replData. If will also set a ReplyMetadataReader to parse the
      * response for the metadata field.
      */
-    Status _createNewCursor();
+    void _createNewCursor(bool initialFind);
 
     /**
      * This function will create the `find` query to issue to the sync source. It is provided with
      * whether this is the initial attempt to create the `find` query to determine what the find
      * timeout should be.
      */
-    BSONObj _makeFindQuery(bool initialFind) const;
+    BSONObj _makeFindQuery(long long findTimeout) const;
 
     /**
      * Gets the next batch from the exhaust cursor.
@@ -502,6 +512,12 @@ private:
      * oplog using the "_onShutdownCallbackFn".
      */
     void _finishCallback(Status status);
+
+    /**
+     * Sets the socket timeout on the connection to the source node. It will add a network buffer to
+     * the provided timeout.
+     */
+    void _setSocketTimeout(long long timeout);
 
     /**
      * Returns how long the `find` command should wait before timing out.

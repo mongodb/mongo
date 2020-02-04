@@ -34,7 +34,9 @@
 #include "mongo/db/repl/abstract_oplog_fetcher_test_fixture.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/oplog_fetcher.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/task_executor_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -1090,10 +1092,39 @@ bool blockedOnNetworkSoon(MockDBClientConnection* conn) {
     return false;
 }
 
+void validateFindCommand(Message m, OpTime lastFetched, int findTimeout) {
+    auto msg = mongo::OpMsg::parse(m);
+    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
+    ASSERT_TRUE(msg.body.getBoolField("tailable"));
+    ASSERT_TRUE(msg.body.getBoolField("oplogReplay"));
+    ASSERT_TRUE(msg.body.getBoolField("awaitData"));
+    ASSERT_EQUALS(findTimeout, msg.body.getIntField("maxTimeMS"));
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
+                      msg.body.getObjectField("filter"));
+    ASSERT_EQUALS(lastFetched.getTerm(), msg.body.getIntField("term"));
+    ASSERT_BSONOBJ_EQ(BSON("level"
+                           << "local"
+                           << "afterClusterTime" << Timestamp(0, 1)),
+                      msg.body.getObjectField("readConcern"));
+    // TODO SERVER-45470: Test the metadata sent.
+}
+
+void validateGetMoreCommand(Message m, int cursorId, int timeout, bool exhaustSupported = true) {
+    auto msg = mongo::OpMsg::parse(m);
+    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(cursorId, msg.body.getIntField("getMore"));
+    ASSERT_EQUALS(timeout, msg.body.getIntField("maxTimeMS"));
+    if (exhaustSupported) {
+        ASSERT_TRUE(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
+    } else {
+        ASSERT_FALSE(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
+    }
+}
+
 // Simulate a response to a single outgoing client request and return the client request. Use this
 // function to simulate responses to client find/getMore requests.
 Message processSingleRequestResponse(DBClientConnection* conn,
-                                     const Message& response,
+                                     const StatusWith<Message> response,
                                      bool expectReadyNetworkOperationsAfterProcessing = false) {
     auto* mockConn = dynamic_cast<MockDBClientConnection*>(conn);
     ASSERT_TRUE(blockedOnNetworkSoon(mockConn));
@@ -1108,7 +1139,7 @@ Message processSingleRequestResponse(DBClientConnection* conn,
 // Simulate a response to a single network recv() call. Use this function to simulate responses to
 // exhaust stream where a client expects to receive responses without sending out new requests.
 void processSingleExhaustResponse(DBClientConnection* conn,
-                                  const Message& response,
+                                  const StatusWith<Message> response,
                                   bool expectReadyNetworkOperationsAfterProcessing = false) {
     auto* mockConn = dynamic_cast<MockDBClientConnection*>(conn);
     ASSERT_TRUE(blockedOnNetworkSoon(mockConn));
@@ -1118,8 +1149,8 @@ void processSingleExhaustResponse(DBClientConnection* conn,
     }
 }
 
-
-class NewOplogFetcherTest : public executor::ThreadPoolExecutorTest {
+class NewOplogFetcherTest : public executor::ThreadPoolExecutorTest,
+                            public ScopedGlobalServiceContextForTest {
 protected:
     static const OpTime remoteNewerOpTime;
     static const OpTime staleOpTime;
@@ -1136,7 +1167,14 @@ protected:
 
     std::unique_ptr<NewOplogFetcher> makeOplogFetcher();
     std::unique_ptr<NewOplogFetcher> makeOplogFetcherWithDifferentExecutor(
-        executor::TaskExecutor* executor, NewOplogFetcher::OnShutdownCallbackFn fn);
+        executor::TaskExecutor* executor,
+        NewOplogFetcher::OnShutdownCallbackFn fn,
+        int numRestarts = 0,
+        bool requireFresherSyncSource = true);
+    std::unique_ptr<NewOplogFetcher> getOplogFetcherAfterConnectionCreated(
+        NewOplogFetcher::OnShutdownCallbackFn fn,
+        int numRestarts = 0,
+        bool requireFresherSyncSource = true);
 
     std::unique_ptr<ShutdownState> processSingleBatch(const Message& response,
                                                       bool requireFresherSyncSource = true);
@@ -1186,16 +1224,38 @@ std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcher() {
     return makeOplogFetcherWithDifferentExecutor(&getExecutor(), [](Status) {});
 }
 
+std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::getOplogFetcherAfterConnectionCreated(
+    NewOplogFetcher::OnShutdownCallbackFn fn, int numRestarts, bool requireFresherSyncSource) {
+    auto oplogFetcher = makeOplogFetcherWithDifferentExecutor(
+        &getExecutor(), fn, numRestarts, requireFresherSyncSource);
+
+    auto waitForConnCreatedFailPoint =
+        globalFailPointRegistry().find("logAfterOplogFetcherConnCreated");
+    auto timesEnteredFailPoint = waitForConnCreatedFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    ASSERT_FALSE(oplogFetcher->isActive());
+    ASSERT_OK(oplogFetcher->startup());
+    ASSERT_TRUE(oplogFetcher->isActive());
+
+    // Ensure that the MockDBClientConnection was created before proceeding.
+    waitForConnCreatedFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    return oplogFetcher;
+}
+
 std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcherWithDifferentExecutor(
-    executor::TaskExecutor* executor, NewOplogFetcher::OnShutdownCallbackFn fn) {
+    executor::TaskExecutor* executor,
+    NewOplogFetcher::OnShutdownCallbackFn fn,
+    int numRestarts,
+    bool requireFresherSyncSource) {
     auto oplogFetcher = std::make_unique<NewOplogFetcher>(
         executor,
         lastFetched,
         source,
         _createConfig(),
-        std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(1),
+        std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
         -1,
-        true,
+        requireFresherSyncSource,
         dataReplicatorExternalState.get(),
         enqueueDocumentsFn,
         fn,
@@ -1209,37 +1269,17 @@ std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcherWithDiffer
 std::unique_ptr<ShutdownState> NewOplogFetcherTest::processSingleBatch(
     const Message& response, bool requireFresherSyncSource) {
     auto shutdownState = std::make_unique<ShutdownState>();
-    NewOplogFetcher oplogFetcher(
-        &getExecutor(),
-        lastFetched,
-        source,
-        _createConfig(),
-        std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(0),
-        rbid,
-        requireFresherSyncSource,
-        dataReplicatorExternalState.get(),
-        enqueueDocumentsFn,
-        std::ref(*shutdownState),
-        defaultBatchSize,
-        NewOplogFetcher::StartingPoint::kSkipFirstDoc);
-    oplogFetcher.setCreateClientFn_forTest(
-        []() { return std::unique_ptr<DBClientConnection>(new MockDBClientConnection()); });
 
-    ASSERT_FALSE(oplogFetcher.isActive());
-    ASSERT_OK(oplogFetcher.startup());
-    ASSERT_TRUE(oplogFetcher.isActive());
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(
+        std::ref(*shutdownState), 0, requireFresherSyncSource);
 
-    auto m = processSingleRequestResponse(oplogFetcher.getDBClientConnection_forTest(), response);
-    auto msg = mongo::OpMsg::parse(m);
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
-    ASSERT_TRUE(msg.body.getBoolField("tailable"));
-    ASSERT_TRUE(msg.body.getBoolField("oplogReplay"));
-    ASSERT_TRUE(msg.body.getBoolField("awaitData"));
-    ASSERT_EQUALS(60000, msg.body.getIntField("maxTimeMS"));
-    // TODO SERVER-45468: Test the find command and the metadata sent.
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), response);
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
-    oplogFetcher.shutdown();
-    oplogFetcher.join();
+    oplogFetcher->shutdown();
+    oplogFetcher->join();
 
     return shutdownState;
 }
@@ -1341,24 +1381,24 @@ TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeR
 }
 
 TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRunQueryScheduled) {
-    ShutdownState shutdownState;
+    // Tests shutting down after _runQuery is scheduled (but not while blocked on the network).
 
-    auto oplogFetcher =
-        makeOplogFetcherWithDifferentExecutor(&getExecutor(), std::ref(shutdownState));
+    ShutdownState shutdownState;
 
     auto waitForCallbackScheduledFailPoint =
         globalFailPointRegistry().find("hangAfterOplogFetcherCallbackScheduled");
     auto timesEnteredFailPoint = waitForCallbackScheduledFailPoint->setMode(FailPoint::alwaysOn, 0);
 
-    ASSERT_FALSE(oplogFetcher->isActive());
-    ASSERT_OK(oplogFetcher->startup());
-    ASSERT_TRUE(oplogFetcher->isActive());
+    // This will also ensure that _runQuery was scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
 
     waitForCallbackScheduledFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-    waitForCallbackScheduledFailPoint->setMode(FailPoint::off);
 
     // Only call shutdown once we have confirmed that the callback is paused at the fail point.
     oplogFetcher->shutdown();
+
+    // Unpause the oplog fetcher.
+    waitForCallbackScheduledFailPoint->setMode(FailPoint::off);
 
     oplogFetcher->join();
 
@@ -1366,32 +1406,66 @@ TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRu
 }
 
 TEST_F(NewOplogFetcherTest,
+       OplogFetcherReturnsHostUnreachableIfShutdownAfterRunQueryScheduledWhileBlockedOnCall) {
+    // Tests that shutting down while the connection is blocked on call successfully shuts down the
+    // connection as well.
+
+    ShutdownState shutdownState;
+
+    // This will also ensure that _runQuery was scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    // Make sure that we are blocked on the network before shutting down to make sure that shutting
+    // down properly interrupts and shuts down the DBClientConnection.
+    auto* mockConn =
+        dynamic_cast<MockDBClientConnection*>(oplogFetcher->getDBClientConnection_forTest());
+    ASSERT_TRUE(blockedOnNetworkSoon(mockConn));
+
+    oplogFetcher->shutdown();
+
+    oplogFetcher->join();
+
+    // This is the error that the connection throws if shutdown while blocked on the network.
+    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest,
        FindQueryContainsTermIfGetCurrentTermAndLastCommittedOpTimeReturnsValidTerm) {
     // Test that the correct maxTimeMS is set if this is the initial 'find' query.
-    auto queryObj = makeOplogFetcher()->getFindQuery_forTest(true);
-    ASSERT_EQUALS(60000, queryObj.getIntField("maxTimeMS"));
+    auto oplogFetcher = makeOplogFetcher();
+    auto findTimeout = durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest());
+    auto queryObj = oplogFetcher->getFindQuery_forTest(findTimeout);
+    ASSERT_EQUALS(60000, queryObj.getIntField("$maxTimeMS"));
 
     ASSERT_EQUALS(mongo::BSONType::Object, queryObj["query"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
                       queryObj["query"].Obj());
     ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
-    ASSERT_BSONOBJ_EQ(BSON("afterClusterTime" << Timestamp(0, 1)), queryObj["readConcern"].Obj());
+    ASSERT_BSONOBJ_EQ(BSON("level"
+                           << "local"
+                           << "afterClusterTime" << Timestamp(0, 1)),
+                      queryObj["readConcern"].Obj());
     ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, queryObj["term"].numberLong());
 }
 
 TEST_F(NewOplogFetcherTest,
        FindQueryDoesNotContainTermIfGetCurrentTermAndLastCommittedOpTimeReturnsUninitializedTerm) {
     dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
+    auto oplogFetcher = makeOplogFetcher();
 
     // Test that the correct maxTimeMS is set if we are retrying the 'find' query.
-    auto queryObj = makeOplogFetcher()->getFindQuery_forTest(false);
-    ASSERT_EQUALS(2000, queryObj.getIntField("maxTimeMS"));
+    auto findTimeout = durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest());
+    auto queryObj = oplogFetcher->getFindQuery_forTest(findTimeout);
+    ASSERT_EQUALS(2000, queryObj.getIntField("$maxTimeMS"));
 
     ASSERT_EQUALS(mongo::BSONType::Object, queryObj["query"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
                       queryObj["query"].Obj());
     ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
-    ASSERT_BSONOBJ_EQ(BSON("afterClusterTime" << Timestamp(0, 1)), queryObj["readConcern"].Obj());
+    ASSERT_BSONOBJ_EQ(BSON("level"
+                           << "local"
+                           << "afterClusterTime" << Timestamp(0, 1)),
+                      queryObj["readConcern"].Obj());
     ASSERT_FALSE(queryObj.hasField("term"));
 }
 
@@ -1409,34 +1483,278 @@ TEST_F(NewOplogFetcherTest, AwaitDataTimeoutSmallerWhenFailPointSet) {
     failPoint->setMode(FailPoint::off);
 }
 
-TEST_F(
-    NewOplogFetcherTest,
-    NoDataAvailableAfterFirstTwoBatchesShouldCauseTheOplogFetcherToShutDownWithSuccessfulStatus) {
-    // TODO SERVER-45468: Enable this test.
-    return;
+TEST_F(NewOplogFetcherTest, FailingInitialCreateNewCursorNoRetriesShutsDownOplogFetcher) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher without any retries.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    // Use an empty message so that the cursor's init function will fail.
+    processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), Message());
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, FailingInitialCreateNewCursorWithRetriesShutsDownOplogFetcher) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    // An empty message will cause the initial attempt to create a cursor to fail.
+    processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), Message(), true);
+
+    // An empty message will cause the attempt to recreate a cursor to fail.
+    processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), Message());
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest,
+       NetworkExceptionDuringInitialCreateNewCursorWithRetriesShutsDownOplogFetcher) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    // This will cause the initial attempt to create a cursor to fail.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        true);
+
+    // This will cause the attempt to recreate a cursor to fail.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"});
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, DontRecreateNewCursorAfterFailedBatchNoRetries) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher without any retries.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // Creating the cursor will succeed.
+    auto m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj),
+        true);
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // This will cause the oplog fetcher to fail while getting the next batch. Since it doesn't have
+    // any retries, the oplog fetcher will shut down.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"});
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, FailCreateNewCursorAfterFailedBatchRetriesShutsDownOplogFetcher) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // Creating the cursor will succeed.
+    auto m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj),
+        true);
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // This will cause us to fail getting the next batch, meaning a new cursor needs to be created.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        true);
+
+    // An empty message will cause the attempt to create a cursor to fail.
+    processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), Message());
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, SuccessfullyRecreateCursorAfterFailedBatch) {
+    // This tests that the oplog fetcher successfully can recreate a cursor after it failed to get
+    // a batch and makes sure the recreated cursor behaves like an exhaust cursor. This will also
+    // check that the socket timeouts are set as expected. The steps are:
+    // 1. Start the oplog fetcher.
+    // 2. Create the initial cursor successfully.
+    // 3. Fail getting the next batch, causing us to create a new cursor.
+    // 4. Succeed creating a new cursor.
+    // 5. Successfully get the next batch (from the first getMore command).
+    // 6. Successfully get the next batch (this is the first exhaust batch).
+    // 7. Shut down while the connection is blocked on the network.
 
     ShutdownState shutdownState;
 
-    NewOplogFetcher oplogFetcher(
-        &getExecutor(),
-        lastFetched,
-        source,
-        _createConfig(),
-        std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(0),
-        rbid,
-        true,
-        dataReplicatorExternalState.get(),
-        enqueueDocumentsFn,
-        std::ref(shutdownState),
-        defaultBatchSize,
-        NewOplogFetcher::StartingPoint::kSkipFirstDoc);
-    oplogFetcher.setCreateClientFn_forTest(
-        []() { return std::unique_ptr<DBClientConnection>(new MockDBClientConnection()); });
+    // -- Step 1 --
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
 
-    ASSERT_EQUALS(OplogFetcher::State::kPreStart, oplogFetcher.getState_forTest());
+    // Make sure we are blocked on the network before checking that the socket timeout is properly
+    // set.
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+    auto* mockConn = dynamic_cast<MockDBClientConnection*>(conn);
+    ASSERT_TRUE(blockedOnNetworkSoon(mockConn));
 
-    ASSERT_OK(oplogFetcher.startup());
-    ASSERT_EQUALS(OplogFetcher::State::kRunning, oplogFetcher.getState_forTest());
+    auto initialMaxFindTimeDouble =
+        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()) / 1000.0;
+    auto retriedMaxFindTimeDouble =
+        durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()) / 1000.0;
+    auto awaitDataTimeoutDouble =
+        durationCount<Milliseconds>(makeOplogFetcher()->getAwaitDataTimeout_forTest()) / 1000.0;
+
+    // Check the socket timeout is equal to the initial find max time plus the network buffer.
+    ASSERT_EQUALS(initialMaxFindTimeDouble + oplogNetworkTimeoutBufferSeconds.load(),
+                  conn->getSoTimeout());
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(124), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // -- Step 2 --
+    // Creating the cursor will succeed. After this, the cursor will be blocked on call() for the
+    // getMore command.
+    auto m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj),
+        true);
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // Check the socket timeout is equal to the awaitData timeout plus the network buffer.
+    ASSERT_EQUALS(awaitDataTimeoutDouble + oplogNetworkTimeoutBufferSeconds.load(),
+                  conn->getSoTimeout());
+
+    // -- Step 3 --
+    // This will cause us to fail getting the next batch, meaning a new cursor needs to be created.
+    // After this, the new cursor will be blocked on call() while trying to initialize.
+    m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        true);
+
+    validateGetMoreCommand(
+        m, cursorId, durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()));
+
+    // Check the socket timeout is equal to the retried find max time plus the network buffer.
+    ASSERT_EQUALS(retriedMaxFindTimeDouble + oplogNetworkTimeoutBufferSeconds.load(),
+                  conn->getSoTimeout());
+
+    cursorId = 23LL;
+    auto thirdEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto fourthEntry = makeNoopOplogEntry({{Seconds(457), 0}, lastFetched.getTerm()});
+
+    // -- Step 4 --
+    // This will cause the attempt to create a cursor to succeed. After this, the cursor will be
+    // blocked on call() for the getMore command.
+    m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {thirdEntry, fourthEntry}, metadataObj),
+        true);
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
+
+    // Check the socket timeout is equal to the awaitData timeout plus the network buffer.
+    ASSERT_EQUALS(awaitDataTimeoutDouble + oplogNetworkTimeoutBufferSeconds.load(),
+                  conn->getSoTimeout());
+
+    auto fifthEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
+    auto sixthEntry = makeNoopOplogEntry({{Seconds(790), 0}, lastFetched.getTerm()});
+
+    // -- Step 5 --
+    // This will be the first getMore. After this, the cursor will be blocked on recv() for the next
+    // batch.
+    m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeSubsequentBatch(cursorId, {fifthEntry, sixthEntry}, metadataObj, true /* moreToCome */),
+        true);
+
+    validateGetMoreCommand(
+        m, cursorId, durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()));
+
+    auto seventhEntry = makeNoopOplogEntry({{Seconds(791), 0}, lastFetched.getTerm()});
+    auto eighthEntry = makeNoopOplogEntry({{Seconds(792), 0}, lastFetched.getTerm()});
+
+    // -- Step 6 --
+    // Getting this batch will mean the cursor was successfully recreated as an exhaust cursor. The
+    // moreToCome flag is set to false so that _connectionHasPendingReplies on the cursor will be
+    // false when cleaning up the cursor (otherwise we'd need to use a side connection to clean up
+    // the cursor).
+    processSingleExhaustResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeSubsequentBatch(
+            cursorId, {seventhEntry, eighthEntry}, metadataObj, false /* moreToCome */),
+        true);
+
+    // TODO SERVER-45469: Update this test to check the contents of the batches.
+
+    // -- Step 7 --
+    oplogFetcher->shutdown();
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, SuccessfulBatchResetsNumRestarts) {
+    // This tests that the OplogFetcherRestartDecision resets its counter when the oplog fetcher
+    // successfully gets the next batch. The steps are:
+    // 1. Start the oplog fetcher.
+    // 2. Fail to create the initial cursor. This will increment the number of failed restarts.
+    // 3. Create the cursor successfully. This should reset the count of failed restarts.
+    // 4. Fail getting the next batch, causing us to create a new cursor.
+    // 5. Succeed creating a new cursor.
+    // 6. Shut down while the connection is blocked on the network.
+
+    ShutdownState shutdownState;
+
+    // -- Step 1 --
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    // -- Step 2 --
+    // This will cause the first attempt to create a cursor to fail. After this, the new cursor will
+    // be blocked on call() while trying to initialize.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        true);
 
     CursorId cursorId = 22LL;
     auto firstEntry = makeNoopOplogEntry(lastFetched);
@@ -1444,41 +1762,140 @@ TEST_F(
 
     auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
 
-    processSingleRequestResponse(oplogFetcher.getDBClientConnection_forTest(),
-                                 makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj),
-                                 true);
-
-    ASSERT_EQUALS(1U, lastEnqueuedDocuments.size());
-    ASSERT_BSONOBJ_EQ(secondEntry, lastEnqueuedDocuments[0]);
-
-    auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
-    auto fourthEntry = makeNoopOplogEntry({{Seconds(1200), 0}, lastFetched.getTerm()});
-
-    // Set cursor ID to 0 in getMore response to indicate no more data available.
-    const auto moreToCome = false;
+    // -- Step 3 --
+    // Creating the cursor will succeed. After this, the cursor will be blocked on call() for the
+    // getMore command.
     auto m = processSingleRequestResponse(
-        oplogFetcher.getDBClientConnection_forTest(),
-        makeSubsequentBatch(0, {thirdEntry, fourthEntry}, metadataObj, moreToCome),
-        false);
-    auto msg = mongo::OpMsg::parse(m);
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj),
+        true);
 
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.coll(), msg.body["collection"].String());
-    ASSERT_EQUALS(int(durationCount<Milliseconds>(oplogFetcher.getAwaitDataTimeout_forTest())),
-                  msg.body.getIntField("maxTimeMS"));
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
 
-    ASSERT_EQUALS(2U, lastEnqueuedDocuments.size());
-    ASSERT_BSONOBJ_EQ(thirdEntry, lastEnqueuedDocuments[0]);
-    ASSERT_BSONOBJ_EQ(fourthEntry, lastEnqueuedDocuments[1]);
+    auto thirdEntry = makeNoopOplogEntry({{Seconds(457), 0}, lastFetched.getTerm()});
+    auto fourthEntry = makeNoopOplogEntry({{Seconds(458), 0}, lastFetched.getTerm()});
 
-    oplogFetcher.join();
-    ASSERT_EQUALS(OplogFetcher::State::kComplete, oplogFetcher.getState_forTest());
+    // -- Step 4 --
+    // This will cause an error when getting the next batch, which will cause us to recreate the
+    // cursor. If the number of retries was not reset, this will fail because the new cursor won't
+    // be blocked on the call while recreating the cursor.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"},
+        true);
+
+    cursorId = 23LL;
+    auto fifthEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
+    auto sixthEntry = makeNoopOplogEntry({{Seconds(790), 0}, lastFetched.getTerm()});
+
+    // -- Step 5 --
+    // Make sure that we can finish recreating the cursor successfully.
+    m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {fifthEntry, sixthEntry}, metadataObj),
+        true);
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
+
+    oplogFetcher->shutdown();
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
+    // Test that the oplog fetcher works if the 'oplogFetcherUsesExhaust' server parameter is set to
+    // false.
+
+    ShutdownState shutdownState;
+
+    oplogFetcherUsesExhaust = false;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // Creating the cursor will succeed. After this, the cursor will be blocked on call() for the
+    // getMore command.
+    auto m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj),
+        true);
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    auto thirdEntry = makeNoopOplogEntry({{Seconds(457), 0}, lastFetched.getTerm()});
+    auto fourthEntry = makeNoopOplogEntry({{Seconds(458), 0}, lastFetched.getTerm()});
+
+    // moreToCome would be set to false if oplogFetcherUsesExhaust was set to false. After this,
+    // the cursor will be blocked on call() for the next getMore command.
+    m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeSubsequentBatch(
+            cursorId, {thirdEntry, fourthEntry}, metadataObj, false /* moreToCome */),
+        true);
+
+    validateGetMoreCommand(m,
+                           cursorId,
+                           durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
+                           false /* exhaustSupported */);
+
+    // TODO SERVER-45469: Update this test to check the contents of the batches.
+
+    auto fifthEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
+    auto sixthEntry = makeNoopOplogEntry({{Seconds(790), 0}, lastFetched.getTerm()});
+
+    m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeSubsequentBatch(cursorId, {fifthEntry, sixthEntry}, metadataObj, false),
+        true);
+
+    validateGetMoreCommand(m,
+                           cursorId,
+                           durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
+                           false /* exhaustSupported */);
+
+    oplogFetcher->shutdown();
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    CursorId cursorId = 0LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(124), 0}, lastFetched.getTerm()});
+
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // Creating the cursor will succeed, but the oplog fetcher will shut down after receiving this
+    // batch because the cursor id is 0.
+    auto m = processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj));
+
+    validateFindCommand(m,
+                        oplogFetcher->getLastOpTimeFetched_forTest(),
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    oplogFetcher->join();
 
     ASSERT_OK(shutdownState.getStatus());
-
-    ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, msg.body["term"].numberLong());
-    ASSERT_EQUALS(dataReplicatorExternalState->lastCommittedOpTime,
-                  unittest::assertGet(
-                      OpTime::parseFromOplogEntry(msg.body["lastKnownCommittedOpTime"].Obj())));
 }
 }  // namespace

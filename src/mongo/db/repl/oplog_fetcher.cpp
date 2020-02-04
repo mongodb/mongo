@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -54,6 +55,7 @@ Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 MONGO_FAIL_POINT_DEFINE(stopReplProducer);
 MONGO_FAIL_POINT_DEFINE(stopReplProducerOnDocument);
 MONGO_FAIL_POINT_DEFINE(setSmallOplogGetMoreMaxTimeMS);
+MONGO_FAIL_POINT_DEFINE(logAfterOplogFetcherConnCreated);
 MONGO_FAIL_POINT_DEFINE(hangAfterOplogFetcherCallbackScheduled);
 
 // TODO SERVER-45574: Define the failpoint in this file instead.
@@ -638,7 +640,9 @@ Status NewOplogFetcher::_doStartup_inlock() noexcept {
 void NewOplogFetcher::_doShutdown_inlock() noexcept {
     _cancelHandle_inlock(_runQueryHandle);
 
-    // TODO SERVER-45468: Call shutdownAndDisallowReconnect on DBClientConnection
+    if (_conn) {
+        _conn->shutdownAndDisallowReconnect();
+    }
 }
 
 Mutex* NewOplogFetcher::_getMutex() noexcept {
@@ -649,8 +653,8 @@ OpTime NewOplogFetcher::getLastOpTimeFetched_forTest() const {
     return _getLastOpTimeFetched();
 }
 
-BSONObj NewOplogFetcher::getFindQuery_forTest(bool initialFind) const {
-    return _makeFindQuery(initialFind);
+BSONObj NewOplogFetcher::getFindQuery_forTest(long long findTimeout) const {
+    return _makeFindQuery(findTimeout);
 }
 
 Milliseconds NewOplogFetcher::getAwaitDataTimeout_forTest() const {
@@ -665,6 +669,23 @@ void NewOplogFetcher::setCreateClientFn_forTest(const CreateClientFn& createClie
 DBClientConnection* NewOplogFetcher::getDBClientConnection_forTest() const {
     stdx::lock_guard lock(_mutex);
     return _conn.get();
+}
+
+Milliseconds NewOplogFetcher::getInitialFindMaxTime_forTest() const {
+    return _getInitialFindMaxTime();
+}
+
+Milliseconds NewOplogFetcher::getRetriedFindMaxTime_forTest() const {
+    return _getRetriedFindMaxTime();
+}
+
+void NewOplogFetcher::_setSocketTimeout(long long timeout) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    invariant(_conn);
+    // setSoTimeout takes a double representing the number of seconds for send and receive
+    // timeouts. Thus, we must express the timeout in milliseconds and divide by 1000.0 to get
+    // the number of seconds with a fractional part.
+    _conn->setSoTimeout(timeout / 1000.0 + oplogNetworkTimeoutBufferSeconds.load());
 }
 
 OpTime NewOplogFetcher::_getLastOpTimeFetched() const {
@@ -701,7 +722,7 @@ void NewOplogFetcher::_finishCallback(Status status) {
     std::swap(_oplogFetcherRestartDecision, oplogFetcherRestartDecision);
 }
 
-void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbackData) {
+void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbackData) noexcept {
     Status responseStatus =
         _checkForShutdownAndConvertStatus(callbackData, "error running oplog fetcher");
     if (!responseStatus.isOK()) {
@@ -709,7 +730,22 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
         return;
     }
 
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        _conn = _createClientFn();
+
+        // TODO SERVER-45931: Connect and authenticate.
+    }
+
+    if (MONGO_unlikely(logAfterOplogFetcherConnCreated.shouldFail())) {
+        // Used in tests that wait for this failpoint to be entered to ensure the DBClientConnection
+        // was created.
+        log() << "logAfterOplogFetcherConnCreated failpoint enabled.";
+    }
+
     hangAfterOplogFetcherCallbackScheduled.pauseWhileSet();
+
+    _createNewCursor(true /* initialFind */);
 
     while (true) {
         bool isShuttingDown;
@@ -724,17 +760,50 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
             _finishCallback(Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"));
             return;
         }
+
+        auto batchResult = _getNextBatch();
+        if (!batchResult.isOK()) {
+            auto brStatus = batchResult.getStatus();
+
+            // Recreate a cursor if we have enough retries left.
+            if (_oplogFetcherRestartDecision->shouldContinue(this, brStatus)) {
+                _createNewCursor(false /* initialFind */);
+                continue;
+            } else {
+                _finishCallback(brStatus);
+                return;
+            }
+        }
+
+        auto status = _onSuccessfulBatch(batchResult.getValue());
+        if (!status.isOK()) {
+            // The stopReplProducer fail point expects this to return successfully. If another fail
+            // point wants this to return unsuccessfully, it should use a different error code.
+            if (status == ErrorCodes::FailPointEnabled) {
+                _finishCallback(Status::OK());
+                return;
+            }
+            _finishCallback(status);
+            return;
+        }
+
+        if (_cursor->isDead()) {
+            // This means the sync source closes the tailable cursor with a returned cursorId of 0.
+            // Any users of the oplog fetcher should create a new oplog fetcher if they see a
+            // successful status and would like to continue fetching more oplog entries.
+            _finishCallback(Status::OK());
+            return;
+        }
     }
 }
 
-BSONObj NewOplogFetcher::_makeFindQuery(bool initialFind) const {
+BSONObj NewOplogFetcher::_makeFindQuery(long long findTimeout) const {
     BSONObjBuilder queryBob;
 
     auto lastOpTimeFetched = _getLastOpTimeFetched();
     queryBob.append("query", BSON("ts" << BSON("$gte" << lastOpTimeFetched.getTimestamp())));
 
-    auto findMaxTime = initialFind ? _getInitialFindMaxTime() : _getRetriedFindMaxTime();
-    queryBob.append("maxTimeMS", durationCount<Milliseconds>(findMaxTime));
+    queryBob.append("$maxTimeMS", findTimeout);
 
     auto lastCommittedWithCurrentTerm =
         _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
@@ -745,9 +814,80 @@ BSONObj NewOplogFetcher::_makeFindQuery(bool initialFind) const {
 
     // This ensures that the sync source waits for all earlier oplog writes to be visible.
     // Since Timestamp(0, 0) isn't allowed, Timestamp(0, 1) is the minimal we can use.
-    queryBob.append("readConcern", BSON("afterClusterTime" << Timestamp(0, 1)));
+    queryBob.append("readConcern",
+                    BSON("level"
+                         << "local"
+                         << "afterClusterTime" << Timestamp(0, 1)));
 
     return queryBob.obj();
+}
+
+void NewOplogFetcher::_createNewCursor(bool initialFind) {
+    invariant(_conn);
+
+    // Set the socket timeout to the 'find' timeout plus a network buffer.
+    auto findTimeout = durationCount<Milliseconds>(initialFind ? _getInitialFindMaxTime()
+                                                               : _getRetriedFindMaxTime());
+    _setSocketTimeout(findTimeout);
+
+    _cursor = std::make_unique<DBClientCursor>(
+        _conn.get(),
+        _nss,
+        _makeFindQuery(findTimeout),
+        0 /* nToReturn */,
+        0 /* nToSkip */,
+        nullptr /* fieldsToReturn */,
+        QueryOption_CursorTailable | QueryOption_AwaitData | QueryOption_OplogReplay |
+            (oplogFetcherUsesExhaust ? QueryOption_Exhaust : 0),
+        _batchSize);
+
+    _firstBatch = true;
+}
+
+StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
+    Documents batch;
+    try {
+        // If it is the first batch, we should initialize the cursor, which will run the find query.
+        // Otherwise we should call more() to get the next batch.
+        if (_firstBatch) {
+            // Network errors manifest as exceptions that are handled in the catch block. If init
+            // returns false it means that the sync source responded with nothing, which could
+            // indicate a problem with the sync source.
+            if (!_cursor->init()) {
+                _cursor.reset();
+                return {ErrorCodes::InvalidSyncSource,
+                        str::stream()
+                            << "Oplog fetcher could not create cursor on source: " << _source};
+            }
+
+            // This will also set maxTimeMS on the generated getMore command.
+            _cursor->setAwaitDataTimeoutMS(_awaitDataTimeout);
+
+            // The 'find' command has already been executed, so reset the socket timeout to reflect
+            // the awaitData timeout with a network buffer.
+            _setSocketTimeout(durationCount<Milliseconds>(_awaitDataTimeout));
+        } else if (!_cursor->more()) {
+            // The only reason more() should return false is if the cursor is dead.
+            invariant(_cursor->isDead());
+        }
+
+        while (_cursor->moreInCurrentBatch()) {
+            batch.emplace_back(_cursor->nextSafe());
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus("Error while getting the next batch in the oplog fetcher");
+    }
+
+    return batch;
+}
+
+Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
+    _oplogFetcherRestartDecision->fetchSuccessful(this);
+
+    // TODO SERVER-45469: handle each batch.
+
+    _firstBatch = false;
+    return Status::OK();
 }
 
 bool NewOplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(NewOplogFetcher* fetcher,
@@ -757,9 +897,9 @@ bool NewOplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(NewOplo
               << redact(status);
         return false;
     }
-    log() << "Restarting oplog query due to error: " << redact(status)
+    log() << "Recreating cursor for oplog fetcher due to error: " << redact(status)
           << ". Last fetched optime: " << fetcher->_getLastOpTimeFetched()
-          << ". Restarts remaining: " << (_maxRestarts - _numRestarts);
+          << ". Attempts remaining: " << (_maxRestarts - _numRestarts);
     _numRestarts++;
     return true;
 }

@@ -227,7 +227,9 @@ void MockDBClientConnection::remove(const string& ns, Query query, int flags) {
 }
 
 void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cursorID) {
-    invariant(false);  // unimplemented
+    // Unimplemented if there is a remote server. Without a remote server, there is nothing that
+    // needs to be done.
+    invariant(!_remoteServer);
 }
 
 bool MockDBClientConnection::call(mongo::Message& toSend,
@@ -258,8 +260,10 @@ bool MockDBClientConnection::call(mongo::Message& toSend,
     _lastSentMessage = toSend;
     _mockCallResponsesCV.wait(lk, [&] {
         _blockedOnNetwork = (_callIter == _mockCallResponses.end());
-        return !_blockedOnNetwork;
+        return !_blockedOnNetwork || !isStillConnected();
     });
+
+    uassert(ErrorCodes::HostUnreachable, "Socket was shut down while in call", isStillConnected());
 
     const auto& swResponse = *_callIter;
     _callIter++;
@@ -272,13 +276,21 @@ Status MockDBClientConnection::recv(mongo::Message& m, int lastRequestId) {
 
     _mockRecvResponsesCV.wait(lk, [&] {
         _blockedOnNetwork = (_recvIter == _mockRecvResponses.end());
-        return !_blockedOnNetwork;
+        return !_blockedOnNetwork || !isStillConnected();
     });
+
+    uassert(ErrorCodes::HostUnreachable, "Socket was shut down while in recv", isStillConnected());
 
     const auto& swResponse = *_recvIter;
     _recvIter++;
     m = uassertStatusOK(swResponse);
     return Status::OK();
+}
+
+void MockDBClientConnection::shutdownAndDisallowReconnect() {
+    DBClientConnection::shutdownAndDisallowReconnect();
+    _mockCallResponsesCV.notify_all();
+    _mockRecvResponsesCV.notify_all();
 }
 
 void MockDBClientConnection::setCallResponses(Responses responses) {
@@ -308,10 +320,6 @@ void MockDBClientConnection::say(mongo::Message& toSend, bool isRetry, string* a
 bool MockDBClientConnection::lazySupported() const {
     invariant(false);  // unimplemented
     return false;
-}
-
-double MockDBClientConnection::getSoTimeout() const {
-    return 0;
 }
 
 void MockDBClientConnection::checkConnection() {
