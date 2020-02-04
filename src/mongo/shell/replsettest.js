@@ -2066,8 +2066,7 @@ var ReplSetTest = function(opts) {
                         // overhead. We call awaitReplication() later on to ensure the collMod
                         // is replicated to all nodes.
                         try {
-                            assert.commandWorked(dbHandle.runCommand(
-                                {collMod: collInfo.name, writeConcern: {w: 1}}));
+                            assert.commandWorked(dbHandle.runCommand({collMod: collInfo.name}));
                         } catch (e) {
                             // Ignore NamespaceNotFound errors because a background thread could
                             // have dropped the collection after getCollectionInfos but before
