@@ -277,8 +277,10 @@ class EvergreenConfigGenerator(object):
         start_date = end_date - datetime.timedelta(days=generate_resmoke.LOOKBACK_DURATION_DAYS)
         suites = gen_suites.calculate_suites(start_date, end_date)
         # Render the given suites into yml files that can be used by resmoke.py.
+        should_create_misc_suite = not bool(self.options.selected_tests_to_run)
         config_file_dict = generate_resmoke.render_suite_files(suites, self.options.suite,
-                                                               gen_suites.test_list, TEST_SUITE_DIR)
+                                                               gen_suites.test_list, TEST_SUITE_DIR,
+                                                               should_create_misc_suite)
         generate_resmoke.write_file_dict(CONFIG_DIR, config_file_dict)
 
         if burn_in_test is not None:

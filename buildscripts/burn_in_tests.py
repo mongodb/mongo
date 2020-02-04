@@ -217,7 +217,7 @@ def _validate_multiversion_config(local_mode: bool):
         raise ValueError("Cannot specify both --local and --use-multiversion together.")
 
 
-def _is_file_a_test_file(file_path: str) -> bool:
+def is_file_a_test_file(file_path: str) -> bool:
     """
     Check if the given path points to a test file.
 
@@ -246,7 +246,7 @@ def find_changed_tests(repo: Repo) -> Set[str]:
     """
     changed_files = find_changed_files(repo)
     LOGGER.debug("Found changed files", files=changed_files)
-    changed_tests = {os.path.normpath(path) for path in changed_files if _is_file_a_test_file(path)}
+    changed_tests = {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
     LOGGER.debug("Found changed tests", files=changed_tests)
     return changed_tests
 
@@ -337,7 +337,7 @@ def _set_resmoke_args(task):
     if task.is_generate_resmoke_task:
         suite_name = task.get_vars_suite_name(task.generate_resmoke_tasks_command["vars"])
 
-    return ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name)
+    return ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name)
 
 
 def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectConfig,
@@ -380,6 +380,7 @@ def _gather_task_info(task: VariantTask, tests_by_suite: Dict,
     :return: Dictionary of information needed to run task.
     """
     return {
+        "display_task_name": _get_task_name(task),
         "resmoke_args": _set_resmoke_args(task),
         "tests": tests_by_suite[task.resmoke_suite],
         "use_multiversion": task.multiversion_path,
@@ -416,7 +417,7 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
     # Find all the build variant tasks.
     exclude_tasks_set = set(exclude_tasks)
     all_variant_tasks = {
-        _get_task_name(task): task
+        task.name: task
         for task in evg_build_variant.tasks
         if task.name not in exclude_tasks_set and task.combined_resmoke_args
     }
@@ -587,15 +588,16 @@ def create_generate_tasks_config(
                                  suite=task)
                     continue
             multiversion_path = tests_by_task[task].get("use_multiversion")
-            task_runtime_stats = _get_task_runtime_history(evg_api, generate_config.project, task,
-                                                           generate_config.build_variant)
+            display_task_name = tests_by_task[task]["display_task_name"]
+            task_runtime_stats = _get_task_runtime_history(
+                evg_api, generate_config.project, display_task_name, generate_config.build_variant)
             resmoke_args = tests_by_task[task]["resmoke_args"]
             distro = tests_by_task[task].get("distro", generate_config.distro)
             # Evergreen always uses a unix shell, even on Windows, so instead of using os.path.join
             # here, just use the forward slash; otherwise the path separator will be treated as
             # the escape character on Windows.
-            sub_task_name = name_generated_task(f"{task_prefix}:{task}", index, len(test_list),
-                                                generate_config.run_build_variant)
+            sub_task_name = name_generated_task(f"{task_prefix}:{display_task_name}", index,
+                                                len(test_list), generate_config.run_build_variant)
             LOGGER.debug("Generating sub-task", sub_task=sub_task_name)
 
             test_unix_style = test.replace('\\', '/')

@@ -115,6 +115,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         evg_conf_mock = get_evergreen_config()
         create_tests_by_task_mock.return_value = {
             "aggregation_mongos_passthrough": {
+                "display_task_name": "aggregation_mongos_passthrough",
                 "resmoke_args":
                     "--suites=aggregation_mongos_passthrough --storageEngine=wiredTiger",
                 "tests": ["jstests/aggregation/bugs/ifnull.js"],

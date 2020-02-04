@@ -376,15 +376,22 @@ class ResmokeArgs(object):
         return re.compile(r"(?P<name_value>--{}[=\s](?P<value>([(\w+,\w+)\w]+)))".format(name))
 
     @staticmethod
-    def _get_first_match(resmoke_args, name, group_name=None):
+    def _arg_regex_inclusive_trailing_whitespace(name):
+        """Return the regex for a resmoke arg, including the trailing whitespace if it exists."""
+        return re.compile(r"(?P<name_value>--{}[=\s](?P<value>([(\w+,\w+)\w]+))\s?)".format(name))
+
+    @staticmethod
+    def _get_first_match(resmoke_args, name, group_name=None, include_trailing_space=False):
         """Return first matching occurrence and matching group_name, or None."""
-        matches = re.findall(ResmokeArgs._arg_regex(name), resmoke_args)
+        regex = ResmokeArgs._arg_regex_inclusive_trailing_whitespace(
+            name) if include_trailing_space else ResmokeArgs._arg_regex(name)
+        matches = re.findall(regex, resmoke_args)
         if not matches:
             return None
         if len(matches) > 1:
             raise RuntimeError("More than one match for --{} discovered in {}".format(
                 name, resmoke_args))
-        return re.search(ResmokeArgs._arg_regex(name), resmoke_args).group(group_name)
+        return re.search(regex, resmoke_args).group(group_name)
 
     @staticmethod
     def get_arg(resmoke_args, name):
@@ -395,7 +402,7 @@ class ResmokeArgs(object):
         return ResmokeArgs._get_first_match(resmoke_args, name, "value")
 
     @staticmethod
-    def get_updated_arg(resmoke_args, name, value):
+    def set_updated_arg(resmoke_args, name, value):
         """Add or update the 'resmoke_args' string and set the 'value' from the first --'name'.
 
         Raise an exception in the case there is more than one occurrence of '--name'.
@@ -405,3 +412,20 @@ class ResmokeArgs(object):
             new_name_value = "--{}={}".format(name, value)
             return resmoke_args.replace(name_value, new_name_value)
         return "{} --{}={}".format(resmoke_args, name, value)
+
+    @staticmethod
+    def remove_arg(resmoke_args: str, name: str):
+        """
+        Remove an arg from the 'resmoke_args' string.
+
+        Raise an exception in the case there is more than one occurrence of '--name'.
+
+        :param resmoke_args: The resmoke args being parsed.
+        :param name: The name of the arg to be removed.
+        :return: New resmoke args with the arg removed.
+        """
+        name_value = ResmokeArgs._get_first_match(resmoke_args, name, "name_value",
+                                                  include_trailing_space=True)
+        if name_value:
+            return resmoke_args.replace(name_value, "")
+        return resmoke_args

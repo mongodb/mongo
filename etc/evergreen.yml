@@ -478,6 +478,21 @@ functions:
         user: "${evergreen_api_user}"
         END_OF_CREDS
 
+  "configure selected tests credentials": &configure_selected_tests_credentials
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        # Create the Evergreen API credentials
+        cat > .selected_tests.yml <<END_OF_CREDS
+        url: "https://selected-tests.server-tig.prod.corp.mongodb.com"
+        project: "${project}"
+        auth_user: "${selected_tests_auth_user}"
+        auth_token: "${selected_tests_auth_token}"
+        END_OF_CREDS
+
   "git get project": &git_get_project
     command: git.get_project
     params:
@@ -1484,6 +1499,60 @@ functions:
 
         cd $target_dir
         tar xzf generate_tasks_config.tgz
+
+  "generate selected tests":
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
+    - *configure_evergreen_api_credentials
+    - *configure_selected_tests_credentials
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # Only run on master branch
+          if [[ "${project}" != "mongodb-mongo-master" ]]; then
+
+            if [ "${is_patch}" = "true" ]; then
+              echo "Not on master, skipping selected_tests_gen task"
+              exit 1
+            else
+              exit 0
+            fi
+
+          else
+
+            ${activate_virtualenv}
+            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --verbose --build-variant=enterprise-rhel-62-64-bit --selected-tests-config .selected_tests.yml
+
+          fi
+    - command: archive.targz_pack
+      params:
+        target: generate_tasks_config.tgz
+        source_dir: src/generated_resmoke_config
+        include:
+          - "*"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: generate_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Generated Task Config - Execution ${execution}
+        optional: true
+    - command: generate.tasks
+      params:
+        optional: true
+        files:
+          - src/generated_resmoke_config/*.json
 
   "generate burn in tags":
     - command: expansions.write
@@ -5412,6 +5481,17 @@ tasks:
       repeat_tests_secs: 600
       repeat_tests_min: 2
       repeat_tests_max: 1000
+
+- name: selected_tests_gen
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
+    vars:
+      pip_dir: ${workdir}/src/etc/pip
+  - func: "upload pip requirements"
+  - func: "generate selected tests"
 
 - name: auth_audit_gen
   tags: ["auth", "audit"]
@@ -11943,6 +12023,17 @@ buildvariants:
   stepback: false
   tasks:
   - name: win_shared_scons_cache_pruning
+
+- name: selected-tests
+  display_name: "~ Selected Tests"
+  modules:
+    - enterprise
+  run_on:
+    - rhel62-small
+  batchtime: 10080 # 7 days
+  stepback: false
+  tasks:
+  - name: selected_tests_gen
 
 - name: commit-queue
   display_name: "~ Commit Queue"

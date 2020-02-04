@@ -496,31 +496,59 @@ class TestResmokeArgs(unittest.TestCase):
         resmoke_args = "--suites=old_suite test1.js"
         new_resmoke_args = "--suites={} test1.js".format(suite_name)
         self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name))
+                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
 
     def test_set_arg_with_space(self):
         suite_name = "new_suite"
         resmoke_args = "--suites old_suite test1.js"
         new_resmoke_args = "--suites={} test1.js".format(suite_name)
         self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name))
+                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
 
     def test_set_arg_same_suite(self):
         suite_name = "new_suite"
         resmoke_args = "--suites=new_suite test1.js"
         new_resmoke_args = "--suites={} test1.js".format(suite_name)
         self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name))
+                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
 
     def test_set_arg_no_suite(self):
         suite_name = "new_suite"
         resmoke_args = "--other_arg=val1 test1.js"
         new_resmoke_args = "{} --suites={}".format(resmoke_args, suite_name)
         self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name))
+                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
 
     def test_set_arg_multiple(self):
         new_val = "myval"
         resmoke_args = "--myarg=val1 --myarg=val2 test1.js"
         with self.assertRaises(RuntimeError):
-            _evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "myarg", new_val)
+            _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "myarg", new_val)
+
+    def test_remove_arg(self):
+        resmoke_args = "--suites=old_suite"
+        new_resmoke_args = ""
+        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(
+            resmoke_args, "suites"))
+
+    def test_remove_arg_with_trailing_space(self):
+        resmoke_args = "--suites=old_suite test1.js"
+        new_resmoke_args = "test1.js"
+        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(
+            resmoke_args, "suites"))
+
+    def test_remove_arg_with_space(self):
+        resmoke_args = "--suites old_suite test1.js"
+        new_resmoke_args = "test1.js"
+        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(
+            resmoke_args, "suites"))
+
+    def test_remove_arg_with_comma(self):
+        resmoke_args = "--myarg=val1,val2,val3 test1.js"
+        new_resmoke_args = "test1.js"
+        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(resmoke_args, "myarg"))
+
+    def test_remove_arg_multiple(self):
+        resmoke_args = "--myarg=val1 --myarg=val2 test1.js"
+        with self.assertRaises(RuntimeError):
+            _evergreen.ResmokeArgs.remove_arg(resmoke_args, "myarg")

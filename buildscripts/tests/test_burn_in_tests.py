@@ -29,8 +29,8 @@ _parser.set_options()
 
 def create_tests_by_task_mock(n_tasks, n_tests):
     return {
-        f"task_{i}": {
-            "resmoke_args": f"--suites=suite_{i}",
+        f"task_{i}_gen": {
+            "display_task_name": f"task_{i}", "resmoke_args": f"--suites=suite_{i}",
             "tests": [f"jstests/tests_{j}" for j in range(n_tests)]
         }
         for i in range(n_tasks)
@@ -575,7 +575,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         gen_config = MagicMock(run_build_variant="variant", distro=None)
         repeat_config = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
-        first_task = "task_0"
+        first_task = "task_0_gen"
         multiversion_path = "multiversion_path"
         tests_by_task[first_task]["use_multiversion"] = multiversion_path
 
