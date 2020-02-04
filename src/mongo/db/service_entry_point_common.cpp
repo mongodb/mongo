@@ -442,20 +442,18 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
         getErrorLabels(opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
     commandBodyFieldsBob->appendElements(errorLabels);
 
-    auto isStateChangeError = false;
+    auto isNotMasterError = false;
     if (code) {
-        isStateChangeError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*code) ||
-            ErrorCodes::isA<ErrorCategory::ShutdownError>(*code);
+        isNotMasterError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*code);
     }
 
-    if (!isStateChangeError && wcCode) {
-        isStateChangeError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode) ||
-            ErrorCodes::isA<ErrorCategory::ShutdownError>(*wcCode);
+    if (!isNotMasterError && wcCode) {
+        isNotMasterError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode);
     }
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-        !isStateChangeError) {
+        !isNotMasterError) {
         return;
     }
     const auto topologyVersion = replCoord->getTopologyVersion();
