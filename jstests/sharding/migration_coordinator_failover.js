@@ -96,6 +96,12 @@ function runMoveChunkMakeDonorStepDownAfterFailpoint(
         });
     }
 
+    // Wait for mongos to see a new primary of rs0 before running the count command, because mongos
+    // will only wait 20 seconds to see a new primary from within the count command, and it may take
+    // longer for a new primary to be elected if both replica set nodes run for election at the same
+    // time (and therefore both lose the first election).
+    awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
+
     // The data should still be present on the shard that owns the chunk.
     assert.eq(numDocs, st.s.getDB(dbName).getCollection(collName).count());
 
