@@ -80,9 +80,12 @@ for (x = 0; x < 4; x++) {
     assert.commandWorked(st.s.adminCommand({split: 'test.sharded', middle: {_id: x}}));
 }
 
-var newMongod = MongoRunner.runMongod({shardsvr: ''});
+let newShard =
+    new ReplSetTest({name: "toRemoveLater", nodes: NUM_NODES, nodeOptions: {shardsvr: ""}});
+newShard.startSet();
+newShard.initiate();
 
-assert.commandWorked(st.s.adminCommand({addShard: newMongod.name, name: 'toRemoveLater'}));
+assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: 'toRemoveLater'}));
 
 for (x = 0; x < 2; x++) {
     assert.commandWorked(
@@ -102,7 +105,7 @@ assert.soon(function() {
     return res.state == 'completed';
 });
 
-MongoRunner.stopMongod(newMongod);
+newShard.stopSet();
 
 checkBasicCRUD(st.s.getDB('test').unsharded);
 checkBasicCRUD(st.s.getDB('test').sharded);

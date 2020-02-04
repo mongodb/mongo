@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/logical_session_id.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -72,7 +73,10 @@ public:
      * NOTE: Must be called without any locks and must succeed, before any other methods are called
      * (except for cancelClone and [insert/update/delete]Op).
      */
-    virtual Status startClone(OperationContext* opCtx, const UUID& migrationId) = 0;
+    virtual Status startClone(OperationContext* opCtx,
+                              const UUID& migrationId,
+                              const LogicalSessionId& lsid,
+                              TxnNumber txnNumber) = 0;
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate

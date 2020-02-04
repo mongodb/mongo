@@ -33,7 +33,10 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
@@ -44,14 +47,22 @@ using unittest::assertGet;
 namespace {
 
 TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
+    auto serviceContext = ServiceContext::make();
+    auto client = serviceContext->makeClient("TestClient");
+    auto opCtx = client->makeOperationContext();
+
     MigrationSessionId sessionId = MigrationSessionId::generate("shard0001", "shard0002");
     UUID migrationId = UUID::gen();
+    auto lsid = makeLogicalSessionId(opCtx.get());
+    TxnNumber txnNumber = 0;
 
     BSONObjBuilder builder;
     StartChunkCloneRequest::appendAsCommand(
         &builder,
         NamespaceString("TestDB.TestColl"),
         migrationId,
+        lsid,
+        txnNumber,
         sessionId,
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")),
         ShardId("shard0001"),
@@ -68,7 +79,9 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
 
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
     ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
-    ASSERT(migrationId == request.getMigrationId());
+    ASSERT_EQ(migrationId, request.getMigrationId());
+    ASSERT_EQ(lsid, request.getLsid());
+    ASSERT_EQ(txnNumber, request.getTxnNumber());
     ASSERT(sessionId.matches(request.getSessionId()));
     ASSERT_EQ(
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345"))

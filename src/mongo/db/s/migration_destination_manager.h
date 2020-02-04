@@ -109,7 +109,7 @@ public:
     Status start(OperationContext* opCtx,
                  const NamespaceString& nss,
                  ScopedReceiveChunk scopedReceiveChunk,
-                 StartChunkCloneRequest cloneRequest,
+                 const StartChunkCloneRequest& cloneRequest,
                  const OID& epoch,
                  const WriteConcernOptions& writeConcern);
 
@@ -207,6 +207,8 @@ private:
     bool _enableResumableRangeDeleter{true};
 
     UUID _migrationId;
+    LogicalSessionId _lsid;
+    TxnNumber _txnNumber;
     NamespaceString _nss;
     ConnectionString _fromShardConnString;
     ShardId _fromShard;

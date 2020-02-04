@@ -1727,15 +1727,16 @@ var ShardingTest = function(params) {
         // TODO SERVER-45108: Enable support for x509 auth for _flushRoutingTableCacheUpdates.
         if (!otherParams.manualAddShard && !x509AuthRequired) {
             for (let i = 0; i < numShards; i++) {
+                const keyFileLocal =
+                    (otherParams.shards && otherParams.shards[i] && otherParams.shards[i].keyFile)
+                    ? otherParams.shards[i].keyFile
+                    : this.keyFile;
+
                 if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
                     const rs = this._rs[i].test;
-                    flushRT(rs.getPrimary(), rs.nodes, this.keyFile);
+                    flushRT(rs.getPrimary(), rs.nodes, keyFileLocal);
                 } else {
                     // If specified, use the keyFile for the standalone shard.
-                    const keyFileLocal = (otherParams.shards && otherParams.shards[i] &&
-                                          otherParams.shards[i].keyFile)
-                        ? otherParams.shards[i].keyFile
-                        : this.keyFile;
                     flushRT(this["shard" + i], this["shard" + i], keyFileLocal);
                 }
             }

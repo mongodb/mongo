@@ -42,6 +42,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -59,7 +60,9 @@
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/remove_saver.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -327,7 +330,7 @@ BSONObj MigrationDestinationManager::getMigrationStatusReport() {
 Status MigrationDestinationManager::start(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           ScopedReceiveChunk scopedReceiveChunk,
-                                          const StartChunkCloneRequest cloneRequest,
+                                          const StartChunkCloneRequest& cloneRequest,
                                           const OID& epoch,
                                           const WriteConcernOptions& writeConcern) {
     stdx::lock_guard<Latch> lk(_mutex);
@@ -357,6 +360,8 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
                 cloneRequest.hasMigrationId());
 
         _migrationId = cloneRequest.getMigrationId();
+        _lsid = cloneRequest.getLsid();
+        _txnNumber = cloneRequest.getTxnNumber();
     }
 
     _nss = nss;
@@ -756,21 +761,42 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
 void MigrationDestinationManager::_migrateThread() {
     Client::initKillableThread("migrateThread", getGlobalServiceContext());
-    auto opCtx = Client::getCurrent()->makeOperationContext();
+    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
 
     if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled()) {
-        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx.get());
+        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
     }
 
     try {
-        _migrateDriver(opCtx.get());
+        // The outer OperationContext is used to hold the session checked out for the
+        // duration of the recipient's side of the migration. This guarantees that if the
+        // donor shard has failed over, then the new donor primary cannot bump the
+        // txnNumber on this session while this node is still executing the recipient side
+        //(which is important because otherwise, this node may create orphans after the
+        // range deletion task on this node has been processed).
+        if (_enableResumableRangeDeleter) {
+            opCtx->setLogicalSessionId(_lsid);
+            opCtx->setTxnNumber(_txnNumber);
+
+            MongoDOperationContextSession sessionTxnState(opCtx);
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            txnParticipant.beginOrContinue(opCtx,
+                                           *opCtx->getTxnNumber(),
+                                           boost::none /* autocommit */,
+                                           boost::none /* startTransaction */);
+            _migrateDriver(opCtx);
+        } else {
+            _migrateDriver(opCtx);
+        }
     } catch (...) {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
 
     if (!_enableResumableRangeDeleter) {
         if (getState() != DONE) {
-            _forgetPending(opCtx.get(), ChunkRange(_min, _max));
+            _forgetPending(opCtx, ChunkRange(_min, _max));
         }
     }
 
@@ -780,7 +806,7 @@ void MigrationDestinationManager::_migrateThread() {
     _isActiveCV.notify_all();
 }
 
-void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
+void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     invariant(isActive());
     invariant(_sessionId);
     invariant(_scopedReceiveChunk);
@@ -792,7 +818,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
           << " at epoch " << _epoch.toString() << " with session id " << *_sessionId;
 
     MoveTimingHelper timing(
-        opCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, ShardId(), ShardId());
+        outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, ShardId(), ShardId());
 
     const auto initialState = getState();
 
@@ -803,10 +829,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
 
     invariant(initialState == READY);
 
-    auto donorCollectionOptionsAndIndexes = getCollectionIndexesAndOptions(opCtx, _nss, _fromShard);
+    auto donorCollectionOptionsAndIndexes =
+        getCollectionIndexesAndOptions(outerOpCtx, _nss, _fromShard);
 
     auto fromShard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard));
+        uassertStatusOK(Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
 
     {
         const ChunkRange range(_min, _max);
@@ -815,20 +842,20 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         // deleted.
         if (_enableResumableRangeDeleter) {
             while (migrationutil::checkForConflictingDeletions(
-                opCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
+                outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
                 LOG(0) << "Migration paused because range overlaps with a "
                           "range that is scheduled for deletion: collection: "
                        << _nss.ns() << " range: " << redact(range.toString());
 
                 auto status = CollectionShardingRuntime::waitForClean(
-                    opCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+                    outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
 
                 if (!status.isOK()) {
                     _setStateFail(redact(status.reason()));
                     return;
                 }
 
-                opCtx->sleepFor(Milliseconds(1000));
+                outerOpCtx->sleepFor(Milliseconds(1000));
             }
 
             RangeDeletionTask recipientDeletionTask(_migrationId,
@@ -839,13 +866,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                                                     CleanWhenEnum::kNow);
             recipientDeletionTask.setPending(true);
 
-            migrationutil::persistRangeDeletionTaskLocally(opCtx, recipientDeletionTask);
+            migrationutil::persistRangeDeletionTaskLocally(outerOpCtx, recipientDeletionTask);
         } else {
             // Synchronously delete any data which might have been left orphaned in the range
             // being moved, and wait for completion
 
-            auto cleanupCompleteFuture = _notePending(opCtx, range);
-            auto cleanupStatus = cleanupCompleteFuture.getNoThrow(opCtx);
+            auto cleanupCompleteFuture = _notePending(outerOpCtx, range);
+            auto cleanupStatus = cleanupCompleteFuture.getNoThrow(outerOpCtx);
             // Wait for the range deletion to report back. Swallow
             // RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the
             // collection could either never exist or get dropped directly from the shard after the
@@ -859,7 +886,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
 
             // Wait for any other, overlapping queued deletions to drain
             cleanupStatus = CollectionShardingRuntime::waitForClean(
-                opCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+                outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
             if (!cleanupStatus.isOK()) {
                 _setStateFail(redact(cleanupStatus.reason()));
                 return;
@@ -869,6 +896,23 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         timing.done(1);
         migrateThreadHangAtStep1.pauseWhileSet();
     }
+
+    // The conventional usage of retryable writes is to assign statement id's to all of
+    // the writes done as part of the data copying so that _recvChunkStart is
+    // conceptually a retryable write batch. However, we are using an alternate approach to do those
+    // writes under an AlternativeClientRegion because 1) threading the
+    // statement id's through to all the places where they are needed would make this code more
+    // complex, and 2) some of the operations, like creating the collection or building indexes, are
+    // not currently supported in retryable writes.
+    auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+    {
+        stdx::lock_guard<Client> lk(*newClient.get());
+        newClient->setSystemOperationKillable(lk);
+    }
+
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtxPtr = cc().makeOperationContext();
+    auto opCtx = newOpCtxPtr.get();
 
     {
         cloneCollectionIndexesAndOptions(opCtx, _nss, donorCollectionOptionsAndIndexes);

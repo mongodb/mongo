@@ -11,6 +11,8 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
 'use strict';
 
+const disableResumableRangeDeleter = true;
+
 var transitionToX509AllowSSL =
     Object.merge(allowSSL, {transitionToAuth: '', clusterAuthMode: 'x509'});
 var transitionToX509PreferSSL =
@@ -18,15 +20,16 @@ var transitionToX509PreferSSL =
 var x509RequireSSL = Object.merge(requireSSL, {clusterAuthMode: 'x509'});
 
 function testCombos(opt1, opt2, shouldSucceed) {
-    mixedShardTest(opt1, opt2, shouldSucceed);
-    mixedShardTest(opt2, opt1, shouldSucceed);
+    mixedShardTest(opt1, opt2, shouldSucceed, disableResumableRangeDeleter);
+    mixedShardTest(opt2, opt1, shouldSucceed, disableResumableRangeDeleter);
 }
 
 print('=== Testing transitionToAuth/allowSSL - transitionToAuth/preferSSL cluster ===');
 testCombos(transitionToX509AllowSSL, transitionToX509PreferSSL, true);
 
 print('=== Testing transitionToAuth/preferSSL - transitionToAuth/preferSSL cluster ===');
-mixedShardTest(transitionToX509PreferSSL, transitionToX509PreferSSL, true);
+mixedShardTest(
+    transitionToX509PreferSSL, transitionToX509PreferSSL, true, disableResumableRangeDeleter);
 
 print('=== Testing transitionToAuth/preferSSL - x509/requireSSL cluster ===');
 testCombos(transitionToX509PreferSSL, x509RequireSSL, true);

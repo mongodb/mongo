@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/client/connection_string.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -62,6 +63,8 @@ public:
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
                                 const UUID& migrationId,
+                                const LogicalSessionId& lsid,
+                                TxnNumber txnNumber,
                                 const MigrationSessionId& sessionId,
                                 const ConnectionString& fromShardConnectionString,
                                 const ShardId& fromShardId,
@@ -109,6 +112,14 @@ public:
         return *_migrationId;
     }
 
+    const LogicalSessionId& getLsid() const {
+        return _lsid;
+    }
+
+    const TxnNumber getTxnNumber() const {
+        return _txnNumber;
+    }
+
     const ShardId& getFromShardId() const {
         return _fromShardId;
     }
@@ -148,6 +159,8 @@ private:
      *  TODO (SERVER-44787): Make non-optional after 4.4 is released.
      */
     boost::optional<UUID> _migrationId;
+    LogicalSessionId _lsid;
+    TxnNumber _txnNumber;
 
     // The session id of this migration
     MigrationSessionId _sessionId;

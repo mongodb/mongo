@@ -270,6 +270,7 @@ private:
     BSONObj _recipientCloneCounts;
 
     boost::optional<CollectionCriticalSection> _critSec;
+    LogicalSessionId _lsid;
 };
 
 }  // namespace mongo

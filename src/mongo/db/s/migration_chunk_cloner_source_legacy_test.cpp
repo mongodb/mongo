@@ -32,6 +32,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
@@ -101,6 +102,8 @@ protected:
         clockSource->advance(Seconds(1));
 
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
+
+        _lsid = makeLogicalSessionId(operationContext());
     }
 
     void tearDown() override {
@@ -167,6 +170,10 @@ protected:
         return BSON("_id" << value << "X" << value);
     }
 
+protected:
+    LogicalSessionId _lsid;
+    TxnNumber _txnNumber{0};
+
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
@@ -214,7 +221,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
             onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
         });
 
-        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen()));
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
         futureStartClone.default_timed_get();
     }
 
@@ -312,7 +319,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
         kDonorConnStr,
         kRecipientConnStr.getServers()[0]);
 
-    ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen()));
+    ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
     cloner.cancelClone(operationContext());
 }
 
@@ -325,7 +332,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
         kDonorConnStr,
         kRecipientConnStr.getServers()[0]);
 
-    ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen()));
+    ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
     cloner.cancelClone(operationContext());
 }
 
@@ -351,7 +358,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
             });
         });
 
-        auto startCloneStatus = cloner.startClone(operationContext(), UUID::gen());
+        auto startCloneStatus =
+            cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber);
         ASSERT_EQ(ErrorCodes::NetworkTimeout, startCloneStatus.code());
         futureStartClone.default_timed_get();
     }

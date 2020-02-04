@@ -29,8 +29,11 @@ assert.commandWorked(mongos.adminCommand(
 assert.commandWorked(mongos.adminCommand({removeShard: st.shard1.shardName}));
 assert.commandWorked(mongos.adminCommand({removeShard: st.shard1.shardName}));
 
-var shard2 = MongoRunner.runMongod({'shardsvr': ''});
-assert.commandWorked(mongos.adminCommand({addShard: shard2.host, name: st.shard1.shardName}));
+let shard2 = new ReplSetTest({nodes: 2, nodeOptions: {shardsvr: ""}});
+shard2.startSet();
+shard2.initiate();
+
+assert.commandWorked(mongos.adminCommand({addShard: shard2.getURL(), name: st.shard1.shardName}));
 
 jsTest.log('Shard was dropped and re-added with same name...');
 st.printShardingStatus();
@@ -39,8 +42,9 @@ st.printShardingStatus();
 assert.commandWorked(
     mongos.adminCommand({moveChunk: coll + '', find: {_id: 0}, to: st.shard1.shardName}));
 
-assert.eq('world', shard2.getCollection(coll + '').findOne().hello);
+let shard2Conn = shard2.getPrimary();
+assert.eq('world', shard2Conn.getCollection(coll + '').findOne().hello);
 
 st.stop();
-MongoRunner.stopMongod(shard2);
+shard2.stopSet();
 })();

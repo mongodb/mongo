@@ -238,7 +238,9 @@ MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
 }
 
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
-                                                    const UUID& migrationId) {
+                                                    const UUID& migrationId,
+                                                    const LogicalSessionId& lsid,
+                                                    TxnNumber txnNumber) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
@@ -285,6 +287,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
         StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
                                                 _args.getNss(),
                                                 migrationId,
+                                                lsid,
+                                                txnNumber,
                                                 _sessionId,
                                                 _donorConnStr,
                                                 _args.getFromShardId(),
