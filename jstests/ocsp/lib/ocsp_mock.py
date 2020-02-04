@@ -26,14 +26,16 @@ def main():
 
     parser.add_argument('--ocsp_responder_key', type=str, required=True, help="OCSP Responder Keyfile")
 
-    parser.add_argument('--fault', choices=[mock_ocsp_responder.FAULT_REVOKED, mock_ocsp_responder.FAULT_UNKNOWN], type=str, help="Specify a specific fault to test")
+    parser.add_argument('--fault', choices=[mock_ocsp_responder.FAULT_REVOKED, mock_ocsp_responder.FAULT_UNKNOWN, None], default=None, type=str, help="Specify a specific fault to test")
+
+    parser.add_argument('--next_update_seconds', type=int, default=32400, help="Specify how long the OCSP response should be valid for")
 
     args = parser.parse_args()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
     print('Initializing OCSP Responder')
-    app = mock_ocsp_responder.OCSPResponder(args.ca_file, args.ocsp_responder_cert, args.ocsp_responder_key, args.fault)
+    app = mock_ocsp_responder.OCSPResponder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds)
 
     if args.verbose:
         app.serve(args.port, debug=True)

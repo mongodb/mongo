@@ -264,6 +264,12 @@ public:
         boost::optional<std::string> sni,
         const std::string& remoteHost,
         const HostAndPort& hostForLogging) = 0;
+
+    /**
+     * No-op function for SChannel and SecureTransport. Attaches stapled OCSP response to the
+     * SSL_CTX obect.
+     */
+    virtual Status stapleOCSPResponse(SSLContextType context) = 0;
 };
 
 // Access SSL functions through this instance.

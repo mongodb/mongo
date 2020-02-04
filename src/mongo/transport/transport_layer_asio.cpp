@@ -932,6 +932,13 @@ Status TransportLayerASIO::setup() {
         if (!status.isOK()) {
             return status;
         }
+
+        auto resp = getSSLManager()->stapleOCSPResponse(_ingressSSLContext->native_handle());
+        if (!resp.isOK()) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream()
+                              << "Can not staple OCSP Response. Reason: " << resp.reason());
+        }
     }
 
     if (_listenerOptions.isEgress() && getSSLManager()) {

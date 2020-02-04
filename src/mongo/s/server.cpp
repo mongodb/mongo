@@ -538,6 +538,12 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     initWireSpec();
 
+    // Set up the periodic runner for background job execution
+    {
+        auto runner = makePeriodicRunner(serviceContext);
+        serviceContext->setPeriodicRunner(std::move(runner));
+    }
+
     OCSPManager::get()->startThreadPool();
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>(serviceContext));
@@ -645,12 +651,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     cacheInvalidatorThread.go();
 
     PeriodicTask::startRunningPeriodicTasks();
-
-    // Set up the periodic runner for background job execution
-    {
-        auto runner = makePeriodicRunner(serviceContext);
-        serviceContext->setPeriodicRunner(std::move(runner));
-    }
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));

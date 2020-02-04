@@ -279,6 +279,7 @@ public:
                                                         const std::string& remoteHost,
                                                         const HostAndPort& hostForLogging) final;
 
+    Status stapleOCSPResponse(SCHANNEL_CRED* cred) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1871,6 +1872,10 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
         default:
             return TLSVersion::kUnknown;
     }
+}
+
+Status SSLManagerWindows::stapleOCSPResponse(SCHANNEL_CRED* cred) {
+    return Status::OK();
 }
 
 Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(

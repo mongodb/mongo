@@ -10,7 +10,11 @@ if (determineSSLProvider() != "openssl") {
     return;
 }
 
-let mock_ocsp = new MockOCSPServer();
+if (!supportsStapling()) {
+    return;
+}
+
+let mock_ocsp = new MockOCSPServer("", 20);
 mock_ocsp.start();
 
 const ocsp_options = {
@@ -19,22 +23,33 @@ const ocsp_options = {
     sslCAFile: OCSP_CA_CERT,
     sslAllowInvalidHostnames: "",
     setParameter: {
-        "failpoint.disableStapling": "{'mode':'alwaysOn'}",
         "ocspEnabled": "true",
     },
 };
 
 let conn = null;
+
 assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);
 });
 
 mock_ocsp.stop();
-
-// Test Scenario when Mock OCSP Server replies stating
-// that the OCSP status of the client cert is revoked.
-mock_ocsp = new MockOCSPServer(FAULT_REVOKED);
+mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1000);
 mock_ocsp.start();
+
+// We're sleeping here to give the server enough time to fetch a new OCSP response
+// saying that it's revoked.
+sleep(15000);
+
+assert.throws(() => {
+    new Mongo(conn.host);
+});
+
+mock_ocsp.stop();
+mock_ocsp = new MockOCSPServer("", 1000);
+mock_ocsp.start();
+
+// This ensures that the client was viewing a stapled response.
 assert.throws(() => {
     new Mongo(conn.host);
 });

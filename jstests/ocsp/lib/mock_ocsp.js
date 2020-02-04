@@ -16,8 +16,9 @@ class MockOCSPServer {
      * Create a new OCSP Server.
      *
      * @param {string} fault_type
+     * @param {number} next_update_secs
      */
-    constructor(fault_type) {
+    constructor(fault_type, next_update_secs) {
         this.python = "python3";
         this.fault_type = fault_type;
 
@@ -32,6 +33,7 @@ class MockOCSPServer {
         // The port must be hard coded to match the port of the
         // responder in the certificates.
         this.port = 8100;
+        this.next_update_secs = next_update_secs;
     }
 
     start() {
@@ -48,6 +50,10 @@ class MockOCSPServer {
 
         if (this.fault_type) {
             args.push("--fault=" + this.fault_type);
+        }
+
+        if (this.next_update_secs) {
+            args.push("--next_update_seconds=" + this.next_update_secs);
         }
 
         this.pid = _startMongoProgram({args: args});

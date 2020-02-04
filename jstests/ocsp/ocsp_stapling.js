@@ -72,10 +72,9 @@ assert.throws(() => {
 
 MongoRunner.stopMongod(conn);
 
-// The mongoRunner spawns a shell to validate the collections which races
-// with the shutdown logic of the mock_ocsp responder on some platforms.
-// We need this sleep to make sure that the threads don't interfere with
-// each other.
+// The mongoRunner spawns a new Mongo Object to validate the collections which races
+// with the shutdown logic of the mock_ocsp responder on some platforms. We need this
+// sleep to make sure that the threads don't interfere with each other.
 sleep(1000);
 mock_ocsp.stop();
 }());

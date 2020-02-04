@@ -64,6 +64,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/strong_weak_finish_line.h"
@@ -348,6 +349,49 @@ UniqueVerifiedChainPolyfill SSLgetVerifiedChain(SSL* s) {
     return UniqueVerifiedChainPolyfill(SSL_get0_verified_chain(s));
 }
 
+/*
+ * Converts time from OpenSSL return value to Date_t representing the time on
+ * the ASN1_TIME object.
+ */
+Date_t convertASN1ToMillis(ASN1_TIME* asn1time) {
+    static const int DATE_LEN = 128;
+
+    BIO* outBIO = BIO_new(BIO_s_mem());
+    int timeError = ASN1_TIME_print(outBIO, asn1time);
+    ON_BLOCK_EXIT([&] { BIO_free(outBIO); });
+
+    if (timeError <= 0) {
+        LOGV2_ERROR(23241, "ASN1_TIME_print failed or wrote no data.");
+        return Date_t();
+    }
+
+    char dateChar[DATE_LEN];
+    timeError = BIO_gets(outBIO, dateChar, DATE_LEN);
+    if (timeError <= 0) {
+        LOGV2_ERROR(23242, "BIO_gets call failed to transfer contents to buf");
+        return Date_t();
+    }
+
+    // Ensure that day format is two digits for parsing.
+    // Jun  8 17:00:03 2014 becomes Jun 08 17:00:03 2014.
+    if (dateChar[4] == ' ') {
+        dateChar[4] = '0';
+    }
+
+    std::istringstream inStringStream((std::string(dateChar, 20)));
+    boost::posix_time::time_input_facet* inputFacet =
+        new boost::posix_time::time_input_facet("%b %d %H:%M:%S %Y");
+
+    inStringStream.imbue(std::locale(std::cout.getloc(), inputFacet));
+    boost::posix_time::ptime posixTime;
+    inStringStream >> posixTime;
+
+    const boost::gregorian::date epoch = boost::gregorian::date(1970, boost::gregorian::Jan, 1);
+
+    return Date_t::fromMillisSinceEpoch(
+        (posixTime - boost::posix_time::ptime(epoch)).total_milliseconds());
+}
+
 class SSLConnectionOpenSSL : public SSLConnectionInterface {
 public:
     SSL* ssl;
@@ -365,7 +409,6 @@ public:
 using UniqueSSLContext =
     std::unique_ptr<SSL_CTX, OpenSSLDeleter<decltype(::SSL_CTX_free), ::SSL_CTX_free>>;
 static const int BUFFER_SIZE = 8 * 1024;
-static const int DATE_LEN = 128;
 
 using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
 
@@ -394,6 +437,12 @@ public:
                                                         const std::string& remoteHost,
                                                         const HostAndPort& hostForLogging) final;
 
+    /**
+     * Sets the OCSP Response to be stapled to the TLS Connection. Sets the _ocspStaplingAnchor
+     * object in the class.
+     */
+    Status stapleOCSPResponse(SSL_CTX* context) final;
+
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
     }
@@ -416,6 +465,9 @@ private:
     bool _allowInvalidHostnames;
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
+
+    Mutex _staplingMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_mutex");
+    PeriodicRunner::JobAnchor _ocspStaplingAnchor;
 
     /** Password caching helper class.
      * Objects of this type will remember the config provided password they had access to at
@@ -485,12 +537,6 @@ private:
     bool _initSynchronousSSLContext(UniqueSSLContext* context,
                                     const SSLParams& params,
                                     ConnectionDirection direction);
-
-    /*
-     * Converts time from OpenSSL return value to unsigned long long
-     * representing the milliseconds since the epoch.
-     */
-    unsigned long long _convertASN1ToMillis(ASN1_TIME* t);
 
     /*
      * Parse and store x509 subject name from the PEM keyfile.
@@ -1041,12 +1087,12 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
 
 /**
  * This function iterates over the basic response object from the OCSP response object
- * and returns the set of Certificate IDs that are there in the response.
+ * and returns a set of Certificate IDs that are there in the response and a date object
+ * which represents the time when the Response needs to be refreshed.
  */
-StatusWith<OCSPCertIDSet> iterateResponse(OCSP_BASICRESP* basicResp,
-                                          STACK_OF(X509) * intermediateCerts) {
-    // TODO SERVER-42938 the updated time will be implemented in the cache
-    ASN1_GENERALIZEDTIME* earliestNextUpdate = nullptr;
+StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* basicResp,
+                                                             STACK_OF(X509) * intermediateCerts) {
+    Date_t earliestNextUpdate = Date_t::max();
 
     OCSPCertIDSet certIdsInResponse;
 
@@ -1063,7 +1109,7 @@ StatusWith<OCSPCertIDSet> iterateResponse(OCSP_BASICRESP* basicResp,
             OCSP_CERTID_dup(const_cast<OCSP_CERTID*>(OCSP_SINGLERESP_get0_id(singleResp))));
 
         int reason;
-        // TODO SERVER-42938 the updated time will be implemented in the cache
+        // TODO SERVER-45798 the updated time will be implemented in the cache
         ASN1_GENERALIZEDTIME *revtime, *thisupd, *nextupd;
 
         auto status = OCSP_single_get0_status(singleResp, &reason, &revtime, &thisupd, &nextupd);
@@ -1077,23 +1123,24 @@ StatusWith<OCSPCertIDSet> iterateResponse(OCSP_BASICRESP* basicResp,
                                  << "Unexpected OCSP Certificate Status. Reason: " << status);
         }
 
-        if (earliestNextUpdate) {
-            earliestNextUpdate = std::min(earliestNextUpdate, nextupd);
-        } else {
-            earliestNextUpdate = nextupd;
-        }
+        Date_t nextUpdateDate(convertASN1ToMillis(static_cast<ASN1_TIME*>(nextupd)));
+        earliestNextUpdate = std::min(earliestNextUpdate, nextUpdateDate);
     }
 
-    return std::move(certIdsInResponse);
+    if (earliestNextUpdate < Date_t::now()) {
+        return getSSLFailure("OCSP Basic Response is invalid: Response is expired.");
+    }
+
+    return std::make_pair(std::move(certIdsInResponse), earliestNextUpdate);
 }
 
 /**
- * certIdsForValidation are the certificateIds that the caller wants the function
- * to check off saying it has validated that certificate.
+ * This function returns a pair of a CertID set and a Date_t object. The CertID set contains
+ * the IDs of the certificates that the OCSP Response contains. The Date_t object is the
+ * earliest expiration date on the OCSPResponse.
  */
-StatusWith<OCSPCertIDSet> validateResponse(SSL_CTX* context,
-                                           OCSP_RESPONSE* response,
-                                           STACK_OF(X509) * intermediateCerts) {
+StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
+    SSL_CTX* context, OCSP_RESPONSE* response, STACK_OF(X509) * intermediateCerts) {
     // Read the overall status of the OCSP response
     int responseStatus = OCSP_response_status(response);
     switch (responseStatus) {
@@ -1177,36 +1224,57 @@ StatusWith<bool> verifyStapledResponse(SSL* conn, X509* peerCert, OCSP_RESPONSE*
         return swCertId.getStatus();
     }
 
-    auto swCertIDSet = validateResponse(SSL_get_SSL_CTX(conn), response, intermediateCerts.get());
+    auto swCertIDSetAndDuration =
+        parseAndValidateOCSPResponse(SSL_get_SSL_CTX(conn), response, intermediateCerts.get());
 
-    if (swCertIDSet.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
-        return swCertIDSet.getStatus();
+    if (swCertIDSetAndDuration.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
+        return swCertIDSetAndDuration.getStatus();
     }
 
-    if (swCertIDSet.isOK() &&
-        swCertIDSet.getValue().find(swCertId.getValue()) != swCertIDSet.getValue().end()) {
+    if (swCertIDSetAndDuration.isOK() &&
+        swCertIDSetAndDuration.getValue().first.find(swCertId.getValue()) !=
+            swCertIDSetAndDuration.getValue().first.end()) {
         return true;
     }
 
     return false;
 }
 
-Future<std::pair<Status, UniqueOCSPResponse>> dispatchRequests(
-    SSL_CTX* context,
-    UniqueVerifiedChainPolyfill intermediateCerts,
-    OCSPValidationContext& ocspContext) {
+constexpr Milliseconds kOCSPUnknownStatusRefreshRate = Minutes(5);
+
+struct OCSPFetchResponse {
+    OCSPFetchResponse(Status statusOfResponse,
+                      UniqueOCSPResponse response,
+                      boost::optional<Date_t> refreshTime)
+        : statusOfResponse(statusOfResponse),
+          response(std::move(response)),
+          refreshTime(refreshTime) {}
+
+    Status statusOfResponse;
+    UniqueOCSPResponse response;
+    boost::optional<Date_t> refreshTime;
+
+    Milliseconds nextUpdateDuration() const {
+        return refreshTime ? (refreshTime.get() - Date_t::now()) / 2
+                           : kOCSPUnknownStatusRefreshRate;
+    }
+};
+
+Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
+                                           std::shared_ptr<STACK_OF(X509)> intermediateCerts,
+                                           OCSPValidationContext& ocspContext) {
     auto& [ocspRequestMap, _, leafResponders] = ocspContext;
 
     struct OCSPCompletionState {
         OCSPCompletionState(int numRequests_,
-                            Promise<std::pair<Status, UniqueOCSPResponse>> promise_,
-                            UniqueVerifiedChainPolyfill intermediateCerts_)
+                            Promise<OCSPFetchResponse> promise_,
+                            std::shared_ptr<STACK_OF(X509)> intermediateCerts_)
             : finishLine(numRequests_),
               promise(std::move(promise_)),
               intermediateCerts(std::move(intermediateCerts_)) {}
 
         StrongWeakFinishLine finishLine;
-        Promise<std::pair<Status, UniqueOCSPResponse>> promise;
+        Promise<OCSPFetchResponse> promise;
         std::shared_ptr<STACK_OF(X509)> intermediateCerts;
     };
 
@@ -1216,9 +1284,9 @@ Future<std::pair<Status, UniqueOCSPResponse>> dispatchRequests(
         auto& ocspRequestAndIDs = ocspRequestMap[host];
         Future<UniqueOCSPResponse> futureResponse = retrieveOCSPResponse(host, ocspRequestAndIDs);
         futureResponses.push_back(std::move(futureResponse));
-    }
+    };
 
-    auto pf = makePromiseFuture<std::pair<Status, UniqueOCSPResponse>>();
+    auto pf = makePromiseFuture<OCSPFetchResponse>();
     auto state = std::make_shared<OCSPCompletionState>(
         futureResponses.size(), std::move(pf.promise), std::move(intermediateCerts));
 
@@ -1235,14 +1303,25 @@ Future<std::pair<Status, UniqueOCSPResponse>> dispatchRequests(
                     return;
                 }
 
-                auto swCertIDSet = validateResponse(
+                auto swCertIDSetAndDuration = parseAndValidateOCSPResponse(
                     context, swResponse.getValue().get(), state->intermediateCerts.get());
 
-                if (swCertIDSet.isOK() ||
-                    swCertIDSet.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
+                if (swCertIDSetAndDuration.isOK() ||
+                    swCertIDSetAndDuration.getStatus() ==
+                        ErrorCodes::OCSPCertificateStatusRevoked) {
+
+                    // We want to send the nextUpdate time down for the cache, so if there is a
+                    // duration value passed from parseAndValidateOCSPResponse, we send that down.
+                    // If not, we pass down a bogus response, and let the caller deal with it down
+                    // there.
+                    boost::optional<Date_t> nextUpdate = swCertIDSetAndDuration.isOK()
+                        ? boost::optional<Date_t>(swCertIDSetAndDuration.getValue().second)
+                        : boost::none;
+
                     if (state->finishLine.arriveStrongly()) {
-                        state->promise.emplaceValue(swCertIDSet.getStatus(),
-                                                    std::move(swResponse.getValue()));
+                        state->promise.emplaceValue(swCertIDSetAndDuration.getStatus(),
+                                                    std::move(swResponse.getValue()),
+                                                    nextUpdate);
                         return;
                     }
                 } else {
@@ -1283,14 +1362,13 @@ Future<void> verifyPeerCertWithOCSP(SSL* conn, X509* peerCert) {
     auto ocspContext = std::move(swOCSPContext.getValue());
 
     return dispatchRequests(context, std::move(intermediateCerts), ocspContext)
-        .onCompletion(
-            [context](StatusWith<std::pair<Status, UniqueOCSPResponse>> swResponse) -> Status {
-                if (!swResponse.isOK()) {
-                    return Status::OK();
-                }
+        .onCompletion([context](StatusWith<OCSPFetchResponse> swResponse) -> Status {
+            if (!swResponse.isOK()) {
+                return Status::OK();
+            }
 
-                return swResponse.getValue().first;
-            });
+            return swResponse.getValue().statusOfResponse;
+        });
 }
 
 // The definition of the callbacks
@@ -1380,18 +1458,15 @@ Future<void> ocspClientVerification(SSL* ssl) {
 }
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
-Status stapleOCSPResponse(SSL_CTX* context) {
-    if (MONGO_unlikely(disableStapling.shouldFail())) {
+Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
+    if (MONGO_unlikely(disableStapling.shouldFail()) || !sslOCSPEnabled) {
         return Status::OK();
     }
 
     X509* cert = SSL_CTX_get0_certificate(context);
     if (!cert) {
-        // Because OpenSSL 1.0.1 doesn't allow accessing the internal cert object of a
-        // SSL context, so this shouldn't fail the program.
-        LOGV2_WARNING(23231,
-                      "Could not staple because could not get certificate from SSL Context.");
-        return Status::OK();
+        return getSSLFailure(
+            "Could not staple because could not get certificate from SSL Context.");
     }
 
     UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(cert));
@@ -1400,37 +1475,76 @@ Status stapleOCSPResponse(SSL_CTX* context) {
         return Status::OK();
     }
 
-    STACK_OF(X509) * intermediateCertsPtr;
+    auto fetchAndStaple = [context, cert]() -> Future<Milliseconds> {
+        STACK_OF(X509) * intermediateCertsPtr;
 
-    if (SSL_CTX_get0_chain_certs(context, &intermediateCertsPtr) == 0) {
-        return getSSLFailure("Could not get chain for SSL Context.");
-    }
+        if (SSL_CTX_get0_chain_certs(context, &intermediateCertsPtr) == 0) {
+            return getSSLFailure("Could not get chain for SSL Context.");
+        }
 
-    UniqueVerifiedChainPolyfill intermediateCerts(intermediateCertsPtr);
+        UniqueVerifiedChainPolyfill intermediateCerts(intermediateCertsPtr);
 
-    auto swOCSPContext = extractOcspUris(context, cert, intermediateCerts.get());
-    if (!swOCSPContext.isOK()) {
-        LOGV2_WARNING(23232, "Could not staple OCSP response to outgoing certificate.");
-        return swOCSPContext.getStatus();
-    }
+        auto swOCSPContext = extractOcspUris(context, cert, intermediateCerts.get());
+        if (!swOCSPContext.isOK()) {
+            LOGV2_WARNING(23232, "Could not staple OCSP response to outgoing certificate.");
+            return swOCSPContext.getStatus();
+        }
 
-    auto ocspContext = std::move(swOCSPContext.getValue());
+        auto ocspContext = std::move(swOCSPContext.getValue());
 
-    dispatchRequests(context, std::move(intermediateCerts), ocspContext)
-        .getAsync([context](StatusWith<std::pair<Status, UniqueOCSPResponse>> swResponse) {
-            if (!swResponse.isOK()) {
-                LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
+        return dispatchRequests(context, std::move(intermediateCerts), ocspContext)
+            .onCompletion([](StatusWith<OCSPFetchResponse> swResponse) -> Milliseconds {
+                if (!swResponse.isOK()) {
+                    LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
+                    return kOCSPUnknownStatusRefreshRate;
+                }
+
+                stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
+                sharedResponseForServer =
+                    std::shared_ptr<OCSP_RESPONSE>(std::move(swResponse.getValue().response));
+
+                return swResponse.getValue().nextUpdateDuration();
+            });
+    };
+
+    fetchAndStaple().getAsync(
+        [this, fetchAndStaple](StatusWith<Milliseconds> swDurationInitial) mutable {
+            stdx::lock_guard<Latch> lock(this->_staplingMutex);
+
+            if (this->_ocspStaplingAnchor) {
                 return;
             }
 
-            stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
-            sharedResponseForServer =
-                std::shared_ptr<OCSP_RESPONSE>(std::move(swResponse.getValue().second));
+            Milliseconds duration = swDurationInitial.isOK() ? swDurationInitial.getValue()
+                                                             : kOCSPUnknownStatusRefreshRate;
+
+            this->_ocspStaplingAnchor =
+                getGlobalServiceContext()->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob(
+                    "OCSP Fetch and Staple",
+                    [this, fetchAndStaple](Client* client) {
+                        fetchAndStaple().getAsync([this](StatusWith<Milliseconds> swDuration) {
+                            stdx::lock_guard<Latch> lock(this->_staplingMutex);
+
+                            if (!swDuration.isOK()) {
+                                this->_ocspStaplingAnchor.setPeriod(kOCSPUnknownStatusRefreshRate);
+                                return;
+                            }
+
+                            this->_ocspStaplingAnchor.setPeriod(swDuration.getValue());
+                        });
+                    },
+                    duration));
+
+            this->_ocspStaplingAnchor.start();
         });
 
     SSL_CTX_set_tlsext_status_cb(context, ocspServerCallback);
     SSL_CTX_set_tlsext_status_arg(context, &sharedResponseForServer);
 
+    return Status::OK();
+}
+#else
+Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
     return Status::OK();
 }
 #endif
@@ -1522,16 +1636,6 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     }
 
     if (sslOCSPEnabled) {
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L
-        if (direction == SSLManagerInterface::ConnectionDirection::kIncoming) {
-            auto resp = stapleOCSPResponse(context);
-            if (!resp.isOK()) {
-                return Status(ErrorCodes::InvalidSSLConfiguration,
-                              "Can not staple OCSP Response. Reason: " + resp.reason());
-            }
-        }
-#endif
-
         if (direction == SSLManagerInterface::ConnectionDirection::kOutgoing) {
             // This should only induce an extra network call if there is no stapled response
             // and there is no CRL.
@@ -1606,42 +1710,6 @@ bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
     return true;
 }
 
-unsigned long long SSLManagerOpenSSL::_convertASN1ToMillis(ASN1_TIME* asn1time) {
-    BIO* outBIO = BIO_new(BIO_s_mem());
-    int timeError = ASN1_TIME_print(outBIO, asn1time);
-    ON_BLOCK_EXIT([&] { BIO_free(outBIO); });
-
-    if (timeError <= 0) {
-        LOGV2_ERROR(23241, "ASN1_TIME_print failed or wrote no data.");
-        return 0;
-    }
-
-    char dateChar[DATE_LEN];
-    timeError = BIO_gets(outBIO, dateChar, DATE_LEN);
-    if (timeError <= 0) {
-        LOGV2_ERROR(23242, "BIO_gets call failed to transfer contents to buf");
-        return 0;
-    }
-
-    // Ensure that day format is two digits for parsing.
-    // Jun  8 17:00:03 2014 becomes Jun 08 17:00:03 2014.
-    if (dateChar[4] == ' ') {
-        dateChar[4] = '0';
-    }
-
-    std::istringstream inStringStream((std::string(dateChar, 20)));
-    boost::posix_time::time_input_facet* inputFacet =
-        new boost::posix_time::time_input_facet("%b %d %H:%M:%S %Y");
-
-    inStringStream.imbue(std::locale(std::cout.getloc(), inputFacet));
-    boost::posix_time::ptime posixTime;
-    inStringStream >> posixTime;
-
-    const boost::gregorian::date epoch = boost::gregorian::date(1970, boost::gregorian::Jan, 1);
-
-    return (posixTime - boost::posix_time::ptime(epoch)).total_milliseconds();
-}
-
 bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
                                                      PasswordFetcher* keyPassword,
                                                      SSLX509Name* subjectName,
@@ -1678,24 +1746,24 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
 
     *subjectName = getCertificateSubjectX509Name(x509);
     if (serverCertificateExpirationDate != nullptr) {
-        unsigned long long notBeforeMillis = _convertASN1ToMillis(X509_get_notBefore(x509));
-        if (notBeforeMillis == 0) {
-            LOGV2_ERROR(23246, "date conversion failed");
+        auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509));
+        if (notBeforeMillis == Date_t()) {
+            error() << "date conversion failed";
             return false;
         }
 
-        unsigned long long notAfterMillis = _convertASN1ToMillis(X509_get_notAfter(x509));
-        if (notAfterMillis == 0) {
-            LOGV2_ERROR(23247, "date conversion failed");
+        auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509));
+        if (notAfterMillis == Date_t()) {
+            error() << "date conversion failed";
             return false;
         }
 
-        if ((notBeforeMillis > curTimeMillis64()) || (curTimeMillis64() > notAfterMillis)) {
-            LOGV2_FATAL(23265, "The provided SSL certificate is expired or not yet valid.");
+        if ((notBeforeMillis > Date_t::now()) || (Date_t::now() > notAfterMillis)) {
+            severe() << "The provided SSL certificate is expired or not yet valid.";
             fassertFailedNoTrace(28652);
         }
 
-        *serverCertificateExpirationDate = Date_t::fromMillisSinceEpoch(notAfterMillis);
+        *serverCertificateExpirationDate = notAfterMillis;
     }
 
     return true;

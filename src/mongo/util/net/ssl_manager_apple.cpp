@@ -1203,6 +1203,8 @@ public:
                                                         const std::string& remoteHost,
                                                         const HostAndPort& hostForLogging) final;
 
+    Status stapleOCSPResponse(asio::ssl::apple::Context* context) final;
+
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
     }
@@ -1420,6 +1422,9 @@ StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
     }
 }
 
+Status SSLManagerApple::stapleOCSPResponse(asio::ssl::apple::Context* context) {
+    return Status::OK();
+}
 
 Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     ::SSLContextRef ssl,

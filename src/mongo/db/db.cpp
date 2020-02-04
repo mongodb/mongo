@@ -309,11 +309,16 @@ ExitCode _initAndListen(int listenPort) {
     VersionInfoInterface::instance().logTargetMinOS();
 #endif
 
-    OCSPManager::get()->startThreadPool();
-
     logProcessDetails();
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
+
+    // Set up the periodic runner for background job execution. This is required to be running
+    // before both the storage engine or the transport layer are initialized.
+    auto runner = makePeriodicRunner(serviceContext);
+    serviceContext->setPeriodicRunner(std::move(runner));
+
+    OCSPManager::get()->startThreadPool();
 
     if (!storageGlobalParams.repair) {
         auto tl =
@@ -326,10 +331,6 @@ ExitCode _initAndListen(int listenPort) {
         serviceContext->setTransportLayer(std::move(tl));
     }
 
-    // Set up the periodic runner for background job execution. This is required to be running
-    // before the storage engine is initialized.
-    auto runner = makePeriodicRunner(serviceContext);
-    serviceContext->setPeriodicRunner(std::move(runner));
     FlowControl::set(serviceContext,
                      std::make_unique<FlowControl>(
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
