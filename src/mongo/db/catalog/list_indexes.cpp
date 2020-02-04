@@ -68,6 +68,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      Collection* collection,
                                      const NamespaceString& nss,
                                      bool includeBuildUUIDs) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
     auto durableCatalog = DurableCatalog::get(opCtx);
 
@@ -86,14 +87,20 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
         auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
             if (includeBuildUUIDs &&
                 !durableCatalog->isIndexReady(opCtx, collection->getCatalogId(), indexNames[i])) {
+                // The durable catalog will not have a build UUID for the given index name if it was
+                // not being built with two-phase.
+                const auto durableBuildUUID = DurableCatalog::get(opCtx)->getIndexBuildUUID(
+                    opCtx, collection->getCatalogId(), indexNames[i]);
+                if (!durableBuildUUID) {
+                    return durableCatalog->getIndexSpec(
+                        opCtx, collection->getCatalogId(), indexNames[i]);
+                }
+
                 BSONObjBuilder builder;
                 builder.append(
                     "spec"_sd,
                     durableCatalog->getIndexSpec(opCtx, collection->getCatalogId(), indexNames[i]));
-
-                // TODO(SERVER-37980): Replace with index build UUID.
-                auto indexBuildUUID = UUID::gen();
-                indexBuildUUID.appendToBuilder(&builder, "buildUUID"_sd);
+                durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
                 return builder.obj();
             }
             return durableCatalog->getIndexSpec(opCtx, collection->getCatalogId(), indexNames[i]);

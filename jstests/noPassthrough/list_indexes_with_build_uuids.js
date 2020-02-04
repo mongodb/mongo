@@ -87,8 +87,13 @@ jsTest.log(indexes);
 
 assert.eq(indexes[0].name, "_id_");
 assert.eq(indexes[1].name, "first");
-assert.eq(indexes[2].spec.name, "second");
-assert(indexes[2].hasOwnProperty("buildUUID"));
+
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(secondary)) {
+    assert.eq(indexes[2].spec.name, "second");
+    assert(indexes[2].hasOwnProperty("buildUUID"));
+} else {
+    assert.eq(indexes[2].name, "second");
+}
 
 // Allow the replica set to finish the index build.
 IndexBuildTest.resumeIndexBuilds(secondary);
