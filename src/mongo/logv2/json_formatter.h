@@ -32,15 +32,19 @@
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
 
+#include "mongo/logv2/constants.h"
+
 namespace mongo::logv2 {
 
 class JSONFormatter {
 public:
-    static bool binary() {
-        return false;
-    };
+    JSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr)
+        : _maxAttributeSizeKB(maxAttributeSizeKB) {}
 
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
+
+private:
+    const AtomicWord<int32_t>* _maxAttributeSizeKB;
 };
 
 }  // namespace mongo::logv2

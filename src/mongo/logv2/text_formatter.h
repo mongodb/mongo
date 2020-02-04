@@ -35,9 +35,8 @@ namespace mongo::logv2 {
 
 class TextFormatter : protected PlainFormatter {
 public:
-    static bool binary() {
-        return false;
-    };
+    TextFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr)
+        : PlainFormatter(maxAttributeSizeKB) {}
 
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 };

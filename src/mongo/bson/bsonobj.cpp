@@ -144,72 +144,91 @@ BSONObj BSONObj::getOwned(const BSONObj& obj) {
 }
 
 template <typename Generator>
-void BSONObj::_jsonStringGenerator(const Generator& g,
-                                   int pretty,
-                                   bool isArray,
-                                   fmt::memory_buffer& buffer) const {
+BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
+                                      int pretty,
+                                      bool isArray,
+                                      fmt::memory_buffer& buffer,
+                                      size_t writeLimit) const {
     if (isEmpty()) {
         fmt::format_to(buffer, "{}", isArray ? "[]" : "{}");
-        return;
+        return BSONObj();
     }
     buffer.push_back(isArray ? '[' : '{');
 
     BSONObjIterator i(*this);
     BSONElement e = i.next();
-    if (!e.eoo())
+    BSONObj truncation;
+    if (!e.eoo()) {
+        bool writeSeparator = false;
         while (1) {
-            e.jsonStringGenerator(g, !isArray, pretty, buffer);
+            truncation =
+                e.jsonStringGenerator(g, writeSeparator, !isArray, pretty, buffer, writeLimit);
             e = i.next();
-            if (e.eoo()) {
+            if (!truncation.isEmpty() || e.eoo()) {
                 g.writePadding(buffer);
                 break;
             }
-            buffer.push_back(',');
+            writeSeparator = true;
             if (pretty) {
                 fmt::format_to(buffer, "{: <{}}", '\n', pretty * 2);
             }
         }
+    }
 
     buffer.push_back(isArray ? ']' : '}');
+    return truncation;
 }
 
-void BSONObj::jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
-                                  int pretty,
-                                  bool isArray,
-                                  fmt::memory_buffer& buffer) const {
-    _jsonStringGenerator(generator, pretty, isArray, buffer);
+BSONObj BSONObj::jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
+                                     int pretty,
+                                     bool isArray,
+                                     fmt::memory_buffer& buffer,
+                                     size_t writeLimit) const {
+    return _jsonStringGenerator(generator, pretty, isArray, buffer, writeLimit);
 }
-void BSONObj::jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
-                                  int pretty,
-                                  bool isArray,
-                                  fmt::memory_buffer& buffer) const {
-    _jsonStringGenerator(generator, pretty, isArray, buffer);
+BSONObj BSONObj::jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                     int pretty,
+                                     bool isArray,
+                                     fmt::memory_buffer& buffer,
+                                     size_t writeLimit) const {
+    return _jsonStringGenerator(generator, pretty, isArray, buffer, writeLimit);
 }
-void BSONObj::jsonStringGenerator(LegacyStrictGenerator const& generator,
-                                  int pretty,
-                                  bool isArray,
-                                  fmt::memory_buffer& buffer) const {
-    _jsonStringGenerator(generator, pretty, isArray, buffer);
+BSONObj BSONObj::jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                     int pretty,
+                                     bool isArray,
+                                     fmt::memory_buffer& buffer,
+                                     size_t writeLimit) const {
+    return _jsonStringGenerator(generator, pretty, isArray, buffer, writeLimit);
 }
 
-std::string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) const {
+std::string BSONObj::jsonString(JsonStringFormat format,
+                                int pretty,
+                                bool isArray,
+                                size_t writeLimit,
+                                BSONObj* outTruncationResult) const {
     fmt::memory_buffer buffer;
-    jsonStringBuffer(format, pretty, isArray, buffer);
+    BSONObj truncation = jsonStringBuffer(format, pretty, isArray, buffer);
+    if (outTruncationResult) {
+        *outTruncationResult = truncation;
+    }
     return fmt::to_string(buffer);
 }
 
-void BSONObj::jsonStringBuffer(JsonStringFormat format,
-                               int pretty,
-                               bool isArray,
-                               fmt::memory_buffer& buffer) const {
-    auto withGenerator = [&](auto&& gen) { jsonStringGenerator(gen, pretty, isArray, buffer); };
+BSONObj BSONObj::jsonStringBuffer(JsonStringFormat format,
+                                  int pretty,
+                                  bool isArray,
+                                  fmt::memory_buffer& buffer,
+                                  size_t writeLimit) const {
+    auto withGenerator = [&](auto&& gen) {
+        return jsonStringGenerator(gen, pretty, isArray, buffer, writeLimit);
+    };
 
     if (format == ExtendedCanonicalV2_0_0) {
-        withGenerator(ExtendedCanonicalV200Generator());
+        return withGenerator(ExtendedCanonicalV200Generator());
     } else if (format == ExtendedRelaxedV2_0_0) {
-        withGenerator(ExtendedRelaxedV200Generator());
+        return withGenerator(ExtendedRelaxedV200Generator());
     } else if (format == LegacyStrict) {
-        withGenerator(LegacyStrictGenerator());
+        return withGenerator(LegacyStrictGenerator());
     } else {
         MONGO_UNREACHABLE;
     }

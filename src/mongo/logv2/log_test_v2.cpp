@@ -1127,6 +1127,101 @@ TEST_F(LogTestV2, Unicode) {
     }
 }
 
+TEST_F(LogTestV2, JsonTruncation) {
+    using namespace constants;
+
+    std::vector<std::string> lines;
+    auto sink = LogCaptureBackend::create(lines);
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
+    sink->set_formatter(JSONFormatter());
+    attach(sink);
+
+    std::size_t maxAttributeOutputSize = constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+
+    BSONObjBuilder builder;
+    BSONObjBuilder subobj = builder.subobjStart("sub"_sd);
+    subobj.append("small1", 1);
+    subobj.append("small2", "small string");
+    subobj.append("large", std::string(maxAttributeOutputSize * 2, 'a'));
+    subobj.append("small3", "small string after large object");
+    subobj.done();
+
+    LOGV2(20085, "{name}{attr2}", "name"_attr = builder.done(), "attr2"_attr = true);
+    auto validateTruncation = [&](const BSONObj& obj) {
+        // Check that all fields up until the large one is written
+        BSONObj sub = obj.getField(constants::kAttributesFieldName)
+                          .Obj()
+                          .getField("name"_sd)
+                          .Obj()
+                          .getField("sub"_sd)
+                          .Obj();
+        ASSERT(sub.hasField("small1"_sd));
+        ASSERT(sub.hasField("small2"_sd));
+        ASSERT(!sub.hasField("large"_sd));
+        ASSERT(!sub.hasField("small3"_sd));
+
+        // The truncated field should we witten in the truncated and size sub object
+        BSONObj truncated = obj.getField(constants::kTruncatedFieldName).Obj();
+        BSONObj truncatedInfo =
+            truncated.getField("name"_sd).Obj().getField("sub"_sd).Obj().getField("large"_sd).Obj();
+        ASSERT_EQUALS(truncatedInfo.getField("type"_sd).String(), typeName(BSONType::String));
+        ASSERT(truncatedInfo.getField("size"_sd).isNumber());
+
+        ASSERT_EQUALS(
+            obj.getField(constants::kTruncatedSizeFieldName).Obj().getField("name"_sd).Int(),
+            builder.done().objsize());
+
+        // Attributes coming after the truncated one should be written
+        ASSERT(obj.getField(constants::kAttributesFieldName).Obj().getField("attr2").Bool());
+    };
+    validateTruncation(mongo::fromjson(lines.back()));
+
+    LOGV2_OPTIONS(20086, {LogTruncation::Disabled}, "{name}", "name"_attr = builder.done());
+    auto validateTruncationDisabled = [&](const BSONObj& obj) {
+        BSONObj sub = obj.getField(constants::kAttributesFieldName)
+                          .Obj()
+                          .getField("name"_sd)
+                          .Obj()
+                          .getField("sub"_sd)
+                          .Obj();
+        // No truncation should occur
+        ASSERT(sub.hasField("small1"_sd));
+        ASSERT(sub.hasField("small2"_sd));
+        ASSERT(sub.hasField("large"_sd));
+        ASSERT(sub.hasField("small3"_sd));
+
+        ASSERT(!obj.hasField(constants::kTruncatedFieldName));
+        ASSERT(!obj.hasField(constants::kTruncatedSizeFieldName));
+    };
+    validateTruncationDisabled(mongo::fromjson(lines.back()));
+
+    BSONArrayBuilder arrBuilder;
+    // Fields will use more than one byte each so this will truncate at some point
+    for (size_t i = 0; i < maxAttributeOutputSize; ++i) {
+        arrBuilder.append("str");
+    }
+
+    BSONArray arrToLog = arrBuilder.arr();
+    LOGV2(20087, "{name}", "name"_attr = arrToLog);
+    auto validateArrayTruncation = [&](const BSONObj& obj) {
+        auto arr = obj.getField(constants::kAttributesFieldName).Obj().getField("name"_sd).Array();
+        ASSERT_LESS_THAN(arr.size(), maxAttributeOutputSize);
+
+        std::string truncatedFieldName = std::to_string(arr.size());
+        BSONObj truncated = obj.getField(constants::kTruncatedFieldName).Obj();
+        BSONObj truncatedInfo =
+            truncated.getField("name"_sd).Obj().getField(truncatedFieldName).Obj();
+        ASSERT_EQUALS(truncatedInfo.getField("type"_sd).String(), typeName(BSONType::String));
+        ASSERT(truncatedInfo.getField("size"_sd).isNumber());
+
+        ASSERT_EQUALS(
+            obj.getField(constants::kTruncatedSizeFieldName).Obj().getField("name"_sd).Int(),
+            arrToLog.objsize());
+    };
+    validateArrayTruncation(mongo::fromjson(lines.back()));
+}
+
 TEST_F(LogTestV2, Threads) {
     std::vector<std::string> linesPlain;
     auto plainSink = LogCaptureBackend::create(linesPlain);

@@ -280,4 +280,31 @@ TEST(StringUtilsTest, ConvertDoubleToStringWithProperPrecision) {
     ASSERT_EQUALS(std::string("0.1000000006"), convertDoubleToString(0.1 + 6E-10, 10));
     ASSERT_EQUALS(std::string("0.1"), convertDoubleToString(0.1 + 6E-8, 6));
 }
+
+TEST(StringUtilsTest, UTF8SafeTruncation) {
+    // Empty string and ASCII works like normal truncation
+    ASSERT_EQUALS(UTF8SafeTruncation(""_sd, 10), ""_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("abcdefg"_sd, 5), "abcde"_sd);
+
+    // Valid 2 Octet sequences, LATIN SMALL LETTER N WITH TILDE
+    ASSERT_EQUALS(UTF8SafeTruncation("\u00f1\u00f1\u00f1"_sd, 1), ""_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u00f1\u00f1\u00f1"_sd, 4), "\u00f1\u00f1"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u00f1\u00f1\u00f1"_sd, 5), "\u00f1\u00f1"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u00f1\u00f1\u00f1"_sd, 6), "\u00f1\u00f1\u00f1"_sd);
+
+    // Valid 3 Octet sequences, RUNIC LETTER TIWAZ TIR TYR T
+    ASSERT_EQUALS(UTF8SafeTruncation("\u16cf\u16cf"_sd, 2), ""_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u16cf\u16cf"_sd, 3), "\u16cf"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u16cf\u16cf"_sd, 4), "\u16cf"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u16cf\u16cf"_sd, 5), "\u16cf"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\u16cf\u16cf"_sd, 6), "\u16cf\u16cf"_sd);
+
+    // Valid 4 Octet sequences, GOTHIC LETTER MANNA
+    ASSERT_EQUALS(UTF8SafeTruncation("\U0001033c\U0001033c"_sd, 4), "\U0001033c"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\U0001033c\U0001033c"_sd, 5), "\U0001033c"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\U0001033c\U0001033c"_sd, 6), "\U0001033c"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\U0001033c\U0001033c"_sd, 7), "\U0001033c"_sd);
+    ASSERT_EQUALS(UTF8SafeTruncation("\U0001033c\U0001033c"_sd, 8), "\U0001033c\U0001033c"_sd);
+}
+
 }  // namespace mongo::str

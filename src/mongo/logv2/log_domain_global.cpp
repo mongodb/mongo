@@ -49,7 +49,7 @@ namespace mongo {
 namespace logv2 {
 
 void LogDomainGlobal::ConfigurationOptions::makeDisabled() {
-    _consoleEnabled = false;
+    consoleEnabled = false;
 }
 
 struct LogDomainGlobal::Impl {
@@ -96,12 +96,12 @@ LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
 
 Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions const& options) {
 #ifndef _WIN32
-    if (options._syslogEnabled) {
+    if (options.syslogEnabled) {
         // Create a backend
         auto backend = boost::make_shared<SyslogBackend>(
             boost::make_shared<boost::log::sinks::syslog_backend>(
                 boost::log::keywords::facility =
-                    boost::log::sinks::syslog::make_facility(options._syslogFacility),
+                    boost::log::sinks::syslog::make_facility(options.syslogFacility),
                 boost::log::keywords::use_impl = boost::log::sinks::syslog::native),
             boost::make_shared<RamLogSink>(RamLog::get("global")),
             boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")));
@@ -133,22 +133,22 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
     }
 #endif
 
-    if (options._consoleEnabled && _consoleSink.use_count() == 1) {
+    if (options.consoleEnabled && _consoleSink.use_count() == 1) {
         boost::log::core::get()->add_sink(_consoleSink);
     }
 
-    if (!options._consoleEnabled && _consoleSink.use_count() > 1) {
+    if (!options.consoleEnabled && _consoleSink.use_count() > 1) {
         boost::log::core::get()->remove_sink(_consoleSink);
     }
 
-    if (options._fileEnabled) {
+    if (options.fileEnabled) {
         auto backend = boost::make_shared<RotatableFileBackend>(
             boost::make_shared<FileRotateSink>(),
             boost::make_shared<RamLogSink>(RamLog::get("global")),
             boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")));
         Status ret = backend->lockedBackend<0>()->addFile(
-            options._filePath,
-            options._fileOpenMode == ConfigurationOptions::OpenMode::kAppend ? true : false);
+            options.filePath,
+            options.fileOpenMode == ConfigurationOptions::OpenMode::kAppend ? true : false);
         if (!ret.isOK())
             return ret;
         backend->lockedBackend<0>()->auto_flush(true);
@@ -173,13 +173,13 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
 #endif
     };
 
-    switch (options._format) {
+    switch (options.format) {
         case LogFormat::kDefault:
         case LogFormat::kText:
-            setFormatters([] { return TextFormatter(); });
+            setFormatters([&] { return TextFormatter(options.maxAttributeSizeKB); });
             break;
         case LogFormat::kJson:
-            setFormatters([] { return JSONFormatter(); });
+            setFormatters([&] { return JSONFormatter(options.maxAttributeSizeKB); });
             break;
     }
 

@@ -282,6 +282,47 @@ inline size_t lengthInUTF8CodePoints(mongo::StringData str) {
     return strLen;
 }
 
+// Performs truncation at closest UTF-8 codepoint boundary to guarantee the end result to be valid
+// UTF-8 Input encoding has to be valid UTF-8. Random-access iterator required
+template <typename Iterator>
+Iterator UTF8SafeTruncation(Iterator begin, Iterator end, std::size_t maximum) {
+    // If we are requesting more bytes than exists in the range, then there's nothing to do
+    if (static_cast<size_t>(end - begin) <= maximum)
+        return end;
+
+    const auto rbegin = std::make_reverse_iterator(begin + maximum);
+    const auto rend = std::make_reverse_iterator(begin);
+    auto it = rbegin;
+
+    // Look back until we find the beginning of a unicode codepoint, extract its expected number of
+    // bytes
+    int codepoint_bytes = 0;
+    for (; it != rend; ++it) {
+        if ((*it & 0b1000'0000) == 0) {
+            codepoint_bytes = 1;
+            break;
+        } else if ((*it & 0b1100'0000) == 0b1100'0000) {
+            codepoint_bytes = 2;
+            uint8_t byte = static_cast<uint8_t>(*it) << 1;
+            while ((codepoint_bytes < 4) && ((byte <<= 1) & 0b1000'0000))
+                ++codepoint_bytes;
+            break;
+        }
+    }
+
+    // Check we had the expected number of continuation bytes. If not skip this codepoint.
+    int offset = codepoint_bytes - 1;
+    if (std::distance(rbegin, it) != offset)
+        offset = -1;  // This was a broken codepoint, go back one extra step to skip it
+
+    return it.base() + offset;
+}
+
+inline StringData UTF8SafeTruncation(StringData input, std::size_t maximum) {
+    auto truncatedEnd = UTF8SafeTruncation(input.begin(), input.end(), maximum);
+    return StringData(input.rawData(), truncatedEnd - input.begin());
+}
+
 inline int caseInsensitiveCompare(const char* s1, const char* s2) {
 #if defined(_WIN32)
     return _stricmp(s1, s2);

@@ -220,10 +220,11 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
     using logger::StatusWithRotatableFileWriter;
 
     // Hook up this global into our logging encoder
-    MessageEventDetailsEncoder::setMaxLogSizeKBSource(gMaxLogSizeKB);
     LogManager* manager = logger::globalLogManager();
     auto& lv2Manager = logv2::LogManager::global();
     logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
+    MessageEventDetailsEncoder::setMaxLogSizeKBSource(gMaxLogAttributeSizeKB);
+    lv2Config.maxAttributeSizeKB = &gMaxLogAttributeSizeKB;
 
     if (serverGlobalParams.logWithSyslog) {
 #ifdef _WIN32
@@ -239,9 +240,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
             javascriptAppender = std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
                 &(lv2Manager.getGlobalDomain()), true);
 
-            lv2Config._consoleEnabled = false;
-            lv2Config._syslogEnabled = true;
-            lv2Config._syslogFacility = serverGlobalParams.syslogFacility;
+            lv2Config.consoleEnabled = false;
+            lv2Config.syslogEnabled = true;
+            lv2Config.syslogFacility = serverGlobalParams.syslogFacility;
         } else {
             using logger::SyslogAppender;
             StringBuilder sb;
@@ -309,13 +310,13 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
             javascriptAppender = std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
                 &(lv2Manager.getGlobalDomain()), true);
 
-            lv2Config._consoleEnabled = false;
-            lv2Config._fileEnabled = true;
-            lv2Config._filePath = absoluteLogpath;
-            lv2Config._fileRotationMode = serverGlobalParams.logRenameOnRotate
+            lv2Config.consoleEnabled = false;
+            lv2Config.fileEnabled = true;
+            lv2Config.filePath = absoluteLogpath;
+            lv2Config.fileRotationMode = serverGlobalParams.logRenameOnRotate
                 ? logv2::LogDomainGlobal::ConfigurationOptions::RotationMode::kRename
                 : logv2::LogDomainGlobal::ConfigurationOptions::RotationMode::kReopen;
-            lv2Config._fileOpenMode = serverGlobalParams.logAppend
+            lv2Config.fileOpenMode = serverGlobalParams.logAppend
                 ? logv2::LogDomainGlobal::ConfigurationOptions::OpenMode::kAppend
                 : logv2::LogDomainGlobal::ConfigurationOptions::OpenMode::kTruncate;
 
@@ -372,7 +373,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
 
     if (logV2Enabled()) {
-        lv2Config._format = serverGlobalParams.logFormat;
+        lv2Config.format = serverGlobalParams.logFormat;
         return lv2Manager.getGlobalDomainInternal().configure(lv2Config);
     }
 

@@ -212,26 +212,37 @@ public:
                   int depth = 0) const;
 
     std::string jsonString(JsonStringFormat format,
+                           bool includeSeparator,
                            bool includeFieldNames = true,
-                           int pretty = 0) const;
+                           int pretty = 0,
+                           size_t writeLimit = 0,
+                           BSONObj* outTruncationResult = nullptr) const;
 
-    void jsonStringBuffer(JsonStringFormat format,
-                          bool includeFieldNames,
-                          int pretty,
-                          fmt::memory_buffer& buffer) const;
+    BSONObj jsonStringBuffer(JsonStringFormat format,
+                             bool includeSeparator,
+                             bool includeFieldNames,
+                             int pretty,
+                             fmt::memory_buffer& buffer,
+                             size_t writeLimit = 0) const;
 
-    void jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
-                             bool includeFieldNames,
-                             int pretty,
-                             fmt::memory_buffer& buffer) const;
-    void jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
-                             bool includeFieldNames,
-                             int pretty,
-                             fmt::memory_buffer& buffer) const;
-    void jsonStringGenerator(LegacyStrictGenerator const& generator,
-                             bool includeFieldNames,
-                             int pretty,
-                             fmt::memory_buffer& buffer) const;
+    BSONObj jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
+                                bool includeSeparator,
+                                bool includeFieldNames,
+                                int pretty,
+                                fmt::memory_buffer& buffer,
+                                size_t writeLimit = 0) const;
+    BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                bool includeSeparator,
+                                bool includeFieldNames,
+                                int pretty,
+                                fmt::memory_buffer& buffer,
+                                size_t writeLimit = 0) const;
+    BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                bool includeSeparator,
+                                bool includeFieldNames,
+                                int pretty,
+                                fmt::memory_buffer& buffer,
+                                size_t writeLimit = 0) const;
 
     operator std::string() const {
         return toString();
@@ -772,10 +783,12 @@ public:
 
 private:
     template <typename Generator>
-    void _jsonStringGenerator(const Generator& g,
-                              bool includeFieldNames,
-                              int pretty,
-                              fmt::memory_buffer& buffer) const;
+    BSONObj _jsonStringGenerator(const Generator& g,
+                                 bool includeSeparator,
+                                 bool includeFieldNames,
+                                 int pretty,
+                                 fmt::memory_buffer& buffer,
+                                 size_t writeLimit) const;
 
     const char* data;
     int fieldNameSize_;  // internal size includes null terminator

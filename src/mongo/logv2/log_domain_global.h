@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_format.h"
 
@@ -40,14 +41,15 @@ public:
         enum class RotationMode { kRename, kReopen };
         enum class OpenMode { kTruncate, kAppend };
 
-        bool _consoleEnabled{true};
-        bool _fileEnabled{false};
-        std::string _filePath;
-        RotationMode _fileRotationMode{RotationMode::kRename};
-        OpenMode _fileOpenMode{OpenMode::kTruncate};
-        bool _syslogEnabled{false};
-        int _syslogFacility{-1};  // invalid facility by default, must be set
-        LogFormat _format{LogFormat::kDefault};
+        bool consoleEnabled{true};
+        bool fileEnabled{false};
+        std::string filePath;
+        RotationMode fileRotationMode{RotationMode::kRename};
+        OpenMode fileOpenMode{OpenMode::kTruncate};
+        bool syslogEnabled{false};
+        int syslogFacility{-1};  // invalid facility by default, must be set
+        LogFormat format{LogFormat::kDefault};
+        const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr;
 
         void makeDisabled();
     };
