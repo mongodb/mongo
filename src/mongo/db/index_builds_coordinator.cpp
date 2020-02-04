@@ -1234,8 +1234,18 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     auto replIndexBuildState = invariant(_getIndexBuild(buildUUID));
 
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
-    AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
-    auto collection = autoColl.getCollection();
+    boost::optional<AutoGetCollection> autoColl;
+    try {
+        autoColl.emplace(opCtx, nssOrUuid, MODE_X);
+    } catch (DBException& ex) {
+        // We need to unregister the index build to allow retries to succeed.
+        stdx::unique_lock<Latch> lk(_mutex);
+        _unregisterIndexBuild(lk, replIndexBuildState);
+
+        return ex.toStatus(str::stream()
+                           << "failed to lock collection for index build setup: " << nssOrUuid);
+    }
+    auto collection = autoColl->getCollection();
     const auto& nss = collection->ns();
     auto status = CollectionShardingState::get(opCtx, nss)->checkShardVersionNoThrow(opCtx, true);
     if (!status.isOK()) {
