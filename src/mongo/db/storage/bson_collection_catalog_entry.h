@@ -64,6 +64,8 @@ public:
 
         void updateTTLSetting(long long newExpireSeconds);
 
+        void updateHiddenSetting(bool hidden);
+
         std::string name() const {
             return spec["name"].String();
         }

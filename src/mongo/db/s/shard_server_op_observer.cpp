@@ -517,7 +517,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       OptionalCollectionUUID uuid,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
-                                      boost::optional<TTLCollModInfo> ttlInfo) {
+                                      boost::optional<IndexCollModInfo> indexInfo) {
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
