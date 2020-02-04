@@ -122,6 +122,7 @@ selector:
   - jstests/sharding/shard3.js
   - jstests/sharding/merge_chunks_test.js
   - jstests/sharding/move_stale_mongos.js
+  - jstests/sharding/cleanup_orphaned_basic.js
   - jstests/sharding/validate_collection.js
   - jstests/sharding/change_stream_enforce_max_time_ms_on_mongos.js
   - jstests/sharding/unowned_doc_filtering.js
@@ -173,11 +174,15 @@ selector:
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/retryable_writes.js
+  - jstests/sharding/cleanup_orphaned_cmd_prereload.js
   - jstests/sharding/basic_merge.js
   - jstests/sharding/migration_critical_section_concurrency.js
   - jstests/sharding/sort1.js
+  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
   - jstests/sharding/upsert_sharded.js
+  - jstests/sharding/cleanup_orphaned_cmd_hashed.js
   - jstests/sharding/addshard5.js
+  - jstests/sharding/cleanup_orphaned_compound.js
   - jstests/sharding/agg_sort.js
   - jstests/sharding/remove1.js
   - jstests/sharding/shard_targeting.js
@@ -194,6 +199,8 @@ selector:
   - jstests/sharding/count2.js
   - jstests/sharding/no_empty_reset.js
   - jstests/sharding/kill_pinned_cursor.js
+  - jstests/sharding/cleanup_orphaned.js
+  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
   - jstests/sharding/sharded_limit_batchsize.js
   - jstests/sharding/migration_sets_fromMigrate_flag.js
   - jstests/sharding/change_stream_metadata_notifications.js
@@ -301,6 +308,7 @@ selector:
   - jstests/sharding/hash_single_shard.js
   - jstests/sharding/version2.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
+  - jstests/sharding/cleanup_orphaned_auth.js
   - jstests/sharding/mrShardedOutputAuth.js
   - jstests/sharding/split_against_shard_with_invalid_split_points.js
   - jstests/sharding/version1.js

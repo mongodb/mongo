@@ -36,7 +36,11 @@ function cleanupOrphaned(shardConnection, ns, expectedIterations) {
 //     keyGen: function() { return [{ a: 'foo', b: 1 }, { a: 'bar', b: 2 }]; }
 // }
 function testCleanupOrphaned(options) {
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    var st = new ShardingTest({
+        shards: 2,
+        mongos: 2,
+        shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}
+    });
 
     var mongos = st.s0, admin = mongos.getDB('admin'),
         shards = mongos.getCollection('config.shards').find().toArray(),
