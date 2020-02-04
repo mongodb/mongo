@@ -1226,33 +1226,17 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
     return boost::none;
 }
 
-Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
-                                                const UUID& buildUUID,
-                                                Timestamp startTimestamp) {
-    auto replState = invariant(_getIndexBuild(buildUUID));
+IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuildInner(
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    Timestamp startTimestamp) {
+    const NamespaceStringOrUUID nssOrUuid{replState->dbName, replState->collectionUUID};
 
-    NamespaceStringOrUUID nssOrUuid{replState->dbName, replState->collectionUUID};
-    boost::optional<AutoGetCollection> autoColl;
-    try {
-        autoColl.emplace(opCtx, nssOrUuid, MODE_X);
-    } catch (DBException& ex) {
-        // We need to unregister the index build to allow retries to succeed.
-        stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replState);
+    AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
 
-        return ex.toStatus(str::stream()
-                           << "failed to lock collection for index build setup: " << nssOrUuid);
-    }
-    auto collection = autoColl->getCollection();
+    auto collection = autoColl.getCollection();
     const auto& nss = collection->ns();
-    auto status = CollectionShardingState::get(opCtx, nss)->checkShardVersionNoThrow(opCtx, true);
-    if (!status.isOK()) {
-        // We need to unregister the index build to allow retries to succeed.
-        stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replState);
-
-        return status;
-    }
+    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx, true);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool replSetAndNotPrimary =
@@ -1261,14 +1245,11 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     // We will not have a start timestamp if we are newly a secondary (i.e. we started as
     // primary but there was a stepdown). We will be unable to timestamp the initial catalog write,
     // so we must fail the index build.
-    if (replSetAndNotPrimary && startTimestamp.isNull()) {
-        stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replState);
-
-        return Status{ErrorCodes::NotMaster,
-                      str::stream()
-                          << "Replication state changed while setting up the index build: "
-                          << replState->buildUUID};
+    if (replSetAndNotPrimary) {
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Replication state changed while setting up the index build: "
+                              << replState->buildUUID,
+                !startTimestamp.isNull());
     }
 
     MultiIndexBlock::OnInitFn onInitFn;
@@ -1297,32 +1278,62 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         : IndexBuildsManager::IndexConstraints::kEnforce;
     options.protocol = replState->protocol;
 
-    status = [&] {
+    try {
         if (!replSetAndNotPrimary) {
             // On standalones and primaries, call setUpIndexBuild(), which makes the initial catalog
             // write. On primaries, this replicates the startIndexBuild oplog entry.
-            return _indexBuildsManager.setUpIndexBuild(
-                opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options);
-        }
-        // If we are starting the index build as a secondary, we must suppress calls to write
-        // our initial oplog entry in setUpIndexBuild().
-        repl::UnreplicatedWritesBlock uwb(opCtx);
+            uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
+                opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options));
+        } else {
+            // If we are starting the index build as a secondary, we must suppress calls to write
+            // our initial oplog entry in setUpIndexBuild().
+            repl::UnreplicatedWritesBlock uwb(opCtx);
 
-        // Use the provided timestamp to write the initial catalog entry.
-        invariant(!startTimestamp.isNull());
-        TimestampBlock tsBlock(opCtx, startTimestamp);
-        return _indexBuildsManager.setUpIndexBuild(
-            opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options);
-    }();
+            // Use the provided timestamp to write the initial catalog entry.
+            invariant(!startTimestamp.isNull());
+            TimestampBlock tsBlock(opCtx, startTimestamp);
+            uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
+                opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options));
+        }
+    } catch (DBException& ex) {
+        _indexBuildsManager.tearDownIndexBuild(
+            opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+
+        const auto& status = ex.toStatus();
+        if (status == ErrorCodes::IndexAlreadyExists ||
+            ((status == ErrorCodes::IndexOptionsConflict ||
+              status == ErrorCodes::IndexKeySpecsConflict) &&
+             options.indexConstraints == IndexBuildsManager::IndexConstraints::kRelax)) {
+            LOG(1) << "Ignoring indexing error: " << redact(status);
+            return PostSetupAction::kCompleteIndexBuildEarly;
+        }
+
+        throw;
+    }
+
+    return PostSetupAction::kContinueIndexBuild;
+}
+
+Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
+                                                const UUID& buildUUID,
+                                                Timestamp startTimestamp) {
+    auto replState = invariant(_getIndexBuild(buildUUID));
+
+    auto postSetupAction = PostSetupAction::kContinueIndexBuild;
+    try {
+        postSetupAction = _setUpIndexBuildInner(opCtx, replState, startTimestamp);
+    } catch (const DBException& ex) {
+        stdx::unique_lock<Latch> lk(_mutex);
+        _unregisterIndexBuild(lk, replState);
+
+        return ex.toStatus();
+    }
 
     // The indexes are in the durable catalog in an unfinished state. Return an OK status so
     // that the caller can continue building the indexes by calling _runIndexBuild().
-    if (status.isOK()) {
+    if (PostSetupAction::kContinueIndexBuild == postSetupAction) {
         return Status::OK();
     }
-
-    _indexBuildsManager.tearDownIndexBuild(
-        opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
 
     // Unregister the index build before setting the promise, so callers do not see the build again.
     {
@@ -1330,22 +1341,17 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         _unregisterIndexBuild(lk, replState);
     }
 
-    if (status == ErrorCodes::IndexAlreadyExists ||
-        ((status == ErrorCodes::IndexOptionsConflict ||
-          status == ErrorCodes::IndexKeySpecsConflict) &&
-         options.indexConstraints == IndexBuildsManager::IndexConstraints::kRelax)) {
-        LOG(1) << "Ignoring indexing error: " << redact(status);
-
-        // The requested index (specs) are already built or are being built. Return success
-        // early (this is v4.0 behavior compatible).
-        ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        int numIndexes = replState->stats.numIndexesBefore;
-        indexCatalogStats.numIndexesBefore = numIndexes;
-        indexCatalogStats.numIndexesAfter = numIndexes;
-        replState->sharedPromise.emplaceValue(indexCatalogStats);
-        return Status::OK();
-    }
-    return status;
+    // The requested index (specs) are already built or are being built. Return success
+    // early (this is v4.0 behavior compatible).
+    invariant(PostSetupAction::kCompleteIndexBuildEarly == postSetupAction,
+              str::stream() << "failed to set up index build " << buildUUID
+                            << " with start timestamp " << startTimestamp.toString());
+    ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
+    int numIndexes = replState->stats.numIndexesBefore;
+    indexCatalogStats.numIndexesBefore = numIndexes;
+    indexCatalogStats.numIndexesAfter = numIndexes;
+    replState->sharedPromise.emplaceValue(indexCatalogStats);
+    return Status::OK();
 }
 
 void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,

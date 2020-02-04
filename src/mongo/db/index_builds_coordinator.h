@@ -483,6 +483,16 @@ protected:
                             Timestamp startTimestamp);
 
     /**
+     * Acquires locks and sets up index build. Throws on error.
+     * Returns PostSetupAction which indicates whether to proceed to _runIndexBuild() or complete
+     * the index build early (because there is no further work to be done).
+     */
+    enum class PostSetupAction { kContinueIndexBuild, kCompleteIndexBuildEarly };
+    PostSetupAction _setUpIndexBuildInner(OperationContext* opCtx,
+                                          std::shared_ptr<ReplIndexBuildState> replState,
+                                          Timestamp startTimestamp);
+
+    /**
      * Sets up the in-memory and durable state of the index build for two-phase recovery.
      *
      * Helper function for startIndexBuild during the two-phase index build recovery process.
