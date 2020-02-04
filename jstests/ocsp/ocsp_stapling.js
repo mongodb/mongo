@@ -14,7 +14,7 @@ if (!supportsStapling()) {
     return;
 }
 
-let mock_ocsp = new MockOCSPServer();
+let mock_ocsp = new MockOCSPServer("", 1000);
 mock_ocsp.start();
 
 const ocsp_options = {
@@ -39,7 +39,7 @@ assert.doesNotThrow(() => {
 });
 mock_ocsp.stop();
 
-mock_ocsp = new MockOCSPServer(FAULT_REVOKED);
+mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1000);
 mock_ocsp.start();
 assert.doesNotThrow(() => {
     new Mongo(conn.host);
@@ -63,7 +63,7 @@ assert.throws(() => {
 });
 mock_ocsp.stop();
 
-mock_ocsp = new MockOCSPServer();
+mock_ocsp = new MockOCSPServer("", 1000);
 mock_ocsp.start();
 
 assert.throws(() => {

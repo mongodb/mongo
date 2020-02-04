@@ -46,7 +46,9 @@ struct CachedValue {
 class Cache : public ReadThroughCache<std::string, CachedValue> {
 public:
     Cache(ServiceContext* service, size_t size, LookupFn lookupFn)
-        : ReadThroughCache(_mutex, service, _threadPool, size), _lookupFn(std::move(lookupFn)) {}
+        : ReadThroughCache(_mutex, service, _threadPool, size), _lookupFn(std::move(lookupFn)) {
+        _threadPool.startup();
+    }
 
 private:
     boost::optional<CachedValue> lookup(OperationContext* opCtx, const std::string& key) override {
@@ -58,11 +60,6 @@ private:
         options.poolName = "ReadThroughCacheTest";
         options.minThreads = 0;
         options.maxThreads = 1;
-
-        // Ensure all threads have a client
-        options.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str());
-        };
 
         return options;
     }()};

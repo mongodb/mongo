@@ -221,17 +221,14 @@ ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
           options.minThreads = 0;
           options.maxThreads = 1;
 
-          // Ensure all threads have a client
-          options.onCreateThread = [](const std::string& threadName) {
-              Client::initThread(threadName.c_str());
-          };
-
           return options;
       }()),
       _defaults(service,
                 _threadPool,
                 [fetchDefaultsFn = std::move(fetchDefaultsFn)](
-                    OperationContext* opCtx, const Type&) { return fetchDefaultsFn(opCtx); }) {}
+                    OperationContext* opCtx, const Type&) { return fetchDefaultsFn(opCtx); }) {
+    _threadPool.startup();
+}
 
 ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
 

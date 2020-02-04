@@ -1200,7 +1200,8 @@ public:
     Future<SSLPeerInfo> parseAndValidatePeerCertificate(::SSLContextRef conn,
                                                         boost::optional<std::string> sniName,
                                                         const std::string& remoteHost,
-                                                        const HostAndPort& hostForLogging) final;
+                                                        const HostAndPort& hostForLogging,
+                                                        const ExecutorPtr& reactor) final;
 
     Status stapleOCSPResponse(asio::ssl::apple::Context* context) final;
 
@@ -1396,7 +1397,8 @@ SSLPeerInfo SSLManagerApple::parseAndValidatePeerCertificateDeprecated(
     auto ssl = checked_cast<const SSLConnectionApple*>(conn)->get();
 
     auto swPeerSubjectName =
-        parseAndValidatePeerCertificate(ssl, boost::none, remoteHost, hostForLogging).getNoThrow();
+        parseAndValidatePeerCertificate(ssl, boost::none, remoteHost, hostForLogging, nullptr)
+            .getNoThrow();
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
@@ -1429,7 +1431,8 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     ::SSLContextRef ssl,
     boost::optional<std::string> sniName,
     const std::string& remoteHost,
-    const HostAndPort& hostForLogging) {
+    const HostAndPort& hostForLogging,
+    const ExecutorPtr& reactor) {
     invariant(!sslGlobalParams.tlsCATrusts);
 
     // Record TLS version stats

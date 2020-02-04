@@ -45,6 +45,7 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
 // SChannel implementation
@@ -258,12 +259,15 @@ public:
      * the `subjectName` will contain  the certificate's subject name, and any roles acquired by
      * X509 authorization will be returned in `roles`.
      * Further, the SNI Name will be captured into the `sni` value, when available.
+     * The reactor is there to continue the execution of the chained statements to the Future
+     * returned by OCSP validation. Can be a nullptr, but will make this function synchronous and
+     * single threaded.
      */
-    virtual Future<SSLPeerInfo> parseAndValidatePeerCertificate(
-        SSLConnectionType ssl,
-        boost::optional<std::string> sni,
-        const std::string& remoteHost,
-        const HostAndPort& hostForLogging) = 0;
+    virtual Future<SSLPeerInfo> parseAndValidatePeerCertificate(SSLConnectionType ssl,
+                                                                boost::optional<std::string> sni,
+                                                                const std::string& remoteHost,
+                                                                const HostAndPort& hostForLogging,
+                                                                const ExecutorPtr& reactor) = 0;
 
     /**
      * No-op function for SChannel and SecureTransport. Attaches stapled OCSP response to the

@@ -63,7 +63,15 @@ server_parameters:
     set_at: startup
     default: false
     cpp_vartype: bool
-    cpp_varname: "sslOCSPEnabled"
+    cpp_varname: "tlsOCSPEnabled"
+  ocspCacheSize:
+    description: "Maximum number of entries in the OCSP Cache"
+    set_at: startup
+    default: 300
+    cpp_vartype: std::int32_t
+    cpp_varname: "tlsOCSPCacheSize"
+    validator:
+      gt: 0
 
   opensslCipherConfig:
     description: "Cipher configuration string for OpenSSL based TLS connections"

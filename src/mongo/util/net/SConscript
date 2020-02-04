@@ -142,6 +142,7 @@ if not get_option('ssl') == 'off':
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/auth/auth',
+            '$BUILD_DIR/mongo/util/caching',
             '$BUILD_DIR/third_party/shim_asio',
             'network',
             'openssl_init' if ssl_provider == 'openssl' else '',

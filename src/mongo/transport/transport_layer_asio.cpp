@@ -570,12 +570,14 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
     struct AsyncConnectState {
         AsyncConnectState(HostAndPort peer,
                           asio::io_context& context,
-                          Promise<SessionHandle> promise_)
+                          Promise<SessionHandle> promise_,
+                          const ReactorHandle& reactor)
             : promise(std::move(promise_)),
               socket(context),
               timeoutTimer(context),
               resolver(context),
-              peer(std::move(peer)) {}
+              peer(std::move(peer)),
+              reactor(reactor) {}
 
         AtomicWord<bool> done{false};
         Promise<SessionHandle> promise;
@@ -587,12 +589,13 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
         WrappedEndpoint resolvedEndpoint;
         const HostAndPort peer;
         TransportLayerASIO::ASIOSessionHandle session;
+        ReactorHandle reactor;
     };
 
     auto reactorImpl = checked_cast<ASIOReactor*>(reactor.get());
     auto pf = makePromiseFuture<SessionHandle>();
-    auto connector =
-        std::make_shared<AsyncConnectState>(std::move(peer), *reactorImpl, std::move(pf.promise));
+    auto connector = std::make_shared<AsyncConnectState>(
+        std::move(peer), *reactorImpl, std::move(pf.promise), reactor);
     Future<SessionHandle> mergedFuture = std::move(pf.future);
 
     if (connector->peer.host().empty()) {
@@ -673,7 +676,8 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                   (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
                 Date_t timeBefore = Date_t::now();
                 return connector->session
-                    ->handshakeSSLForEgressWithLock(std::move(lk), connector->peer)
+                    ->handshakeSSLForEgressWithLock(
+                        std::move(lk), connector->peer, connector->reactor)
                     .then([connector, timeBefore] {
                         Date_t timeAfter = Date_t::now();
                         if (timeAfter - timeBefore > kSlowOperationThreshold) {

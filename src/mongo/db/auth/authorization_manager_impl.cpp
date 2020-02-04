@@ -320,11 +320,6 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
           options.minThreads = 0;
           options.maxThreads = ThreadPool::Options::kUnlimited;
 
-          // Ensure all threads have a client
-          options.onCreateThread = [](const std::string& threadName) {
-              Client::initThread(threadName.c_str());
-          };
-
           return options;
       }()),
       _authSchemaVersionCache(service, _threadPool, _externalState.get()),
@@ -336,10 +331,7 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
     _threadPool.startup();
 }
 
-AuthorizationManagerImpl::~AuthorizationManagerImpl() {
-    _threadPool.shutdown();
-    _threadPool.join();
-}
+AuthorizationManagerImpl::~AuthorizationManagerImpl() = default;
 
 std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession() {
     return std::make_unique<AuthorizationSessionImpl>(

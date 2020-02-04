@@ -37,6 +37,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/future.h"
 #include "mongo/util/invalidating_lru_cache.h"
 
 namespace mongo {
@@ -311,6 +312,7 @@ public:
      * NOTES:
      *  This is a potentially blocking method.
      *  The returned value may be invalid by the time the caller gets access to it.
+     *  TODO SERVER-44978: needs to call acquireAsync and then get.
      */
     ValueHandle acquire(OperationContext* opCtx, const Key& key) {
         while (true) {
@@ -349,6 +351,14 @@ public:
             // associated with the value may now be invalid, so we will throw out the fetched value
             // and retry.
         }
+    }
+
+    /**
+     * This is an async version of acquire.
+     * TODO SERVER-44978: fix this method to make it actually async
+     */
+    SharedSemiFuture<ValueHandle> acquireAsync(const Key& key) {
+        return Future<ValueHandle>::makeReady(acquire(nullptr, key)).share();
     }
 
     /**

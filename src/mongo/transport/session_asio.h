@@ -243,7 +243,8 @@ protected:
     // The unique_lock here is held by TransportLayerASIO to synchronize with the asyncConnect
     // timeout callback. It will be unlocked before the SSL actually handshake begins.
     Future<void> handshakeSSLForEgressWithLock(stdx::unique_lock<Latch> lk,
-                                               const HostAndPort& target) {
+                                               const HostAndPort& target,
+                                               const ReactorHandle& reactor) {
         if (!_tl->_egressSSLContext) {
             return Future<void>::makeReady(Status(ErrorCodes::SSLHandshakeFailed,
                                                   "SSL requested but SSL support is disabled"));
@@ -262,12 +263,15 @@ protected:
                 return _sslSocket->async_handshake(asio::ssl::stream_base::client, UseFuture{});
             }
         };
-        return doHandshake().then([this, target] {
+        return doHandshake().then([this, target, reactor] {
             _ranHandshake = true;
 
             return getSSLManager()
-                ->parseAndValidatePeerCertificate(
-                    _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target)
+                ->parseAndValidatePeerCertificate(_sslSocket->native_handle(),
+                                                  _sslSocket->get_sni(),
+                                                  target.host(),
+                                                  target,
+                                                  reactor)
                 .then([this](SSLPeerInfo info) {
                     SSLPeerInfo::forSession(shared_from_this()) = info;
                 });
@@ -278,7 +282,7 @@ protected:
     // pass it to the WithLock version of handshakeSSLForEgress
     Future<void> handshakeSSLForEgress(const HostAndPort& target) {
         auto mutex = MONGO_MAKE_LATCH();
-        return handshakeSSLForEgressWithLock(stdx::unique_lock<Latch>(mutex), target);
+        return handshakeSSLForEgressWithLock(stdx::unique_lock<Latch>(mutex), target, nullptr);
     }
 #endif
 
@@ -650,8 +654,11 @@ private:
             return doHandshake().then([this](size_t size) {
                 if (SSLPeerInfo::forSession(shared_from_this()).subjectName.empty()) {
                     return getSSLManager()
-                        ->parseAndValidatePeerCertificate(
-                            _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote)
+                        ->parseAndValidatePeerCertificate(_sslSocket->native_handle(),
+                                                          _sslSocket->get_sni(),
+                                                          "",
+                                                          _remote,
+                                                          nullptr)
                         .then([this](SSLPeerInfo info) -> bool {
                             SSLPeerInfo::forSession(shared_from_this()) = info;
                             return true;

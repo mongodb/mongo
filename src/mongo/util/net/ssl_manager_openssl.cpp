@@ -64,6 +64,7 @@
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/periodic_runner.h"
+#include "mongo/util/read_through_cache.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/strong_weak_finish_line.h"
@@ -411,6 +412,483 @@ using UniqueSSLContext =
     std::unique_ptr<SSL_CTX, OpenSSLDeleter<decltype(::SSL_CTX_free), ::SSL_CTX_free>>;
 static const int BUFFER_SIZE = 8 * 1024;
 
+using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
+
+using UniqueOpenSSLStringStack =
+    std::unique_ptr<STACK_OF(OPENSSL_STRING),
+                    OpenSSLDeleter<decltype(X509_email_free), ::X509_email_free>>;
+
+using UniqueOCSPResponse =
+    std::unique_ptr<OCSP_RESPONSE,
+                    OpenSSLDeleter<decltype(OCSP_RESPONSE_free), ::OCSP_RESPONSE_free>>;
+
+using UniqueCertId =
+    std::unique_ptr<OCSP_CERTID, OpenSSLDeleter<decltype(OCSP_CERTID_free), ::OCSP_CERTID_free>>;
+
+Status getSSLFailure(ErrorCodes::Error code, StringData errorMsg) {
+    return Status(code,
+                  str::stream() << "SSL peer certificate revocation status checking failed: "
+                                << errorMsg << " "
+                                << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+}
+
+Status getSSLFailure(StringData errorMsg) {
+    return getSSLFailure(ErrorCodes::SSLHandshakeFailed, errorMsg);
+}
+
+// X509_OBJECT_free is not exposed in the same way as the rest of the functions.
+struct X509_OBJECTFree {
+    void operator()(X509_OBJECT* obj) noexcept {
+        if (obj) {
+            X509_OBJECT_free(obj);
+        }
+    }
+};
+
+using UniqueX509Object = std::unique_ptr<X509_OBJECT, X509_OBJECTFree>;
+
+StatusWith<UniqueCertId> getCertIdForCert(SSL_CTX* context, X509* cert) {
+    // Look in the certificate store for the certificate that issued cert
+    UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
+    if (!storeCtx) {
+        return getSSLFailure("Could not create X509 store.");
+    }
+    if (X509_STORE_CTX_init(storeCtx.get(), SSL_CTX_get_cert_store(context), NULL, NULL) == 0) {
+        return getSSLFailure("Could not initialize the X509 Store Context.");
+    }
+
+    UniqueX509Object obj(X509_STORE_CTX_get_obj_by_subject(
+        storeCtx.get(), X509_LU_X509, X509_get_issuer_name(cert)));
+    if (obj == nullptr) {
+        return getSSLFailure("Could not get X509 Object from store.");
+    }
+    return UniqueCertId(OCSP_cert_to_id(nullptr, cert, X509_OBJECT_get0_X509(obj.get())));
+}
+
+struct OCSPCertIDCompareLess {
+    bool operator()(const UniqueCertId& id1, const UniqueCertId& id2) const {
+        return OCSP_id_cmp(id1.get(), id2.get()) > 0;
+    }
+};
+
+using OCSPCertIDSet = std::set<UniqueCertId, OCSPCertIDCompareLess>;
+
+using UniqueOCSPRequest =
+    std::unique_ptr<OCSP_REQUEST, OpenSSLDeleter<decltype(OCSP_REQUEST_free), ::OCSP_REQUEST_free>>;
+
+using UniqueOcspBasicResp =
+    std::unique_ptr<OCSP_BASICRESP,
+                    OpenSSLDeleter<decltype(OCSP_BASICRESP_free), ::OCSP_BASICRESP_free>>;
+
+struct OCSPRequestAndIDs {
+    UniqueOCSPRequest request;
+    OCSPCertIDSet certIDs;
+};
+
+struct OCSPValidationContext {
+    std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
+    OCSPCertIDSet uniqueCertIds;
+    std::vector<std::string> leafResponders;
+};
+
+constexpr Milliseconds kOCSPUnknownStatusRefreshRate = Minutes(5);
+
+struct OCSPFetchResponse {
+    OCSPFetchResponse(Status statusOfResponse,
+                      UniqueOCSPResponse response,
+                      boost::optional<Date_t> refreshTime)
+        : statusOfResponse(statusOfResponse),
+          response(std::move(response)),
+          refreshTime(refreshTime) {}
+
+    Status statusOfResponse;
+    UniqueOCSPResponse response;
+    boost::optional<Date_t> refreshTime;
+
+    const Milliseconds nextUpdateDuration() {
+        return refreshTime ? (refreshTime.get() - Date_t::now()) / 2
+                           : kOCSPUnknownStatusRefreshRate;
+    }
+};
+
+std::vector<unsigned char> convertX509ToDERVec(X509* cert) {
+    auto len = i2d_X509(cert, nullptr);
+
+    uassert(ErrorCodes::SSLHandshakeFailed,
+            "Could not convert certificate to DER representation",
+            len > 0);
+
+    std::vector<unsigned char> x509Vec(len);
+    auto ptr = x509Vec.data();
+
+    len = i2d_X509(cert, &ptr);
+    return x509Vec;
+}
+
+std::vector<std::vector<unsigned char>> convertStackOfX509ToDERVec(STACK_OF(X509) * chain) {
+    int numCerts = sk_X509_num(chain);
+
+    if (numCerts < 0) {
+        return {};
+    }
+
+    std::vector<std::vector<unsigned char>> retVector(numCerts);
+
+    for (int i = 0; i < numCerts; i++) {
+        retVector.emplace_back(convertX509ToDERVec(sk_X509_value(chain, i)));
+    }
+
+    return retVector;
+}
+
+struct OCSPCacheKey {
+    OCSPCacheKey(UniqueX509 cert, SSL_CTX* context, UniqueVerifiedChainPolyfill intermediateCerts)
+        : peerCert(std::move(cert)),
+          context(context),
+          intermediateCerts(std::move(intermediateCerts)),
+          peerCertBuffer(convertX509ToDERVec(peerCert.get())),
+          chainBuffer(convertStackOfX509ToDERVec(intermediateCerts.get())) {}
+
+    template <typename H>
+    friend H AbslHashValue(H h, const OCSPCacheKey& key) {
+        return H::combine(std::move(h), key.peerCertBuffer, key.chainBuffer, key.context);
+    }
+
+    bool operator==(const OCSPCacheKey key) const {
+        return peerCertBuffer == key.peerCertBuffer && context == key.context &&
+            chainBuffer == key.chainBuffer;
+    }
+
+    std::shared_ptr<X509> peerCert;
+    SSL_CTX* context;
+    std::shared_ptr<STACK_OF(X509)> intermediateCerts;
+    std::vector<unsigned char> peerCertBuffer;
+    std::vector<std::vector<unsigned char>> chainBuffer;
+};
+
+/**
+ * This function takes an individual certificate and adds its OCSP certificate ID
+ * to the ocspRequestMap. See comment in extractOcspUris for details.
+ */
+StatusWith<std::vector<std::string>> addOCSPUrlToMap(
+    SSL_CTX* context,
+    X509* cert,
+    std::map<std::string, OCSPRequestAndIDs>& ocspRequestMap,
+    OCSPCertIDSet& uniqueCertIds) {
+
+    UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(cert));
+    std::vector<std::string> responders;
+
+    if (!aiaOCSP) {
+        return responders;
+    }
+
+    // Iterate through all the values in the Authority Information Access extension in
+    // the certificate to get the location of the OCSP responder.
+    for (int i = 0; i < sk_OPENSSL_STRING_num(aiaOCSP.get()); i++) {
+        int useSSL = 0;
+        char *host, *port, *path;
+        auto OCSPStrGuard = makeGuard([&] {
+            if (host) {
+                OPENSSL_free(host);
+            }
+            if (port) {
+                OPENSSL_free(port);
+            }
+            if (path) {
+                OPENSSL_free(path);
+            }
+        });
+        if (!OCSP_parse_url(
+                sk_OPENSSL_STRING_value(aiaOCSP.get(), i), &host, &port, &path, &useSSL)) {
+            return getSSLFailure("Could not parse AIA url.");
+        }
+
+        HostAndPort hostAndPort(str::stream() << host << ":" << port);
+
+        auto swCertId = getCertIdForCert(context, cert);
+        if (!swCertId.isOK()) {
+            return swCertId.getStatus();
+        }
+
+        UniqueCertId certID = std::move(swCertId.getValue());
+        if (!certID) {
+            return getSSLFailure("Could not get certificate ID for Map.");
+        }
+
+        swCertId = getCertIdForCert(context, cert);
+        if (!swCertId.isOK()) {
+            return swCertId.getStatus();
+        }
+
+        UniqueCertId certIDForArray = std::move(swCertId.getValue());
+        if (certIDForArray == nullptr) {
+            return getSSLFailure("Could not get certificate ID for Array.");
+        }
+
+        OCSPRequestAndIDs reqAndIDs{UniqueOCSPRequest(OCSP_REQUEST_new()), OCSPCertIDSet()};
+
+        auto [mapIter, _] = ocspRequestMap.try_emplace(str::stream() << host << ":" << port << path,
+                                                       std::move(reqAndIDs));
+
+        responders.emplace_back(str::stream() << host << ":" << port << path);
+
+        OCSP_request_add0_id(mapIter->second.request.get(), certID.release());
+        mapIter->second.certIDs.insert(std::move(certIDForArray));
+    }
+
+    auto swCertId = getCertIdForCert(context, cert);
+    if (!swCertId.isOK()) {
+        return swCertId.getStatus();
+    }
+
+    UniqueCertId certIDForSet = std::move(swCertId.getValue());
+    if (!certIDForSet) {
+        return getSSLFailure("Could not get certificate ID for Set.");
+    }
+
+    uniqueCertIds.insert(std::move(certIDForSet));
+
+    return responders;
+}
+
+Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
+                                                OCSPRequestAndIDs& ocspRequestAndIDs) {
+    auto& [ocspReq, certIDs] = ocspRequestAndIDs;
+
+    // Decompose the OCSP request into a DER encoded OCSP request
+    auto len = i2d_OCSP_REQUEST(ocspReq.get(), nullptr);
+    std::vector<uint8_t> buffer;
+    if (len <= 0) {
+        return getSSLFailure("Could not decode response from responder.");
+    }
+
+    buffer.resize(len);
+    auto bufferData = buffer.data();
+    if (i2d_OCSP_REQUEST(ocspReq.get(), &bufferData) < 0) {
+        return getSSLFailure("Could not convert type OCSP Response to DER encoded object.");
+    }
+
+    // Query the OCSP responder
+    return OCSPManager::get()
+        ->requestStatus(buffer, host)
+        .then([](std::vector<uint8_t> responseData) mutable -> StatusWith<UniqueOCSPResponse> {
+            const uint8_t* respDataPtr = responseData.data();
+
+            // Convert the Response back to a OpenSSL known format
+            UniqueOCSPResponse response(
+                d2i_OCSP_RESPONSE(nullptr, &respDataPtr, responseData.size()));
+
+            if (response == nullptr) {
+                return getSSLFailure("Could not retrieve OCSP Response.");
+            }
+
+            return std::move(response);
+        });
+}
+
+/**
+ * This function iterates over the basic response object from the OCSP response object
+ * and returns a set of Certificate IDs that are there in the response and a date object
+ * which represents the time when the Response needs to be refreshed.
+ */
+StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* basicResp,
+                                                             STACK_OF(X509) * intermediateCerts) {
+    Date_t earliestNextUpdate = Date_t::max();
+
+    OCSPCertIDSet certIdsInResponse;
+
+    // Iterate over all the certificates in the Response, mainly to see if any
+    // of them have been revoked.
+    int count = OCSP_resp_count(basicResp);
+    for (int i = 0; i < count; i++) {
+        OCSP_SINGLERESP* singleResp = OCSP_resp_get0(basicResp, i);
+        if (!singleResp) {
+            return getSSLFailure("OCSP Basic Response invalid: Missing response.");
+        }
+
+        certIdsInResponse.emplace(
+            OCSP_CERTID_dup(const_cast<OCSP_CERTID*>(OCSP_SINGLERESP_get0_id(singleResp))));
+
+        int reason;
+        // TODO SERVER-45798 the updated time will be implemented in the cache
+        ASN1_GENERALIZEDTIME *revtime, *thisupd, *nextupd;
+
+        auto status = OCSP_single_get0_status(singleResp, &reason, &revtime, &thisupd, &nextupd);
+
+        if (status == V_OCSP_CERTSTATUS_REVOKED) {
+            return getSSLFailure(ErrorCodes::OCSPCertificateStatusRevoked,
+                                 str::stream() << "OCSP Certificate Status: Revoked. Reason: "
+                                               << OCSP_crl_reason_str(reason));
+        } else if (status != V_OCSP_CERTSTATUS_GOOD) {
+            return getSSLFailure(str::stream()
+                                 << "Unexpected OCSP Certificate Status. Reason: " << status);
+        }
+
+        Date_t nextUpdateDate(convertASN1ToMillis(static_cast<ASN1_TIME*>(nextupd)));
+        earliestNextUpdate = std::min(earliestNextUpdate, nextUpdateDate);
+    }
+
+    if (earliestNextUpdate < Date_t::now()) {
+        return getSSLFailure("OCSP Basic Response is invalid: Response is expired.");
+    }
+
+    return std::make_pair(std::move(certIdsInResponse), earliestNextUpdate);
+}
+
+/**
+ * This function returns a pair of a CertID set and a Date_t object. The CertID set contains
+ * the IDs of the certificates that the OCSP Response contains. The Date_t object is the
+ * earliest expiration date on the OCSPResponse.
+ */
+StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
+    SSL_CTX* context, OCSP_RESPONSE* response, STACK_OF(X509) * intermediateCerts) {
+    // Read the overall status of the OCSP response
+    int responseStatus = OCSP_response_status(response);
+    switch (responseStatus) {
+        case OCSP_RESPONSE_STATUS_SUCCESSFUL:
+            break;
+        case OCSP_RESPONSE_STATUS_MALFORMEDREQUEST:
+        case OCSP_RESPONSE_STATUS_UNAUTHORIZED:
+        case OCSP_RESPONSE_STATUS_SIGREQUIRED:
+            return getSSLFailure(str::stream()
+                                 << "Error querying the OCSP responder, issue with OCSP request. "
+                                 << "Response Status: " << responseStatus);
+        case OCSP_RESPONSE_STATUS_TRYLATER:
+        case OCSP_RESPONSE_STATUS_INTERNALERROR:
+            // TODO: SERVER-42936 Add support for tlsAllowInvalidCertificates
+            return getSSLFailure(str::stream()
+                                 << "Error querying the OCSP responder, an error occured in the "
+                                 << "responder itself. Response Status: " << responseStatus);
+        default:
+            return getSSLFailure(str::stream() << "Error querying the OCSP responder. "
+                                               << "Response Status: " << responseStatus);
+    }
+
+    UniqueOcspBasicResp basicResponse(OCSP_response_get1_basic(response));
+    if (!basicResponse) {
+        return getSSLFailure("incomplete OCSP response.");
+    }
+
+    X509_STORE* store = SSL_CTX_get_cert_store(context);
+
+    // OCSP_basic_verify takes in the Response from the responder and verifies
+    // that the signer of the OCSP response is in intermediateCerts. Then it tries
+    // to form a chain from the signer certificate to the trusted CA in the store.
+    if (OCSP_basic_verify(basicResponse.get(), intermediateCerts, store, 0) != 1) {
+        return getSSLFailure("Failed to verify signature from OCSP response.");
+    }
+
+    return iterateResponse(basicResponse.get(), intermediateCerts);
+}
+
+Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
+                                           std::shared_ptr<STACK_OF(X509)> intermediateCerts,
+                                           OCSPValidationContext& ocspContext) {
+    auto& [ocspRequestMap, _, leafResponders] = ocspContext;
+
+    struct OCSPCompletionState {
+        OCSPCompletionState(int numRequests_,
+                            Promise<OCSPFetchResponse> promise_,
+                            std::shared_ptr<STACK_OF(X509)> intermediateCerts_)
+            : finishLine(numRequests_),
+              promise(std::move(promise_)),
+              intermediateCerts(std::move(intermediateCerts_)) {}
+
+        StrongWeakFinishLine finishLine;
+        Promise<OCSPFetchResponse> promise;
+        std::shared_ptr<STACK_OF(X509)> intermediateCerts;
+    };
+
+    std::vector<Future<UniqueOCSPResponse>> futureResponses{};
+
+    for (auto host : leafResponders) {
+        auto& ocspRequestAndIDs = ocspRequestMap[host];
+        Future<UniqueOCSPResponse> futureResponse = retrieveOCSPResponse(host, ocspRequestAndIDs);
+        futureResponses.push_back(std::move(futureResponse));
+    };
+
+    auto pf = makePromiseFuture<OCSPFetchResponse>();
+    auto state = std::make_shared<OCSPCompletionState>(
+        futureResponses.size(), std::move(pf.promise), std::move(intermediateCerts));
+
+    for (size_t i = 0; i < futureResponses.size(); i++) {
+        auto futureResponse = std::move(futureResponses[i]);
+        std::move(futureResponse)
+            .getAsync([context, state](StatusWith<UniqueOCSPResponse> swResponse) mutable {
+                if (!swResponse.isOK()) {
+                    if (state->finishLine.arriveWeakly()) {
+                        state->promise.setError(
+                            Status(ErrorCodes::OCSPCertificateStatusUnknown,
+                                   "Could not obtain status information of certificates."));
+                    }
+                    return;
+                }
+
+                auto swCertIDSetAndDuration = parseAndValidateOCSPResponse(
+                    context, swResponse.getValue().get(), state->intermediateCerts.get());
+
+                if (swCertIDSetAndDuration.isOK() ||
+                    swCertIDSetAndDuration.getStatus() ==
+                        ErrorCodes::OCSPCertificateStatusRevoked) {
+
+                    // We want to send the nextUpdate time down for the cache, so if there is a
+                    // duration value passed from parseAndValidateOCSPResponse, we send that down.
+                    // If not, we pass down a bogus response, and let the caller deal with it down
+                    // there.
+                    boost::optional<Date_t> nextUpdate = swCertIDSetAndDuration.isOK()
+                        ? boost::optional<Date_t>(swCertIDSetAndDuration.getValue().second)
+                        : boost::none;
+
+                    if (state->finishLine.arriveStrongly()) {
+                        state->promise.emplaceValue(swCertIDSetAndDuration.getStatus(),
+                                                    std::move(swResponse.getValue()),
+                                                    nextUpdate);
+                        return;
+                    }
+                } else {
+                    if (state->finishLine.arriveWeakly()) {
+                        state->promise.setError(
+                            Status(ErrorCodes::OCSPCertificateStatusUnknown,
+                                   "Could not obtain status information of certificates."));
+                        return;
+                    }
+                }
+            });
+    }
+
+    return std::move(pf.future);
+}
+
+/**
+ * Iterates over a list of intermediate certificates and the peer certificate
+ * in a chain of X509 certificates
+ * and adds the OCSP certificate ID to the correct OCSP Request object.
+ * OCSP Request objects need to be separated by the specific OCSP responder URI.
+ */
+StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
+                                                  X509* peerCert,
+                                                  STACK_OF(X509) * intermediateCerts) {
+
+    std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
+    OCSPCertIDSet uniqueCertIds;
+
+    auto swLeafResponders = addOCSPUrlToMap(context, peerCert, ocspRequestMap, uniqueCertIds);
+    if (!swLeafResponders.isOK()) {
+        return swLeafResponders.getStatus();
+    }
+
+    auto leafResponders = std::move(swLeafResponders.getValue());
+    if (leafResponders.size() == 0) {
+        return getSSLFailure("Certificate has no OCSP Responders");
+    }
+
+    return OCSPValidationContext{
+        std::move(ocspRequestMap), std::move(uniqueCertIds), std::move(leafResponders)};
+}
+
+using OCSPCacheVal = ReadThroughCache<OCSPCacheKey, OCSPFetchResponse>::ValueHandle;
+
 class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
     explicit SSLManagerOpenSSL(const SSLParams& params, bool isServer);
@@ -434,7 +912,8 @@ public:
     Future<SSLPeerInfo> parseAndValidatePeerCertificate(SSL* conn,
                                                         boost::optional<std::string> sni,
                                                         const std::string& remoteHost,
-                                                        const HostAndPort& hostForLogging) final;
+                                                        const HostAndPort& hostForLogging,
+                                                        const ExecutorPtr& reactor) final;
 
     /**
      * Sets the OCSP Response to be stapled to the TLS Connection. Sets the _ocspStaplingAnchor
@@ -451,6 +930,8 @@ public:
     int SSL_write(SSLConnectionInterface* conn, const void* buf, int num) final;
 
     int SSL_shutdown(SSLConnectionInterface* conn) final;
+
+    Future<void> ocspClientVerification(SSL* ssl, const ExecutorPtr& reactor);
 
 private:
     const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
@@ -593,6 +1074,78 @@ private:
 
 }  // namespace
 
+class OCSPCache {
+
+    class OCSPCacheInternal : public ReadThroughCache<OCSPCacheKey, OCSPFetchResponse> {
+    public:
+        OCSPCacheInternal(ServiceContext* context, ThreadPool& pool)
+            : ReadThroughCache(_ocspCacheMutex, context, pool, tlsOCSPCacheSize) {}
+
+        boost::optional<OCSPFetchResponse> lookup(OperationContext* opCtx,
+                                                  const OCSPCacheKey& key) final {
+            // If there is a CRL file, we expect the CRL file to cover the certificate
+            // status information, and therefore we don't need to make a roundtrip.
+            if (!getSSLGlobalParams().sslCRLFile.empty()) {
+                return boost::none;
+            }
+
+            auto swOCSPContext =
+                extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
+            if (!swOCSPContext.isOK()) {
+                return boost::none;
+            }
+
+            auto ocspContext = std::move(swOCSPContext.getValue());
+
+            auto swResponse =
+                dispatchRequests(key.context, key.intermediateCerts, ocspContext).getNoThrow();
+            if (!swResponse.isOK()) {
+                return boost::none;
+            }
+
+            return std::move(swResponse.getValue());
+        }
+
+        Mutex _ocspCacheMutex = MONGO_MAKE_LATCH("OCSPCacheMutex::Cache");
+    };
+
+public:
+    OCSPCache(ServiceContext* context)
+        : _pool(([] {
+              ThreadPool::Options options;
+              options.poolName = "OCSPCache";
+
+              return options;
+          }())),
+          _cache(context, _pool) {}
+
+    ~OCSPCache() = default;
+
+    static void set(ServiceContext* service, std::unique_ptr<OCSPCache> cache);
+
+    SharedSemiFuture<ReadThroughCache<OCSPCacheKey, OCSPFetchResponse>::ValueHandle> acquireAsync(
+        const OCSPCacheKey& key) {
+        std::call_once(threadPoolStartupFlag, [this]() { _pool.startup(); });
+        return _cache.acquireAsync(key);
+    };
+
+    void invalidate(const OCSPCacheKey& key) {
+        std::call_once(threadPoolStartupFlag, [this]() { _pool.startup(); });
+        _cache.invalidate(key);
+    }
+
+private:
+    std::once_flag threadPoolStartupFlag;
+    ThreadPool _pool;
+    OCSPCacheInternal _cache;
+};
+
+const auto getOCSPCache = ServiceContext::declareDecoration<std::unique_ptr<OCSPCache>>();
+
+void OCSPCache::set(ServiceContext* service, std::unique_ptr<OCSPCache> cache) {
+    getOCSPCache(service) = std::move(cache);
+}
+
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
@@ -605,6 +1158,12 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
     }
     return Status::OK();
 }
+
+namespace {
+ServiceContext::ConstructorActionRegisterer OCSPCacheInitializer{
+    "CreateOCSPCache",
+    [](ServiceContext* context) { OCSPCache::set(context, std::make_unique<OCSPCache>(context)); }};
+}  // namespace
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
@@ -851,334 +1410,6 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     return status;
 }
 
-using UniqueOCSPRequest =
-    std::unique_ptr<OCSP_REQUEST, OpenSSLDeleter<decltype(OCSP_REQUEST_free), ::OCSP_REQUEST_free>>;
-
-using UniqueOCSPResponse =
-    std::unique_ptr<OCSP_RESPONSE,
-                    OpenSSLDeleter<decltype(OCSP_RESPONSE_free), ::OCSP_RESPONSE_free>>;
-
-// X509_OBJECT_free is not exposed in the same way as the rest of the functions.
-struct X509_OBJECTFree {
-    void operator()(X509_OBJECT* obj) noexcept {
-        if (obj) {
-            X509_OBJECT_free(obj);
-        }
-    }
-};
-
-using UniqueX509Object = std::unique_ptr<X509_OBJECT, X509_OBJECTFree>;
-
-using UniqueCertId =
-    std::unique_ptr<OCSP_CERTID, OpenSSLDeleter<decltype(OCSP_CERTID_free), ::OCSP_CERTID_free>>;
-
-using UniqueOpenSSLStringStack =
-    std::unique_ptr<STACK_OF(OPENSSL_STRING),
-                    OpenSSLDeleter<decltype(X509_email_free), ::X509_email_free>>;
-
-using UniqueOcspBasicResp =
-    std::unique_ptr<OCSP_BASICRESP,
-                    OpenSSLDeleter<decltype(OCSP_BASICRESP_free), ::OCSP_BASICRESP_free>>;
-
-struct OCSPCertIDCompareLess {
-    bool operator()(const UniqueCertId& id1, const UniqueCertId& id2) const {
-        return OCSP_id_cmp(id1.get(), id2.get()) > 0;
-    }
-};
-
-using OCSPCertIDSet = std::set<UniqueCertId, OCSPCertIDCompareLess>;
-
-Status getSSLFailure(ErrorCodes::Error code, StringData errorMsg) {
-    return Status(code,
-                  str::stream() << "SSL peer certificate revocation status checking failed: "
-                                << errorMsg << " "
-                                << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
-}
-
-Status getSSLFailure(StringData errorMsg) {
-    return getSSLFailure(ErrorCodes::SSLHandshakeFailed, errorMsg);
-}
-
-struct OCSPRequestAndIDs {
-    UniqueOCSPRequest request;
-    OCSPCertIDSet certIDs;
-};
-
-StatusWith<UniqueCertId> getCertIdForCert(SSL_CTX* context, X509* cert) {
-    // Look in the certificate store for the certificate that issued cert
-    UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
-    if (!storeCtx) {
-        return getSSLFailure("Could not create X509 store.");
-    }
-    if (X509_STORE_CTX_init(storeCtx.get(), SSL_CTX_get_cert_store(context), NULL, NULL) == 0) {
-        return getSSLFailure("Could not initialize the X509 Store Context.");
-    }
-
-    UniqueX509Object obj(X509_STORE_CTX_get_obj_by_subject(
-        storeCtx.get(), X509_LU_X509, X509_get_issuer_name(cert)));
-    if (obj == nullptr) {
-        return getSSLFailure("Could not get X509 Object from store.");
-    }
-    return UniqueCertId(OCSP_cert_to_id(nullptr, cert, X509_OBJECT_get0_X509(obj.get())));
-}
-
-/**
- * This function takes an individual certificate and adds its OCSP certificate ID
- * to the ocspRequestMap. See comment in extractOcspUris for details.
- */
-StatusWith<std::vector<std::string>> addOCSPUrlToMap(
-    SSL_CTX* context,
-    X509* cert,
-    std::map<std::string, OCSPRequestAndIDs>& ocspRequestMap,
-    OCSPCertIDSet& uniqueCertIds) {
-
-    UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(cert));
-    std::vector<std::string> responders;
-
-    if (!aiaOCSP) {
-        return responders;
-    }
-
-    // Iterate through all the values in the Authority Information Access extension in
-    // the certificate to get the location of the OCSP responder.
-    for (int i = 0; i < sk_OPENSSL_STRING_num(aiaOCSP.get()); i++) {
-        int useSSL = 0;
-        char *host, *port, *path;
-        auto OCSPStrGuard = makeGuard([&] {
-            if (host) {
-                OPENSSL_free(host);
-            }
-            if (port) {
-                OPENSSL_free(port);
-            }
-            if (path) {
-                OPENSSL_free(path);
-            }
-        });
-        if (!OCSP_parse_url(
-                sk_OPENSSL_STRING_value(aiaOCSP.get(), i), &host, &port, &path, &useSSL)) {
-            return getSSLFailure("Could not parse AIA url.");
-        }
-
-        HostAndPort hostAndPort(str::stream() << host << ":" << port);
-
-        auto swCertId = getCertIdForCert(context, cert);
-        if (!swCertId.isOK()) {
-            return swCertId.getStatus();
-        }
-
-        UniqueCertId certID = std::move(swCertId.getValue());
-        if (!certID) {
-            return getSSLFailure("Could not get certificate ID for Map.");
-        }
-
-        swCertId = getCertIdForCert(context, cert);
-        if (!swCertId.isOK()) {
-            return swCertId.getStatus();
-        }
-
-        UniqueCertId certIDForArray = std::move(swCertId.getValue());
-        if (certIDForArray == nullptr) {
-            return getSSLFailure("Could not get certificate ID for Array.");
-        }
-
-        OCSPRequestAndIDs reqAndIDs{UniqueOCSPRequest(OCSP_REQUEST_new()), OCSPCertIDSet()};
-
-        auto [mapIter, _] = ocspRequestMap.try_emplace(str::stream() << host << ":" << port << path,
-                                                       std::move(reqAndIDs));
-
-        responders.emplace_back(str::stream() << host << ":" << port << path);
-
-        OCSP_request_add0_id(mapIter->second.request.get(), certID.release());
-        mapIter->second.certIDs.insert(std::move(certIDForArray));
-    }
-
-    auto swCertId = getCertIdForCert(context, cert);
-    if (!swCertId.isOK()) {
-        return swCertId.getStatus();
-    }
-
-    UniqueCertId certIDForSet = std::move(swCertId.getValue());
-    if (!certIDForSet) {
-        return getSSLFailure("Could not get certificate ID for Set.");
-    }
-
-    uniqueCertIds.insert(std::move(certIDForSet));
-
-    return responders;
-}
-
-struct OCSPValidationContext {
-    std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
-    OCSPCertIDSet uniqueCertIds;
-    std::vector<std::string> leafResponders;
-};
-
-/**
- * Iterates over a list of intermediate certificates and the peer certificate
- * in a chain of X509 certificates
- * and adds the OCSP certificate ID to the correct OCSP Request object.
- * OCSP Request objects need to be separated by the specific OCSP responder URI.
- */
-StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
-                                                  X509* peerCert,
-                                                  STACK_OF(X509) * intermediateCerts) {
-
-    std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
-    OCSPCertIDSet uniqueCertIds;
-
-    auto swLeafResponders = addOCSPUrlToMap(context, peerCert, ocspRequestMap, uniqueCertIds);
-    if (!swLeafResponders.isOK()) {
-        return swLeafResponders.getStatus();
-    }
-
-    auto leafResponders = std::move(swLeafResponders.getValue());
-    if (leafResponders.size() == 0) {
-        return getSSLFailure("Certificate has no OCSP Responders");
-    }
-
-    for (int i = 0; i < sk_X509_num(intermediateCerts); i++) {
-        auto cert = sk_X509_value(intermediateCerts, i);
-        auto swResponders = addOCSPUrlToMap(context, cert, ocspRequestMap, uniqueCertIds);
-        if (!swResponders.isOK()) {
-            return swResponders.getStatus();
-        }
-    }
-
-    return OCSPValidationContext{
-        std::move(ocspRequestMap), std::move(uniqueCertIds), std::move(leafResponders)};
-}
-
-Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
-                                                OCSPRequestAndIDs& ocspRequestAndIDs) {
-    auto& [ocspReq, certIDs] = ocspRequestAndIDs;
-
-    // Decompose the OCSP request into a DER encoded OCSP request
-    auto len = i2d_OCSP_REQUEST(ocspReq.get(), nullptr);
-    std::vector<uint8_t> buffer;
-    if (len <= 0) {
-        return getSSLFailure("Could not decode response from responder.");
-    }
-
-    buffer.resize(len);
-    auto bufferData = buffer.data();
-    if (i2d_OCSP_REQUEST(ocspReq.get(), &bufferData) < 0) {
-        return getSSLFailure("Could not convert type OCSP Response to DER encoded object.");
-    }
-
-    // Query the OCSP responder
-    return OCSPManager::get()
-        ->requestStatus(buffer, host)
-        .then([](std::vector<uint8_t> responseData) mutable -> StatusWith<UniqueOCSPResponse> {
-            const uint8_t* respDataPtr = responseData.data();
-
-            // Convert the Response back to a OpenSSL known format
-            UniqueOCSPResponse response(
-                d2i_OCSP_RESPONSE(nullptr, &respDataPtr, responseData.size()));
-
-            if (response == nullptr) {
-                return getSSLFailure("Could not retrieve OCSP Response.");
-            }
-
-            return std::move(response);
-        });
-}
-
-/**
- * This function iterates over the basic response object from the OCSP response object
- * and returns a set of Certificate IDs that are there in the response and a date object
- * which represents the time when the Response needs to be refreshed.
- */
-StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* basicResp,
-                                                             STACK_OF(X509) * intermediateCerts) {
-    Date_t earliestNextUpdate = Date_t::max();
-
-    OCSPCertIDSet certIdsInResponse;
-
-    // Iterate over all the certificates in the Response, mainly to see if any
-    // of them have been revoked.
-    int count = OCSP_resp_count(basicResp);
-    for (int i = 0; i < count; i++) {
-        OCSP_SINGLERESP* singleResp = OCSP_resp_get0(basicResp, i);
-        if (!singleResp) {
-            return getSSLFailure("OCSP Basic Response invalid: Missing response.");
-        }
-
-        certIdsInResponse.emplace(
-            OCSP_CERTID_dup(const_cast<OCSP_CERTID*>(OCSP_SINGLERESP_get0_id(singleResp))));
-
-        int reason;
-        // TODO SERVER-45798 the updated time will be implemented in the cache
-        ASN1_GENERALIZEDTIME *revtime, *thisupd, *nextupd;
-
-        auto status = OCSP_single_get0_status(singleResp, &reason, &revtime, &thisupd, &nextupd);
-
-        if (status == V_OCSP_CERTSTATUS_REVOKED) {
-            return getSSLFailure(ErrorCodes::OCSPCertificateStatusRevoked,
-                                 str::stream() << "OCSP Certificate Status: Revoked. Reason: "
-                                               << OCSP_crl_reason_str(reason));
-        } else if (status != V_OCSP_CERTSTATUS_GOOD) {
-            return getSSLFailure(str::stream()
-                                 << "Unexpected OCSP Certificate Status. Reason: " << status);
-        }
-
-        Date_t nextUpdateDate(convertASN1ToMillis(static_cast<ASN1_TIME*>(nextupd)));
-        earliestNextUpdate = std::min(earliestNextUpdate, nextUpdateDate);
-    }
-
-    if (earliestNextUpdate < Date_t::now()) {
-        return getSSLFailure("OCSP Basic Response is invalid: Response is expired.");
-    }
-
-    return std::make_pair(std::move(certIdsInResponse), earliestNextUpdate);
-}
-
-/**
- * This function returns a pair of a CertID set and a Date_t object. The CertID set contains
- * the IDs of the certificates that the OCSP Response contains. The Date_t object is the
- * earliest expiration date on the OCSPResponse.
- */
-StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
-    SSL_CTX* context, OCSP_RESPONSE* response, STACK_OF(X509) * intermediateCerts) {
-    // Read the overall status of the OCSP response
-    int responseStatus = OCSP_response_status(response);
-    switch (responseStatus) {
-        case OCSP_RESPONSE_STATUS_SUCCESSFUL:
-            break;
-        case OCSP_RESPONSE_STATUS_MALFORMEDREQUEST:
-        case OCSP_RESPONSE_STATUS_UNAUTHORIZED:
-        case OCSP_RESPONSE_STATUS_SIGREQUIRED:
-            return getSSLFailure(str::stream()
-                                 << "Error querying the OCSP responder, issue with OCSP request. "
-                                 << "Response Status: " << responseStatus);
-        case OCSP_RESPONSE_STATUS_TRYLATER:
-        case OCSP_RESPONSE_STATUS_INTERNALERROR:
-            // TODO: SERVER-42936 Add support for tlsAllowInvalidCertificates
-            return getSSLFailure(str::stream()
-                                 << "Error querying the OCSP responder, an error occured in the "
-                                 << "responder itself. Response Status: " << responseStatus);
-        default:
-            return getSSLFailure(str::stream() << "Error querying the OCSP responder. "
-                                               << "Response Status: " << responseStatus);
-    }
-
-    UniqueOcspBasicResp basicResponse(OCSP_response_get1_basic(response));
-    if (!basicResponse) {
-        return getSSLFailure("incomplete OCSP response.");
-    }
-
-    X509_STORE* store = SSL_CTX_get_cert_store(context);
-
-    // OCSP_basic_verify takes in the Response from the responder and verifies
-    // that the signer of the OCSP response is in intermediateCerts. Then it tries
-    // to form a chain from the signer certificate to the trusted CA in the store.
-    if (OCSP_basic_verify(basicResponse.get(), intermediateCerts, store, 0) != 1) {
-        return getSSLFailure("Failed to verify signature from OCSP response.");
-    }
-
-    return iterateResponse(basicResponse.get(), intermediateCerts);
-}
-
 std::shared_ptr<OCSP_RESPONSE> sharedResponseForServer;
 mongo::Mutex sharedResponseMutex;
 
@@ -1237,137 +1468,6 @@ StatusWith<bool> verifyStapledResponse(SSL* conn, X509* peerCert, OCSP_RESPONSE*
     }
 
     return false;
-}
-
-constexpr Milliseconds kOCSPUnknownStatusRefreshRate = Minutes(5);
-
-struct OCSPFetchResponse {
-    OCSPFetchResponse(Status statusOfResponse,
-                      UniqueOCSPResponse response,
-                      boost::optional<Date_t> refreshTime)
-        : statusOfResponse(statusOfResponse),
-          response(std::move(response)),
-          refreshTime(refreshTime) {}
-
-    Status statusOfResponse;
-    UniqueOCSPResponse response;
-    boost::optional<Date_t> refreshTime;
-
-    Milliseconds nextUpdateDuration() const {
-        return refreshTime ? (refreshTime.get() - Date_t::now()) / 2
-                           : kOCSPUnknownStatusRefreshRate;
-    }
-};
-
-Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
-                                           std::shared_ptr<STACK_OF(X509)> intermediateCerts,
-                                           OCSPValidationContext& ocspContext) {
-    auto& [ocspRequestMap, _, leafResponders] = ocspContext;
-
-    struct OCSPCompletionState {
-        OCSPCompletionState(int numRequests_,
-                            Promise<OCSPFetchResponse> promise_,
-                            std::shared_ptr<STACK_OF(X509)> intermediateCerts_)
-            : finishLine(numRequests_),
-              promise(std::move(promise_)),
-              intermediateCerts(std::move(intermediateCerts_)) {}
-
-        StrongWeakFinishLine finishLine;
-        Promise<OCSPFetchResponse> promise;
-        std::shared_ptr<STACK_OF(X509)> intermediateCerts;
-    };
-
-    std::vector<Future<UniqueOCSPResponse>> futureResponses{};
-
-    for (auto host : leafResponders) {
-        auto& ocspRequestAndIDs = ocspRequestMap[host];
-        Future<UniqueOCSPResponse> futureResponse = retrieveOCSPResponse(host, ocspRequestAndIDs);
-        futureResponses.push_back(std::move(futureResponse));
-    };
-
-    auto pf = makePromiseFuture<OCSPFetchResponse>();
-    auto state = std::make_shared<OCSPCompletionState>(
-        futureResponses.size(), std::move(pf.promise), std::move(intermediateCerts));
-
-    for (size_t i = 0; i < futureResponses.size(); i++) {
-        auto futureResponse = std::move(futureResponses[i]);
-        std::move(futureResponse)
-            .getAsync([context, state](StatusWith<UniqueOCSPResponse> swResponse) mutable {
-                if (!swResponse.isOK()) {
-                    if (state->finishLine.arriveWeakly()) {
-                        state->promise.setError(
-                            Status(ErrorCodes::OCSPCertificateStatusUnknown,
-                                   "Could not obtain status information of certificates."));
-                    }
-                    return;
-                }
-
-                auto swCertIDSetAndDuration = parseAndValidateOCSPResponse(
-                    context, swResponse.getValue().get(), state->intermediateCerts.get());
-
-                if (swCertIDSetAndDuration.isOK() ||
-                    swCertIDSetAndDuration.getStatus() ==
-                        ErrorCodes::OCSPCertificateStatusRevoked) {
-
-                    // We want to send the nextUpdate time down for the cache, so if there is a
-                    // duration value passed from parseAndValidateOCSPResponse, we send that down.
-                    // If not, we pass down a bogus response, and let the caller deal with it down
-                    // there.
-                    boost::optional<Date_t> nextUpdate = swCertIDSetAndDuration.isOK()
-                        ? boost::optional<Date_t>(swCertIDSetAndDuration.getValue().second)
-                        : boost::none;
-
-                    if (state->finishLine.arriveStrongly()) {
-                        state->promise.emplaceValue(swCertIDSetAndDuration.getStatus(),
-                                                    std::move(swResponse.getValue()),
-                                                    nextUpdate);
-                        return;
-                    }
-                } else {
-                    if (state->finishLine.arriveWeakly()) {
-                        state->promise.setError(
-                            Status(ErrorCodes::OCSPCertificateStatusUnknown,
-                                   "Could not obtain status information of certificates."));
-                        return;
-                    }
-                }
-            });
-    }
-
-    return std::move(pf.future);
-}
-
-// This function returns a future with a not OK status if there is an issue processing the
-// request in the beginning. If there is an issue when processing the responses, the function
-// will just continue to the next certificate. If there is a revoked certificate in the chain,
-// the future will resolve to a not OK status.
-Future<void> verifyPeerCertWithOCSP(SSL* conn, X509* peerCert) {
-    UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(peerCert));
-    if (!aiaOCSP) {
-        return Status::OK();
-    }
-
-    // OCSP checks. AIA stands for the Authority Information Access x509 extension.
-    ERR_clear_error();
-    auto intermediateCerts = SSLgetVerifiedChain(conn);
-
-    auto context = SSL_get_SSL_CTX(conn);
-
-    auto swOCSPContext = extractOcspUris(context, peerCert, intermediateCerts.get());
-    if (!swOCSPContext.isOK()) {
-        return swOCSPContext.getStatus();
-    }
-
-    auto ocspContext = std::move(swOCSPContext.getValue());
-
-    return dispatchRequests(context, std::move(intermediateCerts), ocspContext)
-        .onCompletion([context](StatusWith<OCSPFetchResponse> swResponse) -> Status {
-            if (!swResponse.isOK()) {
-                return Status::OK();
-            }
-
-            return swResponse.getValue().statusOfResponse;
-        });
 }
 
 // The definition of the callbacks
@@ -1440,9 +1540,7 @@ int ocspClientCallback(SSL* ssl, void* arg) {
  * the chain using a CRL. If no CRL is provided then the shell should reach out to the OCSP
  * responders itself and verify the status of the peer certificate.
  */
-Future<void> ocspClientVerification(SSL* ssl) {
-    UniqueX509 peerCert(SSL_get_peer_certificate(ssl));
-
+Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorPtr& reactor) {
     const unsigned char* response_ptr = NULL;
     long length = SSL_get_tlsext_status_ocsp_resp(ssl, &response_ptr);
 
@@ -1452,17 +1550,90 @@ Future<void> ocspClientVerification(SSL* ssl) {
         return Status::OK();
     }
 
-    if (!getSSLGlobalParams().sslCRLFile.empty()) {
+    // Do this after everything else - only if a roundtrip is required.
+    UniqueX509 peerCert(SSL_get_peer_certificate(ssl));
+    UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(peerCert.get()));
+
+    if (!aiaOCSP) {
         return Status::OK();
     }
 
-    // Do this after everything else - only if a roundtrip is required.
-    return verifyPeerCertWithOCSP(ssl, peerCert.get());
+    // OCSP checks. AIA stands for the Authority Information Access x509 extension.
+    ERR_clear_error();
+    auto intermediateCerts = SSLgetVerifiedChain(ssl);
+
+    auto context = SSL_get_SSL_CTX(ssl);
+
+    OCSPCacheKey cacheKey(std::move(peerCert), context, std::move(intermediateCerts));
+
+    // Convert
+    auto convert =
+        [reactor](SharedSemiFuture<OCSPCacheVal> semifuture) mutable -> Future<OCSPCacheVal> {
+        if (!reactor) {
+            return Future<OCSPCacheVal>::makeReady(std::move(semifuture).get());
+        } else {
+            auto pf = makePromiseFuture<OCSPCacheVal>();
+            std::move(semifuture)
+                .thenRunOn(reactor)
+                .getAsync(
+                    [promise = std::move(pf.promise)](StatusWith<OCSPCacheVal> response) mutable {
+                        if (!response.isOK()) {
+                            promise.setError(response.getStatus());
+                            return;
+                        }
+                        promise.emplaceValue(std::move(response.getValue()));
+                    });
+
+            return std::move(pf.future);
+        }
+    };
+
+    auto validate = [](StatusWith<OCSPCacheVal> swOcspFetchResponse)
+        -> std::pair<Status, boost::optional<Date_t>> {
+        // OCSP Status Unknown of some kind
+        if (!swOcspFetchResponse.isOK()) {
+            return {Status::OK(), boost::none};
+        }
+
+        // If lookup returns a boost::none, then we have an invalid value and
+        // we can't look into it.
+        if (!swOcspFetchResponse.getValue()) {
+            return {Status::OK(), boost::none};
+        }
+
+        return {swOcspFetchResponse.getValue()->statusOfResponse,
+                swOcspFetchResponse.getValue()->refreshTime};
+    };
+
+    auto refetchIfInvalidAndReturn =
+        [cacheKey, convert, validate](
+            std::pair<Status, boost::optional<Date_t>> validatedResponse) mutable -> Future<void> {
+        if (!validatedResponse.first.isOK() || !validatedResponse.second) {
+            return validatedResponse.first;
+        }
+
+        auto timeNow = Date_t::now();
+
+        if (validatedResponse.second.get() < timeNow) {
+            getOCSPCache(getGlobalServiceContext())->invalidate(cacheKey);
+            auto semifuture = getOCSPCache(getGlobalServiceContext())->acquireAsync(cacheKey);
+            return convert(std::move(semifuture))
+                .onCompletion(validate)
+                .then([](std::pair<Status, boost::optional<Date_t>> validateResult) {
+                    return validateResult.first;
+                });
+        }
+
+        return validatedResponse.first;
+    };
+
+    auto semifuture = getOCSPCache(getGlobalServiceContext())->acquireAsync(cacheKey);
+    return convert(std::move(semifuture)).onCompletion(validate).then(refetchIfInvalidAndReturn);
 }
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
 Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
-    if (MONGO_unlikely(disableStapling.shouldFail()) || !sslOCSPEnabled) {
+    if (MONGO_unlikely(disableStapling.shouldFail()) || !tlsOCSPEnabled) {
         return Status::OK();
     }
 
@@ -1638,7 +1809,7 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
         }
     }
 
-    if (sslOCSPEnabled) {
+    if (tlsOCSPEnabled) {
         if (direction == SSLManagerInterface::ConnectionDirection::kOutgoing) {
             // This should only induce an extra network call if there is no stapled response
             // and there is no CRL.
@@ -2099,7 +2270,8 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     SSL* conn,
     boost::optional<std::string> sni,
     const std::string& remoteHost,
-    const HostAndPort& hostForLogging) {
+    const HostAndPort& hostForLogging,
+    const ExecutorPtr& reactor) {
 
     auto tlsVersionStatus = mapTLSVersion(conn);
     if (!tlsVersionStatus.isOK()) {
@@ -2151,8 +2323,8 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
 
     // The check to ensure that remoteHost is empty is to ensure that we only run OCSP
     // verification when we are a client, never as a server.
-    if (sslOCSPEnabled && !remoteHost.empty() && !_allowInvalidCertificates) {
-        ocspFuture = ocspClientVerification(conn);
+    if (tlsOCSPEnabled && !remoteHost.empty() && !_allowInvalidCertificates) {
+        ocspFuture = ocspClientVerification(conn, reactor);
     }
 
     // TODO: check optional cipher restriction, using cert.
@@ -2315,7 +2487,7 @@ SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
     const SSLConnectionOpenSSL* conn = checked_cast<const SSLConnectionOpenSSL*>(connInterface);
 
     auto swPeerSubjectName =
-        parseAndValidatePeerCertificate(conn->ssl, boost::none, remoteHost, hostForLogging)
+        parseAndValidatePeerCertificate(conn->ssl, boost::none, remoteHost, hostForLogging, nullptr)
             .getNoThrow();
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {

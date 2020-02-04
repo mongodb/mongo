@@ -276,7 +276,8 @@ public:
     Future<SSLPeerInfo> parseAndValidatePeerCertificate(PCtxtHandle ssl,
                                                         boost::optional<std::string> sni,
                                                         const std::string& remoteHost,
-                                                        const HostAndPort& hostForLogging) final;
+                                                        const HostAndPort& hostForLogging,
+                                                        const ExecutorPtr& reactor) final;
 
     Status stapleOCSPResponse(SCHANNEL_CRED* cred) final;
 
@@ -1614,7 +1615,8 @@ SSLPeerInfo SSLManagerWindows::parseAndValidatePeerCertificateDeprecated(
                 ->_engine.native_handle(),
             boost::none,
             remoteHost,
-            hostForLogging)
+            hostForLogging,
+            nullptr)
             .getNoThrow();
     // We can't use uassertStatusOK here because we need to throw a SocketException.
     if (!swPeerSubjectName.isOK()) {
@@ -1881,7 +1883,8 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     PCtxtHandle ssl,
     boost::optional<std::string> sni,
     const std::string& remoteHost,
-    const HostAndPort& hostForLogging) {
+    const HostAndPort& hostForLogging,
+    const ExecutorPtr& reactor) {
     invariant(!sslGlobalParams.tlsCATrusts);
 
     PCCERT_CONTEXT cert;
