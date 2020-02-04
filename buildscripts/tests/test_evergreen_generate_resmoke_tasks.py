@@ -334,6 +334,13 @@ class TestConfigOptions(unittest.TestCase):
 
         self.assertEqual(config["build_id"], config_options.run_tests_build_id)
 
+    def test_create_misc_suite(self):
+        config = {}
+
+        config_options = under_test.ConfigOptions(config)
+
+        self.assertTrue(config_options.create_misc_suite)
+
     def test_item_with_format_function_works(self):
         config = {"number": "1"}
         formats = {"number": int}

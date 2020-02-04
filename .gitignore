@@ -20,10 +20,10 @@
 *.tar.gz
 *.suo
 *.ncb
-*.idb 
-*.obj 
-*.opt 
-*.pch 
+*.idb
+*.obj
+*.opt
+*.pch
 *.jsh
 *.jsall
 *.pyc
@@ -178,6 +178,7 @@ local.properties
 
 compile_commands.json
 generated_resmoke_config
+selected_tests_config
 
 # Code review tool config
 codereview.rc

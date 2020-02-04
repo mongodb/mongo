@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Selected Tests service."""
 
-from typing import Set
+from typing import Any, Dict, Set
 
 import requests
 import yaml
@@ -45,13 +45,13 @@ class SelectedTestsService(object):
 
         return None
 
-    def get_test_mappings(self, threshold: float, changed_files: Set[str]):
+    def get_test_mappings(self, threshold: float, changed_files: Set[str]) -> Dict[str, Any]:
         """
-        Request related test files from selected-tests service and filter them.
+        Request related test files from selected-tests service.
 
         :param threshold: Threshold for test file correlation.
         :param changed_files: Set of changed_files.
-        return: Set of related test files returned by selected-tests service.
+        :return: Related test files returned by selected-tests service.
         """
         payload = {"threshold": threshold, "changed_files": ",".join(changed_files)}
         response = requests.get(
@@ -63,3 +63,22 @@ class SelectedTestsService(object):
         response.raise_for_status()
 
         return response.json()["test_mappings"]
+
+    def get_task_mappings(self, threshold: float, changed_files: Set[str]) -> Dict[str, Any]:
+        """
+        Request related tasks from selected-tests service.
+
+        :param threshold: Threshold for test file correlation.
+        :param changed_files: Set of changed_files.
+        :return: Related tasks returned by selected-tests service.
+        """
+        payload = {"threshold": threshold, "changed_files": ",".join(changed_files)}
+        response = requests.get(
+            self.url + f"/projects/{self.project}/task-mappings",
+            params=payload,
+            headers=self.headers,
+            cookies=self.cookies,
+        )
+        response.raise_for_status()
+
+        return response.json()["task_mappings"]

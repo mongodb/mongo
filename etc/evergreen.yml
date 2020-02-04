@@ -1537,7 +1537,7 @@ functions:
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
-        source_dir: src/generated_resmoke_config
+        source_dir: src/selected_tests_config
         include:
           - "*"
     - command: s3.put
@@ -1555,7 +1555,7 @@ functions:
       params:
         optional: true
         files:
-          - src/generated_resmoke_config/*.json
+          - src/selected_tests_config/*.json
 
   "generate burn in tags":
     - command: expansions.write
@@ -6219,26 +6219,22 @@ tasks:
     vars:
       resmoke_args: --suites=mongos_test
 
-- <<: *task_template
-  name: multiversion_auth
+- name: multiversion_auth_gen
   tags: ["auth", "multiversion"]
   commands:
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      task_path_suffix: /data/multiversion
-      resmoke_args: --suites=multiversion_auth --storageEngine=wiredTiger
+      resmoke_args: "--storageEngine=wiredTiger"
+      use_multiversion: /data/multiversion
+      fallback_num_sub_suites: 1
 
-- <<: *task_template
-  name: multiversion
+- name: multiversion_gen
   commands:
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      task_path_suffix: /data/multiversion
-      resmoke_args: --suites=multiversion --storageEngine=wiredTiger
+      resmoke_args: "--storageEngine=wiredTiger"
+      use_multiversion: /data/multiversion
+      fallback_num_sub_suites: 1
 
 - name: unittest_shell_hang_analyzer_gen
   tags: ["misc_js", "sharded"]
@@ -8607,7 +8603,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
   - name: .sharding .txns
@@ -8715,7 +8711,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: .powercycle
     distros:
     - ubuntu1604-powercycle
@@ -9090,7 +9086,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -9199,7 +9195,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -9504,8 +9500,8 @@ buildvariants:
   - name: jsonSchema
   - name: .jstestfuzz !.initsync
   - name: .logical_session_cache .one_sec
-  - name: multiversion
-  - name: multiversion_auth
+  - name: multiversion_gen
+  - name: multiversion_auth_gen
   - name: .powercycle
   - name: .query_fuzzer
   - name: .read_write_concern
@@ -9785,7 +9781,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion
+  - name: multiversion_gen
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
@@ -9871,8 +9867,8 @@ buildvariants:
   - name: .logical_session_cache .repl
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion_auth
-  - name: multiversion
+  - name: multiversion_auth_gen
+  - name: multiversion_gen
   - name: noPassthrough_gen
   - name: .replica_sets !.multi_oplog !.large
   - name: .replica_sets !.multi_oplog .large
@@ -9945,7 +9941,7 @@ buildvariants:
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control
   - name: .logical_session_cache .repl
-  - name: multiversion
+  - name: multiversion_gen
   - name: .random_multiversion_replica_sets
   - name: .read_write_concern .large
     distros:
@@ -10059,7 +10055,7 @@ buildvariants:
   - name: .multi_shard  .common
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-  - name: multiversion
+  - name: multiversion_gen
   - name: .read_write_concern !.aggregation
     distros:
       - rhel62-large
@@ -10192,7 +10188,7 @@ buildvariants:
     - name: .jstestfuzz_multiversion_gen
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
-    - name: multiversion
+    - name: multiversion_gen
     - name: .multiversion_fuzzer
     - name: .multiversion_passthrough
     - name: .query_fuzzer
@@ -10475,7 +10471,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -10523,7 +10519,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -10574,7 +10570,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -11100,7 +11096,7 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
-  - name: multiversion
+  - name: multiversion_gen
   - name: .logical_session_cache .one_sec
   - name: replica_sets
   - name: .replica_sets .common
@@ -11184,7 +11180,7 @@ buildvariants:
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -11284,7 +11280,7 @@ buildvariants:
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11383,7 +11379,7 @@ buildvariants:
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11552,7 +11548,7 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion
+  - name: multiversion_gen
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
@@ -11648,7 +11644,7 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion
+  - name: multiversion_gen
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
@@ -11860,7 +11856,7 @@ buildvariants:
   - name: .jstestfuzz_multiversion_gen
   - name: .logical_session_cache
   - name: .multi_shard .common
-  - name: multiversion
+  - name: multiversion_gen
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .query_fuzzer
@@ -11951,7 +11947,7 @@ buildvariants:
   - name: .jstestfuzz_multiversion_gen
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
-  - name: multiversion
+  - name: multiversion_gen
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_replica_sets
@@ -12058,7 +12054,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: .logical_session_cache .one_sec
-  - name: multiversion
+  - name: multiversion_gen
   - name: .read_write_concern
   - name: .replica_sets .san
   - name: .read_only

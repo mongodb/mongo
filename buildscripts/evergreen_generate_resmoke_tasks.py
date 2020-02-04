@@ -179,11 +179,12 @@ class ConfigOptions(object):
 
         return config.get(item, None)
 
-    def generate_display_task(self, task_names: List[str]):
+    def generate_display_task(self, task_names: List[str]) -> DisplayTaskDefinition:
         """
         Generate a display task with execution tasks.
 
         :param task_names: The names of the execution tasks to include under the display task.
+        :return: Display task definition for the generated display task.
         """
         return DisplayTaskDefinition(self.task) \
                 .execution_tasks(task_names) \
@@ -776,7 +777,7 @@ class GenerateSubSuites(object):
         Filter relevant tests.
 
         :param tests_runtimes: List of tuples containing test names and test runtimes.
-        return: Filtered TestRuntime objects indicating tests to be run.
+        :return: Filtered TestRuntime objects indicating tests to be run.
         """
         tests_runtimes = self.filter_existing_tests(tests_runtimes)
         if self.config_options.selected_tests_to_run:
@@ -807,37 +808,35 @@ class GenerateSubSuites(object):
         """List the test files that are part of the suite being split."""
         return suitesconfig.get_suite(self.config_options.suite).tests
 
-    def render_evergreen_config(self, shrub_config: Configuration, suites: List[Suite]) -> str:
+    def generate_task_config(self, shrub_config: Configuration, suites: List[Suite]):
         """
         Generate the evergreen configuration for the new suite.
 
         :param shrub_config: Shrub configuration the generated Evergreen config will be added to.
         :param suites: The suite the generated Evergreen config will be generated for.
-        :return: The generated Evergreen config string in json format.
         """
-        evg_config_gen = EvergreenConfigGenerator(shrub_config, suites, self.config_options,
-                                                  self.evergreen_api)
-        evg_config = evg_config_gen.generate_config()
-        return evg_config.to_json()
+        EvergreenConfigGenerator(shrub_config, suites, self.config_options,
+                                 self.evergreen_api).generate_config()
 
-    def generate_task_config_and_suites(self, shrub_config: Configuration) -> Tuple[dict, str]:
+    def generate_suites_config(self, suites: List[Suite]) -> Tuple[dict, str]:
         """
         Generate the suites files and evergreen configuration for the generated task.
 
-        :param shrub_config: Shrub configuration the generated Evergreen config will be added to.
+        :return: The suites files and evergreen configuration for the generated task.
+        """
+        return render_suite_files(suites, self.config_options.suite, self.test_list,
+                                  self.config_options.test_suites_dir,
+                                  self.config_options.create_misc_suite)
+
+    def get_suites(self) -> List[Suite]:
+        """
+        Generate the suites files and evergreen configuration for the generated task.
+
         :return: The suites files and evergreen configuration for the generated task.
         """
         end_date = datetime.datetime.utcnow().replace(microsecond=0)
         start_date = end_date - datetime.timedelta(days=LOOKBACK_DURATION_DAYS)
-        suites = self.calculate_suites(start_date, end_date)
-
-        LOGGER.debug("Creating suites", num_suites=len(suites), task=self.config_options.task,
-                     dir=self.config_options.generated_config_dir)
-        suite_files_dict = render_suite_files(suites, self.config_options.suite, self.test_list,
-                                              self.config_options.test_suites_dir,
-                                              self.config_options.create_misc_suite)
-        shrub_task_config = self.render_evergreen_config(shrub_config, suites)
-        return suite_files_dict, shrub_task_config
+        return self.calculate_suites(start_date, end_date)
 
     def run(self):
         """Generate resmoke suites that run within a target execution time and write to disk."""
@@ -846,11 +845,17 @@ class GenerateSubSuites(object):
             LOGGER.info("Not generating configuration due to previous successful generation.")
             return
 
-        shrub_config = Configuration()
-        suite_files_dict, shrub_task_config = self.generate_task_config_and_suites(shrub_config)
+        suites = self.get_suites()
+        LOGGER.debug("Creating suites", num_suites=len(suites), task=self.config_options.task,
+                     dir=self.config_options.generated_config_dir)
 
-        suite_files_dict[self.config_options.task + ".json"] = shrub_task_config
-        write_file_dict(self.config_options.generated_config_dir, suite_files_dict)
+        config_dict_of_suites = self.generate_suites_config(suites)
+
+        shrub_config = Configuration()
+        self.generate_task_config(shrub_config, suites)
+
+        config_dict_of_suites[self.config_options.task + ".json"] = shrub_config.to_json()
+        write_file_dict(self.config_options.generated_config_dir, config_dict_of_suites)
 
 
 def filter_specified_tests(specified_tests: Set[str], tests_runtimes: List[teststats.TestRuntime]):
@@ -859,7 +864,7 @@ def filter_specified_tests(specified_tests: Set[str], tests_runtimes: List[tests
 
     :param specified_tests: List of test files that should be run.
     :param tests_runtimes: List of tuples containing test names and test runtimes.
-    return: List of TestRuntime tuples that match specified_tests.
+    :return: List of TestRuntime tuples that match specified_tests.
     """
     return [info for info in tests_runtimes if info.test_name in specified_tests]
 

@@ -3,6 +3,7 @@ import os
 import unittest
 
 from mock import MagicMock, patch
+from shrub.config import Configuration
 
 # pylint: disable=wrong-import-position
 import buildscripts.ciconfig.evergreen as _evergreen
@@ -40,6 +41,7 @@ class TestSelectedTestsConfigOptions(unittest.TestCase):
     @patch(ns("read_config"))
     def test_overwrites_overwrite_filepath_config(self, read_config_mock):
         filepath = MagicMock()
+        origin_variant_expansions = {"key1": 0}
         read_config_mock.read_config_file.return_value = {"key1": 1}
         overwrites = {"key1": 2}
         required_keys = {"key1"}
@@ -47,13 +49,14 @@ class TestSelectedTestsConfigOptions(unittest.TestCase):
         formats = {"key1": int}
 
         config_options = under_test.SelectedTestsConfigOptions.from_file(
-            filepath, overwrites, required_keys, defaults, formats)
+            origin_variant_expansions, filepath, overwrites, required_keys, defaults, formats)
 
         self.assertEqual(overwrites["key1"], config_options.key1)
 
     @patch(ns("read_config"))
     def test_overwrites_overwrite_defaults(self, read_config_mock):
         filepath = MagicMock()
+        origin_variant_expansions = {}
         read_config_mock.read_config_file.return_value = {"key1": 1}
         overwrites = {"key1": 2}
         required_keys = {"key1"}
@@ -61,9 +64,25 @@ class TestSelectedTestsConfigOptions(unittest.TestCase):
         formats = {"key1": int}
 
         config_options = under_test.SelectedTestsConfigOptions.from_file(
-            filepath, overwrites, required_keys, defaults, formats)
+            origin_variant_expansions, filepath, overwrites, required_keys, defaults, formats)
 
         self.assertEqual(overwrites["key1"], config_options.key1)
+
+    @patch(ns("read_config"))
+    def test_filepath_config_overrides_origin_expansions(self, read_config_mock):
+        filepath = MagicMock()
+        origin_variant_expansions = {"key1": 0}
+        filepath_config = {"key1": 1}
+        read_config_mock.read_config_file.return_value = filepath_config
+        overwrites = {}
+        required_keys = {"key1"}
+        defaults = {}
+        formats = {"key1": int}
+
+        config_options = under_test.SelectedTestsConfigOptions.from_file(
+            origin_variant_expansions, filepath, overwrites, required_keys, defaults, formats)
+
+        self.assertEqual(filepath_config["key1"], config_options.key1)
 
     def test_run_tests_task(self):
         config_options = under_test.SelectedTestsConfigOptions(
@@ -83,6 +102,17 @@ class TestSelectedTestsConfigOptions(unittest.TestCase):
 
         self.assertEqual(config_options.run_tests_build_id, "my_build_id")
 
+    def test_create_misc_suite_with_no_selected_tests_to_run(self):
+        config_options = under_test.SelectedTestsConfigOptions({}, {}, {}, {})
+
+        self.assertTrue(config_options.create_misc_suite)
+
+    def test_create_misc_suite_with_selected_tests_to_run(self):
+        config_options = under_test.SelectedTestsConfigOptions(
+            {"selected_tests_to_run": {"my_test.js"}}, {}, {}, {})
+
+        self.assertFalse(config_options.create_misc_suite)
+
     @patch(ns("read_config"))
     def test_generate_display_task(self, read_config_mock):
         config_options = under_test.SelectedTestsConfigOptions(
@@ -95,7 +125,7 @@ class TestSelectedTestsConfigOptions(unittest.TestCase):
         self.assertIn("task_2", display_task.to_map()["execution_tasks"])
 
 
-class TestFindRelatedTestFiles(unittest.TestCase):
+class TestFindSelectedTestFiles(unittest.TestCase):
     @patch(ns("is_file_a_test_file"))
     @patch(ns("SelectedTestsService"))
     def test_related_files_returned_from_selected_tests_service(self, selected_tests_service_mock,
@@ -113,8 +143,8 @@ class TestFindRelatedTestFiles(unittest.TestCase):
             },
         ]
 
-        related_test_files = under_test._find_related_test_files(selected_tests_service_mock,
-                                                                 changed_files)
+        related_test_files = under_test._find_selected_test_files(selected_tests_service_mock,
+                                                                  changed_files)
 
         self.assertEqual(related_test_files, {"jstests/file-1.js", "jstests/file-3.js"})
 
@@ -135,8 +165,8 @@ class TestFindRelatedTestFiles(unittest.TestCase):
             },
         ]
 
-        related_test_files = under_test._find_related_test_files(selected_tests_service_mock,
-                                                                 changed_files)
+        related_test_files = under_test._find_selected_test_files(selected_tests_service_mock,
+                                                                  changed_files)
 
         self.assertEqual(related_test_files, set())
 
@@ -145,21 +175,97 @@ class TestFindRelatedTestFiles(unittest.TestCase):
         selected_tests_service_mock.get_test_mappings.return_value = set()
         changed_files = {"src/file1.cpp", "src/file2.js"}
 
-        related_test_files = under_test._find_related_test_files(selected_tests_service_mock,
-                                                                 changed_files)
+        related_test_files = under_test._find_selected_test_files(selected_tests_service_mock,
+                                                                  changed_files)
 
         self.assertEqual(related_test_files, set())
+
+
+class TestFindSelectedTasks(unittest.TestCase):
+    @patch(ns("SelectedTestsService"))
+    def test_related_tasks_returned_from_selected_tests_service(self, selected_tests_service_mock):
+        selected_tests_service_mock.get_task_mappings.return_value = [
+            {
+                "source_file": "src/file1.cpp",
+                "tasks": [{"name": "my_task_1"}],
+            },
+            {
+                "source_file": "src/file2.cpp",
+                "tasks": [{"name": "my_task_2"}],
+            },
+        ]
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+        build_variant_conf = MagicMock()
+        build_variant_conf.get_task.return_value = _evergreen.Task({"name": "my_task_1"})
+
+        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
+                                                        build_variant_conf)
+
+        self.assertEqual(related_tasks, {"my_task_1"})
+
+    @patch(ns("SelectedTestsService"))
+    def test_returned_tasks_do_not_exist(self, selected_tests_service_mock):
+        selected_tests_service_mock.get_task_mappings.return_value = [
+            {
+                "source_file": "src/file1.cpp",
+                "tasks": [{"name": "my_task_1"}],
+            },
+        ]
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+        build_variant_conf = MagicMock()
+        build_variant_conf.get_task.return_value = None
+
+        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
+                                                        build_variant_conf)
+
+        self.assertEqual(related_tasks, set())
+
+    @patch(ns("SelectedTestsService"))
+    def test_returned_tasks_should_be_excluded(self, selected_tests_service_mock):
+        excluded_task = under_test.EXCLUDE_TASK_LIST[0]
+        selected_tests_service_mock.get_task_mappings.return_value = [
+            {
+                "source_file": "src/file1.cpp",
+                "tasks": [{"name": excluded_task}],
+            },
+        ]
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+        build_variant_conf = MagicMock()
+        build_variant_conf.get_task.return_value = _evergreen.Task({"name": excluded_task})
+
+        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
+                                                        build_variant_conf)
+
+        self.assertEqual(related_tasks, set())
+
+    @patch(ns("SelectedTestsService"))
+    def test_returned_tasks_match_excluded_pattern(self, selected_tests_service_mock):
+        task_that_matches_exclude_pattern = "compile_all"
+        selected_tests_service_mock.get_task_mappings.return_value = [
+            {
+                "source_file": "src/file1.cpp",
+                "tasks": [{"name": task_that_matches_exclude_pattern}],
+            },
+        ]
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+        build_variant_conf = MagicMock()
+        build_variant_conf.get_task.return_value = _evergreen.Task(
+            {"name": task_that_matches_exclude_pattern})
+
+        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
+                                                        build_variant_conf)
+
+        self.assertEqual(related_tasks, set())
 
 
 class TestGetSelectedTestsTaskConfiguration(unittest.TestCase):
     @patch(ns("read_config"))
     def test_gets_values(self, read_config_mock):
-        filepath = MagicMock()
         read_config_mock.read_config_file.return_value = {
             "task_name": "my_task", "build_variant": "my-build-variant", "build_id": "my_build_id"
         }
 
-        selected_tests_task_config = under_test._get_selected_tests_task_configuration(filepath)
+        selected_tests_task_config = under_test._get_selected_tests_task_config(MagicMock())
 
         self.assertEqual(selected_tests_task_config["name_of_generating_task"], "my_task")
         self.assertEqual(selected_tests_task_config["name_of_generating_build_variant"],
@@ -167,10 +273,14 @@ class TestGetSelectedTestsTaskConfiguration(unittest.TestCase):
         self.assertEqual(selected_tests_task_config["name_of_generating_build_id"], "my_build_id")
 
 
-class TestGetEvgTaskConfiguration(unittest.TestCase):
-    def test_task_is_a_generate_resmoke_task(self):
+class TestGetEvgTaskConfig(unittest.TestCase):
+    @patch(ns("_get_selected_tests_task_config"))
+    def test_task_is_a_generate_resmoke_task(self, selected_tests_config_mock):
+        selected_tests_config_mock.return_value = {"selected_tests_key": "selected_tests_value"}
         task_name = "auth_gen"
-        task = _evergreen.Task({
+        build_variant_conf = MagicMock()
+        build_variant_conf.name = "variant"
+        build_variant_conf.get_task.return_value = _evergreen.Task({
             "name":
                 task_name,
             "commands": [{
@@ -181,26 +291,26 @@ class TestGetEvgTaskConfiguration(unittest.TestCase):
                 },
             }],
         })
-        burn_in_task_config = tests_by_task_stub()[task_name]
-        evg_conf_mock = MagicMock()
-        evg_conf_mock.get_variant.return_value.get_task.return_value = task
 
-        evg_task_config = under_test._get_evg_task_configuration(evg_conf_mock, "variant",
-                                                                 task_name, burn_in_task_config)
+        evg_task_config = under_test._get_evg_task_config(MagicMock(), task_name,
+                                                          build_variant_conf)
 
         self.assertEqual(evg_task_config["task_name"], task_name)
         self.assertEqual(evg_task_config["build_variant"], "variant")
-        self.assertEqual(evg_task_config["selected_tests_to_run"], {"jstests/auth/auth3.js"})
         self.assertIsNone(evg_task_config.get("suite"))
         self.assertEqual(
             evg_task_config["resmoke_args"],
             "--storageEngine=wiredTiger",
         )
         self.assertEqual(evg_task_config["fallback_num_sub_suites"], "4")
+        self.assertEqual(evg_task_config["selected_tests_key"], "selected_tests_value")
 
-    def test_task_is_not_a_generate_resmoke_task(self):
+    @patch(ns("_get_selected_tests_task_config"))
+    def test_task_is_not_a_generate_resmoke_task(self, selected_tests_config_mock):
         task_name = "jsCore_auth"
-        task = _evergreen.Task({
+        build_variant_conf = MagicMock()
+        build_variant_conf.name = "variant"
+        build_variant_conf.get_task.return_value = _evergreen.Task({
             "name":
                 task_name,
             "commands": [{
@@ -208,18 +318,12 @@ class TestGetEvgTaskConfiguration(unittest.TestCase):
                 "vars": {"resmoke_args": "--suites=core_auth --storageEngine=wiredTiger"}
             }],
         })
-        burn_in_task_config = tests_by_task_stub()[task_name]
-        evg_conf_mock = MagicMock()
-        evg_conf_mock.get_variant.return_value.get_task.return_value = task
 
-        evg_task_config = under_test._get_evg_task_configuration(evg_conf_mock, "variant",
-                                                                 task_name, burn_in_task_config)
+        evg_task_config = under_test._get_evg_task_config(MagicMock(), task_name,
+                                                          build_variant_conf)
 
         self.assertEqual(evg_task_config["task_name"], task_name)
         self.assertEqual(evg_task_config["build_variant"], "variant")
-        self.assertEqual(
-            evg_task_config["selected_tests_to_run"],
-            {"jstests/core/currentop_waiting_for_latch.js", "jstests/core/latch_analyzer.js"})
         self.assertEqual(evg_task_config["suite"], "core_auth")
         self.assertEqual(
             evg_task_config["resmoke_args"],
@@ -228,55 +332,136 @@ class TestGetEvgTaskConfiguration(unittest.TestCase):
         self.assertEqual(evg_task_config["fallback_num_sub_suites"], "1")
 
 
-class TestGenerateShrubConfig(unittest.TestCase):
-    @patch(ns("_get_selected_tests_task_configuration"))
-    @patch(ns("_get_evg_task_configuration"))
+class TestUpdateConfigDictWithTask(unittest.TestCase):
     @patch(ns("SelectedTestsConfigOptions"))
     @patch(ns("GenerateSubSuites"))
-    def test_when_test_by_task_returned(
-            self, generate_subsuites_mock, selected_tests_config_options_mock,
-            get_evg_task_configuration_mock, get_selected_tests_task_configuration_mock):
-        evg_api = MagicMock()
-        evg_conf = MagicMock()
-        expansion_file = MagicMock()
+    def test_suites_and_tasks_are_generated(self, generate_subsuites_mock,
+                                            selected_tests_config_options_mock):
+        suites_config_mock = {"my_suite_0.yml": "suite file contents"}
+        generate_subsuites_mock.return_value.generate_suites_config.return_value = suites_config_mock
+
+        def generate_task_config(shrub_config, suites):
+            shrub_config.task("my_fake_task")
+
+        generate_subsuites_mock.return_value.generate_task_config.side_effect = generate_task_config
+
+        shrub_config = Configuration()
+        config_dict_of_suites_and_tasks = {}
+        under_test._update_config_with_task(
+            evg_api=MagicMock(), shrub_config=shrub_config, config_options=MagicMock(),
+            config_dict_of_suites_and_tasks=config_dict_of_suites_and_tasks)
+
+        self.assertEqual(config_dict_of_suites_and_tasks, suites_config_mock)
+        self.assertIn("my_fake_task", shrub_config.to_json())
+
+    @patch(ns("SelectedTestsConfigOptions"))
+    @patch(ns("GenerateSubSuites"))
+    def test_no_suites_or_tasks_are_generated(self, generate_subsuites_mock,
+                                              selected_tests_config_options_mock):
+        generate_subsuites_mock.return_value.generate_suites_config.return_value = {}
+
+        def generate_task_config(shrub_config, suites):
+            pass
+
+        generate_subsuites_mock.return_value.generate_task_config.side_effect = generate_task_config
+
+        shrub_config = Configuration()
+        config_dict_of_suites_and_tasks = {}
+        under_test._update_config_with_task(
+            evg_api=MagicMock(), shrub_config=shrub_config, config_options=MagicMock(),
+            config_dict_of_suites_and_tasks=config_dict_of_suites_and_tasks)
+
+        self.assertEqual(config_dict_of_suites_and_tasks, {})
+        self.assertEqual(shrub_config.to_json(), "{}")
+
+
+class TestGetTaskConfigsForTestMappings(unittest.TestCase):
+    @patch(ns("_get_evg_task_config"))
+    def test_get_config_for_test_mapping(self, get_evg_task_config_mock):
         tests_by_task = tests_by_task_stub()
-        yml_suite_file_contents = MagicMock()
-        shrub_json_file_contents = MagicMock()
-        suite_file_dict_mock = {"auth_0.yml": yml_suite_file_contents}
-        generate_subsuites_mock.return_value.generate_task_config_and_suites.return_value = (
-            suite_file_dict_mock,
-            shrub_json_file_contents,
-        )
+        get_evg_task_config_mock.side_effect = [{"task_config_key": "task_config_value_1"},
+                                                {"task_config_key": "task_config_value_2"}]
 
-        config_file_dict = under_test._generate_shrub_config(evg_api, evg_conf, expansion_file,
-                                                             tests_by_task, "variant")
+        task_configs = under_test._get_task_configs_for_test_mappings(
+            expansion_file=MagicMock(), tests_by_task=tests_by_task,
+            build_variant_config=MagicMock())
+
+        self.assertEqual(task_configs["jsCore_auth"]["task_config_key"], "task_config_value_1")
         self.assertEqual(
-            config_file_dict,
-            {
-                "auth_0.yml": yml_suite_file_contents,
-                "selected_tests_config.json": shrub_json_file_contents,
-            },
-        )
+            task_configs["jsCore_auth"]["selected_tests_to_run"],
+            {"jstests/core/currentop_waiting_for_latch.js", "jstests/core/latch_analyzer.js"})
+        self.assertEqual(task_configs["auth_gen"]["task_config_key"], "task_config_value_2")
+        self.assertEqual(task_configs["auth_gen"]["selected_tests_to_run"],
+                         {'jstests/auth/auth3.js'})
 
-    @patch(ns("_get_selected_tests_task_configuration"))
-    @patch(ns("_get_evg_task_configuration"))
+
+class TestGetTaskConfigsForTaskMappings(unittest.TestCase):
+    @patch(ns("_get_evg_task_config"))
+    def test_get_config_for_task_mapping(self, get_evg_task_config_mock):
+        tasks = ["task_1", "task_2"]
+        get_evg_task_config_mock.side_effect = [{"task_config_key": "task_config_value_1"},
+                                                {"task_config_key": "task_config_value_2"}]
+        task_configs = under_test._get_task_configs_for_task_mappings(
+            expansion_file=MagicMock(), related_tasks=tasks, build_variant_config=MagicMock())
+
+        self.assertEqual(task_configs["task_1"]["task_config_key"], "task_config_value_1")
+        self.assertEqual(task_configs["task_2"]["task_config_key"], "task_config_value_2")
+
+
+class TestRun(unittest.TestCase):
     @patch(ns("SelectedTestsConfigOptions"))
-    @patch(ns("GenerateSubSuites"))
-    def test_when_no_test_by_task_returned(
-            self, generate_subsuites_mock, selected_tests_config_options_mock,
-            get_evg_task_configuration_mock, get_selected_tests_task_configuration_mock):
-        evg_api = MagicMock()
-        evg_conf = MagicMock()
-        expansion_file = MagicMock()
-        tests_by_task = {}
-        yml_suite_file_contents = MagicMock()
-        shrub_json_file_contents = MagicMock()
-        suite_file_dict_mock = {"auth_0.yml": yml_suite_file_contents}
-        generate_subsuites_mock.return_value.generate_task_config_and_suites.return_value = (
-            suite_file_dict_mock,
-            shrub_json_file_contents,
-        )
+    @patch(ns("_find_selected_test_files"))
+    @patch(ns("create_task_list_for_tests"))
+    @patch(ns("_get_task_configs_for_test_mappings"))
+    @patch(ns("_find_selected_tasks"))
+    @patch(ns("_update_config_with_task"))
+    # pylint: disable=too-many-arguments
+    def test_run_with_related_tests_but_no_related_tasks(
+            self, update_config_with_task_mock, find_selected_tasks_mock,
+            get_task_configs_for_test_mappings_mock, create_task_list_for_tests_mock,
+            find_selected_test_files_mock, selected_tests_config_options):
+        find_selected_test_files_mock.return_value = {"jstests/file-1.js", "jstests/file-3.js"}
+        get_task_configs_for_test_mappings_mock.return_value = {
+            "task_config_key": "task_config_value_1"
+        }
+        find_selected_tasks_mock.return_value = set()
 
-        config_file_dict = under_test._generate_shrub_config(evg_api, evg_conf, expansion_file,
-                                                             tests_by_task, "variant")
-        self.assertEqual(config_file_dict, {})
+        def update_config_with_task(evg_api, shrub_config, config_options,
+                                    config_dict_of_suites_and_tasks):
+            config_dict_of_suites_and_tasks["new_config_key"] = "new_config_values"
+
+        update_config_with_task_mock.side_effect = update_config_with_task
+
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+        config_dict_of_suites_and_tasks = under_test.run(MagicMock(), MagicMock(), MagicMock(),
+                                                         MagicMock(), changed_files, "variant")
+
+        self.assertEqual(config_dict_of_suites_and_tasks["new_config_key"], "new_config_values")
+
+    @patch(ns("SelectedTestsConfigOptions"))
+    @patch(ns("_find_selected_test_files"))
+    @patch(ns("_get_task_configs_for_task_mappings"))
+    @patch(ns("_find_selected_tasks"))
+    @patch(ns("_update_config_with_task"))
+    # pylint: disable=too-many-arguments
+    def test_run_with_related_tasks_but_no_related_tests(
+            self, update_config_with_task_mock, find_selected_tasks_mock,
+            get_task_configs_for_task_mappings_mock, find_selected_test_files_mock,
+            selected_tests_config_options):
+        find_selected_test_files_mock.return_value = {}
+        get_task_configs_for_task_mappings_mock.return_value = {
+            "task_config_key": "task_config_value_1"
+        }
+        find_selected_tasks_mock.return_value = {"jsCore_auth", "auth_gen"}
+
+        def update_config_with_task(evg_api, shrub_config, config_options,
+                                    config_dict_of_suites_and_tasks):
+            config_dict_of_suites_and_tasks["new_config_key"] = "new_config_values"
+
+        update_config_with_task_mock.side_effect = update_config_with_task
+
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+        config_dict_of_suites_and_tasks = under_test.run(MagicMock(), MagicMock(), MagicMock(),
+                                                         MagicMock(), changed_files, "variant")
+
+        self.assertEqual(config_dict_of_suites_and_tasks["new_config_key"], "new_config_values")
