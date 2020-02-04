@@ -274,14 +274,18 @@ Status validateTTLOptions(OperationContext* opCtx, const BSONObj& cmdObj) {
  */
 boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* opCtx,
                                                              const BSONObj& cmdObj) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
     if (cmdObj.hasField(kCommitQuorumFieldName)) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Standalones can't specify commitQuorum",
+                replCoord->isReplEnabled());
         CommitQuorumOptions commitQuorum;
         uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));
         return commitQuorum;
     } else {
         // Retrieve the default commit quorum if one wasn't passed in, which consists of all
         // data-bearing nodes.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         int numDataBearingMembers =
             replCoord->isReplEnabled() ? replCoord->getConfig().getNumDataBearingMembers() : 1;
         return CommitQuorumOptions(numDataBearingMembers);
