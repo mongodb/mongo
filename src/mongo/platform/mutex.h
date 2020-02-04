@@ -37,6 +37,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/stdx/mutex.h"
@@ -49,9 +50,9 @@
 
 namespace mongo {
 
-class Mutex;
-
 namespace latch_detail {
+
+class Mutex;
 
 using Level = hierarchical_acquisition_detail::Level;
 
@@ -290,7 +291,6 @@ auto getOrMakeLatchData(Tag&&, Identity identity, const SourceLocationHolder& so
 inline auto defaultData() {
     return getOrMakeLatchData([] {}, Identity(kAnonymousName), MONGO_SOURCE_LOCATION());
 }
-}  // namespace latch_detail
 
 /**
  * Latch is an abstract base class that implements the Lockable concept
@@ -334,8 +334,8 @@ public:
     bool try_lock() override;
     StringData getName() const override;
 
-    Mutex() : Mutex(latch_detail::defaultData()) {}
-    explicit Mutex(std::shared_ptr<latch_detail::Data> data);
+    Mutex() : Mutex(defaultData()) {}
+    explicit Mutex(std::shared_ptr<Data> data);
 
     ~Mutex();
 
@@ -345,11 +345,20 @@ private:
     void _onSlowLock() noexcept;
     void _onUnlock() noexcept;
 
-    const std::shared_ptr<latch_detail::Data> _data;
+    const std::shared_ptr<Data> _data;
 
     stdx::mutex _mutex;  // NOLINT
     bool _isLocked = false;
 };
+}  // namespace latch_detail
+
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
+using Latch = latch_detail::Latch;
+using Mutex = latch_detail::Mutex;
+#else
+using Latch = stdx::mutex;  // NOLINT
+using Mutex = stdx::mutex;  // NOLINT
+#endif
 
 }  // namespace mongo
 
@@ -363,4 +372,8 @@ private:
 /**
  * Construct a mongo::Mutex using the result of MONGO_GET_LATCH_DATA with all arguments forwarded
  */
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
 #define MONGO_MAKE_LATCH(...) ::mongo::Mutex(MONGO_GET_LATCH_DATA(__VA_ARGS__));
+#else
+#define MONGO_MAKE_LATCH(...) ::mongo::stdx::mutex();  // NOLINT
+#endif

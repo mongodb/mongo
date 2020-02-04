@@ -323,7 +323,7 @@ public:
      * Get the name for a Latch
      */
     TEMPLATE(typename LatchT)
-    REQUIRES(std::is_base_of_v<Latch, LatchT>)  //
+    REQUIRES(std::is_base_of_v<latch_detail::Latch, LatchT>)  //
     static StringData getLatchName(const stdx::unique_lock<LatchT>& lk) {
         return lk.mutex()->getName();
     }

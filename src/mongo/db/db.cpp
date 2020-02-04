@@ -1219,7 +1219,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     audit::logShutdown(client);
 
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
     LatchAnalyzer::get(serviceContext).dump();
+#endif
 }
 
 int mongoDbMain(int argc, char* argv[], char** envp) {

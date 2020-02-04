@@ -12026,6 +12026,18 @@ buildvariants:
     distros:
     - ubuntu1604-build
 
+- name: enterprise-ubuntu-no-latch-1604-64-bit
+  display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
+  batchtime: 1440 # 1 day
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1604-build
+
 - name: shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"
   run_on:

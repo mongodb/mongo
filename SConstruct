@@ -320,6 +320,13 @@ add_option('use-sasl-client',
     nargs=0,
 )
 
+add_option('use-diagnostic-latches',
+    choices=['on', 'off'],
+    default='on',
+    help='Enable annotated Mutex types',
+    type='choice',
+)
+
 # Most of the "use-system-*" options follow a simple form.
 for pack in [
     ('abseil-cpp',),
@@ -3477,6 +3484,9 @@ def doConfigure(myenv):
 
     if posix_monotonic_clock:
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
+
+    if get_option('use-diagnostic-latches') == 'off':
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USE_RAW_LATCHES")
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and

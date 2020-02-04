@@ -42,7 +42,7 @@
 namespace mongo {
 
 #if defined(_WIN32)
-class SpinLock : public Latch {
+class SpinLock : public latch_detail::Latch {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
 
@@ -74,7 +74,7 @@ private:
 #else
 
 #if MONGO_CONFIG_DEBUG_BUILD
-class SpinLock : public Latch {
+class SpinLock : public latch_detail::Latch {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
 
@@ -99,7 +99,7 @@ private:
 
 #else
 
-class SpinLock : public Latch {
+class SpinLock : public latch_detail::Latch {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
 

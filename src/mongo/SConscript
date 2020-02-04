@@ -310,6 +310,7 @@ config_header_substs = (
     ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
     ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
     ('@mongo_config_use_libunwind@', 'MONGO_CONFIG_USE_LIBUNWIND'),
+    ('@mongo_config_use_raw_latches@', 'MONGO_CONFIG_USE_RAW_LATCHES'),
     ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
 )
 
@@ -469,7 +470,7 @@ mongod = env.Program(
         'util/clock_sources',
         'util/elapsed_tracker',
         'util/fail_point',
-        'util/latch_analyzer',
+        'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'util/net/network',
         'util/ntservice',
         'util/options_parser/options_parser_init',
@@ -579,7 +580,7 @@ mongos = env.Program(
         'transport/transport_layer_manager',
         'util/clock_sources',
         'util/fail_point',
-        'util/latch_analyzer',
+        'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
         'util/ntservice',
         'util/version_impl',

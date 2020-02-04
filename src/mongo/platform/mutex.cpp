@@ -31,9 +31,9 @@
 
 #include "mongo/base/init.h"
 
-namespace mongo {
+namespace mongo::latch_detail {
 
-Mutex::Mutex(std::shared_ptr<latch_detail::Data> data) : _data{std::move(data)} {
+Mutex::Mutex(std::shared_ptr<Data> data) : _data{std::move(data)} {
     invariant(_data);
 
     _data->counts().created.fetchAndAdd(1);
@@ -80,7 +80,7 @@ StringData Mutex::getName() const {
 void Mutex::_onContendedLock() noexcept {
     _data->counts().contended.fetchAndAdd(1);
 
-    auto& state = latch_detail::getDiagnosticListenerState();
+    auto& state = getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -93,7 +93,7 @@ void Mutex::_onContendedLock() noexcept {
 void Mutex::_onQuickLock() noexcept {
     _data->counts().acquired.fetchAndAdd(1);
 
-    auto& state = latch_detail::getDiagnosticListenerState();
+    auto& state = getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -106,7 +106,7 @@ void Mutex::_onQuickLock() noexcept {
 void Mutex::_onSlowLock() noexcept {
     _data->counts().acquired.fetchAndAdd(1);
 
-    auto& state = latch_detail::getDiagnosticListenerState();
+    auto& state = getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -119,7 +119,7 @@ void Mutex::_onSlowLock() noexcept {
 void Mutex::_onUnlock() noexcept {
     _data->counts().released.fetchAndAdd(1);
 
-    auto& state = latch_detail::getDiagnosticListenerState();
+    auto& state = getDiagnosticListenerState();
     if (!state.isFinalized.load()) {
         return;
     }
@@ -141,4 +141,4 @@ MONGO_INITIALIZER(FinalizeDiagnosticListeners)(InitializerContext* context) {
     return Status::OK();
 }
 
-}  // namespace mongo
+}  // namespace mongo::latch_detail

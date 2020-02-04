@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
 
 #include "mongo/bson/mutable/document.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -45,8 +46,11 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/diagnostic_info.h"
 #include "mongo/util/net/socket_utils.h"
+
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
+#include "mongo/util/diagnostic_info.h"
+#endif
 
 namespace mongo {
 
@@ -63,7 +67,9 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
     std::vector<BSONObj> ops;
 
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
     auto blockedOpGuard = DiagnosticInfo::maybeMakeBlockedOpForTest(opCtx->getClient());
+#endif
 
     for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
          Client* client = cursor.next();) {
