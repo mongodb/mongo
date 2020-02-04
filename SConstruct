@@ -3792,7 +3792,7 @@ if get_option('ninja') == 'true':
     # write_uuid_to_file for FAKELIB in SCons because SCons does.
     env.NinjaRule(
         rule="FAKELIB",
-        command="cmd /c copy NUL $out" if env["PLATFORM"] == "win32" else "touch $out",
+        command="cmd /c copy 1>NUL NUL $out" if env["PLATFORM"] == "win32" else "touch $out",
     )
 
     def fakelib_in_ninja(env, node):
