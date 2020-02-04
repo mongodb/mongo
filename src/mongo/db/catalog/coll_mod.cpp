@@ -69,6 +69,7 @@ MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
+    BSONElement indexHidden = {};
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
     BSONElement collValidator = {};
@@ -125,14 +126,18 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
-            if (cmr.indexExpireAfterSeconds.eoo()) {
-                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field");
+            cmr.indexHidden = indexObj["hidden"];
+
+            if (cmr.indexExpireAfterSeconds.eoo() && cmr.indexHidden.eoo()) {
+                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds or hidden field");
             }
-            if (!cmr.indexExpireAfterSeconds.isNumber()) {
+            if (!cmr.indexExpireAfterSeconds.eoo() && !cmr.indexExpireAfterSeconds.isNumber()) {
                 return Status(ErrorCodes::InvalidOptions,
                               "expireAfterSeconds field must be a number");
             }
-
+            if (!cmr.indexHidden.eoo() && !cmr.indexHidden.isBoolean()) {
+                return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
+            }
             if (!indexName.empty()) {
                 cmr.idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
                 if (!cmr.idx) {
@@ -161,15 +166,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 cmr.idx = indexes[0];
             }
 
-            BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
-            if (oldExpireSecs.eoo()) {
-                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field to update");
+            if (!cmr.indexExpireAfterSeconds.eoo()) {
+                BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
+                if (oldExpireSecs.eoo()) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  "no expireAfterSeconds field to update");
+                }
+                if (!oldExpireSecs.isNumber()) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  "existing expireAfterSeconds field is not a number");
+                }
             }
-            if (!oldExpireSecs.isNumber()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "existing expireAfterSeconds field is not a number");
-            }
-
         } else if (fieldName == "validator" && !isView) {
             // Save this to a variable to avoid reading the atomic variable multiple times.
             const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
@@ -250,13 +257,26 @@ class CollModResultChange : public RecoveryUnit::Change {
 public:
     CollModResultChange(const BSONElement& oldExpireSecs,
                         const BSONElement& newExpireSecs,
+                        const BSONElement& oldHidden,
+                        const BSONElement& newHidden,
                         BSONObjBuilder* result)
-        : _oldExpireSecs(oldExpireSecs), _newExpireSecs(newExpireSecs), _result(result) {}
+        : _oldExpireSecs(oldExpireSecs),
+          _newExpireSecs(newExpireSecs),
+          _oldHidden(oldHidden),
+          _newHidden(newHidden),
+          _result(result) {}
 
     void commit(boost::optional<Timestamp>) override {
         // add the fields to BSONObjBuilder result
-        _result->appendAs(_oldExpireSecs, "expireAfterSeconds_old");
-        _result->appendAs(_newExpireSecs, "expireAfterSeconds_new");
+        if (!_oldExpireSecs.eoo()) {
+            _result->appendAs(_oldExpireSecs, "expireAfterSeconds_old");
+            _result->appendAs(_newExpireSecs, "expireAfterSeconds_new");
+        }
+        if (!_newHidden.eoo()) {
+            bool oldValue = _oldHidden.eoo() ? false : _oldHidden.booleanSafe();
+            _result->append("hidden_old", oldValue);
+            _result->appendAs(_newHidden, "hidden_new");
+        }
     }
 
     void rollback() override {}
@@ -264,6 +284,8 @@ public:
 private:
     const BSONElement _oldExpireSecs;
     const BSONElement _newExpireSecs;
+    const BSONElement _oldHidden;
+    const BSONElement _newHidden;
     BSONObjBuilder* _result;
 };
 
@@ -326,6 +348,19 @@ Status _collModInternal(OperationContext* opCtx,
     const CollModRequest cmrOld = statusW.getValue();
     CollModRequest cmrNew = statusW.getValue();
 
+    if (!cmrOld.indexHidden.eoo()) {
+
+        if (serverGlobalParams.featureCompatibility.getVersion() <
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46 &&
+            cmrOld.indexHidden.booleanSafe()) {
+            return Status(ErrorCodes::BadValue, "Hidden indexes can only be created with FCV 4.6");
+        }
+        if (coll->ns().isSystem())
+            return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
+        if (cmrOld.idx->isIdIndex())
+            return Status(ErrorCodes::BadValue, "can't hide _id index");
+    }
+
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 
@@ -362,40 +397,64 @@ Status _collModInternal(OperationContext* opCtx,
         CollectionOptions oldCollOptions =
             DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->getCatalogId());
 
-        boost::optional<TTLCollModInfo> ttlInfo;
+        boost::optional<IndexCollModInfo> indexCollModInfo;
 
         // Handle collMod operation type appropriately.
 
-        // TTLIndex
-        if (!cmrOld.indexExpireAfterSeconds.eoo()) {
-            BSONElement newExpireSecs = cmrOld.indexExpireAfterSeconds;
-            BSONElement oldExpireSecs = cmrOld.idx->infoObj().getField("expireAfterSeconds");
+        if (!cmrOld.indexExpireAfterSeconds.eoo() || !cmrOld.indexHidden.eoo()) {
+            BSONElement newExpireSecs = {};
+            BSONElement oldExpireSecs = {};
+            BSONElement newHidden = {};
+            BSONElement oldHidden = {};
+            // TTL Index
+            if (!cmrOld.indexExpireAfterSeconds.eoo()) {
+                newExpireSecs = cmrOld.indexExpireAfterSeconds;
+                oldExpireSecs = cmrOld.idx->infoObj().getField("expireAfterSeconds");
+                if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs !=
+                                                                    newExpireSecs)) {
+                    // Change the value of "expireAfterSeconds" on disk.
+                    DurableCatalog::get(opCtx)->updateTTLSetting(opCtx,
+                                                                 coll->getCatalogId(),
+                                                                 cmrOld.idx->indexName(),
+                                                                 newExpireSecs.safeNumberLong());
+                }
+            }
 
-            if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
-                // Change the value of "expireAfterSeconds" on disk.
-                DurableCatalog::get(opCtx)->updateTTLSetting(opCtx,
-                                                             coll->getCatalogId(),
-                                                             cmrOld.idx->indexName(),
-                                                             newExpireSecs.safeNumberLong());
-
-                // Notify the index catalog that the definition of this index changed. This will
-                // invalidate the idx pointer in cmrOld. On rollback of this WUOW, the idx pointer
-                // in cmrNew will be invalidated and the idx pointer in cmrOld will be valid again.
-                cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmrOld.idx);
-                opCtx->recoveryUnit()->registerChange(
-                    std::make_unique<CollModResultChange>(oldExpireSecs, newExpireSecs, result));
-
-                if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
-                    LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled.");
-                    uasserted(50970, "trigger rollback after the index update");
+            // User wants to hide or unhide index.
+            if (!cmrOld.indexHidden.eoo()) {
+                newHidden = cmrOld.indexHidden;
+                oldHidden = cmrOld.idx->infoObj().getField("hidden");
+                // Make sure when we set 'hidden' to false, we can remove the hidden field from
+                // catalog.
+                if (SimpleBSONElementComparator::kInstance.evaluate(oldHidden != newHidden)) {
+                    DurableCatalog::get(opCtx)->updateHiddenSetting(opCtx,
+                                                                    coll->getCatalogId(),
+                                                                    cmrOld.idx->indexName(),
+                                                                    newHidden.booleanSafe());
                 }
             }
 
 
-            // Save previous TTL index expiration.
-            ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
-                                     Seconds(oldExpireSecs.safeNumberLong()),
-                                     cmrNew.idx->indexName()};
+            indexCollModInfo = IndexCollModInfo{
+                cmrOld.indexExpireAfterSeconds.eoo() ? boost::optional<Seconds>()
+                                                     : Seconds(newExpireSecs.safeNumberLong()),
+                cmrOld.indexExpireAfterSeconds.eoo() ? boost::optional<Seconds>()
+                                                     : Seconds(oldExpireSecs.safeNumberLong()),
+                cmrOld.indexHidden.eoo() ? boost::optional<bool>() : newHidden.booleanSafe(),
+                cmrOld.indexHidden.eoo() ? boost::optional<bool>() : oldHidden.booleanSafe(),
+                cmrNew.idx->indexName()};
+
+            // Notify the index catalog that the definition of this index changed. This will
+            // invalidate the idx pointer in cmrOld. On rollback of this WUOW, the idx pointer
+            // in cmrNew will be invalidated and the idx pointer in cmrOld will be valid again.
+            cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmrOld.idx);
+            opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
+                oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
+
+            if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
+                LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled.");
+                uasserted(50970, "trigger rollback after the index update");
+            }
         }
 
         // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
@@ -412,8 +471,10 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
+
         auto* const opObserver = opCtx->getServiceContext()->getOpObserver();
-        opObserver->onCollMod(opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, ttlInfo);
+        opObserver->onCollMod(
+            opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, indexCollModInfo);
 
         wunit.commit();
         return Status::OK();

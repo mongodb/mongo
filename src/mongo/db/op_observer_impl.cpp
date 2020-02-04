@@ -655,7 +655,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                OptionalCollectionUUID uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
-                               boost::optional<TTLCollModInfo> ttlInfo) {
+                               boost::optional<IndexCollModInfo> indexInfo) {
 
     if (!nss.isSystemDotProfile()) {
         // do not replicate system.profile modifications
@@ -663,16 +663,23 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         // Create the 'o2' field object. We save the old collection metadata and TTL expiration.
         BSONObjBuilder o2Builder;
         o2Builder.append("collectionOptions_old", oldCollOptions.toBSON());
-        if (ttlInfo) {
-            auto oldExpireAfterSeconds = durationCount<Seconds>(ttlInfo->oldExpireAfterSeconds);
-            o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
+        if (indexInfo) {
+            if (indexInfo->oldExpireAfterSeconds) {
+                auto oldExpireAfterSeconds =
+                    durationCount<Seconds>(indexInfo->oldExpireAfterSeconds.get());
+                o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
+            }
+            if (indexInfo->oldHidden) {
+                auto oldHidden = indexInfo->oldHidden.get();
+                o2Builder.append("hidden_old", oldHidden);
+            }
         }
 
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
         oplogEntry.setNss(nss.getCommandNS());
         oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(makeCollModCmdObj(collModCmd, oldCollOptions, ttlInfo));
+        oplogEntry.setObject(makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         logOperation(opCtx, &oplogEntry);
     }

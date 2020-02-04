@@ -60,9 +60,11 @@ struct OplogUpdateEntryArgs {
         : updateArgs(std::move(updateArgs)), nss(std::move(nss)), uuid(std::move(uuid)) {}
 };
 
-struct TTLCollModInfo {
-    Seconds expireAfterSeconds;
-    Seconds oldExpireAfterSeconds;
+struct IndexCollModInfo {
+    boost::optional<Seconds> expireAfterSeconds;
+    boost::optional<Seconds> oldExpireAfterSeconds;
+    boost::optional<bool> hidden;
+    boost::optional<bool> oldHidden;
     std::string indexName;
 };
 
@@ -208,7 +210,7 @@ public:
                            OptionalCollectionUUID uuid,
                            const BSONObj& collModCmd,
                            const CollectionOptions& oldCollOptions,
-                           boost::optional<TTLCollModInfo> ttlInfo) = 0;
+                           boost::optional<IndexCollModInfo> indexInfo) = 0;
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
 
     /**

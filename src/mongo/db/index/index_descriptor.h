@@ -82,6 +82,7 @@ public:
     static constexpr StringData kStorageEngineFieldName = "storageEngine"_sd;
     static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
     static constexpr StringData kUniqueFieldName = "unique"_sd;
+    static constexpr StringData kHiddenFieldName = "hidden"_sd;
     static constexpr StringData kWeightsFieldName = "weights"_sd;
 
     /**
@@ -174,6 +175,10 @@ public:
         return _unique;
     }
 
+    bool hidden() const {
+        return _hidden;
+    }
+
     // Is this index sparse?
     bool isSparse() const {
         return _sparse;
@@ -255,6 +260,7 @@ private:
     bool _isIdIndex;
     bool _sparse;
     bool _unique;
+    bool _hidden;
     bool _partial;
     IndexVersion _version;
     BSONObj _collation;

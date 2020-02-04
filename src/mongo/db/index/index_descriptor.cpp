@@ -61,7 +61,8 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
                 IndexDescriptor::kBackgroundFieldName ||  // this is a creation time option only
             fieldName == IndexDescriptor::kDropDuplicatesFieldName ||  // this is now ignored
             fieldName == IndexDescriptor::kSparseFieldName ||          // checked specially
-            fieldName == IndexDescriptor::kUniqueFieldName             // check specially
+            fieldName == IndexDescriptor::kHiddenFieldName ||  // not considered for equivalence
+            fieldName == IndexDescriptor::kUniqueFieldName     // check specially
         ) {
             continue;
         }
@@ -93,6 +94,7 @@ constexpr StringData IndexDescriptor::kSparseFieldName;
 constexpr StringData IndexDescriptor::kStorageEngineFieldName;
 constexpr StringData IndexDescriptor::kTextVersionFieldName;
 constexpr StringData IndexDescriptor::kUniqueFieldName;
+constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 
 IndexDescriptor::IndexDescriptor(Collection* collection,
@@ -109,6 +111,7 @@ IndexDescriptor::IndexDescriptor(Collection* collection,
       _isIdIndex(isIdIndexPattern(_keyPattern)),
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
+      _hidden(infoObj[kHiddenFieldName].trueValue()),
       _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
       _cachedEntry(nullptr) {
     BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];

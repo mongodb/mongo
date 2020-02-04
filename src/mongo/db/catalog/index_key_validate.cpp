@@ -83,6 +83,7 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kDropDuplicatesFieldName,
     IndexDescriptor::kExpireAfterSecondsFieldName,
     IndexDescriptor::kGeoHaystackBucketSize,
+    IndexDescriptor::kHiddenFieldName,
     IndexDescriptor::kIndexNameFieldName,
     IndexDescriptor::kIndexVersionFieldName,
     IndexDescriptor::kKeyPatternFieldName,
@@ -270,6 +271,12 @@ StatusWith<BSONObj> validateIndexSpec(
 
     boost::optional<IndexVersion> resolvedIndexVersion;
 
+    // Allow hidden index only if FCV is 4.6.
+    const auto isFeatureDisabled =
+        (!featureCompatibility.isVersionInitialized() ||
+         featureCompatibility.getVersion() <
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
+
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
         if (IndexDescriptor::kKeyPatternFieldName == indexSpecElemFieldName) {
@@ -307,6 +314,7 @@ StatusWith<BSONObj> validateIndexSpec(
                                 << "Values in the index key pattern cannot be empty strings"};
                 }
             }
+
             hasKeyPatternField = true;
         } else if (IndexDescriptor::kIndexNameFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::String) {
@@ -317,6 +325,18 @@ StatusWith<BSONObj> validateIndexSpec(
             }
 
             hasIndexNameField = true;
+        } else if (IndexDescriptor::kHiddenFieldName == indexSpecElemFieldName) {
+            if (isFeatureDisabled) {
+                return {ErrorCodes::Error(31449),
+                        "Hidden indexes can only be created with FCV 4.6"};
+            }
+            if (indexSpecElem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << IndexDescriptor::kIndexNameFieldName
+                            << "' must be a bool, but got " << typeName(indexSpecElem.type())};
+            }
+
         } else if (IndexDescriptor::kNamespaceFieldName == indexSpecElemFieldName) {
             hasNamespaceField = true;
         } else if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
@@ -496,6 +516,10 @@ Status validateIdIndexSpec(const BSONObj& indexSpec) {
                 str::stream() << "The field '" << IndexDescriptor::kKeyPatternFieldName
                               << "' for an _id index must be {_id: 1}, but got "
                               << keyPatternElem.Obj()};
+    }
+
+    if (!indexSpec[IndexDescriptor::kHiddenFieldName].eoo()) {
+        return Status(ErrorCodes::BadValue, "can't hide _id index");
     }
 
     return Status::OK();

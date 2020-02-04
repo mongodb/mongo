@@ -60,6 +60,11 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".drop() drop the collection");
     print("\tdb." + shortName + ".dropIndex(index) - e.g. db." + shortName +
           ".dropIndex( \"indexName\" ) or db." + shortName + ".dropIndex( { \"indexKey\" : 1 } )");
+    print("\tdb." + shortName + ".hideIndex(index) - e.g. db." + shortName +
+          ".hideIndex( \"indexName\" ) or db." + shortName + ".hideIndex( { \"indexKey\" : 1 } )");
+    print("\tdb." + shortName + ".unhideIndex(index) - e.g. db." + shortName +
+          ".unhideIndex( \"indexName\" ) or db." + shortName +
+          ".unhideIndex( { \"indexKey\" : 1 } )");
     print("\tdb." + shortName + ".dropIndexes()");
     print("\tdb." + shortName +
           ".ensureIndex(keypattern[,options]) - DEPRECATED, use createIndex() instead");
@@ -872,6 +877,35 @@ DBCollection.prototype.dropIndex = function(index) {
 
     var res = this._dbCommand("dropIndexes", {index: index});
     return res;
+};
+
+/**
+ * Hide an index from the query planner.
+ */
+DBCollection.prototype._hiddenIndex = function(index, hidden) {
+    assert(index, "please specify index to hide");
+
+    // Need an extra check for array because 'Array' is an 'object', but not every 'object' is an
+    // 'Array'.
+    var indexField = {};
+    if (typeof index == "string") {
+        indexField = {name: index, hidden: hidden};
+    } else if (typeof index == "object") {
+        indexField = {keyPattern: index, hidden: hidden};
+    } else {
+        throw new Error("Index must be either the index name or the index specification document");
+    }
+    var cmd = {"collMod": this._shortName, index: indexField};
+    var res = this._db.runCommand(cmd);
+    return res;
+};
+
+DBCollection.prototype.hideIndex = function(index) {
+    return this._hiddenIndex(index, true);
+};
+
+DBCollection.prototype.unhideIndex = function(index) {
+    return this._hiddenIndex(index, false);
 };
 
 DBCollection.prototype.getCollection = function(subName) {

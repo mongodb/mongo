@@ -920,6 +920,19 @@ void DurableCatalogImpl::updateTTLSetting(OperationContext* opCtx,
     putMetaData(opCtx, catalogId, md);
 }
 
+void DurableCatalogImpl::updateHiddenSetting(OperationContext* opCtx,
+                                             RecordId catalogId,
+                                             StringData idxName,
+                                             bool hidden) {
+
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    int offset = md.findIndexOffset(idxName);
+    invariant(offset >= 0);
+    md.indexes[offset].updateHiddenSetting(hidden);
+    putMetaData(opCtx, catalogId, md);
+}
+
+
 bool DurableCatalogImpl::isEqualToMetadataUUID(OperationContext* opCtx,
                                                RecordId catalogId,
                                                OptionalCollectionUUID uuid) {
