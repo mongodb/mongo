@@ -213,7 +213,7 @@ assert.throws(function() {
 const foreignCollection = db[colName + "_foreign"];
 foreignCollection.drop();
 assert.commandWorked(foreignCollection.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
-col.drop();
+assert(col.drop());
 assert.commandWorked(col.insert([{_id: 0, foreignId: 1}, {_id: 1, foreignId: 2}]));
 assert.eq(0, getUsageCount("_id_"));
 assert.eq(2,
@@ -245,7 +245,7 @@ assert.commandWorked(foreignCollection.insert([
     {_id: 3, connectedTo: "Y"},  // Be sure to use a different value here to make sure
                                  // $graphLookup doesn't cache the query.
 ]));
-col.drop();
+assert(col.drop());
 assert.commandWorked(col.insert([{_id: 0, foreignId: 0}, {_id: 1, foreignId: 2}]));
 assert.eq(0, getUsageCount("_id_"));
 assert.eq(2,
@@ -266,4 +266,40 @@ assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index"
 assert.eq(2 * 3,
           getUsageCount("_id_", foreignCollection),
           "Expected each of two graph searches to issue 3 queries, each using the _id index");
+
+//
+// Confirm that index 'hidden' status can be found in '$indexStats'.
+//
+assert(col.drop());
+assert.commandWorked(col.createIndex({a: 1}, {hidden: true}));
+const hiddenIndexStats =
+    col.aggregate([{$indexStats: {}}, {$match: {"name": "a_1", "spec.hidden": true}}]).toArray();
+assert.eq(hiddenIndexStats.length, 1);
+
+//
+// Confirm the index usage stats will be reset on hiding and unhiding the index.
+//
+assert(col.drop());
+assert.commandWorked(col.insert({a: 1}));
+assert.commandWorked(col.createIndex({a: 1}));
+
+// When the index is not hidden, the stats keep counting.
+res = col.findOne({a: 1});
+assert(1, res);
+assert.eq(1, getUsageCount("a_1"));
+
+// On modifying an index's definition (i.e. hiding or unhiding an index), the usage stats of the
+// index will be reset to zero.
+assert.commandWorked(col.hideIndex("a_1"));
+assert.eq(0, getUsageCount("a_1"));
+
+// Confirm that the stats don't tick after the index is hidden.
+res = col.findOne({a: 1});
+assert(1, res);
+assert.eq(0, getUsageCount("a_1"));
+
+assert.commandWorked(col.unhideIndex("a_1"));
+res = col.findOne({a: 1});
+assert(1, res);
+assert.eq(1, getUsageCount("a_1"));
 })();
