@@ -151,6 +151,11 @@ public:
                                   StringData idxName,
                                   long long newExpireSeconds) = 0;
 
+    virtual void updateHiddenSetting(OperationContext* opCtx,
+                                        RecordId catalogId,
+                                        StringData idxName,
+                                        bool hidden) = 0;
+
     /** Compares the UUID argument to the UUID obtained from the metadata. Returns true if they are
      * equal, false otherwise.
      */

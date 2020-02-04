@@ -94,7 +94,9 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kStorageEngineFieldName,
     IndexDescriptor::kTextVersionFieldName,
     IndexDescriptor::kUniqueFieldName,
+    IndexDescriptor::kHiddenFieldName,
     IndexDescriptor::kWeightsFieldName,
+    IndexDescriptor::kHiddenFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
@@ -259,6 +261,7 @@ StatusWith<BSONObj> validateIndexSpec(
     bool hasNamespaceField = false;
     bool hasVersionField = false;
     bool hasCollationField = false;
+    bool hasHiddenField = false;
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
     if (!fieldNamesValidStatus.isOK()) {
@@ -266,6 +269,12 @@ StatusWith<BSONObj> validateIndexSpec(
     }
 
     boost::optional<IndexVersion> resolvedIndexVersion;
+
+    // Allow compound hashed index only if FCV is 4.4.
+    const auto isFeatureDisabled =
+                (featureCompatibility.isVersionInitialized() &&
+                 featureCompatibility.getVersion() <
+                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
@@ -305,11 +314,7 @@ StatusWith<BSONObj> validateIndexSpec(
                 }
             }
 
-            // Allow compound hashed index only if FCV is 4.4.
-            const auto isFeatureDisabled =
-                (featureCompatibility.isVersionInitialized() &&
-                 featureCompatibility.getVersion() <
-                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
             if (isFeatureDisabled && (indexSpecElem.embeddedObject().nFields() > 1) &&
                 (IndexNames::findPluginName(indexSpecElem.embeddedObject()) ==
                  IndexNames::HASHED)) {
@@ -328,6 +333,19 @@ StatusWith<BSONObj> validateIndexSpec(
             }
 
             hasIndexNameField = true;
+        } else if (IndexDescriptor::kHiddenFieldName == indexSpecElemFieldName) {
+            if (isFeatureDisabled) {
+                return {ErrorCodes::Error(51765),
+                        "Hidden indexes can only be created with FCV 4.4"};
+            }
+            if (indexSpecElem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << IndexDescriptor::kIndexNameFieldName
+                            << "' must be a bool, but got " << typeName(indexSpecElem.type())};
+            }
+            hasHiddenField = true;
+
         } else if (IndexDescriptor::kNamespaceFieldName == indexSpecElemFieldName) {
             hasNamespaceField = true;
         } else if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {

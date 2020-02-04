@@ -50,6 +50,9 @@ structs:
       unique:
         type: bool
         optional: true
+      hidden:
+        type: bool
+        optional: true
       partialFilterExpression:
         type: object
         optional: true

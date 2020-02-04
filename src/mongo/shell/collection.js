@@ -60,6 +60,10 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".drop() drop the collection");
     print("\tdb." + shortName + ".dropIndex(index) - e.g. db." + shortName +
           ".dropIndex( \"indexName\" ) or db." + shortName + ".dropIndex( { \"indexKey\" : 1 } )");
+    print("\tdb." + shortName + ".hiddenIndex(index) - e.g. db." + shortName +
+          ".hiddenIndex( \"indexName\" ) or db." + shortName + ".hiddenIndex( { \"indexKey\" : 1 } )");
+    print("\tdb." + shortName + ".unhiddenIndex(index) - e.g. db." + shortName +
+          ".unhiddenIndex( \"indexName\" ) or db." + shortName + ".unhiddenIndex( { \"indexKey\" : 1 } )");
     print("\tdb." + shortName + ".dropIndexes()");
     print("\tdb." + shortName +
           ".ensureIndex(keypattern[,options]) - DEPRECATED, use createIndex() instead");
@@ -873,6 +877,38 @@ DBCollection.prototype.dropIndex = function(index) {
     var res = this._dbCommand("dropIndexes", {index: index});
     return res;
 };
+
+
+/**
+ * Hidden an index
+ */
+DBCollection.prototype._hiddenIndex = function(index, hidden) {
+    assert(index, "need to specify index to dropIndex");
+
+    // Need an extra check for array because 'Array' is an 'object', but not every 'object' is an
+    // 'Array'.
+    var indexField = {};
+    if (typeof index == "string") {
+	indexField = {name: index, hidden: hidden};
+    } else if (typeof index == "object") {
+	indexField = { keyPattern: index, hidden: hidden};
+    } else {
+        throw new Error(
+            "The index to drop must be either the index name or the index specification document");
+    }
+    var cmd = {"collMod": this._shortName, index: indexField};
+    var res = this._db.runCommand(cmd);
+    return res;
+};
+
+DBCollection.prototype.hiddenIndex = function(index) {
+    return this._hiddenIndex(index, true);
+}
+
+DBCollection.prototype.unhiddenIndex = function(index) {
+    return this._hiddenIndex(index, false);
+}
+
 
 DBCollection.prototype.getCollection = function(subName) {
     return this._db.getCollection(this._shortName + "." + subName);

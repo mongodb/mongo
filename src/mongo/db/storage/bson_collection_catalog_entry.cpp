@@ -120,6 +120,26 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newEx
     spec = b.obj();
 }
 
+
+void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden) {
+    // if hidden == true, we remove this field from mddata rather than add a field with false value.
+    // or else, the old binary can't startup due to the unknown field
+    BSONObjBuilder b;
+    for (BSONObjIterator bi(spec); bi.more();) {
+        BSONElement e = bi.next();
+        if (e.fieldNameStringData() == "hidden") {
+            continue;
+        }
+        b.append(e);
+    }
+
+    if (hidden) {
+        b.append("hidden", hidden);
+    }
+    spec = b.obj();
+}
+
+
 // --------------------------
 
 int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const {

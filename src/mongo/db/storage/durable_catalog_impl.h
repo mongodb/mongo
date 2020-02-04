@@ -124,6 +124,11 @@ public:
                           StringData idxName,
                           long long newExpireSeconds);
 
+    void updateHiddenSetting(OperationContext* opCtx,
+                             RecordId catalogId,
+                             StringData idxName,
+                             bool hidden);
+
     bool isEqualToMetadataUUID(OperationContext* opCtx,
                                RecordId catalogId,
                                OptionalCollectionUUID uuid);

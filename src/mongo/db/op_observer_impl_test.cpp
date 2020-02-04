@@ -273,16 +273,16 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     oldCollOpts.validationLevel = "strict";
     oldCollOpts.validationAction = "error";
 
-    TTLCollModInfo ttlInfo;
-    ttlInfo.expireAfterSeconds = Seconds(10);
-    ttlInfo.oldExpireAfterSeconds = Seconds(5);
-    ttlInfo.indexName = "name_of_index";
+    IndexCollModInfo indexInfo;
+    indexInfo.expireAfterSeconds = Seconds(10);
+    indexInfo.oldExpireAfterSeconds = Seconds(5);
+    indexInfo.indexName = "name_of_index";
 
     // Write to the oplog.
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onCollMod(opCtx.get(), nss, uuid, collModCmd, oldCollOpts, ttlInfo);
+        opObserver.onCollMod(opCtx.get(), nss, uuid, collModCmd, oldCollOpts, indexInfo);
         wunit.commit();
     }
 
@@ -296,8 +296,8 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
                        << "validationAction"
                        << "warn"
                        << "index"
-                       << BSON("name" << ttlInfo.indexName << "expireAfterSeconds"
-                                      << durationCount<Seconds>(ttlInfo.expireAfterSeconds)));
+                       << BSON("name" << indexInfo.indexName << "expireAfterSeconds"
+                               << durationCount<Seconds>(indexInfo.expireAfterSeconds.get())));
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     // Ensure that the old collection metadata was saved.
@@ -306,7 +306,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
         BSON("collectionOptions_old"
              << BSON("validationLevel" << oldCollOpts.validationLevel << "validationAction"
                                        << oldCollOpts.validationAction)
-             << "expireAfterSeconds_old" << durationCount<Seconds>(ttlInfo.oldExpireAfterSeconds));
+             << "expireAfterSeconds_old" << durationCount<Seconds>(indexInfo.oldExpireAfterSeconds.get()));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
