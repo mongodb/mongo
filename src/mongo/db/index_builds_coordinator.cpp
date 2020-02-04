@@ -1227,20 +1227,18 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
 }
 
 Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
-                                                StringData dbName,
-                                                CollectionUUID collectionUUID,
                                                 const UUID& buildUUID,
                                                 Timestamp startTimestamp) {
-    auto replIndexBuildState = invariant(_getIndexBuild(buildUUID));
+    auto replState = invariant(_getIndexBuild(buildUUID));
 
-    NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
+    NamespaceStringOrUUID nssOrUuid{replState->dbName, replState->collectionUUID};
     boost::optional<AutoGetCollection> autoColl;
     try {
         autoColl.emplace(opCtx, nssOrUuid, MODE_X);
     } catch (DBException& ex) {
         // We need to unregister the index build to allow retries to succeed.
         stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replIndexBuildState);
+        _unregisterIndexBuild(lk, replState);
 
         return ex.toStatus(str::stream()
                            << "failed to lock collection for index build setup: " << nssOrUuid);
@@ -1251,7 +1249,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     if (!status.isOK()) {
         // We need to unregister the index build to allow retries to succeed.
         stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replIndexBuildState);
+        _unregisterIndexBuild(lk, replState);
 
         return status;
     }
@@ -1265,25 +1263,25 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     // so we must fail the index build.
     if (replSetAndNotPrimary && startTimestamp.isNull()) {
         stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replIndexBuildState);
+        _unregisterIndexBuild(lk, replState);
 
         return Status{ErrorCodes::NotMaster,
                       str::stream()
                           << "Replication state changed while setting up the index build: "
-                          << replIndexBuildState->buildUUID};
+                          << replState->buildUUID};
     }
 
     MultiIndexBlock::OnInitFn onInitFn;
-    if (IndexBuildProtocol::kTwoPhase == replIndexBuildState->protocol) {
+    if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
         // Two-phase index builds write a different oplog entry than the default behavior which
         // writes a no-op just to generate an optime.
         onInitFn = [&](std::vector<BSONObj>& specs) {
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,
                 nss,
-                replIndexBuildState->collectionUUID,
-                replIndexBuildState->buildUUID,
-                replIndexBuildState->indexSpecs,
+                replState->collectionUUID,
+                replState->buildUUID,
+                replState->indexSpecs,
                 false /* fromMigrate */);
 
             return Status::OK();
@@ -1297,18 +1295,14 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, nss)
         ? IndexBuildsManager::IndexConstraints::kRelax
         : IndexBuildsManager::IndexConstraints::kEnforce;
-    options.protocol = replIndexBuildState->protocol;
+    options.protocol = replState->protocol;
 
     status = [&] {
         if (!replSetAndNotPrimary) {
             // On standalones and primaries, call setUpIndexBuild(), which makes the initial catalog
             // write. On primaries, this replicates the startIndexBuild oplog entry.
-            return _indexBuildsManager.setUpIndexBuild(opCtx,
-                                                       collection,
-                                                       replIndexBuildState->indexSpecs,
-                                                       replIndexBuildState->buildUUID,
-                                                       onInitFn,
-                                                       options);
+            return _indexBuildsManager.setUpIndexBuild(
+                opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options);
         }
         // If we are starting the index build as a secondary, we must suppress calls to write
         // our initial oplog entry in setUpIndexBuild().
@@ -1317,12 +1311,8 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         // Use the provided timestamp to write the initial catalog entry.
         invariant(!startTimestamp.isNull());
         TimestampBlock tsBlock(opCtx, startTimestamp);
-        return _indexBuildsManager.setUpIndexBuild(opCtx,
-                                                   collection,
-                                                   replIndexBuildState->indexSpecs,
-                                                   replIndexBuildState->buildUUID,
-                                                   onInitFn,
-                                                   options);
+        return _indexBuildsManager.setUpIndexBuild(
+            opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options);
     }();
 
     // The indexes are in the durable catalog in an unfinished state. Return an OK status so
@@ -1332,12 +1322,12 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     }
 
     _indexBuildsManager.tearDownIndexBuild(
-        opCtx, collection, replIndexBuildState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+        opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
 
     // Unregister the index build before setting the promise, so callers do not see the build again.
     {
         stdx::unique_lock<Latch> lk(_mutex);
-        _unregisterIndexBuild(lk, replIndexBuildState);
+        _unregisterIndexBuild(lk, replState);
     }
 
     if (status == ErrorCodes::IndexAlreadyExists ||
@@ -1349,10 +1339,10 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         // The requested index (specs) are already built or are being built. Return success
         // early (this is v4.0 behavior compatible).
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        int numIndexes = replIndexBuildState->stats.numIndexesBefore;
+        int numIndexes = replState->stats.numIndexesBefore;
         indexCatalogStats.numIndexesBefore = numIndexes;
         indexCatalogStats.numIndexesAfter = numIndexes;
-        replIndexBuildState->sharedPromise.emplaceValue(indexCatalogStats);
+        replState->sharedPromise.emplaceValue(indexCatalogStats);
         return Status::OK();
     }
     return status;

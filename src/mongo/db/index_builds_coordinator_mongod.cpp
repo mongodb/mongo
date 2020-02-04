@@ -216,8 +216,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
             opCtx->lockState());
 
         if (!indexBuildOptions.twoPhaseRecovery) {
-            status =
-                _setUpIndexBuild(opCtx.get(), dbName, collectionUUID, buildUUID, startTimestamp);
+            status = _setUpIndexBuild(opCtx.get(), buildUUID, startTimestamp);
             if (!status.isOK()) {
                 startPromise.setError(status);
                 return;

@@ -479,8 +479,6 @@ protected:
      * Returns an error status if there are any errors setting up the index build.
      */
     Status _setUpIndexBuild(OperationContext* opCtx,
-                            StringData dbName,
-                            CollectionUUID collectionUUID,
                             const UUID& buildUUID,
                             Timestamp startTimestamp);
 
