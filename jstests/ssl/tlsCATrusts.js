@@ -85,7 +85,7 @@ requireSSLProvider('openssl', function() {
                                           '--tlsCertificateKeyFile',
                                           user.cert,
                                           '--tlsCAFile',
-                                          CA_CERT,
+                                          COMBINED_CA_CERT,
                                           uri,
                                           '--eval',
                                           script);
