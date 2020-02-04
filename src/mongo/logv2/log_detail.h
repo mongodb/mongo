@@ -61,6 +61,17 @@ void doLog(int32_t id,
     doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), attributes);
 }
 
+template <typename S, size_t N, typename... Args>
+void doLog(int32_t id,
+           LogSeverity const& severity,
+           LogOptions const& options,
+           S const& fmtmsg,
+           const char (&msg)[N],
+           const fmt::internal::named_arg<Args, char>&... args) {
+    // TODO: When using JSON formatter, use 'msg' instead of 'fmtmsg' below.
+    doLog(id, severity, options, fmtmsg, args...);
+}
+
 template <typename S>
 void doLog(int32_t id,
            LogSeverity const& severity,

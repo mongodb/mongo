@@ -14,21 +14,25 @@ To be able to include it a default log component needs to be defined in the cpp 
 
 Logging is performed using function style macros:
 
-`LOGV2(ID, message-string, "name0"_attr = var0, ..., "nameN"_attr = varN);`
+`LOGV2(ID, format-string, "name0"_attr = var0, ..., "nameN"_attr = varN);`
+
+`LOGV2(ID, format-string, message-string, "name0"_attr = var0, ..., "nameN"_attr = varN);`
 
 The ID is a signed 32bit integer in the same number space as the error code numbers. It is used to uniquely identify a log statement. If changing existing code, using a new ID is strongly advised to avoid any parsing ambiguity. 
 
-The message string contains the description of the log event with libfmt style replacement fields optionally embedded within it. The message string must comply with the [format syntax](https://fmt.dev/6.1.1/syntax.html#formatspec) from libfmt. 
+The format string contains the description of the log event with libfmt style replacement fields optionally embedded within it. The format string must comply with the [format syntax](https://fmt.dev/6.1.1/syntax.html#formatspec) from libfmt. The purpose of embedding the replacement fields is to be able to create a human readable message used by the text output format or a tool that converts JSON logs to a human readable format.
 
-Replacement fields are placed in the message string with curly braces `{}`. Everything not surrounded with curly braces is part of the message text. Curly brace characters can be output by escaping them using double braces: `{{` or `}}`. 
+Replacement fields are placed in the format string with curly braces `{}`. Everything not surrounded with curly braces is part of the message text. Curly brace characters can be output by escaping them using double braces: `{{` or `}}`. 
 
 Attributes are created with the `_attr` user-defined literal. The intermediate object that gets instantiated provides the assignment operator `=` for assigning a value to the attribute.
 
-Attributes are associated with replacement fields in the message string by name or index, using names is strongly recommended. When using unnamed replacement fields, attributes map to replacement fields in the order they appear in the message string. 
+Attributes are associated with replacement fields in the format string by name or index, using names is strongly recommended. When using unnamed replacement fields, attributes map to replacement fields in the order they appear in the format string. 
 
 It is allowed to have more attributes than replacement fields in a log statement. However, having fewer attributes than replacement fields is not allowed.
 
-The message string must be a compile time constant. This is to be able to add compile time verification of log statements in the future.
+As shown above there is also an API taking both a format string and a message string. This is an API to help with the transition from text output to JSON output. JSON logs have no need for embedded replacement fields in the description, if written in a short and descriptive manner providing context for the attribute names. But a format string may still be needed to provide good JSON to human readable text conversion. See the JSON output format and style guide below for more information.
+
+Both the format string and the message string must be compile time constants. This is to avoid dynamic attribute names in the log output and to be able to add compile time verification of log statements in the future.
 
 ##### Examples
 
@@ -76,9 +80,13 @@ Fatal level log statements perform `fassert` after logging, using the provided I
 
 Debug-level logging is slightly different where an additional parameter (as integer) required to indicate the desired debug level:
 
-`LOGV2_DEBUG(ID, debug-level, message-string, attr0, ..., attrN);`
+`LOGV2_DEBUG(ID, debug-level, format-string, attr0, ..., attrN);`
 
-`LOGV2_DEBUG_OPTIONS(ID, debug-level, options, message-string, attr0, ..., attrN);`
+`LOGV2_DEBUG(ID, debug-level, format-string, message-string, attr0, ..., attrN);`
+
+`LOGV2_DEBUG_OPTIONS(ID, debug-level, options, format-string, attr0, ..., attrN);`
+
+`LOGV2_DEBUG_OPTIONS(ID, debug-level, options, format-string, message-string, attr0, ..., attrN);`
 
 ##### Examples
 
@@ -114,11 +122,11 @@ When using the `DynamicAttributes` you need to be careful about parameter lifeti
 
 ```
 DynamicAttributes attrs;
-attrs.add("str"_sd, "StringData value"_sd);
+attrs.add("str", "StringData value"_sd);
 if (condition) {
     // getExtraInfo() returns a reference that is valid until the LOGV2 call below.
     // Be careful of functions returning by value
-    attrs.add("extra"_sd, getExtraInfo());
+    attrs.add("extra", getExtraInfo());
 }
 LOGV2(1030, "dynamic attributes", attrs);
 ```
@@ -335,10 +343,10 @@ unsigned long long | int64 (0x12)
 
 # Style guide
 
-### Message string
+### Message and Format string
 
 * Prefer pithy noun phrases or short sentence describing what is being logged
-* Avoid using replacement fields when not needed to describe meaning of log or attributes
+* Prefer providing both message without replacement fields and format string with replacement fields when writing new log messages. That will help the transition to good JSON logs.
 * Avoid ending with punctuation (.)
 
 ### Attribute names
@@ -351,7 +359,10 @@ unsigned long long | int64 (0x12)
 ##### Examples
 
 ```
-LOGV2(1040, "Replica set state transition on this node", "oldState"_attr = getOldState(), "newState"_attr = getNewState());
+LOGV2(1040, 
+      "Replica set state transition from {oldState} to {newState} on this node", 
+      "Replica set state transition on this node", 
+      "oldState"_attr = getOldState(), "newState"_attr = getNewState());
 
 { ..., "id": 1040, "msg": "Replica set state transition on this node", "attr": { "oldState": "SECONARY", "newState": "PRIMARY" } }
 ```

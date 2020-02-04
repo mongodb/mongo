@@ -553,29 +553,31 @@ AttributeStorage<Args...> makeAttributeStorage(const Args&... args) {
 class DynamicAttributes {
 public:
     // Do not allow rvalue references and temporary objects to avoid lifetime problem issues
-    template <typename T,
+    template <size_t N,
+              typename T,
               std::enable_if_t<std::is_arithmetic_v<T> || std::is_pointer_v<T> || std::is_enum_v<T>,
                                int> = 0>
-    void add(StringData name, T value) {
-        _attributes.emplace_back(name, value);
+    void add(const char (&name)[N], T value) {
+        _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
-    template <typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
-    void add(StringData name, const T& value) {
-        _attributes.emplace_back(name, value);
+    template <size_t N, typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
+    void add(const char (&name)[N], const T& value) {
+        _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
-    template <typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
-    void add(StringData name, T&& value) = delete;
+    template <size_t N, typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
+    void add(const char (&name)[N], T&& value) = delete;
 
-    void add(StringData name, StringData value) {
-        _attributes.emplace_back(name, value);
+    template <size_t N>
+    void add(const char (&name)[N], StringData value) {
+        _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
     // Does not have the protections of add() above. Be careful about lifetime of value!
-    template <typename T>
-    void addUnsafe(StringData name, const T& value) {
-        _attributes.emplace_back(name, value);
+    template <size_t N, typename T>
+    void addUnsafe(const char (&name)[N], const T& value) {
+        _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
 private:

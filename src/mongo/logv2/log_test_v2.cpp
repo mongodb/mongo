@@ -237,6 +237,10 @@ TEST_F(LogTestV2, Basic) {
     buffer.clear();
     t4.serialize(buffer);
     ASSERT_EQUALS(lines.back(), fmt::to_string(buffer));
+
+    // Text formatter selects format string
+    LOGV2(20084, "fmtstr {name}", "msgstr", "name"_attr = 1);
+    ASSERT_EQUALS(lines.back(), "fmtstr 1");
 }
 
 TEST_F(LogTestV2, Types) {
@@ -795,16 +799,16 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     validateNonMemberToBSON(BSONObj(linesBson.back().data()));
 
     DynamicAttributes attrs;
-    attrs.add("string data"_sd, "a string data"_sd);
-    attrs.add("cstr"_sd, "a c string");
-    attrs.add("int"_sd, 5);
-    attrs.add("float"_sd, 3.0f);
-    attrs.add("bool"_sd, true);
-    attrs.add("enum"_sd, UnscopedEntryWithToString);
-    attrs.add("custom"_sd, t6);
-    attrs.addUnsafe("unsafe but ok"_sd, 1);
+    attrs.add("string data", "a string data"_sd);
+    attrs.add("cstr", "a c string");
+    attrs.add("int", 5);
+    attrs.add("float", 3.0f);
+    attrs.add("bool", true);
+    attrs.add("enum", UnscopedEntryWithToString);
+    attrs.add("custom", t6);
+    attrs.addUnsafe("unsafe but ok", 1);
     BSONObj bsonObj;
-    attrs.add("bson"_sd, bsonObj);
+    attrs.add("bson", bsonObj);
     LOGV2(20083, "message", attrs);
     auto validateDynamic = [](const BSONObj& obj) {
         const BSONObj& attrObj = obj.getField(kAttributesFieldName).Obj();
