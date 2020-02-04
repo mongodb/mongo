@@ -247,6 +247,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
         collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
+
+        // Skip the addition of hidden indexes to prevent use in query planning.
+        if (ice->descriptor()->hidden())
+            continue;
         plannerParams->indices.push_back(
             indexEntryFromIndexCatalogEntry(opCtx, *ice, canonicalQuery));
     }
@@ -1436,6 +1440,10 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         const IndexDescriptor* desc = ice->descriptor();
+
+        // Skip the addition of hidden indexes to prevent use in query planning.
+        if (desc->hidden())
+            continue;
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             if (!mayUnwindArrays &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),

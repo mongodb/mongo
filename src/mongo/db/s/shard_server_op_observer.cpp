@@ -47,6 +47,7 @@
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
@@ -493,7 +494,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       OptionalCollectionUUID uuid,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
-                                      boost::optional<TTLCollModInfo> ttlInfo) {
+                                      boost::optional<IndexCollModInfo> indexInfo) {
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
