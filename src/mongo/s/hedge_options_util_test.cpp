@@ -112,9 +112,10 @@ protected:
 
     static inline const BSONObj kDefaultParameters =
         BSON(kReadHedgingModeFieldName
-             << "on" << kMaxTimeMSThresholdForHedgingFieldName << gMaxTimeMSThresholdForHedging
-             << kHedgingDelayPercentageFieldName << gHedgingDelayPercentage
-             << kDefaultHedgingDelayMSFieldName << gDefaultHedgingDelayMS);
+             << "on" << kMaxTimeMSThresholdForHedgingFieldName
+             << gMaxTimeMSThresholdForHedging.load() << kHedgingDelayPercentageFieldName
+             << gHedgingDelayPercentage.load() << kDefaultHedgingDelayMSFieldName
+             << gDefaultHedgingDelayMS.load());
 
 private:
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();

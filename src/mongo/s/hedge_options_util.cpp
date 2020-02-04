@@ -39,14 +39,15 @@ boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeO
     OperationContext* opCtx, const BSONObj& cmdObj) {
     const auto hedgingMode = ReadPreferenceSetting::get(opCtx).hedgingMode;
 
-    if (gReadHedgingMode == kReadHedgingModeOn && hedgingMode && hedgingMode->getEnabled()) {
+    if (gReadHedgingMode.load() == ReadHedgingMode::kOn && hedgingMode &&
+        hedgingMode->getEnabled()) {
         boost::optional<int> maxTimeMS;
         if (auto cmdOptionMaxTimeMSField = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
             maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
         }
 
         // Check if the operation is worth hedging.
-        if (maxTimeMS && maxTimeMS > gMaxTimeMSThresholdForHedging) {
+        if (maxTimeMS && maxTimeMS > gMaxTimeMSThresholdForHedging.load()) {
             return boost::none;
         }
 
@@ -55,8 +56,8 @@ boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeO
         bool shouldDelayHedging = hedgingMode->getDelay();
 
         if (shouldDelayHedging) {
-            delay = maxTimeMS ? Milliseconds{gHedgingDelayPercentage * maxTimeMS.get() / 100}
-                              : Milliseconds{gDefaultHedgingDelayMS};
+            delay = maxTimeMS ? Milliseconds{gHedgingDelayPercentage.load() * maxTimeMS.get() / 100}
+                              : Milliseconds{gDefaultHedgingDelayMS.load()};
         }
 
         return executor::RemoteCommandRequestOnAny::HedgeOptions{1, delay};

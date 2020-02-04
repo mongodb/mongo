@@ -8,10 +8,7 @@
  */
 (function() {
 
-const st = new ShardingTest({
-    shards: 2,
-    mongosOptions: {setParameter: {maxTimeMSThresholdForHedging: 1500, hedgingDelayPercentage: 50}}
-});
+const st = new ShardingTest({shards: 2});
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
@@ -21,29 +18,42 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
-// With maxTimeMS.
+assert.commandWorked(st.s.adminCommand(
+    {setParameter: 1, maxTimeMSThresholdForHedging: 1500, hedgingDelayPercentage: 50}));
+
+// With maxTimeMS < maxTimeMSThresholdForHedging, expect hedging.
 assert.commandWorked(st.s.getDB(dbName).runCommand(
     {query: {find: collName, maxTimeMS: 1000}, $readPreference: {mode: "nearest", hedge: {}}}));
 
-// Without maxTimeMS.
-st.restartMongos(0, {
-    restart: true,
-    setParameter: {defaultHedgingDelayMS: 800},
-});
+// With maxTimeMS > maxTimeMSThresholdForHedging, expect no hedging.
+assert.commandWorked(st.s.getDB(dbName).runCommand(
+    {query: {find: collName, maxTimeMS: 1600}, $readPreference: {mode: "nearest", hedge: {}}}));
+
+// Without maxTimeMS, expect hedging.
+assert.commandWorked(st.s.adminCommand({setParameter: 1, defaultHedgingDelayMS: 800}));
 
 assert.commandWorked(st.s.getDB(dbName).runCommand(
     {query: {count: collName}, $readPreference: {mode: "secondaryPreferred", hedge: {}}}));
 
-// readHedgingMode "off".
-st.restartMongos(0, {
-    restart: true,
-    setParameter: {readHedgingMode: "off"},
-});
+// readHedgingMode "off", expect no hedging.
+st.s.adminCommand({setParameter: 1, readHedgingMode: "off"});
 
 assert.commandWorked(st.s.getDB(dbName).runCommand({
     query: {distinct: collName, key: "x"},
     $readPreference: {mode: "primaryPreferred", hedge: {}}
 }));
+
+// Test server parameter validation.
+assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, maxTimeMSThresholdForHedging: -1}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, hedgingDelayPercentage: -1}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, hedgingDelayPercentage: 101}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, defaultHedgingDelayMS: -1}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, readHedgingMode: "invalidMode"}),
+                             ErrorCodes.BadValue);
 
 st.stop();
 })();

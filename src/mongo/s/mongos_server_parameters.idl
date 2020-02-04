@@ -63,35 +63,39 @@ server_parameters:
   readHedgingMode:
     description: >-
         Enables hedged reads.
-    set_at: [ startup ]
-    cpp_vartype: std::string
-    cpp_varname: "gReadHedgingMode"
-    default: "on"
-    validator:
-      callback: "validateReadHedgingMode"
+    set_at: [ startup, runtime ]
+    cpp_class:
+      name: HedgingModeServerParameter
 
   maxTimeMSThresholdForHedging:
     description: >-
         The upper threshold for the expected running time of an operation (maxTimeMS)
         for it to be worth hedging.
-    set_at: [ startup ]
-    cpp_vartype: int
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
     cpp_varname: "gMaxTimeMSThresholdForHedging"
+    validator:
+        gte: 0
     default: 5000
 
   hedgingDelayPercentage:
     description: >-
         The percentage of maxTimeMS to wait for before dispatching subsequent reads.
-    set_at: [ startup ]
-    cpp_vartype: int
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
     cpp_varname: "gHedgingDelayPercentage"
+    validator:
+        gte: 0
+        lte: 100
     default: 25
 
   defaultHedgingDelayMS:
     description: >-
           The default wait time in milliseconds before dispatching subsequent reads if
           maxTimeMS is not given.
-    set_at: [ startup ]
-    cpp_vartype: int
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
     cpp_varname: "gDefaultHedgingDelayMS"
+    validator:
+        gte: 0
     default: 1250

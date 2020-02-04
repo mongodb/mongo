@@ -29,18 +29,13 @@
 
 #pragma once
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
-
-#include "mongo/base/status.h"
 
 namespace mongo {
 
-constexpr auto kReadHedgingModeOn = "on";
-constexpr auto kReadHedgingModeOff = "off";
+enum ReadHedgingMode { kOn, kOff };
 
-/**
- * Validation callback for setParameter 'readHedgingMode'.
- */
-Status validateReadHedgingMode(const std::string& mode);
+extern AtomicWord<ReadHedgingMode> gReadHedgingMode;
 
 }  // namespace mongo

@@ -29,18 +29,34 @@
 
 #include "mongo/s/mongos_server_parameters.h"
 
+#include "mongo/base/status.h"
+#include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
-/**
- * Validation callback for setParameter 'readHedgingMode'.
- */
-Status validateReadHedgingMode(const std::string& mode) {
-    if (mode != kReadHedgingModeOn && mode != kReadHedgingModeOff) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "readHedgingMode must be either \"" << kReadHedgingModeOn
-                              << "\" or \"" << kReadHedgingModeOff << "\""};
+namespace {
+std::string toReadHedgingModeString(ReadHedgingMode readHedgingMode) {
+    return readHedgingMode == ReadHedgingMode::kOn ? "on" : "off";
+}
+}  // namespace
+
+AtomicWord<ReadHedgingMode> gReadHedgingMode{ReadHedgingMode::kOn};
+
+void HedgingModeServerParameter::append(OperationContext*,
+                                        BSONObjBuilder& builder,
+                                        const std::string& name) {
+    builder.append(name, toReadHedgingModeString(gReadHedgingMode.load()));
+}
+
+Status HedgingModeServerParameter::setFromString(const std::string& modeStr) {
+    if (modeStr == "on") {
+        gReadHedgingMode.store(ReadHedgingMode::kOn);
+    } else if (modeStr == "off") {
+        gReadHedgingMode.store(ReadHedgingMode::kOff);
+    } else {
+        return Status{ErrorCodes::BadValue,
+                      str::stream() << "Unrecognized readHedgingMode '" << modeStr << "'"};
     }
     return Status::OK();
 }
