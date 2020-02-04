@@ -1714,6 +1714,27 @@ TEST(ReplSetConfig, ReplSetId) {
                            "\"replicaSetId\" had the wrong type. Expected objectId, found int");
 }
 
+TEST(ReplSetConfig, ConfigVersionAndTermComparison) {
+    // Test equality.
+    ASSERT_EQ(ConfigVersionAndTerm(1, 1), ConfigVersionAndTerm(1, 1));
+    ASSERT_EQ(ConfigVersionAndTerm(1, 2), ConfigVersionAndTerm(1, 2));
+    ASSERT_EQ(ConfigVersionAndTerm(2, 2), ConfigVersionAndTerm(2, 2));
+    ASSERT_EQ(ConfigVersionAndTerm(1, -1), ConfigVersionAndTerm(1, 1));
+    ASSERT_EQ(ConfigVersionAndTerm(1, 1), ConfigVersionAndTerm(1, -1));
+    ASSERT_EQ(ConfigVersionAndTerm(1, -1), ConfigVersionAndTerm(1, -1));
+    // Test greater/less than or equal to.
+    ASSERT_GT(ConfigVersionAndTerm(2, 1), ConfigVersionAndTerm(1, 1));
+    ASSERT_GTE(ConfigVersionAndTerm(2, 1), ConfigVersionAndTerm(1, 1));
+    ASSERT_GT(ConfigVersionAndTerm(1, 2), ConfigVersionAndTerm(1, 1));
+    ASSERT_GTE(ConfigVersionAndTerm(1, 2), ConfigVersionAndTerm(1, 1));
+    ASSERT_LT(ConfigVersionAndTerm(1, 1), ConfigVersionAndTerm(2, 1));
+    ASSERT_LTE(ConfigVersionAndTerm(1, 1), ConfigVersionAndTerm(2, 1));
+    ASSERT_LT(ConfigVersionAndTerm(1, 1), ConfigVersionAndTerm(1, 2));
+    ASSERT_LTE(ConfigVersionAndTerm(1, 1), ConfigVersionAndTerm(1, 2));
+    ASSERT_GT(ConfigVersionAndTerm(2, 1), ConfigVersionAndTerm(1, -1));
+    ASSERT_GT(ConfigVersionAndTerm(2, -1), ConfigVersionAndTerm(1, 1));
+    ASSERT_GT(ConfigVersionAndTerm(2, -1), ConfigVersionAndTerm(1, -1));
+}
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

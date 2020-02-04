@@ -48,6 +48,67 @@ class BSONObj;
 namespace repl {
 
 /**
+ * A structure that stores a ReplSetConfig (version, term) pair.
+ *
+ * This can be used to compare two ReplSetConfig objects to determine which is logically newer.
+ */
+class ConfigVersionAndTerm {
+public:
+    ConfigVersionAndTerm() : _version(0), _term(OpTime::kUninitializedTerm) {}
+    ConfigVersionAndTerm(int version, long long term) : _version(version), _term(term) {}
+
+    inline bool operator==(const ConfigVersionAndTerm& rhs) const {
+        // If term of either item is uninitialized (-1), then we ignore terms entirely and only
+        // compare versions.
+        if (_term == OpTime::kUninitializedTerm || rhs._term == OpTime::kUninitializedTerm) {
+            return _version == rhs._version;
+        }
+        // Compare term first, then the versions.
+        return std::tie(_term, _version) == std::tie(rhs._term, rhs._version);
+    }
+
+    inline bool operator<(const ConfigVersionAndTerm& rhs) const {
+        // If term of either item is uninitialized (-1), then we ignore terms entirely and only
+        // compare versions. This allows force reconfigs, which set the config term to -1, to
+        // override other configs by using a high config version.
+        if (_term == OpTime::kUninitializedTerm || rhs._term == OpTime::kUninitializedTerm) {
+            return _version < rhs._version;
+        }
+        // Compare term first, then the versions.
+        return std::tie(_term, _version) < std::tie(rhs._term, rhs._version);
+    }
+
+    inline bool operator!=(const ConfigVersionAndTerm& rhs) const {
+        return !(*this == rhs);
+    }
+
+    inline bool operator<=(const ConfigVersionAndTerm& rhs) const {
+        return *this < rhs || *this == rhs;
+    }
+
+    inline bool operator>(const ConfigVersionAndTerm& rhs) const {
+        return !(*this <= rhs);
+    }
+
+    inline bool operator>=(const ConfigVersionAndTerm& rhs) const {
+        return !(*this < rhs);
+    }
+
+    // TODO (SERVER-45082): Implement string conversion.
+    std::string toString() const {
+        return "";
+    };
+
+    friend std::ostream& operator<<(std::ostream& out, const ConfigVersionAndTerm& cvt) {
+        return out << cvt.toString();
+    }
+
+private:
+    long long _version;
+    long long _term;
+};
+
+/**
  * Representation of the configuration information about a particular replica set.
  */
 class ReplSetConfig {
