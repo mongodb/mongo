@@ -57,7 +57,7 @@ protected:
 
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
-        CatalogCacheLoader::get(operationContext()).initializeReplicaSetRole(true);
+        getCatalogCacheLoaderForFiltering(operationContext()).initializeReplicaSetRole(true);
 
         setupNShards(2);
     }
@@ -230,27 +230,6 @@ protected:
                                         chunk3.toConfigBSON(),
                                         chunk4.toConfigBSON()};
         }());
-    }
-
-    void respondToMetadataRefreshRequestsWithError() {
-        // Return an empty database (need to return it twice because for missing databases, the
-        // CatalogClient tries twice)
-        expectFindSendBSONObjVector(kConfigHostAndPort, {});
-        expectFindSendBSONObjVector(kConfigHostAndPort, {});
-
-        // getCollectionRoutingInfoWithRefresh calls _getCollectionRoutingInfo twice
-        expectFindSendBSONObjVector(kConfigHostAndPort, {});
-        expectFindSendBSONObjVector(kConfigHostAndPort, {});
-    }
-
-    boost::optional<CachedCollectionRoutingInfo> getRoutingInfo() {
-        auto future = scheduleRoutingInfoRefresh(kNss);
-
-        respondToMetadataRefreshRequests();
-
-        auto routingInfo = future.default_timed_get();
-
-        return routingInfo;
     }
 };
 

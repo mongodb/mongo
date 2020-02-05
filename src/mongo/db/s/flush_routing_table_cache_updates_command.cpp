@@ -136,7 +136,7 @@ public:
                 forceShardFilteringMetadataRefresh(opCtx, ns());
             }
 
-            CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());
+            getCatalogCacheLoaderForFiltering(opCtx).waitForCollectionFlush(opCtx, ns());
 
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
