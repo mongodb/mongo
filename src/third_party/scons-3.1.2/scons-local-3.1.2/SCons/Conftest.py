@@ -315,8 +315,8 @@ int main(void) {
     return ret
 
 
-def CheckHeader(context, header_name, header = None, language = None,
-                                                        include_quotes = None):
+def CheckHeader(context, header_name, header=None, language=None,
+                include_quotes=None):
     """
     Configure check for a C or C++ header file "header_name".
     Optional "header" can be defined to do something before including the

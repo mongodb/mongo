@@ -647,6 +647,8 @@ class BuilderBase(object):
                 env_kw = kw
         else:
             env_kw = self.overrides
+
+        # TODO if env_kw: then the following line. there's no purpose in calling if no overrides.
         env = env.Override(env_kw)
         return self._execute(env, target, source, OverrideWarner(kw), ekw)
 
