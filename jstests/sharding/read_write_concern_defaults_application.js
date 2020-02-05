@@ -25,6 +25,7 @@
  *   requires_majority_read_concern,
  *   requires_profiling,
  *   requires_text_logs,
+ *   uses_transactions,
  * ]
  */
 (function() {
