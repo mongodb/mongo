@@ -105,13 +105,11 @@ Status ShardingState::canAcceptShardedCommands() const {
 
 ShardId ShardingState::shardId() {
     invariant(enabled());
-    stdx::lock_guard<Latch> lk(_mutex);
     return _shardId;
 }
 
 OID ShardingState::clusterId() {
     invariant(enabled());
-    stdx::lock_guard<Latch> lk(_mutex);
     return _clusterId;
 }
 

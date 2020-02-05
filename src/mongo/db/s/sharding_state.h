@@ -93,14 +93,12 @@ public:
     Status canAcceptShardedCommands() const;
 
     /**
-     * Returns the shard id to which this node belongs. May only be called if 'enabled()' above
-     * returns true.
+     * Returns the shard id to which this node belongs.
      */
     ShardId shardId();
 
     /**
-     * Returns the cluster id of the cluster to which this node belongs. May only be called if
-     * 'enabled()' above returns true.
+     * Returns the cluster id of the cluster to which this node belongs.
      */
     OID clusterId();
 
@@ -135,13 +133,22 @@ private:
         return static_cast<InitializationState>(_initializationState.load());
     }
 
-    // Protects state below
+    // Protects state for initializing '_shardId', '_clusterId', and '_initializationStatus'.
+    // Protects read access for '_initializationStatus'.
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingState::_mutex");
 
     // State of the initialization of the sharding state along with any potential errors
     AtomicWord<unsigned> _initializationState{static_cast<uint32_t>(InitializationState::kNew)};
 
-    // Sets the shard name for this host (comes through setShardVersion)
+    // For '_shardId' and '_clusterId':
+    //
+    // These variables will invariant if attempts are made to access them before 'enabled()' has
+    // been set to true. 'enabled()' being set to true guarantees that these variables have been
+    // set, and that they will remain unchanged for the duration of the ShardingState object's
+    // lifetime. Because these variables will not change, it's unnecessary to acquire the class's
+    // mutex in order to call these getters and access their underlying data.
+
+    // Sets the shard name for this host.
     ShardId _shardId;
 
     // The id for the cluster this shard belongs to.
