@@ -1255,9 +1255,9 @@ def generate(env):
         env.NinjaRuleMapping(env[var], provider)
 
     robust_rule_mapping("CCCOM", "CC", env["CC"])
-    robust_rule_mapping("SHCCCOM", "LINK", env["CC"])
+    robust_rule_mapping("SHCCCOM", "CC", env["CC"])
     robust_rule_mapping("CXXCOM", "CXX", env["CXX"])
-    robust_rule_mapping("SHCXXCOM", "LINK", env["CXX"])
+    robust_rule_mapping("SHCXXCOM", "CXX", env["CXX"])
     robust_rule_mapping("LINKCOM", "LINK", "$LINK")
     robust_rule_mapping("SHLINKCOM", "LINK", "$SHLINK")
     robust_rule_mapping("ARCOM", "AR", env["AR"])
