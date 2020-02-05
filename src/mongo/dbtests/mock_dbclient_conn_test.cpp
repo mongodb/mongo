@@ -625,10 +625,16 @@ TEST(MockDBClientConnTest, Delay) {
     ASSERT_EQUALS(1U, server.getCmdCount());
 }
 
-TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
-    MockDBClientConnection conn;
+const auto docObj = [](int i) { return BSON("_id" << i); };
+const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
+const long long cursorId = 123;
+const bool moreToCome = true;
+const NamespaceString nss("test", "coll");
 
-    const NamespaceString nss("test", "coll");
+TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
+
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
                                  Query().obj,
@@ -638,11 +644,6 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
                                  mongo::QueryOption_Exhaust,
                                  0);
     cursor.setBatchSize(2);
-
-    const auto docObj = [](int i) { return BSON("_id" << i); };
-    const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
-    const long long cursorId = 123;
-    const bool moreToCome = true;
 
     // Two batches from the initial find and getMore command.
     MockDBClientConnection::Responses callResponses = {
@@ -703,9 +704,9 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
 }
 
 TEST(MockDBClientConnTest, SimulateCallErrors) {
-    MockDBClientConnection conn;
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
 
-    const NamespaceString nss("test", "coll");
     mongo::DBClientCursor cursor(
         &conn, mongo::NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, 0, 0);
 
@@ -729,10 +730,31 @@ TEST(MockDBClientConnTest, SimulateCallErrors) {
     ASSERT_TRUE(cursor.isDead());
 }
 
-TEST(MockDBClientConnTest, SimulateRecvErrors) {
-    MockDBClientConnection conn;
+void runUntilExhaustRecv(MockDBClientConnection* conn, mongo::DBClientCursor* cursor) {
+    cursor->setBatchSize(1);
 
-    const NamespaceString nss("test", "coll");
+    // Two batches from the initial find and getMore command.
+    MockDBClientConnection::Responses callResponses = {
+        MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1)),
+        MockDBClientConnection::mockGetMoreResponse(
+            nss, cursorId, {docObj(2)}, metadata(2), moreToCome)};
+    conn->setCallResponses(callResponses);
+
+    // First batch from the initial find command.
+    ASSERT_TRUE(cursor->init());
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor->next());
+    ASSERT_FALSE(cursor->moreInCurrentBatch());
+
+    // Second batch from the first getMore command.
+    ASSERT_TRUE(cursor->more());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor->next());
+    ASSERT_FALSE(cursor->moreInCurrentBatch());
+}
+
+TEST(MockDBClientConnTest, SimulateRecvErrors) {
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
+
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
                                  Query().obj,
@@ -741,29 +763,8 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
                                  nullptr,
                                  mongo::QueryOption_Exhaust,
                                  0);
-    cursor.setBatchSize(1);
 
-    const auto docObj = [](int i) { return BSON("_id" << i); };
-    const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
-    const long long cursorId = 123;
-    const bool moreToCome = true;
-
-    // Two batches from the initial find and getMore command.
-    MockDBClientConnection::Responses callResponses = {
-        MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1)),
-        MockDBClientConnection::mockGetMoreResponse(
-            nss, cursorId, {docObj(2)}, metadata(2), moreToCome)};
-    conn.setCallResponses(callResponses);
-
-    // First batch from the initial find command.
-    ASSERT_TRUE(cursor.init());
-    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
-    ASSERT_FALSE(cursor.moreInCurrentBatch());
-
-    // Second batch from the first getMore command.
-    ASSERT_TRUE(cursor.more());
-    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
-    ASSERT_FALSE(cursor.moreInCurrentBatch());
+    runUntilExhaustRecv(&conn, &cursor);
 
     // Test network exception and error response from exhaust stream.
     MockDBClientConnection::Responses recvResponses = {
@@ -787,10 +788,21 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
     ASSERT_TRUE(cursor.isDead());
 }
 
-TEST(MockDBClientConnTest, BlockingNetwork) {
-    MockDBClientConnection conn;
+bool blockedOnNetworkSoon(MockDBClientConnection* conn) {
+    // Wait up to 10 seconds.
+    for (auto i = 0; i < 100; i++) {
+        if (conn->isBlockedOnNetwork()) {
+            return true;
+        }
+        mongo::sleepmillis(100);
+    }
+    return false;
+}
 
-    const NamespaceString nss("test", "coll");
+TEST(MockDBClientConnTest, BlockingNetwork) {
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
+
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
                                  Query().obj,
@@ -800,11 +812,6 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
                                  mongo::QueryOption_Exhaust,
                                  0);
     cursor.setBatchSize(1);
-
-    const auto docObj = [](int i) { return BSON("_id" << i); };
-    const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
-    const long long cursorId = 123;
-    const bool moreToCome = true;
 
     mongo::stdx::thread cursorThread([&] {
         // First batch from the initial find command.
@@ -824,19 +831,8 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
         ASSERT_TRUE(cursor.isDead());
     });
 
-    const auto blockedOnNetworkSoon = [&]() {
-        // Wait up to 10 seconds.
-        for (auto i = 0; i < 100; i++) {
-            if (conn.isBlockedOnNetwork()) {
-                return true;
-            }
-            mongo::sleepmillis(100);
-        }
-        return false;
-    };
-
     // Cursor should be blocked on the first find command.
-    ASSERT_TRUE(blockedOnNetworkSoon());
+    ASSERT_TRUE(blockedOnNetworkSoon(&conn));
     auto m = conn.getLastSentMessage();
     auto msg = mongo::OpMsg::parse(m);
     ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
@@ -845,7 +841,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
         {MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1))});
 
     // Cursor should be blocked on the getMore command.
-    ASSERT_TRUE(blockedOnNetworkSoon());
+    ASSERT_TRUE(blockedOnNetworkSoon(&conn));
     m = conn.getLastSentMessage();
     msg = mongo::OpMsg::parse(m);
     ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
@@ -854,10 +850,153 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
         nss, cursorId, {docObj(2)}, metadata(2), moreToCome)});
 
     // Cursor should be blocked on the exhaust stream.
-    ASSERT_TRUE(blockedOnNetworkSoon());
+    ASSERT_TRUE(blockedOnNetworkSoon(&conn));
     // Set the response for the exhaust stream and unblock network recv().
     conn.setRecvResponses(
         {MockDBClientConnection::mockGetMoreResponse(nss, 0, {docObj(3)}, metadata(3))});
+
+    cursorThread.join();
+}
+
+TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
+
+    ASSERT_OK(conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData()));
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+
+    // Shut down server before call.
+    server.shutdown();
+
+    // Connection is broken before call.
+    ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::SocketException);
+
+    // Reboot the mock server but the cursor.init() would still fail because the connection does not
+    // support autoreconnect.
+    server.reboot();
+    ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::SocketException);
+}
+
+TEST(MockDBClientConnTest, ShutdownServerAfterCall) {
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
+
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+
+    mongo::stdx::thread cursorThread([&] {
+        ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::HostUnreachable);
+    });
+
+    // Cursor should be blocked on the first find command.
+    ASSERT_TRUE(blockedOnNetworkSoon(&conn));
+
+    // Shutting down the server doesn't interrupt the blocking network call, so we shut down the
+    // connection as well to simulate shutdown of the server.
+    server.shutdown();
+    conn.shutdown();
+
+    cursorThread.join();
+}
+
+TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
+    const bool autoReconnect = true;
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server, autoReconnect);
+
+    ASSERT_OK(conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData()));
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+
+    server.shutdown();
+
+    // Connection is broken before call.
+    ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::SocketException);
+
+    // AutoReconnect fails because the server is down.
+    ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::HostUnreachable);
+
+    // Reboot the mock server and the cursor.init() will reconnect and succeed.
+    server.reboot();
+
+    conn.setCallResponses(
+        {MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1))});
+    ASSERT_TRUE(cursor.init());
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+}
+
+TEST(MockDBClientConnTest, ShutdownServerBeforeRecv) {
+    const bool autoReconnect = true;
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server, autoReconnect);
+
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+
+    runUntilExhaustRecv(&conn, &cursor);
+
+    server.shutdown();
+
+    // cursor.more() will call recv on the exhaust stream.
+    ASSERT_THROWS_CODE(cursor.more(), mongo::DBException, mongo::ErrorCodes::SocketException);
+
+    server.reboot();
+    // Reconnect is not possible for exhaust recv.
+    ASSERT_THROWS_CODE(cursor.more(), mongo::DBException, mongo::ErrorCodes::SocketException);
+}
+
+TEST(MockDBClientConnTest, ShutdownServerAfterRecv) {
+    MockRemoteDBServer server("test");
+    MockDBClientConnection conn(&server);
+
+    mongo::DBClientCursor cursor(&conn,
+                                 mongo::NamespaceStringOrUUID(nss),
+                                 Query().obj,
+                                 0,
+                                 0,
+                                 nullptr,
+                                 mongo::QueryOption_Exhaust,
+                                 0);
+
+    runUntilExhaustRecv(&conn, &cursor);
+
+    mongo::stdx::thread cursorThread([&] {
+        ASSERT_THROWS_CODE(cursor.more(), mongo::DBException, mongo::ErrorCodes::HostUnreachable);
+    });
+
+    // Cursor should be blocked on the recv.
+    ASSERT_TRUE(blockedOnNetworkSoon(&conn));
+
+    // Shutting down the server doesn't interrupt the blocking network call, so we shut down the
+    // connection as well to simulate shutdown of the server.
+    server.shutdown();
+    conn.shutdown();
 
     cursorThread.join();
 }

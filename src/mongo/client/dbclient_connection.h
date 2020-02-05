@@ -190,6 +190,13 @@ public:
 
     void setTags(transport::Session::TagMask tag);
 
+
+    /**
+     * Disconnects the client and interrupts operations if they are currently blocked waiting for
+     * the network. If autoreconnect is on, a connection will be re-established after reconnecting.
+     */
+    virtual void shutdown();
+
     /**
      * Causes an error to be reported the next time the connection is used. Will interrupt
      * operations if they are currently blocked waiting for the network.

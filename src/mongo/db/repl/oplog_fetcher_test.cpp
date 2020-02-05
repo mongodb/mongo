@@ -1149,6 +1149,12 @@ void processSingleExhaustResponse(DBClientConnection* conn,
     }
 }
 
+void simulateNetworkDisconnect(DBClientConnection* conn) {
+    auto* mockConn = dynamic_cast<MockDBClientConnection*>(conn);
+    ASSERT_TRUE(blockedOnNetworkSoon(mockConn));
+    mockConn->shutdown();
+}
+
 class NewOplogFetcherTest : public executor::ThreadPoolExecutorTest,
                             public ScopedGlobalServiceContextForTest {
 protected:
@@ -1193,6 +1199,8 @@ protected:
 
     // The last OpTime fetched by the oplog fetcher.
     OpTime lastFetched;
+
+    std::unique_ptr<MockRemoteDBServer> _mockServer;
 };
 
 const OpTime NewOplogFetcherTest::remoteNewerOpTime = OpTime(Timestamp(124, 1), 2);
@@ -1218,6 +1226,9 @@ void NewOplogFetcherTest::setUp() {
         lastEnqueuedDocumentsInfo = info;
         return Status::OK();
     };
+
+    auto target = HostAndPort{"localhost:12346"};
+    _mockServer = std::make_unique<MockRemoteDBServer>(target.toString());
 }
 
 std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcher() {
@@ -1261,8 +1272,11 @@ std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcherWithDiffer
         fn,
         defaultBatchSize,
         NewOplogFetcher::StartingPoint::kSkipFirstDoc);
-    oplogFetcher->setCreateClientFn_forTest(
-        []() { return std::unique_ptr<DBClientConnection>(new MockDBClientConnection()); });
+    oplogFetcher->setCreateClientFn_forTest([this]() {
+        const auto autoReconnect = true;
+        return std::unique_ptr<DBClientConnection>(
+            new MockDBClientConnection(_mockServer.get(), autoReconnect));
+    });
     return oplogFetcher;
 }
 
@@ -1427,6 +1441,176 @@ TEST_F(NewOplogFetcherTest,
 
     // This is the error that the connection throws if shutdown while blocked on the network.
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherReturnsHostUnreachableOnConnectionFailures) {
+    // Test that OplogFetcher fails to establish initial connection, retrying HostUnreachable.
+    ShutdownState shutdownState;
+
+    // Shutdown the mock remote server before the OplogFetcher tries to connect.
+    _mockServer->shutdown();
+
+    // This will also ensure that _runQuery was scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    oplogFetcher->join();
+
+    // This is the error code for connection failures.
+    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherRetriesConnectionButFails) {
+    // Test that OplogFetcher tries but fails after failing the initial connection, retrying
+    // HostUnreachable.
+    ShutdownState shutdownState;
+
+    // Shutdown the mock remote server before the OplogFetcher tries to connect.
+    _mockServer->shutdown();
+
+    // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
+    // scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    oplogFetcher->join();
+
+    // This is the error code for connection failures.
+    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherResetsNumRestartsOnSuccessfulConnection) {
+    // Test that OplogFetcher resets the number of restarts after a successful connection on a
+    // retry.
+    ShutdownState shutdownState;
+
+    // Shutdown the mock remote server before the OplogFetcher tries to connect.
+    _mockServer->shutdown();
+
+    // Hang OplogFetcher before it retries the connection.
+    auto beforeRetryingConnection = globalFailPointRegistry().find("hangBeforeOplogFetcherRetries");
+    auto timesEntered = beforeRetryingConnection->setMode(FailPoint::alwaysOn);
+
+    // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
+    // scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    // Wait until the first connect attempt fails but before it retries.
+    beforeRetryingConnection->waitForTimesEntered(timesEntered + 1);
+
+    // Bring up the mock server so that the connection retry can succeed.
+    _mockServer->reboot();
+
+    // Disable the failpoint to allow reconnection.
+    beforeRetryingConnection->setMode(FailPoint::off);
+
+    // After the connection succeeded, the number of restarts should be reset back to 0 so that the
+    // OplogFetcher can tolerate another failure before failing. This will cause the first attempt
+    // to create a cursor to fail. After this, the new cursor will be blocked on call() while
+    // retrying to initialize. This also makes sure the OplogFetcher reconnects correctly.
+    simulateNetworkDisconnect(oplogFetcher->getDBClientConnection_forTest());
+
+    CursorId cursorId = 0LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // Allow the cursor re-initialization to succeed. But the OplogFetcher will shut down with an OK
+    // status after receiving this batch because the cursor id is 0.
+    processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                 makeFirstBatch(cursorId, {firstEntry}, metadataObj));
+
+    oplogFetcher->join();
+
+    ASSERT_OK(shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherCanAutoReconnect) {
+    // Test that the OplogFetcher can autoreconnect after a broken connection.
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+    // Simulate a disconnect for the first find command.
+    simulateNetworkDisconnect(conn);
+
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(124), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    // Simulate closing the cursor and the OplogFetcher should exit with an OK status.
+    processSingleRequestResponse(conn, makeFirstBatch(0LL, {firstEntry}, metadataObj));
+
+    oplogFetcher->join();
+
+    ASSERT_OK(shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, OplogFetcherAutoReconnectsButFails) {
+    // Test that the OplogFetcher fails an autoreconnect after a broken connection.
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+    // Shut down the mock server and simulate a disconnect for the first find command. And the
+    // OplogFetcher should retry with AutoReconnect.
+    _mockServer->shutdown();
+    simulateNetworkDisconnect(conn);
+
+    oplogFetcher->join();
+
+    // AutoReconnect should also fail because the server is shut down.
+    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, DisconnectsOnErrorsDuringExhaustStream) {
+    // Test that the connection disconnects if we get errors after successfully receiving a batch
+    // from the exhaust stream.
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(124), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+    // First batch for the initial find command.
+    processSingleRequestResponse(conn, makeFirstBatch(cursorId, {firstEntry}, metadataObj), true);
+
+    auto beforeRecreatingCursor = globalFailPointRegistry().find("hangBeforeOplogFetcherRetries");
+    auto timesEntered = beforeRecreatingCursor->setMode(FailPoint::alwaysOn);
+
+    // Temporarily override the metatdata reader to introduce failure after successfully receiving a
+    // batch from the first getMore. And the exhaust stream is now established.
+    conn->setReplyMetadataReader(
+        [&](OperationContext* opCtx, const BSONObj& metadataObj, StringData target) {
+            return Status(ErrorCodes::FailedToParse, "Fake error");
+        });
+    processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {secondEntry}, metadataObj, true /* moreToCome */));
+
+    beforeRecreatingCursor->waitForTimesEntered(timesEntered + 1);
+
+    // Test that the connection is disconnected because we cannot use the same connection to
+    // recreate cursor as more data is on the way from the server for the exhaust stream.
+    ASSERT_TRUE(conn->isFailed());
+
+    // Unset the metatdata reader.
+    conn->setReplyMetadataReader(rpc::ReplyMetadataReader());
+
+    // Allow retry and autoreconnect.
+    beforeRecreatingCursor->setMode(FailPoint::off);
+
+    // Simulate closing the cursor and the OplogFetcher should exit with an OK status.
+    processSingleRequestResponse(conn, makeFirstBatch(0LL, {firstEntry}, metadataObj));
+
+    oplogFetcher->join();
+
+    ASSERT_OK(shutdownState.getStatus());
 }
 
 TEST_F(NewOplogFetcherTest,

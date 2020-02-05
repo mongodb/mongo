@@ -100,11 +100,6 @@ public:
     MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect = false);
     virtual ~MockDBClientConnection();
 
-    /**
-     * Create a mock connection that only supports call() and recv().
-     */
-    MockDBClientConnection();
-
     //
     // DBClientBase methods
     //
@@ -115,7 +110,7 @@ public:
     Status connect(const HostAndPort& host, StringData applicationName) override {
         std::string errmsg;
         if (!connect(host.toString().c_str(), applicationName, errmsg)) {
-            return {ErrorCodes::HostNotFound, errmsg};
+            return {ErrorCodes::HostUnreachable, errmsg};
         }
         return Status::OK();
     }
@@ -145,6 +140,7 @@ public:
               std::string* actualServer) override;
     Status recv(mongo::Message& m, int lastRequestId) override;
 
+    void shutdown() override;
     void shutdownAndDisallowReconnect() override;
 
     // Methods to simulate network responses.
@@ -157,7 +153,6 @@ public:
     //
 
     mongo::ConnectionString::ConnectionType type() const override;
-    bool isFailed() const override;
     std::string getServerAddress() const override;
     std::string toString() const override;
 
@@ -197,9 +192,7 @@ private:
 
     MockRemoteDBServer::InstanceID _remoteServerInstanceID;
     MockRemoteDBServer* _remoteServer;
-    bool _isFailed;
     uint64_t _sockCreationTime;
-    bool _autoReconnect;
     boost::optional<OpMsgRequest> _lastCursorMessage;
 
     Mutex _netMutex = MONGO_MAKE_LATCH("MockDBClientConnection");

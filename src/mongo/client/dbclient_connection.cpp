@@ -454,6 +454,11 @@ void DBClientConnection::setTags(transport::Session::TagMask tags) {
     _session->setTags(tags);
 }
 
+void DBClientConnection::shutdown() {
+    stdx::lock_guard<Latch> lk(_sessionMutex);
+    _markFailed(kEndSession);
+}
+
 void DBClientConnection::shutdownAndDisallowReconnect() {
     stdx::lock_guard<Latch> lk(_sessionMutex);
     _stayFailed.store(true);

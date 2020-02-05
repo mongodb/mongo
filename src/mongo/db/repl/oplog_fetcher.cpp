@@ -57,6 +57,7 @@ MONGO_FAIL_POINT_DEFINE(stopReplProducerOnDocument);
 MONGO_FAIL_POINT_DEFINE(setSmallOplogGetMoreMaxTimeMS);
 MONGO_FAIL_POINT_DEFINE(logAfterOplogFetcherConnCreated);
 MONGO_FAIL_POINT_DEFINE(hangAfterOplogFetcherCallbackScheduled);
+MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
 
 // TODO SERVER-45574: Define the failpoint in this file instead.
 extern FailPoint hangBeforeStartingOplogFetcher;
@@ -733,8 +734,6 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
     {
         stdx::lock_guard<Latch> lock(_mutex);
         _conn = _createClientFn();
-
-        // TODO SERVER-45931: Connect and authenticate.
     }
 
     if (MONGO_unlikely(logAfterOplogFetcherConnCreated.shouldFail())) {
@@ -744,6 +743,13 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
     }
 
     hangAfterOplogFetcherCallbackScheduled.pauseWhileSet();
+
+    auto connectStatus = _connect();
+    // Error out if we failed to connect after exhausting the allowed retry attempts.
+    if (!connectStatus.isOK()) {
+        _finishCallback(connectStatus);
+        return;
+    }
 
     _createNewCursor(true /* initialFind */);
 
@@ -767,6 +773,7 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
 
             // Recreate a cursor if we have enough retries left.
             if (_oplogFetcherRestartDecision->shouldContinue(this, brStatus)) {
+                hangBeforeOplogFetcherRetries.pauseWhileSet();
                 _createNewCursor(false /* initialFind */);
                 continue;
             } else {
@@ -795,6 +802,32 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
             return;
         }
     }
+}
+
+Status NewOplogFetcher::_connect() {
+    Status connectStatus = Status::OK();
+    do {
+        connectStatus = [&] {
+            try {
+                // Always try to start from scratch with a new connection if either the connection
+                // or the authentication fails from the previous attempt.
+                uassertStatusOK(_conn->connect(_source, "OplogFetcher"));
+                uassertStatusOK(replAuthenticate(_conn.get())
+                                    .withContext(str::stream()
+                                                 << "OplogFecther failed to authenticate to "
+                                                 << _source));
+                // Reset any state needed to track restarts on successful connection.
+                _oplogFetcherRestartDecision->fetchSuccessful(this);
+                return Status::OK();
+            } catch (const DBException& e) {
+                hangBeforeOplogFetcherRetries.pauseWhileSet();
+                return e.toStatus();
+            }
+        }();
+    } while (!connectStatus.isOK() &&
+             _oplogFetcherRestartDecision->shouldContinue(this, connectStatus));
+
+    return connectStatus;
 }
 
 BSONObj NewOplogFetcher::_makeFindQuery(long long findTimeout) const {
@@ -875,6 +908,12 @@ StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
             batch.emplace_back(_cursor->nextSafe());
         }
     } catch (const DBException& ex) {
+        if (_cursor->connectionHasPendingReplies()) {
+            // Close the connection because the connection cannot be used anymore as more data is on
+            // the way from the server for the exhaust stream. Thus, we have to reconnect. The
+            // DBClientConnection does autoreconnect on the next network operation.
+            _conn->shutdown();
+        }
         return ex.toStatus("Error while getting the next batch in the oplog fetcher");
     }
 

@@ -474,6 +474,13 @@ private:
     void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData) noexcept;
 
     /**
+     * Establishes the initial connection to the sync source and authenticates the connection for
+     * replication. This will also retry on connection failures until it exhausts the allowed retry
+     * attempts.
+     */
+    Status _connect();
+
+    /**
      * Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
      * exhaust cursor.
      *
