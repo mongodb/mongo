@@ -141,8 +141,8 @@ std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsR
     return {"_id"};
 }
 
-bool CommonProcessInterface::keyPatternNamesExactPaths(
-    const BSONObj& keyPattern, const std::set<FieldPath>& uniqueKeyPaths) {
+bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern,
+                                                       const std::set<FieldPath>& uniqueKeyPaths) {
     size_t nFieldsMatched = 0;
     for (auto&& elem : keyPattern) {
         if (!elem.isNumber()) {
