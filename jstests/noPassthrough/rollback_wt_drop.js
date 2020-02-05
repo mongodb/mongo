@@ -93,9 +93,6 @@ let RollbackOps = (node) => {
     assert.commandWorked(mydb.createCollection(tempColl.getName()));
     assert.commandWorked(tempColl.insert({_id: 100, y: 100}));
     assert(tempColl.drop());
-
-    // restartCatalog should not remove drop-pending idents.
-    assert.commandWorked(mydb.adminCommand({restartCatalog: 1}));
 };
 
 // Set up Rollback Test.

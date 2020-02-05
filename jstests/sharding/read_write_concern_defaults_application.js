@@ -522,7 +522,6 @@ let testCases = {
     replSetTest: {skip: "does not accept read or write concern"},
     replSetUpdatePosition: {skip: "does not accept read or write concern"},
     resetError: {skip: "does not accept read or write concern"},
-    restartCatalog: {skip: "internal command"},
     resync: {skip: "does not accept read or write concern"},
     revokePrivilegesFromRole: {
         setUp: function(conn) {

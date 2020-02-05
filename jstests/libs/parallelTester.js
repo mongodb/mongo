@@ -205,9 +205,6 @@ if (typeof _threadInject != "undefined") {
             "views/views_all_commands.js",        // Drops test DB.
             "views/view_with_invalid_dbname.js",  // Puts invalid view definitions in system.views.
 
-            // Destroys and recreates the catalog, which will interfere with other tests.
-            "restart_catalog.js",
-
             // This test works close to the BSON document limit for entries in the durable catalog,
             // so running it in parallel with other tests will cause failures.
             "long_collection_names.js",

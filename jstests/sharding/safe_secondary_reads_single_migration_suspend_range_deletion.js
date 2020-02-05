@@ -347,7 +347,6 @@ let testCases = {
     replSetUpdatePosition: {skip: "does not return user data"},
     replSetResizeOplog: {skip: "does not return user data"},
     resetError: {skip: "does not return user data"},
-    restartCatalog: {skip: "internal-only command"},
     resync: {skip: "primary only"},
     revokePrivilegesFromRole: {skip: "primary only"},
     revokeRolesFromRole: {skip: "primary only"},

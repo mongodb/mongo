@@ -72,8 +72,7 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     invariant(_collection);
 
     uassert(ErrorCodes::QueryPlanKilled,
-            str::stream()
-                << "Database epoch changed due to a database-level event such as 'restartCatalog'.",
+            str::stream() << "Database epoch changed due to a database-level event.",
             getDatabaseEpoch(_collection) == _databaseEpoch);
 
     doRestoreStateRequiresCollection();

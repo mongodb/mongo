@@ -371,7 +371,6 @@ env.Library(
         "oplog_note.cpp",
         'read_write_concern_defaults_server_status.cpp',
         "resize_oplog.cpp",
-        "restart_catalog_command.cpp",
         'rwc_defaults_commands.cpp',
         "set_feature_compatibility_version_command.cpp",
         "set_index_commit_quorum_command.cpp",

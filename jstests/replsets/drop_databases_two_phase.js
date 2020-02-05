@@ -125,10 +125,6 @@ assert.commandFailedWithCode(
     ErrorCodes.DatabaseDropPending,
     'collection creation should fail while we are in the process of dropping the database');
 
-assert.commandFailedWithCode(dbToDrop.adminCommand('restartCatalog'),
-                             ErrorCodes.DatabaseDropPending,
-                             'restartCatalog should fail if any databases are marked drop-pending');
-
 /**
  * DROP DATABASE 'Database' PHASE
  */

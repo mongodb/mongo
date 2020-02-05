@@ -387,30 +387,6 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase)
     ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
 }
 
-TEST_F(PlanExecutorInvalidationTest, CollScanDiesOnRestartCatalog) {
-    // TODO: SERVER-40588. Avoid restarting the catalog on the Biggie storage engine as it
-    // currently does not support this feature.
-    if (storageGlobalParams.engine == "biggie") {
-        return;
-    }
-
-    auto exec = getCollscan();
-
-    // Partially scan the collection.
-    BSONObj obj;
-    for (int i = 0; i < 10; ++i) {
-        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
-        ASSERT_EQUALS(i, obj["foo"].numberInt());
-    }
-
-    // Restart the catalog during yield. Verify that yield recovery throws with the expected error
-    // code.
-    exec->saveState();
-    BSONObj info;
-    ASSERT_TRUE(_client.runCommand("admin", BSON("restartCatalog" << 1), info));
-    ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
-}
-
 TEST_F(PlanExecutorInvalidationTest, IxscanDiesWhenTruncateCollectionDropsAllIndices) {
     BSONObj keyPattern = BSON("foo" << 1);
     ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), keyPattern));

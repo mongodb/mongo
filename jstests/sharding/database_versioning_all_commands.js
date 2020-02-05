@@ -592,7 +592,6 @@ let testCases = {
     },
     replSetGetStatus: {skip: "not supported in mongos"},
     resetError: {skip: "not on a user database"},
-    restartCatalog: {skip: "not on a user database"},
     revokePrivilegesFromRole: {skip: "always targets the config server"},
     revokeRolesFromRole: {skip: "always targets the config server"},
     revokeRolesFromUser: {skip: "always targets the config server"},
