@@ -7,9 +7,6 @@
 (function() {
 "use strict";
 
-// Deliberately inserts orphans outside of migration.
-TestData.skipCheckOrphans = true;
-
 load('jstests/libs/analyze_plan.js');  // For aggPlanHasStage().
 
 // Set up a 2-shard cluster.

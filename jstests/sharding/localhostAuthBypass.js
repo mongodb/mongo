@@ -8,7 +8,6 @@
 // which stops the mongoses before calling ShardingTest.stop.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-TestData.skipCheckOrphans = true;
 
 (function() {
 'use strict';

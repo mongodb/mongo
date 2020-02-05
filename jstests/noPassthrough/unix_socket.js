@@ -18,7 +18,6 @@ if (_isWindows()) {
 
 // Checking index consistency involves reconnecting to the mongos.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-TestData.skipCheckOrphans = true;
 
 // Do not fail if this test leaves unterminated processes because testSockOptions
 // is expected to throw before it calls stopMongod.

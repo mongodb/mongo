@@ -9,9 +9,6 @@ load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/sharded_index_util.js");
 
-// Test deliberately inserts orphans outside of migration.
-TestData.skipCheckOrphans = true;
-
 /*
  * Runs moveChunk on the host to move the chunk to the given shard.
  */

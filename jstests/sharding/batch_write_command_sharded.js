@@ -8,7 +8,6 @@
 // no config server primary by the end of this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-TestData.skipCheckOrphans = true;
 
 (function() {
 "use strict";

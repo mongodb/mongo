@@ -11,7 +11,6 @@ load('jstests/multiVersion/libs/multi_rs.js');
 // and sharded clusters as a user other than __system. Attempting to advance the clusterTime while
 // it has been signed with a dummy key results in an authorization error.
 TestData.skipGossipingClusterTime = true;
-TestData.skipCheckOrphans = true;
 
 (function() {
 'use strict';

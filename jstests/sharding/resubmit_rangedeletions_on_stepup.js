@@ -9,8 +9,6 @@
 load("jstests/libs/uuid_util.js");
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-// Test deliberately keeps range deletion in pending state.
-TestData.skipCheckOrphans = true;
 
 const dbName = "test";
 const collName = "foo";

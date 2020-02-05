@@ -10,9 +10,6 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/sharded_index_util.js");
 
-// Test intentionally inserts orphans outside of migration.
-TestData.skipCheckOrphans = true;
-
 /*
  * Shards the given collection.
  */

@@ -6,7 +6,6 @@
 // Checking index consistency involves talking to the primary config server which is blackholed from
 // the mongos in this test.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-TestData.skipCheckOrphans = true;
 
 var st = new ShardingTest({shards: 2, mongos: 1, useBridge: true});
 

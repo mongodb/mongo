@@ -8,9 +8,6 @@
 
 load("jstests/libs/uuid_util.js");
 
-// TODO: remove after SERVER-45338 is fixed.
-TestData.skipCheckOrphans = true;
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

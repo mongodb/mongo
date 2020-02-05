@@ -339,9 +339,6 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     eval_sb.append(
         "load('jstests/libs/override_methods/check_indexes_consistent_across_cluster.js');")
 
-    # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
-    eval_sb.append("load('jstests/libs/override_methods/check_orphans_are_deleted.js');")
-
     # Load this file to retry operations that fail due to in-progress background operations.
     eval_sb.append(
         "load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');")

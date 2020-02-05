@@ -11,7 +11,6 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckDBHashes = true;
-TestData.skipCheckOrphans = true;
 
 (function() {
 'use strict';
