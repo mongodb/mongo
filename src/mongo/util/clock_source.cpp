@@ -98,4 +98,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     alarmInfo->cv = nullptr;
     return alarmInfo->result;
 }
+
+ClockSource::StopWatch::StopWatch() : StopWatch(SystemClockSource::get()){};
+
 }  // namespace mongo

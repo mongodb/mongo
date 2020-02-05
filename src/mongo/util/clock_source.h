@@ -58,6 +58,40 @@ class ClockSource {
     static constexpr auto kMaxTimeoutForArtificialClocks = Seconds(1);
 
 public:
+    /**
+     * A StopWatch tracks the time that its ClockSource believes has passed since the creation of
+     * the StopWatch.
+     *
+     * For microsecond accurate metrics, use a Timer instead.
+     */
+    class StopWatch {
+    public:
+        StopWatch(ClockSource* clockSource, Date_t start)
+            : _clockSource{clockSource}, _start{start} {}
+        StopWatch(ClockSource* clockSource) : StopWatch(clockSource, clockSource->now()) {}
+        StopWatch(/** SystemClockSource::get() */);
+
+        Date_t now() noexcept {
+            return _clockSource->now();
+        }
+
+        ClockSource* getClockSource() noexcept {
+            return _clockSource;
+        }
+
+        auto start() const noexcept {
+            return _start;
+        }
+
+        auto elapsed() noexcept {
+            return now() - _start;
+        }
+
+    private:
+        ClockSource* const _clockSource;
+        const Date_t _start;
+    };
+
     virtual ~ClockSource() = default;
 
     /**
@@ -136,6 +170,13 @@ public:
                              const PredicateT& pred,
                              Waitable* waitable = nullptr) {
         return waitForConditionUntil(cv, m, now() + duration, pred, waitable);
+    }
+
+    /**
+     * Return a StopWatch that uses this ClockSource to track time
+     */
+    StopWatch makeStopWatch() {
+        return StopWatch(this);
     }
 
 protected:
