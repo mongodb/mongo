@@ -1277,6 +1277,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
             _oplogStones->firstRecord = stone->lastRecord;
+            _cappedFirstRecord = stone->lastRecord;
         } catch (const WriteConflictException&) {
             LOG(1) << "Caught WriteConflictException while truncating oplog entries, retrying";
         }
@@ -1399,7 +1400,7 @@ void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
 StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     OperationContext* opCtx) const {
     invariant(_isOplog);
-    invariant(opCtx->lockState()->isReadLocked());
+    dassert(opCtx->lockState()->isReadLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     auto sessRaii = cache->getSession();
@@ -1416,6 +1417,31 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     invariantWTOK(sess->reset(sess));
 
     return {Timestamp(static_cast<unsigned long long>(recordId.repr()))};
+}
+
+StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(OperationContext* opCtx) {
+    invariant(_isOplog);
+    dassert(opCtx->lockState()->isReadLocked());
+
+    stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
+
+    if (_cappedFirstRecord == RecordId()) {
+        WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+        auto sessRaii = cache->getSession();
+        WT_SESSION* sess = sessRaii->getSession();
+        WT_CURSOR* cursor;
+        invariantWTOK(sess->open_cursor(sess, _uri.c_str(), nullptr, nullptr, &cursor));
+        auto ret = cursor->next(cursor);
+        if (ret == WT_NOTFOUND) {
+            return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
+        }
+        invariantWTOK(ret);
+
+        _cappedFirstRecord = getKey(cursor);
+        invariantWTOK(sess->reset(sess));
+    }
+
+    return {Timestamp(static_cast<unsigned long long>(_cappedFirstRecord.repr()))};
 }
 
 Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
