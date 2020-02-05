@@ -57,7 +57,7 @@ protected:
 
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
-        CatalogCacheLoader::get(operationContext()).initializeReplicaSetRole(true);
+        getCatalogCacheLoaderForFiltering(operationContext()).initializeReplicaSetRole(true);
 
         setupNShards(2);
     }
