@@ -25,7 +25,6 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config}
 replTest.awaitReplication();
 
 config = primary.getDB("local").system.replset.findOne();
-// TODO SERVER-45408: uncomment once we enable serialization of the term field.
-// assert.eq(config.term, 1);
+assert.eq(config.term, 1);
 replTest.stopSet();
 }());

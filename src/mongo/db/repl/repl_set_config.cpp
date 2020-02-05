@@ -862,9 +862,12 @@ BSONObj ReplSetConfig::toBSON() const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
-    // TODO (SERVER-45408): Enable serialization of the config "term" field once we can handle it
-    // properly in upgrade/downgrade scenarios.
-    // configBuilder.appendIntOrLL(kTermFieldName, _term);
+
+    if (serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+        configBuilder.appendIntOrLL(kTermFieldName, _term);
+    }
+
     if (_configServer) {
         // Only include "configsvr" field if true
         configBuilder.append(kConfigServerFieldName, _configServer);
