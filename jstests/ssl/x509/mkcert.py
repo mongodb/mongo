@@ -14,6 +14,8 @@ import tempfile
 from typing import Any, Dict
 import yaml
 import OpenSSL
+import re
+import shutil
 
 # pylint: disable=protected-access
 OpenSSL._util.lib.OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
@@ -26,8 +28,14 @@ CONFIGFILE = 'jstests/ssl/x509/certs.yml'
 
 CONFIG = Dict[str, Any]
 
-MUST_STAPLE_KEY = b'1.3.6.1.5.5.7.1.24'
-MUST_STAPLE_VALUE = str('DER:30:03:02:01:05').encode('utf-8')
+# tlsfeature = status_request isn't supported by older versions of OpenSSL so we manually define this below
+# 1.3.6.1.5.5.7.1.24: "tls_feature" extension as defined in https://tools.ietf.org/html/rfc7633#section-6
+MUST_STAPLE_KEY_STR = '1.3.6.1.5.5.7.1.24'
+MUST_STAPLE_KEY = bytes(MUST_STAPLE_KEY_STR, "utf-8")
+
+# status_request extension as defined in https://tools.ietf.org/html/rfc4366#section-2.3
+MUST_STAPLE_VALUE_STR = 'DER:30:03:02:01:05' # ASN.1 value: SEQUENCE { INTEGER 0x05 (5 decimal) }
+MUST_STAPLE_VALUE = str(MUST_STAPLE_VALUE_STR).encode('utf-8')
 
 def glbl(key, default=None):
     """Fetch a key from the global dict."""
@@ -456,13 +464,30 @@ def create_cert(cert):
         convert_cert_to_pkcs12(cert)
 
 def check_special_case_keys(cert):
-    """All special cases must contain precisely these keys."""
-    for key in cert.keys():
-        if not key in ['name', 'description', 'Issuer']:
-            raise ValueError('Unexpected field in special entry: ' + key)
+    """All special cases must contain three keys with an optional tags key"""
+    keys = set(cert.keys())
+    required_keys = {'name', 'description', 'Issuer'}
+    optional_keys = {'tags'}
+    allowed_tags = {'ecdsa', 'ocsp', 'responder', 'must-staple'}
+    allowed_keys = required_keys.union(optional_keys)
 
-    if len(cert) != 3:
-        raise ValueError('Missing field in special entry')
+    if not keys.issubset(allowed_keys):
+        unexpected_keys = keys - allowed_keys
+        raise ValueError('Unexpected fields in special entry: ' + ", ".join(map(str, unexpected_keys)))
+
+    if not required_keys.issubset(keys):
+        missing_keys = required_keys - keys
+        raise ValueError('Missing fields in special entry: ' + ", ".join(map(str, missing_keys)))
+
+    if "tags" in keys:
+        tags = set(cert["tags"])
+        if not tags.issubset(allowed_tags):
+            unexpected_tags = tags - allowed_tags
+            raise ValueError('Unexpected tags: ' + ", ".join(map(str, unexpected_tags)))
+
+def check_for_ecdsa_in_tags(cert):
+    if not cert.get('tags') or not 'ecdsa' in cert['tags']:
+        raise ValueError('ECDSA special case certs must contain an ECDSA tag')
 
 def process_client_multivalue_rdn(cert):
     """Special handling for client-multivalue-rdn.pem"""
@@ -487,24 +512,80 @@ def process_client_multivalue_rdn(cert):
     os.remove(rsa)
     os.remove(pem)
 
+def convert_ecdsa_key_to_pkcs8(ec_key_file, pkcs8_key_file):
+    """
+    Convert ECDSA key with explicit text header into a PEM-encoded PKCS#8 object
+    :param ec_key_file: name of file containing the PEM-encoded ECDSA key with explicit text header
+    :param pkcs8_key_file: name of file to contain PEM-encoded PKCS#8 object describing the ECDSA key
+    """
+    # wrap the PEM-encoded EC key with explicit text header into a PEM-encoded PKCS#8 object
+    pkcs8args = ['openssl', 'pkcs8', '-topk8', '-nocrypt', '-in', ec_key_file, '-out', pkcs8_key_file]
+    subprocess.check_call(pkcs8args)
+
+def process_ecdsa_cert(cert, pem, key, dest, filename, split_pem=True):
+    """Convert the ECDSA key and write the public/private key pair key into a .pem file, optionally writing the
+     public key to a .crt file and private key to a .key file"""
+
+    # copy the public key to a temp crt file
+    temp_cert_filename = tempfile.mkstemp()[1]
+    cert_filename = make_filename({'name': f"{filename}.crt"})
+    shutil.copy(src = pem, dst = temp_cert_filename)
+
+    # convert and create the temp key file
+    temp_key_filename = tempfile.mkstemp()[1]
+    convert_ecdsa_key_to_pkcs8(ec_key_file=key, pkcs8_key_file=temp_key_filename)
+
+    # combine public and private key into a .pem file with no comments
+    open(dest, 'wt').write(open(pem, 'rt').read() + open(temp_key_filename, 'rt').read())
+
+    if split_pem: # copy the temp files into .crt + .key files
+        cert_filename = make_filename({'name': f"{filename}.crt"})
+        shutil.copy(src = temp_cert_filename, dst = cert_filename)
+        key_filename = make_filename({'name': f"{filename}.key"})
+        shutil.copy(src = temp_key_filename, dst = key_filename)
+
+    os.remove(temp_key_filename)
+    os.remove(temp_cert_filename)
+
 def process_ecdsa_ca(cert):
     """Create CA for ECDSA tree."""
     check_special_case_keys(cert)
+    check_for_ecdsa_in_tags(cert)
     if cert['Issuer'] != 'self':
         raise ValueError('ECDSA-CA should be self-signed')
 
     key = tempfile.mkstemp()[1]
     csr = tempfile.mkstemp()[1]
     pem = tempfile.mkstemp()[1]
+    extfile = tempfile.mkstemp()[1]
     dest = make_filename(cert)
 
     serial = str(random.randint(1000, 0x7FFFFFFF))
     subject = '/C=US/ST=New York/L=New York City/O=MongoDB/OU=Kernel/CN=Kernel Test ESCDA CA/'
-    subprocess.check_call(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key])
-    subprocess.check_call(['openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', subject])
-    subprocess.check_call(['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-signkey', key, '-days', '7300', '-sha256', '-set_serial', serial])
 
-    open(dest, 'wt').write(get_header_comment(cert) + "\n" + open(pem, 'rt').read() + open(key, 'rt').read())
+    reqargs = ['openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', subject]
+    x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-signkey', key, '-days', '7300', '-sha256', '-set_serial', serial]
+    ecparamargs = (['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key, '-noout']
+                   if "ocsp" in cert.get('tags', [])
+                   else ['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key])
+
+    reqargs = reqargs + ['-reqexts', 'v3_req']
+    extfile = tempfile.mkstemp()[1]
+    open(extfile, 'wt').write('basicConstraints=CA:TRUE\n')
+    x509args.append('-extfile')
+    x509args.append(extfile)
+
+    subprocess.check_call(ecparamargs)
+    subprocess.check_call(reqargs)
+    subprocess.check_call(x509args)
+
+    if "ocsp" in cert['name']:
+        # given foo.pem, we'll generate foo.crt and foo.key as well
+        filename = re.search('(.*)\.pem', cert['name']).group(1)
+        process_ecdsa_cert(cert, pem, key, dest, filename)
+    else:
+        open(dest, 'wt').write(get_header_comment(cert) + "\n" + open(pem, 'rt').read() + open(key, 'rt').read())
+
     os.remove(key)
     os.remove(csr)
     os.remove(pem)
@@ -512,6 +593,7 @@ def process_ecdsa_ca(cert):
 def process_ecdsa_leaf(cert):
     """Create leaf certificates for ECDSA tree."""
     check_special_case_keys(cert)
+    check_for_ecdsa_in_tags(cert)
 
     key = tempfile.mkstemp()[1]
     csr = tempfile.mkstemp()[1]
@@ -528,9 +610,26 @@ def process_ecdsa_leaf(cert):
     reqargs = ['openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', subject]
     x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-CA', ca, '-CAkey', ca, '-days', '7300', '-sha256', '-set_serial', serial]
     if mode == 'server':
-        reqargs.append('-reqexts=v3_req')
+        reqargs = reqargs + ['-reqexts', 'v3_req']
         extfile = tempfile.mkstemp()[1]
-        open(extfile, 'wt').write('subjectAltName=DNS:localhost,DNS:127.0.0.1')
+        with open(extfile, 'wt') as f:
+            f.write('basicConstraints=CA:FALSE\n')
+            f.write('subjectAltName=DNS:localhost,IP:127.0.0.1\n')
+            f.write('subjectKeyIdentifier=hash\n')
+            key_usage = ('keyUsage=nonRepudiation,digitalSignature,keyEncipherment\n'
+                        if "responder" in cert.get('tags', [])
+                        else 'keyUsage=digitalSignature,keyEncipherment\n')
+            f.write(key_usage)
+            extended_key_usage = ('extendedKeyUsage=serverAuth,clientAuth,OCSPSigning\n'
+                                 if "responder" in cert.get('tags', [])
+                                 else 'extendedKeyUsage=serverAuth,clientAuth\n')
+            f.write(extended_key_usage)
+            if cert.get('tags'):
+                if "ocsp" in cert['tags']:
+                    if not "responder" in cert['tags']:
+                        f.write('authorityInfoAccess = OCSP;URI:http://localhost:9001/power/level,OCSP;URI:http://localhost:8100/status\n')
+                        if "must-staple" in cert['tags']:
+                            f.write(f'{MUST_STAPLE_KEY_STR}={MUST_STAPLE_VALUE_STR}\n')
         x509args.append('-extfile')
         x509args.append(extfile)
 
@@ -538,7 +637,17 @@ def process_ecdsa_leaf(cert):
     subprocess.check_call(reqargs)
     subprocess.check_call(x509args)
 
-    open(dest, 'wt').write(get_header_comment(cert) + "\n" + open(pem, 'rt').read() + open(key, 'rt').read())
+    if 'responder' in cert.get('tags', []):
+       # given foo.crt, we'll generate foo.pem and foo.key
+       filename = re.search('(.*)\.crt', cert['name']).group(1)
+       process_ecdsa_cert(cert, pem, key, dest, filename)
+    elif "ocsp" in cert.get('tags', []):
+       # given foo.pem, we'll regenerate foo.pem and delete foo.crt and foo.key
+       filename = re.search('(.*)\.pem', cert['name']).group(1)
+       process_ecdsa_cert(cert, pem, key, dest, filename, split_pem=False)
+    else:
+        open(dest, 'wt').write(get_header_comment(cert) + "\n" + open(pem, 'rt').read() + open(key, 'rt').read())
+
     os.remove(key)
     os.remove(csr)
     os.remove(pem)
@@ -553,11 +662,12 @@ def process_cert(cert):
         process_client_multivalue_rdn(cert)
         return
 
-    if cert['name'] == 'ecdsa-ca.pem':
+    if cert['name'] in ['ecdsa-ca.pem', 'ecdsa-ca-ocsp.pem']:
         process_ecdsa_ca(cert)
         return
 
-    if cert['name'] in ['ecdsa-client.pem', 'ecdsa-server.pem']:
+    if cert['name'] in ['ecdsa-client.pem', 'ecdsa-server.pem', 'ecdsa-server-ocsp.pem',
+                        'ecdsa-server-ocsp-mustStaple.pem', 'ecdsa-ocsp-responder.crt']:
         process_ecdsa_leaf(cert)
         return
 
@@ -602,7 +712,7 @@ def validate_config():
     if not CONFIG.get('certs'):
         raise ValueError('No certificates defined')
 
-    permissible = ['name', 'description', 'Subject', 'Issuer', 'append_cert', 'extensions', 'passphrase', 'output_path', 'hash', 'include_header', 'key_type', 'keyfile', 'crtfile', 'explicit_subject', 'serial', 'not_before', 'not_after', 'pkcs1', 'pkcs12', 'version']
+    permissible = ['name', 'description', 'Subject', 'Issuer', 'append_cert', 'extensions', 'passphrase', 'output_path', 'hash', 'include_header', 'key_type', 'keyfile', 'crtfile', 'explicit_subject', 'serial', 'not_before', 'not_after', 'pkcs1', 'pkcs12', 'version', 'tags']
     for cert in CONFIG.get('certs', []):
         keys = cert.keys()
         if not 'name' in keys:
