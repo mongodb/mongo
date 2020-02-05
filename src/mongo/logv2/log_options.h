@@ -32,6 +32,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
 
 namespace mongo {
 namespace logv2 {
@@ -51,8 +52,13 @@ public:
 
     LogOptions(LogTag tags) : _tags(tags) {}
 
+    LogOptions(LogTruncation truncation) : _truncation(truncation) {}
+
     LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
         : _domain(domain), _tags(tags), _component(component) {}
+
+    LogOptions(LogComponent component, LogDomain* domain, LogTag tags, LogTruncation truncation)
+        : _domain(domain), _tags(tags), _component(component), _truncation(truncation) {}
 
     LogComponent component() const {
         return _component;
@@ -66,10 +72,15 @@ public:
         return _tags;
     }
 
+    LogTruncation truncation() const {
+        return _truncation;
+    }
+
 private:
     LogDomain* _domain = &LogManager::global().getGlobalDomain();
     LogTag _tags;
     LogComponent _component = LogComponent::kAutomaticDetermination;
+    LogTruncation _truncation = constants::kDefaultTruncation;
 };
 
 }  // namespace logv2

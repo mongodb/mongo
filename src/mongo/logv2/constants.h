@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/logv2/log_truncation.h"
+
 namespace mongo::logv2::constants {
 
 // Used in data structures to indicate number of attributes to store without having to allocate
@@ -47,5 +49,8 @@ constexpr StringData kTagsFieldName = "tags"_sd;
 
 // String to be used when logging empty boost::optional with the text formatter
 constexpr StringData kNullOptionalString = "(nothing)"_sd;
+
+constexpr LogTruncation kDefaultTruncation = LogTruncation::Enabled;
+constexpr size_t kDefaultMaxAttributeOutputSize = 10 * 1024;
 
 }  // namespace mongo::logv2::constants

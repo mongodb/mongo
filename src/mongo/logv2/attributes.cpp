@@ -78,6 +78,11 @@ const boost::log::attribute_name& attributes() {
     return attr;
 }
 
+const boost::log::attribute_name& truncation() {
+    static const boost::log::attribute_name attr("truncation");
+    return attr;
+}
+
 }  // namespace attributes
 }  // namespace logv2
 }  // namespace mongo

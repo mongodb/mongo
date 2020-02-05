@@ -38,10 +38,12 @@
 #include <boost/log/sources/threading_models.hpp>
 
 #include "mongo/logv2/attributes.h"
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -60,11 +62,13 @@ public:
           _severity(LogSeverity::Log()),
           _component(LogComponent::kDefault),
           _tags(LogTag::kNone),
+          _truncation(constants::kDefaultTruncation),
           _id(-1) {
         add_attribute_unlocked(attributes::domain(), _domain);
         add_attribute_unlocked(attributes::severity(), _severity);
         add_attribute_unlocked(attributes::component(), _component);
         add_attribute_unlocked(attributes::tags(), _tags);
+        add_attribute_unlocked(attributes::truncation(), _truncation);
         add_attribute_unlocked(attributes::id(), _id);
         add_attribute_unlocked(attributes::timeStamp(), boost::log::attributes::make_function([]() {
                                    return Date_t::now();
@@ -77,12 +81,14 @@ public:
     boost::log::record open_record(int32_t id,
                                    LogSeverity severity,
                                    LogComponent component,
-                                   LogTag tags) {
+                                   LogTag tags,
+                                   LogTruncation truncation) {
         // Perform a quick check first
         if (this->core()->get_logging_enabled()) {
             _severity.set(severity);
             _component.set(component);
             _tags.set(tags);
+            _truncation.set(truncation);
             _id.set(id);
             return Base::open_record_unlocked();
         } else
@@ -94,6 +100,7 @@ public:
         _severity.set(LogSeverity::Log());
         _component.set(LogComponent::kDefault);
         _tags.set(LogTag::kNone);
+        _truncation.set(constants::kDefaultTruncation);
         _id.set(-1);
     }
 
@@ -102,6 +109,7 @@ private:
     boost::log::attributes::mutable_constant<LogSeverity> _severity;
     boost::log::attributes::mutable_constant<LogComponent> _component;
     boost::log::attributes::mutable_constant<LogTag> _tags;
+    boost::log::attributes::mutable_constant<LogTruncation> _truncation;
     boost::log::attributes::mutable_constant<int32_t> _id;
 };
 

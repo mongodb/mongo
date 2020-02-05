@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,12 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/logv2/attributes.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_domain.h"
-#include "mongo/logv2/log_domain_internal.h"
-#include "mongo/logv2/log_options.h"
-#include "mongo/logv2/log_source.h"
+#pragma once
 
 namespace mongo {
 namespace logv2 {
-namespace detail {
 
-void doLogImpl(int32_t id,
-               LogSeverity const& severity,
-               LogOptions const& options,
-               StringData message,
-               TypeErasedAttributeStorage const& attrs) {
-    dassert(options.component() != LogComponent::kNumLogComponents);
-    auto& source = options.domain().internal().source();
-    auto record =
-        source.open_record(id, severity, options.component(), options.tags(), options.truncation());
-    if (record) {
-        record.attribute_values().insert(
-            attributes::message(),
-            boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<StringData>(message)));
+enum class LogTruncation { Enabled, Disabled };
 
-        record.attribute_values().insert(
-            attributes::attributes(),
-            boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<TypeErasedAttributeStorage>(
-                    attrs)));
-
-        source.push_record(std::move(record));
-    }
-}
-
-}  // namespace detail
 }  // namespace logv2
 }  // namespace mongo
