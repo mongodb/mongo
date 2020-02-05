@@ -23,6 +23,8 @@ selector:
   - jstests/sharding/merge_from_stale_mongos.js
   - jstests/sharding/migration_coordinator_basic.js
   - jstests/sharding/migration_coordinator_failover.js
+  - jstests/sharding/migration_coordinator_killop_in_critical_section.js
+  - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable when SERVER-43310 is backported

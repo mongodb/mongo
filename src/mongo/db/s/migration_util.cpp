@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
@@ -64,6 +65,8 @@ namespace migrationutil {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeFilteringMetadataRefresh);
+MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenThrow);
+MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenThrow);
 
 const char kSourceShard[] = "source";
 const char kDestinationShard[] = "destination";
@@ -445,43 +448,107 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     const auto ensureChunkVersionIsGreaterThanRequestBSON =
         ensureChunkVersionIsGreaterThanRequest.toBSON({});
 
-    for (int attempts = 1;; attempts++) {
-        const auto ensureChunkVersionIsGreaterThanResponse =
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
-                ensureChunkVersionIsGreaterThanRequestBSON,
-                Shard::RetryPolicy::kIdempotent);
-        const auto ensureChunkVersionIsGreaterThanStatus =
-            Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
-        if (ensureChunkVersionIsGreaterThanStatus.isOK()) {
-            break;
-        }
+    const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
-        // If the server is already doing a clean shutdown, join the shutdown.
-        if (globalInShutdownDeprecated()) {
-            shutdown(waitForShutdown());
-        }
-        opCtx->checkForInterrupt();
-
-        LOG(0) << "_configsvrEnsureChunkVersionIsGreaterThan failed after " << attempts
-               << " attempts " << causedBy(ensureChunkVersionIsGreaterThanStatus)
-               << " . Will try again.";
-    }
-}
-
-void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
     for (int attempts = 1;; attempts++) {
         try {
-            forceShardFilteringMetadataRefresh(opCtx, nss, true);
+            auto newClient =
+                opCtx->getServiceContext()->makeClient("ensureChunkVersionIsGreaterThan");
+            {
+                stdx::lock_guard<Client> lk(*newClient.get());
+                newClient->setSystemOperationKillable(lk);
+            }
+            AlternativeClientRegion acr(newClient);
+            auto newOpCtxPtr = cc().makeOperationContext();
+            auto newOpCtx = newOpCtxPtr.get();
+
+            const auto ensureChunkVersionIsGreaterThanResponse =
+                Grid::get(newOpCtx)
+                    ->shardRegistry()
+                    ->getConfigShard()
+                    ->runCommandWithFixedRetryAttempts(
+                        newOpCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        "admin",
+                        ensureChunkVersionIsGreaterThanRequestBSON,
+                        Shard::RetryPolicy::kIdempotent);
+            const auto ensureChunkVersionIsGreaterThanStatus =
+                Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
+
+            uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
+
+            // 'newOpCtx' won't get interrupted if a stepdown occurs while the thread is hanging in
+            // the failpoint, because 'newOpCtx' hasn't been used to take a MODE_S, MODE_IX, or
+            // MODE_X lock. To ensure the catch block is entered if the failpoint was set, throw an
+            // arbitrary error.
+            if (hangInEnsureChunkVersionIsGreaterThanThenThrow.shouldFail()) {
+                hangInEnsureChunkVersionIsGreaterThanThenThrow.pauseWhileSet(newOpCtx);
+                uasserted(
+                    ErrorCodes::InternalError,
+                    "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
+            }
             break;
         } catch (const DBException& ex) {
             // If the server is already doing a clean shutdown, join the shutdown.
             if (globalInShutdownDeprecated()) {
                 shutdown(waitForShutdown());
             }
-            opCtx->checkForInterrupt();
+
+            // If this node has stepped down, stop retrying.
+            uassert(
+                ErrorCodes::InterruptedDueToReplStateChange,
+                "Stepped down while trying to send ensureChunkVersionIsGreaterThan to recover a "
+                "migration commit decision",
+                repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                        repl::MemberState::RS_PRIMARY &&
+                    term == repl::ReplicationCoordinator::get(opCtx)->getTerm());
+
+            LOG(0) << "_configsvrEnsureChunkVersionIsGreaterThan failed after " << attempts
+                   << " attempts " << causedBy(redact(ex.toStatus())) << " . Will try again.";
+        }
+    }
+}
+
+void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
+    const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+    for (int attempts = 1;; attempts++) {
+        try {
+            auto newClient =
+                opCtx->getServiceContext()->makeClient("refreshFilteringMetadataUntilSuccess");
+            {
+                stdx::lock_guard<Client> lk(*newClient.get());
+                newClient->setSystemOperationKillable(lk);
+            }
+            AlternativeClientRegion acr(newClient);
+            auto newOpCtxPtr = cc().makeOperationContext();
+            auto newOpCtx = newOpCtxPtr.get();
+
+            forceShardFilteringMetadataRefresh(newOpCtx, nss, true);
+
+            // 'newOpCtx' won't get interrupted if a stepdown occurs while the thread is hanging in
+            // the failpoint, because 'newOpCtx' hasn't been used to take a MODE_S, MODE_IX, or
+            // MODE_X lock. To ensure the catch block is entered if the failpoint was set, throw an
+            // arbitrary error.
+            if (hangInRefreshFilteringMetadataUntilSuccessThenThrow.shouldFail()) {
+                hangInRefreshFilteringMetadataUntilSuccessThenThrow.pauseWhileSet(newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response for forceShardFilteringMetadataRefresh");
+            }
+            break;
+        } catch (const DBException& ex) {
+            // If the server is already doing a clean shutdown, join the shutdown.
+            if (globalInShutdownDeprecated()) {
+                shutdown(waitForShutdown());
+            }
+
+            // If this node has stepped down, stop retrying.
+            uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                    "Stepped down while trying to force a filtering metadata refresh to recover a "
+                    "migration commit decision",
+                    repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                            repl::MemberState::RS_PRIMARY &&
+                        term == repl::ReplicationCoordinator::get(opCtx)->getTerm());
 
             LOG(0) << "Failed to refresh metadata for " << nss.ns() << " after " << attempts
                    << " attempts " << causedBy(redact(ex.toStatus()))
