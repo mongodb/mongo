@@ -161,7 +161,16 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
                 // forceShardFilteringMetadataRefresh to avoid blocking on the network in the
                 // thread pool.
                 autoColl.reset();
-                forceShardFilteringMetadataRefresh(opCtx, deletionTask.getNss(), true);
+                try {
+                    forceShardFilteringMetadataRefresh(opCtx, deletionTask.getNss(), true);
+                } catch (const DBException& ex) {
+                    if (ex.toStatus() == ErrorCodes::NamespaceNotFound) {
+                        deleteRangeDeletionTaskLocally(
+                            opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
+                        return false;
+                    }
+                    throw;
+                }
             }
 
             autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
