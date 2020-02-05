@@ -7,12 +7,12 @@
  * 4. Cause a step down on Shard A
  * 5. Connect directly to the new primary of Shard A and verify that eventually no documents remain
  *    from the chunk that was migrated away
+ *
+ * @tags: [requires_fcv_44]
  */
 
 (function() {
 "use strict";
-
-load('./jstests/libs/cleanup_orphaned_util.js');
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
@@ -96,15 +96,10 @@ originalShard0Primary.adminCommand({configureFailPoint: 'suspendRangeDeletion', 
 let shard0Primary = st.rs0.getPrimary();
 let shard0PrimaryColl = shard0Primary.getCollection(ns);
 
-// Verify that orphans are not yet deleted on the new primary.
-assert.eq(shard0PrimaryColl.find().itcount(), expectedNumDocsShard0Before);
-
-// TODO SERVER-41800: Remove call to cleanupOrphaned from range deleter acceptance test.
-const expectedNumIterations = 2;
-cleanupOrphaned(shard0Primary, ns, expectedNumIterations);
-
-// Verify that orphans are deleted.
-assert.eq(shard0PrimaryColl.find().itcount(), expectedNumDocsShard0After);
+// Verify that orphans are deleted on the new primary.
+assert.soon(() => {
+    return shard0PrimaryColl.find().itcount() === expectedNumDocsShard0After;
+});
 
 st.stop();
 })();
