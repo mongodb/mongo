@@ -631,7 +631,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // The index build will continue to run in the background and will complete when this
             // node receives a commitIndexBuild oplog entry from the new primary.
 
-            if (indexBuildsCoord->supportsTwoPhaseIndexBuild()) {
+            if (IndexBuildProtocol::kTwoPhase == protocol) {
                 log() << "Index build continuing in background: " << buildUUID;
                 throw;
             }
