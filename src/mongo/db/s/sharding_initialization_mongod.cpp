@@ -49,6 +49,7 @@
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_config_optime_gossip.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -65,6 +66,7 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -174,7 +176,7 @@ void ShardingInitializationMongoD::initializeShardingEnvironmentOnShardServer(
     bool isStandaloneOrPrimary =
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 
-    CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+    getCatalogCacheLoaderForFiltering(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
     ChunkSplitter::get(opCtx).onShardingInitialization(isStandaloneOrPrimary);
     PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(opCtx->getServiceContext(),
                                                                          isStandaloneOrPrimary);
@@ -436,17 +438,46 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
 
     auto const service = opCtx->getServiceContext();
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        if (storageGlobalParams.readOnly) {
-            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
-        } else {
-            CatalogCacheLoader::set(service,
-                                    std::make_unique<ShardServerCatalogCacheLoader>(
-                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
-        }
-    } else {
-        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        hasAdditionalCatalogCacheForFiltering()) {
+        // Setup additional CatalogCache for filtering only
+        setCatalogCacheLoaderForFiltering(service,
+                                          std::make_unique<ShardServerCatalogCacheLoader>(
+                                              std::make_unique<ConfigServerCatalogCacheLoader>()));
+        setCatalogCacheForFiltering(
+            service, std::make_unique<CatalogCache>(getCatalogCacheLoaderForFiltering(opCtx)));
+        registerShutdownTask(
+            [service]() { getCatalogCacheLoaderForFiltering(service).shutDown(); });
     }
+
+    // Make primary CatalogCacheLoader according to the cluster Role
+    auto makeCatalogCacheLoader = []() -> std::unique_ptr<CatalogCacheLoader> {
+        switch (serverGlobalParams.clusterRole) {
+            case ClusterRole::ShardServer:
+                if (storageGlobalParams.readOnly) {
+                    return std::make_unique<ReadOnlyCatalogCacheLoader>();
+                }
+                if (hasAdditionalCatalogCacheForFiltering()) {
+                    // The primary CatalogCache will be used only for routing
+                    return std::make_unique<ConfigServerCatalogCacheLoader>();
+                }
+
+                // Normal ShardServer without additional cache for filtering
+                return std::make_unique<ShardServerCatalogCacheLoader>(
+                    std::make_unique<ConfigServerCatalogCacheLoader>());
+                break;
+
+            case ClusterRole::ConfigServer:
+                return std::make_unique<ConfigServerCatalogCacheLoader>();
+                break;
+
+            default:
+                MONGO_UNREACHABLE;
+        }
+    };
+
+    CatalogCacheLoader::set(service, makeCatalogCacheLoader());
 
     auto validator = LogicalTimeValidator::get(service);
     if (validator) {  // The keyManager may be existing if the node was a part of a standalone RS.

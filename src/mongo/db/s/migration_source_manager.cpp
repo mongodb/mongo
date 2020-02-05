@@ -745,7 +745,7 @@ void MigrationSourceManager::_cleanup() {
         // possible that the persisted metadata is rolled back after step down, but the write which
         // cleared the 'inMigration' flag is not, a secondary node will report itself at an older
         // shard version.
-        CatalogCacheLoader::get(_opCtx).waitForCollectionFlush(_opCtx, getNss());
+        getCatalogCacheLoaderForFiltering(_opCtx).waitForCollectionFlush(_opCtx, getNss());
 
         // Clear the 'minOpTime recovery' document so that the next time a node from this shard
         // becomes a primary, it won't have to recover the config server optime.

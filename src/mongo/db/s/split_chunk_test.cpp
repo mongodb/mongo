@@ -69,7 +69,7 @@ public:
         ShardServerTestFixture::setUp();
 
         ShardingState::get(operationContext())->setInitialized(_shardId, OID::gen());
-        CatalogCacheLoader::get(getServiceContext()).initializeReplicaSetRole(true);
+        getCatalogCacheLoaderForFiltering(getServiceContext()).initializeReplicaSetRole(true);
 
         // Instantiate names.
         _epoch = OID::gen();
