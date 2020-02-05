@@ -579,7 +579,7 @@ certs:
   - 'trusted-ca.pem'
 
 ###
-# ECDSA tree
+# ECDSA trees
 ###
 
 # These three are all special cases handled internally by mkcert.py
@@ -587,11 +587,38 @@ certs:
 - name: 'ecdsa-ca.pem'
   description: Root of ECDSA tree.
   Issuer: self
+  tags: [ecdsa]
 
 - name: 'ecdsa-client.pem'
   description: Client certificate for ECDSA tree.
   Issuer: 'ecdsa-ca.pem'
+  tags: [ecdsa]
 
 - name: 'ecdsa-server.pem'
   description: Server certificate for ECDSA tree.
   Issuer: 'ecdsa-ca.pem'
+  tags: [ecdsa]
+
+###
+# ECDSA OCSP tree
+###
+
+- name: 'ecdsa-ca-ocsp.pem'
+  description: Root of ECDSA tree for OCSP testing
+  Issuer: self
+  tags: [ecdsa]
+
+- name: 'ecdsa-server-ocsp.pem'
+  description: ECDSA server certificate w/OCSP
+  Issuer: 'ecdsa-ca-ocsp.pem'
+  tags: [ecdsa, ocsp]
+
+- name: 'ecdsa-server-ocsp-mustStaple.pem'
+  description: ECDSA server certificate w/OCSP + must-staple
+  Issuer: 'ecdsa-ca-ocsp.pem'
+  tags: [ecdsa, ocsp, must-staple]
+
+- name: 'ecdsa-ocsp-responder.crt'
+  description: ECDSA certificate and key for OCSP responder
+  Issuer: 'ecdsa-ca-ocsp.pem'
+  tags: [ecdsa, ocsp, responder ]
