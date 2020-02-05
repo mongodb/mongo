@@ -6788,8 +6788,6 @@ buildvariants:
     build_mongoreplay: false
   tasks:
   - name: compile
-    requires:
-    - name: burn_in_tests
     distros:
     - windows-64-vs2015-large
   - name: compile_all
@@ -7396,10 +7394,6 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
-    requires:
-    - name: burn_in_tests
-    - name: lint
-    - name: lint_fuzzer_sanity_patch
     distros:
     - rhel62-large
   - name: compile_all
