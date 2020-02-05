@@ -68,8 +68,8 @@ TEST_F(QueryPlannerTest, SparseIndexIgnoreForSort) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
 }
 
 TEST_F(QueryPlannerTest, SparseIndexHintForSort) {
@@ -89,8 +89,8 @@ TEST_F(QueryPlannerTest, SparseIndexPreferCompoundIndexForSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: "
         "{filter: null, pattern: {a: 1, b: 1}}}}}");
@@ -466,8 +466,8 @@ TEST_F(QueryPlannerTest, IndexBoundsIndexedSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a:1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {filter: {$or:[{a:1},{a:2}]}, dir: 1}}}}}}");
+        "{sort: {pattern: {a:1}, limit: 0, type: 'simple', node: "
+        "{cscan: {filter: {$or:[{a:1},{a:2}]}, dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {filter: null, "
         "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}");
@@ -479,12 +479,12 @@ TEST_F(QueryPlannerTest, IndexBoundsUnindexedSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {filter: {$or:[{a:1},{a:2}]}, dir: 1}}}}}}");
+        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: "
+        "{cscan: {filter: {$or:[{a:1},{a:2}]}, dir: 1}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: {fetch: "
+        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: {fetch: "
         "{filter: null, node: {ixscan: {filter: null, "
-        "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}}}}}");
+        "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, IndexBoundsUnindexedSortHint) {
@@ -493,9 +493,9 @@ TEST_F(QueryPlannerTest, IndexBoundsUnindexedSortHint) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: {fetch: "
+        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: {fetch: "
         "{filter: null, node: {ixscan: {filter: null, "
-        "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}}}}}");
+        "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundIndexBoundsIntersectRanges) {
@@ -1258,9 +1258,9 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenSingleFieldSortIsCoveredByIndex) {
                  "sort: {b: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'default', node:"
         "{proj: {spec: {a: 1, b: 1, _id: 0}, node:"
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldAscendingSortIsCoveredByIndex) {
@@ -1273,9 +1273,9 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldAscendingSortIsCoveredByIndex) 
                  "sort: {b: 1, a: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1, a: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{sort: {pattern: {b: 1, a: 1}, limit: 0, type: 'default', node:"
         "{proj: {spec: {a: 1, b: 1, _id: 0}, node:"
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldMixedSortOrderSortIsCoveredByIndex) {
@@ -1288,8 +1288,8 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldMixedSortOrderSortIsCoveredByIn
                  "sort: {b: 1, a: -1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1, a: -1}, limit: 0, node: {sortKeyGen: {node:"
-        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{sort: {pattern: {b: 1, a: -1}, limit: 0, type: 'default', node:"
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenNotAllSortKeysAreCoveredByIndex) {
@@ -1302,9 +1302,10 @@ TEST_F(QueryPlannerTest, MustFetchWhenNotAllSortKeysAreCoveredByIndex) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {b: 1, c: 1}, limit: 0, node: "
-        "{sortKeyGen:{node: {fetch: {node: {ixscan: "
-        "{pattern: {a: 1, b: 1}}}}}}}}}}}");
+        "{proj: {spec: {a: 1, b:1, _id: 0}, node: "
+        "{sort: {pattern: {b: 1, c: 1}, limit: 0, type: 'simple', node: "
+        "{fetch: {node: {ixscan: "
+        "{pattern: {a: 1, b: 1}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenProjectionUsesExpressionWithCoveredDependency) {

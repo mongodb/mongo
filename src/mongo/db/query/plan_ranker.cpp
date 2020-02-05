@@ -235,7 +235,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     // In the case of ties, prefer solutions without a blocking sort
     // to solutions with a blocking sort.
     double noSortBonus = epsilon;
-    if (hasStage(STAGE_SORT, stats)) {
+    if (hasStage(STAGE_SORT_DEFAULT, stats) || hasStage(STAGE_SORT_SIMPLE, stats)) {
         noSortBonus = 0;
     }
 

@@ -118,10 +118,6 @@ public:
         return _stats;
     }
 
-    std::unique_ptr<SortStats> cloneStats() const {
-        return std::unique_ptr<SortStats>{static_cast<SortStats*>(_stats.clone())};
-    }
-
     /**
      * Add data item to be sorted of type T with sort key specified by Value to the sort executor.
      * Should only be called before 'loadingDone()' is called.
@@ -149,21 +145,30 @@ public:
     }
 
     /**
-     * Returns the next data item in the sorted stream, or boost::none for end-of-stream. Should
-     * only be called after 'loadingDone()' is called.
+     * Returns true if there are more results which can be returned via 'getNext()', or false to
+     * indicate end-of-stream. Should only be called after 'loadingDone()' is called.
      */
-    boost::optional<T> getNext() {
+    bool hasNext() {
         if (_isEOF) {
-            return boost::none;
+            return false;
         }
 
         if (!_output->more()) {
             _output.reset();
             _isEOF = true;
-            return boost::none;
+            return false;
         }
 
-        return _output->next().second;
+        return true;
+    }
+
+    /**
+     * Returns the next data item in the sorted stream, which is a pair consisting of the sort key
+     * and the corresponding item being sorted. Illegal to call if there is no next item;
+     * end-of-stream must be detected with 'hasNext()'.
+     */
+    std::pair<Value, T> getNext() {
+        return _output->next();
     }
 
 private:

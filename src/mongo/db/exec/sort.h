@@ -42,48 +42,143 @@
 namespace mongo {
 
 /**
- * Sorts the input received from the child according to the sort pattern provided.
+ * Sorts the input received from the child according to the sort pattern provided. If
+ * 'addSortKeyMetadata' is true, then also attaches the sort key as metadata. This could be consumed
+ * downstream for a sort-merge on a merging node, or by a $meta:"sortKey" expression.
  *
- * Preconditions:
- *   -- For each field in 'pattern', all inputs in the child must handle a getFieldDotted for that
- *   field.
- *   -- All WSMs produced by the child stage must have the sort key available as WSM computed data.
+ * Concrete implementations derive from this abstract base class by implementing methods for
+ * spooling and unspooling.
  */
-class SortStage final : public PlanStage {
+class SortStage : public PlanStage {
 public:
     static constexpr StringData kStageType = "SORT"_sd;
 
     SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
               WorkingSet* ws,
               SortPattern sortPattern,
-              uint64_t limit,
-              uint64_t maxMemoryUsageBytes,
+              bool addSortKeyMetadata,
               std::unique_ptr<PlanStage> child);
+
+    /**
+     * Loads the WorkingSetMember pointed to by 'wsid' into the set of objects being sorted. This
+     * should be called repeatedly until all documents are loaded, followed by a single call to
+     * 'loadingDone()'. Illegal to call after 'loadingDone()' has been called.
+     */
+    virtual void spool(WorkingSetID wsid) = 0;
+
+    /**
+     * Indicates that all documents to be sorted have been loaded via 'spool()'. This method must
+     * not be called more than once.
+     */
+    virtual void loadingDone() = 0;
+
+    /**
+     * Returns an id referring to the next WorkingSetMember in the sorted stream of results.
+     *
+     * If there is another WSM, the id is returned via the out-parameter and the return value is
+     * PlanStage::ADVANCED. If there are no more documents remaining in the sorted stream, returns
+     * PlanStage::IS_EOF, and 'out' is left unmodified.
+     *
+     * Illegal to call before 'loadingDone()' has been called.
+     */
+    virtual StageState unspool(WorkingSetID* out) = 0;
+
+    StageState doWork(WorkingSetID* out) final;
+
+    std::unique_ptr<PlanStageStats> getStats() override final;
+
+protected:
+    // Not owned by us.
+    WorkingSet* _ws;
+
+    const SortKeyGenerator _sortKeyGen;
+
+    const bool _addSortKeyMetadata;
+
+private:
+    // Whether or not we have finished loading data into '_sortExecutor'.
+    bool _populated = false;
+};
+
+/**
+ * Generic sorting implementation which can handle sorting any WorkingSetMember, including those
+ * that have RecordIds, metadata, or which represent index keys.
+ */
+class SortStageDefault final : public SortStage {
+public:
+    SortStageDefault(boost::intrusive_ptr<ExpressionContext> expCtx,
+                     WorkingSet* ws,
+                     SortPattern sortPattern,
+                     uint64_t limit,
+                     uint64_t maxMemoryUsageBytes,
+                     bool addSortKeyMetadata,
+                     std::unique_ptr<PlanStage> child);
+
+    void spool(WorkingSetID wsid) override final;
+
+    void loadingDone() override final {
+        _sortExecutor.loadingDone();
+    }
+
+    StageState unspool(WorkingSetID* out) override final;
+
+    StageType stageType() const final {
+        return STAGE_SORT_DEFAULT;
+    }
 
     bool isEOF() final {
         return _sortExecutor.isEOF();
     }
-
-    StageState doWork(WorkingSetID* out) final;
-
-    StageType stageType() const final {
-        return STAGE_SORT;
-    }
-
-    std::unique_ptr<PlanStageStats> getStats();
 
     const SpecificStats* getSpecificStats() const final {
         return &_sortExecutor.stats();
     }
 
 private:
-    // Not owned by us.
-    WorkingSet* _ws;
-
     SortExecutor<SortableWorkingSetMember> _sortExecutor;
+};
 
-    // Whether or not we have finished loading data into '_sortExecutor'.
-    bool _populated = false;
+/**
+ * Optimized sorting implementation which can be used for WorkingSetMembers in a fetched state that
+ * have no metadata. This implementation is faster but less general than WorkingSetMemberSortStage.
+ *
+ * For performance, this implementation discards record ids and returns WorkingSetMembers in the
+ * OWNED_OBJ state. Therefore, this sort implementation cannot be used if the plan requires the
+ * record id to be preserved (e.g. for update or delete plans, where an ancestor stage needs to
+ * refer to the record in order to perform a write).
+ */
+class SortStageSimple final : public SortStage {
+public:
+    SortStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
+                    WorkingSet* ws,
+                    SortPattern sortPattern,
+                    uint64_t limit,
+                    uint64_t maxMemoryUsageBytes,
+                    bool addSortKeyMetadata,
+                    std::unique_ptr<PlanStage> child);
+
+    virtual void spool(WorkingSetID wsid) override final;
+
+    void loadingDone() override final {
+        _sortExecutor.loadingDone();
+    }
+
+    virtual StageState unspool(WorkingSetID* out) override final;
+
+    StageType stageType() const final {
+        return STAGE_SORT_SIMPLE;
+    }
+
+    bool isEOF() final {
+        return _sortExecutor.isEOF();
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return &_sortExecutor.stats();
+    }
+
+private:
+    SortExecutor<BSONObj> _sortExecutor;
 };
 
 }  // namespace mongo

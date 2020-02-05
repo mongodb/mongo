@@ -86,10 +86,11 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
         invariant(populationResult.isEOF());
     }
 
-    auto result = _sortExecutor->getNext();
-    if (!result)
+    if (!_sortExecutor->hasNext()) {
         return GetNextResult::makeEOF();
-    return GetNextResult(std::move(*result));
+    }
+
+    return GetNextResult{_sortExecutor->getNext().second};
 }
 
 void DocumentSourceSort::serializeToArray(

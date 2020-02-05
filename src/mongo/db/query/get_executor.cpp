@@ -782,7 +782,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
-    const size_t defaultPlannerOptions = 0;
+    // The underlying query plan must preserve the record id, since it will be needed in order to
+    // identify the record to update.
+    const size_t defaultPlannerOptions = QueryPlannerParams::PRESERVE_RECORD_ID;
+
     StatusWith<PrepareExecutionResult> executionResult =
         prepareExecution(opCtx, collection, ws.get(), std::move(cq), defaultPlannerOptions);
     if (!executionResult.isOK()) {
@@ -930,7 +933,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
-    const size_t defaultPlannerOptions = 0;
+    // The underlying query plan must preserve the record id, since it will be needed in order to
+    // identify the record to update.
+    const size_t defaultPlannerOptions = QueryPlannerParams::PRESERVE_RECORD_ID;
+
     StatusWith<PrepareExecutionResult> executionResult =
         prepareExecution(opCtx, collection, ws.get(), std::move(cq), defaultPlannerOptions);
     if (!executionResult.isOK()) {

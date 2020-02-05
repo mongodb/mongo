@@ -54,10 +54,10 @@ std::string nextFileName() {
 
 #include "mongo/db/sorter/sorter.cpp"
 
-// Instantiate Sorter templates for sorting both Document and WorkingSetMember.
 MONGO_CREATE_SORTER(mongo::Value,
                     mongo::Document,
                     mongo::SortExecutor<mongo::Document>::Comparator);
 MONGO_CREATE_SORTER(mongo::Value,
                     mongo::SortableWorkingSetMember,
                     mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
+MONGO_CREATE_SORTER(mongo::Value, mongo::BSONObj, mongo::SortExecutor<mongo::BSONObj>::Comparator);

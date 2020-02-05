@@ -359,8 +359,8 @@ TEST_F(QueryPlannerTest, CannotUseIndexWithNonMatchingCollatorForSort) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {cscan: {dir: 1, filter: {b: 1}}}}}}}");
+        "{sort: {pattern: {a: 1}, type: 'simple', limit: 0,"
+        "node: {cscan: {dir: 1, filter: {b: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CanUseIndexWithMatchingCollatorForSort) {
@@ -372,8 +372,8 @@ TEST_F(QueryPlannerTest, CanUseIndexWithMatchingCollatorForSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {cscan: {dir: 1, filter: {b: 1}, collation: {locale: 'reverse'}}}}}}}");
+        "{sort: {pattern: {a: 1}, type: 'simple', limit: 0,"
+        "node: {cscan: {dir: 1, filter: {b: 1}, collation: {locale: 'reverse'}}}}}");
     assertSolutionExists(
         "{fetch: {filter: {b: 1}, collation: {locale: 'reverse'}, node: {ixscan: {pattern: {a: "
         "1}}}}}");
@@ -387,11 +387,11 @@ TEST_F(QueryPlannerTest, IndexWithNonMatchingCollatorCausesInMemorySort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {fetch: {node : {ixscan: {pattern: {a: 1}}}}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node:"
+        "{fetch: {node : {ixscan: {pattern: {a: 1}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {cscan: {dir: 1, filter: {a: {'$exists': true}}}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1, filter: {a: {'$exists': true}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, IndexWithMatchingCollatorDoesNotCauseInMemorySort) {
@@ -405,8 +405,8 @@ TEST_F(QueryPlannerTest, IndexWithMatchingCollatorDoesNotCauseInMemorySort) {
     assertNumSolutions(2U);
     assertSolutionExists("{fetch: {node : {ixscan: {pattern: {a: 1}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {cscan: {dir: 1, filter: {a: {'$exists': true}}}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1, filter: {a: {'$exists': true}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundIndexWithNonMatchingCollatorCausesInMemorySort) {
@@ -419,11 +419,11 @@ TEST_F(QueryPlannerTest, CompoundIndexWithNonMatchingCollatorCausesInMemorySort)
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1, c: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1, c: 1}, limit: 0, type: 'simple', node:"
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1, c: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {cscan: {dir: 1, filter: {a: 1, b: 2, c: {a: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1, c: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1, filter: {a: 1, b: 2, c: {a: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundIndexWithNonMatchingPrefixedCollatorDoesNotCauseInMemorySort) {
@@ -437,8 +437,8 @@ TEST_F(QueryPlannerTest, CompoundIndexWithNonMatchingPrefixedCollatorDoesNotCaus
     assertNumSolutions(2U);
     assertSolutionExists("{fetch: {node : {ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {cscan: {dir: 1, filter : {a: 1, b: 2, c: {a: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1, filter : {a: 1, b: 2, c: {a: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, SuccessfullyPlanWhenMinMaxHaveNumberBoundariesAndCollationsDontMatch) {
@@ -553,7 +553,7 @@ TEST_F(QueryPlannerTest, MustSortInMemoryWhenMinMaxQueryHasCollationAndIndexDoes
     assertNumSolutions(1U);
 
     assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen:{node: {ixscan: "
+        "{fetch: {node: {sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'default', node: {ixscan: "
         "{pattern: {a: 1, b: 1}}}}}}}}}");
 }
 
@@ -568,8 +568,8 @@ TEST_F(QueryPlannerTest, MustSortInMemoryWhenMinMaxIndexHasCollationAndQueryDoes
     assertNumSolutions(1U);
 
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen:"
-        "{node: {fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node:"
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenQueryHasCollationButIndexDoesNot) {
@@ -581,8 +581,8 @@ TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenQueryHasCollationButIndexD
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'default', node: "
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasNoCollationButIndexHasNonSimpleCollation) {
@@ -594,8 +594,8 @@ TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasNoCollationButIndexHasNonSimp
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {cscan: {dir: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: "
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {cscan: {dir: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasDifferentNonSimpleCollationThanIndex) {
@@ -608,12 +608,12 @@ TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasDifferentNonSimpleCollationTh
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {cscan: {dir: 1}}}}}}}}");
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: "
+        "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {cscan: {dir: 1}}}}}}");
 }
 
 /**
- * This test confirms that we place a fetch stage before sortKeyGen in the case where both query
+ * This test confirms that we place a fetch stage before sort in the case where both query
  * and index have the same non-simple collation. To handle this scenario without this fetch would
  * require a mechanism to ensure we don't attempt to encode for collation an already encoded index
  * key entry when generating the sort key.
@@ -629,10 +629,10 @@ TEST_F(QueryPlannerTest, MustFetchBeforeSortWhenQueryHasSameNonSimpleCollationAs
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1, a: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{sort: {pattern: {b: 1, a: 1}, limit: 0, type: 'simple', node: "
         "{proj: {spec: {a: 1, b: 1, _id: 0}, node:"
         "{fetch: {filter: null, collation: {locale: 'reverse'}, node:"
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}}}}}");
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBoundsContainNoStrings) {

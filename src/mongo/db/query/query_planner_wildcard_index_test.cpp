@@ -1176,10 +1176,10 @@ TEST_F(QueryPlannerWildcardTest,
 
     // A blocking sort solution (by doing a scan with a filter on 'b').
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node:"
         "{fetch: {filter: {a: {$gte: 3}}, node: "
         "{ixscan: {pattern: {'$_path': 1, b: 1},"
-        "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}}}");
+        "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithElemMatch) {
@@ -1188,10 +1188,10 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithElemMatch) 
     runQuerySortProj(fromjson("{a: {$elemMatch: {$eq: 1}}}"), BSON("a" << 1), BSONObj());
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: {a: {$elemMatch: {$eq: 1}}}, node: "
         "{ixscan: {pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]], a: [[1, 1, true, true]]}}}}}}}}}");
+        "bounds: {'$_path': [['a','a',true,true]], a: [[1, 1, true, true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithCompoundSort) {
@@ -1200,10 +1200,10 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithCompoundSor
     runQuerySortProj(fromjson("{a: {$lte: 3}}"), BSON("a" << 1 << "b" << 1), BSONObj());
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: null, node: "
         "{ixscan: {pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity, 3, true, true]]}}}}}}}}}");
+        "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity, 3, true, true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithExistsQueries) {
@@ -1212,11 +1212,11 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithExistsQueri
     runQuerySortProj(fromjson("{a: {$exists: true}}"), BSON("a" << 1), BSONObj());
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: null, node: "
         "{ixscan: {pattern: {'$_path': 1, a: 1},"
         "bounds: {'$_path': [['a','a',true,true], ['a.', 'a/', true, false]],"
-        "a: [['MinKey', 'MaxKey', true, true]]}}}}}}}}}");
+        "a: [['MinKey', 'MaxKey', true, true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterNotPresent) {
@@ -1224,8 +1224,8 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterNotPr
     // answer the query as $** indexes are sparse.
     runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterDoesNotIncludeSortKey) {
@@ -1234,15 +1234,15 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterDoesN
     runQuerySortProj(fromjson("{b: 1, c: 1}"), fromjson("{a: 1}"), BSONObj());
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: {c: 1}, node: "
         "{ixscan: {pattern: {'$_path': 1, b: 1},"
-        "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}}}");
+        "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: {b: 1}, node: "
         "{ixscan: {pattern: {'$_path': 1, c: 1},"
-        "bounds: {'$_path': [['c','c',true,true]], c: [[1, 1, true, true]]}}}}}}}}}");
+        "bounds: {'$_path': [['c','c',true,true]], c: [[1, 1, true, true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFieldIsNotIncluded) {
@@ -1251,10 +1251,8 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFieldIsNotI
     runQuerySortProj(fromjson("{b: 1}"), fromjson("{b: 1}"), BSONObj());
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: "
-        "{sortKeyGen: {node: "
-        "{cscan: {dir: 1, filter: {b: 1}}}"
-        "}}}}");
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1, filter: {b: 1}}}}}");
 }
 
 //
@@ -1858,12 +1856,12 @@ TEST_F(QueryPlannerWildcardTest, CanProduceSortMergePlanWithWildcardIndex) {
         "{ixscan: {pattern: {$_path: 1, b: 1}, bounds:"
         "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}");
     assertSolutionExists(
-        "{fetch: {filter: null, node: {sort: {pattern: {b: -1}, limit: 0, node: {sortKeyGen: "
-        "{node: {or: {nodes: ["
+        "{fetch: {filter: null, node: {sort: {pattern: {b: -1}, type: 'default', limit: 0, "
+        "node: {or: {nodes: ["
         "{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {$_path: 1, a: 1}, bounds:"
         "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}},"
         "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds:"
-        "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}}}}}");
+        "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, ContainedOrPushdownWorksWithWildcardIndex) {
@@ -1956,10 +1954,10 @@ TEST_F(QueryPlannerWildcardTest, CanUseWildcardIndexAndPushProjectionBeneathSort
         "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds: "
         "{$_path: [['b','b',true,true]], b: [[0,Infinity,false,true]]}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node:"
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {b: {$gt: 0}}, node:"
         "{ixscan: {filter: null, pattern: {$_path: 1, a: 1}, bounds:"
-        "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}}}}}}}}");
+        "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, CanPushProjectionBeneathSortWithExistsPredicate) {
@@ -1970,16 +1968,16 @@ TEST_F(QueryPlannerWildcardTest, CanPushProjectionBeneathSortWithExistsPredicate
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{sort: {pattern: {b: 1}, limit: 0,  type: 'simple', node:"
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {a: {$eq: 1}}, node:"
         "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds:"
         "{$_path: [['b','b',true,true], ['b.', 'b/', true, false]],"
         "b: [['MinKey','MaxKey',true,true]]}}}}}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node:"
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {b: {$exists: true}}, node:"
         "{ixscan: {filter: null, pattern: {$_path: 1, a: 1}, bounds:"
-        "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}}}}}}}}");
+        "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}}}}}}");
 }
 
 }  // namespace mongo

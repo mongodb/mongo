@@ -401,9 +401,7 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
  */
 std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     std::unique_ptr<QuerySolutionNode> root) {
-    if (StageType::STAGE_PROJECTION_DEFAULT != root->getType() &&
-        StageType::STAGE_PROJECTION_COVERED != root->getType() &&
-        StageType::STAGE_PROJECTION_SIMPLE != root->getType()) {
+    if (!isProjectionStageType(root->getType())) {
         // There's no projection to push down.
         return root;
     }
@@ -416,7 +414,7 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
         return root;
     }
 
-    if (projectNode->children[0]->getType() != StageType::STAGE_SORT) {
+    if (!isSortStageType(projectNode->children[0]->getType())) {
         return root;
     }
 
@@ -428,12 +426,6 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
         return root;
     }
 
-    if (sortNode->children[0]->getType() != StageType::STAGE_SORT_KEY_GENERATOR) {
-        return root;
-    }
-
-    auto sortKeyGenerator = static_cast<SortKeyGeneratorNode*>(sortNode->children[0]);
-
     // It is only legal to push down the projection it if preserves all of the fields on which we
     // need to sort.
     for (auto&& sortComponent : sortNode->pattern) {
@@ -443,16 +435,15 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     }
 
     // Perform the swap. We are starting with the following structure:
-    //   PROJECT => SORT => SORT_KEY_GENERATOR => CHILD
+    //   PROJECT => SORT => CHILD
     //
     // This needs to be transformed to the following:
-    //   SORT => SORT_KEY_GENERATOR => PROJECT => CHILD
+    //   SORT => PROJECT => CHILD
     //
-    // First, detach the sort key generator node from the tree by clearing its
-    // child vector.
-    std::unique_ptr<QuerySolutionNode> restOfTree{sortKeyGenerator->children[0]};
-    invariant(sortKeyGenerator->children.size() == 1u);
-    sortKeyGenerator->children.clear();
+    // First, detach the bottom of the tree.
+    std::unique_ptr<QuerySolutionNode> restOfTree{sortNode->children[0]};
+    invariant(sortNode->children.size() == 1u);
+    sortNode->children.clear();
 
     // Next, detach the sort from the projection and assume ownership of it.
     std::unique_ptr<QuerySolutionNode> ownedSortNode{sortNode};
@@ -464,13 +455,38 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     std::unique_ptr<QuerySolutionNode> ownedProjectionNode = std::move(root);
     ownedProjectionNode->children.push_back(restOfTree.release());
 
-    // Attach the projection as the child of the sort key generator.
-    sortKeyGenerator->children.push_back(ownedProjectionNode.release());
+    // Attach the projection as the child of the sort stage.
+    ownedSortNode->children.push_back(ownedProjectionNode.release());
 
     // Re-compute properties so that they reflect the new structure of the tree.
     ownedSortNode->computeProperties();
 
     return ownedSortNode;
+}
+
+bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
+                      const CanonicalQuery& cq,
+                      const QueryPlannerParams& plannerParams) {
+    const bool splitLimitedSortEligible = cq.getQueryRequest().getNToReturn() &&
+        cq.getQueryRequest().wantMore() &&
+        plannerParams.options & QueryPlannerParams::SPLIT_LIMITED_SORT;
+
+    // The simple sort stage discards any metadata other than sort key metadata. It can only be used
+    // if there are no metadata dependencies, or the only metadata dependency is a 'kSortKey'
+    // dependency.
+    const bool metadataDepsCompatible = cq.metadataDeps().none() ||
+        (cq.metadataDeps().count() == 1u && cq.metadataDeps()[DocumentMetadataFields::kSortKey]);
+
+    return solnRoot.fetched() && metadataDepsCompatible &&
+        // For performance, the simple sort stage discards any incoming record ids. Carrying the
+        // record ids along through the sorting process is wasted work when these ids will never be
+        // consumed later in the execution of the query. If the record ids are needed, however, then
+        // we can't use the simple sort stage.
+        !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID)
+        // Disable for queries which have an ntoreturn value and are eligible for the "split limited
+        // sort" hack. Such plans require record ids to be present for deduping, but the simple sort
+        // stage discards record ids.
+        && !splitLimitedSortEligible;
 }
 
 }  // namespace
@@ -719,23 +735,23 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         }
     }
 
-    // And build the full sort stage. The sort stage has to have a sort key generating stage
-    // as its child, supplying it with the appropriate sort keys.
-    SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
-    keyGenNode->sortSpec = sortObj;
-    keyGenNode->children.push_back(solnRoot);
-    solnRoot = keyGenNode;
-
-    SortNode* sort = new SortNode();
-    sort->pattern = sortObj;
-    sort->children.push_back(solnRoot);
-    solnRoot = sort;
+    std::unique_ptr<SortNode> sortNode;
+    if (canUseSimpleSort(*solnRoot, query, params)) {
+        sortNode = std::make_unique<SortNodeSimple>();
+    } else {
+        sortNode = std::make_unique<SortNodeDefault>();
+    }
+    sortNode->pattern = sortObj;
+    sortNode->children.push_back(solnRoot);
+    sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
+    solnRoot = sortNode.release();
+    auto sortNodeRaw = static_cast<SortNode*>(solnRoot);
     // When setting the limit on the sort, we need to consider both
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.
     if (qr.getLimit()) {
         // We have a true limit. The limit can be combined with the SORT stage.
-        sort->limit =
+        sortNodeRaw->limit =
             static_cast<size_t>(*qr.getLimit()) + static_cast<size_t>(qr.getSkip().value_or(0));
     } else if (qr.getNToReturn()) {
         // We have an ntoreturn specified by an OP_QUERY style find. This is used
@@ -744,55 +760,58 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         // Overflow here would be bad and could cause a nonsense limit. Cast
         // skip and limit values to unsigned ints to make sure that the
         // sum is never stored as signed. (See SERVER-13537).
-        sort->limit =
+        sortNodeRaw->limit =
             static_cast<size_t>(*qr.getNToReturn()) + static_cast<size_t>(qr.getSkip().value_or(0));
 
-        // This is a SORT with a limit. The wire protocol has a single quantity
-        // called "numToReturn" which could mean either limit or batchSize.
-        // We have no idea what the client intended. One way to handle the ambiguity
-        // of a limited OR stage is to use the SPLIT_LIMITED_SORT hack.
+        // This is a SORT with a limit. The wire protocol has a single quantity called "numToReturn"
+        // which could mean either limit or batchSize.  We have no idea what the client intended.
+        // One way to handle the ambiguity of a limited OR stage is to use the SPLIT_LIMITED_SORT
+        // hack.
         //
-        // If wantMore is false (meaning that 'ntoreturn' was initially passed to
-        // the server as a negative value), then we treat numToReturn as a limit.
-        // Since there is no limit-batchSize ambiguity in this case, we do not use the
-        // SPLIT_LIMITED_SORT hack.
+        // If wantMore is false (meaning that 'ntoreturn' was initially passed to the server as a
+        // negative value), then we treat numToReturn as a limit.  Since there is no limit-batchSize
+        // ambiguity in this case, we do not use the SPLIT_LIMITED_SORT hack.
         //
-        // If numToReturn is really a limit, then we want to add a limit to this
-        // SORT stage, and hence perform a topK.
+        // If numToReturn is really a limit, then we want to add a limit to this SORT stage, and
+        // hence perform a topK.
         //
-        // If numToReturn is really a batchSize, then we want to perform a regular
-        // blocking sort.
+        // If numToReturn is really a batchSize, then we want to perform a regular blocking sort.
         //
-        // Since we don't know which to use, just join the two options with an OR,
-        // with the topK first. If the client wants a limit, they'll get the efficiency
-        // of topK. If they want a batchSize, the other OR branch will deliver the missing
-        // results. The OR stage handles deduping.
+        // Since we don't know which to use, just join the two options with an OR, with the topK
+        // first. If the client wants a limit, they'll get the efficiency of topK. If they want a
+        // batchSize, the other OR branch will deliver the missing results. The OR stage handles
+        // deduping.
         //
         // We must also add an ENSURE_SORTED node above the OR to ensure that the final results are
         // in correct sorted order, which may not be true if the data is concurrently modified.
+        //
+        // Not allowed for geo or text, because we assume elsewhere that those stages appear just
+        // once.
         if (qr.wantMore() && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
-            // If we're here then the SPLIT_LIMITED_SORT hack is turned on,
-            // and the query is of a type that allows the hack.
+            // If we're here then the SPLIT_LIMITED_SORT hack is turned on, and the query is of a
+            // type that allows the hack.
             //
-            // Not allowed for geo or text, because we assume elsewhere that those
-            // stages appear just once.
-            OrNode* orn = new OrNode();
-            orn->children.push_back(sort);
-            SortNode* sortClone = static_cast<SortNode*>(sort->clone());
+            // The EnsureSortedStage consumes sort key metadata, so we must instruct the sort to
+            // attach it.
+            sortNodeRaw->addSortKeyMetadata = true;
+
+            auto orNode = std::make_unique<OrNode>();
+            orNode->children.push_back(solnRoot);
+            auto sortClone = static_cast<SortNode*>(sortNodeRaw->clone());
             sortClone->limit = 0;
-            orn->children.push_back(sortClone);
+            orNode->children.push_back(sortClone);
 
             // Add ENSURE_SORTED above the OR.
-            EnsureSortedNode* esn = new EnsureSortedNode();
-            esn->pattern = sort->pattern;
-            esn->children.push_back(orn);
-            solnRoot = esn;
+            auto ensureSortedNode = std::make_unique<EnsureSortedNode>();
+            ensureSortedNode->pattern = sortNodeRaw->pattern;
+            ensureSortedNode->children.push_back(orNode.release());
+            solnRoot = ensureSortedNode.release();
         }
     } else {
-        sort->limit = 0;
+        sortNodeRaw->limit = 0;
     }
 
     *blockingSortOut = true;

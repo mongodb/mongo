@@ -685,8 +685,8 @@ TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicate) {
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
-        "{sort: {pattern: {creationDate: 1}, limit: 0, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {creationDate: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}");
 }
@@ -702,11 +702,11 @@ TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicateMultikey) {
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
-        "{sort: {pattern: {creationDate: 1}, limit: 0, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {creationDate: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {creationDate: 1}, limit: 0, node: {sortKeyGen: {node: {fetch: {node: "
-        "{ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}}}}}");
+        "{sort: {pattern: {creationDate: 1}, limit: 0, type: 'simple', node: {fetch: {node: "
+        "{ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}}}");
 }
 
 // Test that a 2dsphere index can satisfy a whole index scan solution if the query has a GEO
@@ -754,8 +754,8 @@ TEST_F(QueryPlannerTest, CantUseNonCompoundGeoIndexToProvideSort) {
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{sort: {pattern: {x: 1}, limit: 0, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1, filter: {}}}}}}}");
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1, filter: {}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CantUseNonCompoundGeoIndexToProvideSortWithIndexablePred) {
@@ -768,11 +768,11 @@ TEST_F(QueryPlannerTest, CantUseNonCompoundGeoIndexToProvideSortWithIndexablePre
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
-        "{sort: {pattern: {x: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{fetch: {node: {ixscan: {pattern: {x: '2dsphere'}}}}}}}}}");
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node: "
+        "{fetch: {node: {ixscan: {pattern: {x: '2dsphere'}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {x: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
 }
 
 TEST_F(QueryPlannerTest, CantUseCompoundGeoIndexToProvideSortIfNoGeoPred) {
@@ -782,8 +782,8 @@ TEST_F(QueryPlannerTest, CantUseCompoundGeoIndexToProvideSortIfNoGeoPred) {
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{sort: {pattern: {x: 1}, limit: 0, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1, filter: {}}}}}}}");
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1, filter: {}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CanUseCompoundGeoIndexToProvideSortWithGeoPred) {
@@ -799,8 +799,8 @@ TEST_F(QueryPlannerTest, CanUseCompoundGeoIndexToProvideSortWithGeoPred) {
         "{fetch: {node: "
         "{ixscan: {pattern: {x: 1, y: '2dsphere'}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {x: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
 }
 
 //

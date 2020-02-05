@@ -577,9 +577,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         return childrenMatch(andSortedObj, asn, relaxBoundsCheck);
-    } else if (STAGE_PROJECTION_DEFAULT == trueSoln->getType() ||
-               STAGE_PROJECTION_COVERED == trueSoln->getType() ||
-               STAGE_PROJECTION_SIMPLE == trueSoln->getType()) {
+    } else if (isProjectionStageType(trueSoln->getType())) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(trueSoln);
 
         BSONElement el = testSoln["proj"];
@@ -628,14 +626,14 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         auto solnProjObj = projection_ast::astToDebugBSON(pn->proj.root());
         return SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj) &&
             solutionMatches(child.Obj(), pn->children[0], relaxBoundsCheck);
-    } else if (STAGE_SORT == trueSoln->getType()) {
+    } else if (isSortStageType(trueSoln->getType())) {
         const SortNode* sn = static_cast<const SortNode*>(trueSoln);
         BSONElement el = testSoln["sort"];
         if (el.eoo() || !el.isABSONObj()) {
             return false;
         }
         BSONObj sortObj = el.Obj();
-        invariant(bsonObjFieldsAreInSet(sortObj, {"pattern", "limit", "node"}));
+        invariant(bsonObjFieldsAreInSet(sortObj, {"pattern", "limit", "type", "node"}));
 
         BSONElement patternEl = sortObj["pattern"];
         if (patternEl.eoo() || !patternEl.isABSONObj()) {
@@ -645,6 +643,31 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!limitEl.isNumber()) {
             return false;
         }
+
+        BSONElement sortType = sortObj["type"];
+        if (sortType) {
+            if (sortType.type() != BSONType::String) {
+                return false;
+            }
+
+            auto sortTypeString = sortType.valueStringData();
+            switch (sn->getType()) {
+                case StageType::STAGE_SORT_DEFAULT: {
+                    if (sortTypeString != "default") {
+                        return false;
+                    }
+                    break;
+                }
+                case StageType::STAGE_SORT_SIMPLE: {
+                    if (sortTypeString != "simple") {
+                        return false;
+                    }
+                    break;
+                }
+                default: { MONGO_UNREACHABLE; }
+            }
+        }
+
         BSONElement child = sortObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
             return false;

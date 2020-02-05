@@ -670,12 +670,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     auto deps = pipeline->getDependencies(unavailableMetadata);
     *hasNoRequirements = deps.hasNoRequirements();
 
-    // If we're pushing down a sort, and a merge will be required later, then we need the query
-    // system to produce sortKey metadata.
-    if (!sortObj.isEmpty() && expCtx->needsMerge) {
-        deps.setNeedsMetadata(DocumentMetadataFields::kSortKey, true);
-    }
-
     BSONObj projObj;
     if (*hasNoRequirements) {
         // This query might be eligible for count optimizations, since the remaining stages in the

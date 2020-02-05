@@ -121,15 +121,29 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             return std::make_unique<FetchStage>(
                 opCtx, ws, std::move(childStage), fn->filter.get(), collection);
         }
-        case STAGE_SORT: {
-            const SortNode* sn = static_cast<const SortNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, sn->children[0], ws);
-            return std::make_unique<SortStage>(cq.getExpCtx(),
-                                               ws,
-                                               SortPattern{sn->pattern, cq.getExpCtx()},
-                                               sn->limit,
-                                               internalQueryMaxBlockingSortMemoryUsageBytes.load(),
-                                               std::move(childStage));
+        case STAGE_SORT_DEFAULT: {
+            auto snDefault = static_cast<const SortNodeDefault*>(root);
+            auto childStage = buildStages(opCtx, collection, cq, qsol, snDefault->children[0], ws);
+            return std::make_unique<SortStageDefault>(
+                cq.getExpCtx(),
+                ws,
+                SortPattern{snDefault->pattern, cq.getExpCtx()},
+                snDefault->limit,
+                internalQueryMaxBlockingSortMemoryUsageBytes.load(),
+                snDefault->addSortKeyMetadata,
+                std::move(childStage));
+        }
+        case STAGE_SORT_SIMPLE: {
+            auto snSimple = static_cast<const SortNodeSimple*>(root);
+            auto childStage = buildStages(opCtx, collection, cq, qsol, snSimple->children[0], ws);
+            return std::make_unique<SortStageSimple>(
+                cq.getExpCtx(),
+                ws,
+                SortPattern{snSimple->pattern, cq.getExpCtx()},
+                snSimple->limit,
+                internalQueryMaxBlockingSortMemoryUsageBytes.load(),
+                snSimple->addSortKeyMetadata,
+                std::move(childStage));
         }
         case STAGE_SORT_KEY_GENERATOR: {
             const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(root);

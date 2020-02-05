@@ -14,7 +14,7 @@ const projectPushedDownRes =
 // Run it again where it cannot be pushed down.
 const projectNotPushedDownRes = coll.aggregate([
                                         {$sort: {a: 1}},
-                                        {$_internalInhibitOptimization: {}},
+                                        {$unwind: {path: "$a"}},
                                         {$project: {_id: 0, metaField: {$meta: "sortKey"}}}
                                     ])
                                     .toArray();

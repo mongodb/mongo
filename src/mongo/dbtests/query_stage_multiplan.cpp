@@ -409,12 +409,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
 
     // We should have picked the index intersection plan due to forcing ixisect.
     QuerySolution* soln = mps->bestSolution();
-    ASSERT(QueryPlannerTestLib::solutionMatches(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
-        "{fetch: {node: {andSorted: {nodes: ["
-        "{ixscan: {filter: null, pattern: {a:1}}},"
-        "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}}}",
-        soln->root.get()));
+    ASSERT(
+        QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
+                                             "{fetch: {node: {andSorted: {nodes: ["
+                                             "{ixscan: {filter: null, pattern: {a:1}}},"
+                                             "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+                                             soln->root.get()));
 
     // Get the resulting document.
     PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -433,12 +433,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     // and the winning plan should still be the index intersection one.
     ASSERT(!mps->hasBackupPlan());
     soln = mps->bestSolution();
-    ASSERT(QueryPlannerTestLib::solutionMatches(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
-        "{fetch: {node: {andSorted: {nodes: ["
-        "{ixscan: {filter: null, pattern: {a:1}}},"
-        "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}}}",
-        soln->root.get()));
+    ASSERT(
+        QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
+                                             "{fetch: {node: {andSorted: {nodes: ["
+                                             "{ixscan: {filter: null, pattern: {a:1}}},"
+                                             "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+                                             soln->root.get()));
 
     // Restore index intersection force parameter.
     internalQueryForceIntersectionPlans.store(forceIxisectOldValue);

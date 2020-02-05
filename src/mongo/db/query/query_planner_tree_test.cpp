@@ -753,8 +753,8 @@ TEST_F(QueryPlannerTest, InWithSort) {
     runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1, 2]}}"), BSON("b" << 1), BSONObj(), 0, 1);
 
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 1, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {b: 1}, limit: 1, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: {pattern: {a: 1, b: 1}}}]}}}}");
@@ -780,8 +780,8 @@ TEST_F(QueryPlannerTest, ManyInWithSort) {
                                   1);
 
     assertSolutionExists(
-        "{sort: {pattern: {d: 1}, limit: 1, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {d: 1}, limit: 1, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
@@ -808,11 +808,11 @@ TEST_F(QueryPlannerTest, TooManyToExplode) {
     // We cap the # of ixscans we're willing to create.
     assertNumSolutions(2);
     assertSolutionExists(
-        "{sort: {pattern: {d: 1}, limit: 1, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {d: 1}, limit: 1, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {d: 1}, limit: 1, node: {sortKeyGen: {node: {ixscan: "
-        "{pattern: {a: 1, b: 1, c:1, d:1}}}}}}}}}");
+        "{fetch: {node: {sort: {pattern: {d: 1}, limit: 1, type: 'default', node: {ixscan: "
+        "{pattern: {a: 1, b: 1, c:1, d:1}}}}}}}");
 }
 
 // SERVER-13618: test that exploding scans for sort works even
@@ -823,8 +823,8 @@ TEST_F(QueryPlannerTest, ExplodeMustReverseScans) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: -1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: -1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1, b:1, c:1, d:1}}},"
@@ -840,8 +840,8 @@ TEST_F(QueryPlannerTest, ExplodeMustReverseScans2) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1, b:1, c:-1}}},"
@@ -858,11 +858,11 @@ TEST_F(QueryPlannerTest, CantExplodeWithEmptyBounds) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: "
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+        "{fetch: {node: {sort: {pattern: {b:1}, limit: 0, type: 'default', node: "
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
 // SERVER-13752
@@ -872,11 +872,11 @@ TEST_F(QueryPlannerTest, CantExplodeWithEmptyBounds2) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: "
-        "{ixscan: {pattern: {a:1,b:1,c:1}}}}}}}}}");
+        "{fetch: {node: {sort: {pattern: {b:1}, limit: 0, type: 'default', node: "
+        "{ixscan: {pattern: {a:1,b:1,c:1}}}}}}}");
 }
 
 // SERVER-13754: exploding an $or
@@ -888,8 +888,8 @@ TEST_F(QueryPlannerTest, ExplodeOrForSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {bounds: {a: [[1,1,true,true]], "
@@ -913,8 +913,8 @@ TEST_F(QueryPlannerTest, ExplodeOrForSort2) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {bounds: {a: [[1,1,true,true]], b: [[1,1,true,true]],"
@@ -938,13 +938,13 @@ TEST_F(QueryPlannerTest, CantExplodeOrForSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
         "{cscan: {dir: 1}}}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {sort: {pattern: {c: 1}, "
-        "limit: 0, node: {sortKeyGen: {node: {or: {nodes: ["
+        "limit: 0, type: 'default', node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1, c: 1}}},"
-        "{ixscan: {pattern: {d: 1, c: 1}}}]}}}}}}}}");
+        "{ixscan: {pattern: {d: 1, c: 1}}}]}}}}}}");
 }
 
 // SERVER-13754: too many scans in an $or explosion.
@@ -964,28 +964,28 @@ TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
     // we get 5 different solutions which all use a blocking sort.
     assertNumSolutions(5U);
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
         "{or: {nodes: ["
         "{fetch: {node: {ixscan: {pattern: {a: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {c: 1, e: 1}}}}}]}}}}}}");
+        "{fetch: {node: {ixscan: {pattern: {c: 1, e: 1}}}}}]}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
         "{or: {nodes: ["
         "{fetch: {node: {ixscan: {pattern: {b: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {c: 1, e: 1}}}}}]}}}}}}");
+        "{fetch: {node: {ixscan: {pattern: {c: 1, e: 1}}}}}]}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
         "{or: {nodes: ["
         "{fetch: {node: {ixscan: {pattern: {a: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}}}");
+        "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
         "{or: {nodes: ["
         "{fetch: {node: {ixscan: {pattern: {b: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}}}");
+        "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}");
 }
 
 // SERVER-15696: Make sure explodeForSort copies filters on IXSCAN stages to all of the
@@ -1001,8 +1001,8 @@ TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1, b:1},"
@@ -1021,8 +1021,8 @@ TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {b:-1}, limit: 1, node: {sortKeyGen: "
-        "{node: {cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {b:-1}, limit: 1, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{limit: {n: 1, node: {fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1,b:-1,c:1}}}, "
@@ -1141,8 +1141,8 @@ TEST_F(QueryPlannerTest, MergeSort) {
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, c: 1}}}, {ixscan: {pattern: {b: 1, c: 1}}}]}}}}");
@@ -1169,8 +1169,8 @@ TEST_F(QueryPlannerTest, MergeSortEvenIfSameIndex) {
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     // TODO the second solution should be mergeSort rather than just sort
 }
 
@@ -1179,8 +1179,8 @@ TEST_F(QueryPlannerTest, ReverseScanForSort) {
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
-        "{sort: {pattern: {_id: -1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {_id: -1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: "
         "{filter: null, pattern: {_id: 1}}}}}");
@@ -1193,8 +1193,8 @@ TEST_F(QueryPlannerTest, MergeSortReverseScans) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {a: -1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {a: -1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {a: 1}, dir: -1}}}}, {ixscan: "
@@ -1208,8 +1208,8 @@ TEST_F(QueryPlannerTest, MergeSortReverseScanOneIndex) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, c: 1}, dir: 1}}, {ixscan: {pattern: {b: 1, c: -1}, dir: "
@@ -1224,8 +1224,8 @@ TEST_F(QueryPlannerTest, MergeSortReverseScanOneIndexNotExplodeForSort) {
 
     assertNumSolutions(5U);
     assertSolutionExists(
-        "{sort: {pattern: {a: -1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {a: -1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: -1, b: -1}, dir: 1}}, {ixscan: {pattern: {a: 1}, dir: -1}}]}}}}");
@@ -1251,8 +1251,8 @@ TEST_F(QueryPlannerTest, MergeSortReverseIxscanBelowFetch) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {d: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {d: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, d: 1}, dir: 1}}, {fetch: {node: {ixscan: {pattern: {b: 1, d: "
@@ -1268,8 +1268,8 @@ TEST_F(QueryPlannerTest, MergeSortReverseSubtreeContainedOr) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, e: 1}, dir: 1}}, {fetch: {node: {mergeSort: {nodes: "
@@ -1284,12 +1284,12 @@ TEST_F(QueryPlannerTest, CannotMergeSort) {
 
     assertNumSolutions(2U);
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}");
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {c: 1}, limit: 0, type: 'simple', node:"
         "{fetch: {node: {or: {nodes: [{ixscan: {pattern: {a: 1, c: -1}, dir: -1}}, {ixscan: "
-        "{pattern: {b: 1}, dir: 1}}]}}}}}}}}");
+        "{pattern: {b: 1}, dir: 1}}]}}}}}}");
 }
 
 

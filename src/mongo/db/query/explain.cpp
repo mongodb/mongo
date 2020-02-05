@@ -518,9 +518,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
         bob->appendNumber("limitAmount", spec->limit);
-    } else if (STAGE_PROJECTION_DEFAULT == stats.stageType ||
-               STAGE_PROJECTION_COVERED == stats.stageType ||
-               STAGE_PROJECTION_SIMPLE == stats.stageType) {
+    } else if (isProjectionStageType(stats.stageType)) {
         ProjectionStats* spec = static_cast<ProjectionStats*>(stats.specific.get());
         bob->append("transformBy", spec->projObj);
     } else if (STAGE_RECORD_STORE_FAST_COUNT == stats.stageType) {
@@ -539,7 +537,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_SKIP == stats.stageType) {
         SkipStats* spec = static_cast<SkipStats*>(stats.specific.get());
         bob->appendNumber("skipAmount", spec->skip);
-    } else if (STAGE_SORT == stats.stageType) {
+    } else if (isSortStageType(stats.stageType)) {
         SortStats* spec = static_cast<SortStats*>(stats.specific.get());
         bob->append("sortPattern", spec->sortPattern);
         bob->appendIntOrLL("memLimit", spec->maxMemoryUsageBytes);
@@ -547,6 +545,8 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         if (spec->limit > 0) {
             bob->appendIntOrLL("limitAmount", spec->limit);
         }
+
+        bob->append("type", stats.stageType == STAGE_SORT_SIMPLE ? "simple" : "default");
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendIntOrLL("totalDataSizeSorted", spec->totalDataSizeBytes);
@@ -973,7 +973,7 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
         statsOut->totalDocsExamined +=
             getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
 
-        if (STAGE_SORT == stages[i]->stageType()) {
+        if (isSortStageType(stages[i]->stageType())) {
             statsOut->hasSortStage = true;
 
             auto sortStage = static_cast<const SortStage*>(stages[i]);

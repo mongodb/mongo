@@ -762,10 +762,6 @@ struct SortNode : public QuerySolutionNode {
 
     virtual ~SortNode() {}
 
-    virtual StageType getType() const {
-        return STAGE_SORT;
-    }
-
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const {
@@ -782,8 +778,6 @@ struct SortNode : public QuerySolutionNode {
         return _sorts;
     }
 
-    QuerySolutionNode* clone() const;
-
     virtual void computeProperties() {
         for (size_t i = 0; i < children.size(); ++i) {
             children[i]->computeProperties();
@@ -798,6 +792,47 @@ struct SortNode : public QuerySolutionNode {
 
     // Sum of both limit and skip count in the parsed query.
     size_t limit;
+
+    bool addSortKeyMetadata = false;
+
+protected:
+    void cloneSortData(SortNode* copy) const;
+
+private:
+    virtual StringData sortImplementationTypeToString() const = 0;
+};
+
+/**
+ * Represents sort algorithm that can handle any kind of input data.
+ */
+struct SortNodeDefault final : public SortNode {
+    virtual StageType getType() const override {
+        return STAGE_SORT_DEFAULT;
+    }
+
+    QuerySolutionNode* clone() const override;
+
+    StringData sortImplementationTypeToString() const override {
+        return "DEFAULT"_sd;
+    }
+};
+
+/**
+ * Represents a special, optimized sort algorithm that is only correct if:
+ *  - The input data is fetched.
+ *  - The input data has no metadata attached.
+ *  - The record id can be discarded.
+ */
+struct SortNodeSimple final : public SortNode {
+    virtual StageType getType() const {
+        return STAGE_SORT_SIMPLE;
+    }
+
+    QuerySolutionNode* clone() const override;
+
+    StringData sortImplementationTypeToString() const override {
+        return "SIMPLE"_sd;
+    }
 };
 
 struct LimitNode : public QuerySolutionNode {

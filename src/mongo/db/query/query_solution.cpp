@@ -1092,6 +1092,8 @@ void SortNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SORT\n";
     addIndent(ss, indent + 1);
+    *ss << "type = " << sortImplementationTypeToString() << '\n';
+    addIndent(ss, indent + 1);
     *ss << "pattern = " << pattern.toString() << '\n';
     addIndent(ss, indent + 1);
     *ss << "limit = " << limit << '\n';
@@ -1101,15 +1103,24 @@ void SortNode::appendToString(str::stream* ss, int indent) const {
     children[0]->appendToString(ss, indent + 2);
 }
 
-QuerySolutionNode* SortNode::clone() const {
-    SortNode* copy = new SortNode();
+void SortNode::cloneSortData(SortNode* copy) const {
     cloneBaseData(copy);
-
     copy->_sorts = this->_sorts;
     copy->pattern = this->pattern;
     copy->limit = this->limit;
+    copy->addSortKeyMetadata = this->addSortKeyMetadata;
+}
 
-    return copy;
+QuerySolutionNode* SortNodeDefault::clone() const {
+    auto copy = std::make_unique<SortNodeDefault>();
+    cloneSortData(copy.get());
+    return copy.release();
+}
+
+QuerySolutionNode* SortNodeSimple::clone() const {
+    auto copy = std::make_unique<SortNodeSimple>();
+    cloneSortData(copy.get());
+    return copy.release();
 }
 
 //

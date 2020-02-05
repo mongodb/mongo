@@ -49,11 +49,11 @@ using namespace mongo;
 
 namespace {
 
-class SortStageTest : public ServiceContextMongoDTest {
+class SortStageDefaultTest : public ServiceContextMongoDTest {
 public:
     static constexpr uint64_t kMaxMemoryUsageBytes = 1024u * 1024u;
 
-    SortStageTest() {
+    SortStageDefaultTest() {
         getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
         _opCtx = makeOperationContext();
         CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
@@ -64,7 +64,7 @@ public:
     }
 
     /**
-     * Test function to verify sort stage. SortStage will be initialized using 'patternStr',
+     * Test function to verify sort stage. SortStageDefault will be initialized using 'patternStr',
      * 'collator', and 'limit;.
      *
      * 'inputStr' represents the input data set in a BSONObj.
@@ -82,7 +82,7 @@ public:
         // so it's fine to declare
         WorkingSet ws;
 
-        // QueuedDataStage will be owned by SortStage.
+        // QueuedDataStage will be owned by SortStageDefault.
         auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj.getField("input");
@@ -109,12 +109,13 @@ public:
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
             expCtx, std::move(queuedDataStage), &ws, sortPattern);
 
-        SortStage sort(expCtx,
-                       &ws,
-                       SortPattern{sortPattern, expCtx},
-                       limit,
-                       kMaxMemoryUsageBytes,
-                       std::move(sortKeyGen));
+        SortStageDefault sort(expCtx,
+                              &ws,
+                              SortPattern{sortPattern, expCtx},
+                              limit,
+                              kMaxMemoryUsageBytes,
+                              false,  // addSortKeyMetadata
+                              std::move(sortKeyGen));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -163,23 +164,24 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-TEST_F(SortStageTest, SortEmptyWorkingSet) {
+TEST_F(SortStageDefaultTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
     // Create an ExpressionContext for the SortKeyGeneratorStage.
     auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), nullptr);
 
-    // QueuedDataStage will be owned by SortStage.
+    // QueuedDataStage will be owned by SortStageDefault.
     auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
     auto sortKeyGen =
         std::make_unique<SortKeyGeneratorStage>(expCtx, std::move(queuedDataStage), &ws, BSONObj());
     auto sortPattern = BSON("a" << 1);
-    SortStage sort(expCtx,
-                   &ws,
-                   SortPattern{sortPattern, expCtx},
-                   0u,
-                   kMaxMemoryUsageBytes,
-                   std::move(sortKeyGen));
+    SortStageDefault sort(expCtx,
+                          &ws,
+                          SortPattern{sortPattern, expCtx},
+                          0u,
+                          kMaxMemoryUsageBytes,
+                          false,  // addSortKeyMetadata
+                          std::move(sortKeyGen));
 
     // Check initial EOF state.
     ASSERT_FALSE(sort.isEOF());
@@ -209,7 +211,7 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
 // Implementation should keep all items fetched from child.
 //
 
-TEST_F(SortStageTest, SortAscending) {
+TEST_F(SortStageDefaultTest, SortAscending) {
     testWork("{a: 1}",
              nullptr,
              0,
@@ -217,7 +219,7 @@ TEST_F(SortStageTest, SortAscending) {
              "{output: [{a: 1}, {a: 2}, {a: 3}]}");
 }
 
-TEST_F(SortStageTest, SortDescending) {
+TEST_F(SortStageDefaultTest, SortDescending) {
     testWork("{a: -1}",
              nullptr,
              0,
@@ -225,7 +227,7 @@ TEST_F(SortStageTest, SortDescending) {
              "{output: [{a: 3}, {a: 2}, {a: 1}]}");
 }
 
-TEST_F(SortStageTest, SortIrrelevantSortKey) {
+TEST_F(SortStageDefaultTest, SortIrrelevantSortKey) {
     testWork("{b: 1}",
              nullptr,
              0,
@@ -239,12 +241,12 @@ TEST_F(SortStageTest, SortIrrelevantSortKey) {
 // and discard the rest.
 //
 
-TEST_F(SortStageTest, SortAscendingWithLimit) {
+TEST_F(SortStageDefaultTest, SortAscendingWithLimit) {
     testWork(
         "{a: 1}", nullptr, 2, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}, {a: 2}]}");
 }
 
-TEST_F(SortStageTest, SortDescendingWithLimit) {
+TEST_F(SortStageDefaultTest, SortDescendingWithLimit) {
     testWork(
         "{a: -1}", nullptr, 2, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}, {a: 2}]}");
 }
@@ -255,7 +257,7 @@ TEST_F(SortStageTest, SortDescendingWithLimit) {
 // and discard the rest.
 //
 
-TEST_F(SortStageTest, SortAscendingWithLimitGreaterThanInputSize) {
+TEST_F(SortStageDefaultTest, SortAscendingWithLimitGreaterThanInputSize) {
     testWork("{a: 1}",
              nullptr,
              10,
@@ -263,7 +265,7 @@ TEST_F(SortStageTest, SortAscendingWithLimitGreaterThanInputSize) {
              "{output: [{a: 1}, {a: 2}, {a: 3}]}");
 }
 
-TEST_F(SortStageTest, SortDescendingWithLimitGreaterThanInputSize) {
+TEST_F(SortStageDefaultTest, SortDescendingWithLimitGreaterThanInputSize) {
     testWork("{a: -1}",
              nullptr,
              10,
@@ -276,15 +278,15 @@ TEST_F(SortStageTest, SortDescendingWithLimitGreaterThanInputSize) {
 // Implementation should optimize this into a running maximum.
 //
 
-TEST_F(SortStageTest, SortAscendingWithLimitOfOne) {
+TEST_F(SortStageDefaultTest, SortAscendingWithLimitOfOne) {
     testWork("{a: 1}", nullptr, 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}]}");
 }
 
-TEST_F(SortStageTest, SortDescendingWithLimitOfOne) {
+TEST_F(SortStageDefaultTest, SortDescendingWithLimitOfOne) {
     testWork("{a: -1}", nullptr, 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}]}");
 }
 
-TEST_F(SortStageTest, SortAscendingWithCollation) {
+TEST_F(SortStageDefaultTest, SortAscendingWithCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     testWork("{a: 1}",
              &collator,
@@ -293,7 +295,7 @@ TEST_F(SortStageTest, SortAscendingWithCollation) {
              "{output: [{a: 'aa'}, {a: 'ba'}, {a: 'ab'}]}");
 }
 
-TEST_F(SortStageTest, SortDescendingWithCollation) {
+TEST_F(SortStageDefaultTest, SortDescendingWithCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     testWork("{a: -1}",
              &collator,

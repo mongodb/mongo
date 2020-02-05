@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/working_set_common.h"
 
@@ -37,16 +38,12 @@ namespace mongo {
 SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
                      WorkingSet* ws,
                      SortPattern sortPattern,
-                     uint64_t limit,
-                     uint64_t maxMemoryUsageBytes,
+                     bool addSortKeyMetadata,
                      std::unique_ptr<PlanStage> child)
     : PlanStage(kStageType.rawData(), expCtx->opCtx),
       _ws(ws),
-      _sortExecutor(std::move(sortPattern),
-                    limit,
-                    maxMemoryUsageBytes,
-                    expCtx->tempDir,
-                    expCtx->allowDiskUse) {
+      _sortKeyGen(sortPattern, expCtx->getCollator()),
+      _addSortKeyMetadata(addSortKeyMetadata) {
     _children.emplace_back(std::move(child));
 }
 
@@ -62,14 +59,8 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
         if (code == PlanStage::ADVANCED) {
             // The plan must be structured such that a previous stage has attached the sort key
             // metadata.
-            auto member = _ws->get(id);
-            invariant(member->metadata().hasSortKey());
-
-            SortableWorkingSetMember extractedMember{_ws->extract(id)};
-
             try {
-                auto sortKey = extractedMember->metadata().getSortKey();
-                _sortExecutor.add(sortKey, extractedMember);
+                spool(id);
             } catch (const AssertionException&) {
                 // Propagate runtime errors using the FAILED status code.
                 *out = WorkingSetCommon::allocateStatusMember(_ws, exceptionToStatus());
@@ -83,7 +74,7 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
             _populated = true;
 
             try {
-                _sortExecutor.loadingDone();
+                loadingDone();
             } catch (const AssertionException&) {
                 // Propagate runtime errors using the FAILED status code.
                 *out = WorkingSetCommon::allocateStatusMember(_ws, exceptionToStatus());
@@ -98,22 +89,97 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
         return code;
     }
 
-    auto nextWsm = _sortExecutor.getNext();
-    if (!nextWsm) {
-        return PlanStage::IS_EOF;
-    }
-
-    *out = _ws->emplace(nextWsm->extract());
-    return PlanStage::ADVANCED;
+    return unspool(out);
 }
 
 std::unique_ptr<PlanStageStats> SortStage::getStats() {
     _commonStats.isEOF = isEOF();
     std::unique_ptr<PlanStageStats> ret =
-        std::make_unique<PlanStageStats>(_commonStats, STAGE_SORT);
-    ret->specific = _sortExecutor.cloneStats();
+        std::make_unique<PlanStageStats>(_commonStats, stageType());
+    ret->specific = std::unique_ptr<SpecificStats>{getSpecificStats()->clone()};
     ret->children.emplace_back(child()->getStats());
     return ret;
+}
+
+SortStageDefault::SortStageDefault(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                   WorkingSet* ws,
+                                   SortPattern sortPattern,
+                                   uint64_t limit,
+                                   uint64_t maxMemoryUsageBytes,
+                                   bool addSortKeyMetadata,
+                                   std::unique_ptr<PlanStage> child)
+    : SortStage(expCtx, ws, sortPattern, addSortKeyMetadata, std::move(child)),
+      _sortExecutor(std::move(sortPattern),
+                    limit,
+                    maxMemoryUsageBytes,
+                    expCtx->tempDir,
+                    expCtx->allowDiskUse) {}
+
+void SortStageDefault::spool(WorkingSetID wsid) {
+    SortableWorkingSetMember extractedMember{_ws->extract(wsid)};
+    auto sortKey = _sortKeyGen.computeSortKey(*extractedMember);
+    _sortExecutor.add(sortKey, extractedMember);
+}
+
+PlanStage::StageState SortStageDefault::unspool(WorkingSetID* out) {
+    if (!_sortExecutor.hasNext()) {
+        return PlanStage::IS_EOF;
+    }
+
+    auto&& [key, nextWsm] = _sortExecutor.getNext();
+    *out = _ws->emplace(nextWsm.extract());
+
+    if (_addSortKeyMetadata) {
+        auto member = _ws->get(*out);
+        member->metadata().setSortKey(std::move(key), _sortKeyGen.isSingleElementKey());
+    }
+
+    return PlanStage::ADVANCED;
+}
+
+SortStageSimple::SortStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                 WorkingSet* ws,
+                                 SortPattern sortPattern,
+                                 uint64_t limit,
+                                 uint64_t maxMemoryUsageBytes,
+                                 bool addSortKeyMetadata,
+                                 std::unique_ptr<PlanStage> child)
+    : SortStage(expCtx, ws, sortPattern, addSortKeyMetadata, std::move(child)),
+      _sortExecutor(std::move(sortPattern),
+                    limit,
+                    maxMemoryUsageBytes,
+                    expCtx->tempDir,
+                    expCtx->allowDiskUse) {}
+
+void SortStageSimple::spool(WorkingSetID wsid) {
+    auto member = _ws->get(wsid);
+    invariant(!member->metadata());
+    invariant(!member->doc.value().metadata());
+    invariant(member->hasObj());
+
+    auto sortKey = _sortKeyGen.computeSortKeyFromDocument(member->doc.value());
+
+    _sortExecutor.add(std::move(sortKey), member->doc.value().toBson());
+    _ws->free(wsid);
+}
+
+PlanStage::StageState SortStageSimple::unspool(WorkingSetID* out) {
+    if (!_sortExecutor.hasNext()) {
+        return PlanStage::IS_EOF;
+    }
+
+    auto&& [key, nextObj] = _sortExecutor.getNext();
+
+    *out = _ws->allocate();
+    auto member = _ws->get(*out);
+    member->resetDocument(SnapshotId{}, nextObj.getOwned());
+    member->transitionToOwnedObj();
+
+    if (_addSortKeyMetadata) {
+        member->metadata().setSortKey(std::move(key), _sortKeyGen.isSingleElementKey());
+    }
+
+    return PlanStage::ADVANCED;
 }
 
 }  // namespace mongo

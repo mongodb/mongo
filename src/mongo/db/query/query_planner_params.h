@@ -91,6 +91,12 @@ struct QueryPlannerParams {
         // return exactly one document per value of the distinct field. See the comments above the
         // declaration of getExecutorDistinct() for more detail.
         STRICT_DISTINCT_ONLY = 1 << 9,
+
+        // Instruct the planner that the caller is expecting to consume the record ids associated
+        // with documents returned by the plan. Any generated query solution must not discard record
+        // ids. In some cases, record ids can be discarded as an optimization when they will not be
+        // consumed downstream.
+        PRESERVE_RECORD_ID = 1 << 10,
     };
 
     // See Options enum above.

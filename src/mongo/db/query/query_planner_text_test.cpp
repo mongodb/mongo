@@ -434,8 +434,8 @@ TEST_F(QueryPlannerTest, SortKeyMetaProjectionWithTextScoreMetaSort) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {a: {$meta: 'textScore'}, b: {$meta: 'sortKey'}}, node: "
-        "{sort: {limit: 0, pattern: {a: {$meta: 'textScore'}}, node: "
-        "{sortKeyGen: {node: {text: {search: 'foo'}}}}}}}}");
+        "{sort: {limit: 0, pattern: {a: {$meta: 'textScore'}}, type: 'default', node: "
+        "{text: {search: 'foo'}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, PredicatesOverLeadingFieldsWithSharedPathPrefixHandledCorrectly) {

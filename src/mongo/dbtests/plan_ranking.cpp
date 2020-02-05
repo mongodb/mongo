@@ -557,9 +557,9 @@ public:
 
         // The best must not be a collscan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node:"
+            "{sort: {pattern: {c: 1}, limit: 0, type:'simple', node:"
             "{fetch: {filter: null, node: "
-            "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}}}",
+            "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}",
             soln->root.get()));
     }
 };

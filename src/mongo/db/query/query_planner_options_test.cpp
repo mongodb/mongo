@@ -155,8 +155,8 @@ TEST_F(QueryPlannerTest, MaxMinSortInequalityFirstSortSecond) {
 
     assertNumSolutions(1);
     assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: {ixscan: "
-        "{filter: null, pattern: {a: 1, b: 1}}}}}}}}}");
+        "{fetch: {node: {sort: {pattern: {b: 1}, limit: 0, type: 'default', node: {ixscan: "
+        "{filter: null, pattern: {a: 1, b: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, MaxMinReverseSort) {
@@ -247,8 +247,8 @@ TEST_F(QueryPlannerTest, NaturalHint) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{cscan: {filter: {a: 1}, dir: 1}}}}}}");
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: "
+        "{cscan: {filter: {a: 1}, dir: 1}}}}");
 }
 
 // Test $natural sort and its interaction with $natural hint.
@@ -325,9 +325,9 @@ TEST_F(QueryPlannerTest, HintValidWithSort) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: {b: 200}, "
-        "node: {ixscan: {filter: null, pattern: {a: 1}}}}}}}}}");
+        "node: {ixscan: {filter: null, pattern: {a: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, HintElemMatch) {
@@ -373,10 +373,10 @@ TEST_F(QueryPlannerTest, SplitLimitedSort) {
     assertSolutionExists(
         "{ensureSorted: {pattern: {b: 1}, node: "
         "{or: {nodes: ["
-        "{sort: {pattern: {b: 1}, limit: 3, node: {sortKeyGen: {node: "
-        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}, "
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}}}");
+        "{sort: {pattern: {b: 1}, limit: 3, type: 'default', node: "
+        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}, "
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'default', node: "
+        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}]}}}}");
 }
 
 // The same query run as a find command with a limit should not require the "split limited sort"
@@ -394,8 +394,8 @@ TEST_F(QueryPlannerTest, NoSplitLimitedSortAsCommand) {
         "{limit: {n: 3, node: {fetch: {filter: {a:1}, node: "
         "{ixscan: {filter: null, pattern: {b: 1}}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 3, node: {sortKeyGen: {node: {fetch: {filter: null,"
-        "node: {ixscan: {pattern: {a: 1}}}}}}}}}");
+        "{sort: {pattern: {b: 1}, limit: 3, type: 'simple', node: {fetch: {filter: null,"
+        "node: {ixscan: {pattern: {a: 1}}}}}}}");
 }
 
 // Same query run as a find command with a batchSize rather than a limit should not require
@@ -413,8 +413,8 @@ TEST_F(QueryPlannerTest, NoSplitLimitedSortAsCommandBatchSize) {
         "{fetch: {filter: {a: 1}, node: {ixscan: "
         "{filter: null, pattern: {b: 1}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: {fetch: {filter: null,"
-        "node: {ixscan: {pattern: {a: 1}}}}}}}}}");
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: {fetch: {filter: null,"
+        "node: {ixscan: {pattern: {a: 1}}}}}}}");
 }
 
 
@@ -789,8 +789,8 @@ TEST_F(QueryPlannerTest, SortKeyMetaProjection) {
     assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {b: {$meta: 'sortKey'}}, node: "
-        "{sort: {limit: 0, pattern: {a: 1}, node: {sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}}}");
+        "{sort: {limit: 0, pattern: {a: 1}, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}}}");
     assertSolutionExists(
         "{proj: {spec: {b: {$meta: 'sortKey'}}, node: "
         "{sortKeyGen: {node: {fetch: {filter: null, node: "
@@ -806,9 +806,8 @@ TEST_F(QueryPlannerTest, SortKeyMetaProjectionCovered) {
     assertNumSolutions(2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1, b: {$meta: 'sortKey'}}, node: "
-        "{sort: {limit: 0, pattern: {a: 1}, node: "
-        "{sortKeyGen: {node: "
-        "{cscan: {dir: 1}}}}}}}}");
+        "{sort: {limit: 0, pattern: {a: 1}, type: 'simple', node: "
+        "{cscan: {dir: 1}}}}}}");
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1, b: {$meta: 'sortKey'}}, node: "
         "{sortKeyGen: {node: "
@@ -885,7 +884,6 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_NOT_OK(s);
 }
 
-
 // A query run as a find command with a sort and ntoreturn should generate a plan implementing
 // the 'ntoreturn hack'.
 TEST_F(QueryPlannerTest, NToReturnHackWithFindCommand) {
@@ -897,8 +895,8 @@ TEST_F(QueryPlannerTest, NToReturnHackWithFindCommand) {
     assertSolutionExists(
         "{ensureSorted: {pattern: {a: 1}, node: "
         "{or: {nodes: ["
-        "{sort: {limit:3, pattern: {a:1}, node: {sortKeyGen: {node: {cscan: {dir:1}}}}}}, "
-        "{sort: {limit:0, pattern: {a:1}, node: {sortKeyGen: {node: {cscan: {dir:1}}}}}}"
+        "{sort: {limit:3, pattern: {a:1}, type: 'default', node: {cscan: {dir:1}}}}, "
+        "{sort: {limit:0, pattern: {a:1}, type: 'default', node: {cscan: {dir:1}}}}"
         "]}}}}");
 }
 
@@ -909,8 +907,8 @@ TEST_F(QueryPlannerTest, NToReturnHackWithSingleBatch) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {a:1}, limit:3, node: {sortKeyGen: {node: "
-        "{cscan: {dir:1, filter: {}}}}}}}");
+        "{sort: {pattern: {a:1}, limit:3, type: 'simple', node: "
+        "{cscan: {dir:1, filter: {}}}}}");
 }
 
 TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStageBuilder) {
@@ -924,6 +922,16 @@ TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStage
     const auto* node = solns.front()->root.get();
     const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(node);
     ASSERT_EQUALS(RecordId(42LL), csn->resumeAfterRecordId.get());
+}
+
+TEST_F(QueryPlannerTest, PreserveRecordIdOptionPrecludesSimpleSort) {
+    params.options |= QueryPlannerParams::PRESERVE_RECORD_ID;
+
+    runQueryAsCommand(fromjson("{find: 'testns', sort: {a:1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'default', node: {cscan: {dir: 1}}}}");
 }
 
 }  // namespace

@@ -280,8 +280,12 @@ public:
     /**
      * Returns a reference to the underlying WorkingSetMember.
      */
-    const WorkingSetMember* operator->() const {
+    WorkingSetMember* operator->() const {
         return _holder.get();
+    }
+
+    WorkingSetMember& operator*() const {
+        return *_holder;
     }
 
     SortableWorkingSetMember getOwned() const;

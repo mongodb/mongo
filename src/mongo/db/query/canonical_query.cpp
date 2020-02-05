@@ -270,6 +270,11 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         return ex.toStatus();
     }
 
+    // If the 'returnKey' option is set, then the plan should produce index key metadata.
+    if (_qr->returnKey()) {
+        _metadataDeps.set(DocumentMetadataFields::kIndexKey);
+    }
+
     return Status::OK();
 }
 
@@ -291,6 +296,12 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
 
     _sortPattern = SortPattern{_qr->getSort(), _expCtx};
     _metadataDeps |= _sortPattern->metadataDeps(unavailableMetadata);
+
+    // If the results of this query might have to be merged on a remote node, then that node might
+    // need the sort key metadata. Request that the plan generates this metadata.
+    if (_expCtx->needsMerge) {
+        _metadataDeps.set(DocumentMetadataFields::kSortKey);
+    }
 }
 
 void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {

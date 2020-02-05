@@ -588,10 +588,10 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
     runQueryAsCommand(fromjson("{filter: {x: 3}, sort: {z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {z:1}, limit: 0, node: {sortKeyGen: {node: {fetch: {filter: {x: {$eq: "
+        "{sort: {pattern: {z:1}, limit: 0, type: 'simple', node: {fetch: {filter: {x: {$eq: "
         "3}}, node: {ixscan: {pattern: {x: 'hashed', y: -1, z: 1}, bounds: {x: [" +
         getHashedBound(3) +
-        "], y: [['MaxKey','MinKey',true,true]], z: [['MinKey','MaxKey',true,true]]} }} }} }} }}");
+        "], y: [['MaxKey','MinKey',true,true]], z: [['MinKey','MaxKey',true,true]]} }} }} }}");
 }
 
 TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
@@ -629,19 +629,21 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
     runQueryAsCommand(fromjson("{filter: {x: 3}, sort: {a: 1}, projection: {_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {_id: 0, y: 1}, node: {sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: "
-        "{node: {ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: 1}, bounds: {x: "
+        "{proj: {spec: {_id: 0, y: 1}, node: "
+        "{sort: {pattern: {a: 1}, limit: 0, type: 'default', node: "
+        "{ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: 1}, bounds: {x: "
         "[[3,3,true,true]], y: [['MaxKey','MinKey',true,true]], z: "
-        "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }} }} }} ");
+        "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }} }}");
 
     //  Verify that sort on a hashed field requires a fetch and a blocking sort stage.
     runQueryAsCommand(fromjson("{filter: {x: 3}, sort: {z: 1}, projection: {_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {_id: 0, y: 1}, node: {sort: {pattern: {z:1}, limit: 0, node: {sortKeyGen: "
-        "{node: {fetch: {filter: null, node: {ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: 1}, "
+        "{proj: {spec: {_id: 0, y: 1}, node: "
+        "{sort: {pattern: {z:1}, limit: 0, type: 'simple', node: "
+        "{fetch: {filter: null, node: {ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: 1}, "
         "bounds: {x: [[3,3,true,true]], y: [['MaxKey','MinKey',true,true]], z: "
-        "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }} }} }} }}");
+        "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }} }} }}");
 }
 
 //

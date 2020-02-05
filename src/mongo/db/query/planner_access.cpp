@@ -322,8 +322,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         // because expr might be inside an array operator that provides a path prefix.
         auto isn = std::make_unique<IndexScanNode>(index);
         isn->bounds.fields.resize(index.keyPattern.nFields());
-        isn->addKeyMetadata = query.getQueryRequest().returnKey() ||
-            query.metadataDeps()[DocumentMetadataFields::kIndexKey];
+        isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
         isn->queryCollator = query.getCollator();
 
         // Get the ixtag->pos-th element of the index key pattern.
@@ -1342,8 +1341,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
 
     // Build an ixscan over the id index, use it, and return it.
     unique_ptr<IndexScanNode> isn = std::make_unique<IndexScanNode>(index);
-    isn->addKeyMetadata = query.getQueryRequest().returnKey() ||
-        query.metadataDeps()[DocumentMetadataFields::kIndexKey];
+    isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
     isn->queryCollator = query.getCollator();
 
     IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds);
@@ -1475,8 +1473,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     // Build an ixscan over the id index, use it, and return it.
     auto isn = std::make_unique<IndexScanNode>(index);
     isn->direction = 1;
-    isn->addKeyMetadata = query.getQueryRequest().returnKey() ||
-        query.metadataDeps()[DocumentMetadataFields::kIndexKey];
+    isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
     isn->bounds.isSimpleRange = true;
     isn->bounds.startKey = startKey;
     isn->bounds.endKey = endKey;
