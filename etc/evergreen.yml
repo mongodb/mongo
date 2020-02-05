@@ -261,8 +261,6 @@ variables:
     large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_all_run_unittests_TG
-    requires:
-    - name: burn_in_tests
     distros:
     - windows-64-vs2015-large
   - name: compile_benchmarks
@@ -7623,8 +7621,6 @@ buildvariants:
     large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_TG
-    requires:
-    - name: burn_in_tests
     distros:
     - windows-64-vs2015-large
   - name: compile_benchmarks
