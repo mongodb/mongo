@@ -44,6 +44,28 @@
 
 namespace mongo {
 
+#ifndef _WIN32
+char getachar(void)  
+{  
+    struct termios tm, tm_temp;
+    char chr;
+    if (isatty(STDIN_FILENO)) {
+        if(tcgetattr(STDIN_FILENO, &tm) < 0)
+            return -1;
+        tm_temp = tm;
+        cfmakeraw(&tm);
+        if(tcsetattr(STDIN_FILENO, TCSANOW, &tm) < 0)
+            return -1;
+    }
+    chr = getchar();
+    if (isatty(STDIN_FILENO)) {
+        if(tcsetattr(STDIN_FILENO, TCSANOW, &tm_temp) < 0)
+            return -1;
+    }
+    return chr;
+}
+#endif
+
 std::string askPassword() {
     std::string password;
     std::cerr << "Enter password: ";
@@ -53,33 +75,11 @@ std::string askPassword() {
     }
 
 #ifndef _WIN32
-    const int stdinfd = 0;
-    termios termio;
-    tcflag_t old = 0;
-    if (isatty(stdinfd)) {
-        int i = tcgetattr(stdinfd, &termio);
-        if (i == -1) {
-            std::cerr << "Cannot get terminal attributes " << errnoWithDescription() << std::endl;
-            return std::string();
-        }
-        old = termio.c_lflag;
-        termio.c_lflag &= ~ECHO;
-        i = tcsetattr(stdinfd, TCSANOW, &termio);
-        if (i == -1) {
-            std::cerr << "Cannot set terminal attributes " << errnoWithDescription() << std::endl;
-            return std::string();
-        }
-    }
-
-    getline(std::cin, password);
-
-    if (isatty(stdinfd)) {
-        termio.c_lflag = old;
-        int i = tcsetattr(stdinfd, TCSANOW, &termio);
-        if (i == -1) {
-            std::cerr << "Cannot set terminal attributes " << errnoWithDescription() << std::endl;
-            return std::string();
-        }
+    char chr;
+    while ((chr = getachar()) > 0) {
+        if (chr == '\r' || chr == '\n')
+            break;
+        password.append(&chr);
     }
 #else
     HANDLE stdinh = GetStdHandle(STD_INPUT_HANDLE);
