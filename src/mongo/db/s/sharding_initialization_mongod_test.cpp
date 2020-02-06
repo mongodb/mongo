@@ -35,6 +35,8 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
@@ -135,15 +137,27 @@ protected:
 class ScopedSetStandaloneMode {
 public:
     ScopedSetStandaloneMode(ServiceContext* serviceContext) : _serviceContext(serviceContext) {
+        CollectionShardingStateFactory::clear(serviceContext);
+
+        CollectionShardingStateFactory::set(
+            serviceContext,
+            std::make_unique<CollectionShardingStateFactoryStandalone>(serviceContext));
+
         serverGlobalParams.clusterRole = ClusterRole::None;
         _serviceContext->setOpObserver(std::make_unique<OpObserverRegistry>());
     }
 
     ~ScopedSetStandaloneMode() {
+        CollectionShardingStateFactory::clear(_serviceContext);
+
+        CollectionShardingStateFactory::set(
+            _serviceContext,
+            std::make_unique<CollectionShardingStateFactoryShard>(_serviceContext));
+
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         auto makeOpObserver = [&] {
             auto opObserver = std::make_unique<OpObserverRegistry>();
-            opObserver->addObserver(std::make_unique<OpObserverShardingImpl>());
+            opObserver->addObserver(std::make_unique<OpObserverImpl>());
             opObserver->addObserver(std::make_unique<ConfigServerOpObserver>());
             opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
             return opObserver;

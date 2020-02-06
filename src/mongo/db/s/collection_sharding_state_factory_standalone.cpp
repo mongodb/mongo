@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,16 +31,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 
 namespace mongo {
-namespace {
 
+namespace {
 class UnshardedCollection : public ScopedCollectionMetadata::Impl {
 public:
     UnshardedCollection() = default;
-
     const CollectionMetadata& get() override {
         return _metadata;
     }
@@ -56,57 +54,43 @@ public:
     ScopedCollectionFilter getOwnershipFilter(OperationContext*, bool) override {
         return {kUnshardedCollection};
     }
-
     ScopedCollectionMetadata getCurrentMetadata() override {
         return {kUnshardedCollection};
     }
-
-    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown() override {
+    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown() noexcept override {
         return boost::none;
     }
-    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override {
+    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() noexcept override {
         return boost::none;
     }
-
-    void checkShardVersionOrThrow(OperationContext*, bool) override {}
-
+    void checkShardVersionOrThrow(OperationContext*, bool) noexcept override {}
     Status checkShardVersionNoThrow(OperationContext*, bool) noexcept override {
         return Status::OK();
     }
-
-    void enterCriticalSectionCatchUpPhase(OperationContext*) override{};
-    void enterCriticalSectionCommitPhase(OperationContext*) override{};
-    void exitCriticalSection(OperationContext*) override{};
+    void enterCriticalSectionCatchUpPhase(OperationContext*) noexcept override {}
+    void enterCriticalSectionCommitPhase(OperationContext*) noexcept override {}
+    void exitCriticalSection(OperationContext*) noexcept override {}
     std::shared_ptr<Notification<void>> getCriticalSectionSignal(
-        ShardingMigrationCriticalSection::Operation) const override {
+        ShardingMigrationCriticalSection::Operation) const noexcept override {
         return nullptr;
     }
 
-    void toBSONPending(BSONArrayBuilder&) const override {}
+    void toBSONPending(BSONArrayBuilder& bb) const noexcept override {}
 
-    void setFilteringMetadata(OperationContext*, CollectionMetadata) override {}
-};
-
-class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
-public:
-    CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext)
-        : CollectionShardingStateFactory(serviceContext) {}
-
-    void join() override {}
-
-    std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
-        return std::make_unique<CollectionShardingStateStandalone>();
-    }
+    void setFilteringMetadata(OperationContext*, CollectionMetadata) noexcept override {}
 };
 
 }  // namespace
 
-ServiceContext::ConstructorActionRegisterer collectionShardingStateFactoryRegisterer{
-    "CollectionShardingStateFactory",
-    [](ServiceContext* service) {
-        CollectionShardingStateFactory::set(
-            service, std::make_unique<CollectionShardingStateFactoryEmbedded>(service));
-    },
-    [](ServiceContext* service) { CollectionShardingStateFactory::clear(service); }};
+CollectionShardingStateFactoryStandalone::CollectionShardingStateFactoryStandalone(
+    ServiceContext* serviceContext)
+    : CollectionShardingStateFactory(serviceContext) {}
+
+void CollectionShardingStateFactoryStandalone::join() {}
+
+std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryStandalone::make(
+    const NamespaceString&) {
+    return std::make_unique<CollectionShardingStateStandalone>();
+}
 
 }  // namespace mongo

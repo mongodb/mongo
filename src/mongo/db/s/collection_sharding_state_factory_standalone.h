@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,40 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 
-/**
- * Test fixture class for tests that use the "ephemeralForTest" storage engine.
- */
-class ServiceContextMongoDTest : public ServiceContextTest {
-protected:
-    enum class RepairAction { kNoRepair, kRepair };
+class CollectionShardingStateFactoryStandalone final : public CollectionShardingStateFactory {
+public:
+    CollectionShardingStateFactoryStandalone(ServiceContext* serviceContext);
 
-    ServiceContextMongoDTest();
+    void join() override;
 
-    /**
-     * Build a ServiceContextMongoDTest, using the named storage engine.
-     */
-    explicit ServiceContextMongoDTest(std::string engine);
-    ServiceContextMongoDTest(std::string engine, RepairAction repair);
-    virtual ~ServiceContextMongoDTest();
-
-    void setUp() override;
-
-    void tearDown() override;
-
-private:
-    struct {
-        std::string engine;
-        bool engineSetByUser;
-        bool repair;
-    } _stashedStorageParams;
-    unittest::TempDir _tempDir;
+    std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override;
 };
 
 }  // namespace mongo

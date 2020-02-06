@@ -43,6 +43,7 @@
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
@@ -104,6 +105,20 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
+}
+
+void ServiceContextMongoDTest::setUp() {
+    ServiceContextTest::setUp();
+
+    CollectionShardingStateFactory::set(
+        getServiceContext(),
+        std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
+}
+
+void ServiceContextMongoDTest::tearDown() {
+    CollectionShardingStateFactory::clear(getServiceContext());
+
+    ServiceContextTest::tearDown();
 }
 
 }  // namespace mongo

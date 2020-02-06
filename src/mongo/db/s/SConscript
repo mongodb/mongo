@@ -40,6 +40,7 @@ env.Library(
         'chunk_splitter.cpp',
         'collection_sharding_runtime.cpp',
         'collection_sharding_state_factory_shard.cpp',
+        'collection_sharding_state_factory_standalone.cpp',
         'config_server_op_observer.cpp',
         'implicit_create_collection.cpp',
         'metadata_manager.cpp',

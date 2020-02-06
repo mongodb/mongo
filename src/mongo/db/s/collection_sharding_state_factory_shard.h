@@ -29,40 +29,29 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
-/**
- * Test fixture class for tests that use the "ephemeralForTest" storage engine.
- */
-class ServiceContextMongoDTest : public ServiceContextTest {
-protected:
-    enum class RepairAction { kNoRepair, kRepair };
+class CollectionShardingStateFactoryShard final : public CollectionShardingStateFactory {
+public:
+    CollectionShardingStateFactoryShard(ServiceContext* serviceContext);
 
-    ServiceContextMongoDTest();
+    ~CollectionShardingStateFactoryShard();
 
-    /**
-     * Build a ServiceContextMongoDTest, using the named storage engine.
-     */
-    explicit ServiceContextMongoDTest(std::string engine);
-    ServiceContextMongoDTest(std::string engine, RepairAction repair);
-    virtual ~ServiceContextMongoDTest();
+    void join() override;
 
-    void setUp() override;
-
-    void tearDown() override;
+    std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override;
 
 private:
-    struct {
-        std::string engine;
-        bool engineSetByUser;
-        bool repair;
-    } _stashedStorageParams;
-    unittest::TempDir _tempDir;
+    std::shared_ptr<executor::TaskExecutor> _getExecutor();
+
+    // Serializes the instantiation of the task executor
+    Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateFactoryShard::_mutex");
+
+    // Required to be a shared_ptr since it is used as an executor for ExecutorFutures.
+    std::shared_ptr<executor::TaskExecutor> _taskExecutor = {nullptr};
 };
 
 }  // namespace mongo

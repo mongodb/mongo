@@ -548,7 +548,7 @@ void State::prepTempCollection() {
                 str::stream() << "createIndex failed for mr incLong ns " << _config.incLong.ns());
             wuow.commit();
 
-            CollectionShardingRuntime::get(_opCtx, _config.incLong)
+            CollectionShardingState::get(_opCtx, _config.incLong)
                 ->setFilteringMetadata(_opCtx, CollectionMetadata());
         });
     }
@@ -632,7 +632,7 @@ void State::prepTempCollection() {
 
         wuow.commit();
 
-        CollectionShardingRuntime::get(_opCtx, _config.tempNamespace)
+        CollectionShardingState::get(_opCtx, _config.tempNamespace)
             ->setFilteringMetadata(_opCtx, CollectionMetadata());
     });
 }

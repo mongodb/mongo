@@ -62,8 +62,11 @@ public:
             std::swap(prevUUID, colUUID);
         ASSERT_GT(colUUID, prevUUID);
         ASSERT_GT(nextUUID, colUUID);
+    }
 
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
+
         std::unique_ptr<Collection> collection = std::make_unique<CollectionMock>(nss);
         col = collection.get();
         // Register dummy collection in catalog.

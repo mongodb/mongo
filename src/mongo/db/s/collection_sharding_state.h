@@ -161,6 +161,22 @@ public:
      */
     virtual std::shared_ptr<Notification<void>> getCriticalSectionSignal(
         ShardingMigrationCriticalSection::Operation op) const = 0;
+
+    /**
+     * BSON output of the pending metadata into a BSONArray
+     * used for reporting/diagnostic purposes only
+     */
+    virtual void toBSONPending(BSONArrayBuilder& bb) const = 0;
+
+    /**
+     * Updates the collection's filtering metadata based on changes received from the config server
+     * and also resolves the pending receives map in case some of these pending receives have
+     * committed on the config server or have been abandoned by the donor shard.
+     *
+     * This method must be called with an exclusive collection lock and it does not acquire any
+     * locks itself.
+     */
+    virtual void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) = 0;
 };
 
 /**

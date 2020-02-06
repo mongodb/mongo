@@ -108,7 +108,7 @@ public:
 
         AutoGetCollection autoColl(
             opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);
-        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
+        auto* const css = CollectionShardingState::get(opCtx, nss);
 
         const auto optMetadata = css->getCurrentMetadataIfKnown();
         if (!optMetadata) {

@@ -97,6 +97,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
@@ -118,6 +119,8 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
@@ -278,19 +281,6 @@ ExitCode _initAndListen(int listenPort) {
     auto serviceContext = getGlobalServiceContext();
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
-    opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
-
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
-    }
-    setupFreeMonitoringOpObserver(opObserverRegistry.get());
-
-
-    serviceContext->setOpObserver(std::move(opObserverRegistry));
 
     DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
         return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
@@ -836,6 +826,17 @@ void startupConfigActions(const std::vector<std::string>& args) {
 #endif
 }
 
+void setUpCollectionShardingState(ServiceContext* serviceContext) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        CollectionShardingStateFactory::set(
+            serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
+    } else {
+        CollectionShardingStateFactory::set(
+            serviceContext,
+            std::make_unique<CollectionShardingStateFactoryStandalone>(serviceContext));
+    }
+}
+
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
@@ -896,6 +897,24 @@ void setUpReplication(ServiceContext* serviceContext) {
     repl::setOplogCollectionName(serviceContext);
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
+}
+
+void setUpObservers(ServiceContext* serviceContext) {
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
+        opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+        opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
+    } else {
+        opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    }
+    opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
+
+    setupFreeMonitoringOpObserver(opObserverRegistry.get());
+
+    serviceContext->setOpObserver(std::move(opObserverRegistry));
 }
 
 #ifdef MONGO_CONFIG_SSL
@@ -1136,8 +1155,10 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
     }
 
     auto service = getGlobalServiceContext();
+    setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);
+    setUpObservers(service);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();

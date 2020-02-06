@@ -55,6 +55,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"

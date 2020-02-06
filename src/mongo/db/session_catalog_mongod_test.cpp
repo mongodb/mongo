@@ -43,6 +43,7 @@ namespace {
 class MongoDSessionCatalogTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
+        ServiceContextMongoDTest::setUp();
         const auto service = getServiceContext();
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
