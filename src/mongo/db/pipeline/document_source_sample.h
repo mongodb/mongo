@@ -50,7 +50,8 @@ public:
                 DiskUseRequirement::kWritesTmpData,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed};
+                LookupRequirement::kAllowed,
+                UnionRequirement::kAllowed};
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {

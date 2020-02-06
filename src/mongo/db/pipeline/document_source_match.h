@@ -90,6 +90,7 @@ public:
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
+                UnionRequirement::kAllowed,
                 ChangeStreamRequirement::kWhitelist};
     }
 

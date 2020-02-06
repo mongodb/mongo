@@ -71,7 +71,8 @@ public:
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
                 _mergeType == HostTypeRequirement::kMongoS ? LookupRequirement::kNotAllowed
-                                                           : LookupRequirement::kAllowed};
+                                                           : LookupRequirement::kAllowed,
+                UnionRequirement::kAllowed};
     }
 
 private:

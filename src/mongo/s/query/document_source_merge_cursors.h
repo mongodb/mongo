@@ -91,7 +91,8 @@ public:
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kAllowed,
-                                     LookupRequirement::kNotAllowed);
+                                     LookupRequirement::kNotAllowed,
+                                     UnionRequirement::kNotAllowed);
 
         constraints.requiresInputDocSource = false;
         return constraints;

@@ -217,7 +217,8 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
                                  diskRequirement,
                                  FacetRequirement::kAllowed,
                                  txnRequirement,
-                                 LookupRequirement::kAllowed);
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed);
 
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithLimitAndSample = !_unwindSrc;

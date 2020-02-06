@@ -114,7 +114,10 @@ public:
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
-                                     LookupRequirement::kAllowed);
+                                     LookupRequirement::kAllowed,
+                                     (_showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps
+                                          ? UnionRequirement::kNotAllowed
+                                          : UnionRequirement::kAllowed));
 
         constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;

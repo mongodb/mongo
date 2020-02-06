@@ -58,7 +58,19 @@ public:
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
-        : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {}
+        : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {
+        if (_pipeline) {
+            const auto& sources = _pipeline->getSources();
+            auto it = std::find_if(sources.begin(), sources.end(), [](const auto& src) {
+                return !src->constraints().isAllowedInUnionPipeline();
+            });
+
+            uassert(31441,
+                    str::stream() << (*it)->getSourceName()
+                                  << " is not allowed within a $unionWith's sub-pipeline",
+                    it == sources.end());
+        }
+    }
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -80,7 +92,8 @@ public:
             TransactionRequirement::kNotAllowed,
             // The check to disallow $unionWith on a sharded collection within $lookup happens
             // outside of the constraints as long as the involved namespaces are reported correctly.
-            LookupRequirement::kAllowed);
+            LookupRequirement::kAllowed,
+            UnionRequirement::kAllowed);
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;

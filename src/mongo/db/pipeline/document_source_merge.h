@@ -125,7 +125,8 @@ public:
                 DiskUseRequirement::kWritesPersistentData,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed};
+                LookupRequirement::kNotAllowed,
+                UnionRequirement::kNotAllowed};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final override {

@@ -117,6 +117,18 @@ StageConstraints::LookupRequirement computeLookupRequirement(
     return StageConstraints::LookupRequirement::kAllowed;
 }
 
+StageConstraints::UnionRequirement computeUnionRequirement(
+    const std::vector<DocumentSourceFacet::FacetPipeline>& facets) {
+    for (auto&& facet : facets) {
+        for (auto&& src : facet.pipeline->getSources()) {
+            if (!src->constraints().isAllowedInUnionPipeline()) {
+                return StageConstraints::UnionRequirement::kNotAllowed;
+            }
+        }
+    }
+    return StageConstraints::UnionRequirement::kAllowed;
+}
+
 }  // namespace
 
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
@@ -253,7 +265,8 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
             std::get<StageConstraints::DiskUseRequirement>(diskAndTxnReq),
             FacetRequirement::kNotAllowed,
             std::get<StageConstraints::TransactionRequirement>(diskAndTxnReq),
-            computeLookupRequirement(_facets)};
+            computeLookupRequirement(_facets),
+            computeUnionRequirement(_facets)};
 }
 
 bool DocumentSourceFacet::usedDisk() {

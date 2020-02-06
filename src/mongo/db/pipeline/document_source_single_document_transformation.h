@@ -63,6 +63,7 @@ public:
                                      FacetRequirement::kAllowed,
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kWhitelist);
         constraints.canSwapWithMatch = true;
         constraints.canSwapWithLimitAndSample = true;

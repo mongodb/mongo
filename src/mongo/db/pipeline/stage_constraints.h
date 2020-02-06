@@ -106,6 +106,11 @@ struct StageConstraints {
      */
     enum class LookupRequirement { kNotAllowed, kAllowed };
 
+    /**
+     * Indicates whether or not this stage may be run as part of a $unionWith pipeline.
+     */
+    enum class UnionRequirement { kNotAllowed, kAllowed };
+
     using DiskUseAndTransactionRequirement = std::pair<DiskUseRequirement, TransactionRequirement>;
 
     /**
@@ -151,6 +156,7 @@ struct StageConstraints {
         FacetRequirement facetRequirement,
         TransactionRequirement transactionRequirement,
         LookupRequirement lookupRequirement,
+        UnionRequirement unionRequirement,
         ChangeStreamRequirement changeStreamRequirement = ChangeStreamRequirement::kBlacklist)
         : requiredPosition(requiredPosition),
           hostRequirement(hostRequirement),
@@ -159,6 +165,7 @@ struct StageConstraints {
           facetRequirement(facetRequirement),
           transactionRequirement(transactionRequirement),
           lookupRequirement(lookupRequirement),
+          unionRequirement(unionRequirement),
           streamType(streamType) {
         // Stages which are allowed to run in $facet must not have any position requirements.
         invariant(!(isAllowedInsideFacetStage() && requiredPosition != PositionRequirement::kNone));
@@ -257,6 +264,13 @@ struct StageConstraints {
     }
 
     /**
+     * Returns true if this stage may be used inside a $unionWith subpipeline.
+     */
+    bool isAllowedInUnionPipeline() const {
+        return unionRequirement == UnionRequirement::kAllowed;
+    }
+
+    /**
      * Returns true if this stage writes persistent data to disk.
      */
     bool writesPersistentData() const {
@@ -287,6 +301,9 @@ struct StageConstraints {
 
     // Indicates whether this stage is allowed in a $lookup subpipeline.
     const LookupRequirement lookupRequirement;
+
+    // Indicates whether this stage is allowed in a $unionWith subpipeline.
+    const UnionRequirement unionRequirement;
 
     // Indicates whether this is a streaming or blocking stage.
     const StreamType streamType;

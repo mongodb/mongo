@@ -121,6 +121,7 @@ StageConstraints DocumentSourceOplogMatch::constraints(Pipeline::SplitState pipe
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,
                                  LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage);
     constraints.isIndependentOfAnyCollection =
         pExpCtx->ns.isCollectionlessAggregateNS() ? true : false;

@@ -129,6 +129,7 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,
                                  LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage);
 
     // This transformation could be part of a 'collectionless' change stream on an entire

@@ -211,7 +211,8 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
-                LookupRequirement::kNotAllowed};
+                LookupRequirement::kNotAllowed,
+                UnionRequirement::kNotAllowed};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

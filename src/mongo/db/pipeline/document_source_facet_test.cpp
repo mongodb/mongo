@@ -241,7 +241,8 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed};
+                LookupRequirement::kAllowed,
+                UnionRequirement::kAllowed};
     }
 
     DocumentSource::GetNextResult doGetNext() final {
@@ -282,6 +283,7 @@ public:
             FacetRequirement::kAllowed,
             TransactionRequirement::kNotAllowed,
             LookupRequirement::kNotAllowed,
+            UnionRequirement::kAllowed,
         };
     }
 
@@ -738,7 +740,8 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed};
+                LookupRequirement::kAllowed,
+                UnionRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create() {
@@ -806,7 +809,8 @@ public:
                 DiskUseRequirement::kWritesTmpData,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kNotAllowed,
-                LookupRequirement::kAllowed};
+                LookupRequirement::kAllowed,
+                UnionRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourcePrimaryShardTmpDataNoTxn> create() {
@@ -826,7 +830,8 @@ public:
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
-                LookupRequirement::kNotAllowed};
+                LookupRequirement::kNotAllowed,
+                UnionRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceBannedInLookup> create() {

@@ -96,7 +96,8 @@ public:
                 DiskUseRequirement::kWritesPersistentData,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed};
+                LookupRequirement::kNotAllowed,
+                UnionRequirement::kNotAllowed};
     }
 
     Value serialize(

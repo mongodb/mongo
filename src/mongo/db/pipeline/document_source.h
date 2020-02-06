@@ -142,6 +142,7 @@ public:
     using StreamType = StageConstraints::StreamType;
     using TransactionRequirement = StageConstraints::TransactionRequirement;
     using LookupRequirement = StageConstraints::LookupRequirement;
+    using UnionRequirement = StageConstraints::UnionRequirement;
 
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
