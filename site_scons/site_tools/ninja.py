@@ -20,14 +20,13 @@ import io
 import shutil
 import shlex
 
-from threading import Lock
 from glob import glob
 from os.path import join as joinpath
 from os.path import splitext
 
 import SCons
 from SCons.Action import _string_from_cmd_list, get_default_ENV
-from SCons.Util import is_String, is_List
+from SCons.Util import is_List, flatten_sequence
 from SCons.Script import COMMAND_LINE_TARGETS
 
 NINJA_SYNTAX = "NINJA_SYNTAX"
@@ -189,7 +188,6 @@ class SConsToNinjaTranslator:
 
         raise Exception("Got an unbuildable ListAction for: {}".format(str(node)))
 
-
     def handle_func_action(self, node, action):
         """Determine how to handle the function action."""
         name = action.function_name()
@@ -222,7 +220,9 @@ class SConsToNinjaTranslator:
             for act in action.list
             if act is not None
         ]
-        results = [result for result in results if result is not None and result["outputs"]]
+        results = [
+            result for result in results if result is not None and result["outputs"]
+        ]
         if not results:
             return None
 
@@ -763,6 +763,12 @@ def get_comstr(env, action, targets, sources):
 
 
 def get_command_env(env):
+    """
+    Return a string that sets the enrivonment for any environment variables that
+    differ between the OS environment and the SCons command ENV.
+
+    It will be compatible with the default shell of the operating system.
+    """
     try:
         return env["NINJA_ENV_VAR_CACHE"]
     except KeyError:
@@ -832,7 +838,9 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
             cmd_list = shlex.split(command)
 
         if tool_is_dynamic:
-            tool_command = env.subst(tool, target=targets, source=sources, executor=executor)
+            tool_command = env.subst(
+                tool, target=targets, source=sources, executor=executor
+            )
         else:
             tool_command = tool
 
@@ -840,7 +848,11 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
             # Add 1 so we always keep the actual tool inside of cmd
             tool_idx = cmd_list.index(tool_command) + 1
         except ValueError:
-            raise Exception("Could not find tool {} in {} generated from {}".format(tool, cmd_list, get_comstr(env, action, targets, sources)))
+            raise Exception(
+                "Could not find tool {} in {} generated from {}".format(
+                    tool, cmd_list, get_comstr(env, action, targets, sources)
+                )
+            )
 
         cmd, rsp_content = cmd_list[:tool_idx], cmd_list[tool_idx:]
 
@@ -848,6 +860,7 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
         # like ld (think $ORIGIN). We need to protect that $ from
         # Ninja by using $$.
         rsp_content = " ".join(rsp_content).replace('$', '$$')
+
         variables = {"rspc": rsp_content}
         variables[rule] = cmd
         if use_command_env:
@@ -868,31 +881,13 @@ def generate_command(env, node, action, targets, sources, executor=None):
         # Anything else works with genstring, this is most commonly hit by
         # ListActions which essentially call process on all of their
         # commands and concatenate it for us.
-        genstring = action.genstring(tlist, slist, sub_env)
+        genstring = action.genstring(targets, sources, env)
         if executor is not None:
-            cmd = sub_env.subst(genstring, executor=executor)
+            cmd = env.subst(genstring, executor=executor)
         else:
-            cmd = sub_env.subst(genstring, target=tlist, source=slist)
+            cmd = env.subst(genstring, targets, sources)
 
-        # Since we're only enabling Ninja for developer builds right
-        # now we skip all Manifest related work on Windows as it's not
-        # necessary. We shouldn't have gotten here but on Windows
-        # SCons has a ListAction which shows as a
-        # CommandGeneratorAction for linking. That ListAction ends
-        # with a FunctionAction (embedManifestExeCheck,
-        # embedManifestDllCheck) that simply say "does
-        # target[0].manifest exist?" if so execute the real command
-        # action underlying me, otherwise do nothing.
-        #
-        # Eventually we'll want to find a way to translate this to
-        # Ninja but for now, and partially because the existing Ninja
-        # generator does so, we just disable it all together.
         cmd = cmd.replace("\n", " && ").strip()
-        if env["PLATFORM"] == "win32" and (
-            "embedManifestExeCheck" in cmd or "embedManifestDllCheck" in cmd
-        ):
-            cmd = " && ".join(cmd.split(" && ")[0:-1])
-
         if cmd.endswith("&&"):
             cmd = cmd[0:-2].strip()
 
@@ -1246,6 +1241,15 @@ def generate(env):
     # might not catch it.
     env.AddMethod(register_custom_rule_mapping, "NinjaRuleMapping")
 
+    # TODO: change LINKCOM and SHLINKCOM to handle embedding manifest exe checks
+    # without relying on the SCons hacks that SCons uses by default.
+    if env["PLATFORM"] == "win32":
+        from SCons.Tool.mslink import compositeLinkAction
+
+        if env["LINKCOM"] == compositeLinkAction:
+            env["LINKCOM"] = '${TEMPFILE("$LINK $LINKFLAGS /OUT:$TARGET.windows $_LIBDIRFLAGS $_LIBFLAGS $_PDB $SOURCES.windows", "$LINKCOMSTR")}'
+            env["SHLINKCOM"] = '${TEMPFILE("$SHLINK $SHLINKFLAGS $_SHLINK_TARGETS $_LIBDIRFLAGS $_LIBFLAGS $_PDB $_SHLINK_SOURCES", "$SHLINKCOMSTR")}'
+
     # Normally in SCons actions for the Program and *Library builders
     # will return "${*COM}" as their pre-subst'd command line. However
     # if a user in a SConscript overwrites those values via key access
@@ -1289,7 +1293,6 @@ def generate(env):
 
         # Disable running ranlib, since we added 's' above
         env["RANLIBCOM"] = ""
-
 
     # This is the point of no return, anything after this comment
     # makes changes to SCons that are irreversible and incompatible
