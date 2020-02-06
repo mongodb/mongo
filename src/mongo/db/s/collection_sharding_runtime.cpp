@@ -44,8 +44,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(useFCV44CheckShardVersionProtocol);
-
 namespace {
 
 /**
@@ -335,19 +333,6 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
         auto optionalWantedShardVersion = getCurrentShardVersionIfKnown();
         return optionalWantedShardVersion ? *optionalWantedShardVersion : ChunkVersion::UNSHARDED();
     }();
-
-    if (MONGO_unlikely(useFCV44CheckShardVersionProtocol.shouldFail())) {
-        LOG(0) << "Received shardVersion: " << receivedShardVersion << " for " << _nss.ns();
-        if (isCollection) {
-            auto shardVersionKnown = _metadataType != MetadataType::kUnknown;
-            LOG(0) << "Namespace " << _nss.ns() << " is collection, "
-                   << (shardVersionKnown ? "have shardVersion cached" : "don't know shardVersion");
-            uassert(StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion, shardId),
-                    "don't know shardVersion",
-                    shardVersionKnown);
-        }
-        LOG(0) << "Wanted shardVersion: " << wantedShardVersion << " for " << _nss.ns();
-    }
 
     auto criticalSectionSignal = [&] {
         return _critSec.getSignal(opCtx->lockState()->isWriteLocked()
