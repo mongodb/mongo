@@ -103,7 +103,10 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     Milliseconds timeout(0);
     const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
         _topCoord->prepareHeartbeatRequestV1(now, _settings.ourSetName(), target);
-    heartbeatObj = hbRequest.first.toBSON();
+    // Omit config term from all heartbeat requests sent by arbiter, since it cannot be parsed by
+    // 4.2 nodes and arbiters do not respect FCV setting.
+    bool omitConfigTerm = _getMemberState_inlock().arbiter();
+    heartbeatObj = hbRequest.first.toBSON(omitConfigTerm);
     timeout = hbRequest.second;
 
     const RemoteCommandRequest request(
@@ -464,7 +467,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     }
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
-              _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+              _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm());
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         LOG_FOR_HEARTBEATS(2) << "Rescheduling heartbeat reconfig to config with term "
                               << newConfig.getConfigTerm() << ", version "
@@ -654,7 +657,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
-              _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+              _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm());
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {

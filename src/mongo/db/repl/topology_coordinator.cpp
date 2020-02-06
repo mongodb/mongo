@@ -626,9 +626,11 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
     }
 
     const long long v = _rsConfig.getConfigVersion();
+    const long long t = _rsConfig.getConfigTerm();
     response->setConfigVersion(v);
-    // Deliver new config if caller's version is older than ours
-    if (v > args.getConfigVersion()) {
+    response->setConfigTerm(t);
+    // Deliver new config if caller's config is older than ours
+    if (_rsConfig.getConfigVersionAndTerm() > args.getConfigVersionAndTerm()) {
         response->setConfig(_rsConfig);
     }
 
@@ -676,6 +678,7 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
     if (_rsConfig.isInitialized()) {
         hbArgs.setSetName(_rsConfig.getReplSetName());
         hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
+        hbArgs.setConfigTerm(_rsConfig.getConfigTerm());
         if (_selfIndex >= 0) {
             const MemberConfig& me = _selfConfig();
             hbArgs.setSenderId(me.getId().getData());
@@ -745,17 +748,19 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     }
 
     if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
-        const long long currentConfigVersion =
-            _rsConfig.isInitialized() ? _rsConfig.getConfigVersion() : -2;
+        // -2 is for uninitialized config.
+        const ConfigVersionAndTerm currentConfigVersionAndTerm = _rsConfig.isInitialized()
+            ? _rsConfig.getConfigVersionAndTerm()
+            : ConfigVersionAndTerm(-2, OpTime::kUninitializedTerm);
         const ReplSetConfig& newConfig = hbResponse.getValue().getConfig();
-        if (newConfig.getConfigVersion() > currentConfigVersion) {
+        if (newConfig.getConfigVersionAndTerm() > currentConfigVersionAndTerm) {
             HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeReconfigAction();
             nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
             return nextAction;
         } else {
             // Could be we got the newer version before we got the response, or the
-            // target erroneously sent us one, even through it isn't newer.
-            if (newConfig.getConfigVersion() < currentConfigVersion) {
+            // target erroneously sent us one, even though it isn't newer.
+            if (newConfig.getConfigVersionAndTerm() < currentConfigVersionAndTerm) {
                 LOG(1) << "Config version from heartbeat was older than ours.";
             } else {
                 LOG(2) << "Config from heartbeat response was same as ours.";

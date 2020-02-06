@@ -1863,7 +1863,7 @@ public:
         TopoCoordTest::setUp();
         updateConfig(BSON("_id"
                           << "rs0"
-                          << "version" << 1 << "members"
+                          << "version" << initConfigVersion << "term" << initConfigTerm << "members"
                           << BSON_ARRAY(BSON("_id" << 10 << "host"
                                                    << "hself")
                                         << BSON("_id" << 20 << "host"
@@ -1880,6 +1880,9 @@ public:
                                     Status* result) {
         *result = getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", response);
     }
+
+    int initConfigVersion = 1;
+    int initConfigTerm = 1;
 };
 
 TEST_F(PrepareHeartbeatResponseV1Test,
@@ -2004,7 +2007,52 @@ TEST_F(PrepareHeartbeatResponseV1Test,
        PopulateHeartbeatResponseWithFullConfigWhenHeartbeatRequestHasAnOldConfigVersion) {
     // set up args with a config version lower than ours
     ReplSetHeartbeatArgsV1 args;
-    args.setConfigVersion(0);
+    args.setConfigVersion(initConfigVersion - 1);
+    args.setConfigTerm(initConfigTerm);
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+    // prepare response and check the results
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_TRUE(response.hasConfig());
+    ASSERT_EQUALS("rs0", response.getReplicaSetName());
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
+    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(1, response.getConfigVersion());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test,
+       PopulateHeartbeatResponseWithFullConfigWhenHeartbeatRequestHasAnOldConfigTerm) {
+    // set up args with a config version lower than ours
+    ReplSetHeartbeatArgsV1 args;
+    args.setConfigVersion(initConfigVersion);
+    args.setConfigTerm(initConfigTerm - 1);
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+    // prepare response and check the results
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_TRUE(response.hasConfig());
+    ASSERT_EQUALS("rs0", response.getReplicaSetName());
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
+    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(1, response.getConfigVersion());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test,
+       PopulateHeartbeatResponseWithFullConfigWhenHeartbeatRequestHasAnOlderTermButNewerVersion) {
+    // set up args with a config version lower than ours
+    ReplSetHeartbeatArgsV1 args;
+    args.setConfigVersion(initConfigVersion + 1);
+    args.setConfigTerm(initConfigTerm - 1);
     args.setSetName("rs0");
     args.setSenderId(20);
     ReplSetHeartbeatResponse response;
@@ -2026,6 +2074,30 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     // set up args with a config version higher than ours
     ReplSetHeartbeatArgsV1 args;
     args.setConfigVersion(10);
+    args.setConfigTerm(1);
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+    // prepare response and check the results
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_FALSE(response.hasConfig());
+    ASSERT_EQUALS("rs0", response.getReplicaSetName());
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
+    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(1, response.getConfigVersion());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test,
+       PopulateFullHeartbeatResponseWhenHeartbeatRequestHasANewerConfigTerm) {
+    // set up args with a config term higher than ours
+    ReplSetHeartbeatArgsV1 args;
+    args.setConfigVersion(1);
+    args.setConfigTerm(10);
+    args.setTerm(10);
     args.setSetName("rs0");
     args.setSenderId(20);
     ReplSetHeartbeatResponse response;
@@ -3170,7 +3242,7 @@ public:
         TopoCoordTest::setUp();
         updateConfig(BSON("_id"
                           << "rs0"
-                          << "version" << 5 << "members"
+                          << "version" << 5 << "term" << 1 << "members"
                           << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                    << "host1:27017")
                                         << BSON("_id" << 1 << "host"
@@ -3515,6 +3587,187 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberNotInConfig) 
     ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, OID(), -1, -1);
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), now()));
+}
+
+class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {
+public:
+    virtual void setUp() {
+        TopoCoordTest::setUp();
+        updateConfig(makeRSConfigWithVersionAndTerm(initConfigVersion, initConfigTerm), 0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+    }
+
+    BSONObj makeRSConfigWithVersionAndTerm(long long version, long long term) {
+        return BSON("_id"
+                    << "rs0"
+                    << "version" << version << "term" << term << "members"
+                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                             << "host1:27017")
+                                  << BSON("_id" << 1 << "host"
+                                                << "host2:27017")
+                                  << BSON("_id" << 2 << "host"
+                                                << "host3:27017"))
+                    << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
+    }
+
+    long long initConfigVersion = 2;
+    long long initConfigTerm = 2;
+};
+
+TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfVersionInHeartbeatResponseIsNewer) {
+    ReplSetConfig config;
+    long long version = initConfigVersion + 1;
+    long long term = initConfigTerm;
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host2"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host2"), hbResponse);
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::Reconfig);
+}
+
+TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfTermInHeartbeatResponseIsNewer) {
+    ReplSetConfig config;
+    long long version = initConfigVersion;
+    long long term = initConfigTerm + 1;
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host2"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host2"), hbResponse);
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::Reconfig);
+}
+
+TEST_F(HeartbeatResponseReconfigTestV1,
+       NodeAcceptsConfigIfVersionInHeartbeatResponseIfNewerAndTermUninitialized) {
+    ReplSetConfig config;
+    long long version = initConfigVersion + 1;
+    long long term = OpTime::kUninitializedTerm;
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host2"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host2"), hbResponse);
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::Reconfig);
+}
+
+TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfVersionIsOlder) {
+    // Older config version, same term.
+    ReplSetConfig config;
+    long long version = (initConfigVersion - 1);
+    long long term = initConfigTerm;
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host2"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host2"), hbResponse);
+    // Don't reconfig to an older config.
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::NoAction);
+}
+
+TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfConfigIsTheSame) {
+    ReplSetConfig config;
+    long long version = initConfigVersion;
+    long long term = initConfigTerm;
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 0)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host3"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host3"), hbResponse);
+    // Don't reconfig to the same config.
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::NoAction);
+}
+
+TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfTermIsOlder) {
+    // Older config term, same version
+    ReplSetConfig config;
+    long long version = initConfigVersion;
+    long long term = initConfigTerm - 1;
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 0)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host3"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host3"), hbResponse);
+    // Don't reconfig to an older config.
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::NoAction);
+}
+
+TEST_F(HeartbeatResponseReconfigTestV1,
+       NodeRejectsConfigInHeartbeatResponseIfNewerVersionButOlderTerm) {
+    // Newer version but older term.
+    ReplSetConfig config;
+    long long version = (initConfigVersion + 1);
+    long long term = (initConfigTerm - 1);
+    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 0)
+        .transitional_ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", HostAndPort("host3"));
+    now() += Milliseconds(1);
+    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+        now(), Milliseconds(1), HostAndPort("host3"), hbResponse);
+    // Don't reconfig to an older config.
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::NoAction);
 }
 
 // TODO(dannenberg) figure out what this is trying to test..

@@ -72,6 +72,7 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(const ReplSetCo
                                                                  const HostAndPort& source) {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
+    hbArgs.setConfigTerm(rsConfig.getConfigTerm());
     hbArgs.setSetName(rsConfig.getReplSetName());
     hbArgs.setSenderHost(source);
     hbArgs.setSenderId(sourceId);
@@ -150,6 +151,307 @@ TEST_F(ReplCoordHBV1Test,
     exitNetwork();
 
     ASSERT_TRUE(getExternalState()->threadsStarted());
+}
+
+class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
+public:
+    void setUp() {
+        setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        BSONObj configBson = BSON("_id"
+                                  << "mySet"
+                                  << "version" << initConfigVersion << "term" << initConfigTerm
+                                  << "members" << members << "protocolVersion" << 1);
+        ReplSetConfig rsConfig = assertMakeRSConfig(configBson);
+        assertStartSuccess(configBson, HostAndPort("h2", 1));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+        // Black hole initial heartbeat requests.
+        NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        net->blackHole(net->getNextReadyRequest());
+        net->blackHole(net->getNextReadyRequest());
+        net->exitNetwork();
+    }
+
+    BSONObj makeConfigObj(long long version, boost::optional<long long> term) {
+        BSONObjBuilder bob;
+        bob.appendElements(BSON("_id"
+                                << "mySet"
+                                << "version" << version << "members" << members << "protocolVersion"
+                                << 1));
+        if (term) {
+            bob.append("term", *term);
+        }
+        return bob.obj();
+    }
+
+    ReplSetConfig makeRSConfigWithVersionAndTerm(long long version, long long term) {
+        return assertMakeRSConfig(makeConfigObj(version, term));
+    }
+
+    int initConfigVersion = 2;
+    int initConfigTerm = 2;
+    long long UninitializedTerm = OpTime::kUninitializedTerm;
+    BSONArray members = BSON_ARRAY(BSON("_id" << 1 << "host"
+                                              << "h1:1")
+                                   << BSON("_id" << 2 << "host"
+                                                 << "h2:1")
+                                   << BSON("_id" << 3 << "host"
+                                                 << "h3:1"));
+};
+
+
+TEST_F(ReplCoordHBV1ReconfigTest,
+       NodeSchedulesHeartbeatToFetchConfigIfItHearsAboutConfigWithNewerVersionAndWillInstallIt) {
+    // Config with newer version and same term.
+    ReplSetConfig rsConfig =
+        makeRSConfigWithVersionAndTerm((initConfigVersion + 1), initConfigTerm);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    // Construct the heartbeat response containing the newer config.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    // Add the raw config object.
+    responseBuilder << "config" << makeConfigObj(initConfigVersion + 1, initConfigTerm);
+    auto origResObj = responseBuilder.obj();
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
+    getNet()->runReadyNetworkOperations();
+
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigVersion(), initConfigVersion + 1);
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), initConfigTerm);
+}
+
+TEST_F(ReplCoordHBV1ReconfigTest,
+       NodeSchedulesHeartbeatToFetchConfigIfItHearsAboutConfigWithNewerTermAndWillInstallIt) {
+    // Config with newer term and same version.
+    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm(initConfigVersion, initConfigTerm + 1);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    // Construct the heartbeat response containing the newer config.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    // Add the raw config object.
+    responseBuilder << "config" << makeConfigObj(initConfigVersion, initConfigTerm + 1);
+    auto origResObj = responseBuilder.obj();
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
+    getNet()->runReadyNetworkOperations();
+
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), initConfigTerm + 1);
+}
+
+TEST_F(ReplCoordHBV1ReconfigTest,
+       NodeShouldntScheduleHeartbeatToFetchConfigIfItHearsAboutSameConfig) {
+    // Config with same term and same version. Shouldn't schedule any heartbeats.
+    receiveHeartbeatFrom(getReplCoord()->getReplicaSetConfig_forTest(), 1, HostAndPort("h1", 1));
+    getNet()->enterNetwork();
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+}
+
+TEST_F(
+    ReplCoordHBV1ReconfigTest,
+    NodeSchedulesHeartbeatToFetchConfigIfItHearsAboutConfigWithNewerTermAndLowerVersionAndWillInstallIt) {
+    // Config with newer term and lower version.
+    ReplSetConfig rsConfig =
+        makeRSConfigWithVersionAndTerm((initConfigVersion - 1), (initConfigTerm + 1));
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    // Construct the heartbeat response containing the newer config.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    // Add the raw config object.
+    responseBuilder << "config" << makeConfigObj((initConfigVersion - 1), (initConfigTerm + 1));
+    auto origResObj = responseBuilder.obj();
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
+    getNet()->runReadyNetworkOperations();
+
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigVersion(), (initConfigVersion - 1));
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), (initConfigTerm + 1));
+}
+
+TEST_F(
+    ReplCoordHBV1ReconfigTest,
+    NodeSchedulesHeartbeatToFetchConfigIfItHearsAboutConfigWithNewerVersionAndUninitializedTermAndWillInstallIt) {
+    // Config with version and uninitialized term.
+    ReplSetConfig rsConfig =
+        makeRSConfigWithVersionAndTerm(initConfigVersion + 1, UninitializedTerm);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    // Construct the heartbeat response containing the newer config.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    // Add the raw config object.
+    responseBuilder << "config" << makeConfigObj((initConfigVersion + 1), UninitializedTerm);
+    auto origResObj = responseBuilder.obj();
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
+    getNet()->runReadyNetworkOperations();
+
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigVersion(), (initConfigVersion + 1));
+    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), UninitializedTerm);
+}
+
+TEST_F(ReplCoordHBV1ReconfigTest,
+       NodeSchedulesHeartbeatToFetchNewerConfigAndInstallsConfigWithNoTermField) {
+    // Config with newer version.
+    ReplSetConfig rsConfig =
+        makeRSConfigWithVersionAndTerm(initConfigVersion + 1, UninitializedTerm);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfig(rsConfig);
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    auto origResObj = responseBuilder.obj();
+
+    // Construct a heartbeat response object that omits the top-level 't' field and the 'term' field
+    // from the config object. This simulates the case of receiving a heartbeat response from a 4.2
+    // node.
+    BSONObjBuilder finalRes;
+    for (auto field : origResObj.getFieldNames<std::set<std::string>>()) {
+        if (field == "t") {
+            continue;
+        } else if (field == "config") {
+            finalRes.append("config", makeConfigObj(initConfigVersion + 1, boost::none /* term */));
+        } else {
+            finalRes.append(origResObj[field]);
+        }
+    }
+
+    // Make sure the response has no term fields.
+    auto finalResObj = finalRes.obj();
+    ASSERT_FALSE(finalResObj.hasField("t"));
+    ASSERT_TRUE(finalResObj.hasField("config"));
+    ASSERT_TRUE(finalResObj["config"].isABSONObj());
+    ASSERT_FALSE(finalResObj.getObjectField("config").hasField("term"));
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(finalResObj));
+    getNet()->runReadyNetworkOperations();
+
+    // We should have installed the newer config, even though it had no term attached.
+    auto myConfig = getReplCoord()->getConfig();
+    ASSERT_EQ(myConfig.getConfigVersion(), initConfigVersion + 1);
+    ASSERT_EQ(myConfig.getConfigTerm(), UninitializedTerm);
 }
 
 TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {

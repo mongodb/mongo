@@ -202,6 +202,13 @@ public:
     }
 
     /**
+     * Gets the (version, term) pair of this configuration.
+     */
+    ConfigVersionAndTerm getConfigVersionAndTerm() const {
+        return ConfigVersionAndTerm(_version, _term);
+    }
+
+    /**
      * Gets the name (_id field value) of the replica set described by this configuration.
      */
     const std::string& getReplSetName() const {

@@ -88,6 +88,12 @@ public:
     int getConfigVersion() const {
         return _configVersion;
     }
+    int getConfigTerm() const {
+        return _configTerm;
+    }
+    ConfigVersionAndTerm getConfigVersionAndTerm() const {
+        return ConfigVersionAndTerm(_configVersion, _configTerm);
+    }
     bool hasConfig() const {
         return _configSet;
     }
@@ -148,6 +154,13 @@ public:
     }
 
     /**
+     * Sets _configTerm to "configTerm".
+     */
+    void setConfigTerm(int configTerm) {
+        _configTerm = configTerm;
+    }
+
+    /**
      * Initializes _config with "config".
      */
     void setConfig(const ReplSetConfig& config) {
@@ -189,6 +202,7 @@ private:
     MemberState _state;
 
     int _configVersion = -1;
+    int _configTerm = OpTime::kUninitializedTerm;
     std::string _setName;
     HostAndPort _syncingTo;
 

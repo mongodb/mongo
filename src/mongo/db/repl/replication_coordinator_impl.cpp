@@ -4120,13 +4120,20 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
         // a configuration that contains us.  Chances are excellent that it will, since that
         // is the only reason for a remote node to send this node a heartbeat request.
         if (!senderHost.empty() && _seedList.insert(senderHost).second) {
+            log() << "Scheduling heartbeat to fetch a new config from: " << senderHost
+                  << " since we are not a member of our current config.";
             _scheduleHeartbeatToTarget_inlock(senderHost, -1, now);
         }
-    } else if (result.isOK() && response->getConfigVersion() < args.getConfigVersion()) {
+    } else if (result.isOK() &&
+               response->getConfigVersionAndTerm() < args.getConfigVersionAndTerm()) {
         // Schedule a heartbeat to the sender to fetch the new config.
+        // Only send this if the sender's config is newer.
         // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
         // will trigger reconfig, which cancels and reschedules all heartbeats.
         if (args.hasSender()) {
+            log() << "Scheduling heartbeat to fetch a newer config with term "
+                  << args.getConfigTerm() << " and version " << args.getConfigVersion()
+                  << " from member: " << senderHost;
             int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
             _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
         }

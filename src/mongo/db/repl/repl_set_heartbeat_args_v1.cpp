@@ -43,6 +43,7 @@ namespace {
 
 const std::string kCheckEmptyFieldName = "checkEmpty";
 const std::string kConfigVersionFieldName = "configVersion";
+const std::string kConfigTermFieldName = "configTerm";
 const std::string kHeartbeatVersionFieldName = "hbv";
 const std::string kSenderHostFieldName = "from";
 const std::string kSenderIdFieldName = "fromId";
@@ -51,6 +52,7 @@ const std::string kTermFieldName = "term";
 
 const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
                                                  kConfigVersionFieldName,
+                                                 kConfigTermFieldName,
                                                  kHeartbeatVersionFieldName,
                                                  kSenderHostFieldName,
                                                  kSenderIdFieldName,
@@ -70,6 +72,11 @@ Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
         return status;
 
     status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_configVersion);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractIntegerFieldWithDefault(
+        argsObj, kConfigTermFieldName, OpTime::kUninitializedTerm, &_configTerm);
     if (!status.isOK())
         return status;
 
@@ -122,6 +129,10 @@ void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
     _configVersion = newVal;
 }
 
+void ReplSetHeartbeatArgsV1::setConfigTerm(long long newVal) {
+    _configTerm = newVal;
+}
+
 void ReplSetHeartbeatArgsV1::setHeartbeatVersion(long long newVal) {
     _heartbeatVersion = newVal;
     _hasHeartbeatVersion = true;
@@ -148,19 +159,27 @@ void ReplSetHeartbeatArgsV1::setCheckEmpty() {
     _checkEmpty = true;
 }
 
-BSONObj ReplSetHeartbeatArgsV1::toBSON() const {
+BSONObj ReplSetHeartbeatArgsV1::toBSON(bool omitConfigTerm) const {
     invariant(isInitialized());
     BSONObjBuilder builder;
-    addToBSON(&builder);
+    addToBSON(&builder, omitConfigTerm);
     return builder.obj();
 }
 
-void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
+void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder, bool omitConfigTerm) const {
     builder->append(kSetNameFieldName, _setName);
     if (_checkEmpty) {
         builder->append(kCheckEmptyFieldName, _checkEmpty);
     }
     builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
+    // Only attach the term field if we are fully upgraded to 4.4, since 4.2 nodes won't be able to
+    // parse it.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
+        !omitConfigTerm) {
+        builder->appendIntOrLL(kConfigTermFieldName, _configTerm);
+    }
     if (_hasHeartbeatVersion) {
         builder->appendIntOrLL(kHeartbeatVersionFieldName, _hasHeartbeatVersion);
     }

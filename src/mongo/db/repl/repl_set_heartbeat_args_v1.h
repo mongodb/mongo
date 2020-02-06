@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -61,6 +62,20 @@ public:
      */
     long long getConfigVersion() const {
         return _configVersion;
+    }
+
+    /**
+     * Gets the ReplSetConfig term number of the sender.
+     */
+    long long getConfigTerm() const {
+        return _configTerm;
+    }
+
+    /**
+     * Gets the ReplSetConfig (version, term) pair of the sender.
+     */
+    ConfigVersionAndTerm getConfigVersionAndTerm() const {
+        return ConfigVersionAndTerm(_configVersion, _configTerm);
     }
 
     /**
@@ -124,6 +139,7 @@ public:
      * The below methods set the value in the method name to 'newVal'.
      */
     void setConfigVersion(long long newVal);
+    void setConfigTerm(long long newVal);
     void setHeartbeatVersion(long long newVal);
     void setSenderId(long long newVal);
     void setSenderHost(const HostAndPort& newVal);
@@ -136,13 +152,14 @@ public:
      * Should only be called if the mandatory fields have been set.
      * Optional fields are only included if they have been set.
      */
-    BSONObj toBSON() const;
+    BSONObj toBSON(bool omitConfigTerm = false) const;
 
-    void addToBSON(BSONObjBuilder* builder) const;
+    void addToBSON(BSONObjBuilder* builder, bool omitConfigTerm) const;
 
 private:
     // look at the body of the isInitialized() function to see which fields are mandatory
     long long _configVersion = -1;
+    long long _configTerm = OpTime::kUninitializedTerm;
     long long _heartbeatVersion = -1;
     long long _senderId = -1;
     long long _term = -1;
