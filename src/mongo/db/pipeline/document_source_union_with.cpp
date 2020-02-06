@@ -188,8 +188,16 @@ Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
     return std::next(itr);
 };
 
+bool DocumentSourceUnionWith::usedDisk() {
+    if (_pipeline) {
+        _usedDisk = _usedDisk || _pipeline->usedDisk();
+    }
+    return _usedDisk;
+}
+
 void DocumentSourceUnionWith::doDispose() {
     if (_pipeline) {
+        _usedDisk = _usedDisk || _pipeline->usedDisk();
         _pipeline->dispose(pExpCtx->opCtx);
         _pipeline.reset();
     }

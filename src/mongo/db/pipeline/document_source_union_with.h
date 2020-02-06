@@ -129,6 +129,8 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) final;
 
+    bool usedDisk() final;
+
 protected:
     GetNextResult doGetNext() final;
 
@@ -153,6 +155,7 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     bool _sourceExhausted = false;
     bool _cursorAttached = false;
+    bool _usedDisk = false;
 };
 
 }  // namespace mongo
