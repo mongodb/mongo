@@ -94,7 +94,7 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
     _stats.ns = _sourceNss.ns();
 
     // Find out whether the sync source supports resumable queries.
-    _resumeSupported = (getClient()->getMaxWireVersion() == WireVersion::PLACEHOLDER_FOR_44);
+    _resumeSupported = (getClient()->getMaxWireVersion() == WireVersion::RESUMABLE_INITIAL_SYNC);
 }
 
 BaseCloner::ClonerStages CollectionCloner::getStages() {

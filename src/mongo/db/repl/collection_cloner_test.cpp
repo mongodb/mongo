@@ -78,8 +78,8 @@ protected:
         };
         _storageInterface.createCollectionForBulkFn = _standardCreateCollectionFn;
 
-        _mockClient->setWireVersions(WireVersion::PLACEHOLDER_FOR_44,
-                                     WireVersion::PLACEHOLDER_FOR_44);
+        _mockClient->setWireVersions(WireVersion::RESUMABLE_INITIAL_SYNC,
+                                     WireVersion::RESUMABLE_INITIAL_SYNC);
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
         _mockServer->setCommandReply("replSetGetRBID",
                                      BSON("ok" << 1 << "rbid" << _sharedData->getRollBackId()));

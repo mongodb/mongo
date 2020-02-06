@@ -181,7 +181,7 @@ void TopologyDescription::checkWireCompatibilityVersions() {
 
 const std::string TopologyDescription::minimumRequiredMongoVersionString(int version) {
     switch (version) {
-        case PLACEHOLDER_FOR_44:
+        case RESUMABLE_INITIAL_SYNC:
             return "4.4";
         case SHARDED_TRANSACTIONS:
             return "4.2";

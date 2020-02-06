@@ -76,12 +76,12 @@ enum WireVersion {
     // Supports sharded transactions (4.2+).
     SHARDED_TRANSACTIONS = 8,
 
-    // TODO SERVER-42985: Supports some upcoming feature (4.4+).
-    PLACEHOLDER_FOR_44 = 9,
+    // Supports resumable initial sync (4.4+).
+    RESUMABLE_INITIAL_SYNC = 9,
 
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = PLACEHOLDER_FOR_44,
+    LATEST_WIRE_VERSION = RESUMABLE_INITIAL_SYNC,
 };
 
 /**
