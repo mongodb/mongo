@@ -28,6 +28,9 @@ function runTest(conn, failPointConn, restartFn) {
         failPointConn.adminCommand({configureFailPoint: "failRWCDefaultsLookup", mode: "off"}));
     res = assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1}));
     assert.eq(res.defaultReadConcern, {level: "majority"});
+
+    // Unset the default read concern so it won't interfere with testing hooks.
+    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}}));
 }
 
 jsTestLog("Testing mongos...");
