@@ -32,9 +32,11 @@
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
 #include "mongo/logv2/console.h"
+#include "mongo/logv2/file_rotate_sink.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log_source.h"
 #include "mongo/logv2/ramlog_sink.h"
+#include "mongo/logv2/shared_access_fstream.h"
 #include "mongo/logv2/tagged_severity_filter.h"
 #include "mongo/logv2/text_formatter.h"
 
@@ -45,35 +47,6 @@
 
 namespace mongo {
 namespace logv2 {
-namespace {
-
-class RotateCollector : public boost::log::sinks::file::collector {
-public:
-    explicit RotateCollector(LogDomainGlobal::ConfigurationOptions const& options)
-        : _mode{options._fileRotationMode} {}
-
-    void store_file(boost::filesystem::path const& file) override {
-        if (_mode == LogDomainGlobal::ConfigurationOptions::RotationMode::kRename) {
-            auto renameTarget = file.string() + "." + terseCurrentTime(false);
-            boost::system::error_code ec;
-            boost::filesystem::rename(file, renameTarget, ec);
-            if (ec) {
-                // throw here or propagate this error in another way?
-            }
-        }
-    }
-
-    uintmax_t scan_for_files(boost::log::sinks::file::scan_method,
-                             boost::filesystem::path const&,
-                             unsigned int*) override {
-        return 0;
-    }
-
-private:
-    LogDomainGlobal::ConfigurationOptions::RotationMode _mode;
-};
-
-}  // namespace
 
 void LogDomainGlobal::ConfigurationOptions::makeDisabled() {
     _consoleEnabled = false;
@@ -86,12 +59,11 @@ struct LogDomainGlobal::Impl {
     typedef CompositeBackend<boost::log::sinks::syslog_backend, RamLogSink, RamLogSink>
         SyslogBackend;
 #endif
-    typedef CompositeBackend<boost::log::sinks::text_file_backend, RamLogSink, RamLogSink>
-        RotatableFileBackend;
+    typedef CompositeBackend<FileRotateSink, RamLogSink, RamLogSink> RotatableFileBackend;
 
     Impl(LogDomainGlobal& parent);
     Status configure(LogDomainGlobal::ConfigurationOptions const& options);
-    Status rotate();
+    Status rotate(bool rename, StringData renameSuffix);
 
     LogDomainGlobal& _parent;
     LogComponentSettings _settings;
@@ -171,15 +143,15 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
 
     if (options._fileEnabled) {
         auto backend = boost::make_shared<RotatableFileBackend>(
-            boost::make_shared<boost::log::sinks::text_file_backend>(
-                boost::log::keywords::file_name = options._filePath),
+            boost::make_shared<FileRotateSink>(),
             boost::make_shared<RamLogSink>(RamLog::get("global")),
             boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")));
-
+        Status ret = backend->lockedBackend<0>()->addFile(
+            options._filePath,
+            options._fileOpenMode == ConfigurationOptions::OpenMode::kAppend ? true : false);
+        if (!ret.isOK())
+            return ret;
         backend->lockedBackend<0>()->auto_flush(true);
-
-        backend->lockedBackend<0>()->set_file_collector(
-            boost::make_shared<RotateCollector>(options));
 
         _rotatableFileSink =
             boost::make_shared<boost::log::sinks::unlocked_sink<RotatableFileBackend>>(backend);
@@ -214,10 +186,10 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
     return Status::OK();
 }
 
-Status LogDomainGlobal::Impl::rotate() {
+Status LogDomainGlobal::Impl::rotate(bool rename, StringData renameSuffix) {
     if (_rotatableFileSink) {
         auto backend = _rotatableFileSink->locked_backend()->lockedBackend<0>();
-        backend->rotate_file();
+        return backend->rotate(rename, renameSuffix);
     }
     return Status::OK();
 }
@@ -239,8 +211,8 @@ Status LogDomainGlobal::configure(LogDomainGlobal::ConfigurationOptions const& o
     return _impl->configure(options);
 }
 
-Status LogDomainGlobal::rotate() {
-    return _impl->rotate();
+Status LogDomainGlobal::rotate(bool rename, StringData renameSuffix) {
+    return _impl->rotate(rename, renameSuffix);
 }
 
 LogComponentSettings& LogDomainGlobal::settings() {

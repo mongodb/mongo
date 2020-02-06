@@ -82,22 +82,24 @@ Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
     return Status::OK();
 }
 
-bool rotateLogs(bool renameFiles, bool useLogV2) {
-    if (useLogV2) {
-        log() << "Logv2 rotation initiated";
-        return logv2::LogManager::global().getGlobalDomainInternal().rotate().isOK();
-    }
+bool rotateLogs(bool renameFiles) {
+    // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
+    log() << "Log rotation initiated";
+    std::string suffix = "." + terseCurrentTime(false);
+    Status resultv2 =
+        logv2::LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
+    if (!resultv2.isOK())
+        warning() << "Log rotation failed: " << resultv2;
+
     using logger::RotatableFileManager;
     RotatableFileManager* manager = logger::globalRotatableFileManager();
-    log() << "Log rotation initiated";
-    RotatableFileManager::FileNameStatusPairVector result(
-        manager->rotateAll(renameFiles, "." + terseCurrentTime(false)));
+    RotatableFileManager::FileNameStatusPairVector result(manager->rotateAll(renameFiles, suffix));
     for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
          it != result.end();
          it++) {
         warning() << "Rotating log file " << it->first << " failed: " << it->second.toString();
     }
-    return result.empty();
+    return resultv2.isOK() && result.empty();
 }
 
 void logContext(const char* errmsg) {

@@ -75,6 +75,7 @@ bool isValidUTF8(StringData s);
 
 std::string toUtf8String(const std::wstring& wide);
 
+std::wstring toWideStringFromStringData(StringData s);
 std::wstring toWideString(const char* s);
 
 bool writeUtf8ToWindowsConsole(const char* utf8String, unsigned int utf8StringSize);

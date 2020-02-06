@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,42 +29,29 @@
 
 #pragma once
 
-#include "mongo/logv2/log_domain_internal.h"
-#include "mongo/logv2/log_format.h"
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <memory>
+#include <string>
 
-namespace mongo {
-namespace logv2 {
-class LogDomainGlobal : public LogDomain::Internal {
+#include "mongo/base/status.h"
+
+namespace mongo::logv2 {
+// boost::log backend sink to provide MongoDB style file rotation.
+// Uses custom stream type to open log files with shared access on Windows, somthing the built-in
+// boost file rotation sink does not do.
+class FileRotateSink : public boost::log::sinks::text_ostream_backend {
 public:
-    struct ConfigurationOptions {
-        enum class RotationMode { kRename, kReopen };
-        enum class OpenMode { kTruncate, kAppend };
+    FileRotateSink();
+    ~FileRotateSink();
 
-        bool _consoleEnabled{true};
-        bool _fileEnabled{false};
-        std::string _filePath;
-        RotationMode _fileRotationMode{RotationMode::kRename};
-        OpenMode _fileOpenMode{OpenMode::kTruncate};
-        bool _syslogEnabled{false};
-        int _syslogFacility{-1};  // invalid facility by default, must be set
-        LogFormat _format{LogFormat::kDefault};
+    Status addFile(const std::string& filename, bool append);
+    void removeFile(const std::string& filename);
 
-        void makeDisabled();
-    };
-
-    LogDomainGlobal();
-    ~LogDomainGlobal();
-
-    LogSource& source() override;
-
-    Status configure(ConfigurationOptions const& options);
     Status rotate(bool rename, StringData renameSuffix);
-
-    LogComponentSettings& settings();
 
 private:
     struct Impl;
     std::unique_ptr<Impl> _impl;
 };
-}  // namespace logv2
-}  // namespace mongo
+
+}  // namespace mongo::logv2

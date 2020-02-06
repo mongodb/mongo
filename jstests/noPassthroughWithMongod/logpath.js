@@ -1,5 +1,4 @@
 // check replica set authentication
-// @tags: [SERVER-45989]
 
 var name = "logpath";
 var token = "logpath_token";
