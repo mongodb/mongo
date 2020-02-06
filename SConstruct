@@ -2131,7 +2131,7 @@ def doConfigure(myenv):
         #endif
 
         #if defined(__apple_build_version__)
-        #if __apple_build_version__ < 10001044
+        #if __apple_build_version__ < 10010046
         #error %s or newer is required to build MongoDB
         #endif
         #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
