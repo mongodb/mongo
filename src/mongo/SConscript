@@ -56,7 +56,7 @@ env.SConscript(
 # it, and do not declare other libraries in this file.
 baseEnv = env.Clone()
 
-if use_libunwind == True:
+if use_libunwind:
     baseEnv.InjectThirdParty('unwind')
 
 stacktrace_impl_cpp = [ File('util/stacktrace_${TARGET_OS_FAMILY}.cpp') ]
@@ -307,7 +307,6 @@ config_header_substs = (
     ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
     ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
     ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
-    ('@mongo_config_use_libunwind@', 'MONGO_CONFIG_USE_LIBUNWIND'),
     ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
 )
 

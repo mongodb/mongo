@@ -185,12 +185,12 @@ if not use_system_version_of_library('kms-message'):
 
 if use_system_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
-        'CPPDEFINES' : ['UNW_LOCAL_ONLY'],
+        'CPPDEFINES' : ['MONGO_USE_LIBUNWIND', 'UNW_LOCAL_ONLY'],
         'SYSLIBDEPS' : [env['LIBDEPS_UNWIND_SYSLIBDEP'], 'lzma'],
     }
 elif use_vendored_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
-        'CPPDEFINES' : ['UNW_LOCAL_ONLY'],
+        'CPPDEFINES' : ['MONGO_USE_LIBUNWIND', 'UNW_LOCAL_ONLY'],
         'LIBDEPS' : ['$BUILD_DIR/third_party/shim_unwind'],
         'SYSLIBDEPS' : ['lzma'],
     }

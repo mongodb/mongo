@@ -57,11 +57,7 @@ void reportOutOfMemoryErrorAndExit();
  */
 void clearSignalMask();
 
-#if defined(__linux__) || defined(__APPLE__)
-#define MONGO_STACKTRACE_HAS_SIGNAL
-#endif
-
-#if defined(MONGO_STACKTRACE_HAS_SIGNAL)
+#ifdef __linux__
 /**
  * Returns the signal used to initiate all-thread stack traces.
  */
