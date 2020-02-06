@@ -34,6 +34,8 @@ env.Library(
     source=[
         'common_mongod_process_interface.cpp',
         'non_shardsvr_process_interface.cpp',
+        'replica_set_node_process_interface.cpp',
+        'standalone_process_interface.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
@@ -100,7 +102,7 @@ env.CppUnitTest(
     target='process_interface_test',
     source=[
         'mongos_process_interface_test.cpp',
-        'shardsvr_process_interface_test.cpp',
+        'standalone_process_interface_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

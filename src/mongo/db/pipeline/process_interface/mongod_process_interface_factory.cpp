@@ -30,8 +30,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/shim.h"
-#include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/s/sharding_state.h"
 
 namespace mongo {
@@ -40,8 +42,11 @@ namespace {
 std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
     if (ShardingState::get(opCtx)->enabled()) {
         return std::make_shared<ShardServerProcessInterface>(opCtx);
+    } else if (getTestCommandsEnabled()) {
+        if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx))
+            return std::make_shared<ReplicaSetNodeProcessInterface>(opCtx, executor);
     }
-    return std::make_shared<NonShardServerProcessInterface>(opCtx);
+    return std::make_shared<StandaloneProcessInterface>(opCtx);
 }
 
 auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(

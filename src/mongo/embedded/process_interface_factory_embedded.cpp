@@ -30,13 +30,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/shim.h"
-#include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
+#include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 
 namespace mongo {
 namespace {
 
 std::shared_ptr<MongoProcessInterface> mongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
-    return std::make_shared<NonShardServerProcessInterface>(opCtx);
+    return std::make_shared<StandaloneProcessInterface>(opCtx);
 }
 
 auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(

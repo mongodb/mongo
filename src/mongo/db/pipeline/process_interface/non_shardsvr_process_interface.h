@@ -45,44 +45,10 @@ class NonShardServerProcessInterface : public CommonMongodProcessInterface {
 public:
     using CommonMongodProcessInterface::CommonMongodProcessInterface;
 
-    virtual ~NonShardServerProcessInterface() = default;
-
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
         return false;
     }
 
-    Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                  const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
-                  const WriteConcernOptions& wc,
-                  boost::optional<OID> targetEpoch) override;
-    StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    const NamespaceString& ns,
-                                    BatchedObjects&& batch,
-                                    const WriteConcernOptions& wc,
-                                    UpsertType upsert,
-                                    bool multi,
-                                    boost::optional<OID> targetEpoch) override;
-
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs);
-    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const BSONObj& renameCommandObj,
-                                                 const NamespaceString& targetNs,
-                                                 const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes);
-    void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
-                          const BSONObj& cmdObj);
-    void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
-    void createIndexesOnEmptyCollection(OperationContext* opCtx,
-                                        const NamespaceString& ns,
-                                        const std::vector<BSONObj>& indexSpecs);
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards) override;
     std::unique_ptr<ShardFilterer> getShardFilterer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
         // We'll never do shard filtering on a standalone.
