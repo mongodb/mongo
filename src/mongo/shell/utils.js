@@ -1753,9 +1753,9 @@ help = shellHelper.help = function(x) {
         print("\t" +
               "use <db_name>                set current database");
         print("\t" +
-              "db.mycoll.find()                list objects in collection mycoll");
+              "db.mycoll.find()             list objects in collection mycoll");
         print("\t" +
-              "db.mycoll.find( { a : 1 } )     list objects in mycoll where a == 1");
+              "db.mycoll.find( { a : 1 } )  list objects in mycoll where a == 1");
         print(
             "\t" +
             "it                           result of the last line evaluated; use to further iterate");
