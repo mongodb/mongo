@@ -28,6 +28,7 @@ session.commitTransaction();
 assert.eq(sessionColl.find({}).itcount(), 1);
 
 sessionColl.drop({writeConcern: {w: "majority"}});
+
 jsTest.log("Testing multiple createCollections in a transaction");
 session.startTransaction({writeConcern: {w: "majority"}});
 createCollAndCRUDInTxn(sessionDB, collName);
@@ -46,13 +47,13 @@ assert.commandWorked(session.abortTransaction_forTesting());
 
 assert.eq(sessionColl.find({}).itcount(), 0);
 
+jsTest.log("Testing createCollection on an existing collection in a transaction (SHOULD ABORT)");
 assert.commandWorked(sessionDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
-jsTest.log(
-    "Testing createCollection on an existing collection in a transaction that aborts (SHOULD FAIL)");
 session.startTransaction({writeConcern: {w: "majority"}});
 createCollAndCRUDInTxn(sessionDB, secondCollName);
 assert.commandFailedWithCode(sessionDB.runCommand({create: collName}), ErrorCodes.NamespaceExists);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
 assert.eq(sessionColl.find({}).itcount(), 0);
 assert.eq(secondSessionColl.find({}).itcount(), 0);
 

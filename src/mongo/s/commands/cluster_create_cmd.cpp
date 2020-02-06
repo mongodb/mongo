@@ -138,7 +138,9 @@ public:
         uassertStatusOK(response.swResponse);
         const auto createStatus =
             mongo::getStatusFromCommandResult(response.swResponse.getValue().data);
-        if (createStatus == ErrorCodes::NamespaceExists) {
+        if (createStatus == ErrorCodes::NamespaceExists && !opCtx->inMultiDocumentTransaction()) {
+            // NamespaceExists will cause multi-document transactions to implicitly abort, so
+            // mongos should surface this error to the client.
             CollectionOptions options = uassertStatusOK(CollectionOptions::parse(cmdObj));
             checkCollectionOptions(opCtx, nss, options);
         } else {

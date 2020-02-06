@@ -36,6 +36,7 @@ assert.eq(sessionColl.find({}).itcount(), 1);
 
 assert.commandFailedWithCode(secondSessionDB.runCommand({create: collName}),
                              ErrorCodes.NamespaceExists);
+
 assert.commandFailedWithCode(secondSession.abortTransaction_forTesting(),
                              ErrorCodes.NoSuchTransaction);
 
