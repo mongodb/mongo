@@ -80,10 +80,15 @@ public:
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    GetModPathsReturn getModifiedPaths() const final;
+    GetModPathsReturn getModifiedPaths() const final {
+        // Since we might have a document arrive from the foreign pipeline with the same path as a
+        // document in the main pipeline. Without introspecting the sub-pipeline, we must report
+        // that all paths have been modified.
+        return {GetModPathsReturn::Type::kAllPaths, {}, {}};
+    }
 
     StageConstraints constraints(Pipeline::SplitState) const final {
-        return StageConstraints(
+        auto constraints = StageConstraints(
             StreamType::kStreaming,
             PositionRequirement::kNone,
             HostTypeRequirement::kAnyShard,
@@ -94,6 +99,13 @@ public:
             // outside of the constraints as long as the involved namespaces are reported correctly.
             LookupRequirement::kAllowed,
             UnionRequirement::kAllowed);
+
+        // DocumentSourceUnionWith cannot directly swap with match but it contains custom logic in
+        // the doOptimizeAt() member function to allow itself to duplicate any match ahead in the
+        // current pipeline and place one copy inside its sub-pipeline and one copy behind in the
+        // current pipeline.
+        constraints.canSwapWithMatch = false;
+        return constraints;
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -111,6 +123,15 @@ public:
 
 protected:
     GetNextResult doGetNext() final;
+
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
+    boost::intrusive_ptr<DocumentSource> optimize() final {
+        _pipeline->optimizePipeline();
+        return this;
+    }
+
     void doDispose() final;
 
 private:

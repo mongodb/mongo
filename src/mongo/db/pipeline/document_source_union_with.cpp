@@ -32,15 +32,18 @@
 
 #include <iterator>
 
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-REGISTER_TEST_DOCUMENT_SOURCE(unionWith,
-                              DocumentSourceUnionWith::LiteParsed::parse,
-                              DocumentSourceUnionWith::createFromBson);
+REGISTER_DOCUMENT_SOURCE(unionWith,
+                         DocumentSourceUnionWith::LiteParsed::parse,
+                         DocumentSourceUnionWith::createFromBson);
 
 namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
@@ -116,6 +119,9 @@ PrivilegeVector DocumentSourceUnionWith::LiteParsed::requiredPrivileges(
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(ErrorCodes::NotImplemented,
+            "$unionWith can only be used if test commands are enabled",
+            getTestCommandsEnabled());
     uassert(ErrorCodes::FailedToParse,
             str::stream()
                 << "the $unionWith stage specification must be an object or string, but found "
@@ -163,12 +169,23 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     return GetNextResult::makeEOF();
 }
 
-DocumentSource::GetModPathsReturn DocumentSourceUnionWith::getModifiedPaths() const {
-    // Since we might have a document arrive from the foreign pipeline with the same path as a
-    // document in the main pipeline. Without introspecting the sub-pipeline, we must report that
-    // all paths have been modified.
-    return {GetModPathsReturn::Type::kAllPaths, {}, {}};
-}
+Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    auto duplicateAcrossUnion = [&](auto&& nextStage) {
+        _pipeline->addFinalSource(nextStage->clone());
+        auto newStageItr = container->insert(itr, std::move(nextStage));
+        container->erase(std::next(itr));
+        return newStageItr == container->begin() ? newStageItr : std::prev(newStageItr);
+    };
+    if (std::next(itr) != container->end()) {
+        if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get()))
+            return duplicateAcrossUnion(nextMatch);
+        else if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
+                     (*std::next(itr)).get()))
+            return duplicateAcrossUnion(nextProject);
+    }
+    return std::next(itr);
+};
 
 void DocumentSourceUnionWith::doDispose() {
     if (_pipeline) {
