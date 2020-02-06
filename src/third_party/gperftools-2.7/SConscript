@@ -10,7 +10,6 @@ env = env.Clone()
 if use_libunwind:
     env.Append(
         CPPDEFINES=[
-            "NO_FRAME_POINTER",
             ("HAVE_LIBUNWIND_H", "1"),
             'HAVE_UCONTEXT_H'
         ],

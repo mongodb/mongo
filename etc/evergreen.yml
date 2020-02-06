@@ -354,7 +354,7 @@ variables:
   - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-70-64-bit-kitchen-sink
-  - enterprise-rhel-70-64-bit-libunwind
+  - enterprise-rhel-70-64-bit-no-libunwind
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-72-s390x
@@ -8511,6 +8511,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
+  - name: libunwind_tests
   - name: .logical_session_cache
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -8602,6 +8603,7 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets
@@ -8655,6 +8657,7 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: .jstestfuzz_multiversion_gen
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
@@ -8710,6 +8713,7 @@ buildvariants:
     - ubuntu1604-build
   - name: .jscore .common
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: .powercycle
@@ -9032,6 +9036,7 @@ buildvariants:
   - name: .encrypt !.aggregation
   - name: .jscore .common !.compat
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
@@ -9085,6 +9090,7 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets
@@ -9138,6 +9144,7 @@ buildvariants:
   - name: .encrypt !.aggregation
   - name: .jscore .common !.compat
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
@@ -9194,6 +9201,7 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets
@@ -9777,6 +9785,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz
+  - name: libunwind_tests
   - name: .logical_session_cache
   - name: mqlrun
   - name: .multi_shard
@@ -10186,6 +10195,7 @@ buildvariants:
     - name: jsCore_minimum_batch_size
     - name: jsCore_op_query
     - name: .jstestfuzz_multiversion_gen
+    - name: libunwind_tests
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
     - name: multiversion_gen
@@ -10248,6 +10258,7 @@ buildvariants:
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
+  - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
@@ -10307,6 +10318,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
@@ -10326,17 +10338,16 @@ buildvariants:
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
-  display_name: "~ Enterprise RHEL 7.0 (Dagger, libunwind)"
+  display_name: "~ Enterprise RHEL 7.0 (Dagger)"
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl --use-libunwind MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     additional_targets: dagger # If this moves to another variant, update the compile_all task
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel70
   - name: jsCore
-  - name: libunwind_tests
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
@@ -10354,13 +10365,13 @@ buildvariants:
   - name: noPassthrough_gen
 
 - <<: *enterprise-rhel-70-64-bit-template
-  name: enterprise-rhel-70-64-bit-libunwind
-  display_name: "~ Enterprise RHEL 7.0 (libunwind)"
+  name: enterprise-rhel-70-64-bit-no-libunwind
+  display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
   runs_on:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-libunwind
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 --use-libunwind=off --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: false
     mh_target: ""
   # Override list of tasks to exclude package testing and publishing
@@ -10380,7 +10391,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog

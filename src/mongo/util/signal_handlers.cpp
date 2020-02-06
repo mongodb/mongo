@@ -205,7 +205,7 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
           "got signal {sig} ({strsignal_sig})",
           "sig"_attr = sig,
           "strsignal_sig"_attr = strsignal(sig));
-#ifdef __linux__
+#if defined(__linux__)
     const siginfo_t& si = waited.si;
     switch (si.si_code) {
         case SI_USER:
@@ -239,12 +239,18 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
         }
         return;
     }
-#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+
+#if defined(MONGO_STACKTRACE_HAS_SIGNAL)
     if (sig == stackTraceSignal()) {
+        // If there's a stackTraceSignal at all, catch it here so we don't die from it.
+        // Can dump all threads if we can, else silently ignore it.
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
         printAllThreadStacks();
+#endif
         return;
     }
 #endif
+
     // interrupt/terminate signal
     LOGV2(23381, "will terminate after current cmd ends");
     exitCleanly(EXIT_CLEAN);
@@ -265,8 +271,8 @@ void signalProcessingThread(LogFileStatus rotate) {
     for (int sig : kSignalProcessingThreadExclusives)
         sigaddset(&waitSignals, sig);
 
-#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
-    // On this thread, block the stackTraceSignal and rely on sigwaitinfo to deliver it.
+#if defined(MONGO_STACKTRACE_HAS_SIGNAL)
+    // On this thread, block the stackTraceSignal and rely on a signal wait to deliver it.
     sigaddset(&waitSignals, stackTraceSignal());
 #endif
 
@@ -316,6 +322,13 @@ void startSignalProcessingThread(LogFileStatus rotate) {
     sigemptyset(&sigset);
     for (int sig : kSignalProcessingThreadExclusives)
         sigaddset(&sigset, sig);
+
+#if defined(MONGO_STACKTRACE_HAS_SIGNAL) && !defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+    // On a Unixlike build without the stacktrace behavior, we still want to handle SIGUSR2 to
+    // print a message, but it must only go to the signalProcessingThread, not on other threads.
+    // It's as if stackTraceSignal (e.g. SIGUSR2) is a member of kSignalProcessingThreadExclusives.
+    sigaddset(&sigset, stackTraceSignal());
+#endif
 
     // Mask signals in the current (only) thread. All new threads will inherit this mask.
     invariant(pthread_sigmask(SIG_SETMASK, &sigset, nullptr) == 0);

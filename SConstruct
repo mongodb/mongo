@@ -503,10 +503,10 @@ add_option('msvc-debugging-format',
 )
 
 add_option('use-libunwind',
-    choices=["on", "off"],
+    choices=["on", "off", "auto"],
     const="on",
-    default="off",
-    help="Enable libunwind for backtraces (experimental)",
+    default="auto",
+    help="Enable libunwind for backtraces",
     nargs="?",
     type='choice',
 )
@@ -1021,17 +1021,6 @@ usemozjs = (jsEngine.startswith('mozjs'))
 if not serverJs and not usemozjs:
     print("Warning: --server-js=off is not needed with --js-engine=none")
 
-use_libunwind = get_option("use-libunwind") == "on"
-if use_libunwind:
-    use_system_libunwind = use_system_version_of_library("libunwind")
-    use_vendored_libunwind = not use_system_libunwind
-else:
-    if use_system_version_of_library("libunwind"):
-        print("Error: --use-system-libunwind requires --use-libunwind")
-        Exit(1)
-
-    use_system_libunwind = use_vendored_libunwind = False
-
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
 # to build it up via a dict, and then construct the Environment in one shot with kwargs.
@@ -1382,6 +1371,38 @@ if has_option("cache"):
 link_model = get_option('link-model')
 if link_model == "auto":
     link_model = "static"
+
+# libunwind configuration.
+# In which the following globals are set and normalized to bool:
+#     - use_libunwind
+#     - use_system_libunwind
+#     - use_vendored_libunwind
+use_libunwind = get_option("use-libunwind")
+use_system_libunwind = use_system_version_of_library("libunwind")
+
+# Assume system libunwind works if it's installed and selected.
+# Vendored libunwind, however, works only on linux-x86_64.
+can_use_libunwind = (use_system_libunwind or
+    env.TargetOSIs('linux') and env['TARGET_ARCH'] == 'x86_64')
+
+if use_libunwind == "off":
+    use_libunwind = False
+    use_system_libunwind = False
+elif use_libunwind == "on":
+    use_libunwind = True
+    if not can_use_libunwind:
+        env.ConfError("libunwind not supported on target platform")
+        Exit(1)
+elif use_libunwind == "auto":
+    use_libunwind = can_use_libunwind
+
+use_vendored_libunwind = use_libunwind and not use_system_libunwind
+if use_system_libunwind and not use_libunwind:
+    print("Error: --use-system-libunwind requires --use-libunwind")
+    Exit(1)
+if use_libunwind == True:
+    env.SetConfigHeaderDefine("MONGO_CONFIG_USE_LIBUNWIND")
+
 
 # Windows can't currently support anything other than 'object' or 'static', until
 # we have both hygienic builds and have annotated functions for export.

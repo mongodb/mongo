@@ -38,6 +38,7 @@
 #include <fmt/format.h>
 #include <fmt/printf.h>
 
+#define UNW_LOCAL_ONLY
 #include <libunwind.h>
 
 #include "mongo/unittest/unittest.h"

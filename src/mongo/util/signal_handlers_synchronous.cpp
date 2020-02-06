@@ -361,12 +361,10 @@ void clearSignalMask() {
 #endif
 }
 
-#ifdef __linux__
-
+#if defined(MONGO_STACKTRACE_HAS_SIGNAL)
 int stackTraceSignal() {
     return SIGUSR2;
 }
-
 #endif
 
 }  // namespace mongo
