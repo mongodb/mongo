@@ -736,12 +736,12 @@ void MigrationSourceManager::_cleanup() {
     }
 
     if (_enableResumableRangeDeleter) {
-        if (_state >= kCloning && _state < kCommittingOnConfig) {
+        if (_state >= kCloning) {
             invariant(_coordinator);
-            _coordinator->setMigrationDecision(
-                migrationutil::MigrationCoordinator::Decision::kAborted);
-        }
-        {
+            if (_state < kCommittingOnConfig) {
+                _coordinator->setMigrationDecision(
+                    migrationutil::MigrationCoordinator::Decision::kAborted);
+            }
             // This can be called on an exception path after the OperationContext has been
             // interrupted, so use a new OperationContext. Note, it's valid to call
             // getServiceContext on an interrupted OperationContext.
