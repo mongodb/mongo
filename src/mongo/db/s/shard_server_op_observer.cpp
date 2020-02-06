@@ -44,6 +44,7 @@
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard_collection.h"
@@ -356,7 +357,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs.updatedDoc);
 
-            migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+            if (deletionTask.getDonorShardId() != ShardingState::get(opCtx)->shardId()) {
+                // Range deletion tasks for moved away chunks are scheduled through the
+                // MigrationCoordinator, so only schedule a task for received chunks.
+                migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+            }
         }
     }
 

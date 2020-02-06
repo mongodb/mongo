@@ -50,7 +50,8 @@ public:
                          NamespaceString collectionNamespace,
                          UUID collectionUuid,
                          ChunkRange range,
-                         ChunkVersion preMigrationChunkVersion);
+                         ChunkVersion preMigrationChunkVersion,
+                         bool waitForDelete);
     MigrationCoordinator(const MigrationCoordinator&) = delete;
     MigrationCoordinator& operator=(const MigrationCoordinator&) = delete;
     MigrationCoordinator(MigrationCoordinator&&) = delete;
@@ -67,7 +68,7 @@ public:
      * with the collectionUUID, range to delete, and "pending: true" and waits for majority
      * writeConcern.
      */
-    void startMigration(OperationContext* opCtx, bool waitForDelete);
+    void startMigration(OperationContext* opCtx);
 
     /**
      * Saves the decision.
@@ -79,8 +80,11 @@ public:
     /**
      * If a decision has been set, makes the decision durable, then communicates the decision by
      * updating the local (donor's) and remote (recipient's) config.rangeDeletions entries.
+     *
+     * If the decision was to commit, returns a future that completes when the moved away range is
+     * scheduled to be deleted and contains whether the task was submitted successfully.
      */
-    void completeMigration(OperationContext* opCtx);
+    boost::optional<SemiFuture<bool>> completeMigration(OperationContext* opCtx);
 
     /**
      * Deletes the persistent state for this migration from config.migrationCoordinators.
@@ -90,9 +94,10 @@ public:
 private:
     /**
      * Deletes the range deletion task from the recipient node and marks the range deletion task on
-     * the donor as ready to be processed.
+     * the donor as ready to be processed. Returns a future that completes when the moved away range
+     * is scheduled to be deleted and contains whether the task was submitted successfully.
      */
-    void _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    SemiFuture<bool> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
     /**
      * Deletes the range deletion task from the donor node and marks the range deletion task on the
@@ -109,6 +114,7 @@ private:
     std::string _logPrefix() const;
 
     MigrationCoordinatorDocument _migrationInfo;
+    bool _waitForDelete = false;
 };
 
 }  // namespace migrationutil

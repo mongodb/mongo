@@ -301,7 +301,8 @@ Status MigrationSourceManager::startClone() {
                 getNss(),
                 _collectionUuid.get(),
                 ChunkRange(_args.getMinKey(), _args.getMaxKey()),
-                _chunkVersion);
+                _chunkVersion,
+                _args.getWaitForDelete());
         }
 
         _state = kCloning;
@@ -317,7 +318,7 @@ Status MigrationSourceManager::startClone() {
     }
 
     if (_enableResumableRangeDeleter) {
-        _coordinator->startMigration(_opCtx, _args.getWaitForDelete());
+        _coordinator->startMigration(_opCtx);
     }
 
     Status startCloneStatus = _cloneDriver->startClone(_opCtx, migrationId, _lsid, TxnNumber{0});
@@ -549,9 +550,15 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             log() << "Waiting for cleanup of " << getNss().ns() << " range "
                   << redact(range.toString());
 
+            invariant(_scheduledRangeDeletionOnSuccess);
+            auto scheduleSW = _scheduledRangeDeletionOnSuccess->getNoThrow(_opCtx);
+            if (!scheduleSW.isOK()) {
+                return {ErrorCodes::OrphanedRangeCleanUpFailed,
+                        orphanedRangeCleanUpErrMsg + redact(scheduleSW.getStatus())};
+            }
+
             auto deleteStatus = CollectionShardingRuntime::waitForClean(
                 _opCtx, getNss(), _collectionUuid.get(), range);
-
             if (!deleteStatus.isOK()) {
                 return {ErrorCodes::OrphanedRangeCleanUpFailed,
                         orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
@@ -746,7 +753,7 @@ void MigrationSourceManager::_cleanup() {
             AlternativeClientRegion acr(newClient);
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
-            _coordinator->completeMigration(newOpCtx);
+            _scheduledRangeDeletionOnSuccess = _coordinator->completeMigration(newOpCtx);
         }
 
         LogicalSessionCache::get(_opCtx)->endSessions({_lsid});

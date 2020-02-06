@@ -612,7 +612,8 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
                                                  doc.getNss(),
                                                  doc.getCollectionUuid(),
                                                  doc.getRange(),
-                                                 doc.getPreMigrationChunkVersion());
+                                                 doc.getPreMigrationChunkVersion(),
+                                                 false /* waitForDelete */);
 
                 if (doc.getDecision()) {
                     // The decision is already known.
