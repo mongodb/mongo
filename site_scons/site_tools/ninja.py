@@ -843,6 +843,11 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
             raise Exception("Could not find tool {} in {} generated from {}".format(tool, cmd_list, get_comstr(env, action, targets, sources)))
 
         cmd, rsp_content = cmd_list[:tool_idx], cmd_list[tool_idx:]
+
+        # Some commands may have a need to pass a literal $ to a tool
+        # like ld (think $ORIGIN). We need to protect that $ from
+        # Ninja by using $$.
+        rsp_content = " ".join(rsp_content).replace('$', '$$')
         variables = {"rspc": rsp_content}
         variables[rule] = cmd
         if use_command_env:
