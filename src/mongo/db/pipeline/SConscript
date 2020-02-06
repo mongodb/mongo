@@ -252,7 +252,6 @@ pipelineEnv.Library(
         'pipeline.cpp',
         'semantic_analysis.cpp',
         'sequential_document_cache.cpp',
-        'stage_constraints.cpp',
         'tee_buffer.cpp',
     ],
     LIBDEPS=[

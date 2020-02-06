@@ -41,7 +41,21 @@ using boost::intrusive_ptr;
 using std::deque;
 
 DocumentSourceMock::DocumentSourceMock(deque<GetNextResult> results)
-    : DocumentSourceQueue(std::move(results), new ExpressionContextForTest()) {}
+    : DocumentSourceMock(std::move(results), new ExpressionContextForTest()) {}
+
+DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSourceQueue(std::move(results), expCtx),
+      mockConstraints(StreamType::kStreaming,
+                      PositionRequirement::kNone,
+                      HostTypeRequirement::kNone,
+                      DiskUseRequirement::kNoDiskUse,
+                      FacetRequirement::kAllowed,
+                      TransactionRequirement::kAllowed,
+                      LookupRequirement::kAllowed,
+                      UnionRequirement::kAllowed) {
+    mockConstraints.requiresInputDocSource = false;
+}
 
 const char* DocumentSourceMock::getSourceName() const {
     return "mock";

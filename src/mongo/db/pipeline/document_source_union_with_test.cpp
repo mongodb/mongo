@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -453,6 +454,118 @@ TEST_F(DocumentSourceUnionWithTest, RejectUnionWhenDepthLimitIsExceeded) {
             expCtx),
         AssertionException,
         ErrorCodes::MaxSubPipelineDepthExceeded);
+}
+
+TEST_F(DocumentSourceUnionWithTest, ConstraintsWithoutPipelineAreCorrect) {
+    auto emptyUnion = DocumentSourceUnionWith(
+        getExpCtx(),
+        uassertStatusOK(
+            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+    StageConstraints defaultConstraints(StageConstraints::StreamType::kStreaming,
+                                        StageConstraints::PositionRequirement::kNone,
+                                        StageConstraints::HostTypeRequirement::kAnyShard,
+                                        StageConstraints::DiskUseRequirement::kNoDiskUse,
+                                        StageConstraints::FacetRequirement::kAllowed,
+                                        StageConstraints::TransactionRequirement::kNotAllowed,
+                                        StageConstraints::LookupRequirement::kAllowed,
+                                        StageConstraints::UnionRequirement::kAllowed);
+    ASSERT_TRUE(emptyUnion.constraints(Pipeline::SplitState::kUnsplit) == defaultConstraints);
+}
+
+TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
+    const auto mock = DocumentSourceMock::createForTest();
+    StageConstraints stricterConstraint(StageConstraints::StreamType::kStreaming,
+                                        StageConstraints::PositionRequirement::kNone,
+                                        StageConstraints::HostTypeRequirement::kAnyShard,
+                                        StageConstraints::DiskUseRequirement::kNoDiskUse,
+                                        StageConstraints::FacetRequirement::kNotAllowed,
+                                        StageConstraints::TransactionRequirement::kNotAllowed,
+                                        StageConstraints::LookupRequirement::kNotAllowed,
+                                        StageConstraints::UnionRequirement::kAllowed);
+    mock->mockConstraints = stricterConstraint;
+    auto unionWithOne = DocumentSourceUnionWith(
+        getExpCtx(),
+        uassertStatusOK(
+            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{mock}, getExpCtx())));
+    ASSERT_TRUE(unionWithOne.constraints(Pipeline::SplitState::kUnsplit) == stricterConstraint);
+}
+
+TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) {
+    const auto mockOne = DocumentSourceMock::createForTest();
+    StageConstraints constraintTmpDataFacetLookupNotAllowed(
+        StageConstraints::StreamType::kStreaming,
+        StageConstraints::PositionRequirement::kNone,
+        StageConstraints::HostTypeRequirement::kAnyShard,
+        StageConstraints::DiskUseRequirement::kWritesTmpData,
+        StageConstraints::FacetRequirement::kNotAllowed,
+        StageConstraints::TransactionRequirement::kAllowed,
+        StageConstraints::LookupRequirement::kNotAllowed,
+        StageConstraints::UnionRequirement::kAllowed);
+    mockOne->mockConstraints = constraintTmpDataFacetLookupNotAllowed;
+    const auto mockTwo = DocumentSourceMock::createForTest();
+    StageConstraints constraintPermissive(StageConstraints::StreamType::kStreaming,
+                                          StageConstraints::PositionRequirement::kNone,
+                                          StageConstraints::HostTypeRequirement::kNone,
+                                          StageConstraints::DiskUseRequirement::kNoDiskUse,
+                                          StageConstraints::FacetRequirement::kAllowed,
+                                          StageConstraints::TransactionRequirement::kAllowed,
+                                          StageConstraints::LookupRequirement::kAllowed,
+                                          StageConstraints::UnionRequirement::kAllowed);
+    mockTwo->mockConstraints = constraintPermissive;
+    const auto mockThree = DocumentSourceMock::createForTest();
+    StageConstraints constraintPersistentDataTransactionLookupNotAllowed(
+        StageConstraints::StreamType::kStreaming,
+        StageConstraints::PositionRequirement::kNone,
+        StageConstraints::HostTypeRequirement::kNone,
+        StageConstraints::DiskUseRequirement::kWritesPersistentData,
+        StageConstraints::FacetRequirement::kAllowed,
+        StageConstraints::TransactionRequirement::kNotAllowed,
+        StageConstraints::LookupRequirement::kNotAllowed,
+        StageConstraints::UnionRequirement::kAllowed);
+    mockThree->mockConstraints = constraintPersistentDataTransactionLookupNotAllowed;
+    auto unionStage = DocumentSourceUnionWith(
+        getExpCtx(),
+        uassertStatusOK(Pipeline::create(
+            std::list<boost::intrusive_ptr<DocumentSource>>{mockOne, mockTwo, mockThree},
+            getExpCtx())));
+    StageConstraints strict(StageConstraints::StreamType::kStreaming,
+                            StageConstraints::PositionRequirement::kNone,
+                            StageConstraints::HostTypeRequirement::kAnyShard,
+                            StageConstraints::DiskUseRequirement::kWritesPersistentData,
+                            StageConstraints::FacetRequirement::kNotAllowed,
+                            StageConstraints::TransactionRequirement::kNotAllowed,
+                            StageConstraints::LookupRequirement::kNotAllowed,
+                            StageConstraints::UnionRequirement::kAllowed);
+    ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == strict);
+}
+TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInherited) {
+    const auto mock = DocumentSourceMock::createForTest();
+    StageConstraints strictConstraint(StageConstraints::StreamType::kStreaming,
+                                      StageConstraints::PositionRequirement::kNone,
+                                      StageConstraints::HostTypeRequirement::kAnyShard,
+                                      StageConstraints::DiskUseRequirement::kNoDiskUse,
+                                      StageConstraints::FacetRequirement::kAllowed,
+                                      StageConstraints::TransactionRequirement::kNotAllowed,
+                                      StageConstraints::LookupRequirement::kNotAllowed,
+                                      StageConstraints::UnionRequirement::kAllowed);
+    mock->mockConstraints = strictConstraint;
+    auto facetPipeline = uassertStatusOK(Pipeline::createFacetPipeline({mock}, getExpCtx()));
+    std::vector<DocumentSourceFacet::FacetPipeline> facets;
+    facets.emplace_back("pipeline", std::move(facetPipeline));
+    auto facetStage = DocumentSourceFacet::create(std::move(facets), getExpCtx());
+    auto unionStage = DocumentSourceUnionWith(
+        getExpCtx(),
+        uassertStatusOK(Pipeline::create(
+            std::list<boost::intrusive_ptr<DocumentSource>>{facetStage}, getExpCtx())));
+    StageConstraints expectedConstraints(StageConstraints::StreamType::kStreaming,
+                                         StageConstraints::PositionRequirement::kNone,
+                                         StageConstraints::HostTypeRequirement::kAnyShard,
+                                         StageConstraints::DiskUseRequirement::kNoDiskUse,
+                                         StageConstraints::FacetRequirement::kNotAllowed,
+                                         StageConstraints::TransactionRequirement::kNotAllowed,
+                                         StageConstraints::LookupRequirement::kNotAllowed,
+                                         StageConstraints::UnionRequirement::kAllowed);
+    ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == expectedConstraints);
 }
 }  // namespace
 }  // namespace mongo

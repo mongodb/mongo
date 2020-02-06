@@ -32,6 +32,7 @@
 #include <deque>
 
 #include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 
 namespace mongo {
 
@@ -57,6 +58,7 @@ public:
 
     using DocumentSourceQueue::DocumentSourceQueue;
     DocumentSourceMock(std::deque<GetNextResult>);
+    DocumentSourceMock(std::deque<GetNextResult>, const boost::intrusive_ptr<ExpressionContext>&);
 
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
@@ -79,6 +81,10 @@ public:
         return this;
     }
 
+    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+        return mockConstraints;
+    }
+
     /**
      * This stage does not modify anything.
      */
@@ -93,6 +99,8 @@ public:
     bool isDisposed = false;
     bool isDetachedFromOpCtx = false;
     bool isOptimized = false;
+    StageConstraints mockConstraints;
+
 
 protected:
     GetNextResult doGetNext() override {

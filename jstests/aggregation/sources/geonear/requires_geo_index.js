@@ -1,6 +1,7 @@
 // Test that $geoNear requires a geospatial index.
 // TODO SERVER-29159: Enable test on passthroughs with sharded collections.
-// @tags: [assumes_unsharded_collection]
+// $geoNear is not allowed in a facet, even in a lookup.
+// @tags: [assumes_unsharded_collection, do_not_wrap_aggregations_in_facets]
 (function() {
 "use strict";
 

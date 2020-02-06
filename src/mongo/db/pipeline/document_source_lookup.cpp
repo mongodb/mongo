@@ -176,19 +176,6 @@ const char* DocumentSourceLookUp::getSourceName() const {
 }
 
 StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
-    // By default, $lookup is allowed in a transaction and does not use disk.
-    auto diskRequirement = DiskUseRequirement::kNoDiskUse;
-    auto txnRequirement = TransactionRequirement::kAllowed;
-
-    // However, if $lookup is specified with a pipeline, it inherits the strictest disk use and
-    // transaction requirement from the children in its pipeline.
-    if (wasConstructedWithPipelineSyntax()) {
-        const auto resolvedRequirements = StageConstraints::resolveDiskUseAndTransactionRequirement(
-            _resolvedIntrospectionPipeline->getSources());
-        diskRequirement = resolvedRequirements.first;
-        txnRequirement = resolvedRequirements.second;
-    }
-
     // If executing on mongos and the foreign collection is sharded, then this stage can run on
     // mongos or any shard.
     HostTypeRequirement hostRequirement =
@@ -203,17 +190,26 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
         hostRequirement = HostTypeRequirement::kPrimaryShard;
     }
 
+    // By default, $lookup is allowed in a transaction and does not use disk.
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  hostRequirement,
-                                 diskRequirement,
+                                 DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kAllowed,
-                                 txnRequirement,
+                                 TransactionRequirement::kAllowed,
                                  LookupRequirement::kAllowed,
                                  UnionRequirement::kAllowed);
 
+    // However, if $lookup is specified with a pipeline, it inherits the strictest disk use, facet,
+    // transaction, and lookup requirements from the children in its pipeline.
+    if (wasConstructedWithPipelineSyntax()) {
+        constraints = StageConstraints::getStrictestConstraints(
+            _resolvedIntrospectionPipeline->getSources(), constraints);
+    }
+
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithLimitAndSample = !_unwindSrc;
+
     return constraints;
 }
 

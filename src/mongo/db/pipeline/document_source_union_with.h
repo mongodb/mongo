@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 
 namespace mongo {
 
@@ -88,7 +89,7 @@ public:
     }
 
     StageConstraints constraints(Pipeline::SplitState) const final {
-        auto constraints = StageConstraints(
+        StageConstraints unionConstraints(
             StreamType::kStreaming,
             PositionRequirement::kNone,
             HostTypeRequirement::kAnyShard,
@@ -100,12 +101,19 @@ public:
             LookupRequirement::kAllowed,
             UnionRequirement::kAllowed);
 
+        if (_pipeline) {
+            // The constraints of the sub-pipeline determine the constraints of the $unionWith
+            // stage. We want to forward the strictest requirements of the stages in the
+            // sub-pipeline.
+            unionConstraints = StageConstraints::getStrictestConstraints(_pipeline->getSources(),
+                                                                         unionConstraints);
+        }
         // DocumentSourceUnionWith cannot directly swap with match but it contains custom logic in
         // the doOptimizeAt() member function to allow itself to duplicate any match ahead in the
         // current pipeline and place one copy inside its sub-pipeline and one copy behind in the
         // current pipeline.
-        constraints.canSwapWithMatch = false;
-        return constraints;
+        unionConstraints.canSwapWithMatch = false;
+        return unionConstraints;
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;

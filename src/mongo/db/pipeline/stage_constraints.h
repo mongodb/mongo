@@ -111,41 +111,33 @@ struct StageConstraints {
      */
     enum class UnionRequirement { kNotAllowed, kAllowed };
 
-    using DiskUseAndTransactionRequirement = std::pair<DiskUseRequirement, TransactionRequirement>;
-
     /**
-     * By default, a stage is assumed to use no disk and be allowed to run in a transaction.
-     */
-    static constexpr auto kDefaultDiskUseAndTransactionRequirement =
-        std::make_pair(DiskUseRequirement::kNoDiskUse, TransactionRequirement::kAllowed);
-
-    /**
-     * Given a 'pipeline' of DocumentSources, resolves the container's disk use requirement and
-     * transaction requirement:
-     *
-     *  - Returns the "strictest" DiskUseRequirement reported by the stages in 'pipeline',
-     *    where the strictness order is kNone < kWritesTmpData < kWritesPersistentData. For example,
-     *    in a pipeline where all three DiskUseRequirements are present, the return value will be
-     *    DiskUseRequirement::kWritesPersistentData.
-     *
-     *  - Returns TransactionRequirement::kAllowed if and only if every DocumentSource in
-     *    'pipeline' is allowed in a transaction.
+     * Returns the StageConstraints representing the strictest constraint of each type from the
+     * given pipeline. Does not compare StreamType and PositionRequirement because those values
+     * don't make sense as a property of a pipeline. Also does not compare HostTypeRequirement as
+     * there is no strict ordering of possible values. Those three values in the returned
+     * StageConstraints will always be the same as those passed in `defaultReqs`.
      */
     template <typename DocumentSourceContainer>
-    static DiskUseAndTransactionRequirement resolveDiskUseAndTransactionRequirement(
-        const DocumentSourceContainer& pipeline,
-        DiskUseAndTransactionRequirement defaultReqs = kDefaultDiskUseAndTransactionRequirement) {
-        return std::accumulate(
-            pipeline.begin(),
-            pipeline.end(),
-            defaultReqs,
-            [](const DiskUseAndTransactionRequirement& constraints, const auto& stage) {
-                const auto stageConstraints = stage->constraints();
-                const auto diskUse = std::max(constraints.first, stageConstraints.diskRequirement);
-                const auto txnReq =
-                    std::min(constraints.second, stageConstraints.transactionRequirement);
-                return std::make_pair(diskUse, txnReq);
-            });
+    static StageConstraints getStrictestConstraints(const DocumentSourceContainer& pipeline,
+                                                    const StageConstraints& defaultReqs) {
+        auto newReqs = defaultReqs;
+        for (const auto& stage : pipeline) {
+            const auto stageConstraints = stage->constraints();
+            // Skip PositionRequirement, StreamType, and HostTypeRequirement, as it doesn't make
+            // sense to compare those values.
+            newReqs.diskRequirement =
+                std::max(newReqs.diskRequirement, stageConstraints.diskRequirement);
+            newReqs.facetRequirement =
+                std::max(newReqs.facetRequirement, stageConstraints.facetRequirement);
+            newReqs.transactionRequirement =
+                std::min(newReqs.transactionRequirement, stageConstraints.transactionRequirement);
+            newReqs.lookupRequirement =
+                std::min(newReqs.lookupRequirement, stageConstraints.lookupRequirement);
+            newReqs.unionRequirement =
+                std::min(newReqs.unionRequirement, stageConstraints.unionRequirement);
+        }
+        return newReqs;
     }
 
     StageConstraints(
@@ -278,35 +270,35 @@ struct StageConstraints {
     }
 
     // Indicates whether this stage needs to be at a particular position in the pipeline.
-    const PositionRequirement requiredPosition;
+    PositionRequirement requiredPosition;
 
     // Indicates whether this stage can only be executed on specific components of a sharded
     // cluster.
-    const HostTypeRequirement hostRequirement;
+    HostTypeRequirement hostRequirement;
 
     // Indicates whether this stage may write persistent data to disk, or may spill to temporary
     // files if its memory usage becomes excessive.
-    const DiskUseRequirement diskRequirement;
+    DiskUseRequirement diskRequirement;
 
     // Indicates whether this stage is itself a $changeStream stage, or if not whether it may
     // exist in a pipeline which begins with $changeStream.
-    const ChangeStreamRequirement changeStreamRequirement;
+    ChangeStreamRequirement changeStreamRequirement;
 
     // Indicates whether this stage may run inside a $facet stage.
-    const FacetRequirement facetRequirement;
+    FacetRequirement facetRequirement;
 
     // Indicates whether this stage is legal when the readConcern level is "snapshot" or the
     // aggregate is running inside of a multi-document transaction.
-    const TransactionRequirement transactionRequirement;
+    TransactionRequirement transactionRequirement;
 
     // Indicates whether this stage is allowed in a $lookup subpipeline.
-    const LookupRequirement lookupRequirement;
+    LookupRequirement lookupRequirement;
 
     // Indicates whether this stage is allowed in a $unionWith subpipeline.
-    const UnionRequirement unionRequirement;
+    UnionRequirement unionRequirement;
 
     // Indicates whether this is a streaming or blocking stage.
-    const StreamType streamType;
+    StreamType streamType;
 
     // True if this stage does not generate results itself, and instead pulls inputs from an
     // input DocumentSource (via 'pSource').
@@ -332,5 +324,20 @@ struct StageConstraints {
 
     // Indicates that a stage is allowed within a pipeline-stlye update.
     bool isAllowedWithinUpdatePipeline = false;
+
+    bool operator==(const StageConstraints& other) const {
+        return requiredPosition == other.requiredPosition &&
+            hostRequirement == other.hostRequirement && diskRequirement == other.diskRequirement &&
+            changeStreamRequirement == other.changeStreamRequirement &&
+            facetRequirement == other.facetRequirement &&
+            transactionRequirement == other.transactionRequirement &&
+            lookupRequirement == other.lookupRequirement && streamType == other.streamType &&
+            requiresInputDocSource == other.requiresInputDocSource &&
+            isIndependentOfAnyCollection == other.isIndependentOfAnyCollection &&
+            canSwapWithMatch == other.canSwapWithMatch &&
+            canSwapWithLimitAndSample == other.canSwapWithLimitAndSample &&
+            isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
+            unionRequirement == other.unionRequirement;
+    }
 };
 }  // namespace mongo

@@ -1,6 +1,6 @@
 // Cannot implicitly shard accessed collections as $lookup does not support sharded target
-// collection.
-// @tags: [assumes_unsharded_collection]
+// collection. Facet in a lookup cannot be wrapped in a facet.
+// @tags: [assumes_unsharded_collection, do_not_wrap_aggregations_in_facets]
 
 /**
  * Confirms that $lookup with a non-correlated prefix returns expected results.

@@ -104,31 +104,6 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
     return rawFacetPipelines;
 }
 
-StageConstraints::LookupRequirement computeLookupRequirement(
-    const std::vector<DocumentSourceFacet::FacetPipeline>& facets) {
-    for (auto&& facet : facets) {
-        const auto& sources = facet.pipeline->getSources();
-        for (auto&& src : sources) {
-            if (!src->constraints().isAllowedInLookupPipeline()) {
-                return StageConstraints::LookupRequirement::kNotAllowed;
-            }
-        }
-    }
-    return StageConstraints::LookupRequirement::kAllowed;
-}
-
-StageConstraints::UnionRequirement computeUnionRequirement(
-    const std::vector<DocumentSourceFacet::FacetPipeline>& facets) {
-    for (auto&& facet : facets) {
-        for (auto&& src : facet.pipeline->getSources()) {
-            if (!src->constraints().isAllowedInUnionPipeline()) {
-                return StageConstraints::UnionRequirement::kNotAllowed;
-            }
-        }
-    }
-    return StageConstraints::UnionRequirement::kAllowed;
-}
-
 }  // namespace
 
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
@@ -251,22 +226,21 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
         }
     }
 
-    // Resolve the disk use and transaction requirement of this $facet by iterating through the
-    // children in its facets.
-    auto diskAndTxnReq = StageConstraints::kDefaultDiskUseAndTransactionRequirement;
+    // Resolve the disk use, lookup, and transaction requirement of this $facet by iterating through
+    // the children in its facets.
+    StageConstraints constraints(StreamType::kBlocking,
+                                 PositionRequirement::kNone,
+                                 host,
+                                 StageConstraints::DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 StageConstraints::TransactionRequirement::kAllowed,
+                                 StageConstraints::LookupRequirement::kAllowed,
+                                 StageConstraints::UnionRequirement::kAllowed);
     for (const auto& facet : _facets) {
-        diskAndTxnReq = StageConstraints::resolveDiskUseAndTransactionRequirement(
-            facet.pipeline->getSources(), diskAndTxnReq);
+        constraints =
+            StageConstraints::getStrictestConstraints(facet.pipeline->getSources(), constraints);
     }
-
-    return {StreamType::kBlocking,
-            PositionRequirement::kNone,
-            host,
-            std::get<StageConstraints::DiskUseRequirement>(diskAndTxnReq),
-            FacetRequirement::kNotAllowed,
-            std::get<StageConstraints::TransactionRequirement>(diskAndTxnReq),
-            computeLookupRequirement(_facets),
-            computeUnionRequirement(_facets)};
+    return constraints;
 }
 
 bool DocumentSourceFacet::usedDisk() {
