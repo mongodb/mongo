@@ -128,6 +128,15 @@ runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeSendingCommitDecision",
                                             false /* shouldMakeMigrationFailToCommitOnConfig */);
 runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeForgettingMigrationAfterCommitDecision",
                                             false /* shouldMakeMigrationFailToCommitOnConfig */);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible",
+    false /* shouldMakeMigrationFailToCommitOnConfig */);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
+    false /* shouldMakeMigrationFailToCommitOnConfig */);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible",
+    false /* shouldMakeMigrationFailToCommitOnConfig */);
 
 //
 // Decision is abort
@@ -154,6 +163,21 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
     ErrorCodes.OperationFailed);
+
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    ErrorCodes.StaleEpoch);
+
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    ErrorCodes.StaleEpoch);
+
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    ErrorCodes.StaleEpoch);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeMakingAbortDecisionDurable",
                                             true /* shouldMakeMigrationFailToCommitOnConfig */,

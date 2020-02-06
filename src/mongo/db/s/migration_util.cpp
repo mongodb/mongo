@@ -33,6 +33,8 @@
 
 #include "mongo/db/s/migration_util.h"
 
+#include <fmt/format.h>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -67,17 +69,32 @@ namespace mongo {
 namespace migrationutil {
 namespace {
 
+using namespace fmt::literals;
+
 MONGO_FAIL_POINT_DEFINE(hangBeforeFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateAbortDecisionInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionOnRecipientInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionLocallyInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible);
 
 const char kSourceShard[] = "source";
 const char kDestinationShard[] = "destination";
 const char kIsDonorShard[] = "isDonorShard";
 const char kChunk[] = "chunk";
 const char kCollection[] = "collection";
+const auto kLogRetryAttemptThreshold = 20;
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -124,6 +141,53 @@ static std::shared_ptr<ThreadPool> getMigrationUtilExecutor() {
     return executor;
 }
 
+/**
+ * Runs doWork until it doesn't throw an error.
+ *
+ * Requirements:
+ * - doWork must be idempotent.
+ */
+void retryIdempotentWorkUntilSuccess(OperationContext* opCtx,
+                                     StringData taskDescription,
+                                     std::function<void(OperationContext*)> doWork) {
+    const std::string newClientName = "{}-{}"_format(getThreadName(), taskDescription);
+    const auto initialTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+    for (int attempt = 1;; attempt++) {
+        // If the server is already doing a clean shutdown, join the shutdown.
+        if (globalInShutdownDeprecated()) {
+            shutdown(waitForShutdown());
+        }
+
+        // If the term changed, that means that the step up recovery could have run or is running
+        // so stop retrying in order to avoid duplicate work.
+        uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                "Stepped down while {}"_format(taskDescription),
+                repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                        repl::MemberState::RS_PRIMARY &&
+                    initialTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm());
+
+        try {
+            auto newClient = opCtx->getServiceContext()->makeClient(newClientName);
+
+            {
+                stdx::lock_guard<Client> lk(*newClient.get());
+                newClient->setSystemOperationKillable(lk);
+            }
+
+            auto newOpCtx = newClient->makeOperationContext();
+            AlternativeClientRegion altClient(newClient);
+
+            doWork(newOpCtx.get());
+            break;
+        } catch (DBException& ex) {
+            if (attempt % kLogRetryAttemptThreshold == 1) {
+                warning() << "retrying " << taskDescription << " after " << attempt
+                          << " failed attempts, last seen error: " << ex;
+            }
+        }
+    }
+}
 
 }  // namespace
 
@@ -416,21 +480,45 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 }
 
 void persistCommitDecision(OperationContext* opCtx, const UUID& migrationId) {
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
-    store.update(
-        opCtx,
-        QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
-        BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName << "committed")));
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "persist migrate commit decision", [&](OperationContext* newOpCtx) {
+            hangInPersistMigrateCommitDecisionInterruptible.pauseWhileSet(newOpCtx);
+
+            PersistentTaskStore<MigrationCoordinatorDocument> store(
+                newOpCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+            store.update(newOpCtx,
+                         QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
+                         BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName
+                                             << "committed")));
+
+            if (hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when persisting migrate commit decision");
+            }
+        });
 }
 
 void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId) {
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
-    store.update(
-        opCtx,
-        QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
-        BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName << "aborted")));
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "persist migrate abort decision", [&](OperationContext* newOpCtx) {
+            hangInPersistMigrateAbortDecisionInterruptible.pauseWhileSet(newOpCtx);
+
+            PersistentTaskStore<MigrationCoordinatorDocument> store(
+                newOpCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+            store.update(newOpCtx,
+                         QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
+                         BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName
+                                             << "aborted")));
+
+            if (hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when persisting migrate abort decision");
+            }
+        });
 }
 
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
@@ -441,17 +529,43 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                    false /*multi*/);
     deleteOp.setDeletes({query});
 
-    sendToRecipient(opCtx,
-                    recipientId,
-                    deleteOp,
-                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "cancel range deletion on recipient", [&](OperationContext* newOpCtx) {
+            hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
+
+            sendToRecipient(
+                newOpCtx,
+                recipientId,
+                deleteOp,
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+
+            if (hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when deleting range deletion on recipient");
+            }
+        });
 }
 
 void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
                                     const UUID& deletionTaskId,
                                     const WriteConcernOptions& writeConcern) {
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
-    store.remove(opCtx, QUERY(RangeDeletionTask::kIdFieldName << deletionTaskId), writeConcern);
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "cancel local range deletion", [&](OperationContext* newOpCtx) {
+            hangInDeleteRangeDeletionLocallyInterruptible.pauseWhileSet(newOpCtx);
+            PersistentTaskStore<RangeDeletionTask> store(newOpCtx,
+                                                         NamespaceString::kRangeDeletionNamespace);
+            store.remove(
+                newOpCtx, QUERY(RangeDeletionTask::kIdFieldName << deletionTaskId), writeConcern);
+
+            if (hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when deleting range deletion locally");
+            }
+        });
 }
 
 void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
@@ -472,10 +586,23 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     updateEntry.setUpsert(false);
     updateOp.setUpdates({updateEntry});
 
-    sendToRecipient(opCtx,
-                    recipientId,
-                    updateOp,
-                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {
+            hangInReadyRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
+
+            sendToRecipient(
+                newOpCtx,
+                recipientId,
+                updateOp,
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+
+            if (hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when initiating range deletion on recipient");
+            }
+        });
 }
 
 void advanceTransactionOnRecipient(OperationContext* opCtx,
@@ -503,7 +630,18 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
     auto query = QUERY(RangeDeletionTask::kIdFieldName << migrationId);
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
-    store.update(opCtx, query, update);
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "ready local range deletion", [&](OperationContext* newOpCtx) {
+            hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(newOpCtx);
+            store.update(newOpCtx, query, update);
+
+            if (hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when initiating range deletion locally");
+            }
+        });
 }
 
 void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId) {
@@ -525,20 +663,8 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     const auto ensureChunkVersionIsGreaterThanRequestBSON =
         ensureChunkVersionIsGreaterThanRequest.toBSON({});
 
-    const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-
-    for (int attempts = 1;; attempts++) {
-        try {
-            auto newClient =
-                opCtx->getServiceContext()->makeClient("ensureChunkVersionIsGreaterThan");
-            {
-                stdx::lock_guard<Client> lk(*newClient.get());
-                newClient->setSystemOperationKillable(lk);
-            }
-            AlternativeClientRegion acr(newClient);
-            auto newOpCtxPtr = cc().makeOperationContext();
-            auto newOpCtx = newOpCtxPtr.get();
-
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "ensureChunkVersionIsGreaterThan", [&](OperationContext* newOpCtx) {
             hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(newOpCtx);
 
             const auto ensureChunkVersionIsGreaterThanResponse =
@@ -564,49 +690,20 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                     ErrorCodes::InternalError,
                     "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
             }
-            break;
-        } catch (const DBException& ex) {
-            // If the server is already doing a clean shutdown, join the shutdown.
-            if (globalInShutdownDeprecated()) {
-                shutdown(waitForShutdown());
-            }
-
-            // If this node has stepped down, stop retrying.
-            uassert(
-                ErrorCodes::InterruptedDueToReplStateChange,
-                "Stepped down while trying to send ensureChunkVersionIsGreaterThan to recover a "
-                "migration commit decision",
-                repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-                        repl::MemberState::RS_PRIMARY &&
-                    term == repl::ReplicationCoordinator::get(opCtx)->getTerm());
-
-            LOGV2(22035,
-                  "_configsvrEnsureChunkVersionIsGreaterThan failed after {attempts} attempts "
-                  "{causedBy_ex_toStatus} . Will try again.",
-                  "attempts"_attr = attempts,
-                  "causedBy_ex_toStatus"_attr = causedBy(redact(ex.toStatus())));
-        }
-    }
+        });
 }
 
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-
-    for (int attempts = 1;; attempts++) {
-        try {
-            auto newClient =
-                opCtx->getServiceContext()->makeClient("refreshFilteringMetadataUntilSuccess");
-            {
-                stdx::lock_guard<Client> lk(*newClient.get());
-                newClient->setSystemOperationKillable(lk);
-            }
-            AlternativeClientRegion acr(newClient);
-            auto newOpCtxPtr = cc().makeOperationContext();
-            auto newOpCtx = newOpCtxPtr.get();
-
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "refreshFilteringMetadataUntilSuccess", [&nss](OperationContext* newOpCtx) {
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
 
-            forceShardFilteringMetadataRefresh(newOpCtx, nss, true);
+            try {
+                forceShardFilteringMetadataRefresh(newOpCtx, nss, true);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // A filtering metadata refresh can throw NamespaceNotFound if the database was
+                // dropped from the cluster.
+            }
 
             if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
                     .shouldFail()) {
@@ -615,33 +712,7 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
                 uasserted(ErrorCodes::InternalError,
                           "simulate an error response for forceShardFilteringMetadataRefresh");
             }
-            break;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // A filtering metadata refresh can throw NamespaceNotFound if the database was dropped
-            // from the cluster.
-            break;
-        } catch (const DBException& ex) {
-            // If the server is already doing a clean shutdown, join the shutdown.
-            if (globalInShutdownDeprecated()) {
-                shutdown(waitForShutdown());
-            }
-
-            // If this node has stepped down, stop retrying.
-            uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                    "Stepped down while trying to force a filtering metadata refresh to recover a "
-                    "migration commit decision",
-                    repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-                            repl::MemberState::RS_PRIMARY &&
-                        term == repl::ReplicationCoordinator::get(opCtx)->getTerm());
-
-            LOGV2(22036,
-                  "Failed to refresh metadata for {nss_ns} after {attempts} attempts "
-                  "{causedBy_ex_toStatus}. Will try to refresh again.",
-                  "nss_ns"_attr = nss.ns(),
-                  "attempts"_attr = attempts,
-                  "causedBy_ex_toStatus"_attr = causedBy(redact(ex.toStatus())));
-        }
-    }
+        });
 }
 
 void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {

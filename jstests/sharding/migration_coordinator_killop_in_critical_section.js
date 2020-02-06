@@ -73,7 +73,7 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
             matchingOps = donorShard.getDB("admin")
                               .aggregate([
                                   {$currentOp: {'allUsers': true, 'idleConnections': true}},
-                                  {$match: {desc: opToKillThreadName}}
+                                  {$match: {desc: {$regex: opToKillThreadName}}}
                               ])
                               .toArray();
             // Wait for the opid to be present, since it's possible for currentOp to run after the
@@ -93,6 +93,12 @@ testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
                          "ensureChunkVersionIsGreaterThan");
 testKillOpAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible",
                          "refreshFilteringMetadataUntilSuccess");
+testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible",
+                         "persist migrate commit decision");
+testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible",
+                         "cancel range deletion on recipient");
+testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible",
+                         "ready local range deletion");
 
 st.stop();
 })();

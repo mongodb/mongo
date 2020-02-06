@@ -73,4 +73,7 @@ function testShutDownAfterFailPoint(failPointName) {
 
 testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible");
 testShutDownAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible");
+testShutDownAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible");
+testShutDownAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible");
+testShutDownAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible");
 })();
