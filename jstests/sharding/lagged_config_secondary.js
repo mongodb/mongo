@@ -7,6 +7,7 @@
 // server, but this test is designed to make mongos time out when reading from the config server.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
 
 (function() {
 var st =

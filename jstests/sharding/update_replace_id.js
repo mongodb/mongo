@@ -16,6 +16,9 @@
 (function() {
 load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
 
+// Test deliberately inserts orphans outside of migrations.
+TestData.skipCheckOrphans = true;
+
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1, other: {enableBalancer: false}});
 
 const mongosDB = st.s0.getDB(jsTestName());

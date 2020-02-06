@@ -15,6 +15,7 @@
 // test, one shard does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
 
 (function() {
 'use strict';

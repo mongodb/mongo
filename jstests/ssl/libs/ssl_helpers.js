@@ -204,6 +204,13 @@ function mixedShardTest(options1, options2, shouldSucceed, disableResumableRange
                     'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
                 st.s.getDB('$external')
                     .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+
+                // Check orphan hook needs a privileged user to auth as.
+                // Works only for stand alone shards.
+                st._connections.forEach((shardConn) => {
+                    shardConn.getDB('$external')
+                        .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+                });
             }
 
             st.stop();

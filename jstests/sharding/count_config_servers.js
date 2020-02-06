@@ -7,6 +7,7 @@
 // shuts down 2 out of the 3 config servers. Therefore, we cannot do the check on this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
 
 (function() {
 "use strict";

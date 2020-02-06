@@ -14,6 +14,7 @@
 // This test shuts down a shard primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
 
 load('jstests/libs/parallel_shell_helpers.js');
 

@@ -12,6 +12,9 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/libs/sharded_index_util.js");
 load("jstests/sharding/libs/shard_versioning_util.js");
 
+// Test deliberately inserts orphans outside of migration.
+TestData.skipCheckOrphans = true;
+
 /*
  * Runs the command after performing chunk operations to make the primary shard (shard0) not own
  * any chunks for the collection, and the subset of non-primary shards (shard1 and shard2) that

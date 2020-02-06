@@ -15,3 +15,5 @@ executor:
         TestData:
           useRandomBinVersionsWithinReplicaSet: true
           mongosBinVersion: 'last-stable'
+          # TODO: SERVER-45959 remove after v4.4
+          skipCheckOrphans: true

@@ -25,6 +25,7 @@ selector:
   - jstests/sharding/migration_coordinator_failover.js
   - jstests/sharding/migration_coordinator_killop_in_critical_section.js
   - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
+  - jstests/sharding/test_stacked_migration_cleanup.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable when SERVER-43310 is backported
@@ -38,4 +39,6 @@ executor:
           mongosBinVersion: 'last-stable'
           shardMixedBinVersions: true
           skipCheckingUUIDsConsistentAcrossCluster: true
+          # TODO: SERVER-45959 remove after v4.4
+          skipCheckOrphans: true
       nodb: ''

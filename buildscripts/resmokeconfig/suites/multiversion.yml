@@ -23,3 +23,7 @@ executor:
   config:
     shell_options:
       nodb: ''
+      global_vars:
+        TestData:
+          # TODO: SERVER-45959 remove after v4.4
+          skipCheckOrphans: true

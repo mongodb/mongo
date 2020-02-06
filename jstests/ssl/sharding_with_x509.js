@@ -82,5 +82,9 @@ if (st.configRS) {
 const x509User = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 st.s.getDB('$external').createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
 
+// Orphan checks needs a privileged user to auth as.
+st.shard0.getDB('$external').createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+st.shard1.getDB('$external').createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+
 st.stop();
 })();
