@@ -391,7 +391,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                 return Status::OK();
             }
 
-            if (!uuidToDrop || (uuidToDrop && uuidToDrop != targetColl->uuid())) {
+            if (!uuidToDrop || uuidToDrop != targetColl->uuid()) {
                 // We need to rename the targetColl to a temporary name.
                 auto status = renameTargetCollectionToTmp(
                     opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
