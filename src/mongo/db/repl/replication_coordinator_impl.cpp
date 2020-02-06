@@ -3467,6 +3467,19 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         log() << startupWarningsLog;
     }
 
+    // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
+    // customized is if it's different to the implicit defaults of { w: 1, wtimeout: 0 }.
+    if (const auto& wc = newConfig.getDefaultWriteConcern();
+        !(wc.wNumNodes == 1 && wc.wTimeout == 0)) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: Replica set config contains customized getLastErrorDefaults,"
+              << startupWarningsLog;
+        log() << "**          which are deprecated. Use setDefaultRWConcern instead to set a"
+              << startupWarningsLog;
+        log() << "**          cluster-wide default writeConcern." << startupWarningsLog;
+        log() << startupWarningsLog;
+    }
+
 
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
