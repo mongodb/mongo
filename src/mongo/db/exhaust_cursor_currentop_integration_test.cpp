@@ -194,11 +194,6 @@ void runOneGetMore(DBClientBase* conn,
     // Re-enable the original failpoint to catch the next getMore, and release the current one.
     setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, true);
     setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn, false);
-
-    ASSERT(queryCursor->more());
-    // Assuming documents start with {a: 0}, the (nDocsReturned+1)-th document should have {a:
-    // nDocsReturned}. See initTestCollection().
-    ASSERT_BSONOBJ_EQ(queryCursor->nextSafe(), BSON("a" << nDocsReturned));
 }
 }  // namespace
 
