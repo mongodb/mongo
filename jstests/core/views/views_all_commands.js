@@ -7,6 +7,7 @@
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   uses_map_reduce_with_temp_collections,
+//   requires_emptycapped,
 // ]
 //
 // Tagged as 'requires_fcv_44', since this test cannot run against versions less then 4.4. This is
