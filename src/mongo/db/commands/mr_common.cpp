@@ -52,8 +52,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression_function.h"
-#include "mongo/db/pipeline/expression_js_emit.h"
+#include "mongo/db/pipeline/expression_javascript.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log.h"
@@ -140,15 +139,14 @@ auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string
 auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx,
                        MapReduceJavascriptCodeOrNull codeObj) {
     return codeObj.getCode().map([&](auto&& code) {
-        auto jsExpression = ExpressionFunction::create(
+        auto jsExpression = ExpressionInternalJs::create(
             expCtx,
             ExpressionArray::create(
                 expCtx,
                 make_vector<boost::intrusive_ptr<Expression>>(
                     ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState),
                     ExpressionFieldPath::parse(expCtx, "$value", expCtx->variablesParseState))),
-            code,
-            ExpressionFunction::kJavaScript);
+            code);
         auto node = std::make_unique<projection_executor::InclusionNode>(
             ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
         node->addProjectionForPath(FieldPath{"_id"s});
@@ -189,24 +187,23 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
     // Because of communication for sharding, $merge must hold on to a serializable BSON object
     // at the moment so we reparse here. Note that the reduce function signature expects 2
     // arguments, the first being the key and the second being the array of values to reduce.
-    auto reduceObj =
-        BSON("args" << BSON_ARRAY("$_id" << BSON_ARRAY("$value"
-                                                       << "$$new.value"))
-                    << "body" << reduceCode << "lang" << ExpressionFunction::kJavaScript);
+    auto reduceObj = BSON("args" << BSON_ARRAY("$_id" << BSON_ARRAY("$value"
+                                                                    << "$$new.value"))
+                                 << "eval" << reduceCode);
 
-    auto reduceSpec = BSON(DocumentSourceProject::kStageName << BSON(
-                               "value" << BSON(ExpressionFunction::kExpressionName << reduceObj)));
+    auto reduceSpec =
+        BSON(DocumentSourceProject::kStageName
+             << BSON("value" << BSON(ExpressionInternalJs::kExpressionName << reduceObj)));
     auto pipelineSpec = boost::make_optional(std::vector<BSONObj>{reduceSpec});
 
     // Build finalize $project stage if given.
     if (finalizeCode && finalizeCode->hasCode()) {
         auto finalizeObj = BSON("args" << BSON_ARRAY("$_id"
                                                      << "$value")
-                                       << "body" << finalizeCode->getCode().get() << "lang"
-                                       << ExpressionFunction::kJavaScript);
+                                       << "eval" << finalizeCode->getCode().get());
         auto finalizeSpec =
             BSON(DocumentSourceProject::kStageName
-                 << BSON("value" << BSON(ExpressionFunction::kExpressionName << finalizeObj)));
+                 << BSON("value" << BSON(ExpressionInternalJs::kExpressionName << finalizeObj)));
         pipelineSpec->emplace_back(std::move(finalizeSpec));
     }
 

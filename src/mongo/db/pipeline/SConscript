@@ -103,8 +103,7 @@ env.Library(
 env.Library(
     target='expression_javascript',
     source=[
-        'expression_function.cpp',
-        'expression_js_emit.cpp'
+        'expression_javascript.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/scripting/scripting_common',

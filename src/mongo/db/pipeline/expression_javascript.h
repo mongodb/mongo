@@ -32,6 +32,10 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 
+/**
+ * This file contains all expressions which make use of JavaScript execution and depend on the JS
+ * engine to operate.
+ */
 namespace mongo {
 
 /**
@@ -95,4 +99,41 @@ private:
     std::string _funcSource;
 };
 
+/**
+ * This expression takes a Javascript function and an array of arguments to pass to it. It returns
+ * the return value of the Javascript function with the given arguments.
+ */
+class ExpressionInternalJs final : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+    static boost::intrusive_ptr<ExpressionInternalJs> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::intrusive_ptr<Expression> passedArgs,
+        std::string funcSourceString) {
+        return new ExpressionInternalJs{expCtx, passedArgs, std::move(funcSourceString)};
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    Value serialize(bool explain) const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    static constexpr auto kExpressionName = "$_internalJs"_sd;
+
+private:
+    ExpressionInternalJs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         boost::intrusive_ptr<Expression> passedArgs,
+                         std::string funcSourceString);
+    void _doAddDependencies(DepsTracker* deps) const final override;
+
+    const boost::intrusive_ptr<Expression>& _passedArgs;
+    std::string _funcSource;
+};
 }  // namespace mongo
