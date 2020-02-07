@@ -942,6 +942,8 @@ buildvariants:
   expansions:
     <<: *compile-expansions
     compile-variant: -wtdevelop
+  tasks:
+    - name: compile
 
 - name: compile-rhel70
   display_name: Compile for Atlas-like
