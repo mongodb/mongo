@@ -111,7 +111,9 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
     // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
     // operations will be able to have a resolved view definition.
     NamespaceString lookupCollNs("a", "lookupColl");
+    NamespaceString unionCollNs("b", "unionColl");
     ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
+    ctx->setResolvedNamespace(unionCollNs, {unionCollNs, std::vector<BSONObj>{}});
 
     auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
     outputPipe->optimizePipeline();
@@ -1853,6 +1855,160 @@ TEST(PipelineOptimizationTest, SortSkipProjSkipLimSkipLimBecomesTopKSortSkipProj
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, MatchGetsPushedIntoBothChildrenOfUnion) {
+    setTestCommandsEnabled(true);  // TODO SERVER-45712 remove this line.
+    assertPipelineOptimizesTo(
+        "["
+        " {$unionWith: 'unionColl'},"
+        " {$match: {x: {$eq: 2}}}"
+        "]",
+        "[{$match: {x: {$eq: 2}}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: [{$match: {x: {$eq: 2}}}]"
+        " }}]");
+
+    // Test that the $match can get pulled forward through other stages.
+    assertPipelineOptimizesAndSerializesTo(
+        "["
+        " {$unionWith: 'unionColl'},"
+        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}},"
+        " {$sort: {score: 1}},"
+        " {$match: {x: {$eq: 2}}}"
+        "]",
+        "["
+        " {$match: {x: {$eq: 2}}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: [{$match: {x: {$eq: 2}}}]"
+        " }},"
+        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}},"
+        " {$sort: {sortKey: {score: 1}}}"
+        "]",
+        "["
+        " {$match: {x: {$eq: 2}}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: [{$match: {x: {$eq: 2}}}]"
+        " }},"
+        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}},"
+        " {$sort: {score: 1}}"
+        "]");
+
+    // Test that the $match can get pulled forward from after the $unionWith to inside, then to the
+    // beginning of a $unionWith subpipeline.
+    // TODO: SERVER-45535 the explained inner pipeline should have the 'sortKey' form for $sort.
+    assertPipelineOptimizesAndSerializesTo(
+        "["
+        " {$unionWith: {"
+        "    coll: 'unionColl',"
+        "    pipeline: ["
+        "      {$project: {y: false}},"
+        "      {$sort: {score: 1}}"
+        "    ]"
+        " }},"
+        " {$match: {x: {$eq: 2}}}"
+        "]",
+        "["
+        " {$match: {x: {$eq: 2}}},"
+        " {$unionWith: {"
+        "    coll: 'unionColl',"
+        "    pipeline: ["
+        "      {$match: {x: {$eq: 2}}},"
+        "      {$project: {y: false}},"
+        "      {$sort: {score: 1}}"
+        "    ]"
+        " }}"
+        "]",
+        "["
+        " {$match: {x: {$eq: 2}}},"
+        " {$unionWith: {"
+        "    coll: 'unionColl',"
+        "    pipeline: ["
+        "      {$match: {x: {$eq: 2}}},"
+        "      {$project: {y: false}},"
+        "      {$sort: {score: 1}}"
+        "    ]"
+        " }}"
+        "]");
+}
+
+TEST(PipelineOptimizationTest, ProjectGetsPushedIntoBothChildrenOfUnion) {
+    setTestCommandsEnabled(true);  // TODO SERVER-45712 remove this line.
+    assertPipelineOptimizesTo(
+        "["
+        " {$unionWith: 'unionColl'},"
+        " {$project: {x: false}}"
+        "]",
+        "[{$project: {x: false}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: [{$project: {x: false}}]"
+        " }}]");
+
+    // Test an inclusion projection.
+    assertPipelineOptimizesTo(
+        "["
+        " {$unionWith: 'unionColl'},"
+        " {$project: {x: true}}"
+        "]",
+        "[{$project: {_id: true, x: true}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: [{$project: {_id: true, x: true}}]"
+        " }}]");
+
+    // Test a $set.
+    assertPipelineOptimizesTo(
+        "["
+        " {$unionWith: 'unionColl'},"
+        " {$set: {x: 'new value'}}"
+        "]",
+        "[{$set: {x: {$const: 'new value'}}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: [{$set: {x: {$const: 'new value'}}}]"
+        " }}]");
+}
+
+TEST(PipelineOptimizationTest, UnionWithViewsSampleUseCase) {
+    setTestCommandsEnabled(true);  // TODO SERVER-45712 remove this line.
+    // Test that if someone uses $unionWith to query one logical collection from four physical
+    // collections then the query and projection can get pushed down to next to each collection
+    // access.
+    assertPipelineOptimizesTo(
+        "["
+        " {$unionWith: 'unionColl'},"
+        " {$unionWith: 'unionColl'},"
+        " {$unionWith: 'unionColl'},"
+        " {$match: {business: {$eq: 'good'}}},"
+        " {$project: {_id: true, x: true}}"
+        "]",
+        "[{$match: {business: {$eq: 'good'}}},"
+        " {$project: {_id: true, x: true}},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: ["
+        "     {$match: {business: {$eq: 'good'}}},"
+        "     {$project: {_id: true, x: true}}"
+        "   ]"
+        " }},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: ["
+        "     {$match: {business: {$eq: 'good'}}},"
+        "     {$project: {_id: true, x: true}}"
+        "   ]"
+        " }},"
+        " {$unionWith: {"
+        "   coll: 'unionColl',"
+        "   pipeline: ["
+        "     {$match: {business: {$eq: 'good'}}},"
+        "     {$project: {_id: true, x: true}}"
+        "   ]"
+        " }}"
+        "]");
+}
 }  // namespace Local
 
 namespace Sharded {

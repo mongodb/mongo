@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 
@@ -42,6 +44,12 @@ namespace mongo {
  */
 class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
+    virtual boost::intrusive_ptr<DocumentSource> clone() const {
+        auto list = DocumentSource::parse(pExpCtx, serialize().getDocument().toBson());
+        invariant(list.size() == 1);
+        return list.front();
+    }
+
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
