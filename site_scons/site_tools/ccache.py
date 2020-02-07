@@ -82,18 +82,17 @@ def generate(env):
     if not exists(env):
         return
 
+    # Propagate CCACHE related variables into the command environment
+    for var, host_value in os.environ.items():
+        if var.startswith("CCACHE_"):
+            env["ENV"][var] = host_value
+
     # Record our found CCACHE_VERSION. Other tools that need to know
     # about ccache (like iecc) should query this variable to determine
     # if ccache is active. Looking at the CCACHE variable in the
     # environment is not sufficient, since the user may have set it,
     # but it doesn't work or is out of date.
     env["CCACHE_VERSION"] = _ccache_version_found
-
-    # ccache does not support response files so force scons to always
-    # use the full command
-    #
-    # Note: This only works for Python versions >= 3.5
-    env["MAXLINELENGTH"] = math.inf
 
     # Add ccache to the relevant command lines. Wrap the reference to
     # ccache in the $( $) pattern so that turning ccache on or off
