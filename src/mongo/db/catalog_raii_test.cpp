@@ -94,8 +94,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadline) {
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
-    Lock::GlobalLock gLock1(
-        client1.second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
     ASSERT(gLock1.isLocked());
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs); },
@@ -105,7 +104,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
-    AutoGetDb db(client2.second.get(), nss.db(), MODE_IX, Date_t::now());
+    AutoGetDb db(client2.second.get(), nss.db(), MODE_IX);
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now()); },
         Milliseconds(0));
@@ -114,10 +113,9 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
-    AutoGetDb db(client2.second.get(), nss.db(), MODE_IX, Date_t::now());
-    failsWithLockTimeout(
-        [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now()); },
-        Milliseconds(0));
+    AutoGetDb db(client2.second.get(), nss.db(), MODE_IX);
+    failsWithLockTimeout([&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t{}); },
+                         Milliseconds(0));
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetOrCreateDbDeadline) {
@@ -161,8 +159,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
-    Lock::GlobalLock gLock1(
-        client1.second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
     ASSERT(client1.second->lockState()->isLocked());
     failsWithLockTimeout(
         [&] {

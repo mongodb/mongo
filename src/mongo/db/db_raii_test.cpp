@@ -104,8 +104,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockDeadline) {
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadGlobalLockDeadline) {
-    Lock::GlobalLock gLock1(
-        client1.second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
     ASSERT(client1.second->lockState()->isLocked());
     failsWithLockTimeout(
         [&] {
