@@ -29,15 +29,12 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -213,12 +210,6 @@ private:
  */
 class DocumentSourceOplogMatch final : public DocumentSourceMatch {
 public:
-    DocumentSourceOplogMatch(const DocumentSourceOplogMatch& other) : DocumentSourceMatch(other) {}
-
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
-    }
-
     static boost::intrusive_ptr<DocumentSourceOplogMatch> create(
         BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -237,7 +228,7 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
 private:
-    using DocumentSourceMatch::DocumentSourceMatch;
+    DocumentSourceOplogMatch(BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 };
 
 }  // namespace mongo

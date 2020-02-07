@@ -30,24 +30,16 @@
 #pragma once
 
 #include <memory>
-#include <type_traits>
 #include <utility>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
-    template <typename T, typename... Args, typename>
-    friend boost::intrusive_ptr<T> make_intrusive(Args&&...);
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
-    }
-
     static constexpr StringData kStageName = "$match"_sd;
     /**
      * Convenience method for creating a $match stage.
@@ -178,11 +170,6 @@ public:
     }
 
 protected:
-    DocumentSourceMatch(const DocumentSourceMatch& other)
-        : DocumentSourceMatch(
-              other.serialize().getDocument().toBson().firstElement().embeddedObject(),
-              other.pExpCtx) {}
-
     GetNextResult doGetNext() override;
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
