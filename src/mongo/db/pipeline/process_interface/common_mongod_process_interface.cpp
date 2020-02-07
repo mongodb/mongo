@@ -152,13 +152,6 @@ CommonMongodProcessInterface::createTransactionHistoryIterator(repl::OpTime time
         new TransactionHistoryIterator(time, permitYield));
 }
 
-bool CommonMongodProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-    const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
-    return metadata->isSharded();
-}
-
 std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationContext* opCtx,
                                                                   const NamespaceString& ns,
                                                                   StringData host,

@@ -42,6 +42,11 @@ class ShardServerProcessInterface final : public CommonMongodProcessInterface {
 public:
     using CommonMongodProcessInterface::CommonMongodProcessInterface;
 
+    /**
+     * Note: Information returned can be stale. Caller should always attach shardVersion when
+     * sending request against nss based on this information.
+     */
+    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
                                       ChunkVersion targetCollectionVersion) const final;

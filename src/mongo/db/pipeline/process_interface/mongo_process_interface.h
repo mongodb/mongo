@@ -128,7 +128,8 @@ public:
     /**
      * Note that in some rare cases this could return a false negative but will never return a false
      * positive. This method will be fixed in the future once it becomes possible to avoid false
-     * negatives.
+     * negatives. Caller should always attach shardVersion when sending request against nss based
+     * on this information.
      */
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 

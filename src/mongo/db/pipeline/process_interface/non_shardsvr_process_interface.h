@@ -47,6 +47,10 @@ public:
 
     virtual ~NonShardServerProcessInterface() = default;
 
+    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
+        return false;
+    }
+
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
                   std::vector<BSONObj>&& objs,

@@ -73,6 +73,13 @@ void attachWriteConcern(BatchedCommandRequest* request, const WriteConcernOption
 
 }  // namespace
 
+bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
+    const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+    return metadata->isSharded();
+}
+
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,

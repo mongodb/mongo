@@ -55,12 +55,6 @@ public:
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
 
-    /**
-     * Note: Information returned can be stale. Caller should always attach shardVersion when
-     * sending request against nss based on this information.
-     */
-    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
-
     std::vector<Document> getIndexStats(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         StringData host,
