@@ -81,14 +81,14 @@ public:
 
     // Helpers to generate ReplOperation.
     static ReplOperation makeInsertOperation(const NamespaceString& nss,
-                                             boost::optional<UUID> uuid,
+                                             UUID uuid,
                                              const BSONObj& docToInsert);
     static ReplOperation makeUpdateOperation(const NamespaceString nss,
-                                             boost::optional<UUID> uuid,
+                                             UUID uuid,
                                              const BSONObj& update,
                                              const BSONObj& criteria);
     static ReplOperation makeDeleteOperation(const NamespaceString& nss,
-                                             boost::optional<UUID> uuid,
+                                             UUID uuid,
                                              const BSONObj& docToDelete);
 
     static ReplOperation makeCreateCommand(const NamespaceString nss,

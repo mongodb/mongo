@@ -310,7 +310,7 @@ protected:
 
     const LogicalSessionId _sessionId{makeLogicalSessionIdForTest()};
     const TxnNumber _txnNumber{20};
-    const OptionalCollectionUUID _uuid = UUID::gen();
+    const UUID _uuid = UUID::gen();
 
     OpObserverMock* _opObserver = nullptr;
 };

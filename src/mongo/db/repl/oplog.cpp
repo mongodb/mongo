@@ -604,9 +604,7 @@ std::pair<OptionalCollectionUUID, NamespaceString> extractCollModUUIDAndNss(
     return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, *nsByUUID);
 }
 
-NamespaceString extractNsFromUUID(OperationContext* opCtx, const boost::optional<UUID>& ui) {
-    invariant(ui);
-    auto uuid = ui.get();
+NamespaceString extractNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
     auto& catalog = CollectionCatalog::get(opCtx);
     auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), nss);
@@ -617,7 +615,7 @@ NamespaceString extractNsFromUUIDorNs(OperationContext* opCtx,
                                       const NamespaceString& ns,
                                       const boost::optional<UUID>& ui,
                                       const BSONObj& cmd) {
-    return ui ? extractNsFromUUID(opCtx, ui) : extractNs(ns, cmd);
+    return ui ? extractNsFromUUID(opCtx, ui.get()) : extractNs(ns, cmd);
 }
 
 using OpApplyFn = std::function<Status(
@@ -799,40 +797,32 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
-          return dropIndexes(opCtx,
-                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
-                             cmd,
-                             &resultWeDontCareAbout);
+          return dropIndexes(
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
-          return dropIndexes(opCtx,
-                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
-                             cmd,
-                             &resultWeDontCareAbout);
+          return dropIndexes(
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
-          return dropIndexes(opCtx,
-                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
-                             cmd,
-                             &resultWeDontCareAbout);
+          return dropIndexes(
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
-          return dropIndexes(opCtx,
-                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
-                             cmd,
-                             &resultWeDontCareAbout);
+          return dropIndexes(
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",

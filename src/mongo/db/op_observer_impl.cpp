@@ -413,7 +413,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
 
         for (auto iter = first; iter != last; iter++) {
-            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc);
+            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid.get(), iter->doc);
             txnParticipant.addTransactionOperation(opCtx, operation);
         }
     } else {
@@ -563,7 +563,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation = MutableOplogEntry::makeDeleteOperation(
-            nss, uuid, deletedDoc ? deletedDoc.get() : documentKey);
+            nss, uuid.get(), deletedDoc ? deletedDoc.get() : documentKey);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         opTime = replLogDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);

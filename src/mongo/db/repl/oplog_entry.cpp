@@ -155,7 +155,7 @@ const int MutableOplogEntry::kOplogVersion = 2;
 
 // Static
 ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
-                                                     boost::optional<UUID> uuid,
+                                                     UUID uuid,
                                                      const BSONObj& docToInsert) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kInsert);
@@ -191,7 +191,7 @@ BSONObj MutableOplogEntry::makeCreateCollCmdObj(const NamespaceString& collectio
 }
 
 ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
-                                                     boost::optional<UUID> uuid,
+                                                     UUID uuid,
                                                      const BSONObj& update,
                                                      const BSONObj& criteria) {
     ReplOperation op;
@@ -233,7 +233,7 @@ ReplOperation MutableOplogEntry::makeCreateIndexesCommand(const NamespaceString 
 }
 
 ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
-                                                     boost::optional<UUID> uuid,
+                                                     UUID uuid,
                                                      const BSONObj& docToDelete) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kDelete);
