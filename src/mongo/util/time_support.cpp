@@ -55,6 +55,10 @@
 #include <mach/mach.h>
 #endif
 
+#if !defined(_WIN32)
+#include <sys/time.h>
+#endif
+
 #ifdef __sun
 // Some versions of Solaris do not have timegm defined, so fall back to our implementation when
 // building on Solaris.  See SERVER-13446.
@@ -918,7 +922,6 @@ unsigned long long curTimeMicros64() {
 }
 
 #else
-#include <sys/time.h>
 unsigned long long curTimeMillis64() {
     timeval tv;
     gettimeofday(&tv, nullptr);
