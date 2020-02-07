@@ -575,6 +575,7 @@ icuEnv.CppUnitTest(
         'itoa_test.cpp',
         'latch_analyzer_test.cpp',
         'lockable_adapter_test.cpp',
+        'log_with_sampling_test.cpp',
         'lru_cache_test.cpp',
         'md5_test.cpp',
         'md5main.cpp',
