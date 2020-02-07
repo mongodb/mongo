@@ -114,7 +114,7 @@ public:
     virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
 
     // Methods from JournalListener.
-    virtual JournalListener::Token getToken();
+    virtual JournalListener::Token getToken(OperationContext* opCtx, stdx::unique_lock<Latch>& lk);
     virtual void onDurable(const JournalListener::Token& token);
 
     virtual void setupNoopWriter(Seconds waitTime);

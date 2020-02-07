@@ -80,7 +80,6 @@ public:
         BSONObjBuilder sub;
 
         bool ok = true;
-        int numFiles = 0;
 
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
         std::vector<ShardId> shardIds;
@@ -108,11 +107,11 @@ public:
                 ok = false;
                 errmsg = x["errmsg"].String();
             }
-
-            numFiles += x["numFiles"].numberInt();
         }
 
-        result.append("numFiles", numFiles);
+        // This field has had dummy value since MMAP went away. It is undocumented.
+        // Maintaining it so as not to cause unnecessary user pain across upgrades.
+        result.append("numFiles", 1);
         result.append("all", sub.obj());
 
         return ok;

@@ -645,8 +645,8 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     return firstError;
 }
 
-int StorageEngineImpl::flushAllFiles(OperationContext* opCtx, bool sync) {
-    return _engine->flushAllFiles(opCtx, sync);
+void StorageEngineImpl::flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) {
+    _engine->flushAllFiles(opCtx, callerHoldsReadLock);
 }
 
 Status StorageEngineImpl::beginBackup(OperationContext* opCtx) {

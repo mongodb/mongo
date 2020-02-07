@@ -213,10 +213,10 @@ public:
         return status;
     }
 
-    // optional
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync) {
-        return 0;
-    }
+    /**
+     * See StorageEngine::flushAllFiles for details
+     */
+    virtual void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) {}
 
     /**
      * See StorageEngine::beginBackup for details

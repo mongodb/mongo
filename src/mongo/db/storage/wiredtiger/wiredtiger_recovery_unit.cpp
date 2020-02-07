@@ -247,9 +247,12 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     invariant(!_inUnitOfWork(), toString(_getState()));
     invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
-    const bool forceCheckpoint = false;
-    const bool stableCheckpoint = false;
-    _sessionCache->waitUntilDurable(opCtx, forceCheckpoint, stableCheckpoint);
+
+    // Flushes the journal log to disk. Checkpoints all data if journaling is disabled.
+    _sessionCache->waitUntilDurable(opCtx,
+                                    WiredTigerSessionCache::Fsync::kJournal,
+                                    WiredTigerSessionCache::UseJournalListener::kUpdate);
+
     return true;
 }
 
@@ -257,11 +260,19 @@ bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable(OperationContext*
                                                                bool stableCheckpoint) {
     invariant(!_inUnitOfWork(), toString(_getState()));
     invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
-    const bool forceCheckpoint = true;
-    // Calling `waitUntilDurable` with `forceCheckpoint` set to false only performs a log
-    // (journal) flush, and thus has no effect on unjournaled writes. Setting `forceCheckpoint` to
-    // true will lock in stable writes to unjournaled tables.
-    _sessionCache->waitUntilDurable(opCtx, forceCheckpoint, stableCheckpoint);
+
+    // Take a checkpoint, rather than only flush the (oplog) journal, in order to lock in stable
+    // writes to unjournaled tables.
+    //
+    // If 'stableCheckpoint' is set, then we will only checkpoint data up to and including the
+    // stable_timestamp set on WT at the time of the checkpoint. Otherwise, we will checkpoint all
+    // of the data.
+    WiredTigerSessionCache::Fsync fsyncType = stableCheckpoint
+        ? WiredTigerSessionCache::Fsync::kCheckpointStableTimestamp
+        : WiredTigerSessionCache::Fsync::kCheckpointAll;
+    _sessionCache->waitUntilDurable(
+        opCtx, fsyncType, WiredTigerSessionCache::UseJournalListener::kUpdate);
+
     return true;
 }
 
@@ -359,9 +370,12 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     if (_isTimestamped) {
         if (!_orderedCommit) {
             // We only need to update oplog visibility where commits can be out-of-order with
-            // respect to their assigned optime and such commits might otherwise be visible.
+            // respect to their assigned optime. This will ensure the oplog read timestamp gets
+            // updated when oplog 'holes' are filled: the last commit filling the last hole will
+            // prompt the oplog read timestamp to be forwarded.
+            //
             // This should happen only on primary nodes.
-            _oplogManager->triggerJournalFlush();
+            _oplogManager->triggerOplogVisibilityUpdate();
         }
         _isTimestamped = false;
     }

@@ -64,7 +64,7 @@ void EphemeralForTestRecoveryUnit::doCommitUnitOfWork() {
     // SERVER-22575: Remove this once we add a generic mechanism to periodically wait
     // for durability.
     if (_waitUntilDurableCallback) {
-        _waitUntilDurableCallback();
+        _waitUntilDurableCallback(nullptr);
     }
 
     _setState(State::kInactive);
@@ -91,7 +91,7 @@ void EphemeralForTestRecoveryUnit::doAbortUnitOfWork() {
 
 bool EphemeralForTestRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     if (_waitUntilDurableCallback) {
-        _waitUntilDurableCallback();
+        _waitUntilDurableCallback(opCtx);
     }
     return true;
 }

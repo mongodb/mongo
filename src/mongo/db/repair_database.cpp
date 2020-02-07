@@ -77,7 +77,7 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    engine->flushAllFiles(opCtx, true);
+    engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
     return Status::OK();
 }
 
@@ -85,7 +85,6 @@ namespace {
 Status repairCollections(OperationContext* opCtx,
                          StorageEngine* engine,
                          const std::string& dbName) {
-
     auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
 
     for (const auto& nss : colls) {

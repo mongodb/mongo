@@ -49,19 +49,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
 using namespace mongo::repl;
 
-/**
- * Generates a unique namespace from the test registration agent.
- */
-template <typename T>
-NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
-    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName()) +
-                           suffix);
-}
+NamespaceString kMinValidNss("local", "replset.minvalid");
+NamespaceString kOplogTruncateAfterPointNss("local", "replset.oplogTruncateAfterPoint");
 
 /**
  * Returns min valid document.
@@ -76,26 +70,6 @@ BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minV
         }
         return mv;
     });
-}
-
-/**
- * Returns oplog truncate after point document.
- */
-BSONObj getOplogTruncateAfterPointDocument(OperationContext* opCtx,
-                                           const NamespaceString& oplogTruncateAfterPointNss) {
-    return writeConflictRetry(
-        opCtx,
-        "getOplogTruncateAfterPointDocument",
-        oplogTruncateAfterPointNss.ns(),
-        [opCtx, oplogTruncateAfterPointNss] {
-            Lock::DBLock dblk(opCtx, oplogTruncateAfterPointNss.db(), MODE_IS);
-            Lock::CollectionLock lk(opCtx, oplogTruncateAfterPointNss, MODE_IS);
-            BSONObj mv;
-            if (Helpers::getSingleton(opCtx, oplogTruncateAfterPointNss.ns().c_str(), mv)) {
-                return mv;
-            }
-            return mv;
-        });
 }
 
 class ReplicationConsistencyMarkersTest : public ServiceContextMongoDTest {
@@ -146,11 +120,8 @@ bool RecoveryUnitWithDurabilityTracking::waitUntilDurable(OperationContext* opCt
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
-    auto minValidNss = makeNamespace(_agent, "minValid");
-    auto oplogTruncateAfterPointNss = makeNamespace(_agent, "oplogTruncateAfterPoint");
-
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), minValidNss, oplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -163,7 +134,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
     ASSERT_TRUE(consistencyMarkers.getInitialSyncFlag(opCtx));
 
     // Check min valid document using storage engine interface.
-    auto minValidDocument = getMinValidDocument(opCtx, minValidNss);
+    auto minValidDocument = getMinValidDocument(opCtx, kMinValidNss);
     ASSERT_TRUE(minValidDocument.hasField(MinValidDocument::kInitialSyncFlagFieldName));
     ASSERT_TRUE(minValidDocument.getBoolField(MinValidDocument::kInitialSyncFlagFieldName));
 
@@ -173,11 +144,8 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlagWorks) {
-    auto minValidNss = makeNamespace(_agent, "minValid");
-    auto oplogTruncateAfterPointNss = makeNamespace(_agent, "oplogTruncateAfterPoint");
-
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), minValidNss, oplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -195,11 +163,8 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlag
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncateAfterPoint) {
-    auto minValidNss = makeNamespace(_agent, "minValid");
-    auto oplogTruncateAfterPointNss = makeNamespace(_agent, "oplogTruncateAfterPoint");
-
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), minValidNss, oplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -221,11 +186,8 @@ TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncat
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
-    auto minValidNss = makeNamespace(_agent, "minValid");
-    auto oplogTruncateAfterPointNss = makeNamespace(_agent, "oplogTruncateAfterPoint");
-
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), minValidNss, oplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -255,7 +217,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), endOpTime);
 
     // Check min valid document using storage engine interface.
-    auto minValidDocument = getMinValidDocument(opCtx, minValidNss);
+    auto minValidDocument = getMinValidDocument(opCtx, kMinValidNss);
     ASSERT_TRUE(minValidDocument.hasField(MinValidDocument::kAppliedThroughFieldName));
     ASSERT_TRUE(minValidDocument[MinValidDocument::kAppliedThroughFieldName].isABSONObj());
     ASSERT_EQUALS(startOpTime,
@@ -264,12 +226,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ASSERT_EQUALS(endOpTime, unittest::assertGet(OpTime::parseFromOplogEntry(minValidDocument)));
 
     // Check oplog truncate after point document.
-    auto oplogTruncateAfterPointDocument =
-        getOplogTruncateAfterPointDocument(opCtx, oplogTruncateAfterPointNss);
-    ASSERT_EQUALS(endOpTime.getTimestamp(),
-                  oplogTruncateAfterPointDocument
-                      [OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName]
-                          .timestamp());
+    ASSERT_EQUALS(endOpTime.getTimestamp(), consistencyMarkers.getOplogTruncateAfterPoint(opCtx));
 
     // Recovery unit will be owned by "opCtx".
     RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
@@ -286,3 +243,4 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
 }
 
 }  // namespace
+}  // namespace mongo

@@ -78,9 +78,7 @@ public:
     Status dropDatabase(OperationContext* opCtx, StringData db) final {
         return Status::OK();
     }
-    int flushAllFiles(OperationContext* opCtx, bool sync) final {
-        return 0;
-    }
+    void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
     Status beginBackup(OperationContext* opCtx) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");

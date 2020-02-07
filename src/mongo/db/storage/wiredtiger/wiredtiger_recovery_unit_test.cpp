@@ -607,7 +607,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     ru->abandonSnapshot();
 
     // Force a checkpoint.
-    ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
+    engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
     // Test 2: Checkpoint cursors are not expected to be cached, they
     // should be immediately closed when destructed.
@@ -699,7 +699,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     ru->commitUnitOfWork();
 
     // Force a checkpoint.
-    ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
+    engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
     // Test 1: Open a checkpoint cursor and ensure it has the first record.
     ru2->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
@@ -724,7 +724,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     ASSERT(!checkpointCursor->seekExact(s2.getValue()));
 
     // Force a checkpoint.
-    ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
+    engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
     // Test 4: Old and new record should appear in new checkpoint cursor. Only old record
     // should appear in the original checkpoint cursor

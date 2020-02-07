@@ -264,9 +264,10 @@ public:
                     _uniqueCtx.emplace(tc->makeOperationContext());
                 });
 
-                _sessionCache->waitUntilDurable(_uniqueCtx->get(),
-                                                /*forceCheckpoint*/ false,
-                                                /*stableCheckpoint*/ false);
+                _sessionCache->waitUntilDurable(
+                    _uniqueCtx->get(),
+                    WiredTigerSessionCache::Fsync::kJournal,
+                    WiredTigerSessionCache::UseJournalListener::kUpdate);
 
                 // Signal the waiters that a round completed.
                 _currentSharedPromise->emplaceValue();
@@ -1218,18 +1219,25 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
             str::stream() << "Re-created empty data file for " << uri};
 }
 
-int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
+void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
     if (_ephemeral) {
-        return 0;
+        return;
     }
     syncSizeInfo(false);
-    const bool forceCheckpoint = true;
-    // If there's no journal, we must take a full checkpoint.
-    const bool stableCheckpoint = _durable;
-    _sessionCache->waitUntilDurable(opCtx, forceCheckpoint, stableCheckpoint);
 
-    return 1;
+    // If there's no journal, we must checkpoint all of the data.
+    WiredTigerSessionCache::Fsync fsyncType = _durable
+        ? WiredTigerSessionCache::Fsync::kCheckpointStableTimestamp
+        : WiredTigerSessionCache::Fsync::kCheckpointAll;
+
+    // We will skip updating the journal listener if the caller holds read locks.
+    // The JournalListener may do writes, and taking write locks would conflict with the read locks.
+    WiredTigerSessionCache::UseJournalListener useListener = callerHoldsReadLock
+        ? WiredTigerSessionCache::UseJournalListener::kSkip
+        : WiredTigerSessionCache::UseJournalListener::kUpdate;
+
+    _sessionCache->waitUntilDurable(opCtx, fsyncType, useListener);
 }
 
 Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {

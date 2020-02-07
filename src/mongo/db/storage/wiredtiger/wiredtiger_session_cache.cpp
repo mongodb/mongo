@@ -240,8 +240,8 @@ bool WiredTigerSessionCache::isShuttingDown() {
 }
 
 void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
-                                              bool forceCheckpoint,
-                                              bool stableCheckpoint) {
+                                              Fsync syncType,
+                                              UseJournalListener useListener) {
     // For inMemory storage engines, the data is "as durable as it's going to get".
     // That is, a restart is equivalent to a complete node failure.
     if (isEphemeral()) {
@@ -260,25 +260,39 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // incidentally what we want. A "true" stable checkpoint (a stable timestamp was set on the
     // WT_CONNECTION, i.e: replication is on) requires `forceCheckpoint` to be true and journaling
     // to be enabled.
-    if (stableCheckpoint && getGlobalReplSettings().usingReplSets()) {
-        invariant(forceCheckpoint && _engine->isDurable());
+    if (syncType == Fsync::kCheckpointStableTimestamp && getGlobalReplSettings().usingReplSets()) {
+        invariant(_engine->isDurable());
     }
 
     // When forcing a checkpoint with journaling enabled, don't synchronize with other
     // waiters, as a log flush is much cheaper than a full checkpoint.
-    if (forceCheckpoint && _engine->isDurable()) {
+    if ((syncType == Fsync::kCheckpointStableTimestamp || syncType == Fsync::kCheckpointAll) &&
+        _engine->isDurable()) {
         UniqueWiredTigerSession session = getSession();
         WT_SESSION* s = session->getSession();
         {
-            stdx::unique_lock<Latch> lk(_journalListenerMutex);
-            JournalListener::Token token = _journalListener->getToken();
-            auto config = stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
+            // Update a value that tracks the latest write that is safe across startup recovery (in
+            // the repl layer) and then report the time of that write as durable after we flush
+            // in-memory to disk.
+            // Defer locking the mutex so that it can be locked after any collection locks that
+            // may be acquired, which avoids deadlocks.
+            stdx::unique_lock<Latch> lk(_journalListenerMutex, stdx::defer_lock);
+            boost::optional<JournalListener::Token> token;
+            if (useListener == UseJournalListener::kUpdate) {
+                token = _journalListener->getToken(opCtx, lk);
+            }
+
+            auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
+                                                                        : "use_timestamp=false";
             {
                 auto checkpointLock = _engine->getCheckpointLock(opCtx);
                 _engine->clearIndividuallyCheckpointedIndexesList();
                 invariantWTOK(s->checkpoint(s, config));
             }
-            _journalListener->onDurable(token);
+
+            if (token) {
+                _journalListener->onDurable(token.get());
+            }
         }
         LOG(4) << "created checkpoint (forced)";
         return;
@@ -297,10 +311,15 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
 
     // Nobody has synched yet, so we have to sync ourselves.
 
-    // This gets the token (OpTime) from the last write, before flushing (either the journal, or a
-    // checkpoint), and then reports that token (OpTime) as a durable write.
-    stdx::unique_lock<Latch> jlk(_journalListenerMutex);
-    JournalListener::Token token = _journalListener->getToken();
+    // Update a value that tracks the latest write that is safe across startup recovery (in the repl
+    // layer) and then report the time of that write as durable after we flush in-memory to disk.
+    // Defer locking the mutex so that it can be locked after any collection locks that may be
+    // acquired, which avoids deadlocks.
+    stdx::unique_lock<Latch> jlk(_journalListenerMutex, stdx::defer_lock);
+    boost::optional<JournalListener::Token> token;
+    if (useListener == UseJournalListener::kUpdate) {
+        token = _journalListener->getToken(opCtx, jlk);
+    }
 
     // Initialize on first use.
     if (!_waitUntilDurableSession) {
@@ -318,7 +337,10 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr));
         LOG(4) << "created checkpoint";
     }
-    _journalListener->onDurable(token);
+
+    if (token) {
+        _journalListener->onDurable(token.get());
+    }
 }
 
 void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx,

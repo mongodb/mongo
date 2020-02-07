@@ -42,9 +42,9 @@
 namespace mongo {
 
 RecoveryUnit* EphemeralForTestEngine::newRecoveryUnit() {
-    return new EphemeralForTestRecoveryUnit([this]() {
-        stdx::lock_guard<Latch> lk(_mutex);
-        JournalListener::Token token = _journalListener->getToken();
+    return new EphemeralForTestRecoveryUnit([this](OperationContext* opCtx) {
+        stdx::unique_lock<Latch> lk(_mutex, stdx::defer_lock);
+        JournalListener::Token token = _journalListener->getToken(opCtx, lk);
         _journalListener->onDurable(token);
     });
 }

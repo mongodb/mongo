@@ -71,15 +71,21 @@ public:
     void setOplogReadTimestamp(Timestamp ts);
 
     // Triggers the oplogJournal thread to update its oplog read timestamp, by flushing the journal.
-    void triggerJournalFlush();
+    void triggerOplogVisibilityUpdate();
 
     // Waits until all committed writes at this point to become visible (that is, no holes exist in
     // the oplog.)
     void waitForAllEarlierOplogWritesToBeVisible(const WiredTigerRecordStore* oplogRecordStore,
                                                  OperationContext* opCtx);
 
-    // Returns the all_durable timestamp. All transactions with timestamps earlier than the
-    // all_durable timestamp are committed.
+    /**
+     * Returns the all_durable timestamp. All transactions with timestamps earlier than the
+     * all_durable timestamp are committed.
+     *
+     * The all_durable timestamp is the in-memory no holes point. That does not mean that there are
+     * no holes behind it on disk. The all_durable timestamp also might not correspond with any
+     * oplog entry, but instead have a timestamp value between that of two oplog entries.
+     */
     uint64_t fetchAllDurableValue(WT_CONNECTION* conn);
 
 private:

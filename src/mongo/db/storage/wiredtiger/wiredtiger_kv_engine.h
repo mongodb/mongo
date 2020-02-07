@@ -173,7 +173,7 @@ public:
                       StringData ident,
                       const RecordStore* originalRecordStore) const override;
 
-    int flushAllFiles(OperationContext* opCtx, bool sync) override;
+    void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
     Status beginBackup(OperationContext* opCtx) override;
 

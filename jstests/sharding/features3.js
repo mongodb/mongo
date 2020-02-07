@@ -146,9 +146,6 @@ assert(x.code == 13, "fsync on non-admin succeeded, but should have failed: " + 
 // test fsync on admin db
 x = dbForTest._adminCommand("fsync");
 assert(x.ok == 1, "fsync failed: " + tojson(x));
-if (x.all[s.shard0.shardName] > 0) {
-    assert(x.numFiles > 0, "fsync failed: " + tojson(x));
-}
 
 // test fsync+lock on admin db
 x = dbForTest._adminCommand({"fsync": 1, lock: true});

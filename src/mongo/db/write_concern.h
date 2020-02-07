@@ -76,13 +76,14 @@ struct WriteConcernResult {
     void appendTo(const WriteConcernOptions& writeConcern, BSONObjBuilder* result) const;
 
     int syncMillis;
-    int fsyncFiles;
-
     bool wTimedOut;
     int wTime;
     std::vector<HostAndPort> writtenTo;
-
     std::string err;  // this is the old err field, should deprecate
+
+    // This field has had a dummy value since MMAP went away. It is undocumented.
+    // Maintaining it so as not to cause unnecessary user pain across upgrades.
+    int fsyncFiles;
 };
 
 /**

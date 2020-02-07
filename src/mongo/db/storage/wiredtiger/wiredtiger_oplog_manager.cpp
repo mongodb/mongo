@@ -147,7 +147,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     });
 }
 
-void WiredTigerOplogManager::triggerJournalFlush() {
+void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
     stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
     if (!_opsWaitingForJournal) {
         _opsWaitingForJournal = true;
@@ -231,7 +231,9 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
 
         // In order to avoid oplog holes after an unclean shutdown, we must ensure this proposed
         // oplog read timestamp's documents are durable before publishing that timestamp.
-        sessionCache->waitUntilDurable(opCtx.get(), /*forceCheckpoint=*/false, false);
+        sessionCache->waitUntilDurable(opCtx.get(),
+                                       WiredTigerSessionCache::Fsync::kJournal,
+                                       WiredTigerSessionCache::UseJournalListener::kUpdate);
 
         lk.lock();
         // Publish the new timestamp value.  Avoid going backward.

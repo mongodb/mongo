@@ -563,8 +563,7 @@ void createOplog(OperationContext* opCtx,
     });
 
     /* sync here so we don't get any surprising lag later when we try to sync */
-    StorageEngine* storageEngine = service->getStorageEngine();
-    storageEngine->flushAllFiles(opCtx, true);
+    service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
     log() << "******" << endl;
 }

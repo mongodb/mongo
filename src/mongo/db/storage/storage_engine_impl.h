@@ -91,7 +91,7 @@ public:
 
     virtual Status dropDatabase(OperationContext* opCtx, StringData db) override;
 
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync) override;
+    virtual void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
     virtual Status beginBackup(OperationContext* opCtx) override;
 

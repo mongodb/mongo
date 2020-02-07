@@ -204,11 +204,6 @@ void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
         result->appendNull("err");
     else
         result->append("err", err);
-
-    // For ephemeral storage engines, 0 files may be fsynced
-    invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::FSYNC ||
-              (result->asTempObj()["fsyncFiles"].numberLong() >= 0 ||
-               !result->asTempObj()["waited"].eoo()));
 }
 
 Status waitForWriteConcern(OperationContext* opCtx,
@@ -239,7 +234,11 @@ Status waitForWriteConcern(OperationContext* opCtx,
         case WriteConcernOptions::SyncMode::FSYNC: {
             StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             if (!storageEngine->isDurable()) {
-                result->fsyncFiles = storageEngine->flushAllFiles(opCtx, true);
+                storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
+
+                // This field has had a dummy value since MMAP went away. It is undocumented.
+                // Maintaining it so as not to cause unnecessary user pain across upgrades.
+                result->fsyncFiles = 1;
             } else {
                 // We only need to commit the journal if we're durable
                 getGlobalServiceContext()->getStorageEngine()->waitForJournalFlush(opCtx);

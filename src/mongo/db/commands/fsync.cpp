@@ -133,10 +133,8 @@ public:
             return false;
         }
 
-        const bool sync =
-            !cmdObj["async"].trueValue();  // async means do an fsync, but return immediately
         const bool lock = cmdObj["lock"].trueValue();
-        log() << "CMD fsync: sync:" << sync << " lock:" << lock;
+        log() << "CMD fsync: lock:" << lock;
 
         // fsync + lock is sometimes used to block writes out of the system and does not care if
         // the `BackupCursorService::fsyncLock` call succeeds.
@@ -147,15 +145,15 @@ public:
             // Take a global IS lock to ensure the storage engine is not shutdown
             Lock::GlobalLock global(opCtx, MODE_IS);
             StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-            result.append("numFiles", storageEngine->flushAllFiles(opCtx, sync));
+            storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
+
+            // This field has had a dummy value since MMAP went away. It is undocumented.
+            // Maintaining it so as not to cause unnecessary user pain across upgrades.
+            result.append("numFiles", 1);
             return true;
         }
 
         Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);
-        if (!sync) {
-            errmsg = "fsync: sync option must be true when using lock";
-            return false;
-        }
 
         const auto lockCountAtStart = getLockCount();
         invariant(lockCountAtStart > 0 || !_lockThread);
@@ -371,7 +369,7 @@ void FSyncLockThread::run() {
         }
 
         try {
-            storageEngine->flushAllFiles(&opCtx, true);
+            storageEngine->flushAllFiles(&opCtx, /*callerHoldsReadLock*/ true);
         } catch (const std::exception& e) {
             error() << "error doing flushAll: " << e.what();
             fsyncCmd.threadStatus = Status(ErrorCodes::CommandFailed, e.what());

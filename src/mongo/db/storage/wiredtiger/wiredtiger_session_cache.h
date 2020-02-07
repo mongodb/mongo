@@ -220,6 +220,27 @@ public:
     };
 
     /**
+     * Specifies what data will get flushed to disk in a WiredTigerSessionCache::waitUntilDurable()
+     * call.
+     */
+    enum class Fsync {
+        // Flushes only the journal (oplog) to disk.
+        // If journaling is disabled, checkpoints all of the data.
+        kJournal,
+        // Checkpoints data up to the stable timestamp.
+        // If journaling is disabled, checkpoints all of the data.
+        kCheckpointStableTimestamp,
+        // Checkpoints all of the data.
+        kCheckpointAll,
+    };
+
+    /**
+     * Controls whether or not WiredTigerSessionCache::waitUntilDurable() updates the
+     * JournalListener.
+     */
+    enum class UseJournalListener { kUpdate, kSkip };
+
+    /**
      * Indicates that WiredTiger should be configured to cache cursors.
      */
     static bool isEngineCachingCursors();
@@ -273,11 +294,26 @@ public:
     bool isEphemeral();
 
     /**
-     * Waits until all commits that happened before this call are durable, either by flushing
-     * the log or forcing a checkpoint if forceCheckpoint is true or the journal is disabled.
+     * Waits until all commits that happened before this call are made durable.
+     *
+     * Specifying Fsync::kJournal will flush only the (oplog) journal to disk. Callers are
+     * serialized by a mutex and will return early if it is discovered that another thread started
+     * and completed a flush while they slept.
+     *
+     * Specifying Fsync::kCheckpointStableTimestamp will take a checkpoint up to and including the
+     * stable timestamp.
+     *
+     * Specifying Fsync::kCheckpointAll, or if journaling is disabled with kJournal or
+     * kCheckpointStableTimestamp, causes a checkpoint to be taken of all of the data.
+     *
+     * Taking a checkpoint has the benefit of persisting unjournaled writes.
+     *
+     * 'useListener' controls whether or not the JournalListener is updated with the last durable
+     * value of the timestamp that it tracks.
+     *
      * Uses a temporary session. Safe to call without any locks, even during shutdown.
      */
-    void waitUntilDurable(OperationContext* opCtx, bool forceCheckpoint, bool stableCheckpoint);
+    void waitUntilDurable(OperationContext* opCtx, Fsync syncType, UseJournalListener useListener);
 
     /**
      * Waits until a prepared unit of work has ended (either been commited or aborted). This

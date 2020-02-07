@@ -289,9 +289,13 @@ public:
     virtual Status dropDatabase(OperationContext* opCtx, StringData db) = 0;
 
     /**
-     * @return number of files flushed
+     * Checkpoints the data to disk.
+     *
+     * 'callerHoldsReadLock' signals whether the caller holds a read lock. A write lock may be taken
+     * internally, but will be skipped for callers holding a read lock because a write lock would
+     * conflict. The JournalListener will not be updated in this case.
      */
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync) = 0;
+    virtual void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) = 0;
 
     /**
      * Transitions the storage engine into backup mode.
