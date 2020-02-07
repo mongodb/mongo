@@ -969,6 +969,14 @@ private:
     void _setConfigState_inlock(ConfigState newState);
 
     /**
+     * Returns true if the horizon mappings between the oldConfig and newConfig are different.
+     */
+    bool _haveHorizonsChanged(const ReplSetConfig& oldConfig,
+                              const ReplSetConfig& newConfig,
+                              int oldIndex,
+                              int newIndex);
+
+    /**
      * Fulfills the promises that are waited on by awaitable isMaster requests. This increments the
      * server TopologyVersion.
      */

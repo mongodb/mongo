@@ -1971,9 +1971,9 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
         return _makeIsMasterResponse(horizonString, lk);
     }
 
-    uassertStatusOK(status);
     // A topology change has happened so we return an IsMasterResponse with the updated
     // topology version.
+    uassertStatusOK(status);
     return statusWithIsMaster.getValue();
 }
 
@@ -3015,6 +3015,19 @@ void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
     }
 }
 
+bool ReplicationCoordinatorImpl::_haveHorizonsChanged(const ReplSetConfig& oldConfig,
+                                                      const ReplSetConfig& newConfig,
+                                                      int oldIndex,
+                                                      int newIndex) {
+    if (oldIndex < 0 || newIndex < 0) {
+        // It's possible for index to be -1 if we are performing a reconfig via heartbeat.
+        return false;
+    }
+    const auto oldHorizonMappings = oldConfig.getMemberAt(oldIndex).getHorizonMappings();
+    const auto newHorizonMappings = newConfig.getMemberAt(newIndex).getHorizonMappings();
+    return oldHorizonMappings != newHorizonMappings;
+}
+
 void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(OperationContext* opCtx,
                                                                WithLock lock) {
     _topCoord->incrementTopologyVersion();
@@ -3480,6 +3493,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         log() << startupWarningsLog;
     }
 
+    const bool horizonsChanged = _haveHorizonsChanged(oldConfig, newConfig, _selfIndex, myIndex);
 
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
@@ -3488,6 +3502,17 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
               << " in the config";
     } else {
         log() << "This node is not a member of the config";
+    }
+
+    if (horizonsChanged) {
+        for (auto iter = _horizonToPromiseMap.begin(); iter != _horizonToPromiseMap.end(); iter++) {
+            iter->second->setError({ErrorCodes::SplitHorizonChange,
+                                    "Received a reconfig that changed the horizon parameters."});
+        }
+        if (_selfIndex >= 0) {
+            // Only create a new horizon promise mapping if the node exists in the new config.
+            _createHorizonTopologyChangePromiseMapping(lk);
+        }
     }
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
@@ -3515,10 +3540,12 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         if (_horizonToPromiseMap.empty()) {
             // We should only create a new horizon-to-promise mapping for nodes that are members of
             // the config.
-            // TODO (SERVER-45039): Create a new horizon to promise mapping after each reconfig
-            // that changes the horizon.
             _createHorizonTopologyChangePromiseMapping(lk);
         }
+    } else {
+        // Clear the horizon promise mappings of removed nodes so they can be recreated if the node
+        // later rejoins the set.
+        _horizonToPromiseMap.clear();
     }
 
     _updateLastCommittedOpTimeAndWallTime(lk);

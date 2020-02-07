@@ -336,6 +336,7 @@ error_codes:
     - {code: 300,name: RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist}
     - {code: 301,name: DataCorruptionDetected}
     - {code: 302,name: OCSPCertificateStatusUnknown}
+    - {code: 303,name: SplitHorizonChange}
 
     # Error codes 4000-8999 are reserved.
 

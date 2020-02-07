@@ -416,7 +416,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
 
     _topCoord->finishUnconditionalStepDown();
-
     const auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx.get());
     if (_pendingTermUpdateDuringStepDown) {
         TopologyCoordinator::UpdateTermResult result;
@@ -579,7 +578,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
     StatusWith<int> myIndex) {
-
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -682,6 +680,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
+
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
 
