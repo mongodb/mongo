@@ -7752,9 +7752,9 @@ tasks:
           mv mh.tgz mh-${push_name}-${push_arch}-${suffix}.${ext|tgz} || true
           mv mongo-debugsymbols.tgz mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
           mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
-          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-${push_arch}-${suffix}.msi || true
+          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-${push_name}-${push_arch}-${suffix}.msi || true
 
-          /usr/local/bin/notary-client.py --key-name "server-4.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz} mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          /usr/local/bin/notary-client.py --key-name "server-4.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz} mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
 
     # Put the binaries tarball/zipfile
     - command: s3.put
@@ -7887,10 +7887,10 @@ tasks:
         aws_secret: ${aws_secret}
         permissions: public-read
         build_variants: ["enterprise-windows", "windows"]
-        local_file: src/mongodb-${push_arch}-${suffix}-signed.msi
+        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
         bucket: build-push-testing
         content_type: application/x-msi
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi
 
     # Put the binaries tarball sha1
     - command: s3.put
@@ -7957,10 +7957,10 @@ tasks:
         aws_secret: ${aws_secret}
         permissions: public-read
         build_variants: ["enterprise-windows", "windows"]
-        local_file: src/mongodb-${push_arch}-${suffix}-signed.msi.sha1
+        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha1
 
     # Put the binaries tarball sha256
     - command: s3.put
@@ -8026,10 +8026,10 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         build_variants: ["enterprise-windows", "windows"]
-        local_file: src/mongodb-${push_arch}-${suffix}-signed.msi.sha256
+        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
         bucket: build-push-testing
         permissions: public-read
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha256
         content_type: text/plain
 
     # Put the binaries tarball md5
@@ -8096,11 +8096,11 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         build_variants: ["enterprise-windows", "windows"]
-        local_file: src/mongodb-${push_arch}-${suffix}-signed.msi.md5
+        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi.md5
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.md5
 
     - command: s3Copy.copy
       params:
@@ -8131,8 +8131,8 @@ tasks:
                'build_variants': ['rhel70', 'windows']}
 
             #MSI (Windows only)
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows', 'windows']}
 
             #Binaries Signature
@@ -8172,8 +8172,8 @@ tasks:
                'build_variants': ['rhel70', 'windows']}
 
             #SHA1 for MSI
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows', 'windows']}
 
             #SHA256 for binaries
@@ -8195,8 +8195,8 @@ tasks:
                'build_variants': ['rhel70', 'windows']}
 
             #SHA256 for MSI files
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows', 'windows']}
 
             #MD5 for binaries
@@ -8218,8 +8218,8 @@ tasks:
                'build_variants': ['rhel70', 'windows']}
 
             #MD5 for MSIs
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows', 'windows']}
 
     # Debug symbols are not created for all variants and the copy is optional.
