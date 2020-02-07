@@ -48,7 +48,6 @@
 #include "mongo/platform/basic.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
-#include "mongo/util/log_with_sampling.h"
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 namespace mongo {
@@ -97,21 +96,17 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const OplogEntry& 
  * Used for logging a report of ops that take longer than "slowMS" to apply. This is called
  * right before returning from applyOplogEntryOrGroupedInserts, and it returns the same status.
  */
-Status finishAndLogApply(OperationContext* opCtx,
-                         ClockSource* clockSource,
+Status finishAndLogApply(ClockSource* clockSource,
                          Status finalStatus,
                          Date_t applyStartTime,
                          const OplogEntryOrGroupedInserts& entryOrGroupedInserts) {
 
     if (finalStatus.isOK()) {
         auto applyEndTime = clockSource->now();
-        auto opDuration = durationCount<Milliseconds>(applyEndTime - applyStartTime);
+        auto diffMS = durationCount<Milliseconds>(applyEndTime - applyStartTime);
 
-        if (shouldLogSlowOpWithSampling(opCtx,
-                                        MONGO_LOG_DEFAULT_COMPONENT,
-                                        Milliseconds(opDuration),
-                                        Milliseconds(serverGlobalParams.slowMS))
-                .first) {
+        // This op was slow to apply, so we should log a report of it.
+        if (diffMS > serverGlobalParams.slowMS) {
 
             StringBuilder s;
             s << "applied op: ";
@@ -123,7 +118,7 @@ Status finishAndLogApply(OperationContext* opCtx,
             }
 
             s << redact(entryOrGroupedInserts.toBSON());
-            s << ", took " << opDuration << "ms";
+            s << ", took " << diffMS << "ms";
 
             log() << s.str();
         }
@@ -976,7 +971,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                     throw;
                 }
             });
-        return finishAndLogApply(opCtx, clockSource, status, applyStartTime, entryOrGroupedInserts);
+        return finishAndLogApply(clockSource, status, applyStartTime, entryOrGroupedInserts);
     } else if (opType == OpTypeEnum::kCommand) {
         auto status =
             writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_command", nss.ns(), [&] {
@@ -985,7 +980,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                 incrementOpsAppliedStats();
                 return status;
             });
-        return finishAndLogApply(opCtx, clockSource, status, applyStartTime, entryOrGroupedInserts);
+        return finishAndLogApply(clockSource, status, applyStartTime, entryOrGroupedInserts);
     }
 
     MONGO_UNREACHABLE;

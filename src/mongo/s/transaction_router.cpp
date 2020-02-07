@@ -53,7 +53,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
-#include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
@@ -1428,12 +1427,8 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
     }
 
     const auto& timingStats = o().metricsTracker->getTimingStats();
-    const auto opDuration =
-        duration_cast<Milliseconds>(timingStats.getDuration(tickSource, curTicks));
-
-    if (shouldLogSlowOpWithSampling(
-            opCtx, MONGO_LOG_DEFAULT_COMPONENT, opDuration, Milliseconds(serverGlobalParams.slowMS))
-            .first) {
+    if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
+        timingStats.getDuration(tickSource, curTicks) > Milliseconds(serverGlobalParams.slowMS)) {
         _logSlowTransaction(opCtx, terminationCause);
     }
 }
