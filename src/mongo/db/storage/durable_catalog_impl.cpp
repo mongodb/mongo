@@ -899,7 +899,9 @@ void DurableCatalogImpl::updateTTLSetting(OperationContext* opCtx,
                                           long long newExpireSeconds) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
     int offset = md.findIndexOffset(idxName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot update TTL setting for index " << idxName << " @ "
+                            << catalogId << " : " << md.toBSON());
     md.indexes[offset].updateTTLSetting(newExpireSeconds);
     putMetaData(opCtx, catalogId, md);
 }
@@ -1004,7 +1006,9 @@ boost::optional<UUID> DurableCatalogImpl::getIndexBuildUUID(OperationContext* op
                                                             StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot get build UUID for index " << indexName << " @ " << catalogId
+                            << " : " << md.toBSON());
     return md.indexes[offset].buildUUID;
 }
 
@@ -1013,7 +1017,9 @@ void DurableCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
                                            StringData indexName) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot mark index " << indexName << " as ready @ " << catalogId
+                            << " : " << md.toBSON());
     md.indexes[offset].ready = true;
     md.indexes[offset].buildUUID = boost::none;
     putMetaData(opCtx, catalogId, md);
@@ -1026,7 +1032,9 @@ bool DurableCatalogImpl::isIndexMultikey(OperationContext* opCtx,
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot get multikey for index " << indexName << " @ " << catalogId
+                            << " : " << md.toBSON());
 
     if (multikeyPaths && !md.indexes[offset].multikeyPaths.empty()) {
         *multikeyPaths = md.indexes[offset].multikeyPaths;
@@ -1042,7 +1050,9 @@ bool DurableCatalogImpl::setIndexIsMultikey(OperationContext* opCtx,
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot set index " << indexName << " as multikey @ " << catalogId
+                            << " : " << md.toBSON());
 
     const bool tracksPathLevelMultikeyInfo = !md.indexes[offset].multikeyPaths.empty();
     if (tracksPathLevelMultikeyInfo) {
@@ -1119,7 +1129,9 @@ BSONObj DurableCatalogImpl::getIndexSpec(OperationContext* opCtx,
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot get index spec for " << indexName << " @ " << catalogId
+                            << " : " << md.toBSON());
 
     BSONObj spec = md.indexes[offset].spec.getOwned();
     return spec;
@@ -1160,7 +1172,9 @@ bool DurableCatalogImpl::isIndexReady(OperationContext* opCtx,
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot get ready status for index " << indexName << " @ "
+                            << catalogId << " : " << md.toBSON());
     return md.indexes[offset].ready;
 }
 
@@ -1169,7 +1183,9 @@ KVPrefix DurableCatalogImpl::getIndexPrefix(OperationContext* opCtx,
                                             StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
     int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0);
+    invariant(offset >= 0,
+              str::stream() << "cannot get prefix for index " << indexName << " @ " << catalogId
+                            << " : " << md.toBSON());
     return md.indexes[offset].prefix;
 }
 }  // namespace mongo
