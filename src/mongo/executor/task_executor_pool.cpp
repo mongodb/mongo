@@ -48,10 +48,10 @@ size_t TaskExecutorPool::getSuggestedPoolSize() {
     }
 
     ProcessInfo p;
-    unsigned numCores = p.getNumCores();
+    auto numCores = p.getNumAvailableCores();
 
     // Never suggest a number outside the range [4, 64].
-    return std::max(4U, std::min(64U, numCores));
+    return std::max<size_t>(4U, std::min<size_t>(64U, numCores));
 }
 
 void TaskExecutorPool::startup() {
