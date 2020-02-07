@@ -107,6 +107,9 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
         print('Caught exception after stepDown cmd: ' + tojson(ex));
     }
 
+    // Wait for the state to be secondary to avoid the race of closing new connections on stepdown
+    // on 3.2 and 3.4.
+    this.waitForState(node, ReplSetTest.State.SECONDARY);
     return this.reconnect(node);
 };
 
