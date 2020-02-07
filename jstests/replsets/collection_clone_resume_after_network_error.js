@@ -63,7 +63,9 @@ const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
         'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
+        // Hang right after cloning the last document.
+        'failpoint.initialSyncHangDuringCollectionClone':
+            tojson({mode: 'alwaysOn', data: {namespace: "test.test", numDocsToClone: 7}}),
         // This test is specifically testing that the cloners stop, so we turn off the
         // oplog fetcher to ensure that we don't inadvertently test that instead.
         'failpoint.hangBeforeStartingOplogFetcher': tojson({mode: 'alwaysOn'}),
@@ -176,6 +178,13 @@ primary.reconnect(secondary);
 beforeRetryFailPoint.off();
 afterBatchFailPoint.off();
 
+// Make sure we have cloned all documents.
+assert.commandWorked(secondary.adminCommand({
+    waitForFailPoint: "initialSyncHangDuringCollectionClone",
+    timesEntered: 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
+
 // Make sure we have cloned exactly four batches and have never requested the same batch more
 // than once.
 const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
@@ -183,9 +192,9 @@ assert(res.initialSyncStatus,
        () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
 assert.eq(res.initialSyncStatus.databases.test["test.test"].fetchedBatches, 4);
 
-// Release the last initial sync failpoint.
-assert.commandWorked(
-    secondaryDb.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+// Release the last cloner failpoint.
+assert.commandWorked(secondaryDb.adminCommand(
+    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // Also let the oplog fetcher run so we can complete initial sync.
 jsTestLog("Releasing the oplog fetcher failpoint.");
