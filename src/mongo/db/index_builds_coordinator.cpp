@@ -1542,31 +1542,36 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         boost::optional<Lock::CollectionLock> collLock;
         collLock.emplace(opCtx, dbAndUUID, MODE_X);
 
-        if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
-            // This index build can only be interrupted at shutdown. For the duration of the
-            // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() invocation, any kill
-            // status set by the killOp command will be ignored. After
-            // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() returns, any call to
-            // OperationContext::checkForInterrupt() will see the kill status and respond
-            // accordingly (checkForInterrupt() will throw an exception while
-            // checkForInterruptNoAssert() returns an error Status).
-
-            // We need to drop the RSTL here, as we do not need synchronization with step up and
-            // step down. Dropping the RSTL is important because otherwise if we held the RSTL it
-            // would create deadlocks with prepared transactions on step up and step down.  A
-            // deadlock could result if the index build was attempting to acquire a Collection S or
-            // X lock while a prepared transaction held a Collection IX lock, and a step down was
-            // waiting to acquire the RSTL in mode X.
-            // TODO(SERVER-44045): Revisit this logic for the non-two phase index build case.
-            if (IndexBuildProtocol::kTwoPhase != replState->protocol) {
-                const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
-                invariant(unlocked);
-            }
+        // Two phase index builds and single-phase builds on secondaries can only be interrupted at
+        // shutdown. For the duration of the runWithoutInterruptionExceptAtGlobalShutdown()
+        // invocation, any kill status set by the killOp command will be ignored. After
+        // runWithoutInterruptionExceptAtGlobalShutdown() returns, any call to checkForInterrupt()
+        // will see the kill status and respond accordingly (checkForInterrupt() will throw an
+        // exception while checkForInterruptNoAssert() returns an error Status).
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->getSettings().usingReplSets()) {
+            _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+        } else if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
             opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
                 _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
             });
         } else {
-            _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+            if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
+                // We need to drop the RSTL here, as we do not need synchronization with step up and
+                // step down. Dropping the RSTL is important because otherwise if we held the RSTL
+                // it would create deadlocks with prepared transactions on step up and step down.  A
+                // deadlock could result if the index build was attempting to acquire a Collection S
+                // or X lock while a prepared transaction held a Collection IX lock, and a step down
+                // was waiting to acquire the RSTL in mode X.
+                // TODO(SERVER-44045): Revisit this logic for the non-two phase index build case.
+                const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
+                invariant(unlocked);
+                opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
+                    _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+                });
+            } else {
+                _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+            }
         }
         // If _buildIndex returned normally, then we should have the collection X lock. It is not
         // required to safely access the collection, though, because an index build is registerd.
