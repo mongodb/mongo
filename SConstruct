@@ -3117,7 +3117,7 @@ def doConfigure(myenv):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
         sslLinkDependencies = ["crypto", "dl"]
-        if conf.env.TargetOSIs('freebsd'):
+        if conf.env.TargetOSIs('freebsd', 'openbsd'):
             sslLinkDependencies = ["crypto"]
 
         if conf.env.TargetOSIs('windows'):
