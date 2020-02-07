@@ -29,13 +29,10 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -50,13 +47,6 @@ namespace mongo {
  */
 class DocumentSourceListSessions final : public DocumentSourceMatch {
 public:
-    DocumentSourceListSessions(const DocumentSourceListSessions& other)
-        : DocumentSourceMatch(other) {}
-
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
-    }
-
     static constexpr StringData kStageName = "$listSessions"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
