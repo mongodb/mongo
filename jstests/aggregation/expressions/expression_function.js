@@ -1,10 +1,10 @@
-// Tests basic functionality of the $_internalJs expression.
+// Tests basic functionality of the $function expression.
 (function() {
 "use strict";
 
 load('jstests/aggregation/extras/utils.js');
 
-const coll = db.internal_js;
+const coll = db.expression_function;
 coll.drop();
 
 function f_finalize(first, second) {
@@ -18,9 +18,10 @@ for (let i = 0; i < 5; i++) {
 let pipeline = [{
     $project: {
         newValue: {
-            $_internalJs: {
+            $function: {
                 args: ["$value", -1],
-                eval: f_finalize,
+                body: f_finalize,
+                lang: "js",
             },
         },
         _id: 0,
@@ -32,14 +33,14 @@ assert(resultsEq(results,
                  [{newValue: -1}, {newValue: 0}, {newValue: 1}, {newValue: 2}, {newValue: 3}]),
        results);
 
-// Test that the 'eval' function accepts a string argument.
-pipeline[0].$project.newValue.$_internalJs.eval = f_finalize.toString();
+// Test that the 'body' function accepts a string argument.
+pipeline[0].$project.newValue.$function.body = f_finalize.toString();
 results = coll.aggregate(pipeline, {cursor: {}}).toArray();
 assert(resultsEq(results,
                  [{newValue: -1}, {newValue: 0}, {newValue: 1}, {newValue: 2}, {newValue: 3}]),
        results);
 
-// Test that internalJs can take an expression that evaluates to an array for the 'args' parameter.
+// Test that function can take an expression that evaluates to an array for the 'args' parameter.
 coll.drop();
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(coll.insert({values: [i, i * 2]}));
@@ -47,9 +48,10 @@ for (let i = 0; i < 5; i++) {
 pipeline = [{
     $project: {
         newValue: {
-            $_internalJs: {
+            $function: {
                 args: "$values",
-                eval: f_finalize,
+                body: f_finalize,
+                lang: "js",
             },
         },
         _id: 0,
@@ -65,9 +67,10 @@ assert(resultsEq(results,
 pipeline = [{
     $project: {
         newValue: {
-            $_internalJs: {
+            $function: {
                 'args': 'must evaluate to an array',
-                'eval': f_finalize,
+                'body': f_finalize,
+                'lang': 'js',
             },
         },
         _id: 0,
@@ -79,9 +82,10 @@ assert.commandFailedWithCode(
 pipeline = [{
     $project: {
         newValue: {
-            $_internalJs: {
+            $function: {
                 'args': [1, 3],
-                'eval': 'this is not a valid function!',
+                'body': 'this is not a valid function!',
+                'lang': 'js',
             },
         },
         _id: 0,
@@ -91,13 +95,43 @@ assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
     ErrorCodes.JSInterpreterFailure);
 
+pipeline = [{
+    $project: {
+        newValue: {
+            $function: {
+                'args': [1, 3],
+                'body': f_finalize,
+            },
+        },
+        _id: 0,
+    }
+}];
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31418);
+
+pipeline = [{
+    $project: {
+        newValue: {
+            $function: {
+                'args': [1, 3],
+                'body': f_finalize,
+                'lang': 'not js!',
+            },
+        },
+        _id: 0,
+    }
+}];
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31419);
+
 // Test that we fail if the 'args' field is not an array.
 pipeline = [{
     $project: {
         newValue: {
-            $_internalJs: {
+            $function: {
                 'args': "A string!",
-                'eval': f_finalize,
+                'body': f_finalize,
+                'lang': 'js',
             },
         },
         _id: 0,

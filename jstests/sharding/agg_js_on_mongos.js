@@ -25,11 +25,12 @@ const pipeline = [
     {
         $project: {
             y: {
-                "$_internalJs": {
+                "$function": {
                     args: ["$_id"],
-                    eval: function(id) {
+                    body: function(id) {
                         return id;
-                    }
+                    },
+                    lang: "js"
                 }
             }
         }

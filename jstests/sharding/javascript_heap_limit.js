@@ -46,7 +46,7 @@ const aggregateWithJSFunction = {
     cursor: {},
     pipeline: [
         {$group: {_id: "$x"}},
-        {$project: {y: {"$_internalJs": {args: [], eval: allocateLargeString}}}}
+        {$project: {y: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}}
     ]
 };
 const aggregateWithJSAccumulator = {
@@ -66,14 +66,7 @@ const aggregateWithJSAccumulator = {
 };
 const findWithJavaScriptFunction = {
     find: "coll",
-    filter: {
-        $expr: {
-            "$_internalJs": {
-                args: [],
-                eval: allocateLargeString,
-            }
-        }
-    }
+    filter: {$expr: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}
 };
 const findWithWhere = {
     find: "coll",
@@ -83,12 +76,7 @@ const findWithWhere = {
 const findWithJavaScriptFunctionAndWhere = {
     find: "coll",
     filter: {
-        $expr: {
-            "$_internalJs": {
-                args: [],
-                eval: allocateLargeString,
-            }
-        },
+        $expr: {"$function": {args: [], body: allocateLargeString, lang: "js"}},
         $where: allocateLargeString,
     }
 };
