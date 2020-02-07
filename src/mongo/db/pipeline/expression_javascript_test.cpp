@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/expression_javascript.h"
+#include "mongo/db/pipeline/expression_js_emit.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -82,78 +83,103 @@ void MapReduceFixture::tearDown() {
     ServiceContextMongoDTest::tearDown();
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsProducesExpectedResult) {
-    auto bsonExpr = BSON("expr" << BSON("eval"
+TEST_F(MapReduceFixture, ExpressionFunctionProducesExpectedResult) {
+    auto bsonExpr = BSON("expr" << BSON("body"
                                         << "function(first, second) {return first + second;};"
-                                        << "args" << BSON_ARRAY("$a" << 4)));
+                                        << "args" << BSON_ARRAY("$a" << 4) << "lang"
+                                        << ExpressionFunction::kJavaScript));
 
-    auto expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+    auto expr = ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
 
     Value result = expr->evaluate(Document{BSON("a" << 2)}, getVariables());
     ASSERT_VALUE_EQ(result, Value(6));
 
     bsonExpr =
-        BSON("expr" << BSON("eval"
+        BSON("expr" << BSON("body"
                             << "function(first, second, third) {return first + second + third;};"
-                            << "args" << BSON_ARRAY(1 << 2 << 4)));
-    expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+                            << "args" << BSON_ARRAY(1 << 2 << 4) << "lang"
+                            << ExpressionFunction::kJavaScript));
+    expr = ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
     result = expr->evaluate(Document{BSONObj{}}, getVariables());
     ASSERT_VALUE_EQ(result, Value(7));
 
-    bsonExpr = BSON("expr" << BSON("eval"
+    bsonExpr = BSON("expr" << BSON("body"
                                    << "function(first) {return first;};"
-                                   << "args" << BSON_ARRAY(1)));
-    expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+                                   << "args" << BSON_ARRAY(1) << "lang"
+                                   << ExpressionFunction::kJavaScript));
+    expr = ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
     result = expr->evaluate(Document{BSONObj{}}, getVariables());
     ASSERT_VALUE_EQ(result, Value(1));
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsIfArgsDoesNotEvaluateToArray) {
-    auto bsonExpr = BSON("expr" << BSON("eval"
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfArgsDoesNotEvaluateToArray) {
+    auto bsonExpr = BSON("expr" << BSON("body"
                                         << "function(first, second) {return first + second;};"
-                                        << "args" << BSON("a" << 1)));
-    auto expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+                                        << "args" << BSON("a" << 1) << "lang"
+                                        << ExpressionFunction::kJavaScript));
+    auto expr = ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
 
     ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()), AssertionException, 31266);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsWithInvalidFunction) {
-    auto bsonExpr = BSON("expr" << BSON("eval"
+TEST_F(MapReduceFixture, ExpressionFunctionFailsWithInvalidFunction) {
+    auto bsonExpr = BSON("expr" << BSON("body"
                                         << "INVALID"
-                                        << "args" << BSON_ARRAY(1 << 2)));
-    auto expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+                                        << "args" << BSON_ARRAY(1 << 2) << "lang"
+                                        << ExpressionFunction::kJavaScript));
+    auto expr = ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
 
     ASSERT_THROWS_CODE(
         expr->evaluate({}, getVariables()), AssertionException, ErrorCodes::JSInterpreterFailure);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsIfArgumentIsNotObject) {
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfArgumentIsNotObject) {
     auto bsonExpr = BSON("expr" << 1);
-    ASSERT_THROWS_CODE(ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
+    ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31260);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsIfEvalNotSpecified) {
-    auto bsonExpr = BSON("expr" << BSON("args" << BSON_ARRAY(1 << 2)));
-    ASSERT_THROWS_CODE(ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyNotSpecified) {
+    auto bsonExpr = BSON(
+        "expr" << BSON("args" << BSON_ARRAY(1 << 2) << "lang" << ExpressionFunction::kJavaScript));
+    ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31261);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsIfEvalIsNotCorrectType) {
-    auto bsonExpr = BSON("expr" << BSON("eval" << BSONObj() << "args" << BSON_ARRAY(1 << 2)));
-    ASSERT_THROWS_CODE(ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyIsNotConstantExpression) {
+    auto bsonExpr = BSON("expr" << BSON("body" << BSONObj() << "args" << BSON_ARRAY(1 << 2)
+                                               << "lang" << ExpressionFunction::kJavaScript));
+    ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
+                       AssertionException,
+                       31432);
+}
+
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyIsNotCorrectType) {
+    auto bsonExpr = BSON("expr" << BSON("body" << 1 << "args" << BSON_ARRAY(1 << 2) << "lang"
+                                               << ExpressionFunction::kJavaScript));
+    ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31262);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsIfArgsIsNotSpecified) {
-    auto bsonExpr = BSON("expr" << BSON("eval"
-                                        << "function(first) {return first;};"));
-    ASSERT_THROWS_CODE(ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfArgsIsNotSpecified) {
+    auto bsonExpr = BSON("expr" << BSON("body"
+                                        << "function(first) {return first;};"
+                                        << "lang" << ExpressionFunction::kJavaScript));
+    ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31263);
+}
+
+TEST_F(MapReduceFixture, ExpressionFunctionFailsIfLangIsNotSpecified) {
+    auto bsonExpr = BSON("expr" << BSON("body"
+                                        << "function(first) {return first;};"
+                                        << "args" << BSON_ARRAY(1 << 2)));
+    ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtx(), bsonExpr.firstElement(), getVPS()),
+                       AssertionException,
+                       31418);
 }
 
 TEST_F(MapReduceFixture, ExpressionInternalJsEmitProducesExpectedResult) {

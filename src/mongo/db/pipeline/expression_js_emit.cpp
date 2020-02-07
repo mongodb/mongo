@@ -30,15 +30,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/pipeline/expression_javascript.h"
+#include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
 
 REGISTER_EXPRESSION(_internalJsEmit, ExpressionInternalJsEmit::parse);
-
-REGISTER_EXPRESSION(_internalJs, ExpressionInternalJs::parse);
 namespace {
 
 /**
@@ -128,66 +126,5 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     auto returnValue = Value(std::move(_emitState.emittedObjects));
     _emitState.reset();
     return returnValue;
-}
-
-ExpressionInternalJs::ExpressionInternalJs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::intrusive_ptr<Expression> passedArgs,
-                                           std::string funcSource)
-    : Expression(expCtx, {std::move(passedArgs)}),
-      _passedArgs(_children[0]),
-      _funcSource(std::move(funcSource)) {}
-
-Value ExpressionInternalJs::serialize(bool explain) const {
-    return Value(
-        Document{{kExpressionName,
-                  Document{{"eval", _funcSource}, {"args", _passedArgs->serialize(explain)}}}});
-}
-
-void ExpressionInternalJs::_doAddDependencies(mongo::DepsTracker* deps) const {
-    _children[0]->addDependencies(deps);
-}
-
-boost::intrusive_ptr<Expression> ExpressionInternalJs::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
-
-    uassert(31260,
-            str::stream() << kExpressionName
-                          << " requires an object as an argument, found: " << expr.type(),
-            expr.type() == BSONType::Object);
-
-    BSONElement evalField = expr["eval"];
-
-    uassert(31261, "The eval function must be specified.", evalField);
-    uassert(31262,
-            "The eval function must be of type string or code",
-            evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
-
-    BSONElement argsField = expr["args"];
-    uassert(31263, "The args field must be specified.", argsField);
-    boost::intrusive_ptr<Expression> argsExpr = parseOperand(expCtx, argsField, vps);
-
-    return new ExpressionInternalJs(expCtx, argsExpr, evalField._asCode());
-}
-
-Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables) const {
-    auto& expCtx = getExpressionContext();
-
-    auto jsExec = expCtx->getJsExecWithScope();
-
-    ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
-    uassert(31265, "The eval function did not evaluate", func);
-
-    auto argExpressions = _passedArgs->evaluate(root, variables);
-    uassert(
-        31266, "The args field must be of type array", argExpressions.getType() == BSONType::Array);
-
-    int argNum = 0;
-    BSONObjBuilder bob;
-    for (const auto& arg : argExpressions.getArray()) {
-        arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
-    }
-    return jsExec->callFunction(func, bob.done(), {});
 }
 }  // namespace mongo
