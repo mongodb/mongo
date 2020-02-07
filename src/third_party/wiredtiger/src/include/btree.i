@@ -1111,7 +1111,7 @@ __wt_ref_info_lock(
      */
     for (;; __wt_yield()) {
         previous_state = ref->state;
-        if (previous_state != WT_REF_LOCKED &&
+        if (previous_state != WT_REF_LOCKED && previous_state != WT_REF_READING &&
           WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
             break;
     }
