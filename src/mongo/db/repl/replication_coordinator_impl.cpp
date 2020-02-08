@@ -334,7 +334,13 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
         return;
     }
 
-    _externalState->setupNoopWriter(Seconds(periodicNoopIntervalSecs));
+    // If this is a config server, then we set the periodic no-op interval to 1 second. This is to
+    // ensure that the config server will not unduly hold up change streams running on the cluster.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        periodicNoopIntervalSecs.store(1);
+    }
+
+    _externalState->setupNoopWriter(Seconds(periodicNoopIntervalSecs.load()));
 }
 
 ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() = default;

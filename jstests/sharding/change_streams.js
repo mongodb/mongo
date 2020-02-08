@@ -35,6 +35,14 @@ function runTest(collName, shardKey) {
     const mongosColl = mongosDB[collName];
 
     //
+    // Test that the config server is running with {periodicNoopIntervalSecs: 1}. This ensures that
+    // the config server does not unduly delay a change stream despite its low write rate.
+    //
+    const noopPeriod = assert.commandWorked(
+        st.configRS.getPrimary().adminCommand({getParameter: 1, periodicNoopIntervalSecs: 1}));
+    assert.eq(noopPeriod.periodicNoopIntervalSecs, 1, noopPeriod);
+
+    //
     // Sanity tests
     //
 

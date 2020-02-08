@@ -60,7 +60,7 @@ server_parameters:
         description: <-
             Number of seconds between noop writer writes.
         set_at: [ startup ]
-        cpp_vartype: int
+        cpp_vartype: AtomicWord<int>
         cpp_varname: periodicNoopIntervalSecs
         default: 10
         validator:
