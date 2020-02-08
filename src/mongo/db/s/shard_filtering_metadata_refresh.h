@@ -35,34 +35,7 @@
 
 namespace mongo {
 
-class CatalogCache;
-class CatalogCacheLoader;
-class ServiceContext;
 class OperationContext;
-
-/**
- * Returns True when a separate CatalogCache must be used for filtering
- */
-bool hasAdditionalCatalogCacheForFiltering();
-
-/**
- * CatalogCacheForFiltering is only used on a shard for obtaining the orphan filtering metadata
- */
-void setCatalogCacheForFiltering(ServiceContext* serviceContext,
-                                 std::unique_ptr<CatalogCache> catalogCache);
-
-
-/**
- * CatalogCacheLoaderForFiltering is only used on a shard for obtaining the orphan filtering
- * metadata
- */
-void setCatalogCacheLoaderForFiltering(ServiceContext* serviceContext,
-                                       std::unique_ptr<CatalogCacheLoader> loader);
-
-// For routing use `CatalogCacheLoader::get()`
-CatalogCacheLoader& getCatalogCacheLoaderForFiltering(ServiceContext* serviceContext);
-CatalogCacheLoader& getCatalogCacheLoaderForFiltering(OperationContext* opCtx);
-
 
 /**
  * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig exception
