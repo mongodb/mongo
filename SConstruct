@@ -1813,13 +1813,29 @@ elif env.TargetOSIs('windows'):
     elif get_option('msvc-debugging-format') == "pdb":
         env['CCPDBFLAGS'] = '/Zi /Fd${TARGET}.pdb'
 
+
+    # The SCons built-in pdbGenerator always adds /DEBUG, but we would like
+    # control over that flag so that users can override with /DEBUG:fastlink
+    # for better local builds. So we overwrite the builtin.
+    def pdbGenerator(env, target, source, for_signature):
+        try:
+            return ['/PDB:%s' % target[0].attributes.pdb]
+        except (AttributeError, IndexError):
+            return None
+    env['_PDB'] = pdbGenerator
+
     # /DEBUG will tell the linker to create a .pdb file
     # which WinDbg and Visual Studio will use to resolve
     # symbols if you want to debug a release-mode image.
     # Note that this means we can't do parallel links in the build.
     #
     # Please also note that this has nothing to do with _DEBUG or optimization.
-    env.Append( LINKFLAGS=["/DEBUG"] )
+
+    # If the user set a /DEBUG flag explicitly, don't add
+    # another. Otherwise use the standard /DEBUG flag, since we always
+    # want PDBs.
+    if not any(flag.startswith('/DEBUG') for flag in env['LINKFLAGS']):
+        env.Append(LINKFLAGS=["/DEBUG"])
 
     # /MD:  use the multithreaded, DLL version of the run-time library (MSVCRT.lib/MSVCR###.DLL)
     # /MDd: Defines _DEBUG, _MT, _DLL, and uses MSVCRTD.lib/MSVCRD###.DLL
