@@ -108,7 +108,7 @@ public:
 
     void _sleepInPBWM(mongo::OperationContext* opCtx, long long millis) {
         Lock::ResourceLock pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode);
-        pbwm.lock(MODE_X);
+        pbwm.lock(nullptr, MODE_X);
         opCtx->sleepFor(Milliseconds(millis));
         pbwm.unlock();
     }
