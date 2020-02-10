@@ -151,7 +151,9 @@ public:
      * The first isMaster exchange for a server succeeded. Creates a new
      * SingleServerPingMonitor to monitor the new replica set member.
      */
-    void onServerHandshakeCompleteEvent(const sdam::ServerAddress& address, OID topologyId);
+    void onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+                                        const sdam::ServerAddress& address,
+                                        const BSONObj reply = BSONObj());
 
     /**
      * The connection to the server was closed. Removes the server from the ServerPingMonitorList.

@@ -26,13 +26,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include "mongo/client/sdam/topology_listener.h"
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 #include "mongo/util/log.h"
 
 namespace mongo::sdam {
+
 void TopologyEventsPublisher::registerListener(TopologyListenerPtr listener) {
     stdx::lock_guard lock(_mutex);
     _listeners.push_back(listener);
@@ -60,6 +61,21 @@ void TopologyEventsPublisher::onTopologyDescriptionChangedEvent(
         event->topologyId = std::move(topologyId);
         event->previousDescription = previousDescription;
         event->newDescription = newDescription;
+        _eventQueue.push_back(std::move(event));
+    }
+    _scheduleNextDelivery();
+}
+
+void TopologyEventsPublisher::onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
+                                                             const sdam::ServerAddress& address,
+                                                             const BSONObj reply) {
+    {
+        stdx::lock_guard<Mutex> lock(_eventQueueMutex);
+        EventPtr event = std::make_unique<Event>();
+        event->type = EventType::HANDSHAKE_COMPLETE;
+        event->duration = duration_cast<IsMasterRTT>(durationMs);
+        event->hostAndPort = address;
+        event->reply = reply;
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -155,6 +171,12 @@ void TopologyEventsPublisher::_sendEvent(TopologyListenerPtr listener, const Eve
             // TODO SERVER-46497: fix uuid or just remove
             listener->onTopologyDescriptionChangedEvent(
                 UUID::gen(), event.previousDescription, event.newDescription);
+            break;
+        case EventType::HANDSHAKE_COMPLETE:
+            listener->onServerHandshakeCompleteEvent(
+                sdam::IsMasterRTT(duration_cast<Milliseconds>(event.duration)),
+                event.hostAndPort,
+                event.reply);
             break;
         default:
             MONGO_UNREACHABLE;

@@ -225,8 +225,9 @@ void ServerPingMonitor::_setupTaskExecutor_inlock() {
     }
 }
 
-void ServerPingMonitor::onServerHandshakeCompleteEvent(const sdam::ServerAddress& address,
-                                                       OID topologyId) {
+void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+                                                       const sdam::ServerAddress& address,
+                                                       const BSONObj reply) {
     stdx::lock_guard lk(_mutex);
     uassert(ErrorCodes::ShutdownInProgress,
             str::stream() << "ServerPingMonitor is unable to start monitoring '" << address

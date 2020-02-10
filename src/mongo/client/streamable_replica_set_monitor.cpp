@@ -331,6 +331,11 @@ HostAndPort StreamableReplicaSetMonitor::getMasterOrUassert() {
     return getHostOrRefresh(kPrimaryOnlyReadPreference).get();
 }
 
+sdam::TopologyEventsPublisherPtr StreamableReplicaSetMonitor::getEventsPublisher() {
+    return _eventsPublisher;
+}
+
+
 void StreamableReplicaSetMonitor::failedHost(const HostAndPort& host, const Status& status) {
     failedHost(host, BSONObj(), status);
 }
@@ -533,6 +538,13 @@ void StreamableReplicaSetMonitor::onServerPingFailedEvent(const ServerAddress& h
 void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT durationMS,
                                                              const ServerAddress& hostAndPort) {
     _topologyManager->onServerRTTUpdated(hostAndPort, durationMS);
+}
+
+void StreamableReplicaSetMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+                                                                 const ServerAddress& hostAndPort,
+                                                                 const BSONObj reply) {
+    IsMasterOutcome outcome(hostAndPort, reply, durationMs);
+    _topologyManager->onServerDescription(outcome);
 }
 
 std::string StreamableReplicaSetMonitor::_logPrefix() {

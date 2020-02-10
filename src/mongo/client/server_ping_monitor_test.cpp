@@ -48,6 +48,7 @@
 namespace mongo {
 namespace {
 
+const sdam::IsMasterRTT initialRTT = duration_cast<Milliseconds>(Milliseconds(100));
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandResponse;
 using executor::ThreadPoolExecutorTest;
@@ -308,12 +309,12 @@ TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
-    auto oid = OID::gen();
     auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]).toString();
+    auto oid = OID::gen();
 
     // Add a SingleServerPingMonitor to the ServerPingMonitor. Confirm pings are sent to the server
     // at pingFrequency.
-    serverPingMonitor->onServerHandshakeCompleteEvent(hostAndPort, oid);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, hostAndPort);
     checkSinglePing(pingFrequency, hostAndPort, replSet.get());
     checkSinglePing(pingFrequency * 2 - Seconds(2), hostAndPort, replSet.get());
 
@@ -337,15 +338,14 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
     auto host0 = hosts[0].toString();
     auto host1 = hosts[1].toString();
     auto oid0 = OID::gen();
-    auto oid1 = OID::gen();
 
     // Add SingleServerPingMonitors for host0 and host1 where host1 is added host1Delay seconds
     // after host0.
     auto host1Delay = Seconds(2);
-    serverPingMonitor->onServerHandshakeCompleteEvent(host0, oid0);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host0);
     checkSinglePing(host1Delay, host0, replSet.get());
     ASSERT_EQ(elapsed(), host1Delay);
-    serverPingMonitor->onServerHandshakeCompleteEvent(host1, oid1);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host1);
     checkSinglePing(pingFrequency - Seconds(2), host1, replSet.get());
 
     serverPingMonitor->onServerClosedEvent(host0, oid0);
@@ -367,8 +367,6 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneDead) {
     auto hosts = replSet->getHosts();
     auto host0 = hosts[0].toString();
     auto host1 = hosts[1].toString();
-    auto oid0 = OID::gen();
-    auto oid1 = OID::gen();
 
     {
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
@@ -376,12 +374,12 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneDead) {
     }
 
     auto host1Delay = Seconds(2);
-    serverPingMonitor->onServerHandshakeCompleteEvent(host0, oid0);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host0);
     checkSinglePing(host1Delay, host0, replSet.get());
 
     // Add host1 host1Delay after host2.
     ASSERT_EQ(elapsed(), host1Delay);
-    serverPingMonitor->onServerHandshakeCompleteEvent(host1, oid1);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host1);
 
     // Confirm host1 reported HostUnreachable to the TopologyLisener.
     processPingRequest(host1, replSet.get());
@@ -416,16 +414,14 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorMutlipleShutdown) {
     auto hosts = replSet->getHosts();
     auto host0 = hosts[0].toString();
     auto host1 = hosts[1].toString();
-    auto oid0 = OID::gen();
-    auto oid1 = OID::gen();
 
     // Add SingleServerPingMonitors for host0 and host1 where host1 is added host1Delay seconds
     // after host0.
     auto host1Delay = Seconds(2);
-    serverPingMonitor->onServerHandshakeCompleteEvent(host0, oid0);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host0);
     checkSinglePing(host1Delay, host0, replSet.get());
     ASSERT_EQ(elapsed(), host1Delay);
-    serverPingMonitor->onServerHandshakeCompleteEvent(host1, oid1);
+    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host1);
     checkSinglePing(pingFrequency - Seconds(2), host1, replSet.get());
 
     serverPingMonitor->shutdown();

@@ -109,6 +109,8 @@ public:
 
     const MongoURI& getOriginalUri() const;
 
+    sdam::TopologyEventsPublisherPtr getEventsPublisher();
+
     bool contains(const HostAndPort& server) const;
 
     void appendInfo(BSONObjBuilder& b, bool forFTDC = false) const;
@@ -158,6 +160,10 @@ private:
 
     void onServerPingSucceededEvent(sdam::IsMasterRTT durationMS,
                                     const sdam::ServerAddress& hostAndPort) override;
+
+    void onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+                                        const ServerAddress& hostAndPort,
+                                        const BSONObj reply) override;
 
     // Get a pointer to the current primary's ServerDescription
     // To ensure a consistent view of the Topology either _currentPrimary or _currentTopology should
