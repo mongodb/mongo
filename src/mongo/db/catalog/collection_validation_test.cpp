@@ -128,7 +128,9 @@ void backgroundValidate(OperationContext* opCtx,
 
     // This function will force a checkpoint, so background validation can then read from that
     // checkpoint.
-    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx);
+    // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
+    // stable_timestamp.
+    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableTimestamp*/ false);
 
     ValidateResults validateResults;
     BSONObjBuilder output;

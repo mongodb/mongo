@@ -206,8 +206,7 @@ public:
      * This must not be called by a system taking user writes until after a stable timestamp is
      * passed to the storage engine.
      */
-    virtual bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
-                                                   bool stableCheckpoint = true) {
+    virtual bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) {
         return waitUntilDurable(opCtx);
     }
 

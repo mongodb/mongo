@@ -524,7 +524,7 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
     // timestamp to determine where to play oplog forward from. As this method shows, when a
     // recovery timestamp does not exist, the applied through is used to determine where to start
     // playing oplog entries from.
-    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx);
+    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableCheckpoint*/ true);
 }
 
 void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,

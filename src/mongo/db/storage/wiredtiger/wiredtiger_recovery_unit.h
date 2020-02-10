@@ -107,8 +107,7 @@ public:
 
     bool waitUntilDurable(OperationContext* opCtx) override;
 
-    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
-                                           bool stableCheckpoint = true) override;
+    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
 
     void preallocateSnapshot() override;
 

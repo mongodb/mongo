@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_unittest_debug_util.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ValidateTests {
@@ -93,7 +94,10 @@ protected:
 
         // This function will force a checkpoint, so background validation can then read from that
         // checkpoint and see all the new data.
-        _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx);
+        // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
+        // stable_timestamp.
+        _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
+                                                                 /*stableCheckpoint*/ false);
 
         auto options = (_full) ? CollectionValidation::ValidateOptions::kFullValidation
                                : CollectionValidation::ValidateOptions::kNoFullValidation;
@@ -120,44 +124,30 @@ protected:
         return results;
     }
 
-    std::string parseValidateResults(const ValidateResults& results) {
-        str::stream ss;
-
-        ss << "ValidateResults:\nValid: " << results.valid << "\n"
-           << "Errors:\n";
-
-        for (const std::string& error : results.errors) {
-            ss << "\t" << error << "\n";
-        }
-
-        ss << "Warnings:\n";
-        for (const std::string& warning : results.warnings) {
-            ss << "\t" << warning << "\n";
-        }
-
-        ss << "Extra index entries:\n";
-        for (const BSONObj& obj : results.extraIndexEntries) {
-            ss << "\t" << obj << "\n";
-        }
-
-        ss << "Missing index entries:\n";
-        for (const BSONObj& obj : results.missingIndexEntries) {
-            ss << "\t" << obj << "\n";
-        }
-
-        return ss;
-    }
-
     void ensureValidateWorked() {
         ValidateResults results = runValidate();
-        ASSERT_TRUE(results.valid)
-            << "Validation failed when it should've worked: " << parseValidateResults(results);
+
+        auto dumpOnErrorGuard = makeGuard([&] {
+            StorageDebugUtil::printValidateResults(results);
+            StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
+        });
+
+        ASSERT_TRUE(results.valid) << "Validation failed when it should've worked.";
+
+        dumpOnErrorGuard.dismiss();
     }
 
     void ensureValidateFailed() {
         ValidateResults results = runValidate();
-        ASSERT_FALSE(results.valid)
-            << "Validation worked when it should've failed: " << parseValidateResults(results);
+
+        auto dumpOnErrorGuard = makeGuard([&] {
+            StorageDebugUtil::printValidateResults(results);
+            StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
+        });
+
+        ASSERT_FALSE(results.valid) << "Validation worked when it should've failed.";
+
+        dumpOnErrorGuard.dismiss();
     }
 
     void lockDb(LockMode mode) {
@@ -900,6 +890,7 @@ public:
                          nullptr,
                          id1,
                          IndexAccessMethod::kNoopOnSuppressedErrorFn);
+
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
@@ -1204,7 +1195,10 @@ public:
         {
             // This function will force a checkpoint, so background validation can then read from
             // that checkpoint and see all the new data.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx);
+            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
+            // stable_timestamp.
+            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
+                                                                     /*stableCheckpoint*/ false);
 
             ValidateResults results;
             BSONObjBuilder output;
@@ -1217,11 +1211,18 @@ public:
                 &results,
                 &output));
 
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
             ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+
+            dumpOnErrorGuard.dismiss();
         }
     }
 };
@@ -1316,7 +1317,10 @@ public:
         {
             // This function will force a checkpoint, so background validation can then read from
             // that checkpoint and see all the new data.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx);
+            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
+            // stable_timestamp.
+            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
+                                                                     /*stableCheckpoint*/ false);
 
             ValidateResults results;
             BSONObjBuilder output;
@@ -1329,11 +1333,18 @@ public:
                 &results,
                 &output));
 
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+
+            dumpOnErrorGuard.dismiss();
         }
     }
 };
@@ -1404,7 +1415,10 @@ public:
         {
             // This function will force a checkpoint, so background validation can then read from
             // that checkpoint and see all the new data.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx);
+            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
+            // stable_timestamp.
+            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
+                                                                     /*stableCheckpoint*/ false);
 
             ValidateResults results;
             BSONObjBuilder output;
@@ -1417,11 +1431,18 @@ public:
                 &results,
                 &output));
 
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
             ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+
+            dumpOnErrorGuard.dismiss();
         }
     }
 };
@@ -1563,7 +1584,10 @@ public:
         {
             // This function will force a checkpoint, so background validation can then read from
             // that checkpoint and see all the new data.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx);
+            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
+            // stable_timestamp.
+            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
+                                                                     /*stableCheckpoint*/ false);
 
             // Now we have two missing index entries with the keys { : 1 } since the KeyStrings
             // aren't hydrated with their field names.
