@@ -114,6 +114,9 @@ MONGO_FAIL_POINT_DEFINE(failInitialSyncBeforeApplyingBatch);
 // Failpoint which fasserts if applying a batch fails.
 MONGO_FAIL_POINT_DEFINE(initialSyncFassertIfApplyingBatchFails);
 
+// Failpoint which causes the initial sync function to hang before stopping the oplog fetcher.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCompletingOplogFetching);
+
 // Failpoints for synchronization, shared with cloners.
 extern FailPoint initialSyncFuzzerSynchronizationPoint1;
 extern FailPoint initialSyncFuzzerSynchronizationPoint2;
@@ -1543,6 +1546,11 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
                    str::stream() << "Rollback occurred on our sync source " << _syncSource
                                  << " during initial sync"));
         return;
+    }
+
+    if (MONGO_unlikely(initialSyncHangBeforeCompletingOplogFetching.shouldFail())) {
+        LOGV2(4599500, "initialSyncHangBeforeCompletingOplogFetching fail point enabled.");
+        initialSyncHangBeforeCompletingOplogFetching.pauseWhileSet();
     }
 
     // Success!
