@@ -398,10 +398,6 @@ add_option('osx-version-min',
 # https://docs.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt?view=vs-2017
 # https://docs.microsoft.com/en-us/windows-server/get-started/windows-server-release-info
 win_version_min_choices = {
-    'win8'     : ('0602', '0000'),
-    'ws2012'   : ('0602', '0000'),
-    'win81'    : ('0603', '0000'),
-    'ws2012r2' : ('0603', '0000'),
     'win10'    : ('0A00', '0000'),
     'ws2016'   : ('0A00', '1607'),
     'ws2019'   : ('0A00', '1809')

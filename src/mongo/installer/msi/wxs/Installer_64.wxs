@@ -1,14 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
-  <Product Id="$(var.ProductId)" 
-           Name="!(wix.ProductName)" 
-           Language="1033" 
-           Version="$(var.MongoDBVersion)" 
-           Manufacturer="MongoDB Inc." 
+  <Product Id="$(var.ProductId)"
+           Name="!(wix.ProductName)"
+           Language="1033"
+           Version="$(var.MongoDBVersion)"
+           Manufacturer="MongoDB Inc."
            UpgradeCode="$(var.UpgradeCode)">
 
     <Package InstallerVersion="405" Compressed="yes" Platform="x64"/>
+
+    <!--
+         We scheck the version number of Windows based on a registry key.
+         Checking the MSI property VersionNT will not work because it is fixed at 603 (i.e. 8.1).
+         https://support.microsoft.com/en-us/help/3202260/versionnt-value-for-windows-10-and-windows-server-2016
+    -->
+    <Property Id="WINDOWSBUILDNUM" Secure="yes">
+        <RegistrySearch Id="WINDOWSBUILDNUM_Search" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentMajorVersionNumber" Type="raw" />
+    </Property>
+
+    <Condition Message="MongoDB application is only supported on Windows 10/Windows 2016 or later">
+        <![CDATA[Installed OR (WINDOWSBUILDNUM >= 10)]]>
+    </Condition>
 
     <WixVariable Id="InstallFolder" Value="$(var.MongoDBMajorVersion)"/>
 
@@ -58,7 +71,7 @@
         Impersonate="no"
         HideTarget="no" />
 
-    <CustomAction Id="UpdateMongoYAML.SetProperty" 
+    <CustomAction Id="UpdateMongoYAML.SetProperty"
         Return="check"
         Property="UpdateMongoYAML"
         Value="BIN=[BIN];MONGO_DATA_PATH=[MONGO_DATA_PATH];MONGO_LOG_PATH=[MONGO_LOG_PATH]"/>
@@ -72,7 +85,7 @@
       <Custom Action="UpdateMongoYAML.SetProperty" Before="InstallFiles" />
       <Custom Action="UpdateMongoYAML" After="InstallFiles">MONGO_SERVICE_INSTALL AND NOT REMOVE</Custom>
     </InstallExecuteSequence>
-  
+
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
     <WixVariable Id="WixUIDialogBmp" Value="$(var.ProjectDir)Dialog.bmp" />
     <WixVariable Id="WixUIBannerBmp" Value="$(var.ProjectDir)Banner.bmp" />
@@ -105,7 +118,7 @@
 
     <util:Group Id="PerfmonGroup" Name="Performance Monitor Users" />
 
-    <!-- 
+    <!--
         Setup the domain to use for granting permissions, the gotcha is the local machine.
         The util:User element wants an empty string for the domain for the local machine.
         The ServiceInstall element wants '.' for the domain for the local machine.

@@ -119,6 +119,17 @@ template <typename HashType>
 void computeHashImpl(BCRYPT_ALG_HANDLE algo,
                      std::initializer_list<ConstDataRange> input,
                      HashType* const output) {
+    if (input.size() == 1) {
+        auto it = begin(input);
+        invariant(BCryptHash(algo,
+                             NULL,
+                             0,
+                             reinterpret_cast<PUCHAR>(const_cast<char*>(it->data())),
+                             it->length(),
+                             output->data(),
+                             output->size()) == STATUS_SUCCESS);
+    }
+
     BCRYPT_HASH_HANDLE hHash;
 
     fassert(50725,
@@ -149,6 +160,17 @@ void computeHmacImpl(BCRYPT_ALG_HANDLE algo,
                      std::initializer_list<ConstDataRange> input,
                      HashType* const output) {
     invariant(key);
+
+    if (input.size() == 1) {
+        auto it = begin(input);
+        invariant(BCryptHash(algo,
+                             const_cast<PUCHAR>(key),
+                             keyLen,
+                             reinterpret_cast<PUCHAR>(const_cast<char*>(it->data())),
+                             it->length(),
+                             output->data(),
+                             output->size()) == STATUS_SUCCESS);
+    }
 
     BCRYPT_HASH_HANDLE hHash;
 

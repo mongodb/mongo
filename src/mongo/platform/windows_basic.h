@@ -45,11 +45,11 @@
 #if !defined(_WIN32_WINNT)
 // Can't use symbolic versions here, since we may not have seen sdkddkver.h yet.
 #if defined(_WIN64)
-// 64-bit builds default to Windows 7/Windows Server 2008 R2 support.
-#define _WIN32_WINNT 0x0601
+// 64-bit builds default to Windows 10/Windows Server 2016 support.
+#define _WIN32_WINNT 0x0A00
 #else
-// 32-bit builds default to Windows 7/Windows Server 2008 R2 support.
-#define _WIN32_WINNT 0x0601
+// 32-bit builds default to Windows 10/Windows Server 2016 support.
+#define _WIN32_WINNT 0x0A00
 #endif
 #endif
 
@@ -58,11 +58,11 @@
 #if !defined(NTDDI_VERSION)
 // Can't use symbolic versions here, since we may not have seen sdkddkver.h yet.
 #if defined(_WIN64)
-// 64-bit builds default to Windows 7/Windows Server 2008 R2 support.
-#define NTDDI_VERSION 0x06010000
+// 64-bit builds default to Windows 10/Windows Server 2016 support.
+#define NTDDI_VERSION 0x0A000000
 #else
-// 32-bit builds default to Windows 7/Windows Server 2008 R2 support.
-#define NTDDI_VERSION 0x06010000
+// 32-bit builds default to Windows 10/Windows Server 2016 support.
+#define NTDDI_VERSION 0x0A000000
 #endif
 #endif
 
@@ -118,10 +118,10 @@
 #error "Expected WINVER to have been defined and to equal _WIN32_WINNT"
 #endif
 
-#if !defined(NTDDI_WINBLUE)
-#error "MongoDB requires Windows SDK 8.1 or higher to build"
+#if !defined(NTDDI_WIN10)
+#error "MongoDB requires Windows SDK 10 or higher to build"
 #endif
 
-#if !defined(NTDDI_WIN7) || NTDDI_VERSION < NTDDI_WIN7
-#error "MongoDB does not support Windows versions older than Windows 7/Windows Server 2008 R2."
+#if !defined(NTDDI_WIN10) || NTDDI_VERSION < NTDDI_WIN10
+#error "MongoDB does not support Windows versions older than Windows 10."
 #endif
