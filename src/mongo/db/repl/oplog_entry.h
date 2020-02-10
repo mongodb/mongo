@@ -67,8 +67,17 @@ public:
         _preImageDocumentKey = std::move(value);
     }
 
+    const BSONObj& getPreImage() const {
+        return _fullPreImage;
+    }
+
+    void setPreImage(BSONObj value) {
+        _fullPreImage = std::move(value);
+    }
+
 private:
     BSONObj _preImageDocumentKey;
+    BSONObj _fullPreImage;
 };
 
 /**
@@ -137,6 +146,14 @@ public:
 
     void setUpsert(boost::optional<bool> value) & {
         getDurableReplOperation().setUpsert(std::move(value));
+    }
+
+    void setPreImageOpTime(boost::optional<OpTime> value) {
+        getDurableReplOperation().setPreImageOpTime(std::move(value));
+    }
+
+    const boost::optional<OpTime>& getPreImageOpTime() const {
+        return getDurableReplOperation().getPreImageOpTime();
     }
 
     void setTimestamp(Timestamp value) & {

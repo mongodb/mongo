@@ -139,6 +139,10 @@ public:
      * "fromMigrate" indicates whether the delete was induced by a chunk migration, and
      * so should be ignored by the user as an internal maintenance operation and not a
      * real delete.
+     *
+     * "deletedDoc" is a reference to an optional copy of the pre-image of the doc before deletion.
+     * If deletedDoc != boost::none, then the opObserver should assume that the caller intended
+     * the pre-image to be stored/logged in addition to the documentKey.
      */
     virtual void onDelete(OperationContext* opCtx,
                           const NamespaceString& nss,
@@ -291,9 +295,14 @@ public:
      * transaction is active.
      *
      * The 'statements' are the list of CRUD operations to be applied in this transaction.
+     *
+     * The 'numberOfPreImagesToWrite' is the number of CRUD operations that have a pre-image
+     * to write as a noop oplog entry. The op observer will reserve oplog slots for these
+     * preimages in addition to the statements.
      */
-    virtual void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const std::vector<repl::ReplOperation>& statements) = 0;
+    virtual void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                               std::vector<repl::ReplOperation>* statements,
+                                               size_t numberOfPreImagesToWrite) = 0;
     /**
      * The onPreparedTransactionCommit method is called on the commit of a prepared transaction,
      * after the RecoveryUnit onCommit() is called.  It must not be called when no transaction is
@@ -318,10 +327,15 @@ public:
      * last reserved slot represents the prepareOpTime used for the prepare oplog entry.
      *
      * The 'statements' are the list of CRUD operations to be applied in this transaction.
+     *
+     * The 'numberOfPreImagesToWrite' is the number of CRUD operations that have a pre-image
+     * to write as a noop oplog entry. The op observer will reserve oplog slots for these
+     * preimages in addition to the statements.
      */
     virtual void onTransactionPrepare(OperationContext* opCtx,
                                       const std::vector<OplogSlot>& reservedSlots,
-                                      std::vector<repl::ReplOperation>& statements) = 0;
+                                      std::vector<repl::ReplOperation>* statements,
+                                      size_t numberOfPreImagesToWrite) = 0;
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the

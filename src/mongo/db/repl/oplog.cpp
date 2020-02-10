@@ -402,7 +402,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         OplogLink oplogLink;
         if (i > 0)
             oplogLink.prevOpTime = opTimes[i - 1];
-        appendRetryableWriteInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtId);
+        appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtId);
 
         opTimes[i] = insertStatementOplogSlot;
         timestamps[i] = insertStatementOplogSlot.getTimestamp();
@@ -430,13 +430,20 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     return opTimes;
 }
 
-void appendRetryableWriteInfo(OperationContext* opCtx,
-                              MutableOplogEntry* oplogEntry,
-                              OplogLink* oplogLink,
-                              StmtId stmtId) {
+void appendOplogEntryChainInfo(OperationContext* opCtx,
+                               MutableOplogEntry* oplogEntry,
+                               OplogLink* oplogLink,
+                               StmtId stmtId) {
+    // We sometimes have a pre-image no-op entry even for normal non-retryable writes
+    // if recordPreImages is enabled on the collection.
+    if (!oplogLink->preImageOpTime.isNull()) {
+        oplogEntry->setPreImageOpTime(oplogLink->preImageOpTime);
+    }
+
     // Not a retryable write.
-    if (stmtId == kUninitializedStmtId)
+    if (stmtId == kUninitializedStmtId) {
         return;
+    }
 
     const auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(txnParticipant);
@@ -447,9 +454,6 @@ void appendRetryableWriteInfo(OperationContext* opCtx,
         oplogLink->prevOpTime = txnParticipant.getLastWriteOpTime();
     }
     oplogEntry->setPrevWriteOpTimeInTransaction(oplogLink->prevOpTime);
-    if (!oplogLink->preImageOpTime.isNull()) {
-        oplogEntry->setPreImageOpTime(oplogLink->preImageOpTime);
-    }
     if (!oplogLink->postImageOpTime.isNull()) {
         oplogEntry->setPostImageOpTime(oplogLink->postImageOpTime);
     }

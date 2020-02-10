@@ -91,10 +91,10 @@ struct OplogLink {
  * Similarly, the "postImageOpTime" field will only be set if the given oplogLink.postImageOpTime is
  * not null.
  */
-void appendRetryableWriteInfo(OperationContext* opCtx,
-                              MutableOplogEntry* oplogEntry,
-                              OplogLink* oplogLink,
-                              StmtId stmtId);
+void appendOplogEntryChainInfo(OperationContext* opCtx,
+                               MutableOplogEntry* oplogEntry,
+                               OplogLink* oplogLink,
+                               StmtId stmtId);
 
 /**
  * Create a new capped collection for the oplog if it doesn't yet exist.
