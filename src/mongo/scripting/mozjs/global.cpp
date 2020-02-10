@@ -68,6 +68,7 @@ logger::MessageLogDomain* plainShellOutputDomain;
 void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
     logger::LogstreamBuilder builder(
         plainShellOutputDomain, getThreadName(), logger::LogSeverity::Log());
+    builder.setIsTruncatable(false);
     std::ostream& ss = builder.stream();
 
     bool first = true;
